@@ -58,24 +58,33 @@ import (
 var (
 	podKind = v1.SchemeGroupVersion.WithKind("Pod")
 
-	nodeName      = "worker"
-	node2Name     = "worker-2"
-	node3Name     = "worker-3"
-	driver        = "some-driver"
-	driver2       = "some-driver-2"
-	podName       = "my-pod"
-	podUID        = "1234"
-	resourceName  = "my-resource"
-	resourceName2 = resourceName + "-2"
-	claimName     = podName + "-" + resourceName
-	claimName2    = podName + "-" + resourceName2
-	className     = "my-resource-class"
-	namespace     = "default"
-	attrName      = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
+	nodeName             = "worker"
+	node2Name            = "worker-2"
+	node3Name            = "worker-3"
+	driver               = "some-driver"
+	driver2              = "some-driver-2"
+	podName              = "my-pod"
+	podUID               = "1234"
+	resourceName         = "my-resource"
+	resourceName2        = resourceName + "-2"
+	claimName            = podName + "-" + resourceName
+	claimName2           = podName + "-" + resourceName2
+	className            = "my-resource-class"
+	namespace            = "default"
+	attrName             = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
+	extendedResourceName = "example.com/gpu"
 
 	deviceClass = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: className,
+		},
+	}
+	deviceClassWithExtendResourceName = &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: className,
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &extendedResourceName,
 		},
 	}
 
@@ -107,6 +116,12 @@ var (
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
 				Obj()
+	podWithExtendedResourceName = st.MakePod().Name(podName).Namespace(namespace).
+					UID(podUID).
+					Req(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		Obj()
 
 	// Node with "instance-1" device and no device attributes.
 	workerNode           = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
@@ -187,6 +202,33 @@ var (
 			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
 		}(),
 	}
+	extendedResourceAllocationResult = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  "instance-1",
+				Request: "container-0-request-0",
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	extendedResourceAllocationResultNode2 = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  "instance-1",
+				Request: "container-0-request-0",
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{node2Name}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+
 	allocationResultWithPrioritizedList = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
@@ -232,6 +274,58 @@ var (
 	otherAllocatedClaim = st.FromResourceClaim(otherClaim).
 				Allocation(allocationResult).
 				Obj()
+	extendedResourceClaim = st.MakeResourceClaim().
+				Name("my-pod-extended-resources-0").
+				GenerateName("my-pod-extended-resources-").
+				Namespace(namespace).
+				Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+				OwnerRef(
+			metav1.OwnerReference{
+				APIVersion:         "v1",
+				Kind:               "Pod",
+				Name:               podName,
+				UID:                types.UID(podUID),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-0", className).
+		Allocation(extendedResourceAllocationResult).
+		Obj()
+	extendedResourceClaimNoName = st.MakeResourceClaim().
+					Name(specialClaimInMemName).
+					GenerateName("my-pod-extended-resources-").
+					Namespace(namespace).
+					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+					OwnerRef(
+			metav1.OwnerReference{
+				APIVersion:         "v1",
+				Kind:               "Pod",
+				Name:               podName,
+				UID:                types.UID(podUID),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-0", className).
+		Allocation(extendedResourceAllocationResult).
+		Obj()
+
+	extendedResourceClaimNode2 = st.MakeResourceClaim().
+					Name("my-pod-extended-resources-0").
+					GenerateName("my-pod-extended-resources-").
+					Namespace(namespace).
+					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+					OwnerRef(
+			metav1.OwnerReference{
+				APIVersion:         "v1",
+				Kind:               "Pod",
+				Name:               podName,
+				UID:                types.UID(podUID),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-0", className).
+		Allocation(extendedResourceAllocationResultNode2).
+		Obj()
 
 	deviceTaint = resourceapi.DeviceTaint{
 		Key:    "taint-key",
@@ -532,6 +626,7 @@ func TestPlugin(t *testing.T) {
 		// doesn't need to be set.
 		disableDRA bool
 
+		enableDRAExtendedResource        bool
 		enableDRAPrioritizedList         bool
 		enableDRADeviceTaints            bool
 		disableDRASchedulerFilterTimeout bool
@@ -539,6 +634,19 @@ func TestPlugin(t *testing.T) {
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
+			want: want{
+				prefilter: result{
+					status: fwk.NewStatus(fwk.Skip),
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable),
+				},
+				prebindPreFlight: fwk.NewStatus(fwk.Skip),
+			},
+		},
+		"empty-with-extended-resources-enabled": {
+			enableDRAExtendedResource: true,
+			pod:                       st.MakePod().Name("foo").Namespace("default").Obj(),
 			want: want{
 				prefilter: result{
 					status: fwk.NewStatus(fwk.Skip),
@@ -1152,6 +1260,104 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
+		"extended-resource-name-no-resource": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`),
+					},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+				},
+			},
+		},
+		"extended-resource-name-with-resources": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaim: extendedResourceClaimNoName,
+				},
+				prebind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+					added:        []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
+				},
+				postbind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+				},
+			},
+		},
+		"extended-resource-name-with-resources-has-claim": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithExtendedResourceName,
+			claims:                    []*resourceapi.ResourceClaim{extendedResourceClaim},
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot schedule extended resource claim`),
+					},
+				},
+				postfilter: result{
+					status:  fwk.NewStatus(fwk.Unschedulable, `deletion of ResourceClaim completed`),
+					removed: []metav1.Object{extendedResourceClaimNode2},
+				},
+			},
+		},
+		"extended-resource-name-with-resources-delete-claim": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithExtendedResourceName,
+			claims:                    []*resourceapi.ResourceClaim{extendedResourceClaimNode2},
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot schedule extended resource claim`),
+					},
+				},
+				postfilter: result{
+					status:  fwk.NewStatus(fwk.Unschedulable, `deletion of ResourceClaim completed`),
+					removed: []metav1.Object{extendedResourceClaimNode2},
+				},
+			},
+		},
+		"extended-resource-name-bind-failure": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaim: extendedResourceClaimNoName,
+				},
+				prebind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+					added:        []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
+				},
+				unreserveAfterBindFailure: &result{
+					removed: []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
+				},
+			},
+		},
+		"extended-resource-name-skip-bind": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaim: extendedResourceClaimNoName,
+				},
+				unreserveBeforePreBind: &result{},
+			},
+		},
 		"canceled": {
 			cancelFilter: true,
 			args: &config.DynamicResourcesArgs{
@@ -1507,6 +1713,7 @@ func TestPlugin(t *testing.T) {
 				EnableDRASchedulerFilterTimeout:    !tc.disableDRASchedulerFilterTimeout,
 				EnableDynamicResourceAllocation:    !tc.disableDRA,
 				EnableDRAPrioritizedList:           tc.enableDRAPrioritizedList,
+				EnableDRAExtendedResource:          tc.enableDRAExtendedResource,
 			}
 			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, features)
 			initialObjects := testCtx.listAll(t)
@@ -1519,7 +1726,8 @@ func TestPlugin(t *testing.T) {
 				return
 			}
 
-			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod, nil)
+			nodeInfo := framework.NewNodeInfo()
+			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod, []fwk.NodeInfo{nodeInfo})
 			t.Run("prefilter", func(t *testing.T) {
 				assert.Equal(t, tc.want.preFilterResult, result)
 				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
@@ -1609,6 +1817,10 @@ func TestPlugin(t *testing.T) {
 						initialObjects = testCtx.listAll(t)
 						testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
 						t.Run("unreserverAfterBindFailure", func(t *testing.T) {
+							// in case we delete the claim API object
+							// wait for assumed cache to sync with informer
+							// then assumed cache should be empty
+							time.Sleep(800 * time.Millisecond)
 							testCtx.verify(t, *tc.want.unreserveAfterBindFailure, initialObjects, nil, status)
 						})
 					} else if status.IsSuccess() {
@@ -1663,6 +1875,13 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 		}
 	}
 	sortObjects(wantObjects)
+	if wantObjects == nil {
+		wantObjects = []metav1.Object{}
+	}
+	if objects == nil {
+		objects = []metav1.Object{}
+	}
+
 	// Sometimes assert strips the diff too much, let's do it ourselves...
 	ignoreFieldsInResourceClaims := []cmp.Option{
 		cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion"),
@@ -1855,6 +2074,7 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 // to your fake client. ResourceVersion handling is required for conflict
 // detection during updates, which is covered by some scenarios.
 func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+	var nameCounter int
 	var uidCounter int
 	var resourceVersionCounter int
 	var mutex sync.Mutex
@@ -1883,6 +2103,10 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 			uidCounter++
 			obj.SetResourceVersion(fmt.Sprintf("%d", resourceVersionCounter))
 			resourceVersionCounter++
+			if obj.GetName() == "" {
+				obj.SetName(obj.GetGenerateName() + fmt.Sprintf("%d", nameCounter))
+				nameCounter++
+			}
 		case "update":
 			uid := obj.GetUID()
 			resourceVersion := obj.GetResourceVersion()
@@ -2143,6 +2367,279 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			}
 			if tc.wantHint != gotHint {
 				t.Fatalf("want %#v, got %#v", tc.wantHint.String(), gotHint.String())
+			}
+		})
+	}
+}
+
+func Test_createDeviceRequests(t *testing.T) {
+	pod1 := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName):       "1",
+			v1.ResourceName(extendedResourceName + "1"): "2",
+		}).
+		Obj()
+	pod2 := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "1"): "2",
+		}).
+		Obj()
+
+	podInit := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "2",
+		}).
+		Obj()
+
+	res := map[v1.ResourceName]int64{
+		v1.ResourceName(extendedResourceName): 1,
+	}
+	res2 := map[v1.ResourceName]int64{
+		v1.ResourceName(extendedResourceName):       1,
+		v1.ResourceName(extendedResourceName + "1"): 2,
+	}
+	resInit := map[v1.ResourceName]int64{
+		v1.ResourceName(extendedResourceName):          1,
+		v1.ResourceName(extendedResourceName + "init"): 2,
+	}
+	devMap := map[v1.ResourceName]string{
+		v1.ResourceName(extendedResourceName): "class",
+	}
+	devMap2 := map[v1.ResourceName]string{
+		v1.ResourceName(extendedResourceName):       "class",
+		v1.ResourceName(extendedResourceName + "1"): "class1",
+	}
+	devMapInit := map[v1.ResourceName]string{
+		v1.ResourceName(extendedResourceName):          "class",
+		v1.ResourceName(extendedResourceName + "init"): "classInit",
+	}
+	devReq := resourceapi.DeviceRequest{
+		Name: "container-0-request-0",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "class",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+		},
+	}
+	devReq2 := resourceapi.DeviceRequest{
+		Name: "container-0-request-1",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "class1",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           2,
+		},
+	}
+	devReq3 := resourceapi.DeviceRequest{
+		Name: "container-1-request-0",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "class1",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           2,
+		},
+	}
+	devReqInit := resourceapi.DeviceRequest{
+		Name: "container-1-request-0",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "class",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+		},
+	}
+	devReq2Init := resourceapi.DeviceRequest{
+		Name: "container-0-request-0",
+		Exactly: &resourceapi.ExactDeviceRequest{
+			DeviceClassName: "classInit",
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           2,
+		},
+	}
+
+	testcases := map[string]struct {
+		pod                *v1.Pod
+		extendedResources  map[v1.ResourceName]int64
+		deviceClassMapping map[v1.ResourceName]string
+		wantDeviceRequests []resourceapi.DeviceRequest
+	}{
+		"nil": {
+			pod:                pod1,
+			wantDeviceRequests: nil,
+		},
+		"one resource match": {
+			pod:                pod1,
+			extendedResources:  res,
+			deviceClassMapping: devMap,
+			wantDeviceRequests: []resourceapi.DeviceRequest{devReq},
+		},
+		"one resource match, one resource not match": {
+			pod:                pod1,
+			extendedResources:  res2,
+			deviceClassMapping: devMap,
+			wantDeviceRequests: []resourceapi.DeviceRequest{devReq},
+		},
+		"two resources match": {
+			pod:                pod1,
+			extendedResources:  res2,
+			deviceClassMapping: devMap2,
+			wantDeviceRequests: []resourceapi.DeviceRequest{devReq, devReq2},
+		},
+		"two containers match": {
+			pod:                pod2,
+			extendedResources:  res2,
+			deviceClassMapping: devMap2,
+			wantDeviceRequests: []resourceapi.DeviceRequest{devReq, devReq3},
+		},
+		"one init container, one regular container": {
+			pod:                podInit,
+			extendedResources:  resInit,
+			deviceClassMapping: devMapInit,
+			wantDeviceRequests: []resourceapi.DeviceRequest{devReq2Init, devReqInit},
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			gotDeviceRequests := createDeviceRequests(tc.pod, tc.extendedResources, tc.deviceClassMapping)
+			if len(tc.wantDeviceRequests) != len(gotDeviceRequests) {
+				t.Fatalf("different length, want %#v, got %#v", tc.wantDeviceRequests, gotDeviceRequests)
+			}
+			sort.Slice(gotDeviceRequests, func(i, j int) bool { return gotDeviceRequests[i].Name < gotDeviceRequests[j].Name })
+			for i, r := range tc.wantDeviceRequests {
+				if r.Name != gotDeviceRequests[i].Name {
+					t.Fatalf("different name, want %#v, got %#v", r, gotDeviceRequests[i])
+				}
+				if r.Exactly.DeviceClassName != gotDeviceRequests[i].Exactly.DeviceClassName {
+					t.Fatalf("different deviceClassName, want %#v, got %#v", r, gotDeviceRequests[i])
+				}
+				if r.Exactly.AllocationMode != gotDeviceRequests[i].Exactly.AllocationMode {
+					t.Fatalf("different allocationMode, want %#v, got %#v", r, gotDeviceRequests[i])
+				}
+				if r.Exactly.Count != gotDeviceRequests[i].Exactly.Count {
+					t.Fatalf("different count, want %#v, got %#v", r, gotDeviceRequests[i])
+				}
+			}
+		})
+	}
+}
+
+func Test_createRequestMappings(t *testing.T) {
+	pod1 := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName):       "1",
+			v1.ResourceName(extendedResourceName + "1"): "2",
+		}).
+		Obj()
+	pod2 := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "1"): "2",
+		}).
+		Obj()
+
+	podInit := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		Res(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "1",
+		}).
+		InitReq(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName + "init"): "2",
+		}).
+		Obj()
+
+	claim := st.MakeResourceClaim().
+		Name(claimName).
+		Namespace(namespace).
+		RequestWithName("container-0-request-0", className).
+		Obj()
+	claim2 := st.MakeResourceClaim().
+		Name(claimName).
+		Namespace(namespace).
+		RequestWithName("container-0-request-0", className).
+		RequestWithName("container-1-request-0", className).
+		Obj()
+
+	cer := v1.ContainerExtendedResourceRequest{
+		ContainerName: "con0",
+		ResourceName:  extendedResourceName,
+		RequestName:   "container-0-request-0",
+	}
+	cer2 := v1.ContainerExtendedResourceRequest{
+		ContainerName: "con1",
+		ResourceName:  extendedResourceName + "1",
+		RequestName:   "container-1-request-0",
+	}
+	cer3 := v1.ContainerExtendedResourceRequest{
+		ContainerName: "con0",
+		ResourceName:  extendedResourceName,
+		RequestName:   "container-1-request-0",
+	}
+	cerInit := v1.ContainerExtendedResourceRequest{
+		ContainerName: "init-con0",
+		ResourceName:  extendedResourceName + "init",
+		RequestName:   "container-0-request-0",
+	}
+
+	testcases := map[string]struct {
+		claim           *resourceapi.ResourceClaim
+		pod             *v1.Pod
+		wantReqMappings []v1.ContainerExtendedResourceRequest
+	}{
+		"one container, one request": {
+			claim:           claim,
+			pod:             pod1,
+			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer},
+		},
+		"two containers, one request": {
+			claim:           claim,
+			pod:             pod2,
+			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer},
+		},
+		"one init container, one regular container, one request": {
+			claim:           claim,
+			pod:             podInit,
+			wantReqMappings: []v1.ContainerExtendedResourceRequest{cerInit},
+		},
+		"two containers, two requests": {
+			claim:           claim2,
+			pod:             pod2,
+			wantReqMappings: []v1.ContainerExtendedResourceRequest{cer, cer2},
+		},
+		"two containers (one is init container), two requests": {
+			claim:           claim2,
+			pod:             podInit,
+			wantReqMappings: []v1.ContainerExtendedResourceRequest{cerInit, cer3},
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			gotReqMappings := createRequestMappings(tc.claim, tc.pod)
+			if len(tc.wantReqMappings) != len(gotReqMappings) {
+				t.Fatalf("different length, want %#v, got %#v", tc.wantReqMappings, gotReqMappings)
+			}
+			sort.Slice(gotReqMappings, func(i, j int) bool { return gotReqMappings[i].RequestName < gotReqMappings[j].RequestName })
+			for i, r := range tc.wantReqMappings {
+				if r.RequestName != gotReqMappings[i].RequestName {
+					t.Fatalf("different request name, want %#v, got %#v", r, gotReqMappings[i])
+				}
+				if r.ContainerName != gotReqMappings[i].ContainerName {
+					t.Fatalf("different container name, want %#v, got %#v", r, gotReqMappings[i])
+				}
+				if r.ResourceName != gotReqMappings[i].ResourceName {
+					t.Fatalf("different resource name, want %#v, got %#v", r, gotReqMappings[i])
+				}
 			}
 		})
 	}

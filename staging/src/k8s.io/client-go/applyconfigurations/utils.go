@@ -720,6 +720,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ConfigMapVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Container"):
 		return &applyconfigurationscorev1.ContainerApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ContainerExtendedResourceRequest"):
+		return &applyconfigurationscorev1.ContainerExtendedResourceRequestApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerImage"):
 		return &applyconfigurationscorev1.ContainerImageApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerPort"):
@@ -930,6 +932,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodDNSConfigApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodDNSConfigOption"):
 		return &applyconfigurationscorev1.PodDNSConfigOptionApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodExtendedResourceClaimStatus"):
+		return &applyconfigurationscorev1.PodExtendedResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodIP"):
 		return &applyconfigurationscorev1.PodIPApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodOS"):

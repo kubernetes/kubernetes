@@ -1806,7 +1806,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			createdTaint := b.Create(ctx, taint)
 			taint = createdTaint[0].(*resourcealphaapi.DeviceTaintRule)
 			gomega.Expect(*taint).Should(gomega.HaveField("Spec.Taint.TimeAdded.Time", gomega.BeTemporally("~", time.Now(), time.Minute /* allow for some clock drift and delays */)))
-
 			framework.ExpectNoError(e2epod.WaitForPodTerminatingInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart))
 			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "get pod")
@@ -1817,6 +1816,177 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				"Reason":  gomega.Equal("DeletionByDeviceTaintManager"),
 				"Message": gomega.Equal("Device Taint manager: deleting due to NoExecute taint"),
 			}))))
+		})
+	})
+
+	framework.Context(f.WithFeatureGate(features.DRAExtendedResource), func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false))
+		b := drautils.NewBuilder(f, driver)
+		b.UseExtendedResourceName = true
+
+		ginkgo.It("must run a pod with extended resource with one container one resource", func(ctx context.Context) {
+			pod := b.Pod()
+			res := v1.ResourceList{}
+			res[v1.ResourceName(drautils.ExtendedResourceName(0))] = resource.MustParse("1")
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+
+			b.Create(ctx, pod)
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+			containerEnv := []string{
+				"container_0_request_0", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+		})
+
+		ginkgo.It("must run a pod with extended resource with one container three resources", func(ctx context.Context) {
+			pod := b.Pod()
+			res := v1.ResourceList{}
+			for i := range 3 {
+				res[v1.ResourceName(drautils.ExtendedResourceName(i))] = resource.MustParse("1")
+			}
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+
+			b.Create(ctx, pod)
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+			containerEnv := []string{
+				"container_0_request_0", "true",
+				"container_0_request_1", "true",
+				"container_0_request_2", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+		})
+		ginkgo.It("must run a pod with extended resource with three containers one resource each", func(ctx context.Context) {
+			pod := b.Pod()
+			pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy())
+			pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy())
+			pod.Spec.Containers[0].Name = "container0"
+			pod.Spec.Containers[1].Name = "container1"
+			pod.Spec.Containers[2].Name = "container2"
+
+			for i := range 3 {
+				res := v1.ResourceList{}
+				res[v1.ResourceName(drautils.ExtendedResourceName(i))] = resource.MustParse("1")
+				pod.Spec.Containers[i].Resources.Requests = res
+				pod.Spec.Containers[i].Resources.Limits = res
+			}
+
+			b.Create(ctx, pod)
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+			for i := range 3 {
+				containerEnv := []string{
+					fmt.Sprintf("container_%d_request_0", i), "true",
+				}
+				drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[i].Name, false, containerEnv...)
+			}
+		})
+		ginkgo.It("must run a pod with extended resource with three containers multiple resources each", func(ctx context.Context) {
+			pod := b.Pod()
+			pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy())
+			pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy())
+			pod.Spec.Containers[0].Name = "container0"
+			pod.Spec.Containers[1].Name = "container1"
+			pod.Spec.Containers[2].Name = "container2"
+
+			res := v1.ResourceList{}
+			res[v1.ResourceName(drautils.ExtendedResourceName(0))] = resource.MustParse("1")
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+			res = v1.ResourceList{}
+			res[v1.ResourceName(drautils.ExtendedResourceName(1))] = resource.MustParse("1")
+			res[v1.ResourceName(drautils.ExtendedResourceName(2))] = resource.MustParse("1")
+			pod.Spec.Containers[1].Resources.Requests = res
+			pod.Spec.Containers[1].Resources.Limits = res
+			res = v1.ResourceList{}
+			res[v1.ResourceName(drautils.ExtendedResourceName(3))] = resource.MustParse("1")
+			res[v1.ResourceName(drautils.ExtendedResourceName(4))] = resource.MustParse("1")
+			res[v1.ResourceName(drautils.ExtendedResourceName(5))] = resource.MustParse("1")
+			pod.Spec.Containers[2].Resources.Requests = res
+			pod.Spec.Containers[2].Resources.Limits = res
+
+			b.Create(ctx, pod)
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+			containerEnv := []string{
+				"container_0_request_0", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+			containerEnv = []string{
+				"container_1_request_0", "true",
+				"container_1_request_1", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[1].Name, false, containerEnv...)
+			containerEnv = []string{
+				"container_2_request_0", "true",
+				"container_2_request_1", "true",
+				"container_2_request_2", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[2].Name, false, containerEnv...)
+		})
+	})
+
+	framework.Context(f.WithFeatureGate(features.DRAExtendedResource), func() {
+		nodes := drautils.NewNodes(f, 2, 2)
+		nodes.NumReservedNodes = 1
+		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(2, false))
+		b := drautils.NewBuilder(f, driver)
+		b.UseExtendedResourceName = true
+
+		// This test needs the entire test cluster for itself, one node in the cluster
+		// is deployed device plugin for the test, therefore it is marked as serial.
+		// The test runs two pods, one pod request extended resource backed by DRA,
+		// the other pod requests extended resource by device plugin.
+		f.It("must run pods with extended resource on dra nodes and device plugin nodes", f.WithSerial(), func(ctx context.Context) {
+			extendedResourceName := deployDevicePlugin(ctx, f, nodes.ExtraNodeNames)
+			// drautils.ExtendedResourceName(-1) must be the same as the returned extendedResourceName
+			// drautils.ExtendedResourceName(-1) is used for DRA drivers
+			// extendedResourceName is used for device plugin.
+			gomega.Expect(string(extendedResourceName)).To(gomega.Equal(drautils.ExtendedResourceName(-1)))
+
+			pod1 := b.Pod()
+			res := v1.ResourceList{}
+			res[v1.ResourceName(drautils.ExtendedResourceName(-1))] = resource.MustParse("2")
+			pod1.Spec.Containers[0].Resources.Requests = res
+			pod1.Spec.Containers[0].Resources.Limits = res
+			b.Create(ctx, pod1)
+
+			pod2 := b.Pod()
+			pod2.Spec.Containers[0].Resources.Requests = res
+			pod2.Spec.Containers[0].Resources.Limits = res
+			b.Create(ctx, pod2)
+
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod1)
+			framework.ExpectNoError(err, "start pod1")
+			err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2)
+			framework.ExpectNoError(err, "start pod2")
+
+			scheduledPod1, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod1.Name, metav1.GetOptions{})
+			gomega.Expect(scheduledPod1).ToNot(gomega.BeNil())
+			framework.ExpectNoError(err)
+
+			scheduledPod2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod2.Name, metav1.GetOptions{})
+			gomega.Expect(scheduledPod2).ToNot(gomega.BeNil())
+			framework.ExpectNoError(err)
+
+			draPod := scheduledPod1
+			devicePluginPod := scheduledPod2
+			if scheduledPod1.Spec.NodeName == nodes.ExtraNodeNames[0] {
+				draPod = scheduledPod2
+				devicePluginPod = scheduledPod1
+			}
+
+			gomega.Expect(devicePluginPod.Spec.NodeName).To(gomega.Equal(nodes.ExtraNodeNames[0]))
+			gomega.Expect(devicePluginPod.Status.ExtendedResourceClaimStatus).To(gomega.BeNil())
+			gomega.Expect(draPod.Spec.NodeName).To(gomega.Equal(nodes.NodeNames[0]))
+			containerEnv := []string{
+				"container_0_request_0", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, draPod, draPod.Spec.Containers[0].Name, false, containerEnv...)
 		})
 	})
 
