@@ -239,7 +239,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 	createService := func(ctx context.Context, trafficDist string) *v1.Service {
 		serviceName := "traffic-dist-test-service"
 		ginkgo.By(fmt.Sprintf("creating a service %q with trafficDistribution %q", serviceName, trafficDist))
-		return createServiceReportErr(ctx, c, f.Namespace.Name, &v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: serviceName,
 			},
@@ -254,7 +254,10 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
-		})
+		}
+		svc, err := c.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
+		return svc
 	}
 
 	// createPods creates endpoint pods for svc as described by serverPods, waits for

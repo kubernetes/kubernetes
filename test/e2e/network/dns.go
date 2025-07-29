@@ -658,7 +658,7 @@ var _ = common.SIGDescribe("DNS", func() {
 
 	framework.It("should work with a service name that starts with a digit", framework.WithFeatureGate(features.RelaxedServiceNameValidation), func(ctx context.Context) {
 		svcName := "1kubernetes"
-		svc := v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: svcName,
 			},
@@ -666,8 +666,9 @@ var _ = common.SIGDescribe("DNS", func() {
 				Ports: []v1.ServicePort{{Port: 443}},
 			},
 		}
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
-		createServiceReportErr(ctx, f.ClientSet, f.Namespace.Name, &svc)
 		namesToResolve := []string{
 			fmt.Sprintf("%s.%s.svc.%s", svcName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 		}
