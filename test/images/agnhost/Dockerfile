@@ -38,7 +38,7 @@ RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz
 # PORT 8080 needed by: netexec, nettest, resource-consumer, resource-consumer-controller
 # PORT 8081 needed by: netexec
 # PORT 9376 needed by: serve-hostname
-# PORT 5000 needed by: grpc-health-checking
+# PORT 5000 needed by: grpc-health-checking, fake-registry-server
 EXPOSE 80 8080 8081 9376 5000
 
 # from netexec
@@ -49,6 +49,7 @@ ADD porter/localhost.crt localhost.crt
 ADD porter/localhost.key localhost.key
 
 ADD agnhost agnhost
+ADD registry.tar.gz /
 
 # needed for the entrypoint-tester related tests. Some of the entrypoint-tester related tests
 # overrides this image's entrypoint with agnhost-2 binary, and will verify that the correct
