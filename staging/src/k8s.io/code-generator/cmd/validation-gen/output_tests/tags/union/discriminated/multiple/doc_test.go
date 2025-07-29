@@ -60,4 +60,29 @@ func Test(t *testing.T) {
 		field.Invalid(field.NewPath("u1m2"), "", "must be specified when `d1` is \"U1M2\""),
 		field.Invalid(field.NewPath("u2m2"), "", "must be specified when `d2` is \"U2M2\""),
 	)
+
+	// Test validation ratcheting
+	st.Value(&Struct{
+		D1: U1M2, U1M1: &M1{}, U1M2: &M2{},
+		D2: U2M2, // no value
+	}).OldValue(&Struct{
+		D1: U1M2, U1M1: &M1{}, U1M2: &M2{},
+		D2: U2M2, // no value
+	}).ExpectValid()
+
+	st.Value(&Struct{
+		D1: U1M2, // no value
+		D2: U2M2, U2M1: &M1{}, U2M2: &M2{},
+	}).OldValue(&Struct{
+		D1: U1M2, // no value
+		D2: U2M2, U2M1: &M1{}, U2M2: &M2{},
+	}).ExpectValid()
+
+	st.Value(&Struct{
+		D1: U1M2, // no value
+		D2: U2M2, // no value
+	}).OldValue(&Struct{
+		D1: U1M2, // no value
+		D2: U2M2, // no value
+	}).ExpectValid()
 }

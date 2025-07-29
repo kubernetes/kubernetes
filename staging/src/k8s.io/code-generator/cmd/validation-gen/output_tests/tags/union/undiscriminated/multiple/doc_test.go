@@ -26,8 +26,8 @@ func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	st.Value(&Struct{}).ExpectInvalid(
-		field.Invalid(nil, "", "must specify exactly one of: `u1m1`, `u1m2`"),
-		field.Invalid(nil, "", "must specify exactly one of: `u2m1`, `u2m2`"),
+		field.Invalid(nil, "", "must specify one of: `u1m1`, `u1m2`"),
+		field.Invalid(nil, "", "must specify one of: `u2m1`, `u2m2`"),
 	)
 
 	st.Value(&Struct{U1M1: &M1{}, U2M1: &M1{}}).ExpectValid()
@@ -35,11 +35,11 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{U1M1: &M1{}, U1M2: &M2{}}).ExpectInvalid(
 		field.Invalid(nil, "{u1m1, u1m2}", "must specify exactly one of: `u1m1`, `u1m2`"),
-		field.Invalid(nil, "", "must specify exactly one of: `u2m1`, `u2m2`"),
+		field.Invalid(nil, "", "must specify one of: `u2m1`, `u2m2`"),
 	)
 
 	st.Value(&Struct{U2M1: &M1{}, U2M2: &M2{}}).ExpectInvalid(
-		field.Invalid(nil, "", "must specify exactly one of: `u1m1`, `u1m2`"),
+		field.Invalid(nil, "", "must specify one of: `u1m1`, `u1m2`"),
 		field.Invalid(nil, "{u2m1, u2m2}", "must specify exactly one of: `u2m1`, `u2m2`"),
 	)
 
@@ -50,4 +50,16 @@ func Test(t *testing.T) {
 		field.Invalid(nil, "{u1m1, u1m2}", "must specify exactly one of: `u1m1`, `u1m2`"),
 		field.Invalid(nil, "{u2m1, u2m2}", "must specify exactly one of: `u2m1`, `u2m2`"),
 	)
+
+	// Test validation ratcheting
+	st.Value(&Struct{}).OldValue(&Struct{}).ExpectValid()
+	st.Value(&Struct{U1M1: &M1{}, U1M2: &M2{}}).OldValue(&Struct{U1M1: &M1{}, U1M2: &M2{}}).ExpectValid()
+	st.Value(&Struct{U2M1: &M1{}, U2M2: &M2{}}).OldValue(&Struct{U2M1: &M1{}, U2M2: &M2{}}).ExpectValid()
+	st.Value(&Struct{
+		U1M1: &M1{}, U1M2: &M2{},
+		U2M1: &M1{}, U2M2: &M2{},
+	}).OldValue(&Struct{
+		U1M1: &M1{}, U1M2: &M2{},
+		U2M1: &M1{}, U2M2: &M2{},
+	}).ExpectValid()
 }

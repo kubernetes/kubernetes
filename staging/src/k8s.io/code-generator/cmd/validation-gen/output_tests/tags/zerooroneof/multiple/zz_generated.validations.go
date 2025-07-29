@@ -48,13 +48,13 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_zerooroneof_multiple_Struct_union1 = validate.NewUnionMembership(validate.NewUnionMember("u1m1"), validate.NewUnionMember("u1m2"))
-var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_zerooroneof_multiple_Struct_union2 = validate.NewUnionMembership(validate.NewUnionMember("u2m1"), validate.NewUnionMember("u2m2"))
+var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_multiple_Struct_union1 = validate.NewUnionMembership(validate.NewUnionMember("u1m1"), validate.NewUnionMember("u1m2"))
+var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_multiple_Struct_union2 = validate.NewUnionMembership(validate.NewUnionMember("u2m1"), validate.NewUnionMember("u2m2"))
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
-	errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_zerooroneof_multiple_Struct_union1, func(obj *Struct) bool {
+	errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_multiple_Struct_union1, func(obj *Struct) bool {
 		if obj == nil {
 			return false
 		}
@@ -65,7 +65,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 		}
 		return obj.U1M2 != nil
 	})...)
-	errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_zerooroneof_multiple_Struct_union2, func(obj *Struct) bool {
+	errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_multiple_Struct_union2, func(obj *Struct) bool {
 		if obj == nil {
 			return false
 		}

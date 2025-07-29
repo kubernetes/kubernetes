@@ -35,4 +35,8 @@ func Test(t *testing.T) {
 	st.Value(&Struct{D: DM1}).ExpectInvalid(
 		field.Invalid(field.NewPath("m1"), "", "must be specified when `d` is \"CustomM1\""),
 	)
+
+	// Test validation ratcheting
+	st.Value(&Struct{D: DM2, M1: &M1{}, M2: &M2{}}).OldValue(&Struct{D: DM2, M1: &M1{}, M2: &M2{}}).ExpectValid()
+	st.Value(&Struct{D: DM1}).OldValue(&Struct{D: DM1}).ExpectValid()
 }
