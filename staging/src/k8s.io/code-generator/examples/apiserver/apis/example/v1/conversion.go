@@ -30,3 +30,13 @@ func Convert_v1_ConversionPrivate_To_example_ConversionPrivate(in *ConversionPri
 func Convert_example_ConversionPrivate_To_v1_ConversionPrivate(in *example.ConversionPrivate, out *ConversionPrivate, scope conversion.Scope) error {
 	return autoConvert_example_ConversionPrivate_To_v1_ConversionPrivate(in, out, scope)
 }
+
+// custom conversion function to exercise use of custom functions in slice/map/pointer fields
+func Convert_v1_ConversionCustom_To_example_ConversionCustom(in *ConversionCustom, out *example.ConversionCustom, scope conversion.Scope) error {
+	return autoConvert_v1_ConversionCustom_To_example_ConversionCustom(in, out, scope)
+}
+
+// custom conversion function to exercise use of custom functions in slice/map/pointer fields
+func Convert_example_ConversionCustom_To_v1_ConversionCustom(in *example.ConversionCustom, out *ConversionCustom, scope conversion.Scope) error {
+	return autoConvert_example_ConversionCustom_To_v1_ConversionCustom(in, out, scope)
+}
