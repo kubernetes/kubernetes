@@ -526,7 +526,7 @@ func (sched *Scheduler) Run(ctx context.Context) {
 	sched.SchedulingQueue.Run(logger)
 
 	if sched.APIDispatcher != nil {
-		go sched.APIDispatcher.Run(logger)
+		sched.APIDispatcher.Run(logger)
 	}
 
 	// We need to start scheduleOne loop in a dedicated goroutine,
