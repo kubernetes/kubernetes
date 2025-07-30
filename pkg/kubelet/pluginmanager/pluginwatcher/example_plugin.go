@@ -36,13 +36,13 @@ import (
 
 // examplePlugin is a sample plugin to work with plugin watcher
 type examplePlugin struct {
-	grpcServer         *grpc.Server
-	wg                 sync.WaitGroup
-	registrationStatus chan registerapi.RegistrationStatus // for testing
-	endpoint           string                              // for testing
-	pluginName         string
-	pluginType         string
-	versions           []string
+	grpcServer *grpc.Server
+	wg         sync.WaitGroup
+	socketPath string
+	endpoint   string // for testing
+	pluginName string
+	pluginType string
+	versions   []string
 
 	registerapi.UnsafeRegistrationServer
 }
@@ -81,20 +81,21 @@ func NewExamplePlugin() *examplePlugin {
 }
 
 // NewTestExamplePlugin returns an initialized examplePlugin instance for testing
-func NewTestExamplePlugin(pluginName string, pluginType string, endpoint string, advertisedVersions ...string) *examplePlugin {
+func NewTestExamplePlugin(pluginName, pluginType, socketPath, endpoint string, advertisedVersions ...string) *examplePlugin {
 	return &examplePlugin{
-		pluginName:         pluginName,
-		pluginType:         pluginType,
-		endpoint:           endpoint,
-		versions:           advertisedVersions,
-		registrationStatus: make(chan registerapi.RegistrationStatus),
+		pluginName: pluginName,
+		pluginType: pluginType,
+		socketPath: socketPath,
+		endpoint:   endpoint,
+		versions:   advertisedVersions,
 	}
 }
 
 // GetPluginInfo returns a PluginInfo object
 func GetPluginInfo(plugin *examplePlugin) cache.PluginInfo {
 	return cache.PluginInfo{
-		SocketPath: plugin.endpoint,
+		SocketPath: plugin.socketPath,
+		Endpoint:   plugin.endpoint,
 	}
 }
 
@@ -110,23 +111,18 @@ func (e *examplePlugin) GetInfo(ctx context.Context, req *registerapi.InfoReques
 
 func (e *examplePlugin) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
 	klog.InfoS("Notify registration status", "status", status)
-
-	if e.registrationStatus != nil {
-		e.registrationStatus <- *status
-	}
-
 	return &registerapi.RegistrationStatusResponse{}, nil
 }
 
 // Serve starts a pluginwatcher server and one or more of the plugin services
 func (e *examplePlugin) Serve(services ...string) error {
-	klog.InfoS("Starting example server", "endpoint", e.endpoint)
-	lis, err := net.Listen("unix", e.endpoint)
+	klog.InfoS("Starting example server", "socket", e.socketPath)
+	lis, err := net.Listen("unix", e.socketPath)
 	if err != nil {
 		return err
 	}
 
-	klog.InfoS("Example server started", "endpoint", e.endpoint)
+	klog.InfoS("Example server started", "socket", e.socketPath)
 	e.grpcServer = grpc.NewServer()
 
 	// Registers kubelet plugin watcher api.
@@ -145,7 +141,7 @@ func (e *examplePlugin) Serve(services ...string) error {
 		}
 	}
 
-	// Starts service
+	// Start registration service
 	e.wg.Add(1)
 	go func() {
 		defer e.wg.Done()
@@ -159,7 +155,7 @@ func (e *examplePlugin) Serve(services ...string) error {
 }
 
 func (e *examplePlugin) Stop() error {
-	klog.InfoS("Stopping example server", "endpoint", e.endpoint)
+	klog.InfoS("Stopping example server", "socket", e.socketPath)
 
 	e.grpcServer.Stop()
 	c := make(chan struct{})
@@ -175,7 +171,7 @@ func (e *examplePlugin) Stop() error {
 		return errors.New("timed out on waiting for stop completion")
 	}
 
-	if err := os.Remove(e.endpoint); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(e.socketPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 

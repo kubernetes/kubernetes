@@ -169,7 +169,7 @@ func TestPluginManager(t *testing.T) {
 
 		// Add a new plugin
 		pluginName := fmt.Sprintf("example-plugin-%d", i)
-		p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+		p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "", supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 
 		// Verify that the plugin is registered
