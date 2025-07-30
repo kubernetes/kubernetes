@@ -1064,7 +1064,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 							mu.Lock()
 							updatedNominatedNodeName = updatedPod.Status.NominatedNodeName
 							mu.Unlock()
-							return true, nil, nil
+							return false, nil, nil
 						})
 
 						schedFramework, err := tf.NewFramework(ctx,
