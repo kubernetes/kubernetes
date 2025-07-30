@@ -37,6 +37,7 @@ type DeviceApplyConfiguration struct {
 	BindsToNode              *bool                                                               `json:"bindsToNode,omitempty"`
 	BindingConditions        []string                                                            `json:"bindingConditions,omitempty"`
 	BindingFailureConditions []string                                                            `json:"bindingFailureConditions,omitempty"`
+	AllowMultipleAllocations *bool                                                               `json:"allowMultipleAllocations,omitempty"`
 }
 
 // DeviceApplyConfiguration constructs a declarative configuration of the Device type for use with
@@ -156,5 +157,13 @@ func (b *DeviceApplyConfiguration) WithBindingFailureConditions(values ...string
 	for i := range values {
 		b.BindingFailureConditions = append(b.BindingFailureConditions, values[i])
 	}
+	return b
+}
+
+// WithAllowMultipleAllocations sets the AllowMultipleAllocations field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllowMultipleAllocations field is set to the value of the last call.
+func (b *DeviceApplyConfiguration) WithAllowMultipleAllocations(value bool) *DeviceApplyConfiguration {
+	b.AllowMultipleAllocations = &value
 	return b
 }

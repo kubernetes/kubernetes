@@ -47,13 +47,17 @@ spec:
       requests:
       - requestsValue
     constraints:
-    - matchAttribute: matchAttributeValue
+    - distinctAttribute: distinctAttributeValue
+      matchAttribute: matchAttributeValue
       requests:
       - requestsValue
     requests:
     - exactly:
         adminAccess: true
         allocationMode: allocationModeValue
+        capacity:
+          requests:
+            requestsKey: "0"
         count: 4
         deviceClassName: deviceClassNameValue
         selectors:
@@ -67,6 +71,9 @@ spec:
           value: valueValue
       firstAvailable:
       - allocationMode: allocationModeValue
+        capacity:
+          requests:
+            requestsKey: "0"
         count: 5
         deviceClassName: deviceClassNameValue
         name: nameValue
@@ -103,10 +110,13 @@ status:
         - bindingConditionsValue
         bindingFailureConditions:
         - bindingFailureConditionsValue
+        consumedCapacity:
+          consumedCapacityKey: "0"
         device: deviceValue
         driver: driverValue
         pool: poolValue
         request: requestValue
+        shareID: shareIDValue
         tolerations:
         - effect: effectValue
           key: keyValue
@@ -148,6 +158,7 @@ status:
       ips:
       - ipsValue
     pool: poolValue
+    shareID: shareIDValue
   reservedFor:
   - apiGroup: apiGroupValue
     name: nameValue
