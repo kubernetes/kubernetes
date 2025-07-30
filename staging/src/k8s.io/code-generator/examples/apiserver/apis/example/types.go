@@ -62,3 +62,8 @@ type MemoryDifferent struct {
 	AllOf      []MemoryDifferent
 	Bool       bool // differs from external representation
 }
+
+type ConversionPrivate struct {
+	PublicField  string
+	privateField string
+}
