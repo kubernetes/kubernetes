@@ -18,63 +18,49 @@ limitations under the License.
 package rand
 
 import (
-	"math/rand"
-	"sync"
+	"math/rand/v2"
+	"sync/atomic"
 	"time"
 )
 
-var rng = struct {
-	sync.Mutex
-	rand *rand.Rand
-}{
-	rand: rand.New(rand.NewSource(time.Now().UnixNano())),
+var rng atomic.Pointer[rand.Rand]
+
+func init() {
+	Seed(time.Now().UnixNano())
 }
 
 // Int returns a non-negative pseudo-random int.
 func Int() int {
-	rng.Lock()
-	defer rng.Unlock()
-	return rng.rand.Int()
+	return rng.Load().Int()
 }
 
 // Intn generates an integer in range [0,max).
 // By design this should panic if input is invalid, <= 0.
 func Intn(max int) int {
-	rng.Lock()
-	defer rng.Unlock()
-	return rng.rand.Intn(max)
+	return rng.Load().IntN(max)
 }
 
 // IntnRange generates an integer in range [min,max).
 // By design this should panic if input is invalid, <= 0.
 func IntnRange(min, max int) int {
-	rng.Lock()
-	defer rng.Unlock()
-	return rng.rand.Intn(max-min) + min
+	return rng.Load().IntN(max-min) + min
 }
 
 // IntnRange generates an int64 integer in range [min,max).
 // By design this should panic if input is invalid, <= 0.
 func Int63nRange(min, max int64) int64 {
-	rng.Lock()
-	defer rng.Unlock()
-	return rng.rand.Int63n(max-min) + min
+	return rng.Load().Int64N(max-min) + min
 }
 
 // Seed seeds the rng with the provided seed.
 func Seed(seed int64) {
-	rng.Lock()
-	defer rng.Unlock()
-
-	rng.rand = rand.New(rand.NewSource(seed))
+	rng.Store(rand.New(rand.NewPCG(uint64(seed), 0)))
 }
 
 // Perm returns, as a slice of n ints, a pseudo-random permutation of the integers [0,n)
 // from the default Source.
 func Perm(n int) []int {
-	rng.Lock()
-	defer rng.Unlock()
-	return rng.rand.Perm(n)
+	return rng.Load().Perm(n)
 }
 
 const (
@@ -97,14 +83,12 @@ const (
 // - if some index is out of range of alphanums we neglect it (unlikely to happen multiple times in a row)
 func String(n int) string {
 	b := make([]byte, n)
-	rng.Lock()
-	defer rng.Unlock()
 
-	randomInt63 := rng.rand.Int63()
+	randomInt63 := rng.Load().Int64()
 	remaining := maxAlphanumsPerInt
 	for i := 0; i < n; {
 		if remaining == 0 {
-			randomInt63, remaining = rng.rand.Int63(), maxAlphanumsPerInt
+			randomInt63, remaining = rng.Load().Int64(), maxAlphanumsPerInt
 		}
 		if idx := int(randomInt63 & alphanumsIdxMask); idx < len(alphanums) {
 			b[i] = alphanums[idx]

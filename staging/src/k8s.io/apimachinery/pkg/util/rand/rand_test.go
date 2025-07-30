@@ -17,7 +17,7 @@ limitations under the License.
 package rand
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"strings"
 	"testing"
 )
@@ -65,7 +65,7 @@ func TestIntn(t *testing.T) {
 
 func TestPerm(t *testing.T) {
 	Seed(5)
-	r := rand.New(rand.NewSource(5))
+	r := rand.New(rand.NewPCG(5, 0))
 	for i := 1; i < 20; i++ {
 		actual := Perm(i)
 		expected := r.Perm(i)
