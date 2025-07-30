@@ -324,6 +324,8 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 }
 
 func TestAPIServerTracing(t *testing.T) {
+	// TODO: remove after updating otelhttp to v0.61.0
+	t.Setenv("OTEL_SEMCONV_STABILITY_OPT_IN", "http/dup")
 	// Listen for traces from the API Server before starting it, so the
 	// API Server will successfully connect right away during the test.
 	listener, err := net.Listen("tcp", "localhost:")
@@ -391,10 +393,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "POST"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {
@@ -510,10 +512,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "GET"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {
@@ -617,10 +619,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "GET"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {
@@ -712,10 +714,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "PUT"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {
@@ -856,10 +858,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "PATCH"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {
@@ -977,10 +979,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "DELETE"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {
