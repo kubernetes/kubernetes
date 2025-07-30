@@ -260,6 +260,10 @@ func (c *claimTracker) AssumeClaimAfterAPICall(claim *resourceapi.ResourceClaim)
 	return c.cache.Assume(claim)
 }
 
+func (c *claimTracker) AddClaimAfterAPICall(claim *resourceapi.ResourceClaim) error {
+	return c.cache.Add(claim)
+}
+
 func (c *claimTracker) AssumedClaimRestore(namespace, claimName string) {
 	c.cache.Restore(namespace + "/" + claimName)
 }

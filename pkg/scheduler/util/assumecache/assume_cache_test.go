@@ -265,6 +265,96 @@ func TestAssume(t *testing.T) {
 	}
 }
 
+func TestAdd(t *testing.T) {
+	scenarios := map[string]struct {
+		oldObj    metav1.Object
+		newObj    interface{}
+		expectErr error
+	}{
+		"success-same-version": {
+			oldObj: makeObj("pvc1", "5", ""),
+			newObj: makeObj("pvc1", "5", ""),
+		},
+		"success-new-higher-version": {
+			oldObj: makeObj("pvc1", "5", ""),
+			newObj: makeObj("pvc1", "6", ""),
+		},
+		"fail-old-not-found": {
+			oldObj: makeObj("pvc2", "5", ""),
+			newObj: makeObj("pvc1", "5", ""),
+			// allow adding new object
+			expectErr: nil,
+		},
+		"fail-new-lower-version": {
+			oldObj:    makeObj("pvc1", "5", ""),
+			newObj:    makeObj("pvc1", "4", ""),
+			expectErr: cmpopts.AnyError,
+		},
+		"fail-new-bad-version": {
+			oldObj:    makeObj("pvc1", "5", ""),
+			newObj:    makeObj("pvc1", "a", ""),
+			expectErr: cmpopts.AnyError,
+		},
+		"fail-old-bad-version": {
+			oldObj:    makeObj("pvc1", "a", ""),
+			newObj:    makeObj("pvc1", "5", ""),
+			expectErr: cmpopts.AnyError,
+		},
+		"fail-new-bad-object": {
+			oldObj:    makeObj("pvc1", "5", ""),
+			newObj:    1,
+			expectErr: ErrObjectName,
+		},
+	}
+
+	for name, scenario := range scenarios {
+		t.Run(name, func(t *testing.T) {
+			tCtx, cache, informer := newTest(t)
+			var events mockEventHandler
+			cache.AddEventHandler(&events)
+
+			// Add old object to cache.
+			informer.add(scenario.oldObj)
+			verify(tCtx, cache, scenario.oldObj.GetName(), scenario.oldObj, scenario.oldObj)
+
+			// Assume new object.
+			err := cache.Add(scenario.newObj)
+			if diff := cmp.Diff(scenario.expectErr, err, cmpopts.EquateErrors()); diff != "" {
+				t.Errorf("Assume() returned error: %v\ndiff (- expected, + actual):\n%s", err, diff)
+			}
+
+			// Check that Get returns correct object and
+			// that events were delivered correctly.
+			expectEvents := []event{{What: "add", Obj: scenario.oldObj}}
+			expectedObj := scenario.newObj
+			newObjName := ""
+			if newObj, ok := scenario.newObj.(*metav1.ObjectMeta); ok {
+				newObjName = newObj.GetName()
+			}
+			if scenario.expectErr != nil {
+				expectedObj = scenario.oldObj
+			} else {
+				if newObjName == scenario.oldObj.GetName() {
+					// update
+					expectEvents = append(expectEvents, event{What: "update", OldObj: scenario.oldObj, Obj: scenario.newObj})
+				} else {
+					// add
+					expectEvents = append(expectEvents, event{What: "add", OldObj: nil, Obj: scenario.newObj})
+				}
+			}
+			if newObjName == scenario.oldObj.GetName() {
+				// update
+				verify(tCtx, cache, scenario.oldObj.GetName(), expectedObj, scenario.oldObj)
+			} else if newObjName != "" {
+				// add
+				verify(tCtx, cache, newObjName, expectedObj, scenario.newObj)
+			}
+
+			events.verifyAndFlush(tCtx, expectEvents)
+		})
+	}
+}
+
 func TestRestore(t *testing.T) {
 	tCtx, cache, informer := newTest(t)
 	var events mockEventHandler
