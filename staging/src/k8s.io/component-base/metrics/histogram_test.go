@@ -333,7 +333,6 @@ func TestHistogramWithExemplar(t *testing.T) {
 		Help:    "helpless",
 		Buckets: []float64{100},
 	})
-	_ = histogram.WithContext(ctxForSpanCtx)
 
 	registry := newKubeRegistry(apimachineryversion.Info{
 		Major:      "1",
@@ -343,7 +342,7 @@ func TestHistogramWithExemplar(t *testing.T) {
 	registry.MustRegister(histogram)
 
 	// Act.
-	histogram.Observe(value)
+	histogram.WithContext(ctxForSpanCtx).Observe(value)
 
 	// Assert.
 	mfs, err := registry.Gather()
