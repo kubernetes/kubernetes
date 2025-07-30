@@ -263,23 +263,26 @@ func MatchTopologySelectorTerms(topologySelectorTerms []v1.TopologySelectorTerm,
 func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration) bool {
 	podTolerations := spec.Tolerations
 
-	var newTolerations []v1.Toleration
+	// do not grow the slice in runtime, the length is already known (PodSpec.Tolerations + toleration)
+	newTolerations := make([]v1.Toleration, len(podTolerations) + 1)
+
 	updated := false
 	for i := range podTolerations {
 		if toleration.MatchToleration(&podTolerations[i]) {
-			if helper.Semantic.DeepEqual(toleration, podTolerations[i]) {
+			if helper.Semantic.DeepEqual(*toleration, podTolerations[i]) {
 				return false
 			}
-			newTolerations = append(newTolerations, *toleration)
+			newTolerations[i] = *toleration
 			updated = true
 			continue
 		}
 
-		newTolerations = append(newTolerations, podTolerations[i])
+		newTolerations[i] = podTolerations[i]
 	}
 
 	if !updated {
-		newTolerations = append(newTolerations, *toleration)
+		newTolerationsLastIndex := len(newTolerations) - 1
+		newTolerations[newTolerationsLastIndex] = *toleration
 	}
 
 	spec.Tolerations = newTolerations
