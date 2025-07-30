@@ -420,5 +420,23 @@ func BenchmarkStringSet(b *testing.B) {
 				randOperand().List()
 			}
 		})
+		b.Run(fmt.Sprintf("difference-%v", here.size), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				for item := range randOperand().Difference(randOperand()) {
+					_ = item
+				}
+			}
+		})
+		b.Run(fmt.Sprintf("difference-seq-%v", here.size), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				s1 := Set[string](randOperand())
+				s2 := Set[string](randOperand())
+				for item := range s1.DifferenceSeq(s2) {
+					_ = item
+				}
+			}
+		})
 	}
 }
