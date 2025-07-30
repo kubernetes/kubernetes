@@ -124,11 +124,15 @@ func parseGetSubIdsOutput(input string) (uint32, uint32, error) {
 // If subordinate user or group ID ranges are specified for the kubelet user and the getsubids tool
 // is installed, then the single mapping specified both for user and group IDs will be used.
 // If the tool is not installed, or there are no IDs configured, the default mapping is returned.
-// The default mapping includes the entire IDs range except IDs below 65536.
-func (kl *Kubelet) getKubeletMappings() (uint32, uint32, error) {
+// The default mapping includes the entire IDs range except IDs below idsPerPod.
+func (kl *Kubelet) getKubeletMappings(idsPerPod uint32) (uint32, uint32, error) {
 	// default mappings to return if there is no specific configuration
-	const defaultFirstID = 1 << 16
-	const defaultLen = 1<<32 - defaultFirstID
+	defaultFirstID := idsPerPod
+	// We cast defaultFirstID to 64 bits, as otherwise any operation (including subtraction)
+	// fires the overflow detection (go is not smart enough to realize that if we subtract a
+	// non-negative number, it fits in 32 bits).
+	// Then we cast it back to 32 bits, as this what the function returns.
+	defaultLen := uint32((1 << 32) - uint64(defaultFirstID))
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return defaultFirstID, defaultLen, nil
