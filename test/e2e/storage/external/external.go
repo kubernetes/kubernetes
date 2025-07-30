@@ -152,6 +152,12 @@ type driverDefinition struct {
 	// use topology to ensure that pods land on the right node(s).
 	ClientNodeName string
 
+	// NodeSelectors is used to specify nodeSelector information for pod deployment
+	// during the tests.  This is beneficial when needing to control placement
+	// for specialized environments.  Most drivers should not need this and
+	// instead can use topolgy to ensure that pods land on the right node(s).
+	NodeSelectors map[string]string
+
 	// Timeouts contains the custom timeouts used during the test execution.
 	// The values specified here will override the default values specified in
 	// the framework.TimeoutContext struct.
@@ -491,6 +497,11 @@ func (d *driverDefinition) PrepareTest(ctx context.Context, f *framework.Framewo
 		e2econfig.ClientNodeSelection.Selector = map[string]string{"kubernetes.io/os": "windows"}
 	} else {
 		e2econfig.ClientNodeSelection.Selector = map[string]string{"kubernetes.io/os": "linux"}
+	}
+
+	// Add all provided nodeSelector settings
+	for key, value := range d.NodeSelectors {
+		e2econfig.ClientNodeSelection.Selector[key] = value
 	}
 
 	return e2econfig
