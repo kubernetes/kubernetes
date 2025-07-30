@@ -266,7 +266,7 @@ func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSe
 }
 
 func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error) {
-	return kvh.podCertificateManager.GetPodCertificateCredentialBundle(ctx, namespace, podName, volumeName, podUID, sourceIndex)
+	return kvh.podCertificateManager.GetPodCertificateCredentialBundle(ctx, namespace, podName, podUID, volumeName, sourceIndex)
 }
 
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
