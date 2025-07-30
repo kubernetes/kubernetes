@@ -86,6 +86,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/code-generator/examples/apiserver/apis/core/v1.TestTypeList":          schema_apiserver_apis_core_v1_TestTypeList(ref),
 		"k8s.io/code-generator/examples/apiserver/apis/core/v1.TestTypeStatus":        schema_apiserver_apis_core_v1_TestTypeStatus(ref),
 		"k8s.io/code-generator/examples/apiserver/apis/example/v1.Conversion":         schema_apiserver_apis_example_v1_Conversion(ref),
+		"k8s.io/code-generator/examples/apiserver/apis/example/v1.ConversionPrivate":  schema_apiserver_apis_example_v1_ConversionPrivate(ref),
 		"k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryDifferent":    schema_apiserver_apis_example_v1_MemoryDifferent(ref),
 		"k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryIdentical":    schema_apiserver_apis_example_v1_MemoryIdentical(ref),
 		"k8s.io/code-generator/examples/apiserver/apis/example/v1.TestType":           schema_apiserver_apis_example_v1_TestType(ref),
@@ -2860,6 +2861,33 @@ func schema_apiserver_apis_example_v1_Conversion(ref common.ReferenceCallback) c
 		},
 		Dependencies: []string{
 			"k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryDifferent", "k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryIdentical"},
+	}
+}
+
+func schema_apiserver_apis_example_v1_ConversionPrivate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"publicField": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"privateField": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"publicField", "privateField"},
+			},
+		},
 	}
 }
 

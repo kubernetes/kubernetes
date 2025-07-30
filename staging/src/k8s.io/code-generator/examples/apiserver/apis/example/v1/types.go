@@ -70,3 +70,8 @@ type MemoryDifferent struct {
 
 	Bool *bool `json:"bool"` // differs from internal representation
 }
+
+type ConversionPrivate struct {
+	PublicField  string `json:"publicField"`
+	privateField string `json:"privateField"`
+}
