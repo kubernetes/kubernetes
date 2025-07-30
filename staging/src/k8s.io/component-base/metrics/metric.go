@@ -210,11 +210,6 @@ func (c *selfCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- c.metric
 }
 
-// metricWithExemplar is an interface that knows how to attach an exemplar to certain supported metric types.
-type metricWithExemplar interface {
-	withExemplar(v float64)
-}
-
 // no-op vecs for convenience
 var noopCounterVec = &prometheus.CounterVec{}
 var noopHistogramVec = &prometheus.HistogramVec{}
