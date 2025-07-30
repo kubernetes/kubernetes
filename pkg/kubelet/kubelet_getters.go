@@ -133,8 +133,8 @@ func (kl *Kubelet) HandlerSupportsUserNamespaces(rtHandler string) (bool, error)
 }
 
 // GetKubeletMappings gets the additional IDs allocated for the Kubelet.
-func (kl *Kubelet) GetKubeletMappings() (uint32, uint32, error) {
-	return kl.getKubeletMappings()
+func (kl *Kubelet) GetKubeletMappings(idsPerPod uint32) (uint32, uint32, error) {
+	return kl.getKubeletMappings(idsPerPod)
 }
 
 func (kl *Kubelet) GetMaxPods() int {
