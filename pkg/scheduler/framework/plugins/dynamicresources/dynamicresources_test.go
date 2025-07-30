@@ -136,7 +136,8 @@ var (
 	workerNode3      = &st.MakeNode().Name(node3Name).Label("kubernetes.io/hostname", node3Name).Node
 	workerNode3Slice = st.MakeResourceSlice(node3Name, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj()
 
-	brokenSelector = resourceapi.DeviceSelector{
+	workerNodeWithExtendedResource = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "1"}).Node
+	brokenSelector                 = resourceapi.DeviceSelector{
 		CEL: &resourceapi.CELDeviceSelector{
 			// Not set for workerNode.
 			Expression: fmt.Sprintf(`device.attributes["%s"].%s`, driver, attrName),
@@ -1259,6 +1260,15 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
+		},
+		"extended-resource-name-wth-node-resource": {
+			enableDRAExtendedResource:          true,
+			enableDRADeviceBindingConditions:   true,
+			enableDRAResourceClaimDeviceStatus: true,
+			nodes:                              []*v1.Node{workerNodeWithExtendedResource},
+			pod:                                podWithExtendedResourceName,
+			classes:                            []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			want:                               want{},
 		},
 		"extended-resource-name-no-resource": {
 			enableDRAExtendedResource: true,

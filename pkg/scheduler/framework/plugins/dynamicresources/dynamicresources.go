@@ -1657,6 +1657,9 @@ func (pl *DynamicResources) isPodReadyForBinding(state *stateData) (bool, error)
 // It returns false if no claim has binding conditions.
 func hasBindingConditions(state *stateData) bool {
 	for _, claim := range state.claims.all() {
+		if claim.Status.Allocation == nil {
+			continue
+		}
 		for _, device := range claim.Status.Allocation.Devices.Results {
 			if len(device.BindingConditions) > 0 {
 				return true
