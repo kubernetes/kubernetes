@@ -22,7 +22,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/dynamic-resource-allocation/structured/internal/experimental"
@@ -41,6 +42,26 @@ type DeviceID = internal.DeviceID
 
 func MakeDeviceID(driver, pool, device string) DeviceID {
 	return internal.MakeDeviceID(driver, pool, device)
+}
+
+// types_experimental
+type AllocatedState = internal.AllocatedState
+type SharedDeviceID = internal.SharedDeviceID
+type DeviceConsumedCapacity = internal.DeviceConsumedCapacity
+type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
+type ConsumedCapacity = internal.ConsumedCapacity
+
+func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
+	return internal.MakeSharedDeviceID(deviceID, shareID)
+}
+
+func NewConsumedCapacityCollection() ConsumedCapacityCollection {
+	return internal.NewConsumedCapacityCollection()
+}
+
+func NewDeviceConsumedCapacity(deviceID DeviceID,
+	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
+	return internal.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
 // Allocator calculates how to allocate a set of unallocated claims which use
@@ -86,7 +107,7 @@ type Allocator interface {
 // The returned Allocator can be used multiple times and is thread-safe.
 func NewAllocator(ctx context.Context,
 	features Features,
-	allocatedDevices sets.Set[DeviceID],
+	allocatedState AllocatedState,
 	classLister DeviceClassLister,
 	slices []*resourceapi.ResourceSlice,
 	celCache *cel.Cache,
@@ -118,7 +139,7 @@ func NewAllocator(ctx context.Context,
 		// All required features supported?
 		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
 			// Use it!
-			return allocator.newAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
+			return allocator.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		}
 	}
 	return nil, fmt.Errorf("internal error: no allocator available for feature set %v", features)
@@ -128,7 +149,7 @@ var availableAllocators = []struct {
 	supportedFeatures Features
 	newAllocator      func(ctx context.Context,
 		features Features,
-		allocatedDevices sets.Set[DeviceID],
+		allocatedState AllocatedState,
 		classLister DeviceClassLister,
 		slices []*resourceapi.ResourceSlice,
 		celCache *cel.Cache,
@@ -139,36 +160,36 @@ var availableAllocators = []struct {
 		supportedFeatures: stable.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
-			allocatedDevices sets.Set[DeviceID],
+			allocatedState AllocatedState,
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return stable.NewAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
+			return stable.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
 	},
 	{
 		supportedFeatures: incubating.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
-			allocatedDevices sets.Set[DeviceID],
+			allocatedState AllocatedState,
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return incubating.NewAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
+			return incubating.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
 	},
 	{
 		supportedFeatures: experimental.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
-			allocatedDevices sets.Set[DeviceID],
+			allocateState AllocatedState,
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return experimental.NewAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
+			return experimental.NewAllocator(ctx, features, allocateState, classLister, slices, celCache)
 		},
 	},
 }

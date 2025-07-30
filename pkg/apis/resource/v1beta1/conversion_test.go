@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/resource"
 )
@@ -53,6 +54,11 @@ func TestConversion(t *testing.T) {
 								},
 								AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
 								Count:          2,
+								Capacity: &resourcev1beta1.CapacityRequirements{
+									Requests: map[resourcev1beta1.QualifiedName]apiresource.Quantity{
+										resourcev1beta1.QualifiedName("cap"): apiresource.MustParse("1"),
+									},
+								},
 							},
 						},
 					},
@@ -76,6 +82,11 @@ func TestConversion(t *testing.T) {
 									},
 									AllocationMode: resource.DeviceAllocationModeExactCount,
 									Count:          2,
+									Capacity: &resource.CapacityRequirements{
+										Requests: map[resource.QualifiedName]apiresource.Quantity{
+											resource.QualifiedName("cap"): apiresource.MustParse("1"),
+										},
+									},
 								},
 							},
 						},
@@ -102,6 +113,11 @@ func TestConversion(t *testing.T) {
 									},
 									AllocationMode: resource.DeviceAllocationModeExactCount,
 									Count:          2,
+									Capacity: &resource.CapacityRequirements{
+										Requests: map[resource.QualifiedName]apiresource.Quantity{
+											resource.QualifiedName("cap"): apiresource.MustParse("1"),
+										},
+									},
 								},
 							},
 						},
@@ -125,6 +141,11 @@ func TestConversion(t *testing.T) {
 								},
 								AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
 								Count:          2,
+								Capacity: &resourcev1beta1.CapacityRequirements{
+									Requests: map[resourcev1beta1.QualifiedName]apiresource.Quantity{
+										resourcev1beta1.QualifiedName("cap"): apiresource.MustParse("1"),
+									},
+								},
 							},
 						},
 					},

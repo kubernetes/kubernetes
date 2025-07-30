@@ -80,7 +80,12 @@
                   "effect": "effectValue",
                   "tolerationSeconds": 5
                 }
-              ]
+              ],
+              "capacity": {
+                "requests": {
+                  "requestsKey": "0"
+                }
+              }
             }
           ],
           "tolerations": [
@@ -91,7 +96,12 @@
               "effect": "effectValue",
               "tolerationSeconds": 5
             }
-          ]
+          ],
+          "capacity": {
+            "requests": {
+              "requestsKey": "0"
+            }
+          }
         }
       ],
       "constraints": [
@@ -99,7 +109,8 @@
           "requests": [
             "requestsValue"
           ],
-          "matchAttribute": "matchAttributeValue"
+          "matchAttribute": "matchAttributeValue",
+          "distinctAttribute": "distinctAttributeValue"
         }
       ],
       "config": [
@@ -148,7 +159,11 @@
             ],
             "bindingFailureConditions": [
               "bindingFailureConditionsValue"
-            ]
+            ],
+            "shareID": "shareIDValue",
+            "consumedCapacity": {
+              "consumedCapacityKey": "0"
+            }
           }
         ],
         "config": [
@@ -212,6 +227,7 @@
         "driver": "driverValue",
         "pool": "poolValue",
         "device": "deviceValue",
+        "shareID": "shareIDValue",
         "conditions": [
           {
             "type": "typeValue",

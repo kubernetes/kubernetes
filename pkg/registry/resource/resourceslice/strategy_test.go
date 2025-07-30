@@ -125,6 +125,32 @@ var sliceWithPartitionableDevices = &resource.ResourceSlice{
 	},
 }
 
+var sliceWithCapacity = func() *resource.ResourceSlice {
+	obj := slice.DeepCopy()
+	obj.Spec.Devices[0].Capacity = map[resource.QualifiedName]resource.DeviceCapacity{
+		"memory": {
+			Value: k8sresource.MustParse("40Gi"),
+		},
+	}
+	return obj
+}()
+
+var sliceWithConsumableCapacity = func() *resource.ResourceSlice {
+	obj := sliceWithCapacity.DeepCopy()
+	obj.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+	obj.Spec.Devices[0].Capacity["memory"] =
+		resource.DeviceCapacity{
+			Value: k8sresource.MustParse("40Gi"),
+			RequestPolicy: &resource.CapacityRequestPolicy{
+				Default: ptr.To(k8sresource.MustParse("1Gi")),
+				ValidRange: &resource.CapacityRequestPolicyRange{
+					Min: ptr.To(k8sresource.MustParse("1Gi")),
+				},
+			},
+		}
+	return obj
+}()
+
 func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
@@ -142,6 +168,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		partitionableDevices    bool
 		bindingConditions       bool
 		deviceStatus            bool
+		consumableCapacity      bool
 		expectedValidationError bool
 		expectObj               *resource.ResourceSlice
 	}{
@@ -260,6 +287,24 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"keep-fields-consumable-capacity": {
+			obj:                sliceWithConsumableCapacity,
+			consumableCapacity: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-consumable-capacity-disabled-feature": {
+			obj:                sliceWithConsumableCapacity,
+			consumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithCapacity.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testCases {
@@ -268,6 +313,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevices, tc.partitionableDevices)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceBindingConditions, tc.bindingConditions)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, tc.deviceStatus)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, tc.consumableCapacity)
 
 			obj := tc.obj.DeepCopy()
 
@@ -297,6 +343,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 		partitionableDevices  bool
 		deviceStatus          bool
 		bindingConditions     bool
+		consumableCapacity    bool
 		expectValidationError bool
 		expectObj             *resource.ResourceSlice
 	}{
@@ -545,6 +592,50 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			bindingConditions: false,
 			deviceStatus:      true,
 		},
+		"keep-existing-fields-consumable-capacity": {
+			oldObj: sliceWithCapacity,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			consumableCapacity: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-consumable-capacity-disabled-feature": {
+			oldObj: sliceWithConsumableCapacity,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			consumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-consumable-capacity-disabled-feature": {
+			oldObj: sliceWithCapacity,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithConsumableCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			consumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithCapacity.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testcases {
@@ -553,6 +644,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevices, tc.partitionableDevices)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceBindingConditions, tc.bindingConditions)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, tc.deviceStatus)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, tc.consumableCapacity)
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()

@@ -278,9 +278,10 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	claimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
-		EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
-		SliceInformer:      informerFactory.Resource().V1().ResourceSlices(),
-		KubeClient:         tCtx.Client(),
+		EnableDeviceTaints:       utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		SliceInformer:            informerFactory.Resource().V1().ResourceSlices(),
+		KubeClient:               tCtx.Client(),
 	}
 	if resourceSliceTrackerOpts.EnableDeviceTaints {
 		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
@@ -306,7 +307,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	}
 
 	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
-	celCache := cel.NewCache(10)
+	celCache := cel.NewCache(10, cel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)})
 
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())
@@ -327,21 +328,40 @@ claims:
 		claims, err := draManager.ResourceClaims().List()
 		tCtx.ExpectNoError(err, "list claims")
 		allocatedDevices := sets.New[structured.DeviceID]()
+		allocatedSharedDeviceIDs := sets.New[structured.SharedDeviceID]()
+		aggregatedCapacity := structured.NewConsumedCapacityCollection()
 		for _, claim := range claims {
 			if claim.Status.Allocation == nil {
 				continue
 			}
 			for _, result := range claim.Status.Allocation.Devices.Results {
-				allocatedDevices.Insert(structured.MakeDeviceID(result.Driver, result.Pool, result.Device))
+				deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+				allocatedDevices.Insert(deviceID)
+				if result.ShareID == nil {
+					allocatedDevices.Insert(deviceID)
+					continue
+				}
+				sharedDeviceID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
+				allocatedSharedDeviceIDs.Insert(sharedDeviceID)
+				claimedCapacity := result.ConsumedCapacity
+				if claimedCapacity != nil {
+					allocatedCapacity := structured.NewDeviceConsumedCapacity(deviceID, claimedCapacity)
+					aggregatedCapacity.Insert(allocatedCapacity)
+				}
 			}
 		}
-
+		allocatedState := structured.AllocatedState{
+			AllocatedDevices:         allocatedDevices,
+			AllocatedSharedDeviceIDs: allocatedSharedDeviceIDs,
+			AggregatedCapacity:       aggregatedCapacity,
+		}
 		allocator, err := structured.NewAllocator(tCtx, structured.Features{
 			PrioritizedList:      utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
 			AdminAccess:          utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 			DeviceTaints:         utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
 			PartitionableDevices: utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
-		}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
+			ConsumableCapacity:   utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		}, allocatedState, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
 		rand.Shuffle(len(nodes), func(i, j int) {

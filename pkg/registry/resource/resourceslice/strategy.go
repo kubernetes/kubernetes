@@ -171,6 +171,7 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRADeviceTaintsFields(newSlice, oldSlice)
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
 	dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice)
+	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -258,4 +259,44 @@ func draBindingConditionsFeatureInUse(slice *resource.ResourceSlice) bool {
 		}
 	}
 	return false
+}
+
+func draConsumableCapacityFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	spec := slice.Spec
+	for _, device := range spec.Devices {
+		if device.AllowMultipleAllocations != nil {
+			return true
+		}
+		for _, capacity := range device.Capacity {
+			if capacity.RequestPolicy != nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// dropDisabledDRAConsumableCapacityFields drops AllowMultipleAllocations and RequestPolicy
+// fields from the new slice if they were not used in the old slice.
+func dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) ||
+		draConsumableCapacityFeatureInUse(oldSlice) {
+		// No need to drop anything.
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].AllowMultipleAllocations = nil
+		if newSlice.Spec.Devices[i].Capacity != nil {
+			for ci, capacity := range newSlice.Spec.Devices[i].Capacity {
+				capacity.RequestPolicy = nil
+				newSlice.Spec.Devices[i].Capacity[ci] = capacity
+			}
+		}
+	}
 }

@@ -467,6 +467,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: DRAConsumableCapacity
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.34"
 - name: DRADeviceBindingConditions
   versionedSpecs:
   - default: false

@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	resourceapi "k8s.io/api/resource/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/dynamic-resource-allocation/structured/internal/allocatortesting"
@@ -33,12 +32,12 @@ func TestAllocator(t *testing.T) {
 		func(
 			ctx context.Context,
 			features Features,
-			allocatedDevices sets.Set[DeviceID],
+			allocatedState AllocatedState,
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (internal.Allocator, error) {
-			return NewAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
+			return NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		},
 	)
 }

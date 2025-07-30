@@ -303,6 +303,7 @@ func TestDRA(t *testing.T) {
 				// as needed by tests for them.
 				features.DRAAdminAccess:               true,
 				features.DRADeviceBindingConditions:   true,
+				features.DRAConsumableCapacity:        true,
 				features.DRADeviceTaints:              true,
 				features.DRAPartitionableDevices:      true,
 				features.DRAPrioritizedList:           true,
@@ -872,13 +873,14 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 				var expected []any
 				for _, device := range spec.Devices {
 					expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
-						"Name":             gomega.Equal(device.Name),
-						"Attributes":       gomega.Equal(device.Attributes),
-						"Capacity":         gomega.Equal(device.Capacity),
-						"ConsumesCounters": gomega.Equal(device.ConsumesCounters),
-						"NodeName":         matchPointer(device.NodeName),
-						"NodeSelector":     matchPointer(device.NodeSelector),
-						"AllNodes":         matchPointer(device.AllNodes),
+						"Name":                     gomega.Equal(device.Name),
+						"AllowMultipleAllocations": gomega.Equal(device.AllowMultipleAllocations),
+						"Attributes":               gomega.Equal(device.Attributes),
+						"Capacity":                 gomega.Equal(device.Capacity),
+						"ConsumesCounters":         gomega.Equal(device.ConsumesCounters),
+						"NodeName":                 matchPointer(device.NodeName),
+						"NodeSelector":             matchPointer(device.NodeSelector),
+						"AllNodes":                 matchPointer(device.AllNodes),
 						"Taints": gomega.HaveExactElements(func() []any {
 							var expected []any
 							for _, taint := range device.Taints {

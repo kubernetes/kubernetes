@@ -109,6 +109,8 @@ type Options struct {
 	// a thin wrapper around the underlying
 	// SliceInformer, with no processing of its own.
 	EnableDeviceTaints bool
+	// EnableConsumableCapacity defines whether the CEL compiler supports the DRAConsumableCapacity feature.
+	EnableConsumableCapacity bool
 
 	SliceInformer resourceinformers.ResourceSliceInformer
 	TaintInformer resourcealphainformers.DeviceTaintRuleInformer
@@ -153,7 +155,7 @@ func newTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr er
 		resourceSlices:        opts.SliceInformer.Informer(),
 		deviceTaints:          opts.TaintInformer.Informer(),
 		deviceClasses:         opts.ClassInformer.Informer(),
-		celCache:              cel.NewCache(10),
+		celCache:              cel.NewCache(10, cel.Features{EnableConsumableCapacity: opts.EnableConsumableCapacity}),
 		patchedResourceSlices: cache.NewStore(cache.MetaNamespaceKeyFunc),
 		handleError:           utilruntime.HandleErrorWithContext,
 		eventQueue:            *buffer.NewRing[func()](buffer.RingOptions{InitialSize: 0, NormalSize: 4}),

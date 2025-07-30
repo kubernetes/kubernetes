@@ -90,7 +90,18 @@
           },
           "capacity": {
             "capacityKey": {
-              "value": "0"
+              "value": "0",
+              "requestPolicy": {
+                "default": "0",
+                "validValues": [
+                  "0"
+                ],
+                "validRange": {
+                  "min": "0",
+                  "max": "0",
+                  "step": "0"
+                }
+              }
             }
           },
           "consumesCounters": [
@@ -143,7 +154,8 @@
           ],
           "bindingFailureConditions": [
             "bindingFailureConditionsValue"
-          ]
+          ],
+          "allowMultipleAllocations": true
         }
       }
     ],

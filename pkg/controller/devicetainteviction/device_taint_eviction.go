@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
@@ -51,6 +52,7 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
+	"k8s.io/kubernetes/pkg/features"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -458,11 +460,12 @@ func (tc *Controller) Run(ctx context.Context) error {
 	tc.haveSynced = append(tc.haveSynced, podHandler.HasSynced)
 
 	opts := resourceslicetracker.Options{
-		EnableDeviceTaints: true,
-		SliceInformer:      tc.sliceInformer,
-		TaintInformer:      tc.taintInformer,
-		ClassInformer:      tc.classInformer,
-		KubeClient:         tc.client,
+		EnableDeviceTaints:       true,
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		SliceInformer:            tc.sliceInformer,
+		TaintInformer:            tc.taintInformer,
+		ClassInformer:            tc.classInformer,
+		KubeClient:               tc.client,
 	}
 	sliceTracker, err := resourceslicetracker.StartTracker(ctx, opts)
 	if err != nil {

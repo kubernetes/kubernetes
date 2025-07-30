@@ -62,6 +62,7 @@ type Device struct {
 	BindsToNode              bool
 	BindingConditions        []string
 	BindingFailureConditions []string
+	AllowMultipleAllocations *bool
 }
 
 type DeviceCounterConsumption struct {
@@ -81,7 +82,20 @@ type DeviceAttribute struct {
 }
 
 type DeviceCapacity struct {
-	Value resource.Quantity
+	Value         resource.Quantity
+	RequestPolicy *CapacityRequestPolicy
+}
+
+type CapacityRequestPolicy struct {
+	Default     *resource.Quantity
+	ValidValues []resource.Quantity
+	ValidRange  *CapacityRequestPolicyRange
+}
+
+type CapacityRequestPolicyRange struct {
+	Min  *resource.Quantity
+	Max  *resource.Quantity
+	Step *resource.Quantity
 }
 
 type Counter struct {
