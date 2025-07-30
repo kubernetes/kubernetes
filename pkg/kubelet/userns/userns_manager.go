@@ -131,16 +131,15 @@ func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 }
 
 func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager, idsPerPod *int64) (*UsernsManager, error) {
-	kubeletMappingID, kubeletMappingLen, err := kl.GetKubeletMappings()
-	if err != nil {
-		return nil, fmt.Errorf("kubelet mappings: %w", err)
-	}
-
 	userNsLength := uint32(kubeletconfig.DefaultKubeletUserNamespacesIDsPerPod)
 	if idsPerPod != nil {
 		// The value is already validated as part of kubelet config validation, so we can safely
 		// cast it.
 		userNsLength = uint32(*idsPerPod)
+	}
+	kubeletMappingID, kubeletMappingLen, err := kl.GetKubeletMappings(userNsLength)
+	if err != nil {
+		return nil, fmt.Errorf("kubelet mappings: %w", err)
 	}
 
 	if userNsLength%userNsUnitLength != 0 {
