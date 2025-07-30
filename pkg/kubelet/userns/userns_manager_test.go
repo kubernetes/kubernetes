@@ -78,7 +78,7 @@ func (m *testUserNsPodsManager) HandlerSupportsUserNamespaces(runtimeHandler str
 	return m.userns, nil
 }
 
-func (m *testUserNsPodsManager) GetKubeletMappings() (uint32, uint32, error) {
+func (m *testUserNsPodsManager) GetKubeletMappings(idsPerPod uint32) (uint32, uint32, error) {
 	if m.mappingFirstID != 0 {
 		return m.mappingFirstID, m.mappingLen, nil
 	}
