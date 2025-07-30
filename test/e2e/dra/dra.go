@@ -1715,6 +1715,87 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	}
 
+	consumableCapacityTests := func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		// single device which allows multiple allocations and has 80Gi consumable memory.
+		driver := drautils.NewDriver(f, nodes, drautils.ToDriverResources(
+			[]resourceapi.CounterSet{},
+			[]resourceapi.Device{
+				{
+					Name:                     "consumable-device-1",
+					AllowMultipleAllocations: ptr.To(true),
+					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+						"memory": {
+							Value: resource.MustParse("8Gi"),
+							RequestPolicy: &resourceapi.CapacityRequestPolicy{
+								Default: ptr.To(resource.MustParse("1Gi")),
+								ValidRange: &resourceapi.CapacityRequestPolicyRange{
+									Min: ptr.To(resource.MustParse("1Gi")),
+								},
+							},
+						},
+					},
+				},
+			}...,
+		))
+		b := drautils.NewBuilder(f, driver)
+
+		f.It("must allow multiple allocations and consume capacity", f.WithLabel("KubeletMinVersion:1.34"), func(ctx context.Context) {
+			// The first pod will use 4Gi of the device.
+			claim := b.ExternalClaim()
+			claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					"memory": resource.MustParse("4Gi"),
+				},
+			}
+			pod := b.PodExternal()
+			pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+			b.Create(ctx, claim, pod)
+			b.TestPod(ctx, f, pod)
+
+			// The second pod will be failed to request 8Gi capacity.
+			claim2 := b.ExternalClaim()
+			claim2.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					"memory": resource.MustParse("8Gi"),
+				},
+			}
+			pod2 := b.PodExternal()
+			pod2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
+			b.Create(ctx, claim2, pod2)
+
+			// The third pod should be able to use the rest 4Gi of the device.
+			claim3 := b.ExternalClaim()
+			claim3.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					"memory": resource.MustParse("4Gi"),
+				},
+			}
+			pod3 := b.PodExternal()
+			pod3.Spec.ResourceClaims[0].ResourceClaimName = &claim3.Name
+			b.Create(ctx, claim3, pod3)
+			b.TestPod(ctx, f, pod3)
+
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				testPod2, err := f.ClientSet.CoreV1().Pods(pod2.Namespace).Get(ctx, pod2.Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("expected the test pod %s to exist: %w", pod2.Name, err)
+				}
+				if testPod2.Status.Phase != v1.PodPending {
+					return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod2.Name, testPod2.Status.Phase, v1.PodPending)
+				}
+				return nil
+			}, 20*time.Second, 200*time.Millisecond).Should(gomega.Succeed())
+
+			// Delete the first and third pod
+			b.DeletePodAndWaitForNotFound(ctx, pod)
+			b.DeletePodAndWaitForNotFound(ctx, pod3)
+
+			// There should be available capacity for pod2 now.
+			b.TestPod(ctx, f, pod2)
+		})
+	}
+
 	// It is okay to use the same context multiple times (like "control plane"),
 	// as long as the test names the still remain unique overall.
 
@@ -1725,6 +1806,10 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on multiple nodes", func() { multiNodeTests(true) })
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPrioritizedList), prioritizedListTests)
+
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAConsumableCapacity), consumableCapacityTests)
+
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAConsumableCapacity), consumableCapacityTests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta1 API", v1beta1Tests)
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta2 API", v1beta2Tests)
@@ -2214,12 +2299,18 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			framework.ExpectNoError(err)
 			gomega.Expect(scheduledPod).ToNot(gomega.BeNil())
 
+			var shareIDStr *string
+			if shareID := allocatedResourceClaim.Status.Allocation.Devices.Results[0].ShareID; shareID != nil {
+				shareIDStr = ptr.To(string(*shareID))
+			}
+
 			ginkgo.By("Setting the device status a first time")
 			allocatedResourceClaim.Status.Devices = append(allocatedResourceClaim.Status.Devices,
 				resourceapi.AllocatedDeviceStatus{
 					Driver:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Driver,
 					Pool:       allocatedResourceClaim.Status.Allocation.Devices.Results[0].Pool,
 					Device:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Device,
+					ShareID:    shareIDStr,
 					Conditions: []metav1.Condition{{Type: "a", Status: "True", Message: "c", Reason: "d", LastTransitionTime: metav1.NewTime(time.Now().Truncate(time.Second))}},
 					Data:       &runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)},
 					NetworkData: &resourceapi.NetworkDeviceData{
@@ -2244,6 +2335,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				Driver:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Driver,
 				Pool:       allocatedResourceClaim.Status.Allocation.Devices.Results[0].Pool,
 				Device:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Device,
+				ShareID:    shareIDStr,
 				Conditions: []metav1.Condition{{Type: "e", Status: "True", Message: "g", Reason: "h", LastTransitionTime: metav1.NewTime(time.Now().Truncate(time.Second))}},
 				Data:       &runtime.RawExtension{Raw: []byte(`{"bar":"foo"}`)},
 				NetworkData: &resourceapi.NetworkDeviceData{

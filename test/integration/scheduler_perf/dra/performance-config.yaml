@@ -693,3 +693,69 @@
       initPods: 2500
       measurePods: 2500
       maxClaimsPerNode: 10
+
+# SteadyStateClusterResourceClaimTemplateConsumableCapacity is a variant of
+# SchedulingWithResourceClaimTemplate. It creates a single ResourceSlice that have two devices, 
+# one preallocate device slice and one basic device. Both allows multiple allocations and contain consumable capacity.
+# And, it creates a resource claim template with two requests.
+# Each requests half of this capacity for two count.
+# The first request checks distinctAttribute which the other checks matchAttribute.
+- name: SteadyStateClusterResourceClaimTemplateConsumableCapacity
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAConsumableCapacity: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: templates/resourceslice-consumablecapacity.yaml
+    countParam: $resourceSlices
+  - opcode: createAny
+    templatePath: templates/deviceclass-consumablecapacity.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-consumablecapacity.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyState: true
+    durationParam: $duration
+    podTemplatePath: templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 1
+      measurePods: 1
+      duration: 2s
+      maxClaimsPerNode: 2
+  - name: fast_with_DRAPartitionableDevices
+    featureGates:
+      DRAPartitionableDevices: true
+      DRAResourceClaimDeviceStatus: true
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 1
+      measurePods: 1
+      duration: 2s
+      maxClaimsPerNode: 2
+  - name: 2000pods_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      resourceSlices: 2000
+      measurePods: 2000
+      duration: 10s
+      maxClaimsPerNode: 20

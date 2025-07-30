@@ -295,6 +295,14 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 		}
 	}
 
+	// Dropped fields for consumable capacity can be detected with allowMultipleAllocations flag without looking at individual device capacity.
+	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
+		if err.DesiredSlice.Spec.Devices[i].AllowMultipleAllocations != nil && err.ActualSlice.Spec.Devices[i].AllowMultipleAllocations == nil {
+			disabled = append(disabled, "DRAConsumableCapacity")
+			break
+		}
+	}
+
 	return disabled
 }
 
