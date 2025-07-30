@@ -131,6 +131,10 @@ func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 }
 
 func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager, idsPerPod *int64) (*UsernsManager, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+		return nil, nil
+	}
+
 	userNsLength := uint32(kubeletconfig.DefaultKubeletUserNamespacesIDsPerPod)
 	if idsPerPod != nil {
 		// The value is already validated as part of kubelet config validation, so we can safely
@@ -169,11 +173,6 @@ func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager, idsPerPod *int6
 		off:          off,
 		len:          len,
 		userNsLength: userNsLength,
-	}
-
-	// do not bother reading the list of pods if user namespaces are not enabled.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-		return &m, nil
 	}
 
 	found, err := kl.ListPodsFromDisk()
