@@ -123,6 +123,12 @@ func filterByPlatform(specs et.ExtensionTestSpecs) {
 			// https://issues.redhat.com/browse/OCPBUGS-53249
 			"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on",
 		},
+		// MicroShift identifies itself as "none"
+		"none": {
+			// LoadBalancer tests in 1.31 require explicit platform-specific skips
+			// https://issues.redhat.com/browse/OCPBUGS-53249
+			"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on",
+		},
 	}
 
 	for platform, exclusions := range platformExclusions {
