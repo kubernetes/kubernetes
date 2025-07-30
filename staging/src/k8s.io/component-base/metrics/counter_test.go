@@ -314,7 +314,6 @@ func TestCounterWithExemplar(t *testing.T) {
 		Name: "metric_exemplar_test",
 		Help: "helpless",
 	})
-	_ = counter.WithContext(ctxForSpanCtx)
 
 	// Register counter.
 	registry := newKubeRegistry(apimachineryversion.Info{
@@ -325,9 +324,9 @@ func TestCounterWithExemplar(t *testing.T) {
 	registry.MustRegister(counter)
 
 	// Call underlying exemplar methods.
-	counter.Add(toAdd)
-	counter.Inc()
-	counter.Inc()
+	counter.WithContext(ctxForSpanCtx).Add(toAdd)
+	counter.WithContext(ctxForSpanCtx).Inc()
+	counter.WithContext(ctxForSpanCtx).Inc()
 
 	// Gather.
 	mfs, err := registry.Gather()
