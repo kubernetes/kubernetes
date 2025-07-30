@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/blang/semver/v4"
@@ -26,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/trace"
+	traceNoop "go.opentelemetry.io/otel/trace/noop"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
@@ -490,4 +492,117 @@ func TestHistogramVecWithExemplar(t *testing.T) {
 			t.Fatalf("Got unexpected label %s", *l.Name)
 		}
 	}
+}
+
+// TestHistogramConcurrentWithContextRace reproduces the race condition in Histogram.WithContext
+// where h.ctx is written concurrently with reads in withExemplar method.
+// This test simulates the real authentication flow that triggers the race:
+// x509.AuthenticateRequest -> union.AuthenticateRequest -> group.AuthenticateRequest
+func TestHistogramConcurrentWithContextRace(t *testing.T) {
+	opts := &HistogramOpts{
+		Namespace: "apiserver",
+		Subsystem: "authentication",
+		Name:      "requests_total",
+		Help:      "Authentication requests histogram for race condition testing",
+		Buckets:   prometheus.DefBuckets,
+	}
+
+	h := NewHistogram(opts)
+
+	// Force initialization by calling initializeMetric directly
+	h.initializeMetric()
+
+	// Create contexts with trace spans to trigger exemplar code path
+	ctx1, span1 := createContextWithSpan("x509-auth", "authenticate-request")
+	defer span1.End()
+	ctx2, span2 := createContextWithSpan("union-auth", "union-authenticate")
+	defer span2.End()
+
+	var wg sync.WaitGroup
+	iterations := 10000 // Increase iterations to make race more likely
+
+	// Goroutine 1: Simulate x509 Authenticator calling WithContext
+	// This matches: x509.(*Authenticator).AuthenticateRequest() calling WithContext
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			// Simulate authentication request processing
+			simulateX509AuthenticateRequest(h, ctx1, i)
+		}
+	}()
+
+	// Goroutine 2: Simulate concurrent Observe calls (metrics collection)
+	// This matches the withExemplar/Observe path that reads h.ctx
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			h.Observe(float64(i % 10))
+		}
+	}()
+
+	// Goroutine 3: Simulate union AuthenticateRequest calling WithContext
+	// This matches: union.(*unionAuthRequestHandler).AuthenticateRequest()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			// Simulate union authentication processing
+			simulateUnionAuthenticateRequest(h, ctx2, i)
+		}
+	}()
+
+	// Goroutine 4: Simulate group AuthenticateRequest calling WithContext
+	// This matches: group.(*AuthenticatedGroupAdder).AuthenticateRequest()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			// Simulate group authentication processing
+			simulateGroupAuthenticateRequest(h, ctx1, ctx2, i)
+		}
+	}()
+
+	wg.Wait()
+}
+
+// simulateX509AuthenticateRequest simulates the call path from x509 authenticator
+func simulateX509AuthenticateRequest(h ObserverMetric, ctx context.Context, iteration int) {
+	// Simulate the authentication request processing that calls WithContext
+	if hWithCtx, ok := h.(*Histogram); ok {
+		hWithCtx.WithContext(ctx)
+	}
+}
+
+// simulateUnionAuthenticateRequest simulates the call path from union authenticator
+func simulateUnionAuthenticateRequest(h ObserverMetric, ctx context.Context, iteration int) {
+	// Simulate union authentication processing
+	if hWithCtx, ok := h.(*Histogram); ok {
+		hWithCtx.WithContext(ctx)
+	}
+}
+
+// simulateGroupAuthenticateRequest simulates the call path from group authenticator
+func simulateGroupAuthenticateRequest(h ObserverMetric, ctx1, ctx2 context.Context, iteration int) {
+	// Alternate between contexts to simulate different authentication scenarios
+	ctx := ctx1
+	if iteration%3 == 0 {
+		ctx = ctx2
+	}
+
+	if hWithCtx, ok := h.(*Histogram); ok {
+		hWithCtx.WithContext(ctx)
+	}
+}
+
+// Helper function to create a context with a valid trace span
+func createContextWithSpan(traceID, spanID string) (context.Context, trace.Span) {
+	ctx := context.Background()
+
+	// Create a noop tracer and span for testing
+	tracer := traceNoop.NewTracerProvider().Tracer("test")
+	ctx, span := tracer.Start(ctx, "test-span")
+
+	return ctx, span
 }
