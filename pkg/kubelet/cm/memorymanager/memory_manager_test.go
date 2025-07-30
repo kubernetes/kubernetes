@@ -151,6 +151,13 @@ func getPod(podUID string, containerName string, requirements *v1.ResourceRequir
 	}
 }
 
+func getPodWithPodLevelResources(podUID string, podRequirements *v1.ResourceRequirements, containerName string, containerRequirements *v1.ResourceRequirements) *v1.Pod {
+	pod := getPod(podUID, containerName, containerRequirements)
+	pod.Spec.Resources = podRequirements
+
+	return pod
+}
+
 func getPodWithInitContainers(podUID string, containers []v1.Container, initContainers []v1.Container) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
