@@ -397,14 +397,6 @@ func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr 
 			// we should log the error and not reconcile this cronjob until an update to spec
 			logger.V(2).Info("Unparseable schedule for cronjob", "cronjob", klog.KObj(newCJ), "schedule", newCJ.Spec.Schedule, "err", err)
 			jm.recorder.Eventf(newCJ, corev1.EventTypeWarning, "UnParseableCronJobSchedule", "unparseable schedule for cronjob: %s", newCJ.Spec.Schedule)
-
-			// Immediately clear NextScheduleTime when schedule is unparseable and update status
-			cronJobCopy := newCJ.DeepCopy()
-			cronJobCopy.Status.NextScheduleTime = nil
-			if _, err := jm.cronJobControl.UpdateStatus(context.TODO(), cronJobCopy); err != nil {
-				logger.V(2).Info("Unable to update status for cronjob after schedule parse error", "cronjob", klog.KObj(newCJ), "err", err)
-			}
-
 			return
 		}
 
@@ -429,33 +421,7 @@ func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr 
 	// TODO: need to handle the change of spec.JobTemplate.metadata.labels explicitly
 	//   to cleanup jobs with old labels
 
-	// Handle suspend state changes immediately
-	oldSuspend := oldCJ.Spec.Suspend != nil && *oldCJ.Spec.Suspend
-	newSuspend := newCJ.Spec.Suspend != nil && *newCJ.Spec.Suspend
-
-	if oldSuspend != newSuspend {
-		cronJobCopy := newCJ.DeepCopy()
-
-		if newSuspend {
-			// Clear NextScheduleTime when suspended
-			cronJobCopy.Status.NextScheduleTime = nil
-		} else {
-			// Calculate NextScheduleTime when unsuspended
-			sched, err := cron.ParseStandard(formatSchedule(newCJ, nil))
-			if err != nil {
-				// Invalid schedule, clear NextScheduleTime
-				cronJobCopy.Status.NextScheduleTime = nil
-			} else {
-				now := jm.now()
-				nextScheduleTime := calculateNextScheduleTime(cronJobCopy, now, sched)
-				cronJobCopy.Status.NextScheduleTime = &metav1.Time{Time: *nextScheduleTime}
-			}
-		}
-
-		if _, err := jm.cronJobControl.UpdateStatus(context.TODO(), cronJobCopy); err != nil {
-			logger.V(2).Info("Unable to update status for cronjob after suspend change", "cronjob", klog.KObj(newCJ), "err", err)
-		}
-	}
+	// Suspend state changes are handled during normal sync
 
 	jm.enqueueController(curr)
 }
@@ -539,11 +505,6 @@ func (jm *ControllerV2) syncCronJob(
 	if cronJob.DeletionTimestamp != nil {
 		// The CronJob is being deleted.
 		// Don't do anything other than updating status.
-
-		// Clear next schedule time when being deleted
-		cronJob.Status.NextScheduleTime = nil
-		updateStatus = true
-
 		return nil, updateStatus, nil
 	}
 
@@ -553,22 +514,12 @@ func (jm *ControllerV2) syncCronJob(
 		if _, err := time.LoadLocation(timeZone); err != nil {
 			logger.V(4).Info("Not starting job because timeZone is invalid", "cronjob", klog.KObj(cronJob), "timeZone", timeZone, "err", err)
 			jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "UnknownTimeZone", "invalid timeZone: %q: %s", timeZone, err)
-
-			// Clear next schedule time when timezone is invalid
-			cronJob.Status.NextScheduleTime = nil
-			updateStatus = true
-
 			return nil, updateStatus, nil
 		}
 	}
 
 	if cronJob.Spec.Suspend != nil && *cronJob.Spec.Suspend {
 		logger.V(4).Info("Not starting job because the cron is suspended", "cronjob", klog.KObj(cronJob))
-
-		// Clear next schedule time when suspended
-		cronJob.Status.NextScheduleTime = nil
-		updateStatus = true
-
 		return nil, updateStatus, nil
 	}
 
@@ -578,11 +529,6 @@ func (jm *ControllerV2) syncCronJob(
 		// we should log the error and not reconcile this cronjob until an update to spec
 		logger.V(2).Info("Unparseable schedule", "cronjob", klog.KObj(cronJob), "schedule", cronJob.Spec.Schedule, "err", err)
 		jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "UnparseableSchedule", "unparseable schedule: %q : %s", cronJob.Spec.Schedule, err)
-
-		// Clear next schedule time when schedule is unparseable
-		cronJob.Status.NextScheduleTime = nil
-		updateStatus = true
-
 		return nil, updateStatus, nil
 	}
 
@@ -600,11 +546,6 @@ func (jm *ControllerV2) syncCronJob(
 		// Otherwise, the queue is always suppose to trigger sync function at the time of
 		// the scheduled time, that will give atleast 1 unmet time schedule
 		logger.V(4).Info("No unmet start times", "cronjob", klog.KObj(cronJob))
-
-		// Calculate and store next schedule time even when no unmet start times
-		nextScheduleTime := calculateNextScheduleTime(cronJob, now, sched)
-		cronJob.Status.NextScheduleTime = &metav1.Time{Time: *nextScheduleTime}
-		updateStatus = true
 
 		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return t, updateStatus, nil
@@ -626,11 +567,6 @@ func (jm *ControllerV2) syncCronJob(
 		// and event the next time we process it, and also so the user looking at the status
 		// can see easily that there was a missed execution.
 
-		// Calculate and store next schedule time even when missing schedule
-		nextScheduleTime := calculateNextScheduleTime(cronJob, now, sched)
-		cronJob.Status.NextScheduleTime = &metav1.Time{Time: *nextScheduleTime}
-		updateStatus = true
-
 		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return t, updateStatus, nil
 	}
@@ -640,11 +576,6 @@ func (jm *ControllerV2) syncCronJob(
 			Namespace: cronJob.Namespace,
 		}}) || cronJob.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
 		logger.V(4).Info("Not starting job because the scheduled time is already processed", "cronjob", klog.KObj(cronJob), "schedule", scheduledTime)
-
-		// Calculate and store next schedule time even when already processed
-		nextScheduleTime := calculateNextScheduleTime(cronJob, now, sched)
-		cronJob.Status.NextScheduleTime = &metav1.Time{Time: *nextScheduleTime}
-		updateStatus = true
 
 		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return t, updateStatus, nil
@@ -661,11 +592,6 @@ func (jm *ControllerV2) syncCronJob(
 		// But that would mean that you could not inspect prior successes or failures of Forbid jobs.
 		logger.V(4).Info("Not starting job because prior execution is still running and concurrency policy is Forbid", "cronjob", klog.KObj(cronJob))
 		jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "JobAlreadyActive", "Not starting job because prior execution is running and concurrency policy is Forbid")
-
-		// Calculate and store next schedule time even when concurrency is forbidden
-		nextScheduleTime := calculateNextScheduleTime(cronJob, now, sched)
-		cronJob.Status.NextScheduleTime = &metav1.Time{Time: *nextScheduleTime}
-		updateStatus = true
 
 		t := nextScheduleTimeDuration(cronJob, now, sched)
 		return t, updateStatus, nil
