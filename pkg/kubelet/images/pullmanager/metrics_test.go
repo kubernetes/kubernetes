@@ -44,85 +44,130 @@ func TestFSPullRecordsMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmpIntents(t, 0)
-	require.NoError(t, fsAccessor.WriteImagePullIntent("test-image:latest"))
-	cmpIntents(t, 1)
+	const pullIntentsCacheSize, pulledRecordsCacheSize, stripedSetLocksSize int32 = 5, 10, 1
+	inMemoryAccessor := NewCachedPullRecordsAccessor(fsAccessor, pullIntentsCacheSize, pulledRecordsCacheSize, stripedSetLocksSize)
+
+	cmpFSIntents(t, 0)
+	cmpMemIntents(t, 0)
+	require.NoError(t, inMemoryAccessor.WriteImagePullIntent("test-image:latest"))
+	cmpFSIntents(t, 1)
+	cmpMemIntents(t, 20)
 
 	// Test that writing the same record does not increase the count
-	require.NoError(t, fsAccessor.WriteImagePullIntent("test-image:latest"))
-	require.NoError(t, fsAccessor.WriteImagePullIntent("test-image:latest"))
-	cmpIntents(t, 1)
+	require.NoError(t, inMemoryAccessor.WriteImagePullIntent("test-image:latest"))
+	require.NoError(t, inMemoryAccessor.WriteImagePullIntent("test-image:latest"))
+	cmpFSIntents(t, 1)
+	cmpMemIntents(t, 20)
 
 	// Test adding more records
-	require.NoError(t, fsAccessor.WriteImagePullIntent("test-image:v1"))
-	require.NoError(t, fsAccessor.WriteImagePullIntent("test-image:v1.1"))
-	cmpIntents(t, 3)
+	require.NoError(t, inMemoryAccessor.WriteImagePullIntent("test-image:v1"))
+	require.NoError(t, inMemoryAccessor.WriteImagePullIntent("test-image:v1.1"))
+	cmpFSIntents(t, 3)
+	cmpMemIntents(t, 60)
 
-	cmpPulledRecords(t, 0)
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
+	cmpFSPulledRecords(t, 0)
+	cmpMemPulledRecords(t, 0)
+	require.NoError(t, inMemoryAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-latest-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
-	cmpPulledRecords(t, 1)
+	cmpFSPulledRecords(t, 1)
+	cmpMemPulledRecords(t, 10)
 
 	// Test that writing the same record does not increase the count
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
+	require.NoError(t, inMemoryAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-latest-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
+	require.NoError(t, inMemoryAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-latest-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
-	cmpPulledRecords(t, 1)
+	cmpFSPulledRecords(t, 1)
+	cmpMemPulledRecords(t, 10)
 
 	// Test adding more records
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
+	require.NoError(t, inMemoryAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-v1-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
+	require.NoError(t, inMemoryAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-v1.1-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
+	require.NoError(t, inMemoryAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-v1.2-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
-	cmpPulledRecords(t, 4)
+	cmpFSPulledRecords(t, 4)
+	cmpMemPulledRecords(t, 40)
 
-	cmpIntents(t, 3) // double-check that intents count is not affected
+	// double-check that intents count is not affected
+	cmpFSIntents(t, 3)
+	cmpMemIntents(t, 60)
 
 	// Test deletions
-	require.NoError(t, fsAccessor.DeleteImagePullIntent("test-image:latest"))
-	cmpIntents(t, 2)
+	require.NoError(t, inMemoryAccessor.DeleteImagePullIntent("test-image:latest"))
+	cmpFSIntents(t, 2)
+	cmpMemIntents(t, 40)
 
-	require.NoError(t, fsAccessor.DeleteImagePullIntent("test-image:latest"))
-	require.NoError(t, fsAccessor.DeleteImagePullIntent("test-image:latest"))
-	cmpIntents(t, 2)
+	require.NoError(t, inMemoryAccessor.DeleteImagePullIntent("test-image:latest"))
+	require.NoError(t, inMemoryAccessor.DeleteImagePullIntent("test-image:latest"))
+	cmpFSIntents(t, 2)
+	cmpMemIntents(t, 40)
 
-	require.NoError(t, fsAccessor.DeleteImagePullIntent("test-image:v1"))
-	require.NoError(t, fsAccessor.DeleteImagePullIntent("test-image:v1.1"))
-	cmpIntents(t, 0)
+	require.NoError(t, inMemoryAccessor.DeleteImagePullIntent("test-image:v1"))
+	require.NoError(t, inMemoryAccessor.DeleteImagePullIntent("test-image:v1.1"))
+	cmpFSIntents(t, 0)
+	cmpMemIntents(t, 0)
 
-	cmpPulledRecords(t, 4) // double-check that pulled records count is not affected
+	// double-check that pulled records count is not affected
+	cmpFSPulledRecords(t, 4)
+	cmpMemPulledRecords(t, 40)
 
 	// Test image pulled record deletions
-	require.NoError(t, fsAccessor.DeleteImagePulledRecord("test-image-v1.1-ref"))
-	cmpPulledRecords(t, 3)
+	require.NoError(t, inMemoryAccessor.DeleteImagePulledRecord("test-image-v1.1-ref"))
+	cmpFSPulledRecords(t, 3)
+	cmpMemPulledRecords(t, 30)
 
-	require.NoError(t, fsAccessor.DeleteImagePulledRecord("test-image-v1.1-ref"))
-	require.NoError(t, fsAccessor.DeleteImagePulledRecord("test-image-v1.1-ref"))
-	cmpPulledRecords(t, 3)
+	require.NoError(t, inMemoryAccessor.DeleteImagePulledRecord("test-image-v1.1-ref"))
+	require.NoError(t, inMemoryAccessor.DeleteImagePulledRecord("test-image-v1.1-ref"))
+	cmpFSPulledRecords(t, 3)
+	cmpMemPulledRecords(t, 30)
 
-	require.NoError(t, fsAccessor.DeleteImagePulledRecord("test-image-v1.2-ref"))
-	require.NoError(t, fsAccessor.DeleteImagePulledRecord("test-image-v1-ref"))
-	require.NoError(t, fsAccessor.DeleteImagePulledRecord("test-image-latest-ref"))
-	cmpPulledRecords(t, 0)
+	require.NoError(t, inMemoryAccessor.DeleteImagePulledRecord("test-image-v1.2-ref"))
+	require.NoError(t, inMemoryAccessor.DeleteImagePulledRecord("test-image-v1-ref"))
+	require.NoError(t, inMemoryAccessor.DeleteImagePulledRecord("test-image-latest-ref"))
+	cmpFSPulledRecords(t, 0)
+	cmpMemPulledRecords(t, 0)
 
-	require.NoError(t, fsAccessor.DeleteImagePulledRecord("test-image-v1-ref"))
-	require.NoError(t, fsAccessor.DeleteImagePulledRecord("test-image-latest-ref"))
-	cmpPulledRecords(t, 0)
+	require.NoError(t, inMemoryAccessor.DeleteImagePulledRecord("test-image-v1-ref"))
+	require.NoError(t, inMemoryAccessor.DeleteImagePulledRecord("test-image-latest-ref"))
+	cmpFSPulledRecords(t, 0)
+	cmpMemPulledRecords(t, 0)
+
+	// test exceeding memory cache sizes
+	for i := range 20 {
+		require.NoError(t, inMemoryAccessor.WriteImagePullIntent(fmt.Sprintf("test-image-%d:latest", i)))
+		require.NoError(t, inMemoryAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
+			ImageRef:        fmt.Sprintf("test-image-v%d-ref", i),
+			LastUpdatedTime: metav1.NewTime(time.Now()),
+		}))
+	}
+	cmpFSIntents(t, 20)
+	cmpFSPulledRecords(t, 20)
+	cmpMemIntents(t, 100)
+	cmpMemPulledRecords(t, 100)
+
+	// test removing some of the latest records from the cache
+	require.NoError(t, inMemoryAccessor.DeleteImagePullIntent("test-image-19:latest"))
+	cmpFSIntents(t, 19)
+	cmpMemIntents(t, 80)
+
+	require.NoError(t, inMemoryAccessor.DeleteImagePulledRecord("test-image-v19-ref"))
+	cmpFSPulledRecords(t, 19)
+	cmpMemPulledRecords(t, 90)
+
 }
 
 func TestMustAttemptPullMetrics(t *testing.T) {
@@ -192,7 +237,7 @@ func TestMustAttemptPullMetrics(t *testing.T) {
 	cmpMustAttemptPullMetrics(t, expectedMetrics)
 }
 
-func cmpIntents(t *testing.T, expected uint) {
+func cmpFSIntents(t *testing.T, expected uint) {
 	t.Helper()
 	const metricFormat = `
 # HELP kubelet_imagemanager_ondisk_pullintents [ALPHA] Number of ImagePullIntents stored on disk.
@@ -207,7 +252,7 @@ kubelet_imagemanager_ondisk_pullintents %d
 		t.Errorf("failed to gather metrics: %v", err)
 	}
 }
-func cmpPulledRecords(t *testing.T, expected uint) {
+func cmpFSPulledRecords(t *testing.T, expected uint) {
 	t.Helper()
 	const metricFormat = `
 # HELP kubelet_imagemanager_ondisk_pulledrecords [ALPHA] Number of ImagePulledRecords stored on disk.
@@ -217,6 +262,37 @@ kubelet_imagemanager_ondisk_pulledrecords %d
 
 	err := metricstestutil.GatherAndCompare(
 		legacyregistry.DefaultGatherer, strings.NewReader(fmt.Sprintf(metricFormat, expected)), "kubelet_imagemanager_ondisk_pulledrecords",
+	)
+	if err != nil {
+		t.Errorf("failed to gather metrics: %v", err)
+	}
+}
+
+func cmpMemIntents(t *testing.T, expected uint) {
+	t.Helper()
+	const metricFormat = `
+# HELP kubelet_imagemanager_inmemory_pullintents_usage_percent [ALPHA] The ImagePullIntents in-memory cache usage in percent.
+# TYPE kubelet_imagemanager_inmemory_pullintents_usage_percent gauge
+kubelet_imagemanager_inmemory_pullintents_usage_percent %d
+`
+
+	err := metricstestutil.GatherAndCompare(
+		legacyregistry.DefaultGatherer, strings.NewReader(fmt.Sprintf(metricFormat, expected)), "kubelet_imagemanager_inmemory_pullintents_usage_percent",
+	)
+	if err != nil {
+		t.Errorf("failed to gather metrics: %v", err)
+	}
+}
+func cmpMemPulledRecords(t *testing.T, expected uint) {
+	t.Helper()
+	const metricFormat = `
+# HELP kubelet_imagemanager_inmemory_pulledrecords_usage_percent [ALPHA] The ImagePulledRecords in-memory cache usage in percent.
+# TYPE kubelet_imagemanager_inmemory_pulledrecords_usage_percent gauge
+kubelet_imagemanager_inmemory_pulledrecords_usage_percent %d
+`
+
+	err := metricstestutil.GatherAndCompare(
+		legacyregistry.DefaultGatherer, strings.NewReader(fmt.Sprintf(metricFormat, expected)), "kubelet_imagemanager_inmemory_pulledrecords_usage_percent",
 	)
 	if err != nil {
 		t.Errorf("failed to gather metrics: %v", err)
