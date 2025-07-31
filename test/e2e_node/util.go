@@ -214,6 +214,38 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ctx
 	})
 }
 
+type updateKubeletOptions struct {
+	deleteStateFiles          bool
+	ensureConsistentReadyNode bool
+	// TODO: add option to use systemctl stop, now we only use systemctl kill for historical reasons
+}
+
+func updateKubeletConfigWithOptions(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, opts updateKubeletOptions) {
+	ginkgo.GinkgoHelper()
+	// Update the Kubelet configuration.
+	ginkgo.By("Stopping the kubelet")
+	restartKubelet := mustStopKubelet(ctx, f)
+
+	// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
+	if opts.deleteStateFiles {
+		ginkgo.By("Deleting the state files")
+		deleteStateFile(cpuManagerStateFile)
+		deleteStateFile(memoryManagerStateFile)
+	}
+
+	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
+
+	ginkgo.By("Restarting the kubelet")
+	restartKubelet(ctx)
+
+	if opts.ensureConsistentReadyNode {
+		gomega.Consistently(ctx, func(ctx context.Context) bool {
+			return getNodeReadyStatus(ctx, f) && kubeletHealthCheck(kubeletHealthCheckURL)
+		}).WithTimeout(2 * time.Minute).WithPolling(2 * time.Second).Should(gomega.BeTrueBecause("node keeps reporting ready status"))
+	}
+}
+
+// backward compatibility: TODO: remove/reimplement in terms of updateKubeletConfigWithOptions
 func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {
 	// Update the Kubelet configuration.
 	ginkgo.By("Stopping the kubelet")
@@ -251,8 +283,19 @@ func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 }
 
 func deleteStateFile(stateFileName string) {
-	err := exec.Command("/bin/sh", "-c", fmt.Sprintf("rm -f %s", stateFileName)).Run()
+	cmdLet := fmt.Sprintf("rm -f %s", stateFileName)
+	framework.Logf("About to run: %q", cmdLet)
+	err := exec.Command("/bin/sh", "-c", cmdLet).Run()
 	framework.ExpectNoError(err, "failed to delete the state file")
+}
+
+func getNodeReadyStatus(ctx context.Context, f *framework.Framework) bool {
+	ginkgo.GinkgoHelper()
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	framework.ExpectNoError(err)
+	// Assuming that there is only one node, because this is a node e2e test.
+	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1), "the number of nodes is not as expected")
+	return isNodeReady(&nodeList.Items[0])
 }
 
 // listNamespaceEvents lists the events in the given namespace.
@@ -630,4 +673,14 @@ func WaitForPodInitContainerToFail(ctx context.Context, c clientset.Interface, n
 
 func nodeNameOrIP() string {
 	return "localhost"
+}
+
+// isNodeReady returns true if a node is ready; false otherwise.
+func isNodeReady(node *v1.Node) bool {
+	for _, c := range node.Status.Conditions {
+		if c.Type == v1.NodeReady {
+			return c.Status == v1.ConditionTrue
+		}
+	}
+	return false
 }
