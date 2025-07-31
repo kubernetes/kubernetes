@@ -37,17 +37,29 @@ type Struct struct {
 	IPTypedefField IPStringType `json:"ipTypedefField"`
 
 	// +k8s:format=k8s-short-name
-	DNSLabelField string `json:"dnsLabelField"`
+	ShortNameField string `json:"shortNameField"`
 
 	// +k8s:format=k8s-short-name
-	DNSLabelPtrField *string `json:"dnsLabelPtrField"`
+	ShortNamePtrField *string `json:"shortNamePtrField"`
 
 	// Note: no validation here
-	DNSLabelTypedefField DNSLabelStringType `json:"dnsLabelTypedefField"`
+	ShortNameTypedefField ShortNameStringType `json:"shortNameTypedefField"`
+
+	// +k8s:format=k8s-long-name
+	LongNameField string `json:"longNameField"`
+
+	// +k8s:format=k8s-long-name
+	LongNamePtrField *string `json:"longNamePtrField"`
+
+	// Note: no validation here
+	LongNameTypedefField LongNameStringType `json:"longNameTypedefField"`
 }
 
 // +k8s:format=k8s-ip
 type IPStringType string
 
 // +k8s:format=k8s-short-name
-type DNSLabelStringType string
+type ShortNameStringType string
+
+// +k8s:format=k8s-long-name
+type LongNameStringType string

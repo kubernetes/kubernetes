@@ -56,6 +56,20 @@ func Validate_T(ctx context.Context, op operation.Operation, fldPath *field.Path
 		return // do not proceed
 	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T Regular")...)
+	func() { // cohort c2
+		if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c2 ShortCircuit"); len(e) != 0 {
+			errs = append(errs, e...)
+			return // do not proceed
+		}
+		errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c2 Regular")...)
+	}()
+	func() { // cohort c1
+		if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c1 ShortCircuit"); len(e) != 0 {
+			errs = append(errs, e...)
+			return // do not proceed
+		}
+		errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c1 Regular")...)
+	}()
 
 	// field T.TypeMeta has no validation
 
@@ -72,6 +86,20 @@ func Validate_T(ctx context.Context, op operation.Operation, fldPath *field.Path
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S Regular")...)
+			func() { // cohort c2
+				if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c2 ShortCircuit"); len(e) != 0 {
+					errs = append(errs, e...)
+					return // do not proceed
+				}
+				errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c2 Regular")...)
+			}()
+			func() { // cohort c1
+				if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c1 ShortCircuit"); len(e) != 0 {
+					errs = append(errs, e...)
+					return // do not proceed
+				}
+				errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c1 Regular")...)
+			}()
 			return
 		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *T) *string { return &oldObj.S }))...)
 

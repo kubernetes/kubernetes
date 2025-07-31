@@ -113,9 +113,10 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 
 func (ftv formatTagValidator) Docs() TagDoc {
 	return TagDoc{
-		Tag:         ftv.TagName(),
-		Scopes:      ftv.ValidScopes().UnsortedList(),
-		Description: "Indicates that a string field has a particular format.",
+		Tag:            ftv.TagName(),
+		Scopes:         ftv.ValidScopes().UnsortedList(),
+		StabilityLevel: Stable,
+		Description:    "Indicates that a string field has a particular format.",
 		Payloads: []TagPayloadDoc{{ // Keep this list alphabetized.
 			Description: "k8s-ip",
 			Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
@@ -130,7 +131,7 @@ func (ftv formatTagValidator) Docs() TagDoc {
 			Docs:        "This field holds a Kubernetes \"long name\", aka a \"DNS subdomain\" value.",
 		}, {
 			Description: "k8s-long-name-caseless",
-			Docs:        "Deprecated: This field holds a case-insensitive Kubernetes \"long name\", aka a \"DNS subdomain\" value.",
+			Docs:        "This field holds a case-insensitive Kubernetes \"long name\", aka a \"DNS subdomain\" value.",
 		}, {
 			Description: "k8s-resource-pool-name",
 			Docs:        "This field holds value with one or more Kubernetes \"long name\" parts separated by `/` and no longer than 253 characters.",

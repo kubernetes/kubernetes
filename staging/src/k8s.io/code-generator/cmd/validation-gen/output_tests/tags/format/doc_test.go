@@ -33,6 +33,9 @@ func Test(t *testing.T) {
 		ShortNameField:        "foo-bar",
 		ShortNamePtrField:     ptr.To("foo-bar"),
 		ShortNameTypedefField: "foo-bar",
+		LongNameField:         "foo.bar",
+		LongNamePtrField:      ptr.To("foo.bar"),
+		LongNameTypedefField:  "foo.bar",
 	}).ExpectValid()
 
 	st.Value(&Struct{
@@ -42,6 +45,9 @@ func Test(t *testing.T) {
 		ShortNameField:        "1234",
 		ShortNamePtrField:     ptr.To("1234"),
 		ShortNameTypedefField: "1234",
+		LongNameField:         "1.2.3.4",
+		LongNamePtrField:      ptr.To("1.2.3.4"),
+		LongNameTypedefField:  "1.2.3.4",
 	}).ExpectValid()
 
 	invalidStruct := &Struct{
@@ -51,6 +57,9 @@ func Test(t *testing.T) {
 		ShortNameField:        "",
 		ShortNamePtrField:     ptr.To(""),
 		ShortNameTypedefField: "",
+		LongNameField:         "",
+		LongNamePtrField:      ptr.To(""),
+		LongNameTypedefField:  "",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=k8s-ip"),
@@ -59,6 +68,9 @@ func Test(t *testing.T) {
 		field.Invalid(field.NewPath("shortNameField"), nil, "").WithOrigin("format=k8s-short-name"),
 		field.Invalid(field.NewPath("shortNamePtrField"), nil, "").WithOrigin("format=k8s-short-name"),
 		field.Invalid(field.NewPath("shortNameTypedefField"), nil, "").WithOrigin("format=k8s-short-name"),
+		field.Invalid(field.NewPath("longNameField"), nil, "").WithOrigin("format=k8s-long-name"),
+		field.Invalid(field.NewPath("longNamePtrField"), nil, "").WithOrigin("format=k8s-long-name"),
+		field.Invalid(field.NewPath("longNameTypedefField"), nil, "").WithOrigin("format=k8s-long-name"),
 	})
 	// Test validation ratcheting
 	st.Value(invalidStruct).OldValue(invalidStruct).ExpectValid()
@@ -70,6 +82,9 @@ func Test(t *testing.T) {
 		ShortNameField:        "Not a ShortName",
 		ShortNamePtrField:     ptr.To("Not a ShortName"),
 		ShortNameTypedefField: "Not a ShortName",
+		LongNameField:         "Not a LongName",
+		LongNamePtrField:      ptr.To("Not a LongName"),
+		LongNameTypedefField:  "Not a LongName",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=k8s-ip"),
@@ -78,6 +93,9 @@ func Test(t *testing.T) {
 		field.Invalid(field.NewPath("shortNameField"), nil, "").WithOrigin("format=k8s-short-name"),
 		field.Invalid(field.NewPath("shortNamePtrField"), nil, "").WithOrigin("format=k8s-short-name"),
 		field.Invalid(field.NewPath("shortNameTypedefField"), nil, "").WithOrigin("format=k8s-short-name"),
+		field.Invalid(field.NewPath("longNameField"), nil, "").WithOrigin("format=k8s-long-name"),
+		field.Invalid(field.NewPath("longNamePtrField"), nil, "").WithOrigin("format=k8s-long-name"),
+		field.Invalid(field.NewPath("longNameTypedefField"), nil, "").WithOrigin("format=k8s-long-name"),
 	})
 	// Test validation ratcheting
 	st.Value(invalidStruct).OldValue(invalidStruct).ExpectValid()

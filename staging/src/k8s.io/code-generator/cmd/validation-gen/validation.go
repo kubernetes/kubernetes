@@ -391,7 +391,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		if fldPath.String() != t.String() {
 			panic(fmt.Sprintf("path for type != the type name: %s, %s", t.String(), fldPath.String()))
 		}
-		consts := td.constantsByType[t]
+		consts, _ := td.constantsByType[t]
 		context := validators.Context{
 			Scope:      validators.ScopeType,
 			Type:       t,
@@ -1319,34 +1319,6 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				sw.Do(")", targs)
 			}
 
-			// If validation is conditional, wrap the validation function with a conditions check.
-			if !v.Conditions.Empty() {
-				emitBaseFunction := emitCall
-				emitCall = func() {
-					sw.Do("func() $.field.ErrorList|raw$ {\n", targs)
-					sw.Do("  if ", nil)
-					firstCondition := true
-					if len(v.Conditions.OptionEnabled) > 0 {
-						sw.Do("op.HasOption($.$)", strconv.Quote(v.Conditions.OptionEnabled))
-						firstCondition = false
-					}
-					if len(v.Conditions.OptionDisabled) > 0 {
-						if !firstCondition {
-							sw.Do(" && ", nil)
-						}
-						sw.Do("!op.HasOption($.$)", strconv.Quote(v.Conditions.OptionDisabled))
-					}
-					sw.Do(" {\n", nil)
-					sw.Do("    return ", nil)
-					emitBaseFunction()
-					sw.Do("\n", nil)
-					sw.Do("  } else {\n", nil)
-					sw.Do("    return nil // skip validation\n", nil)
-					sw.Do("  }\n", nil)
-					sw.Do("}()", nil)
-				}
-			}
-
 			for _, comment := range v.Comments {
 				sw.Do("// $.$\n", comment)
 			}
@@ -1588,7 +1560,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			sw.Do(f.Name, nil)
 			sw.Do(": ", nil)
 			toGolangSourceDataLiteral(sw, c, f.Value)
-			sw.Do(", ", nil)
+			sw.Do(",\n", nil)
 		}
 		sw.Do("}", targs)
 	case validators.SliceLiteral:
