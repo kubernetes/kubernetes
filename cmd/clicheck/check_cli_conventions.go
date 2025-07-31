@@ -48,4 +48,5 @@ func main() {
 	}
 
 	fmt.Fprintln(os.Stdout, "Congrats, CLI looks good!")
+	fmt.Fprintln(os.Stdout, "Congrats again")
 }
