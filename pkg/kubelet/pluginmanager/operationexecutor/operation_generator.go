@@ -130,11 +130,14 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 			logger.Error(err, "RegisterPlugin error -- failed to add plugin", "path", socketPath)
 		}
 		if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, nil); err != nil {
+			actualStateOfWorldUpdater.RemovePlugin(socketPath)
 			return og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
 		}
 
 		// Notify is called after register to guarantee that even if notify throws an error Register will always be called after validate
 		if err := og.notifyPlugin(ctx, client, true, ""); err != nil {
+			actualStateOfWorldUpdater.RemovePlugin(socketPath)
+			handler.DeRegisterPlugin(infoResp.Name, infoResp.Endpoint)
 			return fmt.Errorf("RegisterPlugin error -- failed to send registration status at socket %s, err: %v", socketPath, err)
 		}
 		return nil
