@@ -98,7 +98,7 @@ type cachedPullRecordsAccessor struct {
 	pulledRecords      *lruCache[string, kubeletconfiginternal.ImagePulledRecord]
 }
 
-func NewCachedPullRecordsAccessor(delegate PullRecordsAccessor, intentsCacheSize, pulledRecordsCacheSize, stripedLocksSize int32) *cachedPullRecordsAccessor {
+func NewCachedPullRecordsAccessor(delegate PullRecordsAccessor, intentsCacheSize, pulledRecordsCacheSize, stripedLocksSize int32) PullRecordsAccessor {
 	intentsCacheSize = min(intentsCacheSize, 1024)
 	pulledRecordsCacheSize = min(pulledRecordsCacheSize, 2000)
 
@@ -119,7 +119,7 @@ func NewCachedPullRecordsAccessor(delegate PullRecordsAccessor, intentsCacheSize
 	if err != nil {
 		klog.InfoS("there was an error initializing the image pulled records cache, the cache will work in a non-authoritative mode until the pulled records are listed successfully", "error", err)
 	}
-	return c
+	return NewMeteringRecordsAccessor(c, inMemIntentsPercent, inMemPulledRecordsPercent)
 }
 
 func (c *cachedPullRecordsAccessor) ListImagePullIntents() ([]*kubeletconfiginternal.ImagePullIntent, error) {
@@ -243,6 +243,16 @@ func (c *cachedPullRecordsAccessor) DeleteImagePulledRecord(imageRef string) err
 	}
 	c.pulledRecords.Delete(imageRef)
 	return nil
+}
+
+func (f *cachedPullRecordsAccessor) intentsSize() (uint, error) {
+	intentsUsage := f.intents.Len() * 100 / f.intents.maxSize
+	return uint(intentsUsage), nil
+}
+
+func (f *cachedPullRecordsAccessor) pulledRecordsSize() (uint, error) {
+	pulledRecordsUsage := f.pulledRecords.Len() * 100 / f.pulledRecords.maxSize
+	return uint(pulledRecordsUsage), nil
 }
 
 func cacheRefreshingList[K comparable, V any](
