@@ -5708,8 +5708,8 @@ func TestPrintCronJob(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "<none>", "False", int64(0), "0s", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "a=b"}}},
+			// Columns: Name, Schedule, Timezone, Suspend, Active, Last Schedule, Next Schedule, Age, Containers, Images, Selector
+			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "<none>", "False", int64(0), "0s", "<none>", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "a=b"}}},
 		},
 		// CronJob with Last Schedule and Age
 		{
