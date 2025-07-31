@@ -181,9 +181,9 @@
     version: "1.32"
 - name: ClearingNominatedNodeNameAfterBinding
   versionedSpecs:
-  - default: true
+  - default: false
     lockToDefault: false
-    preRelease: Beta
+    preRelease: Alpha
     version: "1.34"
 - name: CloudControllerManagerWebhook
   versionedSpecs:
@@ -1089,9 +1089,9 @@
     version: "1.34"
 - name: NominatedNodeNameForExpectation
   versionedSpecs:
-  - default: true
+  - default: false
     lockToDefault: false
-    preRelease: Beta
+    preRelease: Alpha
     version: "1.34"
 - name: OpenAPIEnums
   versionedSpecs:
