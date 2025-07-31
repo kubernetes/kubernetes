@@ -124,6 +124,7 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 
 		for _, vfn := range validations.Functions {
 			f := Function(subfieldTagName, vfn.Flags, validateSubfield, subname, getFn, equivArg, WrapperFunction{vfn, submemb.Type})
+			f.Cohort = subname
 			result.AddFunction(f)
 		}
 	}
