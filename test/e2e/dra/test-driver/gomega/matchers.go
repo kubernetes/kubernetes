@@ -45,6 +45,17 @@ func GetInfoFailed() gcustom.CustomGomegaMatcher {
 	}).WithMessage("contain unsuccessful GetInfo call")
 }
 
+func NotifyRegistrationStatusFailed() gcustom.CustomGomegaMatcher {
+	return gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {
+		for _, call := range actualCalls {
+			if call.FullMethod == "/pluginregistration.Registration/NotifyRegistrationStatus" && call.Err != nil {
+				return true, nil
+			}
+		}
+		return false, nil
+	}).WithMessage("contain unsuccessful NotifyRegistrationStatus call")
+}
+
 // NodePrepareResoucesSucceeded checks that NodePrepareResources API has been called and succeeded
 var NodePrepareResourcesSucceeded = gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {
 	for _, call := range actualCalls {

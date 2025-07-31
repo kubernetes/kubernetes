@@ -144,12 +144,35 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			ginkgo.By("restart Kubelet")
 			restartKubelet(ctx, true)
 
-			ginkgo.By("wait for Registration call to fail")
+			ginkgo.By("wait for GetInfo call to fail")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.GetInfoFailed())
 			gomega.Expect(kubeletPlugin.GetGRPCCalls()).ShouldNot(testdrivergomega.BeRegistered, "Expect plugin not to be registered due to GetInfo failure")
 
-			ginkgo.By("unset registration failure mode")
+			ginkgo.By("unset GetInfo failure mode")
 			kubeletPlugin.SetGetInfoError(nil)
+
+			ginkgo.By("wait for Kubelet plugin re-registration")
+			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+		})
+
+		// Test that the kubelet plugin manager retries plugin registration
+		// when the NotifyRegistrationStatus call fails, and succeeds once the call passes.
+		ginkgo.It("must recover and register after NotifyRegistrationStatus failure", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, f.Namespace.Name, getNodeName(ctx, f), driverName)
+
+			ginkgo.By("set NotifyRegistrationStatus failure mode")
+			kubeletPlugin.SetNotifyRegistrationStatusError(fmt.Errorf("simulated NotifyRegistrationStatus failure"))
+			kubeletPlugin.ResetGRPCCalls()
+
+			ginkgo.By("restart Kubelet")
+			restartKubelet(ctx, true)
+
+			ginkgo.By("wait for NotifyRegistrationStatus call to fail")
+			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NotifyRegistrationStatusFailed())
+			gomega.Expect(kubeletPlugin.GetGRPCCalls()).ShouldNot(testdrivergomega.BeRegistered, "Expect plugin not to be registered due to NotifyRegistrationStatus failure")
+
+			ginkgo.By("unset NotifyRegistrationStatus failure mode")
+			kubeletPlugin.SetNotifyRegistrationStatusError(nil)
 
 			ginkgo.By("wait for Kubelet plugin re-registration")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
