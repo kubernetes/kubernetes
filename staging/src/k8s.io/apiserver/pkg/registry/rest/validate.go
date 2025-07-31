@@ -19,6 +19,7 @@ package rest
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -318,5 +319,22 @@ func panicSafeValidateFunc(
 		defer createDeclarativeValidationPanicHandler(ctx, &errs, takeover)()
 
 		return validateUpdateFunc(ctx, scheme, obj, oldObj, o)
+	}
+}
+
+// RecordDuplicateValidationErrors increments a metric and log the error when duplicate validation errors are found.
+func RecordDuplicateValidationErrors(ctx context.Context, qualifiedKind schema.GroupKind, errs field.ErrorList) {
+	logger := klog.FromContext(ctx)
+	seenErrs := make([]string, 0, len(errs))
+
+	for _, err := range errs {
+		errStr := fmt.Sprintf("%v", err)
+
+		if slices.Contains(seenErrs, errStr) {
+			logger.Info("Found duplicate validation error", "kind", qualifiedKind.String(), "error", errStr)
+			validationmetrics.Metrics.IncDuplicateValidationErrorMetric()
+		} else {
+			seenErrs = append(seenErrs, errStr)
+		}
 	}
 }
