@@ -52,7 +52,22 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-
+	inMemIntentsPercent = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      imageManagerSubsystem,
+			Name:           "inmemory_pullintents_usage_percent",
+			Help:           "The ImagePullIntents in-memory cache usage in percent.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	inMemPulledRecordsPercent = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      imageManagerSubsystem,
+			Name:           "inmemory_pulledrecords_usage_percent",
+			Help:           "The ImagePulledRecords in-memory cache usage in percent.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 	mustPullChecksTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      imageManagerSubsystem,
@@ -67,6 +82,8 @@ var (
 func init() {
 	legacyregistry.MustRegister(fsPullIntentsSize)
 	legacyregistry.MustRegister(fsPulledRecordsSize)
+	legacyregistry.MustRegister(inMemIntentsPercent)
+	legacyregistry.MustRegister(inMemPulledRecordsPercent)
 	legacyregistry.MustRegister(mustPullChecksTotal)
 }
 
