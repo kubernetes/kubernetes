@@ -53,10 +53,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
-// podStatusManagerStateFile is the file name where status manager stores its state
+// allocatedPodsStateFileName and actuatedPodsStateFileName are the two file names where allocation manager stores its state,
+// for keeping track of pod resource information. allocatedPodsStateFileName records the resources allocated to a pod's container
+// while actuatedPodsStateFileName records the actuated resources.
 const (
-	allocatedPodsStateFile = "allocated_pods_state"
-	actuatedPodsStateFile  = "actuated_pods_state"
+	allocatedPodsStateFileName = "allocated_pods_state"
+	actuatedPodsStateFileName  = "actuated_pods_state"
 
 	initialRetryDelay = 30 * time.Second
 	retryDelay        = 3 * time.Minute
@@ -160,8 +162,8 @@ func NewManager(checkpointDirectory string,
 	recorder record.EventRecorder,
 ) Manager {
 	return &manager{
-		allocated: newStateImpl(checkpointDirectory, allocatedPodsStateFile),
-		actuated:  newStateImpl(checkpointDirectory, actuatedPodsStateFile),
+		allocated: newStateImpl(checkpointDirectory, allocatedPodsStateFileName),
+		actuated:  newStateImpl(checkpointDirectory, actuatedPodsStateFileName),
 
 		containerManager: containerManager,
 		statusManager:    statusManager,
