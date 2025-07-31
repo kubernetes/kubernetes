@@ -127,11 +127,12 @@ func (psuc *PodStatusPatchCall) Sync(obj metav1.Object) (metav1.Object, error) {
 		// because otherwise it's irrelevant and might race.
 		psuc.podStatus = pod.Status.DeepCopy()
 	}
+	newCondition := psuc.newCondition.DeepCopy()
 	psuc.lock.Unlock()
 
 	podCopy := pod.DeepCopy()
 	// Sync passed pod's status with the call's condition and nominatingInfo.
-	synced := syncStatus(&podCopy.Status, psuc.newCondition, psuc.nominatingInfo)
+	synced := syncStatus(&podCopy.Status, newCondition, psuc.nominatingInfo)
 	if !synced {
 		return pod, nil
 	}
