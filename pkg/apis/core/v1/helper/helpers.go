@@ -270,7 +270,7 @@ func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration)
 	for i := range podTolerations {
 		if toleration.MatchToleration(&podTolerations[i]) {
 			if helper.Semantic.DeepEqual(*toleration, podTolerations[i]) {
-				return false
+				return updated
 			}
 			newTolerations = append(newTolerations, *toleration)
 			updated = true
