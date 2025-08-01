@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // addEnvironmentSelectors adds the environmentSelector field to appropriate specs to facilitate including or excluding
@@ -28,9 +29,10 @@ func addEnvironmentSelectors(specs et.ExtensionTestSpecs) {
 
 	// SELinux tests marked with [Feature:SELinuxMountReadWriteOncePodOnly] require SELinuxMount
 	// feature gate **disabled**.
-	// TODO(jsafrane): once SELinuxMount graduates to GA, remove the tests upstream + remove this check.
+	// REBASE NOTE: this will intentionally fail to compile when the feature gate is removed upstream.
+	// Just remove this check + notify the OCP storage team.
 	specs.Select(et.NameContains("[Feature:SELinuxMountReadWriteOncePodOnly]")).
-		Exclude(et.FeatureGateEnabled("SELinuxMount"))
+		Exclude(et.FeatureGateEnabled(string(features.SELinuxMount)))
 }
 
 // filterByPlatform is a helper function to do, simple, "NameContains" filtering on tests by platform
