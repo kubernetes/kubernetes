@@ -58,11 +58,11 @@
       initPods: 0
       measurePods: 10
       maxClaimsPerNode: 10
-  - name: 2000pods_100nodes
+  - name: 2000pods_200nodes
     labels: [integration-test]
     params:
       classes: 1000
-      nodesWithDRA: 100
+      nodesWithDRA: 200
       nodesWithoutDRA: 0
       initPods: 1000
       measurePods: 1000
