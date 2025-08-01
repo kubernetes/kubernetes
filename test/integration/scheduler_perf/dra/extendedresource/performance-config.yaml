@@ -59,7 +59,6 @@
       measurePods: 10
       maxClaimsPerNode: 10
   - name: 2000pods_200nodes
-    labels: [integration-test]
     params:
       classes: 1000
       nodesWithDRA: 200
@@ -68,7 +67,6 @@
       measurePods: 1000
       maxClaimsPerNode: 10
   - name: 5000pods_500nodes
-    labels: [integration-test]
     params:
       classes: 2500
       nodesWithDRA: 500
