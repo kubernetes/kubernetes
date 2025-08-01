@@ -1064,7 +1064,7 @@ func verifyIfKMSTransformersSwapped(t *testing.T, wantPrefix, wantPrefixForEncry
 
 		return true, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		t.Fatalf("failed to verify if kms transformers swapped, err: %v", swapErr)
 	}
 }
