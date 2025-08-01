@@ -813,8 +813,9 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: imageutils.GetPauseImageName(),
-							Name:  podName,
+							Image:           imageutils.GetPauseImageName(),
+							Name:            podName,
+							ImagePullPolicy: "Always",
 						},
 					},
 				},
