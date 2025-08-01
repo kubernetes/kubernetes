@@ -343,7 +343,7 @@ func (o *WaitOptions) RunWait() error {
 			return foundResource, nil
 		}); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				return fmt.Errorf("%s", wait.ErrWaitTimeout.Error()) // nolint:staticcheck // SA1019
+				return fmt.Errorf("%s", wait.ErrorInterrupted(nil).Error()) // nolint:staticcheck // SA1019
 			}
 			return err
 		}
