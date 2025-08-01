@@ -1170,8 +1170,8 @@ rules:
     - repository: api
       branch: master
     - repository: apimachinery
-      branch: master
     - repository: client-go
+      branch: master
       branch: master
     - repository: component-base
       branch: master
@@ -1834,11 +1834,11 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: component-base
+      branch: master
     - repository: api
       branch: master
     - repository: client-go
-      branch: master
-    - repository: component-base
       branch: master
     - repository: apiserver
       branch: master

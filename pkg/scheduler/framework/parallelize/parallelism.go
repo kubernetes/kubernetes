@@ -27,7 +27,7 @@ import (
 // DefaultParallelism is the default parallelism used in scheduler.
 const DefaultParallelism int = 16
 
-// Parallelizer implements kube-scheduler/framework.Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utulization.
+// Parallelizer implements k8s.io/kube-scheduler/framework.Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utilization.
 // It wraps logic of k8s.io/client-go/util/workqueue to run operations on multiple workers.
 type Parallelizer struct {
 	parallelism int

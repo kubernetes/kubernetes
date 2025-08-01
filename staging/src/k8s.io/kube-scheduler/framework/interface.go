@@ -691,7 +691,7 @@ type Handle interface {
 	APICacher() APICacher
 }
 
-// Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utulization.
+// Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utilization.
 type Parallelizer interface {
 	// Until executes the given func doWorkPiece in parallel chunks, if applicable. Max number of chunks is param pieces.
 	Until(ctx context.Context, pieces int, doWorkPiece workqueue.DoWorkPieceFunc, operation string)
