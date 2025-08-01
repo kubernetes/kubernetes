@@ -264,7 +264,7 @@ func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration)
 	podTolerations := spec.Tolerations
 
 	// do not grow the slice in runtime, the length is already known (PodSpec.Tolerations + toleration)
-	newTolerations := make([]v1.Toleration, len(podTolerations) + 1)
+	newTolerations := make([]v1.Toleration, 0, len(podTolerations) + 1)
 
 	updated := false
 	for i := range podTolerations {
@@ -272,21 +272,21 @@ func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration)
 			if helper.Semantic.DeepEqual(*toleration, podTolerations[i]) {
 				return false
 			}
-			newTolerations[i] = *toleration
+			newTolerations = append(newTolerations, *toleration)
 			updated = true
 			continue
 		}
 
-		newTolerations[i] = podTolerations[i]
+		newTolerations = append(newTolerations, podTolerations[i])
 	}
 
 	if !updated {
-		newTolerationsLastIndex := len(newTolerations) - 1
-		newTolerations[newTolerationsLastIndex] = *toleration
+		newTolerations = append(newTolerations, *toleration)
+		updated = true
 	}
 
 	spec.Tolerations = newTolerations
-	return true
+	return updated
 }
 
 // GetMatchingTolerations returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
