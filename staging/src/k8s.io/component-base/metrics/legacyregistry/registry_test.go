@@ -21,7 +21,6 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
-	"time"
 )
 
 const (
@@ -29,7 +28,7 @@ const (
 )
 
 func TestProcessStartTimeHeader(t *testing.T) {
-	now := time.Now()
+	now := processStart
 	handler := Handler()
 
 	request, _ := http.NewRequest("GET", "/", nil)
