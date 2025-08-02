@@ -18,8 +18,10 @@ package cache
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"runtime"
+	"slices"
 	"testing"
 	"time"
 )
@@ -31,6 +33,21 @@ func (f *RealFIFO) getItems() []Delta {
 	ret := make([]Delta, len(f.items))
 	copy(ret, f.items)
 	return ret
+}
+
+func (f *RealFIFO) list() []interface{} {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	objects := make(map[string]interface{})
+	for _, item := range f.items {
+		if item.Type == Deleted {
+			continue
+		}
+		key, _ := f.keyFunc(item.Object)
+		objects[key] = item.Object
+	}
+	return slices.Collect(maps.Values(objects))
 }
 
 const closedFIFOName = "FIFO WAS CLOSED"
