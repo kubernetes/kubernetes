@@ -27,8 +27,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// WithPanicRecovery wraps an http Handler to recover and log panics (except in the special case of http.ErrAbortHandler panics, which suppress logging).
-func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolver) http.Handler {
+// WithPanicRecovery wraps a http.Handler to log panic stack traces.
+// The (expected) http.ErrAbortHandler panic value is treated specially:
+// for long-running requests it is ignored; for short running requests it is
+// logged, but without a stack trace.
+func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolver, longRunning request.LongRunningRequestCheck) http.Handler {
 	return withPanicRecovery(handler, func(w http.ResponseWriter, req *http.Request, err interface{}) {
 		if err == http.ErrAbortHandler {
 			// Honor the http.ErrAbortHandler sentinel panic value
@@ -46,6 +49,15 @@ func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolve
 				metrics.RecordRequestAbort(req, nil)
 			} else {
 				metrics.RecordRequestAbort(req, info)
+				if longRunning != nil && longRunning(req, info) && req.Context().Err() != nil {
+					// Filter out long-running requests that seem to have been aborted by the
+					// client. In particular, we hit this path for proxied requests because
+					// httputil.ReverseProxy raises ErrAbortHandler when it fails to write
+					// to the client.
+					klog.V(6).InfoS("Long-running request aborted, suppressing timeout log (looks like the client closed the connection).",
+						"method", req.Method, "URI", req.RequestURI, "auditID", audit.GetAuditIDTruncated(req.Context()))
+					return
+				}
 			}
 			// This call can have different handlers, but the default chain rate limits. Call it after the metrics are updated
 			// in case the rate limit delays it.  If you outrun the rate for this one timed out requests, something has gone
