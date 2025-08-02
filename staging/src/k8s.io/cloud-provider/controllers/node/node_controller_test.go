@@ -2381,6 +2381,82 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 	}
 }
 
+
+// TestNodeLabelsUpdate tests that node labels are correctly updated from cloud provider metadata,
+// verifying preservation of existing labels and filtering of kubernetes.io namespace labels.
+func TestNodeLabelsUpdate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	existingNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "node0",
+			CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+			Labels: map[string]string{
+				"kubernetes.io/hostname": "node0",
+				"existing.label/foo":    "bar",
+			},
+		},
+		Spec: v1.NodeSpec{
+			Taints: []v1.Taint{
+				{
+					Key:    cloudproviderapi.TaintExternalCloudProvider,
+					Value:  "true",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+
+	clientset := fake.NewSimpleClientset(existingNode)
+	factory := informers.NewSharedInformerFactory(clientset, 0)
+
+	fakeCloud := &fakecloud.Cloud{
+		EnableInstancesV2: true,
+		AdditionalLabels: map[string]string{
+			"topology.k8s.aws/zone-id":     "use1-az1",
+			"kubernetes.io/should-skip":    "true",
+		},
+	}
+
+	cloudNodeController := &CloudNodeController{
+		kubeClient:   clientset,
+		nodeInformer: factory.Core().V1().Nodes(),
+		cloud:        fakeCloud,
+	}
+
+	instanceMeta := &cloudprovider.InstanceMetadata{
+		AdditionalLabels: fakeCloud.AdditionalLabels,
+	}
+
+	cloudNodeController.updateNodeLabels(ctx, existingNode, instanceMeta)
+
+	updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, existingNode.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("error getting updated node: %v", err)
+	}
+
+	// Verify existing labels are preserved
+	if updatedNode.Labels["kubernetes.io/hostname"] != "node0" {
+		t.Errorf("existing hostname label was modified")
+	}
+	if updatedNode.Labels["existing.label/foo"] != "bar" {
+		t.Errorf("existing custom label was modified")
+	}
+
+	// Verify new AWS labels are added
+	if updatedNode.Labels["topology.k8s.aws/zone-id"] != "use1-az1" {
+		t.Errorf("zone-id label was not added correctly")
+	}
+
+	// Verify kubernetes.io labels from cloud provider are skipped
+	if _, exists := updatedNode.Labels["kubernetes.io/should-skip"]; exists {
+		t.Errorf("kubernetes.io label from cloud provider should have been skipped")
+	}
+}
+
+
 func TestGetInstanceMetadata(t *testing.T) {
 	tests := []struct {
 		name             string
