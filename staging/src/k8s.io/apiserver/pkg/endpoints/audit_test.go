@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -315,56 +317,40 @@ func TestAudit(t *testing.T) {
 			client := http.Client{Timeout: 2 * time.Second}
 
 			req, err := test.req(ctx, server.URL)
-			if err != nil {
-				t.Errorf("[%s] error creating the request: %v", test.desc, err)
-			}
+			require.NoError(t, err)
 
 			req.Header.Set("User-Agent", userAgent)
 
 			response, err := client.Do(req)
-			if err != nil {
-				t.Errorf("[%s] error: %v", test.desc, err)
-			}
+			require.NoError(t, err)
 
-			if response.StatusCode != test.code {
-				t.Errorf("[%s] expected http code %d, got %#v", test.desc, test.code, response)
-			}
+			require.Equal(t, test.code, response.StatusCode)
 
 			// close body because the handler might block in Flush, unable to send the remaining event.
 			response.Body.Close()
 
 			// wait for events to arrive, at least the given number in the test
 			events := []*auditinternal.Event{}
-			err = wait.Poll(50*time.Millisecond, testTimeout(t), wait.ConditionFunc(func() (done bool, err error) {
+			err = wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, testTimeout(t), true, wait.ConditionWithContextFunc(func(context.Context) (done bool, err error) {
 				events = sink.Events()
 				return len(events) >= test.events, nil
 			}))
-			if err != nil {
-				t.Errorf("[%s] timeout waiting for events", test.desc)
+			require.NoError(t, err)
+
+			assert.Len(t, events, test.events)
+
+			for i, check := range test.checks {
+				err = check(events)
+				require.NoErrorf(t, err, "check failed: %d", i)
 			}
 
-			if got := len(events); got != test.events {
-				t.Errorf("[%s] expected %d audit events, got %d", test.desc, test.events, got)
-			} else {
-				for i, check := range test.checks {
-					err := check(events)
-					if err != nil {
-						t.Errorf("[%s,%d] %v", test.desc, i, err)
-					}
-				}
-
-				if err := requestUserAgentMatches(userAgent)(events); err != nil {
-					t.Errorf("[%s] %v", test.desc, err)
-				}
-			}
+			err = requestUserAgentMatches(userAgent)(events)
+			require.NoError(t, err)
 
 			if len(events) > 0 {
 				status := events[len(events)-1].ResponseStatus
-				if status == nil {
-					t.Errorf("[%s] expected non-nil ResponseStatus in last event", test.desc)
-				} else if int(status.Code) != test.code {
-					t.Errorf("[%s] expected ResponseStatus.Code=%d, got %d", test.desc, test.code, status.Code)
-				}
+				require.NotNil(t, status)
+				require.Equal(t, test.code, int(status.Code))
 			}
 		})
 	}
