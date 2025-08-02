@@ -73,12 +73,13 @@ type frameworkImpl struct {
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]framework.Plugin
 
-	clientSet        clientset.Interface
-	kubeConfig       *restclient.Config
-	eventRecorder    events.EventRecorder
-	informerFactory  informers.SharedInformerFactory
-	sharedDRAManager framework.SharedDRAManager
-	logger           klog.Logger
+	clientSet          clientset.Interface
+	kubeConfig         *restclient.Config
+	eventRecorder      events.EventRecorder
+	informerFactory    informers.SharedInformerFactory
+	sharedDRAManager   framework.SharedDRAManager
+	logger             klog.Logger
+	enableNamedLogging bool
 
 	metricsRecorder          *metrics.MetricAsyncRecorder
 	profileName              string
@@ -143,6 +144,7 @@ type frameworkOptions struct {
 	waitingPods            *waitingPodsMap
 	apiDispatcher          *apidispatcher.APIDispatcher
 	logger                 *klog.Logger
+	enableNamedLogging     bool
 }
 
 // Option for the frameworkImpl.
@@ -265,11 +267,19 @@ func WithLogger(logger klog.Logger) Option {
 	}
 }
 
+// EnabledNamedLogging allows named logging to be used in
+func EnabledNamedLogging(enable bool) Option {
+	return func(o *frameworkOptions) {
+		o.enableNamedLogging = enable
+	}
+}
+
 // defaultFrameworkOptions are applied when no option corresponding to those fields exist.
 func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 	return frameworkOptions{
-		metricsRecorder: metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh),
-		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
+		metricsRecorder:    metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh),
+		parallelizer:       parallelize.NewParallelizer(parallelize.DefaultParallelism),
+		enableNamedLogging: true,
 	}
 }
 
@@ -303,6 +313,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		apiDispatcher:        options.apiDispatcher,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
+		enableNamedLogging:   options.enableNamedLogging,
 	}
 
 	if len(f.extenders) > 0 {
@@ -738,13 +749,13 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state fwk.Cycle
 	pluginsWithNodes := sets.New[string]()
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "PreFilter")
 	}
 	var returnStatus *fwk.Status
 	for _, pl := range f.preFilterPlugins {
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
@@ -808,7 +819,7 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 ) (status *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "PreFilterExtension")
 	}
 	for _, pl := range f.preFilterPlugins {
@@ -816,7 +827,7 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 			continue
 		}
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
@@ -853,7 +864,7 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 ) (status *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "PreFilterExtension")
 	}
 	for _, pl := range f.preFilterPlugins {
@@ -861,7 +872,7 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 			continue
 		}
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
@@ -902,7 +913,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 ) *fwk.Status {
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "Filter")
 	}
 
@@ -911,7 +922,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 			continue
 		}
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
@@ -949,7 +960,7 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state fwk.Cycl
 
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "PostFilter")
 	}
 
@@ -959,7 +970,7 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state fwk.Cycl
 	var rejectorPlugin string
 	for _, pl := range f.postFilterPlugins {
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
@@ -1029,7 +1040,9 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 	// nominated pods are running because they are not running right now and in fact,
 	// they may end up getting scheduled to a different node.
 	logger := klog.FromContext(ctx)
-	logger = klog.LoggerWithName(logger, "FilterWithNominatedPods")
+	if f.enableNamedLogging {
+		logger = klog.LoggerWithName(logger, "FilterWithNominatedPods")
+	}
 	ctx = klog.NewContext(ctx, logger)
 	for i := 0; i < 2; i++ {
 		stateToUse := state
@@ -1099,12 +1112,12 @@ func (f *frameworkImpl) RunPreScorePlugins(
 	}()
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "PreScore")
 	}
 	for _, pl := range f.preScorePlugins {
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
@@ -1157,7 +1170,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 	if len(plugins) > 0 {
 		logger := klog.FromContext(ctx)
 		verboseLogs := logger.V(4).Enabled()
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger = klog.LoggerWithName(logger, "Score")
 		}
 		// Run Score method for each node in parallel.
@@ -1165,12 +1178,12 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 			nodeInfo := nodes[index]
 			nodeName := nodeInfo.Node().Name
 			logger := logger
-			if verboseLogs {
+			if verboseLogs && f.enableNamedLogging {
 				logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 			}
 			for _, pl := range plugins {
 				ctx := ctx
-				if verboseLogs {
+				if verboseLogs && f.enableNamedLogging {
 					logger := klog.LoggerWithName(logger, pl.Name())
 					ctx = klog.NewContext(ctx, logger)
 				}
@@ -1273,7 +1286,7 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state fwk.CycleSt
 	}()
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "PreBind")
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
@@ -1283,7 +1296,7 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state fwk.CycleSt
 		}
 
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
@@ -1377,12 +1390,12 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state fwk.CycleState
 	}
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "Bind")
 	}
 	for _, pl := range f.bindPlugins {
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
@@ -1423,12 +1436,12 @@ func (f *frameworkImpl) RunPostBindPlugins(ctx context.Context, state fwk.CycleS
 	}()
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "PostBind")
 	}
 	for _, pl := range f.postBindPlugins {
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
@@ -1458,13 +1471,13 @@ func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state fwk.
 	}()
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "Reserve")
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
 	for _, pl := range f.reservePlugins {
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
@@ -1504,14 +1517,14 @@ func (f *frameworkImpl) RunReservePluginsUnreserve(ctx context.Context, state fw
 	// *reverse* order in which the Reserve operation was executed.
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
-	if verboseLogs {
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "Unreserve")
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
 	for i := len(f.reservePlugins) - 1; i >= 0; i-- {
 		pl := f.reservePlugins[i]
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
@@ -1545,12 +1558,14 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state fwk.CycleSta
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {
-		logger = klog.LoggerWithName(logger, "Permit")
+		if f.enableNamedLogging {
+			logger = klog.LoggerWithName(logger, "Permit")
+		}
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
 	for _, pl := range f.permitPlugins {
 		ctx := ctx
-		if verboseLogs {
+		if verboseLogs && f.enableNamedLogging {
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
