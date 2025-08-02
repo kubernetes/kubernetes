@@ -642,14 +642,6 @@ func emitSignalPrepareForShutdown(b bool) error {
 	return conn.Emit("/org/freedesktop/login1", "org.freedesktop.login1.Manager.PrepareForShutdown", b)
 }
 
-func getNodeReadyStatus(ctx context.Context, f *framework.Framework) bool {
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
-	// Assuming that there is only one node, because this is a node e2e test.
-	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1), "the number of nodes is not as expected")
-	return isNodeReady(&nodeList.Items[0])
-}
-
 const (
 	// https://github.com/kubernetes/kubernetes/blob/1dd781ddcad454cc381806fbc6bd5eba8fa368d7/pkg/kubelet/nodeshutdown/nodeshutdown_manager_linux.go#L43-L44
 	podShutdownReason  = "Terminated"
