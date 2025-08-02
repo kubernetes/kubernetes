@@ -489,16 +489,13 @@ var _ = SIGDescribe("Kubectl client", func() {
 			// testContextHost is a KUBECONFIG URL
 			testContextHost := getTestContextHost()
 
-			// check if testContextHost is on localhost and skip the tests
+			// check if testContextHost is on localhost and skip the tests for env vars only
 			// proxy env vars are always ignored on localhost and loopback IPs
 			// https://pkg.go.dev/golang.org/x/net/http/httpproxy#Config.ProxyFunc
-			// TODO: consider if we can test proxying some other way with local clusters
-			// https://github.com/kubernetes/kubectl/issues/1655#issuecomment-2829408755
+			// Note: --proxy-url flag works with localhost, so we test it regardless
 			u, err := url.Parse(testContextHost)
 			framework.ExpectNoError(err, "parsing test context host: %s", testContextHost)
-			if hostIsLocal(u.Hostname()) {
-				e2eskipper.Skipf("Test host %q is on localhost and would not be proxied by HTTP_PROXY, skipping test", testContextHost)
-			}
+			isLocalhost := hostIsLocal(u.Hostname())
 
 			ginkgo.By("Starting http_proxy")
 			var proxyLogs bytes.Buffer
@@ -509,26 +506,51 @@ var _ = SIGDescribe("Kubectl client", func() {
 			defer testSrv.Close()
 			proxyAddr := testSrv.URL
 
-			for _, proxyVar := range []string{"https_proxy", "HTTPS_PROXY"} {
-				proxyLogs.Reset()
-				ginkgo.By("Running kubectl via an HTTP proxy using " + proxyVar)
-				output := e2ekubectl.NewKubectlCommand(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").
-					AppendEnv([]string{fmt.Sprintf("%s=%s", proxyVar, proxyAddr)}).
-					ExecOrDie(ns)
+			// Test environment variables (skip if localhost)
+			if !isLocalhost {
+				for _, proxyVar := range []string{"https_proxy", "HTTPS_PROXY"} {
+					proxyLogs.Reset()
+					ginkgo.By("Running kubectl via an HTTP proxy using " + proxyVar)
+					output := e2ekubectl.NewKubectlCommand(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").
+						AppendEnv([]string{fmt.Sprintf("%s=%s", proxyVar, proxyAddr)}).
+						ExecOrDie(ns)
 
-				// Verify we got the normal output captured by the exec server
-				expectedExecOutput := "running in container\n"
-				if output != expectedExecOutput {
-					framework.Failf("Unexpected kubectl exec output. Wanted %q, got  %q", expectedExecOutput, output)
+					// Verify we got the normal output captured by the exec server
+					expectedExecOutput := "running in container\n"
+					if output != expectedExecOutput {
+						framework.Failf("Unexpected kubectl exec output. Wanted %q, got  %q", expectedExecOutput, output)
+					}
+
+					// Verify the proxy server logs saw the connection
+					expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(testContextHost, "https://"), "/api"))
+
+					proxyLog := proxyLogs.String()
+					if !strings.Contains(proxyLog, expectedProxyLog) {
+						framework.Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
+					}
 				}
+			} else {
+				ginkgo.By("Skipping env var proxy tests for localhost target")
+			}
 
-				// Verify the proxy server logs saw the connection
-				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(testContextHost, "https://"), "/api"))
+			// Test --proxy-url flag (works with localhost)
+			proxyLogs.Reset()
+			ginkgo.By("Running kubectl via an HTTP proxy using --proxy-url flag")
+			output := e2ekubectl.NewKubectlCommand(ns, "--proxy-url="+proxyAddr, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").
+				ExecOrDie(ns)
 
-				proxyLog := proxyLogs.String()
-				if !strings.Contains(proxyLog, expectedProxyLog) {
-					framework.Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
-				}
+			// Verify we got the normal output captured by the exec server
+			expectedExecOutput := "running in container\n"
+			if output != expectedExecOutput {
+				framework.Failf("Unexpected kubectl exec output. Wanted %q, got  %q", expectedExecOutput, output)
+			}
+
+			// Verify the proxy server logs saw the connection
+			expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(testContextHost, "https://"), "/api"))
+
+			proxyLog := proxyLogs.String()
+			if !strings.Contains(proxyLog, expectedProxyLog) {
+				framework.Failf("Missing expected log result on proxy server for --proxy-url. Expected: %q, got %q", expectedProxyLog, proxyLog)
 			}
 		})
 
