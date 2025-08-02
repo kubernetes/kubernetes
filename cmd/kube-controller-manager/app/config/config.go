@@ -22,6 +22,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	basecompatibility "k8s.io/component-base/compatibility"
+	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/zpages/flagz"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
@@ -51,6 +52,8 @@ type Config struct {
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
 	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
+
+	Metrics *metrics.Options
 }
 
 type completedConfig struct {
