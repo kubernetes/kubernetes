@@ -565,6 +565,7 @@ type setupOptions struct {
 	codec          runtime.Codec
 	newFunc        func() runtime.Object
 	newListFunc    func() runtime.Object
+	reverseKeyFunc func(string) (string, string, error)
 	prefix         string
 	resourcePrefix string
 	groupResource  schema.GroupResource
@@ -626,6 +627,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		setupOpts.codec,
 		setupOpts.newFunc,
 		setupOpts.newListFunc,
+		setupOpts.reverseKeyFunc,
 		setupOpts.prefix,
 		setupOpts.resourcePrefix,
 		setupOpts.groupResource,

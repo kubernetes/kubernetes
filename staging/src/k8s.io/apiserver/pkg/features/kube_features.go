@@ -261,6 +261,10 @@ const (
 	// Enables post-start-hook for storage readiness
 	WatchCacheInitializationPostStartHook featuregate.Feature = "WatchCacheInitializationPostStartHook"
 
+	// owner: @ying.s
+	// Enables watches from storage without prev-kv.
+	WatchFromStorageWithoutPrevKV featuregate.Feature = "WatchFromStorageWithoutPrevKV"
+
 	// owner: @serathius
 	// Enables watches without resourceVersion to be served from storage.
 	// Used to prevent https://github.com/kubernetes/kubernetes/issues/123072 until etcd fixes the issue.
@@ -459,6 +463,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	WatchCacheInitializationPostStartHook: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	WatchFromStorageWithoutPrevKV: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	WatchFromStorageWithoutResourceVersion: {

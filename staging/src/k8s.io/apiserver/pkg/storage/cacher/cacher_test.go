@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -460,6 +461,14 @@ func TestNamespaceScopedWatch(t *testing.T) {
 	storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
 }
 
+func TestWatchWithoutPrevKV(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, true)
+	ctx, cacher, terminate := testSetup(t, withReverseKeyFunc)
+	t.Cleanup(terminate)
+	storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
+	storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, cacher)
+}
+
 func TestWatchDispatchBookmarkEvents(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
@@ -505,6 +514,7 @@ type tearDownFunc func()
 type setupOptions struct {
 	resourcePrefix string
 	keyFunc        func(runtime.Object) (string, error)
+	reverseKeyFunc func(key string) (name string, namespace string, err error)
 	indexerFuncs   map[string]storage.IndexerFunc
 	indexers       cache.Indexers
 	clock          clock.WithTicker
@@ -523,6 +533,13 @@ func withDefaults(options *setupOptions) {
 func withClusterScopedKeyFunc(options *setupOptions) {
 	options.keyFunc = func(obj runtime.Object) (string, error) {
 		return storage.NoNamespaceKeyFunc(options.resourcePrefix, obj)
+	}
+}
+
+func withReverseKeyFunc(options *setupOptions) {
+	options.reverseKeyFunc = func(deleteKey string) (string, string, error) {
+		tokens := strings.Split(deleteKey, "/")
+		return tokens[len(tokens)-1], tokens[len(tokens)-2], nil
 	}
 }
 
@@ -561,7 +578,7 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 		opt(&setupOpts)
 	}
 
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix(), setupOpts.reverseKeyFunc)
 	// Inject one list error to make sure we test the relist case.
 	wrappedStorage := &storagetesting.StorageInjectingListErrors{
 		Interface: etcdStorage,
