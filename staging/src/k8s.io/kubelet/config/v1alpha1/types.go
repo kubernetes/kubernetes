@@ -147,7 +147,7 @@ type ImagePullCredentials struct {
 	// secrets that were used to pull the image.
 	// +optional
 	// +listType=set
-	KubernetesSecrets []ImagePullSecret `json:"kubernetesSecrets"`
+	KubernetesSecrets []ImagePullSecret `json:"kubernetesSecrets,omitempty"`
 
 	// KubernetesServiceAccounts is an index of coordinates of all the kubernetes
 	// service accounts that were used to pull the image.
