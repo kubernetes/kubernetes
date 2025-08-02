@@ -85,6 +85,13 @@ const (
 	kubeProxy = "kube-proxy"
 )
 
+const (
+    livezPath     = "/livez"
+    readyzPath    = "/readyz"
+    metricsPath   = "/metrics"
+    proxyModePath = "/proxyMode"
+)
+
 func init() {
 	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
@@ -486,7 +493,15 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(proxyMux, kubeProxy, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
+		statusz.Install(proxyMux, kubeProxy, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(),
+			statusz.WithListedPaths([]string{
+				livezPath,
+				readyzPath,
+				healthz.DefaultHealthzPath,
+				metricsPath,
+				proxyModePath,
+			}),
+		))
 	}
 
 	fn := func() {
