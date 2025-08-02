@@ -15,7 +15,9 @@
 package common
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"path"
@@ -25,7 +27,6 @@ import (
 
 	"github.com/karrick/godirwalk"
 	"github.com/opencontainers/cgroups"
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 
 	"github.com/google/cadvisor/container"
@@ -308,7 +309,7 @@ func listDirectories(dirpath string, parent string, recursive bool, output map[s
 	dirents, err := godirwalk.ReadDirents(dirpath, buf)
 	if err != nil {
 		// Ignore if this hierarchy does not exist.
-		if os.IsNotExist(errors.Cause(err)) {
+		if errors.Is(err, fs.ErrNotExist) {
 			err = nil
 		}
 		return err

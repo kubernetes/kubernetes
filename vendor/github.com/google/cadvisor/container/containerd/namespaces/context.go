@@ -31,10 +31,10 @@ package namespaces
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/containerd/errdefs"
-	"github.com/pkg/errors"
 
 	"github.com/google/cadvisor/container/containerd/identifiers"
 )
@@ -83,10 +83,10 @@ func Namespace(ctx context.Context) (string, bool) {
 func NamespaceRequired(ctx context.Context) (string, error) {
 	namespace, ok := Namespace(ctx)
 	if !ok || namespace == "" {
-		return "", errors.Wrapf(errdefs.ErrFailedPrecondition, "namespace is required")
+		return "", fmt.Errorf("namespace is required: %w", errdefs.ErrFailedPrecondition)
 	}
 	if err := identifiers.Validate(namespace); err != nil {
-		return "", errors.Wrap(err, "namespace validation")
+		return "", fmt.Errorf("namespace validation: %w", err)
 	}
 	return namespace, nil
 }

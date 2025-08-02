@@ -62,6 +62,34 @@ func (m MD) Append(key string, values ...string) {
 	}
 }
 
+// Clone returns a copy of MD or nil if it's nil.
+// It's copied from golang's `http.Header.Clone` implementation:
+// https://cs.opensource.google/go/go/+/refs/tags/go1.23.4:src/net/http/header.go;l=94
+func (m MD) Clone() MD {
+	if m == nil {
+		return nil
+	}
+
+	// Find total number of values.
+	nv := 0
+	for _, vv := range m {
+		nv += len(vv)
+	}
+	sv := make([]string, nv) // shared backing array for headers' values
+	m2 := make(MD, len(m))
+	for k, vv := range m {
+		if vv == nil {
+			// Preserve nil values.
+			m2[k] = nil
+			continue
+		}
+		n := copy(sv, vv)
+		m2[k] = sv[:n:n]
+		sv = sv[n:]
+	}
+	return m2
+}
+
 func (m MD) setRequest(r *Request) {
 	for k, values := range m {
 		for _, v := range values {
