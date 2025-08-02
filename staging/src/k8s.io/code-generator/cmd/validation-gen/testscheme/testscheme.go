@@ -28,7 +28,6 @@ import (
 	"os"
 	"path"
 	"reflect"
-	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -356,65 +355,6 @@ func (v *ValidationTester) validateFalseArgsByPath() map[string][]string {
 		sort.Strings(args)
 	}
 	return byPath
-}
-
-func (v *ValidationTester) ExpectRegexpsByPath(regexpStringsByPath map[string][]string) *ValidationTester {
-	v.T.Helper()
-
-	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
-		t.Helper()
-
-		errorsByPath := v.getErrorsByPath()
-
-		// sanity check
-		if want, got := len(regexpStringsByPath), len(errorsByPath); got != want {
-			t.Fatalf("wrong number of error-fields: expected %d, got %d:\nwanted:\n%sgot:\n%s",
-				want, got, renderByPath(regexpStringsByPath), renderByPath(errorsByPath))
-		}
-
-		// compile regexps
-		regexpsByPath := map[string][]*regexp.Regexp{}
-		for field, strs := range regexpStringsByPath {
-			regexps := make([]*regexp.Regexp, 0, len(strs))
-			for _, str := range strs {
-				regexps = append(regexps, regexp.MustCompile(str))
-			}
-			regexpsByPath[field] = regexps
-		}
-
-		for field := range errorsByPath {
-			errors := errorsByPath[field]
-			regexps := regexpsByPath[field]
-
-			// sanity check
-			if want, got := len(regexps), len(errors); got != want {
-				t.Fatalf("field %q: wrong number of errors: expected %d, got %d:\nwanted:\n%sgot:\n%s",
-					field, want, got, renderList(regexpStringsByPath[field]), renderList(errors))
-			}
-
-			// build a set of errors and expectations, so we can track them,
-			expSet := sets.New(regexps...)
-
-			for _, err := range errors {
-				var found *regexp.Regexp
-				for _, re := range regexps {
-					if re.MatchString(err) {
-						found = re
-						break // done with regexps
-					}
-				}
-				if found != nil {
-					expSet.Delete(found)
-					continue // next error
-				}
-				t.Errorf("field %q, error %q did not match any expectation", field, err)
-			}
-			if len(expSet) != 0 {
-				t.Errorf("field %q had unsatisfied expectations: %q", field, expSet.UnsortedList())
-			}
-		}
-	})
-	return v
 }
 
 func (v *ValidationTester) ExpectMatches(matcher field.ErrorMatcher, expected field.ErrorList) *ValidationTester {
