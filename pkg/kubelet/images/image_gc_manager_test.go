@@ -645,7 +645,7 @@ func TestGarbageCollectCadvisorFailure(t *testing.T) {
 	manager, _ := newRealImageGCManager(policy, mockStatsProvider)
 
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(&statsapi.FsStats{}, &statsapi.FsStats{}, fmt.Errorf("error"))
-	assert.Error(t, manager.GarbageCollect(ctx, time.Now()))
+	require.Error(t, manager.GarbageCollect(ctx, time.Now()))
 }
 
 func TestGarbageCollectBelowSuccess(t *testing.T) {
@@ -678,19 +678,45 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		LowThresholdPercent:  80,
 	}
 	mockStatsProvider := statstest.NewMockProvider(t)
-	manager, fakeRuntime := newRealImageGCManager(policy, mockStatsProvider)
+	fakeRuntime := &containertest.FakeRuntime{}
+	recorder := record.NewFakeRecorder(1)
+	manager := &realImageGCManager{
+		runtime:       fakeRuntime,
+		policy:        policy,
+		imageRecords:  make(map[string]*imageRecord),
+		statsProvider: mockStatsProvider,
+		recorder:      recorder,
+		tracer:        noopoteltrace.NewTracerProvider().Tracer(""),
+	}
 
-	// Expect 95% usage and little of it gets freed.
+	// Initial state: 95% usage, of which 5% is garbage images.
+	capacity := uint64(10 * 1024 * 1024 * 1024)
+	available := capacity / 20 // 5% available, 95% usage
 	imageFs := &statsapi.FsStats{
-		AvailableBytes: ptr.To(uint64(50)),
-		CapacityBytes:  ptr.To(uint64(1000)),
+		AvailableBytes: ptr.To(available),
+		CapacityBytes:  ptr.To(capacity),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageFs, imageFs, nil)
+	// This image is unused and eligible for deletion.
+	// Its size is less than the required amount to free.
+	imageSize := int64(500 * 1024 * 1024) // 500 MiB
 	fakeRuntime.ImageList = []container.Image{
-		makeImage(0, 50),
+		makeImage(0, imageSize),
 	}
 
-	assert.Error(t, manager.GarbageCollect(ctx, time.Now()))
+	err := manager.GarbageCollect(ctx, time.Now())
+	require.Error(t, err)
+
+	// Check that a warning event was sent
+	expectedEvent := "Warning FreeDiskSpaceFailed Insufficient free disk space on the node's image filesystem" +
+		" (95% of 10.0 GiB used). Failed to free sufficient space by deleting unused images (freed 524288000 bytes)." +
+		" Investigate disk usage, as it could be used by active images, logs, volumes, or other data."
+	select {
+	case event := <-recorder.Events:
+		assert.Equal(t, expectedEvent, event)
+	default:
+		t.Errorf("expected a 'FreeDiskSpaceFailed' event")
+	}
 }
 
 func TestGarbageCollectImageNotOldEnough(t *testing.T) {
