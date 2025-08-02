@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/log"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/klog/v2"
 )
@@ -55,9 +56,19 @@ func New(config *Config) (http.RoundTripper, error) {
 		if err != nil {
 			return nil, err
 		}
+		if transport, ok := rt.(*http.Transport); ok {
+	 	  log.L.Infof("tlsClientConfig: %#v\n", transport.TLSClientConfig)	
+		}
+		// log.L.Infof("tlsClientConfig: %v", rt.(*http.Transport).TLSClientConfig)
 	}
 
-	return HTTPWrappersForConfig(config, rt)
+	httpWrappedConfig, err := HTTPWrappersForConfig(config, rt)
+	
+	if transport, ok := httpWrappedConfig.(*http.Transport); ok {
+			log.L.Infof("http wrapped tlsClientConfig: %#v\n", transport.TLSClientConfig)		
+	}
+	
+	return httpWrappedConfig, err
 }
 
 func isValidHolders(config *Config) bool {
@@ -211,15 +222,20 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 // KeyData, and CAFile fields, or returns an error. If no error is returned, all three fields are
 // either populated or were empty to start.
 func loadTLSFiles(c *Config) error {
+	// Check that we are purely loading CA from file
+	if len(c.TLS.CAFile) > 0 && len(c.TLS.CAData) == 0 {
+		c.TLS.ReloadCAFiles = true
+	}
+
+	// Check that we are purely loading certs and keys from files
+	if len(c.TLS.CertFile) > 0 && len(c.TLS.CertData) == 0 && len(c.TLS.KeyFile) > 0 && len(c.TLS.KeyData) == 0 {
+		c.TLS.ReloadTLSFiles = true
+	}
+
 	var err error
 	c.TLS.CAData, err = dataFromSliceOrFile(c.TLS.CAData, c.TLS.CAFile)
 	if err != nil {
 		return err
-	}
-
-	// Check that we are purely loading from files
-	if len(c.TLS.CertFile) > 0 && len(c.TLS.CertData) == 0 && len(c.TLS.KeyFile) > 0 && len(c.TLS.KeyData) == 0 {
-		c.TLS.ReloadTLSFiles = true
 	}
 
 	c.TLS.CertData, err = dataFromSliceOrFile(c.TLS.CertData, c.TLS.CertFile)
