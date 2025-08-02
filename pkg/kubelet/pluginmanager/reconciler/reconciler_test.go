@@ -191,7 +191,7 @@ func Test_Run_Positive_Register(t *testing.T) {
 	go reconciler.Run(stopChan)
 	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
-	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "", supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	defer func() {
 		require.NoError(t, p.Stop())
@@ -240,7 +240,7 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 
 	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
-	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "", supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	dsw.AddOrUpdatePlugin(socketPath)
 	plugins := dsw.GetPluginsToRegister()
@@ -296,7 +296,7 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 
 	socketPath := filepath.Join(socketDir, "plugin2.sock")
 	pluginName := fmt.Sprintf("example-plugin2")
-	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "", supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	dsw.AddOrUpdatePlugin(socketPath)
 	plugins := dsw.GetPluginsToRegister()
@@ -319,4 +319,48 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 	if aswPlugins[0].SocketPath != socketPath {
 		t.Fatalf("Test_Run_Positive_RegisterThenUnregister: expected\n%s\nin actual state of world, but got\n%v\n", socketPath, aswPlugins[0])
 	}
+}
+
+func Test_Unregister_on_removed_endpoint(t *testing.T) {
+	defer cleanup(t)
+
+	dsw := cache.NewDesiredStateOfWorld()
+	asw := cache.NewActualStateOfWorld()
+
+	reconciler := NewReconciler(
+		operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(nil)),
+		reconcilerLoopSleepDuration,
+		dsw,
+		asw,
+	)
+	reconciler.AddHandler(registerapi.DevicePlugin, cache.PluginHandler(NewDummyImpl()))
+
+	// Start the reconciler to fill ASW.
+	stopChan := make(chan struct{})
+	defer close(stopChan)
+	go reconciler.Run(stopChan)
+
+	// Create fake endpoint
+	endpoint := filepath.Join(t.TempDir(), "endpoint.sock")
+	eF, err := os.Create(endpoint)
+	require.NoError(t, err)
+	require.NoError(t, eF.Close())
+
+	// Create and run a plugin with the endpoint
+	socketPath := filepath.Join(socketDir, "plugin.sock")
+	p := pluginwatcher.NewTestExamplePlugin("example-plugin", registerapi.DevicePlugin, socketPath, endpoint, supportedVersions...)
+	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+	err = dsw.AddOrUpdatePlugin(socketPath)
+	require.NoError(t, err)
+
+	// Wait for registration
+	plugins := dsw.GetPluginsToRegister()
+	require.NotEmpty(t, plugins)
+	waitForRegistration(t, socketPath, plugins[0].UUID, asw)
+
+	// remove endpoint to trigger unregistration
+	err = os.Remove(endpoint)
+	require.NoError(t, err)
+
+	waitForUnregistration(t, socketPath, asw)
 }

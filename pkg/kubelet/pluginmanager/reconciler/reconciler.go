@@ -20,6 +20,8 @@ limitations under the License.
 package reconciler
 
 import (
+	"errors"
+	"os"
 	"sync"
 	"time"
 
@@ -68,6 +70,7 @@ func NewReconciler(
 		desiredStateOfWorld: desiredStateOfWorld,
 		actualStateOfWorld:  actualStateOfWorld,
 		handlers:            make(map[string]cache.PluginHandler),
+		existingEndpoints:   make(map[string]bool),
 	}
 }
 
@@ -77,6 +80,7 @@ type reconciler struct {
 	desiredStateOfWorld cache.DesiredStateOfWorld
 	actualStateOfWorld  cache.ActualStateOfWorld
 	handlers            map[string]cache.PluginHandler
+	existingEndpoints   map[string]bool
 	sync.RWMutex
 }
 
@@ -114,7 +118,17 @@ func (rc *reconciler) reconcile() {
 	// Ensure plugins that should be unregistered are unregistered.
 	for _, registeredPlugin := range rc.actualStateOfWorld.GetRegisteredPlugins() {
 		unregisterPlugin := false
-		if !rc.desiredStateOfWorld.PluginExists(registeredPlugin.SocketPath) {
+		if len(registeredPlugin.Endpoint) > 0 && registeredPlugin.SocketPath != registeredPlugin.Endpoint {
+			if rc.existingEndpoints[registeredPlugin.Endpoint] {
+				if _, err := os.Stat(registeredPlugin.Endpoint); errors.Is(err, os.ErrNotExist) {
+					delete(rc.existingEndpoints, registeredPlugin.Endpoint)
+					rc.desiredStateOfWorld.RemovePlugin(registeredPlugin.SocketPath)
+					unregisterPlugin = true
+				}
+			} else if _, err := os.Stat(registeredPlugin.Endpoint); err == nil {
+				rc.existingEndpoints[registeredPlugin.Endpoint] = true
+			}
+		} else if !rc.desiredStateOfWorld.PluginExists(registeredPlugin.SocketPath) {
 			unregisterPlugin = true
 		} else {
 			// We also need to unregister the plugins that exist in both actual state of world

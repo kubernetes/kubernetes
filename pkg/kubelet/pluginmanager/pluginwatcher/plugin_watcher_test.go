@@ -114,7 +114,7 @@ func TestPluginRegistration(t *testing.T) {
 		socketPath := filepath.Join(socketDir, fmt.Sprintf("plugin-%d.sock", i))
 		pluginName := fmt.Sprintf("example-plugin-%d", i)
 
-		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "", supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 
 		pluginInfo := GetPluginInfo(p)
@@ -149,7 +149,7 @@ func TestPluginRegistrationSameName(t *testing.T) {
 	pluginName := "dep-example-plugin"
 	for i := 0; i < 10; i++ {
 		socketPath := filepath.Join(socketDir, fmt.Sprintf("plugin-%d.sock", i))
-		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "", supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 
 		pluginInfo := GetPluginInfo(p)
@@ -174,7 +174,7 @@ func TestPluginReRegistration(t *testing.T) {
 	// and recreate it.
 	socketPath := filepath.Join(socketDir, "plugin-reregistration.sock")
 	pluginName := "reregister-plugin"
-	p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+	p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "", supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	pluginInfo := GetPluginInfo(p)
 	lastTimestamp := time.Now()
@@ -190,7 +190,7 @@ func TestPluginReRegistration(t *testing.T) {
 
 		// Add the plugin again
 		pluginName := fmt.Sprintf("dep-example-plugin-%d", i)
-		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "", supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 		waitForRegistration(t, pluginInfo.SocketPath, dsw)
 
@@ -216,7 +216,7 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 		socketPath := filepath.Join(socketDir, fmt.Sprintf("plugin-%d.sock", i))
 		pluginName := fmt.Sprintf("example-plugin-%d", i)
 
-		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "", supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 		defer func(p *examplePlugin) {
 			require.NoError(t, p.Stop())
