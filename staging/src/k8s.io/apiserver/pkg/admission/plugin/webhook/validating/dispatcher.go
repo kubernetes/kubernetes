@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -51,6 +53,17 @@ const (
 	// failed or returned an internal server error.
 	ValidatingAuditAnnotationFailedOpenKeyPrefix = "failed-open." + ValidatingAuditAnnotationPrefix
 )
+
+// statusReasonsByPriorityDescending is ordered from highest to lowest priority,
+// prioritizing "actionable" errors that can be resolved by user action.
+var statusReasonsByPriorityDescending = []metav1.StatusReason{
+	metav1.StatusReasonBadRequest,
+	metav1.StatusReasonInvalid,
+	metav1.StatusReasonForbidden,
+	metav1.StatusReasonUnauthorized,
+	metav1.StatusReasonServiceUnavailable,
+	metav1.StatusReasonInternalError,
+}
 
 type validatingDispatcher struct {
 	cm     *webhookutil.ClientManager
@@ -237,12 +250,118 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 		return nil
 	}
 	if len(errs) > 1 {
-		for i := 1; i < len(errs); i++ {
-			// TODO: merge status errors; until then, just return the first one.
-			utilruntime.HandleError(errs[i])
-		}
+		return aggregateWebhookErrors(errs)
 	}
 	return errs[0]
+}
+
+func aggregateWebhookErrors(errs []error) error {
+	if len(errs) == 1 {
+		return errs[0]
+	}
+
+	errorsByReason := groupErrorsByReason(errs)
+
+	// When there are multiple groups of errors, we can only return one group.
+	// We use priorities to decide the group to return. The items are ordered from
+	// highest to lowest priority. We prioritize "actionable" errors, i.e. errors
+	// that can be resolved by some user action, like changing the resource.
+	for _, reason := range statusReasonsByPriorityDescending {
+		if group, exists := errorsByReason[reason]; exists {
+			mergedErr := mergeErrorsOfSameType(group)
+			if statusErr, ok := mergedErr.(*apierrors.StatusError); ok { //nolint:errorlint
+				return statusErr
+			}
+			return apierrors.NewInternalError(mergedErr)
+		}
+	}
+	return errs[0] // fallback
+}
+
+func groupErrorsByReason(errs []error) map[metav1.StatusReason][]error {
+	groups := make(map[metav1.StatusReason][]error)
+
+	for _, err := range errs {
+		// Log all original errors since they won't be directly surfaced to the client
+		utilruntime.HandleError(err)
+
+		if statusErr, ok := err.(*apierrors.StatusError); ok { //nolint:errorlint
+			reason := statusErr.Status().Reason
+			groups[reason] = append(groups[reason], err)
+		} else {
+			// For non-StatusError, categorize as InternalError
+			groups[metav1.StatusReasonInternalError] = append(groups[metav1.StatusReasonInternalError], err)
+		}
+	}
+
+	return groups
+}
+
+func mergeErrorsOfSameType(errs []error) error {
+	if len(errs) == 1 {
+		return errs[0]
+	}
+
+	var firstStatusErr *apierrors.StatusError
+	var details []metav1.StatusDetails
+	var messages []string
+
+	for _, err := range errs {
+		if statusErr, ok := err.(*apierrors.StatusError); ok { //nolint:errorlint
+			if firstStatusErr == nil {
+				firstStatusErr = statusErr
+			}
+			if statusErr.Status().Details != nil {
+				details = append(details, *statusErr.Status().Details)
+			}
+			messages = append(messages, statusErr.Status().Message)
+		}
+	}
+
+	// If no StatusError found, return the first error
+	if firstStatusErr == nil {
+		return errs[0]
+	}
+
+	return &apierrors.StatusError{
+		ErrStatus: metav1.Status{
+			Code:    firstStatusErr.Status().Code,
+			Reason:  firstStatusErr.Status().Reason,
+			Message: strings.Join(messages, "; "),
+			Details: mergeStatusDetails(details),
+		},
+	}
+}
+
+func mergeStatusDetails(details []metav1.StatusDetails) *metav1.StatusDetails {
+	if len(details) == 0 {
+		return nil
+	}
+
+	if len(details) == 1 {
+		return &details[0]
+	}
+
+	// Use the first detail as the base, since errors of the same type
+	// should generally refer to the same resource context
+	merged := details[0]
+
+	// Merge all causes from all details
+	var allCauses []metav1.StatusCause
+	for _, detail := range details {
+		allCauses = append(allCauses, detail.Causes...)
+	}
+	merged.Causes = allCauses
+
+	maxRetryAfter := merged.RetryAfterSeconds
+	for i := 1; i < len(details); i++ {
+		if details[i].RetryAfterSeconds > maxRetryAfter {
+			maxRetryAfter = details[i].RetryAfterSeconds
+		}
+	}
+	merged.RetryAfterSeconds = maxRetryAfter
+
+	return &merged
 }
 
 func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *admission.VersionedAttributes) error {
