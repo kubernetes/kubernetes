@@ -18,6 +18,7 @@ package swap
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	sysruntime "runtime"
@@ -42,6 +43,9 @@ var (
 const TmpfsNoswapOption = "noswap"
 
 func IsTmpfsNoswapOptionSupported(mounter mount.Interface, mountPath string) bool {
+	// TODO: it needs to be replaced by a proper context in the future
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	isTmpfsNoswapOptionSupportedHelper := func() bool {
 		if sysruntime.GOOS == "windows" {
 			return false
@@ -51,13 +55,13 @@ func IsTmpfsNoswapOptionSupported(mounter mount.Interface, mountPath string) boo
 			// Turning off swap in unprivileged tmpfs mounts unsupported
 			// https://github.com/torvalds/linux/blob/v6.8/mm/shmem.c#L4004-L4011
 			// https://github.com/kubernetes/kubernetes/issues/125137
-			klog.InfoS("Running under a user namespace - tmpfs noswap is not supported")
+			logger.Info("Running under a user namespace - tmpfs noswap is not supported")
 			return false
 		}
 
 		kernelVersion, err := utilkernel.GetVersion()
 		if err != nil {
-			klog.ErrorS(err, "cannot determine kernel version, unable to determine is tmpfs noswap is supported")
+			logger.Error(err, "cannot determine kernel version, unable to determine is tmpfs noswap is supported")
 			return false
 		}
 
@@ -66,31 +70,31 @@ func IsTmpfsNoswapOptionSupported(mounter mount.Interface, mountPath string) boo
 		}
 
 		if mountPath == "" {
-			klog.ErrorS(errors.New("mount path is empty, falling back to /tmp"), "")
+			logger.Error(errors.New("mount path is empty, falling back to /tmp"), "")
 		}
 
 		mountPath, err = os.MkdirTemp(mountPath, "tmpfs-noswap-test-")
 		if err != nil {
-			klog.InfoS("error creating dir to test if tmpfs noswap is enabled. Assuming not supported", "mount path", mountPath, "error", err)
+			logger.Info("error creating dir to test if tmpfs noswap is enabled. Assuming not supported", "mount path", mountPath, "error", err)
 			return false
 		}
 
 		defer func() {
 			err = os.RemoveAll(mountPath)
 			if err != nil {
-				klog.ErrorS(err, "error removing test tmpfs dir", "mount path", mountPath)
+				logger.Error(err, "error removing test tmpfs dir", "mount path", mountPath)
 			}
 		}()
 
 		err = mounter.MountSensitiveWithoutSystemd("tmpfs", mountPath, "tmpfs", []string{TmpfsNoswapOption}, nil)
 		if err != nil {
-			klog.InfoS("error mounting tmpfs with the noswap option. Assuming not supported", "error", err)
+			logger.Info("error mounting tmpfs with the noswap option. Assuming not supported", "error", err)
 			return false
 		}
 
 		err = mounter.Unmount(mountPath)
 		if err != nil {
-			klog.ErrorS(err, "error unmounting test tmpfs dir", "mount path", mountPath)
+			logger.Error(err, "error unmounting test tmpfs dir", "mount path", mountPath)
 		}
 
 		return true
@@ -104,7 +108,7 @@ func IsTmpfsNoswapOptionSupported(mounter mount.Interface, mountPath string) boo
 }
 
 // gets /proc/swaps's content as an input, returns true if swap is enabled.
-func isSwapOnAccordingToProcSwaps(procSwapsContent []byte) bool {
+func isSwapOnAccordingToProcSwaps(logger klog.Logger, procSwapsContent []byte) bool {
 	procSwapsContent = bytes.TrimSpace(procSwapsContent) // extra trailing \n
 	procSwapsStr := string(procSwapsContent)
 	procSwapsLines := strings.Split(procSwapsStr, "\n")
@@ -112,7 +116,7 @@ func isSwapOnAccordingToProcSwaps(procSwapsContent []byte) bool {
 	// If there is more than one line (table headers) in /proc/swaps then swap is enabled
 	isSwapOn := len(procSwapsLines) > 1
 	if isSwapOn {
-		klog.InfoS("Swap is on", "/proc/swaps contents", procSwapsStr)
+		logger.Info("Swap is on", "/proc/swaps contents", procSwapsStr)
 	}
 
 	return isSwapOn
@@ -127,18 +131,22 @@ func IsSwapOn() (bool, error) {
 			return false, nil
 		}
 
+		// TODO: it needs to be replaced by a proper context in the future
+		ctx := context.TODO()
+		logger := klog.FromContext(ctx)
+
 		const swapFilePath = "/proc/swaps"
 		procSwapsContent, err := os.ReadFile(swapFilePath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				klog.InfoS("File does not exist, assuming that swap is disabled", "path", swapFilePath)
+				logger.Info("File does not exist, assuming that swap is disabled", "path", swapFilePath)
 				return false, nil
 			}
 
 			return false, err
 		}
 
-		return isSwapOnAccordingToProcSwaps(procSwapsContent), nil
+		return isSwapOnAccordingToProcSwaps(logger, procSwapsContent), nil
 	}
 
 	swapOnOnce.Do(func() {
