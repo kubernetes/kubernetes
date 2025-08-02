@@ -46,6 +46,27 @@ func Node(name string) *NodeApplyConfiguration {
 	return b
 }
 
+// ExtractNodeFrom extracts the applied configuration owned by fieldManager from
+// node for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// node must be a unmodified Node API object that was retrieved from the Kubernetes API.
+// ExtractNodeFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractNodeFrom(node *corev1.Node, fieldManager string, subresource string) (*NodeApplyConfiguration, error) {
+	b := &NodeApplyConfiguration{}
+	err := managedfields.ExtractInto(node, internal.Parser().Type("io.k8s.api.core.v1.Node"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(node.Name)
+
+	b.WithKind("Node")
+	b.WithAPIVersion("v1")
+	return b, nil
+}
+
 // ExtractNode extracts the applied configuration owned by fieldManager from
 // node. If no managedFields are found in node for fieldManager, a
 // NodeApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -58,28 +79,16 @@ func Node(name string) *NodeApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractNode(node *corev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
-	return extractNode(node, fieldManager, "")
+	return ExtractNodeFrom(node, fieldManager, "")
 }
 
-// ExtractNodeStatus is the same as ExtractNode except
-// that it extracts the status subresource applied configuration.
+// ExtractNodeStatus extracts the applied configuration owned by fieldManager from
+// node for the status subresource.
 // Experimental!
 func ExtractNodeStatus(node *corev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
-	return extractNode(node, fieldManager, "status")
+	return ExtractNodeFrom(node, fieldManager, "status")
 }
 
-func extractNode(node *corev1.Node, fieldManager string, subresource string) (*NodeApplyConfiguration, error) {
-	b := &NodeApplyConfiguration{}
-	err := managedfields.ExtractInto(node, internal.Parser().Type("io.k8s.api.core.v1.Node"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(node.Name)
-
-	b.WithKind("Node")
-	b.WithAPIVersion("v1")
-	return b, nil
-}
 func (b NodeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
