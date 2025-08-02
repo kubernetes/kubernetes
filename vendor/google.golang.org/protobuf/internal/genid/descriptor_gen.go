@@ -1014,6 +1014,7 @@ const (
 	FeatureSet_Utf8Validation_field_name        protoreflect.Name = "utf8_validation"
 	FeatureSet_MessageEncoding_field_name       protoreflect.Name = "message_encoding"
 	FeatureSet_JsonFormat_field_name            protoreflect.Name = "json_format"
+	FeatureSet_EnforceNamingStyle_field_name    protoreflect.Name = "enforce_naming_style"
 
 	FeatureSet_FieldPresence_field_fullname         protoreflect.FullName = "google.protobuf.FeatureSet.field_presence"
 	FeatureSet_EnumType_field_fullname              protoreflect.FullName = "google.protobuf.FeatureSet.enum_type"
@@ -1021,6 +1022,7 @@ const (
 	FeatureSet_Utf8Validation_field_fullname        protoreflect.FullName = "google.protobuf.FeatureSet.utf8_validation"
 	FeatureSet_MessageEncoding_field_fullname       protoreflect.FullName = "google.protobuf.FeatureSet.message_encoding"
 	FeatureSet_JsonFormat_field_fullname            protoreflect.FullName = "google.protobuf.FeatureSet.json_format"
+	FeatureSet_EnforceNamingStyle_field_fullname    protoreflect.FullName = "google.protobuf.FeatureSet.enforce_naming_style"
 )
 
 // Field numbers for google.protobuf.FeatureSet.
@@ -1031,6 +1033,7 @@ const (
 	FeatureSet_Utf8Validation_field_number        protoreflect.FieldNumber = 4
 	FeatureSet_MessageEncoding_field_number       protoreflect.FieldNumber = 5
 	FeatureSet_JsonFormat_field_number            protoreflect.FieldNumber = 6
+	FeatureSet_EnforceNamingStyle_field_number    protoreflect.FieldNumber = 7
 )
 
 // Full and short names for google.protobuf.FeatureSet.FieldPresence.
@@ -1110,6 +1113,19 @@ const (
 	FeatureSet_JSON_FORMAT_UNKNOWN_enum_value = 0
 	FeatureSet_ALLOW_enum_value               = 1
 	FeatureSet_LEGACY_BEST_EFFORT_enum_value  = 2
+)
+
+// Full and short names for google.protobuf.FeatureSet.EnforceNamingStyle.
+const (
+	FeatureSet_EnforceNamingStyle_enum_fullname = "google.protobuf.FeatureSet.EnforceNamingStyle"
+	FeatureSet_EnforceNamingStyle_enum_name     = "EnforceNamingStyle"
+)
+
+// Enum values for google.protobuf.FeatureSet.EnforceNamingStyle.
+const (
+	FeatureSet_ENFORCE_NAMING_STYLE_UNKNOWN_enum_value = 0
+	FeatureSet_STYLE2024_enum_value                    = 1
+	FeatureSet_STYLE_LEGACY_enum_value                 = 2
 )
 
 // Names for google.protobuf.FeatureSetDefaults.
