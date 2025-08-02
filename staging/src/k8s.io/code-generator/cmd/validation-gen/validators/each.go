@@ -256,41 +256,47 @@ var (
 )
 
 func (lv listValidator) GetValidations(context Context) (Validations, error) {
-	lm := lv.byPath[context.Path.String()]
-	if err := lv.check(lm); err != nil {
-		return Validations{}, err
+	nt := util.NativeType(context.Type)
+	if nt.Kind != types.Slice && nt.Kind != types.Array {
+		return Validations{}, nil
 	}
+
+	// Look up the list metadata which is defined on this field or type.
+	lm := lv.byPath[context.Path.String()]
+
 	// NOTE: We don't really support list-of-list or map-of-list, so this does
 	// not consider the case of ScopeListVal or ScopeMapVal. If we want to
 	// support those, we need to look at this and make sure the paths work the
 	// way we need.
 	if context.Scope == ScopeField {
+		// If this is a field, look up the list metadata for the type.
+		// TypeValidators happen before FieldValidators, so this is safe.
 		tm := lv.byPath[context.Type.String()]
 		if lm != nil && tm != nil {
 			return Validations{}, fmt.Errorf("found list metadata for both a field and its type: %s", context.Path)
 		}
-		// For the purpose of emitting validations, we can use the
-		// type's metadata if the field's metadata is not set.
-		//
-		// TypeValidators happen before FieldValidators, so if we end
-		// up here, we can rely on this having been checked already.
-		if lm == nil && tm != nil {
-			lm = tm
-		}
-	}
-	if lm == nil {
 		// TODO(thockin): enable this once the whole codebase is converted or
 		// if we only run against fields which are opted-in.
-		// if context.Type.Kind == types.Slice || context.Type.Kind == types.Array {
-		// 	return Validations{}, fmt.Errorf("found list field without a listType")
+		// if lm == nil && tm == nil {
+		// 	 return Validations{}, fmt.Errorf("found a list field without list metadata")
 		// }
+	}
+
+	if lm == nil {
+		// If we don't have metadata for this field, we might have it for the
+		// field's type.
 		return Validations{}, nil
+	}
+
+	// Do this after the above - if we only get one error, the one(s) above
+	// this are more important.
+	if err := lv.check(lm); err != nil {
+		return Validations{}, err
 	}
 
 	result := Validations{}
 
 	// Generate uniqueness checks for lists with higher-order semantics.
-	nt := util.NativeType(context.Type)
 	if lm.declaredAsSet {
 		// Only compare primitive values when possible. Slices and maps are not
 		// comparable, and structs might hold pointer fields, which are directly
@@ -305,50 +311,46 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 			WithComment("listType=set requires unique values")
 		result.AddFunction(f)
 	}
-	// TODO: enable the following once we have a way to either opt-out from this validation
-	// or settle the decision on how to handle the ratcheting cases.
-	// if lm.declaredAsMap {
-	// TODO: There are some fields which are declared as maps which do not
-	// enforce uniqueness in manual validation. Those either need to not be
-	// maps or we need to allow types to opt-out from this validation.  SSA
-	// is also not able to handle these well.
+	if lm.declaredAsMap {
+		// TODO: There are some fields which are declared as maps which do not
+		// enforce uniqueness in manual validation. Those either need to not be
+		// maps or we need to allow types to opt-out from this validation.  SSA
+		// is also not able to handle these well.
 
-	// matchArg := lm.makeListMapMatchFunc(nt.Elem)
-	// f := Function("listValidator", DefaultFlags, validateUnique, matchArg).
-	// 	WithComment("listType=map requires unique keys")
-	// result.AddFunction(f)
-	// }
+		matchArg := lm.makeListMapMatchFunc(nt.Elem)
+		f := Function("listValidator", DefaultFlags, validateUnique, matchArg).
+			WithComment("listType=map requires unique keys")
+		result.AddFunction(f)
+	}
 
 	return result, nil
 }
 
 // make sure a given listMetadata makes sense.
 func (lv listValidator) check(lm *listMetadata) error {
-	if lm != nil {
-		// Check some fundamental constraints on list tags.
-		decls := []string{}
-		if lm.declaredAsAtomic {
-			decls = append(decls, "atomic")
-		}
-		if lm.declaredAsSet {
-			decls = append(decls, "set")
-		}
-		if lm.declaredAsMap {
-			decls = append(decls, "map")
-		}
-		if len(decls) > 1 {
-			return fmt.Errorf("listType cannot have multiple types (%s)", strings.Join(decls, ", "))
-		}
-		if lm.declaredAsMap && len(lm.keyFields) == 0 {
-			return fmt.Errorf("found listType=map without listMapKey")
-		}
-		if len(lm.keyFields) > 0 && !lm.declaredAsMap {
-			return fmt.Errorf("found listMapKey without listType=map")
-		}
-		// Check for missing listType (after the other checks so the more specific errors take priority)
-		if len(decls) == 0 {
-			return fmt.Errorf("found list metadata without a listType")
-		}
+	// Check some fundamental constraints on list tags.
+	decls := []string{}
+	if lm.declaredAsAtomic {
+		decls = append(decls, "atomic")
+	}
+	if lm.declaredAsSet {
+		decls = append(decls, "set")
+	}
+	if lm.declaredAsMap {
+		decls = append(decls, "map")
+	}
+	if len(decls) > 1 {
+		return fmt.Errorf("listType cannot have multiple types (%s)", strings.Join(decls, ", "))
+	}
+	if lm.declaredAsMap && len(lm.keyFields) == 0 {
+		return fmt.Errorf("found listType=map without listMapKey")
+	}
+	if len(lm.keyFields) > 0 && !lm.declaredAsMap {
+		return fmt.Errorf("found listMapKey without listType=map")
+	}
+	// Check for missing listType (after the other checks so the more specific errors take priority)
+	if len(decls) == 0 {
+		return fmt.Errorf("found list metadata without a listType")
 	}
 	return nil
 }
