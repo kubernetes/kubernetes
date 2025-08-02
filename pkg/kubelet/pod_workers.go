@@ -330,6 +330,9 @@ const (
 
 	// backoff period when transient error occurred.
 	backOffOnTransientErrorPeriod = time.Second
+
+	// max amount of time to enqueue a pod
+	maxEnqueueDuration = 5 * time.Minute
 )
 
 // podSyncStatus tracks per-pod transitions through the three phases of pod
@@ -1519,8 +1522,18 @@ func (p *podWorkers) completeWork(podUID types.UID, phaseTransition bool, syncEr
 		// Network is not ready; back off for short period of time and retry as network might be ready soon.
 		p.workQueue.Enqueue(podUID, wait.Jitter(backOffOnTransientErrorPeriod, workerBackOffPeriodJitterFactor))
 	default:
-		// Error occurred during the sync; back off and then retry.
-		p.workQueue.Enqueue(podUID, wait.Jitter(p.backOffPeriod, workerBackOffPeriodJitterFactor))
+		// Error occurred during the sync; back off and then retry. If the error includes a backoff expiration,
+		// wait until then instead of the default to avoid adding extra time to the backoff.
+		backoff := p.backOffPeriod
+		if backoffAt, isBackoffErr := kubecontainer.MinBackoffExpiration(syncErr); isBackoffErr {
+			backoff = backoffAt.Sub(p.clock.Now())
+		}
+		if backoff < 0 {
+			backoff = 0
+		} else if backoff > maxEnqueueDuration {
+			backoff = maxEnqueueDuration
+		}
+		p.workQueue.Enqueue(podUID, wait.Jitter(backoff, workerBackOffPeriodJitterFactor))
 	}
 
 	// if there is a pending update for this worker, requeue immediately, otherwise
