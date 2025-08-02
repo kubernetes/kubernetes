@@ -37,7 +37,7 @@ import (
 
 var (
 	alphabeticalOrder        bool
-	k8RootPath               string
+	k8sRootPath              string
 	versionedFeatureListFile = "test/compatibility_lifecycle/reference/versioned_feature_list.yaml"
 	// thresholdVersion is the version after which we require emulation support for feature removal
 	// 1.31 is when we introduced emulation version support
@@ -75,17 +75,18 @@ func NewFeatureGatesCommand() *cobra.Command {
 	if err != nil {
 		panic(err)
 	}
-	cmd.Flags().StringVar(&k8RootPath, "root-path", defaultRootPath, "absolute path of the k8s repository")
+	cmd.Flags().StringVar(&k8sRootPath, "root-path", defaultRootPath, "absolute path of the k8s repository")
 
 	cmd.AddCommand(NewVerifyFeatureListCommand())
 	cmd.AddCommand(NewUpdateFeatureListCommand())
+	cmd.AddCommand(NewVerifyFeatureCleanupCommand())
 	return cmd
 }
 
 func NewVerifyFeatureListCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "verify",
-		Short: "Verifies feature list files are up to date.",
+		Short: "Verify feature list files are up to date",
 		Run:   verifyFeatureListFunc,
 	}
 	cmd.Flags().BoolVar(&alphabeticalOrder, "alphabetical-order", false, "if true, verify all features in any FeatureSpec map are ordered aphabetically")
@@ -95,15 +96,24 @@ func NewVerifyFeatureListCommand() *cobra.Command {
 func NewUpdateFeatureListCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "update",
-		Short: "updates feature list files.",
+		Short: "Update feature list files",
 		Run:   updateFeatureListFunc,
+	}
+	return &cmd
+}
+
+func NewVerifyFeatureCleanupCommand() *cobra.Command {
+	cmd := cobra.Command{
+		Use:   "verify-cleanup",
+		Short: fmt.Sprintf("Verify that no feature gates in %s need to be cleaned up", versionedFeatureListFile),
+		Run:   verifyFeatureCleanupFunc,
 	}
 	return &cmd
 }
 
 func verifyFeatureListFunc(cmd *cobra.Command, args []string) {
 	currentVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
-	if err := verifyOrUpdateFeatureList(k8RootPath, versionedFeatureListFile, currentVersion, false); err != nil {
+	if err := verifyOrUpdateFeatureList(k8sRootPath, versionedFeatureListFile, currentVersion, false); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to verify versioned feature list: \n%s", err)
 		os.Exit(1)
 	}
@@ -111,8 +121,16 @@ func verifyFeatureListFunc(cmd *cobra.Command, args []string) {
 
 func updateFeatureListFunc(cmd *cobra.Command, args []string) {
 	currentVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
-	if err := verifyOrUpdateFeatureList(k8RootPath, versionedFeatureListFile, currentVersion, true); err != nil {
+	if err := verifyOrUpdateFeatureList(k8sRootPath, versionedFeatureListFile, currentVersion, true); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to update versioned feature list: \n%s", err)
+		os.Exit(1)
+	}
+}
+
+func verifyFeatureCleanupFunc(cmd *cobra.Command, args []string) {
+	currentVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
+	if err := getFeaturesAndVerifyCleanup(k8sRootPath, versionedFeatureListFile, currentVersion); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to verify that feature gates have been cleaned up: \n%s", err)
 		os.Exit(1)
 	}
 }
@@ -121,18 +139,10 @@ func updateFeatureListFunc(cmd *cobra.Command, args []string) {
 // map[featuregate.Feature]featuregate.VersionedSpecs.
 // It will then update the feature list in featureListFile, or verifies there is no change from the existing list.
 func verifyOrUpdateFeatureList(rootPath, featureListFile string, currentVersion *version.Version, update bool) error {
-	featureList := []featureInfo{}
-	features, err := searchPathForFeatures(filepath.Join(rootPath, "pkg"))
+	featureList, err := getFeatures(rootPath)
 	if err != nil {
 		return err
 	}
-	featureList = append(featureList, features...)
-
-	features, err = searchPathForFeatures(filepath.Join(rootPath, "staging"))
-	if err != nil {
-		return err
-	}
-	featureList = append(featureList, features...)
 
 	if err := verifyAlphaFeatures(featureList); err != nil {
 		return err
@@ -147,13 +157,7 @@ func verifyOrUpdateFeatureList(rootPath, featureListFile string, currentVersion 
 	}
 
 	filePath := filepath.Join(rootPath, featureListFile)
-	baseFeatureListBytes, err := os.ReadFile(filePath)
-	if err != nil {
-		return err
-	}
-
-	baseFeatureList := []featureInfo{}
-	err = yaml.Unmarshal(baseFeatureListBytes, &baseFeatureList)
+	baseFeatureList, baseFeatureListBytes, err := getFeaturesFromFile(filePath)
 	if err != nil {
 		return err
 	}
@@ -176,6 +180,37 @@ func verifyOrUpdateFeatureList(rootPath, featureListFile string, currentVersion 
 
 	}
 	return nil
+}
+
+func getFeatures(rootPath string) ([]featureInfo, error) {
+	featureList := []featureInfo{}
+	features, err := searchPathForFeatures(filepath.Join(rootPath, "pkg"))
+	if err != nil {
+		return nil, err
+	}
+	featureList = append(featureList, features...)
+
+	features, err = searchPathForFeatures(filepath.Join(rootPath, "staging"))
+	if err != nil {
+		return nil, err
+	}
+	featureList = append(featureList, features...)
+	return featureList, nil
+}
+
+func getFeaturesFromFile(path string) ([]featureInfo, []byte, error) {
+	featuresBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	features := []featureInfo{}
+	err = yaml.Unmarshal(featuresBytes, &features)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return features, featuresBytes, nil
 }
 
 func dedupeFeatureList(featureList []featureInfo) ([]featureInfo, error) {
@@ -263,6 +298,51 @@ func verifyFeatureRemoval(featureList []featureInfo, baseFeatureList []featureIn
 
 		}
 	}
+	return nil
+}
+
+// getFeaturesAndVerifyCleanup gets the feature list from the YAML file and verifies that
+// no feature gates need to be cleaned up.
+func getFeaturesAndVerifyCleanup(rootPath, featureListFile string, currentVersion *version.Version) error {
+	featureList, _, err := getFeaturesFromFile(filepath.Join(rootPath, featureListFile))
+	if err != nil {
+		return err
+	}
+	if err := verifyFeatureCleanup(featureList, currentVersion); err != nil {
+		return err
+	}
+	return nil
+}
+
+// verifyFeatureCleanup verifies that no feature gates need to be cleaned up.
+// Returns error if there is a feature that's been locked to default for >=5 minor versions.
+// If a feature is locked to its default at version X.Y, the feature is still needed in
+// the code base for version emulation until the release cycle of X.Y+3 ends. After that, it
+// should be cleaned up. We can be certain that the release cycle for X.Y+3 ended only once
+// we're in the release cycle for X.Y+5 because the release cycle for X.Y+4 overlaps with
+// the release cycle for X.Y+3.
+func verifyFeatureCleanup(featureList []featureInfo, currentVersion *version.Version) error {
+	var removableFeatures []string
+
+	for _, f := range featureList {
+		specs := f.VersionedSpecs
+		lastSpec := specs[len(specs)-1]
+		if lastSpec.LockToDefault {
+			specVer, err := version.Parse(lastSpec.Version)
+			if err != nil {
+				return fmt.Errorf("invalid version \"%s\" for feature %s: %w", lastSpec.Version, f.Name, err)
+			}
+			removalVer := specVer.AddMinor(5)
+			if currentVersion.AtLeast(removalVer) {
+				removableFeatures = append(removableFeatures, fmt.Sprintf("%s (locked to default since version %s)", f.Name, specVer))
+			}
+		}
+	}
+
+	if len(removableFeatures) > 0 {
+		return fmt.Errorf("the following features should be removed: %s", strings.Join(removableFeatures, ", "))
+	}
+
 	return nil
 }
 
