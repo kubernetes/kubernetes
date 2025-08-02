@@ -19,8 +19,8 @@ package volumebinding
 import (
 	"testing"
 
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
@@ -34,7 +34,7 @@ func TestScore(t *testing.T) {
 	for _, point := range defaultShapePoint {
 		defaultShape = append(defaultShape, helper.FunctionShapePoint{
 			Utilization: int64(point.Utilization),
-			Score:       int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),
+			Score:       int64(point.Score) * (fwk.MaxNodeScore / config.MaxCustomPriorityScore),
 		})
 	}
 	type scoreCase struct {

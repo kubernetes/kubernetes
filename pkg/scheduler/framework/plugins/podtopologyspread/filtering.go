@@ -27,7 +27,6 @@ import (
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const preFilterStateKey = "PreFilter" + Name
@@ -137,7 +136,7 @@ func (p *criticalPaths) update(tpVal string, num int) {
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	s, err := pl.calPreFilterState(ctx, pod, nodes)
 	if err != nil {
 		return nil, fwk.AsStatus(err)
@@ -150,7 +149,7 @@ func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState fwk.Cycle
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *PodTopologySpread) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *PodTopologySpread) PreFilterExtensions() fwk.PreFilterExtensions {
 	return pl
 }
 
