@@ -217,10 +217,44 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod)
 
 	var errs []error
+	// Verify container cgroup values
 	for _, ci := range tcInfo {
 		tc := makeResizableContainer(ci)
 		errs = append(errs, cgroups.VerifyContainerCgroupValues(f, pod, &tc, onCgroupv2))
 	}
+
+	// Verify pod cgroup values
+	// TODO: Consider PodLevelResources feature and move this function to `cgroups` package.
+	expectedPod := MakePodWithResizableContainers(pod.Namespace, pod.Name, pod.Labels["time"], tcInfo)
+
+	podRequests := helpers.PodRequests(expectedPod, helpers.PodResourcesOptions{
+		SkipPodLevelResources: true,
+	})
+
+	cpuLimitDeclared := true
+	memoryLimitDeclared := true
+	podLimits := helpers.PodLimits(expectedPod, helpers.PodResourcesOptions{
+		SkipPodLevelResources: true,
+		ContainerFn: func(res v1.ResourceList, containerType helpers.ContainerType) {
+			if res.Cpu().IsZero() {
+				cpuLimitDeclared = false
+			}
+			if res.Memory().IsZero() {
+				memoryLimitDeclared = false
+			}
+		},
+	})
+	var podCPULimitMilliValue, podMemoryLimitInBytes int64
+	if cpuLimitDeclared {
+		podCPULimitMilliValue = podLimits.Cpu().MilliValue()
+	}
+	if memoryLimitDeclared {
+		podMemoryLimitInBytes = podLimits.Memory().Value()
+	}
+
+	podResourceInfo := cgroups.BuildPodResourceInfo(podRequests.Cpu().MilliValue(), podCPULimitMilliValue, podMemoryLimitInBytes)
+	errs = append(errs, cgroups.VerifyPodCgroups(ctx, f, pod, &podResourceInfo))
+
 	return utilerrors.NewAggregate(errs)
 }
 
