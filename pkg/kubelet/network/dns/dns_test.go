@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -42,7 +42,7 @@ var (
 	// testHostNameserver and testHostDomain are also being used in dns_windows_test.go.
 	testHostNameserver = "8.8.8.8"
 	testHostDomain     = "host.domain"
-	fetchEvent         = func(recorder *record.FakeRecorder) string {
+	fetchEvent         = func(recorder *events.FakeRecorder) string {
 		select {
 		case event := <-recorder.Events:
 			return event
@@ -133,7 +133,7 @@ func TestFormDNSSearchFitsLimits(t *testing.T) {
 		strings.Repeat("A", 127),
 	}
 
-	recorder := record.NewFakeRecorder(20)
+	recorder := events.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string("testNode"),
@@ -238,7 +238,7 @@ func TestFormDNSSearchFitsLimits(t *testing.T) {
 }
 
 func TestFormDNSNameserversFitsLimits(t *testing.T) {
-	recorder := record.NewFakeRecorder(20)
+	recorder := events.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string("testNode"),
@@ -344,7 +344,7 @@ func TestMergeDNSOptions(t *testing.T) {
 }
 
 func TestGetPodDNSType(t *testing.T) {
-	recorder := record.NewFakeRecorder(20)
+	recorder := events.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string("testNode"),
@@ -449,7 +449,7 @@ func TestGetPodDNSType(t *testing.T) {
 
 func TestGetPodDNS(t *testing.T) {
 	ctx := ktesting.Init(t)
-	recorder := record.NewFakeRecorder(20)
+	recorder := events.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string("testNode"),
@@ -548,7 +548,7 @@ func TestGetPodDNS(t *testing.T) {
 }
 
 func TestGetPodDNSCustom(t *testing.T) {
-	recorder := record.NewFakeRecorder(20)
+	recorder := events.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string("testNode"),
