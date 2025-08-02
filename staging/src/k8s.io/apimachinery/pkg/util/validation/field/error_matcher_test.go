@@ -17,11 +17,358 @@ limitations under the License.
 package field
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 )
 
-func TestErrorMatcherRender(t *testing.T) {
-	tests := []struct {
+func TestErrorMatcher_Matches(t *testing.T) {
+	baseErr := func() *Error {
+		return &Error{
+			Type:     ErrorTypeInvalid,
+			Field:    "field",
+			BadValue: "value",
+			Detail:   "detail",
+			Origin:   "origin",
+		}
+	}
+
+	testCases := []struct {
+		name      string
+		matcher   ErrorMatcher
+		wantedErr func() *Error
+		actualErr *Error
+		matches   bool
+	}{{
+		name:      "ByType: match",
+		matcher:   ErrorMatcher{}.ByType(),
+		wantedErr: baseErr,
+		actualErr: &Error{Type: ErrorTypeInvalid},
+		matches:   true,
+	}, {
+		name:      "ByType: no match",
+		matcher:   ErrorMatcher{}.ByType(),
+		wantedErr: baseErr,
+		actualErr: &Error{Type: ErrorTypeRequired},
+		matches:   false,
+	}, {
+		name:      "ByField: match",
+		matcher:   ErrorMatcher{}.ByField(),
+		wantedErr: baseErr,
+		actualErr: &Error{Field: "field"},
+		matches:   true,
+	}, {
+		name:      "ByField: no match",
+		matcher:   ErrorMatcher{}.ByField(),
+		wantedErr: baseErr,
+		actualErr: &Error{Field: "other"},
+		matches:   false,
+	}, {
+		name:      "ByValue: match",
+		matcher:   ErrorMatcher{}.ByValue(),
+		wantedErr: baseErr,
+		actualErr: &Error{BadValue: "value"},
+		matches:   true,
+	}, {
+		name:      "ByValue: no match",
+		matcher:   ErrorMatcher{}.ByValue(),
+		wantedErr: baseErr,
+		actualErr: &Error{BadValue: "other"},
+		matches:   false,
+	}, {
+		name:      "ByOrigin: match",
+		matcher:   ErrorMatcher{}.ByOrigin(),
+		wantedErr: baseErr,
+		actualErr: &Error{Origin: "origin"},
+		matches:   true,
+	}, {
+		name:      "ByOrigin: no match",
+		matcher:   ErrorMatcher{}.ByOrigin(),
+		wantedErr: baseErr,
+		actualErr: &Error{Origin: "other"},
+		matches:   false,
+	}, {
+		name:      "ByDetailExact: match",
+		matcher:   ErrorMatcher{}.ByDetailExact(),
+		wantedErr: baseErr,
+		actualErr: &Error{Detail: "detail"},
+		matches:   true,
+	}, {
+		name:      "ByDetailExact: no match",
+		matcher:   ErrorMatcher{}.ByDetailExact(),
+		wantedErr: baseErr,
+		actualErr: &Error{Detail: "other"},
+		matches:   false,
+	}, {
+		name:    "ByDetailSubstring: match empty",
+		matcher: ErrorMatcher{}.ByDetailSubstring(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = ""
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   true,
+	}, {
+		name:    "ByDetailSubstring: match full",
+		matcher: ErrorMatcher{}.ByDetailSubstring(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = "is the"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   true,
+	}, {
+		name:    "ByDetailSubstring: match start",
+		matcher: ErrorMatcher{}.ByDetailSubstring(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = "this is"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   true,
+	}, {
+		name:    "ByDetailSubstring: match middle",
+		matcher: ErrorMatcher{}.ByDetailSubstring(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = "is the"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   true,
+	}, {
+		name:    "ByDetailSubstring: match end",
+		matcher: ErrorMatcher{}.ByDetailSubstring(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = "the detail"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   true,
+	}, {
+		name:    "ByDetailSubstring: no match",
+		matcher: ErrorMatcher{}.ByDetailSubstring(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = "is not the"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   false,
+	}, {
+		name:    "ByDetailRegexp: match empty",
+		matcher: ErrorMatcher{}.ByDetailRegexp(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = ".*"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   true,
+	}, {
+		name:    "ByDetailRegexp: match full",
+		matcher: ErrorMatcher{}.ByDetailRegexp(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = "^this is the detail$"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   true,
+	}, {
+		name:    "ByDetailRegexp: match start",
+		matcher: ErrorMatcher{}.ByDetailRegexp(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = "^this is"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   true,
+	}, {
+		name:    "ByDetailRegexp: match middle",
+		matcher: ErrorMatcher{}.ByDetailRegexp(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = "is the"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   true,
+	}, {
+		name:    "ByDetailRegexp: match end",
+		matcher: ErrorMatcher{}.ByDetailRegexp(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = "the detail$"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   true,
+	}, {
+		name:    "ByDetailRegexp: match parts",
+		matcher: ErrorMatcher{}.ByDetailRegexp(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = "^this .* .* detail$"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   true,
+	}, {
+		name:    "ByDetailRegexp: no match",
+		matcher: ErrorMatcher{}.ByDetailRegexp(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Detail = "is not the"
+			return e
+		},
+		actualErr: &Error{Detail: "this is the detail"},
+		matches:   false,
+	}, {
+		name:      "Exactly: match",
+		matcher:   ErrorMatcher{}.Exactly(),
+		wantedErr: baseErr,
+		actualErr: baseErr(),
+		matches:   true,
+	}, {
+		name:      "Exactly: no match (type)",
+		matcher:   ErrorMatcher{}.Exactly(),
+		wantedErr: baseErr,
+		actualErr: &Error{Type: ErrorTypeRequired, Field: "field", BadValue: "value", Detail: "detail", Origin: "origin"},
+		matches:   false,
+	}, {
+		name:      "RequireOriginWhenInvalid: match",
+		matcher:   ErrorMatcher{}.ByOrigin().RequireOriginWhenInvalid(),
+		wantedErr: baseErr,
+		actualErr: &Error{Type: ErrorTypeInvalid, Origin: "origin"},
+		matches:   true,
+	}, {
+		name:      "RequireOriginWhenInvalid: no match (missing origin)",
+		matcher:   ErrorMatcher{}.ByOrigin().RequireOriginWhenInvalid(),
+		wantedErr: baseErr,
+		actualErr: &Error{Type: ErrorTypeInvalid},
+		matches:   false,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.matcher.Matches(tc.wantedErr(), tc.actualErr) != tc.matches {
+				t.Errorf("Matches() = %v, want %v", !tc.matches, tc.matches)
+			}
+		})
+	}
+}
+
+// fakeTestIntf is used to test the testing support.
+type fakeTestIntf struct {
+	errs []string
+}
+
+var _ TestIntf = &fakeTestIntf{}
+
+func (*fakeTestIntf) Helper() {}
+
+func (ft *fakeTestIntf) Errorf(format string, args ...any) {
+	ft.errs = append(ft.errs, fmt.Sprintf(format, args...))
+}
+
+func TestErrorMatcher_Test(t *testing.T) {
+	testCases := []struct {
+		name           string
+		matcher        ErrorMatcher
+		want           ErrorList
+		got            ErrorList
+		expectedErrors []string
+		expectedLogs   []string
+	}{{
+		name:    "no origin: perfect match",
+		matcher: ErrorMatcher{}.ByField(),
+		want:    ErrorList{Invalid(NewPath("f"), nil, "")},
+		got:     ErrorList{Invalid(NewPath("f"), "v", "d")},
+	}, {
+		name:           "no origin: got too few errors",
+		matcher:        ErrorMatcher{}.ByField(),
+		want:           ErrorList{Invalid(NewPath("f"), nil, "")},
+		got:            ErrorList{},
+		expectedErrors: []string{"expected an error matching:"},
+	}, {
+		name:           "no origin: got too many errors",
+		matcher:        ErrorMatcher{}.ByField(),
+		want:           ErrorList{},
+		got:            ErrorList{Invalid(NewPath("f"), "v", "d")},
+		expectedErrors: []string{"unmatched error:"},
+	}, {
+		name:           "no origin: got wrong errors",
+		matcher:        ErrorMatcher{}.ByField(),
+		want:           ErrorList{Invalid(NewPath("f1"), nil, "")},
+		got:            ErrorList{Invalid(NewPath("f2"), "v", "d")},
+		expectedErrors: []string{"expected an error matching:", "unmatched error:"},
+	}, {
+		name:    "with origin: single match",
+		matcher: ErrorMatcher{}.ByField().ByOrigin(),
+		want:    ErrorList{Invalid(NewPath("f"), nil, "").WithOrigin("o")},
+		got:     ErrorList{Invalid(NewPath("f"), "v", "d").WithOrigin("o")},
+	}, {
+		name:    "with origin: multiple matches, different details",
+		matcher: ErrorMatcher{}.ByField().ByOrigin(),
+		want: ErrorList{
+			Invalid(NewPath("f1"), nil, "").WithOrigin("o"),
+			Invalid(NewPath("f2"), nil, "").WithOrigin("o"),
+		},
+		got: ErrorList{
+			Invalid(NewPath("f1"), "v", "d1").WithOrigin("o"),
+			Invalid(NewPath("f2"), "v", "d1").WithOrigin("o"),
+			Invalid(NewPath("f1"), "v", "d2").WithOrigin("o"),
+			Invalid(NewPath("f2"), "v", "d2").WithOrigin("o"),
+		},
+	}, {
+		name:    "with origin: multiple matches, same exact error",
+		matcher: ErrorMatcher{}.ByField().ByOrigin(),
+		want: ErrorList{
+			Invalid(NewPath("f1"), nil, "").WithOrigin("o"),
+			Invalid(NewPath("f2"), nil, "").WithOrigin("o"),
+		},
+		got: ErrorList{
+			Invalid(NewPath("f1"), "v", "d").WithOrigin("o"),
+			Invalid(NewPath("f1"), "v", "d").WithOrigin("o"),
+			Invalid(NewPath("f2"), "v", "d").WithOrigin("o"),
+			Invalid(NewPath("f2"), "v", "d").WithOrigin("o"),
+		},
+		expectedErrors: []string{"exact duplicate error:", "exact duplicate error:"},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeT := &fakeTestIntf{}
+			tc.matcher.Test(fakeT, tc.want, tc.got)
+			if want, got := len(tc.expectedErrors), len(fakeT.errs); got != want {
+				if got == 0 {
+					t.Errorf("expected %d errors, got %d", want, got)
+				} else {
+					q := make([]string, len(fakeT.errs))
+					for i, err := range fakeT.errs {
+						q[i] = fmt.Sprintf("%q", err)
+					}
+					t.Errorf("expected %d errors, got %d:\n%s", want, got, strings.Join(q, "\n"))
+				}
+			} else {
+				for i := range tc.expectedErrors {
+					if !strings.HasPrefix(fakeT.errs[i], tc.expectedErrors[i]) {
+						t.Errorf("error %d: expected prefix %q, got %q", i, tc.expectedErrors[i], fakeT.errs[i])
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestErrorMatcher_Render(t *testing.T) {
+	testCases := []struct {
 		name     string
 		matcher  ErrorMatcher
 		err      *Error
@@ -77,11 +424,11 @@ func TestErrorMatcherRender(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := tt.matcher.Render(tt.err)
-			if result != tt.expected {
-				t.Errorf("Render() = %v, want %v", result, tt.expected)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.matcher.Render(tc.err)
+			if result != tc.expected {
+				t.Errorf("Render() = %v, want %v", result, tc.expected)
 			}
 		})
 	}
