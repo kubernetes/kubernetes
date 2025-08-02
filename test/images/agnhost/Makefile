@@ -24,6 +24,13 @@ LD_FLAGS = -X 'main.Version=$(VERSION)'
 export
 
 bin:
+	# build registry and copy tarball
+	docker build --build-arg GOLANG_VERSION=${GOLANG_VERSION} -f Dockerfile_preparer -t agnhost-preparer:local-build .
+	docker create --name agnhost-preparer-container agnhost-preparer:local-build
+	docker cp agnhost-preparer-container:/registry.tar.gz $(TARGET)/registry.tar.gz
+	docker rm agnhost-preparer-container
+
+	# build the main agnhost binary.
 	../image-util.sh bin $(SRCS)
 
 .PHONY: bin
