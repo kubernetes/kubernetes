@@ -5067,6 +5067,7 @@ type EphemeralContainerCommon struct {
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// Resources resize policy for the container.
+	// ResizePolicy is not allowed for ephemeral containers.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	// +listType=atomic
