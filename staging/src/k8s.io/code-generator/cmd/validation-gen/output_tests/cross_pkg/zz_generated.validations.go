@@ -350,8 +350,6 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a other.StructType, b other.StructType) bool { return a.StringField == b.StringField }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *other.StructType) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T1.SliceOfOtherStruct values")
 			})...)
-			// listType=map requires unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a other.StructType, b other.StructType) bool { return a.StringField == b.StringField })...)
 			return
 		}(fldPath.Child("listMapOfOtherStruct"), obj.ListMapOfOtherStruct, safe.Field(oldObj, func(oldObj *T1) []other.StructType { return oldObj.ListMapOfOtherStruct }))...)
 
