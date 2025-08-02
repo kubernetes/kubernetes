@@ -317,6 +317,9 @@ func NewServer(
 	} else {
 		server.InstallDebuggingDisabledHandlers()
 	}
+
+	server.InstallStatusZ()
+
 	return server
 }
 
@@ -377,6 +380,13 @@ func (s *Server) InstallAuthFilter() {
 // InstallTracingFilter installs OpenTelemetry tracing filter with the restful Container.
 func (s *Server) InstallTracingFilter(tp oteltrace.TracerProvider, opts ...otelrestful.Option) {
 	s.restfulCont.Filter(otelrestful.OTelFilter("kubelet", append(opts, otelrestful.WithTracerProvider(tp))...))
+}
+
+func (s *Server) InstallStatusZ() {
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
+		s.addMetricsBucketMatcher("statusz")
+		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), statusz.WithListedPaths(s.restfulCont.RegisteredHandlePaths())))
+	}
 }
 
 // addMetricsBucketMatcher adds a regexp matcher and the relevant bucket to use when
@@ -573,11 +583,6 @@ func (s *Server) InstallAuthRequiredHandlers() {
 
 	s.addMetricsBucketMatcher("configz")
 	configz.InstallHandler(s.restfulCont)
-
-	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		s.addMetricsBucketMatcher("statusz")
-		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
-	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 		if s.flagz != nil {

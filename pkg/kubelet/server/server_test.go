@@ -514,6 +514,36 @@ func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
 	}
 }
 
+func TestStatusz(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	req, err := http.NewRequest("GET", fw.testHTTPServer.URL+"/statusz", nil)
+	if err != nil {
+		t.Fatalf("Got error creating request: %v", err)
+	}
+	req.Header.Set("Accept", "text/plain")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+	resBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Got error reading response body: %v", err)
+	}
+
+	resBodyString := string(resBody)
+	if !strings.Contains(resBodyString, "Paths") || !strings.Contains(resBodyString, "/configz /debug /healthz /metrics") {
+		t.Errorf("statusz paths missing: %s\n\nExpected: %q", resBodyString, "Paths<delimter> /configz /debug /healthz /metrics")
+	}
+}
+
 // Ensure all registered handlers & services have an associated testcase.
 func TestAuthzCoverage(t *testing.T) {
 	fw := newServerTest()
