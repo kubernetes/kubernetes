@@ -73,7 +73,7 @@ type Validator struct {
 	// celActivationFactory produces a Activations, which resolve identifiers
 	// (e.g. self and oldSelf) to CEL values. One activation must be produced
 	// for each of the cases when oldSelf is optional and non-optional.
-	celActivationFactory func(sts *schema.Structural, obj, oldObj interface{}) (activation interpreter.Activation, optionalOldSelfActivation interpreter.Activation)
+	celActivationFactory func(sts *schema.Structural, obj, oldObj interface{}) (activation *validationActivation, optionalOldSelfActivation *validationActivation)
 }
 
 // NewValidator returns compiles all the CEL programs defined in x-kubernetes-validations extensions
@@ -307,7 +307,7 @@ func (s *Validator) validate(ctx context.Context, fldPath *field.Path, obj, oldO
 		metrics.Metrics.ObserveEvaluation(time.Since(t))
 	}()
 	remainingBudget = costBudget
-	if s == nil || obj == nil {
+	if s == nil {
 		return nil, remainingBudget
 	}
 
@@ -364,12 +364,6 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 	}
 
 	remainingBudget = costBudget
-	if obj == nil {
-		// We only validate non-null values. Rules that need to check for the state of a nullable value or the presence of an optional
-		// field must do so from the surrounding schema. E.g. if an array has nullable string items, a rule on the array
-		// schema can check if items are null, but a rule on the nullable string schema only validates the non-null strings.
-		return nil, remainingBudget
-	}
 	if s.compilationErr != nil {
 		errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("rule compiler initialization error: %v", s.compilationErr)))
 		return errs, remainingBudget
@@ -384,9 +378,24 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 	if s.isResourceRoot {
 		sts = model.WithTypeAndObjectMeta(sts)
 	}
-	activation, optionalOldSelfActivation := s.celActivationFactory(sts, obj, oldObj)
 	for i, compiled := range s.compiledRules {
+
+		klog.Infof("inside compiled rule1 for %s", ruleErrorString(s.uncompiledRules[i]))
+		activation, optionalOldSelfActivation := s.celActivationFactory(sts, obj, oldObj)
+
 		rule := s.uncompiledRules[i]
+		if obj == nil && (rule.OptionalSelf == nil || !*rule.OptionalSelf) {
+			continue
+		}
+		if rule.OptionalSelf != nil && *rule.OptionalSelf {
+			if obj != nil {
+				activation.self = types.OptionalOf(activation.self)
+				optionalOldSelfActivation.self = types.OptionalOf(optionalOldSelfActivation.self)
+			} else {
+				activation.self = types.OptionalNone
+				optionalOldSelfActivation.self = types.OptionalNone
+			}
+		}
 		if compiled.Error != nil {
 			errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("rule compile error: %v", compiled.Error)))
 			continue
@@ -416,6 +425,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 		if optionalOldSelfRule {
 			ruleActivation = optionalOldSelfActivation
 		}
+		klog.Infof("inside compiled rule2 for %s", ruleErrorString(s.uncompiledRules[i]))
 
 		evalResult, evalDetails, err := compiled.Program.ContextEval(ctx, ruleActivation)
 		if evalDetails == nil {
@@ -451,6 +461,11 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			}
 			continue
 		}
+
+		klog.Infof("inside compiled rule3 for %s", ruleErrorString(s.uncompiledRules[i]))
+		klog.Infof("activation for %s is %s", ruleErrorString(s.uncompiledRules[i]), fmt.Sprint(ruleActivation.hasOldSelf, ruleActivation.self, ruleActivation.oldSelf))
+		klog.Infof("obj %s OldObj %s", fmt.Sprint(obj), fmt.Sprint(oldObj))
+
 		if evalResult != types.True {
 			currentFldPath := fldPath
 			if len(compiled.NormalizedRuleFieldPath) > 0 {
@@ -464,9 +479,9 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 					errs = append(errs, e)
 				}
 			}
-
+			klog.Infof("inside compiled rule4  for %s", ruleErrorString(s.uncompiledRules[i]))
 			if compiled.MessageExpression != nil {
-				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
+				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, *activation, remainingBudget)
 				if msgErr != nil {
 					if msgErr.Type == cel.ErrorTypeInternal {
 						addErr(field.InternalError(currentFldPath, msgErr))
@@ -488,6 +503,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			}
 		}
 	}
+
 	return errs, remainingBudget
 }
 
@@ -681,7 +697,7 @@ func fieldErrorForReason(fldPath *field.Path, value interface{}, detail string, 
 
 // evalMessageExpression evaluates the given message expression and returns the evaluated string form and the remaining budget, or an error if one
 // occurred during evaluation.
-func evalMessageExpression(ctx context.Context, expr celgo.Program, exprSrc string, activation interpreter.Activation, remainingBudget int64) (string, int64, *cel.Error) {
+func evalMessageExpression(ctx context.Context, expr celgo.Program, exprSrc string, activation validationActivation, remainingBudget int64) (string, int64, *cel.Error) {
 	evalResult, evalDetails, err := expr.ContextEval(ctx, activation)
 	if evalDetails == nil {
 		return "", -1, &cel.Error{
@@ -761,7 +777,7 @@ type validationActivation struct {
 	hasOldSelf    bool
 }
 
-func validationActivationWithOldSelf(sts *schema.Structural, obj, oldObj interface{}) (activation interpreter.Activation, optionalOldSelfActivation interpreter.Activation) {
+func validationActivationWithOldSelf(sts *schema.Structural, obj, oldObj interface{}) (activation *validationActivation, optionalOldSelfActivation *validationActivation) {
 	va := &validationActivation{
 		self: UnstructuredToVal(obj, sts),
 	}
@@ -781,7 +797,7 @@ func validationActivationWithOldSelf(sts *schema.Structural, obj, oldObj interfa
 	return va, optionalVA
 }
 
-func validationActivationWithoutOldSelf(sts *schema.Structural, obj, _ interface{}) (interpreter.Activation, interpreter.Activation) {
+func validationActivationWithoutOldSelf(sts *schema.Structural, obj, _ interface{}) (*validationActivation, *validationActivation) {
 	res := &validationActivation{
 		self: UnstructuredToVal(obj, sts),
 	}
@@ -840,6 +856,22 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, obj, o
 
 				var err field.ErrorList
 				err, remainingBudget = sub.validate(ctx, fldPath.Child(k), v, oldV, correlation.key(k), remainingBudget)
+				errs = append(errs, err...)
+				if remainingBudget < 0 {
+					return errs, remainingBudget
+				}
+			}
+		}
+		for k, v := range oldObj {
+			sub, ok := s.Properties[k]
+			if ok {
+				var newV interface{}
+				if correlatable {
+					newV = obj[k] // +k8s:verify-mutation:reason=clone
+				}
+
+				var err field.ErrorList
+				err, remainingBudget = sub.validate(ctx, fldPath.Child(k), newV, v, correlation.key(k), remainingBudget)
 				errs = append(errs, err...)
 				if remainingBudget < 0 {
 					return errs, remainingBudget

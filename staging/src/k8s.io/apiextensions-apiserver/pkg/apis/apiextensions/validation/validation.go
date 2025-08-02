@@ -870,6 +870,9 @@ type specStandardValidator interface {
 	// forbidOldSelfValidations returns the path to the first ancestor of the visited path that can't be safely correlated between two revisions of an object, or nil if there is no such path
 	forbidOldSelfValidations() *field.Path
 	withForbidOldSelfValidations(path *field.Path) specStandardValidator
+
+	// IsRequired returns true if the schema is a required field.
+	IsRequired() bool
 }
 
 // validateCustomResourceDefinitionValidation statically validates
@@ -1393,6 +1396,7 @@ type specStandardValidatorV3 struct {
 	isInsideResourceMeta                bool
 	requireValidPropertyType            bool
 	uncorrelatableOldSelfValidationPath *field.Path
+	isRequired                          bool
 }
 
 func (v *specStandardValidatorV3) withForbiddenDefaults(reason string) specStandardValidator {
@@ -1425,6 +1429,21 @@ func (v *specStandardValidatorV3) withForbidOldSelfValidations(path *field.Path)
 
 func (v *specStandardValidatorV3) forbidOldSelfValidations() *field.Path {
 	return v.uncorrelatableOldSelfValidationPath
+}
+
+func (v *specStandardValidatorV3) withRequired(property string, requiredProperties []string) specStandardValidator {
+	clone := *v
+	for _, requiredProperty := range requiredProperties {
+		if property == requiredProperty {
+			clone.isRequired = true
+			break
+		}
+	}
+	return &clone
+}
+
+func (v *specStandardValidatorV3) IsRequired() bool {
+	return v.isRequired
 }
 
 // validate validates against OpenAPI Schema v3.
