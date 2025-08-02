@@ -84,8 +84,8 @@ func TestNewHealthChecker(t *testing.T) {
 				enabledVal: tt.mockEnabled,
 				enabledErr: tt.mockErr,
 			}
-
-			_, err := NewHealthChecker(WithWatchdogClient(mockClient))
+			logger, _ := ktesting.NewTestContext(t)
+			_, err := NewHealthChecker(logger, WithWatchdogClient(mockClient))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewHealthChecker() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -150,7 +150,7 @@ func TestHealthCheckerStart(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
+			logger, tCtx := ktesting.NewTestContext(t)
 			defer func() {
 				tCtx.Cancel("test has completed")
 			}()
@@ -172,7 +172,7 @@ func TestHealthCheckerStart(t *testing.T) {
 			}
 
 			// Create a healthChecker
-			hc, err := NewHealthChecker(WithWatchdogClient(mockClient))
+			hc, err := NewHealthChecker(logger, WithWatchdogClient(mockClient))
 			if err != nil {
 				t.Fatalf("NewHealthChecker() failed: %v", err)
 			}
