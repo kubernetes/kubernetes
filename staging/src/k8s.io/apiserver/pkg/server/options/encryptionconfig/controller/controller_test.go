@@ -44,7 +44,7 @@ func TestController(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	const expectedSuccessMetricValue = `
-# HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
+# HELP apiserver_encryption_config_controller_automatic_reloads_total [BETA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
 # TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
 apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",status="success"} 1
 # HELP apiserver_encryption_config_controller_last_config_info [ALPHA] Information about the last applied encryption configuration with hash as label, split by apiserver identity.
@@ -52,7 +52,7 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 apiserver_encryption_config_controller_last_config_info{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",hash="sha256:6f6af143a5aec5c4056d759f2bdf8b6ffe218a2bf3846c4fd42b6baef037c5ef"} 1
 `
 	const expectedFailureMetricValue = `
-# HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
+# HELP apiserver_encryption_config_controller_automatic_reloads_total [BETA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
 # TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
 apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",status="failure"} 1
 `
