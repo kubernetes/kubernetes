@@ -434,7 +434,25 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	}
 	if pdb.Status.DisruptionsAllowed == 0 {
 		err := errors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget.", 0)
-		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Type: policyv1.DisruptionBudgetCause, Message: fmt.Sprintf("The disruption budget %s needs %d healthy pods and has %d currently", pdb.Name, pdb.Status.DesiredHealthy, pdb.Status.CurrentHealthy)})
+		condition := meta.FindStatusCondition(pdb.Status.Conditions, policyv1.DisruptionAllowedCondition)
+		if condition.Status == metav1.ConditionFalse {
+			err.ErrStatus.Details.Causes = append(
+				err.ErrStatus.Details.Causes,
+				metav1.StatusCause{
+					Type:    metav1.CauseType(condition.Type),
+					Message: condition.Message,
+				},
+			)
+			return err
+		}
+
+		err.ErrStatus.Details.Causes = append(
+			err.ErrStatus.Details.Causes,
+			metav1.StatusCause{
+				Type:    policyv1.DisruptionBudgetCause,
+				Message: fmt.Sprintf("The disruption budget %s needs %d healthy pods and has %d currently", pdb.Name, pdb.Status.DesiredHealthy, pdb.Status.CurrentHealthy),
+			},
+		)
 		return err
 	}
 
