@@ -27,6 +27,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -1036,33 +1036,31 @@ func TestSchedulerScheduleOne(t *testing.T) {
 							},
 						}
 						mu := &sync.Mutex{}
-						updatedNominatedNodeName := ""
+						updatedNominatedNodeName := item.sendPod.Status.NominatedNodeName
 						client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 							if action.GetSubresource() != "status" {
 								return false, nil, nil
 							}
 							patchAction := action.(clienttesting.PatchAction)
-							podName := patchAction.GetName()
-							namespace := patchAction.GetNamespace()
 							patch := patchAction.GetPatch()
-							pod, err := informerFactory.Core().V1().Pods().Lister().Pods(namespace).Get(podName)
-							if err != nil {
-								t.Fatalf("Failed to get the original pod %s/%s before patching: %v\n", namespace, podName, err)
+							patchMap := map[string]map[string]json.RawMessage{}
+							if err := json.Unmarshal(patch, &patchMap); err != nil {
+								t.Fatalf("Failed to unmarshal patch %q: %v", patch, err)
 							}
-							marshalledPod, err := json.Marshal(pod)
-							if err != nil {
-								t.Fatalf("Failed to marshal the original pod %s/%s: %v", namespace, podName, err)
+							statusMap, ok := patchMap["status"]
+							if !ok {
+								t.Fatalf("patch doesn't include status: %q", patch)
 							}
-							updated, err := strategicpatch.StrategicMergePatch(marshalledPod, patch, v1.Pod{})
-							if err != nil {
-								t.Fatalf("Failed to apply strategic merge patch %q on pod %#v: %v", patch, marshalledPod, err)
-							}
-							updatedPod := &v1.Pod{}
-							if err := json.Unmarshal(updated, updatedPod); err != nil {
-								t.Fatalf("Failed to unmarshal updated pod %q: %v", updated, err)
+							nnn, ok := statusMap["nominatedNodeName"]
+							if !ok {
+								return false, nil, nil
 							}
 							mu.Lock()
-							updatedNominatedNodeName = updatedPod.Status.NominatedNodeName
+							updatedNominatedNodeName = strings.Trim(string(nnn), "\"")
+							if updatedNominatedNodeName == "null" {
+								// NNN has to be cleared with this patch.
+								updatedNominatedNodeName = ""
+							}
 							mu.Unlock()
 							return false, nil, nil
 						})
