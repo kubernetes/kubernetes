@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/mock"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -3011,7 +3012,7 @@ func TestPermitPlugins(t *testing.T) {
 }
 
 // withMetricsRecorder set metricsRecorder for the scheduling frameworkImpl.
-func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
+func withMetricsRecorder(recorder MetricsRecorder) Option {
 	return func(o *frameworkOptions) {
 		o.metricsRecorder = recorder
 	}
@@ -3200,6 +3201,201 @@ func TestRecordingMetrics(t *testing.T) {
 			collectAndComparePluginMetrics(t, tt.wantExtensionPoint, testPlugin, tt.wantStatus)
 		})
 	}
+}
+
+// TestRecordingMetricsWithMocks is the refactored approach using mocks.
+// This verifies framework behavior without relying on global metrics registration.
+// Avoids sync.Once issues by not verifying actual metrics.
+func TestRecordingMetricsWithMocks(t *testing.T) {
+	state.SetRecordPluginMetrics(true)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	tests := []struct {
+		name               string
+		action             func(ctx context.Context, f framework.Framework)
+		inject             injectedResult
+		wantExtensionPoint string
+		wantStatus         fwk.Code
+		pluginSet          *config.PluginSet
+	}{
+		{
+			name:               "PreFilter - Success",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
+			wantExtensionPoint: "PreFilter",
+			wantStatus:         fwk.Success,
+			pluginSet:          &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+		},
+		{
+			name: "Score - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
+			},
+			wantExtensionPoint: "Score",
+			wantStatus:         fwk.Success,
+			pluginSet:          &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+		},
+		{
+			name:               "Bind - Success",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, state, pod, "") },
+			wantExtensionPoint: "Bind",
+			wantStatus:         fwk.Success,
+			pluginSet:          &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+		},
+		{
+			name:               "PreFilter - Error",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
+			inject:             injectedResult{PreFilterStatus: int(fwk.Error)},
+			wantExtensionPoint: "PreFilter",
+			wantStatus:         fwk.Error,
+			pluginSet:          &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+		},
+		{
+			name:               "Bind - Error",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, state, pod, "") },
+			inject:             injectedResult{BindStatus: int(fwk.Error)},
+			wantExtensionPoint: "Bind",
+			wantStatus:         fwk.Error,
+			pluginSet:          &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock metrics recorder to verify calls
+			mockRecorder := NewMockMetricsRecorder()
+
+			// Set specific expectations for the metrics call we expect
+			// Score plugins may call metrics twice (Score + ScoreExtensionNormalize)
+			expectedCalls := 1
+			if tt.wantExtensionPoint == "Score" {
+				expectedCalls = 2 // Score plugin calls metrics for both Score and ScoreExtensionNormalize
+			}
+
+			mockRecorder.On("ObservePluginDurationAsync",
+				mock.MatchedBy(func(extensionPoint string) bool {
+					// For Score, accept both "Score" and "ScoreExtensionNormalize"
+					if tt.wantExtensionPoint == "Score" {
+						return extensionPoint == "Score" || extensionPoint == "ScoreExtensionNormalize"
+					}
+					return extensionPoint == tt.wantExtensionPoint
+				}),
+				testPlugin,
+				tt.wantStatus.String(),
+				mock.AnythingOfType("float64")).Return().Times(expectedCalls)
+
+			// Create registry with test plugin
+			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
+			r := make(Registry)
+			if err := r.Register(testPlugin,
+				func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return plugin, nil
+				}); err != nil {
+				t.Fatalf("Failed to register plugin %s: %v", testPlugin, err)
+			}
+
+			// Build plugins configuration based on the test case
+			plugins := &config.Plugins{}
+			switch tt.wantExtensionPoint {
+			case "PreFilter":
+				plugins.PreFilter = *tt.pluginSet
+			case "Score":
+				plugins.Score = *tt.pluginSet
+			case "Bind":
+				plugins.Bind = *tt.pluginSet
+			}
+
+			profile := config.KubeSchedulerProfile{
+				PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
+				SchedulerName:            testProfileName,
+				Plugins:                  plugins,
+			}
+
+			// Create framework with mock recorder
+			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+				withMetricsRecorder(mockRecorder),
+				WithWaitingPods(NewWaitingPodsMap()),
+				WithSnapshotSharedLister(cache.NewEmptySnapshot()),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+			defer func() {
+				_ = f.Close()
+			}()
+
+			// Run the action
+			tt.action(ctx, f)
+
+			// Verify the mock was called exactly as expected
+			mockRecorder.AssertExpectations(t)
+
+			// This test successfully demonstrates that:
+			// 1. The mock properly records all metric calls
+			// 2. We can verify the calls were made as expected
+			// 3. The test runs without sync.Once issues
+			// 4. No real metrics are recorded, avoiding test interference
+			t.Logf("Successfully verified mock pattern for %s operation with status %s",
+				tt.wantExtensionPoint, tt.wantStatus.String())
+		})
+	}
+}
+
+// TestRunBindPluginsWithMocks is focused testing of bind plugins using mocks.
+// This shows how to test specific framework behavior without complex setup.
+func TestRunBindPluginsWithMocks(t *testing.T) {
+	state.SetRecordPluginMetrics(true)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Create a mock metrics recorder with specific expectations
+	mockRecorder := NewMockMetricsRecorder()
+	mockRecorder.On("ObservePluginDurationAsync",
+		"Bind",
+		bindPlugin,
+		"Success",
+		mock.AnythingOfType("float64")).Return().Once()
+
+	// Create framework with bind plugin and mock recorder
+	plugin := &TestBindPlugin{}
+	r := make(Registry)
+	if err := r.Register(bindPlugin,
+		func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return plugin, nil
+		}); err != nil {
+		t.Fatalf("Failed to register bind plugin: %v", err)
+	}
+
+	profile := config.KubeSchedulerProfile{
+		SchedulerName: testProfileName,
+		Plugins: &config.Plugins{
+			Bind: config.PluginSet{
+				Enabled: []config.Plugin{{Name: bindPlugin}},
+			},
+		},
+	}
+
+	f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+		withMetricsRecorder(mockRecorder),
+		WithSnapshotSharedLister(cache.NewEmptySnapshot()),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
+	// Run bind plugins
+	status := f.RunBindPlugins(ctx, state, pod, "test-node")
+	if !status.IsSuccess() {
+		t.Errorf("Expected bind to succeed, got: %v", status)
+	}
+
+	// Verify the mock was called exactly as expected
+	mockRecorder.AssertExpectations(t)
 }
 
 func TestRunBindPlugins(t *testing.T) {
