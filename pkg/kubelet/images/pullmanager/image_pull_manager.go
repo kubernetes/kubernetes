@@ -179,9 +179,9 @@ func (f *PullManager) decrementImagePullIntent(image string) {
 	f.decrementIntentCounterForImage(image)
 }
 
-func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
+func (f *PullManager) MustAttemptImagePull(image, imageRef string, getPodCredentials GetPodCredentials) (bool, error) {
 	if len(imageRef) == 0 {
-		return true
+		return true, nil
 	}
 
 	var imagePulledByKubelet bool
@@ -225,36 +225,41 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 
 	if err != nil {
 		klog.ErrorS(err, "Unable to access cache records about image pulls")
-		return true
+		return true, nil
 	}
 
 	if !f.imagePolicyEnforcer.RequireCredentialVerificationForImage(image, imagePulledByKubelet) {
-		return false
+		return false, nil
 	}
 
 	if pulledRecord == nil {
 		// we have no proper records of the image being pulled in the past, we can short-circuit here
-		return true
+		return true, nil
 	}
 
 	sanitizedImage, err := trimImageTagDigest(image)
 	if err != nil {
 		klog.ErrorS(err, "failed to parse image name, forcing image credentials reverification", "image", sanitizedImage)
-		return true
+		return true, nil
 	}
 
 	cachedCreds, ok := pulledRecord.CredentialMapping[sanitizedImage]
 	if !ok {
-		return true
+		return true, nil
 	}
 
 	if cachedCreds.NodePodsAccessible {
 		// anyone on this node can access the image
-		return false
+		return false, nil
 	}
 
 	if len(cachedCreds.KubernetesSecrets) == 0 && len(cachedCreds.KubernetesServiceAccounts) == 0 {
-		return true
+		return true, nil
+	}
+
+	podSecrets, podServiceAccount, err := getPodCredentials()
+	if err != nil {
+		return true, err
 	}
 
 	for _, podSecret := range podSecrets {
@@ -275,7 +280,7 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 						klog.ErrorS(err, "failed to write an image pulled record", "image", image, "imageRef", imageRef)
 					}
 				}
-				return false
+				return false, nil
 			}
 
 			if secretCoordinatesMatch {
@@ -286,7 +291,7 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 					if err := f.writePulledRecordIfChanged(image, imageRef, &kubeletconfiginternal.ImagePullCredentials{KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{podSecret}}); err != nil {
 						klog.ErrorS(err, "failed to write an image pulled record", "image", image, "imageRef", imageRef)
 					}
-					return false
+					return false, nil
 				}
 			}
 		}
@@ -294,10 +299,10 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 
 	if podServiceAccount != nil && slices.Contains(cachedCreds.KubernetesServiceAccounts, *podServiceAccount) {
 		// we found a matching service account, no need to pull the image
-		return false
+		return false, nil
 	}
 
-	return true
+	return true, nil
 }
 
 func (f *PullManager) PruneUnknownRecords(imageList []string, until time.Time) {
