@@ -21,6 +21,7 @@ reviewers:
   - sttts
   - yliaog
   - jpbetz
+  - jefftree
 labels:
   - sig/api-machinery
 emeritus_approvers:
