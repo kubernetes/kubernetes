@@ -19,6 +19,7 @@ package forbidden
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
@@ -45,20 +46,21 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{ /* All zero-values */ }).ExpectValid()
 
-	st.Value(mkTest()).ExpectRegexpsByPath(map[string][]string{
-		"stringField":           {"Forbidden"},
-		"stringPtrField":        {"Forbidden"},
-		"stringTypedefField":    {"Forbidden"},
-		"stringTypedefPtrField": {"Forbidden"},
-		"intField":              {"Forbidden"},
-		"intPtrField":           {"Forbidden"},
-		"intTypedefField":       {"Forbidden"},
-		"intTypedefPtrField":    {"Forbidden"},
-		"otherStructPtrField":   {"Forbidden"},
-		"sliceField":            {"Forbidden"},
-		"sliceTypedefField":     {"Forbidden"},
-		"mapField":              {"Forbidden"},
-		"mapTypedefField":       {"Forbidden"},
+	testVal := mkTest()
+	st.Value(testVal).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Forbidden(field.NewPath("stringField"), ""),
+		field.Forbidden(field.NewPath("stringPtrField"), ""),
+		field.Forbidden(field.NewPath("stringTypedefField"), ""),
+		field.Forbidden(field.NewPath("stringTypedefPtrField"), ""),
+		field.Forbidden(field.NewPath("intField"), ""),
+		field.Forbidden(field.NewPath("intPtrField"), ""),
+		field.Forbidden(field.NewPath("intTypedefField"), ""),
+		field.Forbidden(field.NewPath("intTypedefPtrField"), ""),
+		field.Forbidden(field.NewPath("otherStructPtrField"), ""),
+		field.Forbidden(field.NewPath("sliceField"), ""),
+		field.Forbidden(field.NewPath("sliceTypedefField"), ""),
+		field.Forbidden(field.NewPath("mapField"), ""),
+		field.Forbidden(field.NewPath("mapTypedefField"), ""),
 	})
 
 	// Test validation ratcheting

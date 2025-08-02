@@ -19,26 +19,27 @@ package required
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
-	st.Value(&Struct{ /* All zero-values */ }).ExpectRegexpsByPath(map[string][]string{
-		"stringField":           {"Required value"},
-		"stringPtrField":        {"Required value"},
-		"stringTypedefField":    {"Required value"},
-		"stringTypedefPtrField": {"Required value"},
-		"intField":              {"Required value"},
-		"intPtrField":           {"Required value"},
-		"intTypedefField":       {"Required value"},
-		"intTypedefPtrField":    {"Required value"},
-		"otherStructPtrField":   {"Required value"},
-		"sliceField":            {"Required value"},
-		"sliceTypedefField":     {"Required value"},
-		"mapField":              {"Required value"},
-		"mapTypedefField":       {"Required value"},
+	st.Value(&Struct{ /* All zero-values */ }).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Required(field.NewPath("stringField"), ""),
+		field.Required(field.NewPath("stringPtrField"), ""),
+		field.Required(field.NewPath("stringTypedefField"), ""),
+		field.Required(field.NewPath("stringTypedefPtrField"), ""),
+		field.Required(field.NewPath("intField"), ""),
+		field.Required(field.NewPath("intPtrField"), ""),
+		field.Required(field.NewPath("intTypedefField"), ""),
+		field.Required(field.NewPath("intTypedefPtrField"), ""),
+		field.Required(field.NewPath("otherStructPtrField"), ""),
+		field.Required(field.NewPath("sliceField"), ""),
+		field.Required(field.NewPath("sliceTypedefField"), ""),
+		field.Required(field.NewPath("mapField"), ""),
+		field.Required(field.NewPath("mapTypedefField"), ""),
 	})
 
 	// Test validation ratcheting
@@ -53,20 +54,22 @@ func Test(t *testing.T) {
 		SliceTypedefField:     []string{},             // does not satisfy required
 		MapField:              map[string]string{},    // does not satisfy required
 		MapTypedefField:       map[string]string{},    // does not satisfy required
-	}).ExpectRegexpsByPath(map[string][]string{
-		"stringField":           {"Required value"},
-		"stringPtrField":        {"field Struct.StringPtrField"},
-		"stringTypedefField":    {"Required value"},
-		"stringTypedefPtrField": {"field Struct.StringTypedefPtrField", "type StringType"},
-		"intField":              {"Required value"},
-		"intPtrField":           {"field Struct.IntPtrField"},
-		"intTypedefField":       {"Required value"},
-		"intTypedefPtrField":    {"field Struct.IntTypedefPtrField", "type IntType"},
-		"otherStructPtrField":   {"Required value"},
-		"sliceField":            {"Required value"},
-		"sliceTypedefField":     {"Required value"},
-		"mapField":              {"Required value"},
-		"mapTypedefField":       {"Required value"},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring(), field.ErrorList{
+		field.Required(field.NewPath("stringField"), ""),
+		field.Invalid(field.NewPath("stringPtrField"), ptr.To(""), "field Struct.StringPtrField"),
+		field.Required(field.NewPath("stringTypedefField"), ""),
+		field.Invalid(field.NewPath("stringTypedefPtrField"), ptr.To(StringType("")), "field Struct.StringTypedefPtrField"),
+		field.Invalid(field.NewPath("stringTypedefPtrField"), ptr.To(StringType("")), "type StringType"),
+		field.Required(field.NewPath("intField"), ""),
+		field.Invalid(field.NewPath("intPtrField"), ptr.To(0), "field Struct.IntPtrField"),
+		field.Required(field.NewPath("intTypedefField"), ""),
+		field.Invalid(field.NewPath("intTypedefPtrField"), ptr.To(IntType(0)), "field Struct.IntTypedefPtrField"),
+		field.Invalid(field.NewPath("intTypedefPtrField"), ptr.To(IntType(0)), "type IntType"),
+		field.Required(field.NewPath("otherStructPtrField"), ""),
+		field.Required(field.NewPath("sliceField"), ""),
+		field.Required(field.NewPath("sliceTypedefField"), ""),
+		field.Required(field.NewPath("mapField"), ""),
+		field.Required(field.NewPath("mapTypedefField"), ""),
 	})
 	// Test validation ratcheting
 	st.Value(&Struct{
@@ -104,7 +107,7 @@ func Test(t *testing.T) {
 		}
 	}
 
-	st.Value(mkInvalid()).ExpectRegexpsByPath(map[string][]string{
+	st.Value(mkInvalid()).ExpectValidateFalseByPath(map[string][]string{
 		"stringField":           {"field Struct.StringField"},
 		"stringPtrField":        {"field Struct.StringPtrField"},
 		"stringTypedefField":    {"field Struct.StringTypedefField", "type StringType"},

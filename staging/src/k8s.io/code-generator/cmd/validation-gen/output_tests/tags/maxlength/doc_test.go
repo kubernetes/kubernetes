@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
@@ -57,7 +58,7 @@ func Test(t *testing.T) {
 		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 10))),
 	}).ExpectValid()
 
-	st.Value(&Struct{
+	testVal := &Struct{
 		Max0Field:                       strings.Repeat("x", 1),
 		Max0PtrField:                    ptr.To(strings.Repeat("x", 1)),
 		Max10Field:                      strings.Repeat("x", 11),
@@ -70,19 +71,20 @@ func Test(t *testing.T) {
 		Max0ValidatedTypedefPtrField:    ptr.To(Max0Type(strings.Repeat("x", 1))),
 		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 11)),
 		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 11))),
-	}).ExpectRegexpsByPath(map[string][]string{
-		"max0Field":                       {`Invalid value:.*must be no more than 0 bytes`},
-		"max0PtrField":                    {`Invalid value:.*must be no more than 0 bytes`},
-		"max10Field":                      {`Invalid value:.*must be no more than 10 bytes`},
-		"max10PtrField":                   {`Invalid value:.*must be no more than 10 bytes`},
-		"max0UnvalidatedTypedefField":     {`Invalid value:.*must be no more than 0 bytes`},
-		"max0UnvalidatedTypedefPtrField":  {`Invalid value:.*must be no more than 0 bytes`},
-		"max10UnvalidatedTypedefField":    {`Invalid value:.*must be no more than 10 bytes`},
-		"max10UnvalidatedTypedefPtrField": {`Invalid value:.*must be no more than 10 bytes`},
-		"max0ValidatedTypedefField":       {`Invalid value:.*must be no more than 0 bytes`},
-		"max0ValidatedTypedefPtrField":    {`Invalid value:.*must be no more than 0 bytes`},
-		"max10ValidatedTypedefField":      {`Invalid value:.*must be no more than 10 bytes`},
-		"max10ValidatedTypedefPtrField":   {`Invalid value:.*must be no more than 10 bytes`},
+	}
+	st.Value(testVal).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Invalid(field.NewPath("max0Field"), nil, ""),
+		field.Invalid(field.NewPath("max0PtrField"), nil, ""),
+		field.Invalid(field.NewPath("max10Field"), nil, ""),
+		field.Invalid(field.NewPath("max10PtrField"), nil, ""),
+		field.Invalid(field.NewPath("max0UnvalidatedTypedefField"), nil, ""),
+		field.Invalid(field.NewPath("max0UnvalidatedTypedefPtrField"), nil, ""),
+		field.Invalid(field.NewPath("max10UnvalidatedTypedefField"), nil, ""),
+		field.Invalid(field.NewPath("max10UnvalidatedTypedefPtrField"), nil, ""),
+		field.Invalid(field.NewPath("max0ValidatedTypedefField"), nil, ""),
+		field.Invalid(field.NewPath("max0ValidatedTypedefPtrField"), nil, ""),
+		field.Invalid(field.NewPath("max10ValidatedTypedefField"), nil, ""),
+		field.Invalid(field.NewPath("max10ValidatedTypedefPtrField"), nil, ""),
 	})
 
 	// Test validation ratcheting
