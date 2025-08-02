@@ -48,10 +48,10 @@ func Test_StructSlice(t *testing.T) {
 	}
 
 	st := localSchemeBuilder.Test(t)
-	st.Value(mkTest()).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Invalid(field.NewPath("sliceField"), "", ""),
-		field.Invalid(field.NewPath("sliceField[0]"), "", ""),
-		field.Invalid(field.NewPath("typedefSliceField"), "", ""),
+	st.Value(mkTest()).ExpectValidateFalseByPath(map[string][]string{
+		"sliceField":        {"field sliceField"},
+		"sliceField[0]":     {"type S"},
+		"typedefSliceField": {"field typedefSliceField", "type MySlice"},
 	})
 
 	st.Value(mkTest()).OldValue(mkTest()).ExpectValid()
@@ -68,13 +68,13 @@ func Test_StructMap(t *testing.T) {
 	}
 
 	st := localSchemeBuilder.Test(t)
-	st.Value(mkTest()).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Invalid(field.NewPath("mapKeyField"), "", ""),
-		field.Invalid(field.NewPath("mapValueField"), "", ""),
-		field.Invalid(field.NewPath("mapValueField[k]"), "", ""),
-		field.Invalid(field.NewPath("aliasMapKeyTypeField"), "", ""),
-		field.Invalid(field.NewPath("aliasMapValueTypeField"), "", ""),
-		field.Invalid(field.NewPath("aliasMapValueTypeField[k]"), "", ""),
+	st.Value(mkTest()).ExpectValidateFalseByPath(map[string][]string{
+		"aliasMapKeyTypeField":      {"field aliasMapKeyTypeField", "type MapKeyType", "type S"},
+		"aliasMapValueTypeField":    {"field aliasMapValueTypeField", "type MapValueType"},
+		"aliasMapValueTypeField[k]": {"type S"},
+		"mapKeyField":               {"field mapKeyField", "type S"},
+		"mapValueField":             {"field mapValueField"},
+		"mapValueField[k]":          {"type S"},
 	})
 
 	st.Value(mkTest()).OldValue(mkTest()).ExpectValid()
