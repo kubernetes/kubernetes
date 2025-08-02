@@ -1,3 +1,7 @@
+> ⚠️ **This is a staging repository for Kubernetes**.  
+> Contributions, including issues and pull requests, should be made to the main Kubernetes repository: [https://github.com/kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).  
+> This repository is not for direct contributions.
+
 # component-helpers
 
 This repository provides helpers primarily for core components (core components as described in [Create a k8s.io/component-base repo](https://github.com/kubernetes/enhancements/blob/master/keps/sig-cluster-lifecycle/wgs/783-component-base/README.md#component-definition)) which are required by at least two separate binaries in kubernetes org.
