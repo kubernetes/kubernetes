@@ -300,7 +300,7 @@ func TestHandles(t *testing.T) {
 // newHandlerForTest returns a handler configured for testing.
 func newHandlerForTest() (*Plugin, error) {
 	handler := NewDefaultTolerationSeconds()
-	pluginInitializer := initializer.New(nil, nil, nil, nil, nil, nil, nil)
+	pluginInitializer := initializer.New(nil, nil, nil, nil, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	return handler, admission.ValidateInitialization(handler)
 }
