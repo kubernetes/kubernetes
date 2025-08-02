@@ -1317,7 +1317,7 @@ func TestPlugin(t *testing.T) {
 				},
 				postfilter: result{
 					status:  fwk.NewStatus(fwk.Unschedulable, `deletion of ResourceClaim completed`),
-					removed: []metav1.Object{extendedResourceClaimNode2},
+					removed: []metav1.Object{extendedResourceClaim},
 				},
 			},
 		},
@@ -1326,6 +1326,7 @@ func TestPlugin(t *testing.T) {
 			pod:                       podWithExtendedResourceName,
 			claims:                    []*resourceapi.ResourceClaim{extendedResourceClaimNode2},
 			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
@@ -1844,6 +1845,10 @@ func TestPlugin(t *testing.T) {
 				result, status := testCtx.p.PostFilter(testCtx.ctx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
 				t.Run("postfilter", func(t *testing.T) {
 					assert.Equal(t, tc.want.postFilterResult, result)
+					// in case we delete the claim API object
+					// wait for assumed cache to sync with informer
+					// then assumed cache should be empty
+					time.Sleep(800 * time.Millisecond)
 					testCtx.verify(t, tc.want.postfilter, initialObjects, nil, status)
 				})
 			}
@@ -1905,9 +1910,33 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	if expected.assumedClaim != nil {
 		expectAssumedClaims = append(expectAssumedClaims, expected.assumedClaim)
 	}
-	actualAssumedClaims := tc.listAssumedClaims()
-	if diff := cmp.Diff(expectAssumedClaims, actualAssumedClaims, ignoreFieldsInResourceClaims...); diff != "" {
-		t.Errorf("Assumed claims are different (- expected, + actual):\n%s", diff)
+	// actualAssumedClaims are claims in assumed cache with different latest and api object
+	// sameAssumedClaims are claims in assumed cache with same latest and api object
+	actualAssumedClaims, sameAssumedClaims := tc.listAssumedClaims()
+
+	// error when expecting no claims in assumed cache with different latest and api object
+	if len(expectAssumedClaims) == 0 && len(actualAssumedClaims) != 0 {
+		t.Errorf("Assumed claims are different, expected: nil, actual:\n%v", actualAssumedClaims)
+	}
+	if len(expectAssumedClaims) > 0 {
+		// it is not an error as long as the expected claim is present in the assumed cache, no
+		// matter its latest and api object are different or not.
+		for _, expected := range expectAssumedClaims {
+			seen := false
+			for _, actual := range actualAssumedClaims {
+				if diff := cmp.Diff(expected, actual, ignoreFieldsInResourceClaims...); diff == "" {
+					seen = true
+				}
+			}
+			for _, same := range sameAssumedClaims {
+				if diff := cmp.Diff(expected, same, ignoreFieldsInResourceClaims...); diff == "" {
+					seen = true
+				}
+			}
+			if !seen {
+				t.Errorf("Assumed claims are different, expected: %v not found", expected)
+			}
+		}
 	}
 
 	var expectInFlightClaims []metav1.Object
@@ -1932,18 +1961,22 @@ func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	return
 }
 
-func (tc *testContext) listAssumedClaims() []metav1.Object {
+func (tc *testContext) listAssumedClaims() ([]metav1.Object, []metav1.Object) {
 	var assumedClaims []metav1.Object
+	var sameClaims []metav1.Object
 	for _, obj := range tc.draManager.resourceClaimTracker.cache.List(nil) {
 		claim := obj.(*resourceapi.ResourceClaim)
 		obj, _ := tc.draManager.resourceClaimTracker.cache.Get(claim.Namespace + "/" + claim.Name)
 		apiObj, _ := tc.draManager.resourceClaimTracker.cache.GetAPIObj(claim.Namespace + "/" + claim.Name)
 		if obj != apiObj {
 			assumedClaims = append(assumedClaims, claim)
+		} else {
+			sameClaims = append(sameClaims, claim)
 		}
 	}
 	sortObjects(assumedClaims)
-	return assumedClaims
+	sortObjects(sameClaims)
+	return assumedClaims, sameClaims
 }
 
 func (tc *testContext) listInFlightClaims() []metav1.Object {

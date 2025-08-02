@@ -102,7 +102,15 @@ type ResourceClaimTracker interface {
 	// AssumeClaimAfterAPICall signals to the tracker that an API call modifying the given ResourceClaim was made in the binding phase, and the
 	// changes should be reflected in informers very soon. This change is immediately reflected in the result of List() and the other accessors.
 	// This mechanism can be used to avoid race conditions between the informer update and subsequent scheduling phases.
+	//
+	// It returns ErrNotFound if the tracker has not started tracking the object yet.
 	AssumeClaimAfterAPICall(claim *resourceapi.ResourceClaim) error
+	// AddClaimAfterAPICall signals to the tracker that an API call modifying the given ResourceClaim was made in the binding phase, and the
+	// changes should be reflected in informers very soon. This change is immediately reflected in the result of List() and the other accessors.
+	// This mechanism can be used to avoid race conditions between the informer update and subsequent scheduling phases.
+	//
+	// It adds the claim to the tracker no matter the tracker tracks the object or not.
+	AddClaimAfterAPICall(claim *resourceapi.ResourceClaim) error
 	// AssumedClaimRestore signals to the tracker that something went wrong with the API call modifying the given ResourceClaim, and
 	// the changes won't be reflected in informers after all. List() and the other accessors immediately stop reflecting the assumed change,
 	// and go back to the informer version.

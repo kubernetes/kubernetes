@@ -217,6 +217,10 @@ func NewAssumeCache(logger klog.Logger, informer Informer, description, indexNam
 }
 
 func (c *AssumeCache) add(obj interface{}) {
+	c.addWithOptionalLock(obj, true)
+}
+
+func (c *AssumeCache) addWithOptionalLock(obj interface{}, useLock bool) {
 	if obj == nil {
 		return
 	}
@@ -227,9 +231,11 @@ func (c *AssumeCache) add(obj interface{}) {
 		return
 	}
 
-	defer c.emitEvents()
-	c.rwMutex.Lock()
-	defer c.rwMutex.Unlock()
+	if useLock {
+		defer c.emitEvents()
+		c.rwMutex.Lock()
+		defer c.rwMutex.Unlock()
+	}
 
 	var oldObj interface{}
 	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
@@ -425,6 +431,16 @@ func (c *AssumeCache) listLocked(indexObj interface{}) []interface{} {
 // Only assuming objects that were returned by an apiserver
 // operation (Update, Patch) is safe.
 func (c *AssumeCache) Assume(obj interface{}) error {
+	return c.assumeOrAdd(obj, false)
+}
+
+// Add is the same as Assume except that it adds the object
+// to the assume cache when the oject is not tracked yet.
+// Assume would return ErrNotFound in this case.
+func (c *AssumeCache) Add(obj interface{}) error {
+	return c.assumeOrAdd(obj, true)
+}
+func (c *AssumeCache) assumeOrAdd(obj interface{}, addIfNotFound bool) error {
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return &ObjectNameError{err}
@@ -436,7 +452,15 @@ func (c *AssumeCache) Assume(obj interface{}) error {
 
 	objInfo, err := c.getObjInfo(name)
 	if err != nil {
-		return err
+		if !addIfNotFound {
+			return err
+		}
+		if !errors.Is(err, ErrNotFound) {
+			return err
+		}
+		c.addWithOptionalLock(obj, false)
+		c.logger.V(4).Info("Added object", "description", c.description, "cacheKey", name)
+		return nil
 	}
 
 	newVersion, err := c.getObjVersion(name, obj)

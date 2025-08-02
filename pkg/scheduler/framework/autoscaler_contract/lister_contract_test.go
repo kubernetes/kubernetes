@@ -121,6 +121,10 @@ func (r *resourceClaimTrackerContract) AssumeClaimAfterAPICall(_ *resourceapi.Re
 	return nil
 }
 
+func (r *resourceClaimTrackerContract) AddClaimAfterAPICall(_ *resourceapi.ResourceClaim) error {
+	return nil
+}
+
 func (r *resourceClaimTrackerContract) AssumedClaimRestore(_, _ string) {
 }
 

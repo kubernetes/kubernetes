@@ -1446,8 +1446,14 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			if finalErr == nil {
 				// This can fail, but only for reasons that are okay (concurrent delete or update).
 				// Shouldn't happen in this case.
-				if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
-					logger.V(5).Info("Claim not stored in assume cache", "err", finalErr)
+				if isExtendedResourceClaim {
+					if err := pl.draManager.ResourceClaims().AddClaimAfterAPICall(claim); err != nil {
+						logger.V(5).Info("Claim cannot be added to the assume cache", "err", err)
+					}
+				} else {
+					if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
+						logger.V(5).Info("Claim not stored in assume cache", "err", err)
+					}
 				}
 			}
 			for _, claimUID := range claimUIDs {
