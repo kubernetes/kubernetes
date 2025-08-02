@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/bootstrap"
 )
@@ -29,41 +28,53 @@ func newBootstrapSignerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                names.BootstrapSignerController,
 		aliases:             []string{"bootstrapsigner"},
-		initFunc:            startBootstrapSignerController,
+		constructor:         newBootstrapSignerController,
 		isDisabledByDefault: true,
 	}
 }
-func startBootstrapSignerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+
+func newBootstrapSignerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.NewClient("bootstrap-signer")
+	if err != nil {
+		return nil, err
+	}
+
 	bsc, err := bootstrap.NewSigner(
-		controllerContext.ClientBuilder.ClientOrDie("bootstrap-signer"),
+		client,
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
 		bootstrap.DefaultSignerOptions(),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating BootstrapSigner controller: %v", err)
+		return nil, fmt.Errorf("error creating BootstrapSigner controller: %w", err)
 	}
-	go bsc.Run(ctx)
-	return nil, true, nil
+
+	return newControllerLoop(bsc.Run, controllerName), nil
 }
 
 func newTokenCleanerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                names.TokenCleanerController,
 		aliases:             []string{"tokencleaner"},
-		initFunc:            startTokenCleanerController,
+		constructor:         newTokenCleanerController,
 		isDisabledByDefault: true,
 	}
 }
-func startTokenCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+
+func newTokenCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.NewClient("token-cleaner")
+	if err != nil {
+		return nil, err
+	}
+
 	tcc, err := bootstrap.NewTokenCleaner(
-		controllerContext.ClientBuilder.ClientOrDie("token-cleaner"),
+		client,
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		bootstrap.DefaultTokenCleanerOptions(),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating TokenCleaner controller: %v", err)
+		return nil, fmt.Errorf("error creating TokenCleaner controller: %w", err)
 	}
-	go tcc.Run(ctx)
-	return nil, true, nil
+
+	return newControllerLoop(tcc.Run, controllerName), nil
 }
