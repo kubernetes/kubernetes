@@ -121,6 +121,10 @@ func Validate_CertificateSigningRequestStatus(ctx context.Context, op operation.
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
+			// listType=map requires unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a certificatesv1beta1.CertificateSigningRequestCondition, b certificatesv1beta1.CertificateSigningRequestCondition) bool {
+				return a.Type == b.Type
+			})...)
 			errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1beta1_CertificateSigningRequestStatus_conditions_, func(list []certificatesv1beta1.CertificateSigningRequestCondition) bool {
 				for i := range list {
 					if list[i].Type == "Approved" {
