@@ -6,27 +6,28 @@ godebug default=go1.24
 
 require (
 	go.uber.org/automaxprocs v1.6.0
-	golang.org/x/mod v0.26.0
+	golang.org/x/mod v0.24.0
 	k8s.io/publishing-bot v0.5.0
 )
 
 require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
-	github.com/aojea/sloppy-netparser v0.0.0-20210819230639-a7bbdb117ea5 // indirect
+	github.com/aojea/sloppy-netparser v0.0.0-20210819225411-1b3bd8b3b975 // indirect
 	github.com/bitfield/gotestdox v0.2.2 // indirect
-	github.com/cespare/prettybench v0.1.0 // indirect
+	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c // indirect
 	github.com/chigopher/pathlib v0.19.1 // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/golang/glog v1.2.2 // indirect
-	github.com/golangci/misspell v0.7.0 // indirect
+	github.com/golangci/misspell v0.6.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/jcchavezs/porto v0.7.0 // indirect
+	github.com/jcchavezs/porto v0.6.0 // indirect
 	github.com/jinzhu/copier v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -43,22 +44,21 @@ require (
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/spf13/viper v1.20.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/vektra/mockery/v2 v2.53.4 // indirect
+	github.com/vektra/mockery/v2 v2.53.3 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.3 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20250210185358-939b2ce775ac // indirect
-	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/term v0.32.0 // indirect
+	golang.org/x/sync v0.13.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
-	golang.org/x/tools v0.35.0 // indirect
-	golang.org/x/tools/go/expect v0.1.1-deprecated // indirect
+	golang.org/x/tools v0.32.0 // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/protobuf v1.36.4 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gotest.tools/gotestsum v1.12.3 // indirect
+	gotest.tools/gotestsum v1.12.0 // indirect
 	honnef.co/go/tools v0.6.1 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
