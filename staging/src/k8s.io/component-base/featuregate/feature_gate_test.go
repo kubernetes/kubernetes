@@ -17,6 +17,7 @@ limitations under the License.
 package featuregate
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -1330,14 +1331,14 @@ func TestVersionedFeatureGateOverrideDefault(t *testing.T) {
 		if !f.Enabled("TestFeature2") {
 			t.Error("expected TestFeature2 to have effective default of true")
 		}
-		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.29")))
+		require.NoError(t, f.SetEmulationVersionWithContext(WithTestLoggerContext(context.Background(), t), version.MustParse("1.29")))
 		if !f.Enabled("TestFeature1") {
 			t.Error("expected TestFeature1 to have effective default of true")
 		}
 		if f.Enabled("TestFeature2") {
 			t.Error("expected TestFeature2 to have effective default of false")
 		}
-		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.26")))
+		require.NoError(t, f.SetEmulationVersionWithContext(WithTestLoggerContext(context.Background(), t), version.MustParse("1.26")))
 		if f.Enabled("TestFeature1") {
 			t.Error("expected TestFeature1 to have effective default of false")
 		}
@@ -1383,11 +1384,11 @@ func TestVersionedFeatureGateOverrideDefault(t *testing.T) {
 		assert.True(t, f.Enabled("TestFeature"))
 		assert.False(t, fcopy.Enabled("TestFeature"))
 
-		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.29")))
+		require.NoError(t, f.SetEmulationVersionWithContext(WithTestLoggerContext(context.Background(), t), version.MustParse("1.29")))
 		assert.False(t, f.Enabled("TestFeature"))
 		assert.False(t, fcopy.Enabled("TestFeature"))
 
-		require.NoError(t, fcopy.SetEmulationVersion(version.MustParse("1.29")))
+		require.NoError(t, fcopy.SetEmulationVersionWithContext(WithTestLoggerContext(context.Background(), t), version.MustParse("1.29")))
 		assert.False(t, f.Enabled("TestFeature"))
 		assert.True(t, fcopy.Enabled("TestFeature"))
 	})
@@ -1737,7 +1738,7 @@ func TestResetFeatureValueToDefault(t *testing.T) {
 	assert.True(t, f.Enabled("TestAlpha"))
 	assert.True(t, f.Enabled("TestBeta"))
 
-	require.NoError(t, f.SetEmulationVersion(version.MustParse("1.28")))
+	require.NoError(t, f.SetEmulationVersionWithContext(WithTestLoggerContext(context.Background(), t), version.MustParse("1.28")))
 	assert.False(t, f.Enabled("AllAlpha"))
 	assert.False(t, f.Enabled("AllBeta"))
 	assert.False(t, f.Enabled("TestAlpha"))
@@ -1901,6 +1902,134 @@ func TestAddVersioned(t *testing.T) {
 
 			if err == nil && test.expectError {
 				t.Errorf("expected errors, no errors found")
+			}
+		})
+	}
+}
+
+// TestSetEmulationVersionWithContext tests various scenarios for SetEmulationVersionWithContext
+func TestSetEmulationVersionWithContext(t *testing.T) {
+	tests := []struct {
+		name            string
+		features        map[Feature]VersionedSpecs
+		queriedFeatures []string
+		targetVersion   *version.Version
+		context         context.Context
+		expectError     bool
+		errorContains   []string
+		expectNoError   bool
+	}{
+		{
+			name: "warning redirection with test logger",
+			features: map[Feature]VersionedSpecs{
+				"TestFeature": {
+					{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+				},
+			},
+			queriedFeatures: []string{"TestFeature"},
+			targetVersion:   version.MustParse("1.28"),
+			context:         WithTestLoggerContext(context.Background(), t),
+			expectNoError:   true,
+		},
+		{
+			name: "error on feature change without test logger",
+			features: map[Feature]VersionedSpecs{
+				"TestFeature": {
+					{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+				},
+			},
+			queriedFeatures: []string{"TestFeature"},
+			targetVersion:   version.MustParse("1.28"),
+			context:         context.Background(),
+			expectError:     true,
+			errorContains:   []string{"SetEmulationVersion would change already queried features"},
+		},
+		{
+			name: "multiple features changing",
+			features: map[Feature]VersionedSpecs{
+				"TestFeature1": {
+					{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+				},
+				"TestFeature2": {
+					{Version: version.MustParse("1.28"), Default: true, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
+				},
+			},
+			queriedFeatures: []string{"TestFeature1", "TestFeature2"},
+			targetVersion:   version.MustParse("1.28"),
+			context:         context.Background(),
+			expectError:     true,
+			errorContains:   []string{"TestFeature1", "TestFeature2"},
+		},
+		{
+			name: "no change with regular context",
+			features: map[Feature]VersionedSpecs{
+				"TestFeature": {
+					{Version: version.MustParse("1.28"), Default: true, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+				},
+			},
+			queriedFeatures: []string{"TestFeature"},
+			targetVersion:   version.MustParse("1.28"),
+			context:         context.Background(),
+			expectNoError:   true,
+		},
+		{
+			name: "no change with test logger context",
+			features: map[Feature]VersionedSpecs{
+				"TestFeature": {
+					{Version: version.MustParse("1.28"), Default: true, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+				},
+			},
+			queriedFeatures: []string{"TestFeature"},
+			targetVersion:   version.MustParse("1.28"),
+			context:         WithTestLoggerContext(context.Background(), t),
+			expectNoError:   true,
+		},
+		{
+			name: "nil context with feature change",
+			features: map[Feature]VersionedSpecs{
+				"TestFeature": {
+					{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+				},
+			},
+			queriedFeatures: []string{"TestFeature"},
+			targetVersion:   version.MustParse("1.28"),
+			context:         nil,
+			expectError:     true,
+			errorContains:   []string{"SetEmulationVersion would change already queried features"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create feature gate
+			f := NewVersionedFeatureGate(version.MustParse("1.29"))
+
+			// Add features
+			err := f.AddVersioned(tt.features)
+			require.NoError(t, err)
+
+			// Query features to mark them as queried
+			for _, featureName := range tt.queriedFeatures {
+				_ = f.Enabled(Feature(featureName))
+			}
+
+			// Test SetEmulationVersionWithContext
+			err = f.SetEmulationVersionWithContext(tt.context, tt.targetVersion)
+
+			if tt.expectError {
+				require.Error(t, err)
+				for _, expectedText := range tt.errorContains {
+					require.Contains(t, err.Error(), expectedText)
+				}
+			} else if tt.expectNoError {
+				require.NoError(t, err)
 			}
 		})
 	}
