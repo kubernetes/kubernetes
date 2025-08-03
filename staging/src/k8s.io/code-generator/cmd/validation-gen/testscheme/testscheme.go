@@ -310,14 +310,6 @@ func (v *ValidationTester) ExpectValid() *ValidationTester {
 	return v
 }
 
-// ExpectInvalid validates the value and calls t.Errorf if want does not match the actual errors.
-// Returns ValidationTester to support call chaining.
-func (v *ValidationTester) ExpectInvalid(want ...*field.Error) *ValidationTester {
-	v.T.Helper()
-
-	return v.expectInvalid(byFullError, want...)
-}
-
 func (v *ValidationTester) ExpectValidateFalseByPath(expectedByPath map[string][]string) *ValidationTester {
 	v.T.Helper()
 
@@ -366,84 +358,6 @@ func (v *ValidationTester) ExpectMatches(matcher field.ErrorMatcher, expected fi
 		matcher.Test(t, expected, actual)
 	})
 	return v
-}
-
-func (v *ValidationTester) getErrorsByPath() map[string][]string {
-	byPath := map[string][]string{}
-	errs := v.validate()
-	for _, e := range errs {
-		f := e.Field
-		if f == "<nil>" {
-			f = ""
-		}
-		byPath[f] = append(byPath[f], e.ErrorBody())
-	}
-	// ensure args are sorted
-	for _, args := range byPath {
-		sort.Strings(args)
-	}
-	return byPath
-}
-
-func renderByPath(byPath map[string][]string) string {
-	keys := []string{}
-	for key := range byPath {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	for _, vals := range byPath {
-		sort.Strings(vals)
-	}
-
-	buf := strings.Builder{}
-	for _, key := range keys {
-		vals := byPath[key]
-		for _, val := range vals {
-			buf.WriteString(fmt.Sprintf("\t%s: %q\n", key, val))
-		}
-	}
-	return buf.String()
-}
-
-func renderList(list []string) string {
-	buf := strings.Builder{}
-	for _, item := range list {
-		buf.WriteString(fmt.Sprintf("\t%q\n", item))
-	}
-	return buf.String()
-}
-
-func (v *ValidationTester) expectInvalid(matcher matcher, errs ...*field.Error) *ValidationTester {
-	v.T.Helper()
-
-	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
-		t.Helper()
-
-		want := sets.New[string]()
-		for _, e := range errs {
-			want.Insert(matcher(e))
-		}
-
-		got := sets.New[string]()
-		for _, e := range v.validate() {
-			got.Insert(matcher(e))
-		}
-		if !got.Equal(want) {
-			t.Errorf("validation errors differed from expected:\n%v\n", cmp.Diff(want, got, cmpopts.SortMaps(stdcmp.Less[string])))
-
-			for x := range got.Difference(want) {
-				fmt.Printf("%q,\n", strings.TrimPrefix(x, "forced failure: "))
-			}
-		}
-	})
-	return v
-}
-
-type matcher func(err *field.Error) string
-
-func byFullError(err *field.Error) string {
-	return err.Error()
 }
 
 func (v *ValidationTester) validate() field.ErrorList {
