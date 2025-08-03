@@ -185,7 +185,12 @@ Usage:
 ### fake-registry-server
 
 Starts a fake OCI registry server that serves static image files. This can be used to test
-pulling images from a private or insecure registry.
+pulling images from a private or public registry.
+
+Registry serving two APIs:
+
+- `/v2/` - public registry
+- `/private/v2` - private registry, protected by basic auth with `test:test` credentials
 
 Usage:
 
