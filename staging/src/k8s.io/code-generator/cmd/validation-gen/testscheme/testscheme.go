@@ -310,6 +310,11 @@ func (v *ValidationTester) ExpectValid() *ValidationTester {
 	return v
 }
 
+// ExpectValidateFalseByPath validates the value and looks for the errors
+// specifically produced by `+k8s:validateFalse` tags. Each field (the map key)
+// can have multiple error strings (the map value). Test which are trying
+// to prove that the validation logic itself (e.g. validation-gen) produces the
+// expected errors should use this method.
 func (v *ValidationTester) ExpectValidateFalseByPath(expectedByPath map[string][]string) *ValidationTester {
 	v.T.Helper()
 
@@ -349,6 +354,10 @@ func (v *ValidationTester) validateFalseArgsByPath() map[string][]string {
 	return byPath
 }
 
+// ExpectMatches compares the expected errors with the actual errors returned
+// by the validation, using the provided ErrorMatcher. Tests which are trying
+// to prove that a use-case of validation (e.g. testing pod validation)
+// produces the expected errors should use this method.
 func (v *ValidationTester) ExpectMatches(matcher field.ErrorMatcher, expected field.ErrorList) *ValidationTester {
 	v.Helper()
 
