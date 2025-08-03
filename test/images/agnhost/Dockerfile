@@ -49,7 +49,7 @@ ADD porter/localhost.crt localhost.crt
 ADD porter/localhost.key localhost.key
 
 ADD agnhost agnhost
-ADD registry.tar.gz /
+ADD registry.tar.gz /var
 
 # needed for the entrypoint-tester related tests. Some of the entrypoint-tester related tests
 # overrides this image's entrypoint with agnhost-2 binary, and will verify that the correct

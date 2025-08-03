@@ -30,20 +30,19 @@ import (
 var (
 	port        int
 	host        string
-	registryDir string
+	registryDir = "/var/registry"
 )
 
 func init() {
 	CmdFakeRegistryServer.Flags().IntVar(&port, "port", 5000, "Port number.")
 	CmdFakeRegistryServer.Flags().StringVar(&host, "host", "0.0.0.0", "Host address.")
-	CmdFakeRegistryServer.Flags().StringVar(&registryDir, "registry-dir", "/registry", "Directory containing the registry data.")
 }
 
 // CmdFakeRegistryServer is the cobra command for the fake registry server
 var CmdFakeRegistryServer = &cobra.Command{
 	Use:   "fake-registry-server",
 	Short: "Starts a fake registry server for testing",
-	Long:  `Starts a fake registry server that serves static OCI image files`,
+	Long:  fmt.Sprintf("Starts a fake registry server that serves static OCI image files from %s folder", registryDir),
 	Run:   main,
 }
 
