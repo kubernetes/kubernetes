@@ -16,8 +16,8 @@ ARG GOLANG_VERSION
 
 FROM golang:$GOLANG_VERSION
 
-RUN go install github.com/google/go-containerregistry/cmd/crane@latest && \
-    apt-get update && apt-get install -y jq
+RUN apt-get update && apt-get install -y jq
+RUN go install github.com/google/go-containerregistry/cmd/crane@latest 
 
 COPY fakeregistryserver/prepare_registry.sh /prepare_registry.sh
 COPY fakeregistryserver/images.txt /images.txt
