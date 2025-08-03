@@ -1909,51 +1909,64 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	})
 
+	extendedResourceTest := func(ctx context.Context, b *drautils.Builder, f *framework.Framework, resourceNames []string, containerEnv []string) {
+		pod := b.Pod()
+		res := v1.ResourceList{}
+		for _, resourceName := range resourceNames {
+			res[v1.ResourceName(resourceName)] = resource.MustParse("1")
+		}
+		pod.Spec.Containers[0].Resources.Requests = res
+		pod.Spec.Containers[0].Resources.Limits = res
+
+		b.Create(ctx, pod)
+		err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+		framework.ExpectNoError(err, "start pod")
+		drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+	}
+
 	framework.Context(f.WithFeatureGate(features.DRAExtendedResource), func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false))
 		b := drautils.NewBuilder(f, driver)
 		b.UseExtendedResourceName = true
 
-		ginkgo.It("must run a pod with extended resource with one container one resource", func(ctx context.Context) {
-			pod := b.Pod()
-			res := v1.ResourceList{}
-			res[v1.ResourceName(b.ExtendedResourceName(0))] = resource.MustParse("1")
-			pod.Spec.Containers[0].Resources.Requests = res
-			pod.Spec.Containers[0].Resources.Limits = res
-
-			b.Create(ctx, pod)
-			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-			framework.ExpectNoError(err, "start pod")
-			containerEnv := []string{
+		ginkgo.It("must run a pod with both implicit and explicit extended resource with one container two resources", func(ctx context.Context) {
+			extendedResourceTest(ctx, b, f, []string{
+				// implicit extended resource name
+				"deviceclass.resource.kubernetes.io/" + b.ClassName(),
+				// b.ExtendedResourceName(0) is added to the deivce class with name: b.ClassName()+"0"
+				b.ExtendedResourceName(0),
+			}, []string{
 				"container_0_request_0", "true",
-			}
-			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+				"container_0_request_1", "true",
+			})
+		})
+
+		ginkgo.It("must run a pod with extended resource with one container one resource", func(ctx context.Context) {
+			extendedResourceTest(ctx, b, f, []string{
+				b.ExtendedResourceName(0),
+			}, []string{
+				"container_0_request_0", "true",
+			})
 		})
 
 		ginkgo.It("must run a pod with extended resource with one container three resources", func(ctx context.Context) {
 			var objects []klog.KMetadata
-			pod := b.Pod()
-			res := v1.ResourceList{}
 			for i := range 3 {
-				res[v1.ResourceName(b.ExtendedResourceName(i))] = resource.MustParse("1")
 				if i > 0 {
 					objects = append(objects, b.Class(i))
 				}
 			}
-			pod.Spec.Containers[0].Resources.Requests = res
-			pod.Spec.Containers[0].Resources.Limits = res
-			objects = append(objects, pod)
-
 			b.Create(ctx, objects...)
-			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-			framework.ExpectNoError(err, "start pod")
-			containerEnv := []string{
+			extendedResourceTest(ctx, b, f, []string{
+				b.ExtendedResourceName(0),
+				b.ExtendedResourceName(1),
+				b.ExtendedResourceName(2),
+			}, []string{
 				"container_0_request_0", "true",
 				"container_0_request_1", "true",
 				"container_0_request_2", "true",
-			}
-			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+			})
 		})
 		ginkgo.It("must run a pod with extended resource with three containers one resource each", func(ctx context.Context) {
 			var objects []klog.KMetadata

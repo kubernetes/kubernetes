@@ -60,21 +60,22 @@ import (
 var (
 	podKind = v1.SchemeGroupVersion.WithKind("Pod")
 
-	nodeName             = "worker"
-	node2Name            = "worker-2"
-	node3Name            = "worker-3"
-	driver               = "some-driver"
-	driver2              = "some-driver-2"
-	podName              = "my-pod"
-	podUID               = "1234"
-	resourceName         = "my-resource"
-	resourceName2        = resourceName + "-2"
-	claimName            = podName + "-" + resourceName
-	claimName2           = podName + "-" + resourceName2
-	className            = "my-resource-class"
-	namespace            = "default"
-	attrName             = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
-	extendedResourceName = "example.com/gpu"
+	nodeName                     = "worker"
+	node2Name                    = "worker-2"
+	node3Name                    = "worker-3"
+	driver                       = "some-driver"
+	driver2                      = "some-driver-2"
+	podName                      = "my-pod"
+	podUID                       = "1234"
+	resourceName                 = "my-resource"
+	resourceName2                = resourceName + "-2"
+	claimName                    = podName + "-" + resourceName
+	claimName2                   = podName + "-" + resourceName2
+	className                    = "my-resource-class"
+	namespace                    = "default"
+	attrName                     = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
+	extendedResourceName         = "example.com/gpu"
+	implicitExtendedResourceName = "deviceclass.resource.kubernetes.io/my-resource-class"
 
 	deviceClass = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -122,6 +123,22 @@ var (
 					UID(podUID).
 					Req(map[v1.ResourceName]string{
 			v1.ResourceName(extendedResourceName): "1",
+		}).
+		Obj()
+	podWithImplicitExtendedResourceName = st.MakePod().Name(podName).Namespace(namespace).
+						UID(podUID).
+						Req(map[v1.ResourceName]string{
+			v1.ResourceName(implicitExtendedResourceName): "1",
+			v1.ResourceName(extendedResourceName):         "2",
+		}).
+		Obj()
+	podWithImplicitExtendedResourceNameTwoContainers = st.MakePod().Name(podName).Namespace(namespace).
+								UID(podUID).
+								Req(map[v1.ResourceName]string{
+			v1.ResourceName(implicitExtendedResourceName): "1",
+		}).
+		Req(map[v1.ResourceName]string{
+			v1.ResourceName(extendedResourceName): "2",
 		}).
 		Obj()
 
@@ -213,6 +230,60 @@ var (
 				Device:  "instance-1",
 				Request: "container-0-request-0",
 			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	implicitExtendedResourceAllocationResult = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-1",
+					Request: "container-0-request-0",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-2",
+					Request: "container-0-request-1",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-3",
+					Request: "container-0-request-1",
+				},
+			},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
+	implicitExtendedResourceAllocationResultTwoContainers = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-1",
+					Request: "container-0-request-0",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-2",
+					Request: "container-1-request-0",
+				},
+				{
+					Driver:  driver,
+					Pool:    nodeName,
+					Device:  "instance-3",
+					Request: "container-1-request-0",
+				},
+			},
 		},
 		NodeSelector: func() *v1.NodeSelector {
 			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
@@ -311,7 +382,78 @@ var (
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
 		Obj()
-
+	implicitExtendedResourceClaim = st.MakeResourceClaim().
+					Name("my-pod-extended-resources-0").
+					GenerateName("my-pod-extended-resources-").
+					Namespace(namespace).
+					Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+					OwnerRef(
+			metav1.OwnerReference{
+				APIVersion:         "v1",
+				Kind:               "Pod",
+				Name:               podName,
+				UID:                types.UID(podUID),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-0", className).
+		RequestWithNameCount("container-0-request-1", className, 2).
+		Allocation(implicitExtendedResourceAllocationResult).
+		Obj()
+	implicitExtendedResourceClaimNoName = st.MakeResourceClaim().
+						Name(specialClaimInMemName).
+						GenerateName("my-pod-extended-resources-").
+						Namespace(namespace).
+						Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+						OwnerRef(
+			metav1.OwnerReference{
+				APIVersion:         "v1",
+				Kind:               "Pod",
+				Name:               podName,
+				UID:                types.UID(podUID),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-0", className).
+		RequestWithNameCount("container-0-request-1", className, 2).
+		Allocation(implicitExtendedResourceAllocationResult).
+		Obj()
+	implicitExtendedResourceClaimTwoContainers = st.MakeResourceClaim().
+							Name("my-pod-extended-resources-0").
+							GenerateName("my-pod-extended-resources-").
+							Namespace(namespace).
+							Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+							OwnerRef(
+			metav1.OwnerReference{
+				APIVersion:         "v1",
+				Kind:               "Pod",
+				Name:               podName,
+				UID:                types.UID(podUID),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-0", className).
+		RequestWithNameCount("container-1-request-0", className, 2).
+		Allocation(implicitExtendedResourceAllocationResultTwoContainers).
+		Obj()
+	implicitExtendedResourceClaimNoNameTwoContainers = st.MakeResourceClaim().
+								Name(specialClaimInMemName).
+								GenerateName("my-pod-extended-resources-").
+								Namespace(namespace).
+								Annotations(map[string]string{"resource.kubernetes.io/extended-resource-claim": "true"}).
+								OwnerRef(
+			metav1.OwnerReference{
+				APIVersion:         "v1",
+				Kind:               "Pod",
+				Name:               podName,
+				UID:                types.UID(podUID),
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}).
+		RequestWithName("container-0-request-0", className).
+		RequestWithNameCount("container-1-request-0", className, 2).
+		Allocation(implicitExtendedResourceAllocationResultTwoContainers).
+		Obj()
 	extendedResourceClaimNode2 = st.MakeResourceClaim().
 					Name("my-pod-extended-resources-0").
 					GenerateName("my-pod-extended-resources-").
@@ -1311,6 +1453,42 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
+		"implicit-extended-resource-name-with-resources": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithImplicitExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{largeWorkerNodeSlice, podWithImplicitExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaim: implicitExtendedResourceClaimNoName,
+				},
+				prebind: result{
+					assumedClaim: reserve(implicitExtendedResourceClaim, podWithImplicitExtendedResourceName),
+					added:        []metav1.Object{reserve(implicitExtendedResourceClaim, podWithImplicitExtendedResourceName)},
+				},
+				postbind: result{
+					assumedClaim: reserve(implicitExtendedResourceClaim, podWithImplicitExtendedResourceName),
+				},
+			},
+		},
+		"implicit-extended-resource-name-two-containers-with-resources": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithImplicitExtendedResourceNameTwoContainers,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{largeWorkerNodeSlice, podWithImplicitExtendedResourceNameTwoContainers},
+			want: want{
+				reserve: result{
+					inFlightClaim: implicitExtendedResourceClaimNoNameTwoContainers,
+				},
+				prebind: result{
+					assumedClaim: reserve(implicitExtendedResourceClaimTwoContainers, podWithImplicitExtendedResourceNameTwoContainers),
+					added:        []metav1.Object{reserve(implicitExtendedResourceClaimTwoContainers, podWithImplicitExtendedResourceNameTwoContainers)},
+				},
+				postbind: result{
+					assumedClaim: reserve(implicitExtendedResourceClaimTwoContainers, podWithImplicitExtendedResourceNameTwoContainers),
+				},
+			},
+		},
 		"extended-resource-name-with-resources-fail-patch": {
 			enableDRAExtendedResource: true,
 			failPatch:                 true,
@@ -1938,6 +2116,8 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	ignoreFieldsInResourceClaims := []cmp.Option{
 		cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion"),
 		cmpopts.IgnoreFields(resourceapi.AllocationResult{}, "AllocationTimestamp"),
+		// It does not matter which specific device is allocated for the testing purpose.
+		cmpopts.IgnoreFields(resourceapi.DeviceRequestAllocationResult{}, "Device"),
 	}
 	if diff := cmp.Diff(wantObjects, objects, ignoreFieldsInResourceClaims...); diff != "" {
 		t.Errorf("Stored objects are different (- expected, + actual):\n%s", diff)
@@ -1995,12 +2175,27 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	}
 }
 
+// sortClaim sorts given claim's Requests in spec, and Results in status
+func sortClaim(claim *resourceapi.ResourceClaim) {
+	requests := claim.Spec.Devices.Requests
+	sort.Slice(requests, func(i, j int) bool {
+		return requests[i].Name < requests[j].Name
+	})
+	if claim.Status.Allocation != nil {
+		results := claim.Status.Allocation.Devices.Results
+		sort.Slice(results, func(i, j int) bool {
+			return results[i].Request < results[j].Request
+		})
+	}
+}
+
 func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	t.Helper()
 	claims, err := tc.client.ResourceV1().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
 	require.NoError(t, err, "list claims")
 	for _, claim := range claims.Items {
 		claim := claim
+		sortClaim(&claim)
 		objects = append(objects, &claim)
 	}
 	sortObjects(objects)
@@ -2012,6 +2207,7 @@ func (tc *testContext) listAssumedClaims() ([]metav1.Object, []metav1.Object) {
 	var sameClaims []metav1.Object
 	for _, obj := range tc.draManager.resourceClaimTracker.cache.List(nil) {
 		claim := obj.(*resourceapi.ResourceClaim)
+		sortClaim(claim)
 		obj, _ := tc.draManager.resourceClaimTracker.cache.Get(claim.Namespace + "/" + claim.Name)
 		apiObj, _ := tc.draManager.resourceClaimTracker.cache.GetAPIObj(claim.Namespace + "/" + claim.Name)
 		if obj != apiObj {
@@ -2028,7 +2224,9 @@ func (tc *testContext) listAssumedClaims() ([]metav1.Object, []metav1.Object) {
 func (tc *testContext) listInFlightClaims() []metav1.Object {
 	var inFlightClaims []metav1.Object
 	tc.draManager.resourceClaimTracker.inFlightAllocations.Range(func(key, value any) bool {
-		inFlightClaims = append(inFlightClaims, value.(*resourceapi.ResourceClaim))
+		claim := value.(*resourceapi.ResourceClaim)
+		sortClaim(claim)
+		inFlightClaims = append(inFlightClaims, claim)
 		return true
 	})
 	sortObjects(inFlightClaims)
