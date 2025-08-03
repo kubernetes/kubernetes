@@ -18,6 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+readonly REGISTRY_URL="registry.k8s.io"
+readonly REGISTRY_DIR="/registry"
+
 # This script prepares a directory with container images to be used as a fake registry,
 # then creates a tarball of that directory inside the container.
 
@@ -26,9 +29,7 @@ prepare_image() {
     local image_name="$1"
     local tag="$2"
     local internal_tag="$3"
-    local registry_dir="$4"
-    local registry_url="registry.k8s.io"
-    local image_dir="$registry_dir/$image_name"
+    local image_dir="$REGISTRY_DIR/$image_name"
 
     echo "--- Preparing image: ${image_name}:${tag} as ${image_name}:${internal_tag} ---"
 
@@ -38,7 +39,7 @@ prepare_image() {
     echo "Downloading and filtering manifest list for $image_name:$tag..."
     local tmp_manifest_path="$image_dir/manifests/tmp_${internal_tag}"
     # download the manifest and pipe it to jq to filter out windows images
-    crane manifest "$registry_url/$image_name:$tag" | jq '.manifests |= map(select(.platform.os != "windows"))' > "$tmp_manifest_path"
+    crane manifest "$REGISTRY_URL/$image_name:$tag" | jq '.manifests |= map(select(.platform.os != "windows"))' > "$tmp_manifest_path"
     echo "Saved manifest list to $tmp_manifest_path"
 
     local manifest_digest="sha256:$(sha256sum < "$tmp_manifest_path" | awk '{print $1}')"
@@ -54,18 +55,18 @@ prepare_image() {
     jq -r '.manifests[].digest' < "$image_dir/manifests/$manifest_digest" | while read -r individual_manifest_digest; do
       echo "  Downloading manifest $individual_manifest_digest..."
       local individual_manifest_path="$image_dir/manifests/$individual_manifest_digest"
-      crane manifest "$registry_url/$image_name@$individual_manifest_digest" > "$individual_manifest_path"
+      crane manifest "$REGISTRY_URL/$image_name@$individual_manifest_digest" > "$individual_manifest_path"
       echo "  Saved manifest to $individual_manifest_path"
 
       local config_digest
       config_digest=$(jq -r '.config.digest' < "$individual_manifest_path")
       echo "    Downloading config blob $config_digest..."
-      crane blob "$registry_url/$image_name@$config_digest" > "$image_dir/blobs/$config_digest"
+      crane blob "$REGISTRY_URL/$image_name@$config_digest" > "$image_dir/blobs/$config_digest"
       echo "    Saved config blob to $image_dir/blobs/$config_digest"
 
       jq -r '.layers[].digest' < "$individual_manifest_path" | while read -r layer_digest; do
         echo "    Downloading layer blob $layer_digest..."
-        crane blob "$registry_url/$image_name@$layer_digest" > "$image_dir/blobs/$layer_digest"
+        crane blob "$REGISTRY_URL/$image_name@$layer_digest" > "$image_dir/blobs/$layer_digest"
         echo "    Saved layer blob to $image_dir/blobs/$layer_digest"
       done
     done
@@ -74,13 +75,13 @@ prepare_image() {
 }
 
 # create the registry directory
-mkdir -p /registry
+mkdir -p "$REGISTRY_DIR"
 
 echo "--> Processing images.txt..."
 while read -r image tag internal_tag; do
     # skip empty lines or comments
     [[ -z "$image" || "$image" == \#* ]] && continue
-    prepare_image "$image" "$tag" "$internal_tag" "/registry"
+    prepare_image "$image" "$tag" "$internal_tag"
 done < /images.txt
 
 # create the final tarball inside the container
