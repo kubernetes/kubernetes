@@ -36,18 +36,22 @@ prepare_image() {
     mkdir -p "$image_dir/blobs"
 
     echo "Downloading and filtering manifest list for $image_name:$tag..."
-    local manifest_list_path="$image_dir/manifests/${internal_tag}_index"
+    local tmp_manifest_path="$image_dir/manifests/tmp_${internal_tag}"
     # download the manifest and pipe it to jq to filter out windows images
-    crane manifest "$registry_url/$image_name:$tag" | jq '.manifests |= map(select(.platform.os != "windows"))' > "$manifest_list_path"
-    echo "Saved manifest list to $manifest_list_path"
+    crane manifest "$registry_url/$image_name:$tag" | jq '.manifests |= map(select(.platform.os != "windows"))' > "$tmp_manifest_path"
+    echo "Saved manifest list to $tmp_manifest_path"
 
-    local manifest_digest="sha256:$(sha256sum < "$manifest_list_path" | awk '{print $1}')"
-    cp "$manifest_list_path" "$image_dir/manifests/$manifest_digest"
-    echo "Created digest-named copy of manifest list: $manifest_digest"
+    local manifest_digest="sha256:$(sha256sum < "$tmp_manifest_path" | awk '{print $1}')"
+    mv "$tmp_manifest_path" "$image_dir/manifests/$manifest_digest"
+    echo "Saved manifest list to $image_dir/manifests/$manifest_digest"
+
+    # the file named after the tag now contains only the digest, acting as a redirect pointer
+    echo "$manifest_digest" > "$image_dir/manifests/${internal_tag}"
+    echo "Created tag file ${internal_tag} pointing to digest $manifest_digest"
 
     echo "Parsing manifest list and downloading individual manifests and blobs..."
     
-    jq -r '.manifests[].digest' < "$manifest_list_path" | while read -r individual_manifest_digest; do
+    jq -r '.manifests[].digest' < "$image_dir/manifests/$manifest_digest" | while read -r individual_manifest_digest; do
       echo "  Downloading manifest $individual_manifest_digest..."
       local individual_manifest_path="$image_dir/manifests/$individual_manifest_digest"
       crane manifest "$registry_url/$image_name@$individual_manifest_digest" > "$individual_manifest_path"

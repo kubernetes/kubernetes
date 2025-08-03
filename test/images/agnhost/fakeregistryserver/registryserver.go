@@ -17,6 +17,7 @@ limitations under the License.
 package fakeregistryserver
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -30,14 +31,12 @@ var (
 	port        int
 	host        string
 	registryDir string
-	private     bool
 )
 
 func init() {
 	CmdFakeRegistryServer.Flags().IntVar(&port, "port", 5000, "Port number.")
 	CmdFakeRegistryServer.Flags().StringVar(&host, "host", "0.0.0.0", "Host address.")
 	CmdFakeRegistryServer.Flags().StringVar(&registryDir, "registry-dir", "/registry", "Directory containing the registry data.")
-	CmdFakeRegistryServer.Flags().BoolVar(&private, "private", false, "Enable basic authentication with static credentials (test:test)")
 }
 
 // CmdFakeRegistryServer is the cobra command for the fake registry server
@@ -49,19 +48,23 @@ var CmdFakeRegistryServer = &cobra.Command{
 }
 
 func main(cmd *cobra.Command, args []string) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/v2/", handleV2)
+	registryMux := NewRegistryServerMux()
 
-	var handler http.Handler = mux
-	if private {
-		handler = auth(mux)
-	}
-
-	serverAdr := fmt.Sprintf("%s:%d", host, port)
-	log.Printf("HTTP server starting to listen on %s", serverAdr)
-	if err := http.ListenAndServe(serverAdr, handler); err != nil {
+	addr := fmt.Sprintf("%s:%d", host, port)
+	log.Printf("HTTP server starting to listen on %s", addr)
+	if err := http.ListenAndServe(addr, registryMux); err != nil {
 		log.Fatalf("Error while starting the HTTP server: %v", err)
 	}
+}
+
+func NewRegistryServerMux() *http.ServeMux {
+	mux := http.NewServeMux()
+
+	// setup private and public routes
+	mux.HandleFunc("/v2/", handleV2)
+	mux.Handle("/private/v2/", auth(http.HandlerFunc(handleV2)))
+
+	return mux
 }
 
 func auth(h http.Handler) http.Handler {
@@ -77,20 +80,68 @@ func auth(h http.Handler) http.Handler {
 	})
 }
 
+// handleBlobs serves blob requests
+func handleBlobs(w http.ResponseWriter, r *http.Request, imageName, identifier string) {
+	filePath := fmt.Sprintf("%s/%s/blobs/%s", registryDir, imageName, identifier)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	log.Printf("Serving blob: %s", filePath)
+	http.ServeFile(w, r, filePath)
+}
+
+// handleManifests serves manifest requests. It dynamically sets the Content-Type
+// based on the manifest's mediaType field. If the identifier is a tag, it
+// reads the digest from the tag file and issues a redirect.
+func handleManifests(w http.ResponseWriter, r *http.Request, imageName, identifier string) {
+	filePath := fmt.Sprintf("%s/%s/manifests/%s", registryDir, imageName, identifier)
+
+	// if the identifier is not a digest, assume it's a tag and perform a redirect.
+	if !strings.HasPrefix(identifier, "sha256:") {
+		digest, err := os.ReadFile(filePath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		redirectURL := strings.Replace(r.URL.String(), identifier, strings.TrimSpace(string(digest)), 1)
+		w.Header().Set("Location", redirectURL)
+		w.WriteHeader(http.StatusTemporaryRedirect)
+		return
+	}
+
+	manifestContent, err := os.ReadFile(filePath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var manifestData struct {
+		MediaType string `json:"mediaType"`
+	}
+
+	if err := json.Unmarshal(manifestContent, &manifestData); err == nil && manifestData.MediaType != "" {
+		w.Header().Set("Content-Type", manifestData.MediaType)
+	}
+
+	log.Printf("Serving manifest: %s", filePath)
+	w.Write(manifestContent)
+}
+
 func handleV2(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Docker-Distribution-Api-Version", "registry/2.0")
 
-	if r.Method == "HEAD" {
+	// root discovery endpoint for both public and private paths
+	if r.URL.Path == "/v2/" || r.URL.Path == "/private/v2/" {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	if r.URL.Path == "/v2/" {
-		w.WriteHeader(http.StatusOK)
-		return
+	var path string
+	if strings.HasPrefix(r.URL.Path, "/private/v2/") {
+		path = strings.TrimPrefix(r.URL.Path, "/private/v2/")
+	} else {
+		path = strings.TrimPrefix(r.URL.Path, "/v2/")
 	}
 
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/v2/"), "/")
+	parts := strings.Split(path, "/")
 	if len(parts) < 3 {
 		http.NotFound(w, r)
 		return
@@ -100,23 +151,12 @@ func handleV2(w http.ResponseWriter, r *http.Request) {
 	objectType := parts[1]
 	identifier := parts[2]
 
-	filePath := fmt.Sprintf("%s/%s/%s/%s", registryDir, imageName, objectType, identifier)
-
 	switch objectType {
 	case "blobs":
-		w.Header().Set("Content-Type", "application/octet-stream")
+		handleBlobs(w, r, imageName, identifier)
 	case "manifests":
-		if _, err := os.Stat(filePath + "_index"); err == nil {
-			filePath += "_index"
-			w.Header().Set("Content-Type", "application/vnd.docker.distribution.manifest.list.v2+json")
-		} else {
-			w.Header().Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
-		}
+		handleManifests(w, r, imageName, identifier)
 	default:
 		http.NotFound(w, r)
-		return
 	}
-
-	log.Printf("Serving file: %s", filePath)
-	http.ServeFile(w, r, filePath)
 }
