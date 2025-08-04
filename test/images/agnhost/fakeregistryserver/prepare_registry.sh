@@ -42,7 +42,8 @@ prepare_image() {
     crane manifest "$REGISTRY_URL/$image_name:$tag" | jq '.manifests |= map(select(.platform.os != "windows"))' > "$tmp_manifest_path"
     echo "Saved manifest list to $tmp_manifest_path"
 
-    local manifest_digest="sha256:$(sha256sum < "$tmp_manifest_path" | awk '{print $1}')"
+    local manifest_digest
+    manifest_digest="sha256:$(sha256sum < "$tmp_manifest_path" | awk '{print $1}')"
     mv "$tmp_manifest_path" "$image_dir/manifests/$manifest_digest"
     echo "Saved manifest list to $image_dir/manifests/$manifest_digest"
 

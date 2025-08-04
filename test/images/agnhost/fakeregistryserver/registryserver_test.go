@@ -49,8 +49,15 @@ const (
 	testBlobContent = `this is a fake blob`
 )
 
+func closeBody(t *testing.T, resp *http.Response) {
+	err := resp.Body.Close()
+	if err != nil {
+		t.Fatalf("Error closing response body: %v", err)
+	}
+}
+
 // setupTestRegistry creates a temporary directory structure for the fake registry.
-func setupTestRegistry(t *testing.T) (string, func()) {
+func setupTestRegistry(t *testing.T) (string, func() error) {
 	t.Helper()
 	tempDir, err := os.MkdirTemp("", "fake-registry-")
 	if err != nil {
@@ -81,8 +88,8 @@ func setupTestRegistry(t *testing.T) (string, func()) {
 		t.Fatalf("Failed to write blob file: %v", err)
 	}
 
-	cleanup := func() {
-		os.RemoveAll(tempDir)
+	cleanup := func() error {
+		return os.RemoveAll(tempDir)
 	}
 
 	return tempDir, cleanup
@@ -90,7 +97,12 @@ func setupTestRegistry(t *testing.T) (string, func()) {
 
 func TestRegistryServer(t *testing.T) {
 	tempDir, cleanup := setupTestRegistry(t)
-	defer cleanup()
+	defer func() {
+		err := cleanup()
+		if err != nil {
+			t.Fatalf("Failed to cleanup temp dir: %v", err)
+		}
+	}()
 
 	originalRegistryDir := registryDir
 	registryDir = tempDir
@@ -107,7 +119,7 @@ func TestRegistryServer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer closeBody(t, resp)
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Expected status OK; got %v", resp.Status)
 			}
@@ -119,7 +131,7 @@ func TestRegistryServer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer closeBody(t, resp)
 
 			if resp.StatusCode != http.StatusNotFound {
 				t.Errorf("Expected status NotFound; got %v", resp.Status)
@@ -137,7 +149,7 @@ func TestRegistryServer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer closeBody(t, resp)
 
 			if resp.StatusCode != http.StatusTemporaryRedirect {
 				t.Errorf("Expected status Temporary Redirect; got %v", resp.Status)
@@ -154,7 +166,7 @@ func TestRegistryServer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer closeBody(t, resp)
 
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Expected status OK; got %v", resp.Status)
@@ -167,7 +179,7 @@ func TestRegistryServer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer closeBody(t, resp)
 
 			if resp.StatusCode != http.StatusNotFound {
 				t.Errorf("Expected status NotFound; got %v", resp.Status)
@@ -180,7 +192,7 @@ func TestRegistryServer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer closeBody(t, resp)
 
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Expected status OK; got %v", resp.Status)
@@ -200,7 +212,7 @@ func TestRegistryServer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer closeBody(t, resp)
 
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Expected status OK; got %v", resp.Status)
@@ -213,7 +225,7 @@ func TestRegistryServer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer closeBody(t, resp)
 
 			if resp.StatusCode != http.StatusNotFound {
 				t.Errorf("Expected status NotFound; got %v", resp.Status)
@@ -226,7 +238,7 @@ func TestRegistryServer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer closeBody(t, resp)
 
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Expected status OK; got %v", resp.Status)
@@ -245,7 +257,7 @@ func TestRegistryServer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer closeBody(t, resp)
 			if resp.StatusCode != http.StatusUnauthorized {
 				t.Errorf("Expected status Unauthorized; got %v", resp.Status)
 			}
@@ -253,13 +265,13 @@ func TestRegistryServer(t *testing.T) {
 
 		t.Run("GET with correct auth", func(t *testing.T) {
 			url := fmt.Sprintf("%s/private/v2/%s/blobs/%s", server.URL, testImageName, testBlobDigest)
-			req, _ := http.NewRequest("GET", url, nil)
+			req, _ := http.NewRequest(http.MethodGet, url, nil)
 			req.SetBasicAuth("test", "test")
 			resp, err := client.Do(req)
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer closeBody(t, resp)
 
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Expected status OK; got %v", resp.Status)

@@ -72,7 +72,7 @@ func auth(h http.Handler) http.Handler {
 		if !ok || user != "test" || pass != "test" {
 			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("Unauthorized\n"))
+			_, _ = w.Write([]byte("Unauthorized\n"))
 			return
 		}
 		h.ServeHTTP(w, r)
@@ -121,7 +121,7 @@ func handleManifests(w http.ResponseWriter, r *http.Request, imageName, identifi
 	}
 
 	log.Printf("Serving manifest: %s", filePath)
-	w.Write(manifestContent)
+	_, _ = w.Write(manifestContent)
 }
 
 func handleV2(w http.ResponseWriter, r *http.Request) {
