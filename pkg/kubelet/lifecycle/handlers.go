@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-helpers/nodecapabilities"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -47,6 +48,11 @@ const (
 
 	AppArmorNotAdmittedReason          = "AppArmor"
 	PodLevelResourcesNotAdmittedReason = "PodLevelResourcesNotSupported"
+
+	// Reasons for pod capabilities admission failure
+	CapabilityRequirementInferError = "CapabilityRequirementInferError"
+	CapabilityMatchError            = "CapabilityMatchError"
+	MissingNodeCapabilities         = "MissingNodeCapabilities"
 )
 
 type handlerRunner struct {
@@ -255,4 +261,59 @@ type podFeaturesAdmitHandler struct{}
 
 func (h *podFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	return isPodLevelResourcesSupported(attrs.Pod)
+}
+
+// capabilitiesAdmitHandler is a PodAdmitHandler that checks a pod's capability requirements.
+type capabilitiesAdmitHandler struct {
+	nodeCapabilitiesHelper *nodecapabilities.NodeCapabilityHelper
+	nodeCapabilities       map[string]string
+}
+
+// NewCapabilitiesAdmitHandler returns a new capabilities admit handler.
+func NewCapabilitiesAdmitHandler(nodeCapabilitiesHelper *nodecapabilities.NodeCapabilityHelper, nodeCapabilities map[string]string) PodAdmitHandler {
+	return &capabilitiesAdmitHandler{
+		nodeCapabilitiesHelper: nodeCapabilitiesHelper,
+		nodeCapabilities:       nodeCapabilities,
+	}
+}
+
+// Admit checks if a pod's capability requirements are met by the node.
+func (c *capabilitiesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	pod := attrs.Pod
+
+	reqs, err := c.nodeCapabilitiesHelper.InferPodCreateRequirements(context.TODO(), pod)
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  CapabilityRequirementInferError,
+			Message: fmt.Sprintf("failed to infer pod's capability requirements: %v", err),
+		}
+	}
+
+	if len(reqs) == 0 {
+		return PodAdmitResult{Admit: true}
+	}
+
+	matchResult, err := c.nodeCapabilitiesHelper.MatchCurrentNode(context.TODO(), reqs, c.nodeCapabilities)
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  CapabilityMatchError,
+			Message: fmt.Sprintf("failed to match pod's capability requirements against the node: %v", err),
+		}
+	}
+
+	if !matchResult.IsMatch {
+		var missing []string
+		for _, req := range matchResult.UnsatisfiedRequirements {
+			missing = append(missing, fmt.Sprintf("%s=%s", req.Key, req.Value))
+		}
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  MissingNodeCapabilities,
+			Message: fmt.Sprintf("pod requires node capabilities that are not available: %s", strings.Join(missing, ", ")),
+		}
+	}
+
+	return PodAdmitResult{Admit: true}
 }
