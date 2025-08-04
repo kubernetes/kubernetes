@@ -74,6 +74,7 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []fwk
 		extractPodScaleDown,
 		extractPodSchedulingGateEliminatedChange,
 		extractPodTolerationChange,
+		extractPodCapabilityRequirementChange,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		podChangeExtractors = append(podChangeExtractors, extractPodGeneratedResourceClaimChange)
@@ -157,6 +158,20 @@ func extractPodGeneratedResourceClaimChange(newPod *v1.Pod, oldPod *v1.Pod) fwk.
 	return fwk.None
 }
 
+func extractPodCapabilityRequirementChange(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType {
+	opt := resource.PodResourcesOptions{
+		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+	}
+	newPodRequests := resource.PodRequests(newPod, opt)
+	oldPodRequests := resource.PodRequests(oldPod, opt)
+
+	if !equality.Semantic.DeepEqual(newPodRequests, oldPodRequests) {
+		return fwk.UpdatePodCapabilityRequirement
+	}
+
+	return fwk.None
+}
+
 // NodeSchedulingPropertiesChange interprets the update of a node and returns corresponding UpdateNodeXYZ event(s).
 func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events []fwk.ClusterEvent) {
 	nodeChangeExtracters := []nodeChangeExtractor{
@@ -166,6 +181,7 @@ func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events 
 		extractNodeTaintsChange,
 		extractNodeConditionsChange,
 		extractNodeAnnotationsChange,
+		extractNodeCapabilitiesChange,
 	}
 
 	for _, fn := range nodeChangeExtracters {
@@ -228,6 +244,13 @@ func extractNodeSpecUnschedulableChange(newNode *v1.Node, oldNode *v1.Node) fwk.
 func extractNodeAnnotationsChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	if !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations()) {
 		return fwk.UpdateNodeAnnotation
+	}
+	return fwk.None
+}
+
+func extractNodeCapabilitiesChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
+	if !equality.Semantic.DeepEqual(oldNode.Status.Capabilities, newNode.Status.Capabilities) {
+		return fwk.UpdateNodeCapability
 	}
 	return fwk.None
 }
