@@ -58,6 +58,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
@@ -69,8 +70,10 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/component-base/version"
 	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/component-helpers/apimachinery/lease"
+	"k8s.io/component-helpers/nodecapabilities"
 	resourcehelper "k8s.io/component-helpers/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -80,6 +83,7 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	nodecapabilitiesregistry "k8s.io/kubernetes/pkg/features/nodecapabilities"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
@@ -1086,6 +1090,20 @@ func NewMainKubelet(ctx context.Context,
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeCapabilities) {
+		v, err := versionutil.Parse(version.Get().String())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse version: %w", err)
+		}
+		klet.kubeletVersion = v
+		helper, err := nodecapabilities.NewNodeCapabilityHelper(nodecapabilitiesregistry.NewRegistry(), v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create node capability helper: %w", err)
+		}
+		klet.nodeCapabilitiesHelper = helper
+		klet.nodeCapabilities = klet.determineNodeCapabilities()
+	}
+
 	// Generating the status funcs should be the last thing we do,
 	// since this relies on the rest of the Kubelet having been constructed.
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
@@ -1247,6 +1265,9 @@ type Kubelet struct {
 	nodeHasSynced cache.InformerSynced
 	// a list of node labels to register
 	nodeLabels map[string]string
+	// nodeCapabilities is a map of node capabilities.
+	nodeCapabilities       map[string]string
+	nodeCapabilitiesHelper *nodecapabilities.NodeCapabilityHelper
 
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
@@ -1472,6 +1493,9 @@ type Kubelet struct {
 
 	// Health check kubelet
 	healthChecker watchdog.HealthChecker
+
+	// kubelet's version
+	kubeletVersion *versionutil.Version
 
 	// flagz is the Reader interface to get flags for flagz page.
 	flagz flagz.Reader
@@ -1978,6 +2002,24 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, err)
 		return false, fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, err)
+	}
+
+	// TODO: handle nodecapability checks during updates
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeCapabilities) && updateType == kubetypes.SyncPodCreate {
+		reqs, err := kl.nodeCapabilitiesHelper.InferPodCreateRequirements(ctx, pod)
+		if err != nil {
+			err = fmt.Errorf("failed to infer pod capabilities: %w", err)
+			return false, err
+		}
+		match, err := kl.nodeCapabilitiesHelper.MatchCurrentNode(ctx, reqs, kl.nodeCapabilities)
+		if err != nil {
+			err = fmt.Errorf("failed to match pod capabilities against node: %w", err)
+			return false, err
+		}
+		if !match {
+			err := fmt.Errorf("pod requires capabilities which are not available on the node")
+			return false, err
+		}
 	}
 
 	// ensure the kubelet knows about referenced secrets or configmaps used by the pod
