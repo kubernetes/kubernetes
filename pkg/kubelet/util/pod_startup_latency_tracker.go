@@ -171,10 +171,9 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 			"observedRunningTime", state.observedRunningTime,
 			"watchObservedRunningTime", when)
 
+		metrics.PodStartTotalDuration.WithLabelValues().Observe(podStartingDuration.Seconds())
 		if !isStatefulPod {
 			metrics.PodStartSLIDuration.WithLabelValues().Observe(podStartSLOduration.Seconds())
-			metrics.PodStartTotalDuration.WithLabelValues().Observe(podStartingDuration.Seconds())
-			state.metricRecorded = true
 			// if is the first Pod with network track the start values
 			// these metrics will help to identify problems with the CNI plugin
 			if !pod.Spec.HostNetwork && !p.firstNetworkPodSeen {
@@ -182,6 +181,7 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 				p.firstNetworkPodSeen = true
 			}
 		}
+		state.metricRecorded = true
 	}
 }
 
