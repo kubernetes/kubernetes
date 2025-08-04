@@ -18,6 +18,7 @@ package cpumanager
 
 import (
 	"fmt"
+
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
@@ -36,13 +37,15 @@ import (
 )
 
 const (
-
 	// PolicyStatic is the name of the static policy.
 	// Should options be given, these will be ignored and backward (up to 1.21 included)
 	// compatible behaviour will be enforced
 	PolicyStatic policyName = "static"
 	// ErrorSMTAlignment represents the type of an SMTAlignmentError
 	ErrorSMTAlignment = "SMTAlignmentError"
+
+	// ErrorCPUManagerPodLevelResources represents the type of a CPUManagerPodLevelResourcesError
+	ErrorCPUManagerPodLevelResources = "CPUManagerPodLevelResourcesError"
 )
 
 // SMTAlignmentError represents an error due to SMT alignment
@@ -52,6 +55,15 @@ type SMTAlignmentError struct {
 	AvailablePhysicalCPUs int
 	CausedByPhysicalCPUs  bool
 }
+
+// PodLevelResourcesError represents an error due to pod-level resources not being supported.
+type CPUManagerPodLevelResourcesError struct{}
+
+func (e CPUManagerPodLevelResourcesError) Error() string {
+	return "CPU Manager static policy does not support pod-level resources"
+}
+
+func (e CPUManagerPodLevelResourcesError) Type() string { return ErrorCPUManagerPodLevelResources }
 
 func (e SMTAlignmentError) Error() string {
 	if e.CausedByPhysicalCPUs {
@@ -317,6 +329,10 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
 	numCPUs := p.guaranteedCPUs(pod, container)
 	if numCPUs == 0 {
+		if p.isPodWithPodLevelResources(pod) {
+			return CPUManagerPodLevelResourcesError{}
+		}
+
 		// container belongs in the shared pool (nothing to do; use default cpuset)
 		return nil
 	}
@@ -473,6 +489,7 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 		klog.V(5).InfoS("Exclusive CPU allocation skipped, pod QoS is not guaranteed", "pod", klog.KObj(pod), "containerName", container.Name, "qos", qos)
 		return 0
 	}
+
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
 	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
 	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
@@ -829,4 +846,15 @@ func updateAllocationPerNUMAMetric(topo *topology.CPUTopology, allocatedCPUs cpu
 	for numaNode, count := range numaCount {
 		metrics.CPUManagerAllocationPerNUMA.WithLabelValues(strconv.Itoa(numaNode)).Set(float64(count))
 	}
+}
+
+func (p *staticPolicy) isPodWithPodLevelResources(pod *v1.Pod) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		// The Memory manager static policy does not support pod-level resources.
+		klog.V(5).InfoS("CPU Manager allocation skipped, pod is using pod-level resources which are not supported by the static CPU manager policy", "pod", klog.KObj(pod))
+
+		return true
+	}
+
+	return false
 }
