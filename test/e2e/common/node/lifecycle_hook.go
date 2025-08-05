@@ -32,6 +32,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -551,7 +552,7 @@ func validDuration(duration time.Duration, low, high int64) bool {
 	return duration >= time.Second*time.Duration(low) && duration <= time.Second*time.Duration(high)
 }
 
-var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
+var _ = SIGDescribe("Lifecycle Sleep Hook", func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -560,73 +561,148 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			podClient = e2epod.NewPodClient(f)
 		})
+
+		var finalizer = "test/finalizer"
+		/*
+			Release : v1.34
+			Testname: Pod Lifecycle, prestop sleep hook
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'Sleep' action, then the handler MUST be invoked before the container is terminated. A test pod will be created to verify if its termination time aligns with the sleep time specified when it is terminated.
+		*/
 		ginkgo.It("valid prestop hook using sleep action", func(ctx context.Context) {
+			const sleepSeconds = 50
+			const gracePeriod = 100
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
-					Sleep: &v1.SleepAction{Seconds: 5},
+					Sleep: &v1.SleepAction{Seconds: sleepSeconds},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-prestop-sleep-hook", imageutils.GetPauseImageName(), lifecycle)
+			name := "pod-with-prestop-sleep-hook"
+			podWithHook := getPodWithHook(name, imageutils.GetPauseImageName(), lifecycle)
+			podWithHook.Finalizers = append(podWithHook.Finalizers, finalizer)
+			podWithHook.Spec.TerminationGracePeriodSeconds = ptr.To[int64](gracePeriod)
 			ginkgo.By("create the pod with lifecycle hook using sleep action")
-			podClient.CreateSync(ctx, podWithHook)
+			p := podClient.CreateSync(ctx, podWithHook)
+			defer podClient.RemoveFinalizer(ctx, name, finalizer)
 			ginkgo.By("delete the pod with lifecycle hook using sleep action")
-			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-			cost := time.Since(start)
-			// cost should be
-			// longer than 5 seconds (pod should sleep for 5 seconds)
-			// shorter than gracePeriodSeconds (default 30 seconds here)
-			if !validDuration(cost, 5, 30) {
-				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
+			_ = podClient.Delete(ctx, podWithHook.Name, metav1.DeleteOptions{})
+			p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("failed getting pod after deletion")
+			}
+			// deletionTimestamp equals to delete_time + tgps
+			// TODO: reduce sleep_seconds and tgps after issues.k8s.io/132205 is solved
+			// we get deletionTimestamp before container become terminated here because of issues.k8s.io/132205
+			deletionTS := p.DeletionTimestamp.Time
+			if err := e2epod.WaitForContainerTerminated(ctx, f.ClientSet, p.Namespace, p.Name, name, sleepSeconds*2*time.Second); err != nil {
+				framework.Failf("failed waiting for container terminated")
+			}
+
+			p, err = podClient.Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("failed getting pod after deletion")
+			}
+			// finishAt equals to delete_time + sleep_duration
+			finishAt := p.Status.ContainerStatuses[0].State.Terminated.FinishedAt
+
+			// sleep_duration = (delete_time + sleep_duration) - (delete_time + tgps) + tgps
+			sleepDuration := finishAt.Sub(deletionTS) + time.Second*gracePeriod
+
+			// sleep_duration should be
+			// longer than 50 seconds (pod should sleep for 50 seconds)
+			// shorter than gracePeriodSeconds (100 seconds here)
+			if !validDuration(sleepDuration, sleepSeconds, gracePeriod) {
+				framework.Failf("unexpected delay duration before killing the pod, finishAt = %v, deletionAt= %v", finishAt, deletionTS)
 			}
 		})
 
+		/*
+			Release : v1.34
+			Testname: Pod Lifecycle, prestop sleep hook with low gracePeriodSeconds
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'Sleep' action, then the handler MUST be invoked before the container is terminated. A test pod will be created, and its `gracePeriodSeconds` will be modified to a value less than the sleep time before termination. The termination time will then be checked to ensure it aligns with the `gracePeriodSeconds` value.
+		*/
 		ginkgo.It("reduce GracePeriodSeconds during runtime", func(ctx context.Context) {
+			const sleepSeconds = 50
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
-					Sleep: &v1.SleepAction{Seconds: 15},
+					Sleep: &v1.SleepAction{Seconds: sleepSeconds},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-prestop-sleep-hook", imageutils.GetPauseImageName(), lifecycle)
+			name := "pod-with-prestop-sleep-hook"
+			podWithHook := getPodWithHook(name, imageutils.GetPauseImageName(), lifecycle)
+			podWithHook.Finalizers = append(podWithHook.Finalizers, finalizer)
+			podWithHook.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
 			ginkgo.By("create the pod with lifecycle hook using sleep action")
-			podClient.CreateSync(ctx, podWithHook)
+			p := podClient.CreateSync(ctx, podWithHook)
+			defer podClient.RemoveFinalizer(ctx, name, finalizer)
 			ginkgo.By("delete the pod with lifecycle hook using sleep action")
-			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(2), f.Timeouts.PodDelete)
-			cost := time.Since(start)
-			// cost should be
-			// longer than 2 seconds (we change gracePeriodSeconds to 2 seconds here, and it's less than sleep action)
+
+			const gracePeriod = 30
+			_ = podClient.Delete(ctx, podWithHook.Name, *metav1.NewDeleteOptions(gracePeriod))
+			p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("failed getting pod after deletion")
+			}
+			// deletionTimestamp equals to delete_time + tgps
+			// TODO: reduce sleep_seconds and tgps after issues.k8s.io/132205 is solved
+			// we get deletionTimestamp before container become terminated here because of issues.k8s.io/132205
+			deletionTS := p.DeletionTimestamp.Time
+			if err := e2epod.WaitForContainerTerminated(ctx, f.ClientSet, p.Namespace, p.Name, name, sleepSeconds*2*time.Second); err != nil {
+				framework.Failf("failed waiting for container terminated")
+			}
+			p, err = podClient.Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("failed getting pod after deletion")
+			}
+			// finishAt equals to delete_time + sleep_duration
+			finishAt := p.Status.ContainerStatuses[0].State.Terminated.FinishedAt
+
+			// sleep_duration = (delete_time + sleep_duration) - (delete_time + tgps) + tgps
+			sleepDuration := finishAt.Sub(deletionTS) + time.Second*gracePeriod
+			// sleep_duration should be
+			// longer than 30 seconds (we change gracePeriodSeconds to 30 seconds here, and it's less than sleep action)
 			// shorter than sleep action (to make sure it doesn't take effect)
-			if !validDuration(cost, 2, 15) {
-				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
+			if !validDuration(sleepDuration, gracePeriod, sleepSeconds) {
+				framework.Failf("unexpected delay duration before killing the pod, finishAt = %v, deletionAt= %v", finishAt, deletionTS)
 			}
 		})
 
+		/*
+			Release : v1.34
+			Testname: Pod Lifecycle, prestop sleep hook with erroneous startup command
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'Sleep' action, then the handler MUST be invoked before the container is terminated. A test pod with an erroneous startup command will be created, and upon termination, it will be checked whether it ignored the sleep time.
+		*/
 		ginkgo.It("ignore terminated container", func(ctx context.Context) {
+			const sleepSeconds = 10
+			const gracePeriod = 30
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
-					Sleep: &v1.SleepAction{Seconds: 20},
+					Sleep: &v1.SleepAction{Seconds: sleepSeconds},
 				},
 			}
 			name := "pod-with-prestop-sleep-hook"
 			podWithHook := getPodWithHook(name, imageutils.GetE2EImage(imageutils.BusyBox), lifecycle)
+			podWithHook.Spec.TerminationGracePeriodSeconds = ptr.To[int64](gracePeriod)
 			podWithHook.Spec.Containers[0].Command = []string{"/bin/sh"}
 			podWithHook.Spec.Containers[0].Args = []string{"-c", "exit 0"}
 			podWithHook.Spec.RestartPolicy = v1.RestartPolicyNever
 			ginkgo.By("create the pod with lifecycle hook using sleep action")
 			p := podClient.Create(ctx, podWithHook)
-			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name, name, 3*time.Minute))
-			ginkgo.By("delete the pod with lifecycle hook using sleep action")
-			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-			cost := time.Since(start)
+			defer podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name, name, gracePeriod*time.Second))
+
+			p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("failed getting pod after deletion")
+			}
+			finishAt := p.Status.ContainerStatuses[0].State.Terminated.FinishedAt
+			startedAt := p.Status.ContainerStatuses[0].State.Terminated.StartedAt
+			cost := finishAt.Sub(startedAt.Time)
 			// cost should be
 			// shorter than sleep action (container is terminated and sleep action should be ignored)
-			if !validDuration(cost, 0, 15) {
+			if !validDuration(cost, 0, sleepSeconds) {
 				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
 			}
 		})
-
 	})
 })
 

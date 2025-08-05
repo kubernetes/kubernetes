@@ -1735,6 +1735,12 @@ var Annotations = map[string]string{
 
 	"[sig-node] Lease lease API should be available [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[sig-node] Lifecycle Sleep Hook when create a pod with lifecycle hook using sleep action ignore terminated container": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] Lifecycle Sleep Hook when create a pod with lifecycle hook using sleep action reduce GracePeriodSeconds during runtime": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] Lifecycle Sleep Hook when create a pod with lifecycle hook using sleep action valid prestop hook using sleep action": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-node] Mount propagation should propagate mounts within defined scopes": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] NoExecuteTaintManager Multiple Pods [Serial] evicts pods with minTolerationSeconds [Disruptive] [Conformance]": " [Suite:k8s]",
@@ -2144,12 +2150,6 @@ var Annotations = map[string]string{
 	"[sig-node] [Feature:KubeletFineGrainedAuthz] when calling kubelet API check /healthz enpoint is not accessible via nodes/configz RBAC": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] [Feature:PodLifecycleSleepActionAllowZero] when create a pod with lifecycle hook using sleep action with a duration of zero seconds prestop hook using sleep action with zero duration": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action ignore terminated container": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action reduce GracePeriodSeconds during runtime": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action valid prestop hook using sleep action": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted by liveness probe because startup probe delays it": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
