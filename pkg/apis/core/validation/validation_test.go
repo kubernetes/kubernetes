@@ -10515,120 +10515,269 @@ func TestValidatePodSpec(t *testing.T) {
 	minGroupID = int64(-1)
 	maxGroupID = int64(2147483648)
 
+	expectedDNS1123SubdomainErrorMsg := "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"
+
 	failureCases := map[string]struct {
 		pod            core.Pod
 		expectedErrors field.ErrorList
 	}{
-		"bad volume":               {pod: *podtest.MakePod("", podtest.SetVolumes(core.Volume{}))},
-		"no containers":            {pod: *podtest.MakePod("", podtest.SetContainers())},
-		"bad container":            {pod: *podtest.MakePod("", podtest.SetContainers(core.Container{}))},
-		"bad init container":       {pod: *podtest.MakePod("", podtest.SetInitContainers(core.Container{}))},
-		"bad DNS policy":           {pod: *podtest.MakePod("", podtest.SetDNSPolicy(core.DNSPolicy("invalid")))},
-		"bad service account name": {pod: *podtest.MakePod("", podtest.SetServiceAccountName("invalidName"))},
-		"bad restart policy":       {pod: *podtest.MakePod("", podtest.SetRestartPolicy("UnknowPolicy"))},
-		"with hostNetwork hostPort unspecified": {pod: *podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr",
-				podtest.SetContainerPorts(core.ContainerPort{HostPort: 0, ContainerPort: 2600, Protocol: "TCP"}))),
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: true,
-			}),
-		)},
-		"with hostNetwork hostPort not equal to containerPort": {pod: *podtest.MakePod("",
-			podtest.SetContainers(podtest.MakeContainer("ctr",
-				podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}))),
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: true,
-			}),
-		)},
-		"with hostAliases with invalid IP": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: false,
-			}),
-			podtest.SetHostAliases(core.HostAlias{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}),
-		)},
-		"with hostAliases with invalid legacy IP with strict IP validation": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: false,
-			}),
-			podtest.SetHostAliases(core.HostAlias{IP: "001.002.003.004", Hostnames: []string{"host1", "host2"}}),
-		)},
-		"with hostAliases with invalid hostname": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: false,
-			}),
-			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}),
-		)},
-		"bad supplementalGroups large than math.MaxInt32": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				SupplementalGroups: []int64{maxGroupID, 1234},
-			}),
-		)},
-		"bad supplementalGroups less than 0": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				SupplementalGroups: []int64{minGroupID, 1234},
-			}),
-		)},
-		"bad runAsUser large than math.MaxInt32": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				RunAsUser: &maxUserID,
-			}),
-		)},
-		"bad runAsUser less than 0": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				RunAsUser: &minUserID,
-			}),
-		)},
-		"bad fsGroup large than math.MaxInt32": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				FSGroup: &maxGroupID,
-			}),
-		)},
-		"bad fsGroup less than 0": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				FSGroup: &minGroupID,
-			}),
-		)},
-		"bad-active-deadline-seconds": {pod: *podtest.MakePod("",
-			podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsZero),
-		)},
-		"active-deadline-seconds-too-large": {pod: *podtest.MakePod("",
-			podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsTooLarge),
-		)},
-		"bad nodeName": {pod: *podtest.MakePod("",
-			podtest.SetNodeName("node name"),
-		)},
-		"bad PriorityClassName": {pod: *podtest.MakePod("",
-			podtest.SetPriorityClassName("InvalidName"),
-		)},
-		"ShareProcessNamespace and HostPID both set": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostPID:               true,
-				ShareProcessNamespace: &[]bool{true}[0],
-			}),
-		)},
-		"bad RuntimeClassName": {pod: *podtest.MakePod("",
-			podtest.SetRuntimeClassName("invalid/sandbox"),
-		)},
-		"bad empty fsGroupchangepolicy": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				FSGroupChangePolicy: &badfsGroupChangePolicy2,
-			}),
-		)},
-		"bad invalid fsgroupchangepolicy": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				FSGroupChangePolicy: &badfsGroupChangePolicy1,
-			}),
-		)},
-		"bad empty SupplementalGroupsPolicy": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				SupplementalGroupsPolicy: &badSupplementalGroupsPolicy2,
-			}),
-		)},
-		"bad invalid SupplementalGroupsPolicy": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				SupplementalGroupsPolicy: &badSupplementalGroupsPolicy1,
-			}),
-		)},
+		"bad volume": {
+			pod: *podtest.MakePod("", podtest.SetVolumes(core.Volume{})),
+			expectedErrors: field.ErrorList{
+				field.Required(field.NewPath("field.volumes[0]"), "must specify a volume type"),
+				field.Required(field.NewPath("field.volumes[0].name"), ""),
+			},
+		},
+		"no containers": {
+			pod: *podtest.MakePod("", podtest.SetContainers()),
+			expectedErrors: field.ErrorList{
+				field.Required(field.NewPath("field.containers"), ""),
+			},
+		},
+		"bad container": {
+			pod: *podtest.MakePod("", podtest.SetContainers(core.Container{})),
+			expectedErrors: field.ErrorList{
+				field.Required(field.NewPath("field.containers[0].name"), ""),
+				field.Required(field.NewPath("field.containers[0].image"), ""),
+				field.Required(field.NewPath("field.containers[0].terminationMessagePolicy"), ""),
+				field.Required(field.NewPath("field.containers[0].imagePullPolicy"), ""),
+			},
+		},
+		"bad init container": {
+			pod: *podtest.MakePod("", podtest.SetInitContainers(core.Container{})),
+			expectedErrors: field.ErrorList{
+				field.Required(field.NewPath("field.initContainers[0].name"), ""),
+				field.Required(field.NewPath("field.initContainers[0].image"), ""),
+				field.Required(field.NewPath("field.initContainers[0].terminationMessagePolicy"), ""),
+				field.Required(field.NewPath("field.initContainers[0].imagePullPolicy"), ""),
+			},
+		},
+		"bad DNS policy": {
+			pod: *podtest.MakePod("", podtest.SetDNSPolicy(core.DNSPolicy("invalid"))),
+			expectedErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("field.dnsPolicy"), "invalid", []core.DNSPolicy{core.DNSClusterFirstWithHostNet, core.DNSClusterFirst, core.DNSDefault, core.DNSNone}),
+			},
+		},
+		"bad service account name": {
+			pod: *podtest.MakePod("", podtest.SetServiceAccountName("invalidName")),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.serviceAccountName"), "invalidName", expectedDNS1123SubdomainErrorMsg),
+			},
+		},
+		"bad restart policy": {
+			pod: *podtest.MakePod("", podtest.SetRestartPolicy("UnknowPolicy")),
+			expectedErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("field.restartPolicy"), "UnknowPolicy", []core.RestartPolicy{core.RestartPolicyAlways, core.RestartPolicyOnFailure, core.RestartPolicyNever}),
+			},
+		},
+		"with hostNetwork hostPort unspecified": {
+			pod: *podtest.MakePod("",
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 0, ContainerPort: 2600, Protocol: "TCP"}))),
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					HostNetwork: true,
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.containers[0].ports[0].hostPort"), 0, "must match `containerPort` when `hostNetwork` is true"),
+			},
+		},
+		"with hostNetwork hostPort not equal to containerPort": {
+			pod: *podtest.MakePod("",
+				podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}))),
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					HostNetwork: true,
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.containers[0].ports[0].hostPort"), 8080, "must match `containerPort` when `hostNetwork` is true"),
+			},
+		},
+		"with hostAliases with invalid IP": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					HostNetwork: false,
+				}),
+				podtest.SetHostAliases(core.HostAlias{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.hostAliases[0].ip"), "999.999.999.999", "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)").WithOrigin("format=ip-sloppy"),
+			},
+		},
+		"with hostAliases with invalid legacy IP with strict IP validation": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					HostNetwork: false,
+				}),
+				podtest.SetHostAliases(core.HostAlias{IP: "001.002.003.004", Hostnames: []string{"host1", "host2"}}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.hostAliases[0].ip"), "001.002.003.004", "must not have leading 0s").WithOrigin("format=ip-sloppy"),
+			},
+		},
+		"with hostAliases with invalid hostname": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					HostNetwork: false,
+				}),
+				podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.hostAliases[0].hostnames[0]"), "@#$^#@#$", expectedDNS1123SubdomainErrorMsg),
+			},
+		},
+		"bad supplementalGroups large than math.MaxInt32": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					SupplementalGroups: []int64{maxGroupID, 1234},
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.securityContext.supplementalGroups[0]"), maxGroupID, "must be between 0 and 2147483647, inclusive"),
+			},
+		},
+		"bad supplementalGroups less than 0": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					SupplementalGroups: []int64{minGroupID, 1234},
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.securityContext.supplementalGroups[0]"), minGroupID, "must be between 0 and 2147483647, inclusive"),
+			},
+		},
+		"bad runAsUser large than math.MaxInt32": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					RunAsUser: &maxUserID,
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.securityContext.runAsUser"), maxUserID, "must be between 0 and 2147483647, inclusive"),
+			},
+		},
+		"bad runAsUser less than 0": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					RunAsUser: &minUserID,
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.securityContext.runAsUser"), minUserID, "must be between 0 and 2147483647, inclusive"),
+			},
+		},
+		"bad fsGroup large than math.MaxInt32": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					FSGroup: &maxGroupID,
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.securityContext.fsGroup"), maxGroupID, "must be between 0 and 2147483647, inclusive"),
+			},
+		},
+		"bad fsGroup less than 0": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					FSGroup: &minGroupID,
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.securityContext.fsGroup"), minGroupID, "must be between 0 and 2147483647, inclusive"),
+			},
+		},
+		"bad-active-deadline-seconds": {
+			pod: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsZero),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.activeDeadlineSeconds"), activeDeadlineSecondsZero, "must be between 1 and 2147483647, inclusive"),
+			},
+		},
+		"active-deadline-seconds-too-large": {
+			pod: *podtest.MakePod("",
+				podtest.SetActiveDeadlineSeconds(activeDeadlineSecondsTooLarge),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.activeDeadlineSeconds"), activeDeadlineSecondsTooLarge, "must be between 1 and 2147483647, inclusive"),
+			},
+		},
+		"bad nodeName": {
+			pod: *podtest.MakePod("",
+				podtest.SetNodeName("node name"),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.nodeName"), "node name", expectedDNS1123SubdomainErrorMsg),
+			},
+		},
+		"bad PriorityClassName": {
+			pod: *podtest.MakePod("",
+				podtest.SetPriorityClassName("InvalidName"),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.priorityClassName"), "InvalidName", expectedDNS1123SubdomainErrorMsg),
+			},
+		},
+		"ShareProcessNamespace and HostPID both set": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					HostPID:               true,
+					ShareProcessNamespace: &[]bool{true}[0],
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.securityContext.shareProcessNamespace"), true, "ShareProcessNamespace and HostPID cannot both be enabled"),
+			},
+		},
+		"bad RuntimeClassName": {
+			pod: *podtest.MakePod("",
+				podtest.SetRuntimeClassName("invalid/sandbox"),
+			),
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field.runtimeClassName"), "invalid/sandbox", expectedDNS1123SubdomainErrorMsg),
+			},
+		},
+		"bad empty fsGroupchangepolicy": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					FSGroupChangePolicy: &badfsGroupChangePolicy2,
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("field.securityContext.fsGroupChangePolicy"), badfsGroupChangePolicy2, sets.List(sets.New(core.FSGroupChangeOnRootMismatch, core.FSGroupChangeAlways))),
+			},
+		},
+		"bad invalid fsgroupchangepolicy": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					FSGroupChangePolicy: &badfsGroupChangePolicy1,
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("field.securityContext.fsGroupChangePolicy"), badfsGroupChangePolicy1, sets.List(sets.New(core.FSGroupChangeOnRootMismatch, core.FSGroupChangeAlways))),
+			},
+		},
+		"bad empty SupplementalGroupsPolicy": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					SupplementalGroupsPolicy: &badSupplementalGroupsPolicy2,
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("field.securityContext.supplementalGroupsPolicy"), badSupplementalGroupsPolicy2, sets.List(sets.New(core.SupplementalGroupsPolicyMerge, core.SupplementalGroupsPolicyStrict))),
+			},
+		},
+		"bad invalid SupplementalGroupsPolicy": {
+			pod: *podtest.MakePod("",
+				podtest.SetSecurityContext(&core.PodSecurityContext{
+					SupplementalGroupsPolicy: &badSupplementalGroupsPolicy1,
+				}),
+			),
+			expectedErrors: field.ErrorList{
+				field.NotSupported(field.NewPath("field.securityContext.supplementalGroupsPolicy"), badSupplementalGroupsPolicy1, sets.List(sets.New(core.SupplementalGroupsPolicyMerge, core.SupplementalGroupsPolicyStrict))),
+			},
+		},
 		"bad OS for PodLevelResources hides bad cpu limit": {
 			pod: *podtest.MakePod("",
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
@@ -10651,7 +10800,9 @@ func TestValidatePodSpec(t *testing.T) {
 				PodLevelResourcesEnabled: true,
 			}
 			errs := ValidatePodSpec(&tc.pod.Spec, nil, field.NewPath("field"), opts)
-			if len(tc.expectedErrors) != 0 {
+			if len(tc.expectedErrors) == 0 {
+				t.Errorf("missing expectedError, got %q", errs.ToAggregate().Error())
+			} else {
 				matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
 				matcher.Test(t, tc.expectedErrors, errs)
 			}
