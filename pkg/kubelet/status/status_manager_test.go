@@ -2161,7 +2161,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize pending condition to deferred with message",
 			updateFunc: func(podUID types.UID) bool {
-				return m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "some-message", 1)
+				return m.SetPodResizePendingCondition(podUID, "some-reason", "some-message", 1)
 			},
 			expectedUpdateFuncReturnVal: true,
 			expected: []*v1.PodCondition{

@@ -700,7 +700,6 @@ func NewMainKubelet(ctx context.Context,
 	)
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(ctx, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
-
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
 
 	if kubeDeps.KubeClient != nil {
@@ -807,6 +806,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.streamingRuntime = runtime
 	klet.runner = runtime
 	klet.allocationManager.SetContainerRuntime(runtime)
+	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, runtime, klet.allocationManager, logger)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
 	if err != nil {
@@ -1023,6 +1023,8 @@ func NewMainKubelet(ctx context.Context,
 		killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation)
 
 	klet.evictionManager = evictionManager
+	handlers := []lifecycle.PodAdmitHandler{}
+	handlers = append(handlers, evictionAdmitHandler)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
 		v, err := versionutil.Parse(version.Get().String())
@@ -1038,9 +1040,6 @@ func NewMainKubelet(ctx context.Context,
 		klet.nodeDeclaredFeatures = klet.discoverNodeDeclaredFeatures()
 		klet.nodeDeclaredFeaturesSet = ndf.NewFeatureSet(klet.nodeDeclaredFeatures...)
 	}
-
-	handlers := []lifecycle.PodAdmitHandler{}
-	handlers = append(handlers, evictionAdmitHandler)
 
 	// Safe, allowed sysctls can always be used as unsafe sysctls in the spec.
 	// Hence, we concatenate those two lists.
@@ -1109,7 +1108,8 @@ func NewMainKubelet(ctx context.Context,
 	})
 	klet.shutdownManager = shutdownManager
 	handlers = append(handlers, shutdownManager)
-	klet.allocationManager.AddPodAdmitHandlers(handlers)
+
+	klet.allocationManager.AddPodAdmitHandlers(append([]lifecycle.PodAdmitHandler{resizeAdmitHandler}, handlers...))
 
 	var usernsIDsPerPod *int64
 	if kubeCfg.UserNamespaces != nil {
