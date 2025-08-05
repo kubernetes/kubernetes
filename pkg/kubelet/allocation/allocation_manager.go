@@ -568,7 +568,7 @@ func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 
 	// Check if we can admit the pod; if so, update the allocation.
 	allocatedPods := m.getAllocatedPods(activePods)
-	ok, reason, message := m.canAdmitPod(allocatedPods, pod)
+	ok, reason, message := m.canAdmitPod(allocatedPods, pod, lifecycle.AddOperation)
 
 	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
@@ -696,12 +696,12 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 // the pod cannot be admitted.
 // allocatedPods should represent the pods that have already been admitted, along with their
 // admitted (allocated) resources.
-func (m *manager) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (m *manager) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod, operation lifecycle.Operation) (bool, string, string) {
 	// Filter out the pod being evaluated.
 	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
 
 	// If any handler rejects, the pod is rejected.
-	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods}
+	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods, Operation: operation}
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
 			klog.InfoS("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message)
@@ -756,7 +756,7 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 		return false, v1.PodReasonInfeasible, msg
 	}
 
-	if ok, failReason, failMessage := m.canAdmitPod(allocatedPods, pod); !ok {
+	if ok, failReason, failMessage := m.canAdmitPod(allocatedPods, pod, lifecycle.ResizeOperation); !ok {
 		// Log reason and return.
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
 		return false, v1.PodReasonDeferred, failMessage
