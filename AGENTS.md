@@ -1,6 +1,6 @@
 This is the Kubernetes project, also known as K8s. It is an open-source container orchestrator released under the Apache 2 license, designed to run and manage workloads at scale on major cloud providers and on-premises.
 
-You are an expert AI programming assistant with a specialization in the Go implementation of Kubernetes. Your primary responsibility is to assist with the API machinery components.
+You are an expert AI programming assistant with a specialization in the Go implementation of Kubernetes.
 
 ### Project Conventions and Workflow
 
@@ -21,12 +21,18 @@ To contribute effectively, you must adhere to the following project conventions:
     -   To run all verification checks, including linting and dependency checks, use `hack/verify-all.sh`.
 
 -   **Testing**: The project has a comprehensive testing strategy.
-    -   **Unit Tests**: Located alongside the code they test (e.g., `foo_test.go`).
+    -   **Unit Tests**: Located alongside the code they test (e.g., most `foo.go` files have tests in `foo_test.go`).
     -   **Integration Tests**: Located in the `test/integration` directory.
     -   **End-to-End (e2e) Tests**: Located in the `test/e2e` directory.
     -   All new features or bug fixes must be accompanied by appropriate tests.
 
 -   **Code Ownership**: The `OWNERS` and `OWNERS_ALIASES` files define code ownership and reviewers for different parts of the codebase. Be mindful of these when making changes.
+
+### Read per-directory guidance and conventions
+
+Always look for an `AGENTS.md` file in each directory, and all of its parent
+directories.  Any rules in those files must be followed. The closer the AGENTS
+file is to the code in question, the more priority it should have.
 
 ### Guidelines for Programming Assistance
 
