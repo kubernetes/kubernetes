@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/cpuset"
 )
@@ -43,9 +44,6 @@ const (
 	PolicyStatic policyName = "static"
 	// ErrorSMTAlignment represents the type of an SMTAlignmentError
 	ErrorSMTAlignment = "SMTAlignmentError"
-
-	// ErrorCPUManagerPodLevelResources represents the type of a CPUManagerPodLevelResourcesError
-	ErrorCPUManagerPodLevelResources = "CPUManagerPodLevelResourcesError"
 )
 
 // SMTAlignmentError represents an error due to SMT alignment
@@ -55,15 +53,6 @@ type SMTAlignmentError struct {
 	AvailablePhysicalCPUs int
 	CausedByPhysicalCPUs  bool
 }
-
-// PodLevelResourcesError represents an error due to pod-level resources not being supported.
-type CPUManagerPodLevelResourcesError struct{}
-
-func (e CPUManagerPodLevelResourcesError) Error() string {
-	return "CPU Manager static policy does not support pod-level resources"
-}
-
-func (e CPUManagerPodLevelResourcesError) Type() string { return ErrorCPUManagerPodLevelResources }
 
 func (e SMTAlignmentError) Error() string {
 	if e.CausedByPhysicalCPUs {
@@ -329,10 +318,6 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
 	numCPUs := p.guaranteedCPUs(pod, container)
 	if numCPUs == 0 {
-		if p.isPodWithPodLevelResources(pod) {
-			return CPUManagerPodLevelResourcesError{}
-		}
-
 		// container belongs in the shared pool (nothing to do; use default cpuset)
 		return nil
 	}
@@ -683,6 +668,18 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 	}
 }
 
+func (p *staticPolicy) GetWarnings(pod *v1.Pod) []lifecycle.PodAdmitWarning {
+	if p.isPodWithPodLevelResources(pod) {
+		return []lifecycle.PodAdmitWarning{
+			{
+				Reason:  "PodLevelResourcesIncompatible",
+				Message: "CPU Manager static policy does not support pod-level resources",
+			},
+		}
+	}
+	return nil
+}
+
 // generateCPUTopologyHints generates a set of TopologyHints given the set of
 // available CPUs and the number of CPUs being requested.
 //
@@ -849,12 +846,5 @@ func updateAllocationPerNUMAMetric(topo *topology.CPUTopology, allocatedCPUs cpu
 }
 
 func (p *staticPolicy) isPodWithPodLevelResources(pod *v1.Pod) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		// The Memory manager static policy does not support pod-level resources.
-		klog.V(5).InfoS("CPU Manager allocation skipped, pod is using pod-level resources which are not supported by the static CPU manager policy", "pod", klog.KObj(pod))
-
-		return true
-	}
-
-	return false
+	return utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
 }

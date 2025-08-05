@@ -35,8 +35,22 @@ type PodAdmitResult struct {
 	Reason string
 	// a brief message explaining why the pod could not be admitted.
 	Message string
-	// all errors for why the pod could not be admitted.
-	Errors []error
+	// any warnings that should be surfaced for the pod.
+	Warnings []PodAdmitWarning
+}
+
+// PodAdmitWarning represents a warning generated during pod admission.
+type PodAdmitWarning struct {
+	// a brief single-word reason for the warning
+	Reason string
+	// a brief message explaining the reason for the warning
+	Message string
+}
+
+// PodWarningProvider is an optional interface that admit handlers can implement
+// to provide warnings about a pod.
+type PodWarningProvider interface {
+	GetWarnings(pod *v1.Pod) []PodAdmitWarning
 }
 
 // PodAdmitHandler is notified during pod admission.

@@ -18,7 +18,6 @@ package cpumanager
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
 )
@@ -98,6 +98,9 @@ type Manager interface {
 	// GetAllCPUs returns all the CPUs known by cpumanager, as reported by the
 	// hardware discovery. Maps to the CPU capacity.
 	GetAllCPUs() cpuset.CPUSet
+
+	// GetWarnings returns warnings for pod admission.
+	GetWarnings(pod *v1.Pod) []lifecycle.PodAdmitWarning
 }
 
 type manager struct {
@@ -262,13 +265,6 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 
 	// Call down into the policy to assign this container CPUs if required.
 	err := m.policy.Allocate(m.state, p, c)
-
-	// If it gets this error it means that the pod requires pod level resources but this is not aligned.
-	// We do not want the pod to fail to schedule on this error so we Admit it, this is just a warning
-	if errors.As(err, &CPUManagerPodLevelResourcesError{}) {
-		return err
-	}
-
 	if err != nil {
 		klog.ErrorS(err, "Allocate error")
 		return err
@@ -532,4 +528,11 @@ func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 
 func (m *manager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 	return m.state.GetCPUSetOrDefault(podUID, containerName)
+}
+
+func (m *manager) GetWarnings(pod *v1.Pod) []lifecycle.PodAdmitWarning {
+	if policy, ok := m.policy.(lifecycle.PodWarningProvider); ok {
+		return policy.GetWarnings(pod)
+	}
+	return nil
 }

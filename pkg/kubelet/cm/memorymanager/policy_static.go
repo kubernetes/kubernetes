@@ -36,14 +36,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
 	PolicyTypeStatic policyType = "Static"
-
-	// ErrorMemoryManagerPodLevelResources represents the type of a MemoryManagerPodLevelResourcesError
-	ErrorMemoryManagerPodLevelResources = "MemoryManagerPodLevelResourcesError"
 )
 
 type systemReservedMemory map[int]map[v1.ResourceName]uint64
@@ -65,16 +63,6 @@ type staticPolicy struct {
 }
 
 var _ Policy = &staticPolicy{}
-
-type MemoryManagerPodLevelResourcesError struct{}
-
-func (e MemoryManagerPodLevelResourcesError) Type() string {
-	return ErrorMemoryManagerPodLevelResources
-}
-
-func (e MemoryManagerPodLevelResourcesError) Error() string {
-	return "Memory Manager static policy does not support pod-level resources"
-}
 
 // NewPolicyStatic returns new static policy instance
 func NewPolicyStatic(ctx context.Context, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
@@ -123,12 +111,8 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 		return nil
 	}
 
-	if p.isPodWithPodLevelResources(ctx, pod) {
-		return MemoryManagerPodLevelResourcesError{}
-	}
-
 	podUID := string(pod.UID)
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if p.isPodWithPodLevelResources(pod) {
 		logger.V(2).Info("Allocation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", podUID)
 		return nil
 	}
@@ -437,7 +421,7 @@ func (p *staticPolicy) GetPodTopologyHints(ctx context.Context, s state.State, p
 		return nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if p.isPodWithPodLevelResources(pod) {
 		logger.V(3).Info("Topology hints generation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", pod.UID)
 		return nil
 	}
@@ -456,6 +440,18 @@ func (p *staticPolicy) GetPodTopologyHints(ctx context.Context, s state.State, p
 	return p.calculateHints(s.GetMachineState(), pod, reqRsrcs)
 }
 
+func (p *staticPolicy) GetWarnings(pod *v1.Pod) []lifecycle.PodAdmitWarning {
+	if p.isPodWithPodLevelResources(pod) {
+		return []lifecycle.PodAdmitWarning{
+			{
+				Reason:  "PodLevelResourcesIncompatible",
+				Message: "Memory Manager static policy does not support pod-level resources",
+			},
+		}
+	}
+	return nil
+}
+
 // GetTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
@@ -472,7 +468,7 @@ func (p *staticPolicy) GetTopologyHints(ctx context.Context, s state.State, pod 
 		return nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if p.isPodWithPodLevelResources(pod) {
 		logger.V(3).Info("Topology hints generation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", pod.UID)
 		return nil
 	}
@@ -1112,15 +1108,6 @@ func isAffinityViolatingNUMAAllocations(machineState state.NUMANodeMap, mask bit
 	return false
 }
 
-func (p *staticPolicy) isPodWithPodLevelResources(ctx context.Context, pod *v1.Pod) bool {
-	logger := klog.FromContext(ctx)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		// The Memory manager static policy does not support pod-level resources.
-		logger.V(5).Info("Memory manager allocation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "pod", klog.KObj(pod))
-
-		return true
-	}
-
-	return false
+func (p *staticPolicy) isPodWithPodLevelResources(pod *v1.Pod) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
 }

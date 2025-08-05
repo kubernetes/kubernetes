@@ -18,7 +18,6 @@ package allocation
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -42,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -699,18 +697,19 @@ func (m *manager) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, strin
 
 	// If any handler rejects, the pod is rejected.
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods}
+	var allWarnings []lifecycle.PodAdmitWarning
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
 			klog.InfoS("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message)
 			return false, result.Reason, result.Message
-		} else if result.Admit && len(result.Errors) > 0 && result.Reason == admission.PodLevelResourcesIncompatible && utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
-			for _, err := range result.Errors {
-				var admissionWarning admission.Error
-				if errors.As(err, &admissionWarning) {
-					m.recorder.Event(attrs.Pod, v1.EventTypeWarning, admission.PodLevelResourcesIncompatible, admissionWarning.Error())
-				}
-			}
+		} else if len(result.Warnings) > 0 {
+			allWarnings = append(allWarnings, result.Warnings...)
 		}
+	}
+
+	// The warnings are produced when it is certain that the pod is going to be admitted.
+	for _, warning := range allWarnings {
+		m.recorder.Event(attrs.Pod, v1.EventTypeWarning, warning.Reason, warning.Message)
 	}
 
 	return true, "", ""
