@@ -20,10 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand"
 	"net/http"
 	"reflect"
 	goruntime "runtime"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -2057,30 +2059,48 @@ func TestReflectorReplacesStoreOnUnsafeDelete(t *testing.T) {
 }
 
 func TestReflectorRespectStoreTransformer(t *testing.T) {
-	type testReflectorStore interface {
-		ReflectorStore
-		list() []interface{}
-	}
-
-	for name, storeBuilder := range map[string]func(counter *atomic.Int32) testReflectorStore{
-		"real-fifo": func(counter *atomic.Int32) testReflectorStore {
-			return NewRealFIFO(MetaNamespaceKeyFunc, NewStore(MetaNamespaceKeyFunc), func(i interface{}) (interface{}, error) {
-				counter.Add(1)
-				cast := i.(*v1.Pod)
-				cast.Spec.Hostname = "transformed"
-				return cast, nil
-			})
-		},
-		"delta-fifo": func(counter *atomic.Int32) testReflectorStore {
-			return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-				KeyFunction: MetaNamespaceKeyFunc,
-				Transformer: func(i interface{}) (interface{}, error) {
+	for name, test := range map[string]struct {
+		storeBuilder func(counter *atomic.Int32) ReflectorStore
+		items        func(rs ReflectorStore) []interface{}
+	}{
+		"real-fifo": {
+			storeBuilder: func(counter *atomic.Int32) ReflectorStore {
+				return NewRealFIFO(MetaNamespaceKeyFunc, NewStore(MetaNamespaceKeyFunc), func(i interface{}) (interface{}, error) {
 					counter.Add(1)
 					cast := i.(*v1.Pod)
 					cast.Spec.Hostname = "transformed"
 					return cast, nil
-				},
-			})
+				})
+			},
+			items: func(rs ReflectorStore) []interface{} {
+				store := rs.(*RealFIFO)
+				objects := make(map[string]interface{})
+				for _, item := range store.getItems() {
+					key, _ := store.keyFunc(item.Object)
+					if item.Type == Deleted {
+						delete(objects, key)
+					} else {
+						objects[key] = item.Object
+					}
+				}
+				return slices.Collect(maps.Values(objects))
+			},
+		},
+		"delta-fifo": {
+			storeBuilder: func(counter *atomic.Int32) ReflectorStore {
+				return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+					KeyFunction: MetaNamespaceKeyFunc,
+					Transformer: func(i interface{}) (interface{}, error) {
+						counter.Add(1)
+						cast := i.(*v1.Pod)
+						cast.Spec.Hostname = "transformed"
+						return cast, nil
+					},
+				})
+			},
+			items: func(rs ReflectorStore) []interface{} {
+				return rs.(*DeltaFIFO).list()
+			},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -2113,7 +2133,7 @@ func TestReflectorRespectStoreTransformer(t *testing.T) {
 			}
 
 			var transformerInvoked atomic.Int32
-			s := storeBuilder(&transformerInvoked)
+			s := test.storeBuilder(&transformerInvoked)
 
 			var once sync.Once
 			lw := &ListWatch{
@@ -2158,10 +2178,11 @@ func TestReflectorRespectStoreTransformer(t *testing.T) {
 				t.Errorf("expected LastSyncResourceVersion to be %q, but got: %q", want, got)
 			}
 
-			if want, got := 3, len(s.list()); want != got {
+			informerItems := test.items(s)
+			if want, got := 3, len(informerItems); want != got {
 				t.Errorf("expected informer to contain %d objects, but got: %d", want, got)
 			}
-			for _, item := range s.list() {
+			for _, item := range informerItems {
 				cast := item.(*v1.Pod)
 				if cast.Spec.Hostname != "transformed" {
 					t.Error("Object was not transformed prior to replacement")
