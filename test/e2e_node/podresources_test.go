@@ -34,6 +34,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/component-base/featuregate"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -337,6 +338,7 @@ func newTestPodData() *testPodData {
 }
 
 func (tpd *testPodData) createPodsForTest(ctx context.Context, f *framework.Framework, podReqs []podDesc) {
+	ginkgo.GinkgoHelper()
 	for _, podReq := range podReqs {
 		pod := makePodResourcesTestPod(podReq)
 		pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
@@ -1195,10 +1197,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					cpus := reservedSystemCPUs.String()
 					framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
 					initialConfig.ReservedSystemCPUs = cpus
-					if initialConfig.FeatureGates == nil {
-						initialConfig.FeatureGates = make(map[string]bool)
-					}
-					initialConfig.FeatureGates[string(kubefeatures.KubeletPodResourcesGet)] = true
+					setKubeletFeatureGate(initialConfig, kubefeatures.KubeletPodResourcesGet, true)
 				})
 
 				ginkgo.Context("with KubeletPodResourcesGet feature gate enabled", func() {
@@ -1624,7 +1623,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				cpus := reservedSystemCPUs.String()
 				framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
 				initialConfig.ReservedSystemCPUs = cpus
-				initialConfig.FeatureGates["KubeletPodResourcesListUseActivePods"] = false
+				setKubeletFeatureGate(initialConfig, kubefeatures.KubeletPodResourcesListUseActivePods, false)
 			})
 
 			ginkgo.It("should report all the known pods regardless of the QoS", func(ctx context.Context) {
@@ -1936,10 +1935,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 
 	f.Context("when querying /metrics", f.WithNodeConformance(), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			if initialConfig.FeatureGates == nil {
-				initialConfig.FeatureGates = make(map[string]bool)
-			}
-			initialConfig.FeatureGates[string(kubefeatures.KubeletPodResourcesGet)] = true
+			setKubeletFeatureGate(initialConfig, kubefeatures.KubeletPodResourcesGet, true)
 		})
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			// ensure APIs have been called at least once
@@ -2123,4 +2119,12 @@ func timelessSampleAtLeast(lower interface{}) types.GomegaMatcher {
 		"Timestamp": gstruct.Ignore(),
 		"Histogram": gstruct.Ignore(),
 	}))
+}
+
+func setKubeletFeatureGate(kubeCfg *kubeletconfig.KubeletConfiguration, name featuregate.Feature, value bool) {
+	if kubeCfg.FeatureGates == nil {
+		kubeCfg.FeatureGates = make(map[string]bool)
+	}
+	framework.Logf("kubelet feature gate: %q -> %v", string(name), value)
+	kubeCfg.FeatureGates[string(name)] = value
 }
