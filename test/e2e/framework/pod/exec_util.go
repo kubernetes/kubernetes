@@ -194,6 +194,9 @@ func execute(ctx context.Context, url *url.URL, config *restclient.Config, stdin
 		return err
 	}
 	exec, err := remotecommand.NewFallbackExecutor(websocketExec, spdyExec, func(err error) bool {
+		if err == nil {
+			return false
+		}
 		if httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err) {
 			framework.Logf("fallback to secondary dialer from primary dialer err: %v", err)
 			return true
