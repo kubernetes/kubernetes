@@ -31,8 +31,8 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/features"
@@ -119,7 +119,7 @@ func TestAPIServerMetrics(t *testing.T) {
 	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
 
 	flags := framework.DefaultTestServerFlags()
-	flags = append(flags, fmt.Sprintf("--runtime-config=%s=true", admissionregistrationv1beta1.SchemeGroupVersion))
+	flags = append(flags, fmt.Sprintf("--runtime-config=%s=true", networkingv1beta1.SchemeGroupVersion))
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 	defer s.TearDownFn()
 
@@ -131,7 +131,7 @@ func TestAPIServerMetrics(t *testing.T) {
 	}
 
 	// Make a request to a deprecated API to ensure there's at least one data point
-	if _, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().List(context.TODO(), metav1.ListOptions{}); err != nil {
+	if _, err := client.NetworkingV1beta1().ServiceCIDRs().List(context.TODO(), metav1.ListOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
