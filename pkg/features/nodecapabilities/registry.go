@@ -28,10 +28,14 @@ import (
 const (
 	// NodeCapabilityLifecyclePrefix is the prefix for all node capability keys that are tied to the lifecycle of feature gates.
 	NodeCapabilityLifecyclePrefix = "lifecycle.kubernetes.io/"
+	// GuaranteedQoSPodCPUResize is the capability key for in-place pod resize for guaranteed QoS pods.
+	GuaranteedQoSPodCPUResize = NodeCapabilityLifecyclePrefix + "guaranteed-qos-pod-cpu-resize"
 )
 
 // wellKnownCapabilities is the authoritative list of all known node capabilities.
-var wellKnownCapabilities = map[string]struct{}{}
+var wellKnownCapabilities = map[string]struct{}{
+	GuaranteedQoSPodCPUResize: {},
+}
 
 // nodeCapabilitiesRegistry is the authoritative registry of all node capabilities.
 var nodeCapabilitiesRegistry = make(map[string]nodecapabilities.Capability)

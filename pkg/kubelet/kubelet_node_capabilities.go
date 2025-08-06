@@ -17,14 +17,29 @@ limitations under the License.
 package kubelet
 
 import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	nodecapabilities "k8s.io/kubernetes/pkg/features/nodecapabilities"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 )
 
 // gatherCapabilities gathers all potential node capabilities based on the Kubelet's configuration.
 func (kl *Kubelet) gatherCapabilities() map[string]string {
 	potentialCapabilities := make(map[string]string)
 	// Gather and report capabilities based on the Kubelet's configuration.
+
+	if kl.nodeCapabilitiesHelper.IsFeatureGateRelevant(features.InPlacePodVerticalScalingExclusiveCPUs, kl.kubeletVersion) {
+		cpuManagerPolicy := kl.containerManager.GetNodeConfig().CPUManagerPolicy
+		if cpuManagerPolicy == string(cpumanager.PolicyStatic) &&
+			utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+			potentialCapabilities[nodecapabilities.GuaranteedQoSPodCPUResize] = "true"
+		}
+		// If the CPUManagerPolicy is None, we still report the GuaranteedQoSPodCPUResize capability even if InPlacePodVerticalScalingExclusiveCPUs is not enabled.
+		if cpuManagerPolicy == string(cpumanager.PolicyNone) {
+			potentialCapabilities[nodecapabilities.GuaranteedQoSPodCPUResize] = "true"
+		}
+	}
 	return potentialCapabilities
 }
 
