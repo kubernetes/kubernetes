@@ -183,8 +183,8 @@ func (h *NodeCapabilityHelper) shouldCheckCapability(ctx context.Context, capabi
 		return false
 	}
 
-	for _, fd := range capability.FeatureDependency {
-		if h.IsFeatureGateRelevant(ctx, fd, h.componentVersion) {
+	for _, fi := range capability.FeatureDependency {
+		if h.IsFeatureGateRelevant(ctx, fi, h.componentVersion) {
 			return true
 		}
 	}
@@ -193,20 +193,20 @@ func (h *NodeCapabilityHelper) shouldCheckCapability(ctx context.Context, capabi
 	return false
 }
 
-func (h *NodeCapabilityHelper) IsFeatureGateRelevant(ctx context.Context, fd FeatureDependency, componentVersion *version.Version) bool {
+func (h *NodeCapabilityHelper) IsFeatureGateRelevant(ctx context.Context, fi FeatureDependency, componentVersion *version.Version) bool {
 	logger := klog.FromContext(ctx)
-	if !fd.IsGA {
-		logger.V(4).Info("Featuregate is relevant", "feature gate", fd.FeatureGate, "reason", "feature is not GA")
+	if !fi.IsGA {
+		logger.V(4).Info("Featuregate is relevant", "feature gate", fi.FeatureGate, "reason", "feature is not GA")
 		return true
 	}
-	if fd.IsDeprecated {
-		logger.V(4).Info("Featuregate is not relevant", "feature gate", fd.FeatureGate, "reason", "feature is deprecated")
+	if fi.IsDeprecated {
+		logger.V(4).Info("Featuregate is not relevant", "feature gate", fi.FeatureGate, "reason", "feature is deprecated")
 		return false
 	}
-	if componentVersion.LessThan(fd.GAVersion.AddMinor(SupportedVersionSkew)) {
-		logger.V(4).Info("Featuregate is relevant", "feature gate", fd.FeatureGate, "reason", "component version is within supported skew")
+	if componentVersion.LessThan(fi.GAVersion.AddMinor(SupportedVersionSkew)) {
+		logger.V(4).Info("Featuregate is relevant", "feature gate", fi.FeatureGate, "reason", "component version is within supported skew")
 		return true
 	}
-	logger.V(4).Info("Featuregate is not relevant", "feature gate", fd.FeatureGate, "reason", "component version is past supported skew")
+	logger.V(4).Info("Featuregate is not relevant", "feature gate", fi.FeatureGate, "reason", "component version is past supported skew")
 	return false
 }

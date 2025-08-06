@@ -73,7 +73,7 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/component-helpers/apimachinery/lease"
-	"k8s.io/component-helpers/nodecapabilities"
+	nodecapabilitieslib "k8s.io/component-helpers/nodecapabilities"
 	resourcehelper "k8s.io/component-helpers/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -83,7 +83,7 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
-	nodecapabilitiesregistry "k8s.io/kubernetes/pkg/features/nodecapabilities"
+	"k8s.io/kubernetes/pkg/features/nodecapabilities"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
@@ -1096,12 +1096,12 @@ func NewMainKubelet(ctx context.Context,
 			return nil, fmt.Errorf("failed to parse version: %w", err)
 		}
 		klet.kubeletVersion = v
-		helper, err := nodecapabilities.NewNodeCapabilityHelper(nodecapabilitiesregistry.NewRegistry(), v)
+		helper, err := nodecapabilitieslib.NewNodeCapabilityHelper(nodecapabilities.NewRegistry(), v)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create node capability helper: %w", err)
 		}
 		klet.nodeCapabilitiesHelper = helper
-		klet.nodeCapabilities = klet.determineNodeCapabilities()
+		klet.nodeCapabilities = klet.determineNodeCapabilities(ctx)
 	}
 
 	// Generating the status funcs should be the last thing we do,
@@ -1267,7 +1267,7 @@ type Kubelet struct {
 	nodeLabels map[string]string
 	// nodeCapabilities is a map of node capabilities.
 	nodeCapabilities       map[string]string
-	nodeCapabilitiesHelper *nodecapabilities.NodeCapabilityHelper
+	nodeCapabilitiesHelper *nodecapabilitieslib.NodeCapabilityHelper
 
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
