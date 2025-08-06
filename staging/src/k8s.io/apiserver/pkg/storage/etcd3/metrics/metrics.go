@@ -224,7 +224,6 @@ func UpdateStoreStats(groupResource schema.GroupResource, stats storage.Stats, e
 
 // DeleteStoreStats delete the stats metrics.
 func DeleteStoreStats(groupResource schema.GroupResource) {
-	objectCounts.DeleteLabelValues(groupResource.String())
 	newObjectCounts.DeleteLabelValues(groupResource.Group, groupResource.Resource)
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
 		resourceSizeEstimate.DeleteLabelValues(groupResource.Group, groupResource.Resource)
