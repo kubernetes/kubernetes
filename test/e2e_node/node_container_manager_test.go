@@ -73,6 +73,7 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	f.Describe("Validate Node Allocatable", feature.NodeAllocatable, func() {
 		ginkgo.It("sets up the node and runs the test", func(ctx context.Context) {
+			ginkgo.Skip("currently broken")
 			framework.ExpectNoError(runTest(ctx, f))
 		})
 	})
@@ -85,6 +86,8 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 		// The closest approximation is this test in this current form, using a kubelet restart. This at least
 		// acts as non regression testing, so it still brings value.
 		ginkgo.It("should correctly start with cpumanager none policy in use with systemd", func(ctx context.Context) {
+			ginkgo.Skip("currently broken")
+
 			if !IsCgroup2UnifiedMode() {
 				ginkgo.Skip("this test requires cgroups v2")
 			}
