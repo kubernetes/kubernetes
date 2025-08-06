@@ -954,7 +954,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp 
 		// bootstrap the cert manager with the contents of the initial client config.
 
 		logger.Info("Client rotation is on, will bootstrap in background")
-		certConfig, clientConfig, err := bootstrap.LoadClientConfig(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory)
+		certConfig, clientConfig, err := bootstrap.LoadClientConfig(ctx, s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory)
 		if err != nil {
 			return nil, nil, err
 		}
