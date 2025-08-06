@@ -45,6 +45,7 @@ import (
 )
 
 func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration, cgroupManager cm.CgroupManager) {
+	initialConfig.ReservedSystemCPUs = ""
 	initialConfig.EnforceNodeAllocatable = []string{"pods", kubeReservedCgroup, systemReservedCgroup}
 	initialConfig.SystemReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
@@ -71,9 +72,9 @@ func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration, 
 var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("node-container-manager")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
 	f.Describe("Validate Node Allocatable", feature.NodeAllocatable, func() {
 		ginkgo.It("sets up the node and runs the test", func(ctx context.Context) {
-			ginkgo.Skip("currently broken")
 			framework.ExpectNoError(runTest(ctx, f))
 		})
 	})
