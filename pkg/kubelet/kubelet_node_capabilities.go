@@ -19,8 +19,12 @@ package kubelet
 import (
 	"context"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	nodecapabilities "k8s.io/kubernetes/pkg/features/nodecapabilities"
+
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 )
 
 // determineNodeCapabilities determines the final set of node capabilities to be reported.
@@ -42,5 +46,23 @@ func (kl *Kubelet) determineNodeCapabilities(ctx context.Context) map[string]str
 // gatherCapabilities gathers all potential node capabilities based on the Kubelet's configuration.
 func (kl *Kubelet) gatherCapabilities(ctx context.Context) map[string]string {
 	potentialCapabilities := make(map[string]string)
+	// Handle NodeCapability for in-place pod resize for guaranteed QoS pods.
+	handleIPPRExlusiveCPUsCapability(ctx, kl.containerManager.GetNodeConfig().CPUManagerPolicy, potentialCapabilities)
 	return potentialCapabilities
+}
+
+// handleIPPRExlusiveCPUsCapability handles the GuaranteedQoSPodCPUResize capability based on the Kubelet's configuration
+func handleIPPRExlusiveCPUsCapability(ctx context.Context, cpuManagerPolicy string, capabilitiesMap map[string]string) {
+	logger := klog.FromContext(ctx)
+	featuregateEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs)
+
+	if featuregateEnabled && cpuManagerPolicy == string(cpumanager.PolicyStatic) {
+		logger.V(4).Info("Enabling GuaranteedQoSPodCPUResize capability", "cpuManagerPolicy", cpuManagerPolicy)
+		capabilitiesMap[nodecapabilities.GuaranteedQoSPodCPUResize] = "true"
+	}
+	// If the CPUManagerPolicy is None, we still report the GuaranteedQoSPodCPUResize capability even if InPlacePodVerticalScalingExclusiveCPUs is not enabled.
+	if cpuManagerPolicy == string(cpumanager.PolicyNone) {
+		logger.V(4).Info("Enabling GuaranteedQoSPodCPUResize capability", "cpuManagerPolicy", cpuManagerPolicy)
+		capabilitiesMap[nodecapabilities.GuaranteedQoSPodCPUResize] = "true"
+	}
 }
