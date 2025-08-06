@@ -129,17 +129,13 @@ func readFromURL(url string, writer io.Writer) error {
 
 var (
 	initRegistry = RegistryList{
-		// TODO: https://github.com/kubernetes/kubernetes/issues/130271
-		// Eliminate GcAuthenticatedRegistry.
-		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
-		PromoterE2eRegistry:     "registry.k8s.io/e2e-test-images",
-		BuildImageRegistry:      "registry.k8s.io/build-image",
-		InvalidRegistry:         "invalid.registry.k8s.io/invalid",
-		GcEtcdRegistry:          "registry.k8s.io",
-		GcRegistry:              "registry.k8s.io",
-		SigStorageRegistry:      "registry.k8s.io/sig-storage",
-		// TODO: https://github.com/kubernetes/kubernetes/issues/130271
-		// Eliminate PrivateRegistry.
+		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
+		PromoterE2eRegistry:      "registry.k8s.io/e2e-test-images",
+		BuildImageRegistry:       "registry.k8s.io/build-image",
+		InvalidRegistry:          "invalid.registry.k8s.io/invalid",
+		GcEtcdRegistry:           "registry.k8s.io",
+		GcRegistry:               "registry.k8s.io",
+		SigStorageRegistry:       "registry.k8s.io/sig-storage",
 		PrivateRegistry:          "gcr.io/k8s-authenticated-test",
 		DockerLibraryRegistry:    "docker.io/library",
 		CloudProviderGcpRegistry: "registry.k8s.io/cloud-provider-gcp",
@@ -158,17 +154,15 @@ const (
 	// Agnhost image
 	Agnhost
 	// AgnhostPrivate image
-	// TODO: https://github.com/kubernetes/kubernetes/issues/130271
-	// Eliminate this.
 	AgnhostPrivate
 	// APIServer image
 	APIServer
 	// AppArmorLoader image
 	AppArmorLoader
 	// AuthenticatedAlpine image
-	// TODO: https://github.com/kubernetes/kubernetes/issues/130271
-	// Eliminate this.
 	AuthenticatedAlpine
+	// AuthenticatedWindowsNanoServer image
+	AuthenticatedWindowsNanoServer
 	// BusyBox image
 	BusyBox
 	// DistrolessIptables Image
@@ -222,6 +216,7 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.56"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
+	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.29.2"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.37.0-1"}
@@ -269,7 +264,7 @@ func GetMappedImageConfigs(originalImageConfigs map[ImageID]Config, repo string)
 	for i, config := range originalImageConfigs {
 		switch i {
 		case InvalidRegistryImage, AuthenticatedAlpine,
-			AgnhostPrivate:
+			AuthenticatedWindowsNanoServer, AgnhostPrivate:
 			// These images are special and can't be run out of the cloud - some because they
 			// are authenticated, and others because they are not real images. Tests that depend
 			// on these images can't be run without access to the public internet.
