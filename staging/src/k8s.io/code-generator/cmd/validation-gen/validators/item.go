@@ -248,8 +248,9 @@ func parseTypedValue(value string, argType codetags.ArgType) (any, codetags.Valu
 
 func (itv itemTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:    itv.TagName(),
-		Scopes: itv.ValidScopes().UnsortedList(),
+		Tag:            itv.TagName(),
+		StabilityLevel: Alpha,
+		Scopes:         itv.ValidScopes().UnsortedList(),
 		Description: "Declares a validation for an item of a slice declared as a +k8s:listType=map. " +
 			"The item to match is declared by providing field-value pair arguments. All key fields must be specified.",
 		Usage: "+k8s:item(stringKey: \"value\", intKey: 42, boolKey: true)=<validation-tag>",

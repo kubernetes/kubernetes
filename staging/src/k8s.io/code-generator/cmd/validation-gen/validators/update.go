@@ -124,9 +124,10 @@ func constraintName(c validate.UpdateConstraint) string {
 
 func (utc updateTagCollector) Docs() TagDoc {
 	return TagDoc{
-		Tag:          utc.TagName(),
-		Scopes:       utc.ValidScopes().UnsortedList(),
-		PayloadsType: codetags.ValueTypeString,
+		Tag:            utc.TagName(),
+		StabilityLevel: Alpha,
+		Scopes:         utc.ValidScopes().UnsortedList(),
+		PayloadsType:   codetags.ValueTypeString,
 		Description: "Provides constraints on the allowed update operations of a field. " +
 			"Currently supports non-list and non-map fields only. " +
 			"Constraints: NoSet (prevents unset->set transitions), NoUnset (prevents set->unset transitions), " +
