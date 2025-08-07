@@ -81,9 +81,10 @@ func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 
 func (mitv maxItemsTagValidator) Docs() TagDoc {
 	return TagDoc{
-		Tag:         mitv.TagName(),
-		Scopes:      mitv.ValidScopes().UnsortedList(),
-		Description: "Indicates that a list has a limit on its size.",
+		Tag:            mitv.TagName(),
+		StabilityLevel: Beta,
+		Scopes:         mitv.ValidScopes().UnsortedList(),
+		Description:    "Indicates that a list has a limit on its size.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<non-negative integer>",
 			Docs:        "This list must be no more than X items long.",
@@ -130,9 +131,10 @@ func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 
 func (mtv minimumTagValidator) Docs() TagDoc {
 	return TagDoc{
-		Tag:         mtv.TagName(),
-		Scopes:      mtv.ValidScopes().UnsortedList(),
-		Description: "Indicates that a numeric field has a minimum value.",
+		Tag:            mtv.TagName(),
+		StabilityLevel: Beta,
+		Scopes:         mtv.ValidScopes().UnsortedList(),
+		Description:    "Indicates that a numeric field has a minimum value.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<integer>",
 			Docs:        "This field must be greater than or equal to x.",
