@@ -593,3 +593,378 @@ func TestGaugeWithLabelValueAllowList(t *testing.T) {
 		})
 	}
 }
+
+func TestGaugeVecDeleteLabelValues(t *testing.T) {
+	version := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+	var tests = []struct {
+		desc               string
+		opts               *GaugeOpts
+		labels             []string
+		expectMetricExists bool
+		expectDelete       bool
+	}{
+		// Non-deprecated metrics
+		{
+			desc: "ALPHA metric non deprecated",
+			opts: &GaugeOpts{
+				Namespace:      "namespace",
+				Name:           "metric_delete_table",
+				Subsystem:      "subsystem",
+				Help:           "gauge help",
+				StabilityLevel: ALPHA,
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: true,
+			expectDelete:       true,
+		},
+		{
+			desc: "BETA metric non deprecated",
+			opts: &GaugeOpts{
+				Namespace:      "namespace",
+				Name:           "metric_delete_table",
+				Subsystem:      "subsystem",
+				Help:           "gauge help",
+				StabilityLevel: BETA,
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: true,
+			expectDelete:       true,
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			opts: &GaugeOpts{
+				Namespace:      "namespace",
+				Name:           "metric_delete_table",
+				Subsystem:      "subsystem",
+				Help:           "gauge help",
+				StabilityLevel: STABLE,
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: true,
+			expectDelete:       true,
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    ALPHA,
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: false,
+			expectDelete:       false,
+		},
+		{
+			desc: "BETA metric deprecated",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: true,
+			expectDelete:       true,
+		},
+		{
+			desc: "STABLE metric deprecated",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: true,
+			expectDelete:       true,
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    ALPHA,
+				DeprecatedVersion: "1.14.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: false,
+			expectDelete:       false,
+		},
+		{
+			desc: "BETA metric hidden",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.14.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: false,
+			expectDelete:       false,
+		},
+		{
+			desc: "STABLE metric hidden",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.12.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: false,
+			expectDelete:       false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			registry := newKubeRegistry(version)
+			gv := NewGaugeVec(test.opts, test.labels)
+			registry.MustRegister(gv)
+			gv.WithLabelValues("foo", "bar").Set(42)
+
+			ms, err := registry.Gather()
+			require.NoError(t, err)
+			found := false
+			for _, mf := range ms {
+				if *mf.Name == BuildFQName(test.opts.Namespace, test.opts.Subsystem, test.opts.Name) {
+					for _, m := range mf.GetMetric() {
+						for _, l := range m.Label {
+							if *l.Name == "label_a" && *l.Value == "foo" {
+								found = true
+							}
+						}
+					}
+				}
+			}
+			assert.Equal(t, test.expectMetricExists, found, "Metric existence mismatch before deletion")
+
+			deleted := gv.DeleteLabelValues("foo", "bar")
+			assert.Equal(t, test.expectDelete, deleted, "DeleteLabelValues return mismatch")
+
+			// Confirm it no longer exists
+			ms, err = registry.Gather()
+			require.NoError(t, err)
+			found = false
+			for _, mf := range ms {
+				if *mf.Name == BuildFQName(test.opts.Namespace, test.opts.Subsystem, test.opts.Name) {
+					for _, m := range mf.GetMetric() {
+						for _, l := range m.Label {
+							if *l.Name == "label_a" && *l.Value == "foo" {
+								found = true
+							}
+						}
+					}
+				}
+			}
+			assert.False(t, found, "Metric with label values should not exist after deletion")
+		})
+	}
+}
+
+func TestGaugeVecDeleteLabelValuesChecked(t *testing.T) {
+	version := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+	var tests = []struct {
+		desc               string
+		opts               *GaugeOpts
+		labels             []string
+		expectMetricExists bool
+		expectDelete       bool
+	}{
+		// Non-deprecated metrics
+		{
+			desc: "ALPHA metric non deprecated",
+			opts: &GaugeOpts{
+				Namespace:      "namespace",
+				Name:           "metric_delete_checked_table",
+				Subsystem:      "subsystem",
+				Help:           "gauge help",
+				StabilityLevel: ALPHA,
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: true,
+			expectDelete:       true,
+		},
+		{
+			desc: "BETA metric non deprecated",
+			opts: &GaugeOpts{
+				Namespace:      "namespace",
+				Name:           "metric_delete_checked_table",
+				Subsystem:      "subsystem",
+				Help:           "gauge help",
+				StabilityLevel: BETA,
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: true,
+			expectDelete:       true,
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			opts: &GaugeOpts{
+				Namespace:      "namespace",
+				Name:           "metric_delete_checked_table",
+				Subsystem:      "subsystem",
+				Help:           "gauge help",
+				StabilityLevel: STABLE,
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: true,
+			expectDelete:       true,
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_checked_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    ALPHA,
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: false,
+			expectDelete:       false,
+		},
+		{
+			desc: "BETA metric deprecated",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_checked_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: true,
+			expectDelete:       true,
+		},
+		{
+			desc: "STABLE metric deprecated",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_checked_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: true,
+			expectDelete:       true,
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_checked_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    ALPHA,
+				DeprecatedVersion: "1.14.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: false,
+			expectDelete:       false,
+		},
+		{
+			desc: "BETA metric hidden",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_checked_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.14.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: false,
+			expectDelete:       false,
+		},
+		{
+			desc: "STABLE metric hidden",
+			opts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_delete_checked_table",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.12.0",
+			},
+			labels:             []string{"label_a", "label_b"},
+			expectMetricExists: false,
+			expectDelete:       false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			registry := newKubeRegistry(version)
+			gv := NewGaugeVec(test.opts, test.labels)
+			registry.MustRegister(gv)
+			gv.WithLabelValues("foo", "bar").Set(42)
+
+			ms, err := registry.Gather()
+			require.NoError(t, err)
+			found := false
+			for _, mf := range ms {
+				if *mf.Name == BuildFQName(test.opts.Namespace, test.opts.Subsystem, test.opts.Name) {
+					for _, m := range mf.GetMetric() {
+						for _, l := range m.Label {
+							if *l.Name == "label_a" && *l.Value == "foo" {
+								found = true
+							}
+						}
+					}
+				}
+			}
+			assert.Equal(t, test.expectMetricExists, found, "Metric existence mismatch before deletion")
+
+			deleted, err := gv.DeleteLabelValuesChecked("foo", "bar")
+			assert.Equal(t, test.expectDelete, deleted, "DeleteLabelValuesChecked return mismatch")
+			require.NoError(t, err, "DeleteLabelValuesChecked should not return error")
+
+			// Confirm it no longer exists
+			ms, err = registry.Gather()
+			require.NoError(t, err)
+			found = false
+			for _, mf := range ms {
+				if *mf.Name == BuildFQName(test.opts.Namespace, test.opts.Subsystem, test.opts.Name) {
+					for _, m := range mf.GetMetric() {
+						for _, l := range m.Label {
+							if *l.Name == "label_a" && *l.Value == "foo" {
+								found = true
+							}
+						}
+					}
+				}
+			}
+			assert.False(t, found, "Metric with label values should not exist after deletion")
+		})
+	}
+}
