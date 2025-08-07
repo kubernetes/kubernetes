@@ -198,12 +198,6 @@ func (f *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service
 	return status, f.Exists, f.Err
 }
 
-// GetLoadBalancerName is a stub implementation of LoadBalancer.GetLoadBalancerName.
-func (f *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
-	// TODO: replace DefaultLoadBalancerName to generate more meaningful loadbalancer names.
-	return cloudprovider.DefaultLoadBalancerName(service)
-}
-
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
 func (f *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
@@ -213,7 +207,7 @@ func (f *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, serv
 		f.Balancers = make(map[string]Balancer)
 	}
 
-	name := f.GetLoadBalancerName(ctx, clusterName, service)
+	name := cloudprovider.DefaultLoadBalancerName(service)
 	spec := service.Spec
 
 	zone, err := f.GetZone(context.TODO())

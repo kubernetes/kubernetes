@@ -81,11 +81,10 @@ type Clusters interface {
 	Master(ctx context.Context, clusterName string) (string, error)
 }
 
-// (DEPRECATED) DefaultLoadBalancerName is the default load balancer name that is called from
-// LoadBalancer.GetLoadBalancerName. Use this method to maintain backward compatible names for
-// LoadBalancers that were created prior to Kubernetes v1.12. In the future, each provider should
-// replace this method call in GetLoadBalancerName with a provider-specific implementation that
-// is less cryptic than the Service's UUID.
+// (DEPRECATED) DefaultLoadBalancerName returns the default load balancer name for a service.
+// Use this method to maintain backward compatible names for LoadBalancers.
+// In the future, each provider should replace this method call with a provider-specific implementation
+// that is less cryptic than the Service's UUID.
 func DefaultLoadBalancerName(service *v1.Service) string {
 	//GCE requires that the name of a load balancer starts with a lower case letter.
 	ret := "a" + string(service.UID)
@@ -142,9 +141,6 @@ type LoadBalancer interface {
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager.
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error)
-	// GetLoadBalancerName returns the name of the load balancer. Implementations must treat the
-	// *v1.Service parameter as read-only and not modify it.
-	GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 	// Implementations must treat the *v1.Service and *v1.Node
 	// parameters as read-only and not modify them.

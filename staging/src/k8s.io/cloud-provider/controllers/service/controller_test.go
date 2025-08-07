@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
@@ -329,7 +330,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				}
 
 				for _, balancer := range cloud.Balancers {
-					if balancer.Name != controller.balancer.GetLoadBalancerName(ctx, "", tc.service) ||
+					if balancer.Name != cloudprovider.DefaultLoadBalancerName(tc.service) ||
 						balancer.Region != region ||
 						balancer.Ports[0].Port != tc.service.Spec.Ports[0].Port {
 						t.Errorf("Created load balancer has incorrect parameters: %v", balancer)
