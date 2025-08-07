@@ -5596,6 +5596,11 @@ type NodeStatus struct {
 	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	Features *NodeFeatures
+	// Capabilities provides a structured way to report various capabilities of the node.
+	// Keys are DNS-style and values are strings.
+	// +optional
+	// +featureGate=NodeCapabilities
+	Capabilities map[string]string
 }
 
 // UniqueVolumeName defines the name of attached volume
