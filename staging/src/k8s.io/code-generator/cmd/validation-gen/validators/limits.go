@@ -130,9 +130,10 @@ func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 
 func (mtv minimumTagValidator) Docs() TagDoc {
 	return TagDoc{
-		Tag:         mtv.TagName(),
-		Scopes:      mtv.ValidScopes().UnsortedList(),
-		Description: "Indicates that a numeric field has a minimum value.",
+		Tag:            mtv.TagName(),
+		StabilityLevel: Stable,
+		Scopes:         mtv.ValidScopes().UnsortedList(),
+		Description:    "Indicates that a numeric field has a minimum value.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<integer>",
 			Docs:        "This field must be greater than or equal to x.",

@@ -146,7 +146,7 @@ func (m *mockTagValidator) Init(cfg Config) {}
 func (m *mockTagValidator) TagName() string { return m.tagName }
 func (m *mockTagValidator) ValidScopes() sets.Set[Scope] {
 	if m.scopes == nil {
-		return sets.New(ScopeAny)
+		return sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 	}
 	return m.scopes
 }
