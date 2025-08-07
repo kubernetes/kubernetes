@@ -371,31 +371,7 @@ func (hns hns) getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags
 		return lb, nil
 	}
 
-	lbPortMappingFlags := hcn.LoadBalancerPortMappingFlagsNone
-	if flags.isILB {
-		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsILB
-	}
-	if flags.useMUX {
-		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsUseMux
-	}
-	if flags.preserveDIP {
-		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsPreserveDIP
-	}
-	if flags.localRoutedVIP {
-		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsLocalRoutedVIP
-	}
-	if flags.isVipExternalIP {
-		lbPortMappingFlags |= LoadBalancerPortMappingFlagsVipExternalIP
-	}
-
-	lbFlags := hcn.LoadBalancerFlagsNone
-	if flags.isDSR {
-		lbFlags |= hcn.LoadBalancerFlagsDSR
-	}
-
-	if flags.isIPv6 {
-		lbFlags |= LoadBalancerFlagsIPv6
-	}
+	lbPortMappingFlags, lbFlags := getLoadBalancerPolicyFlags(flags)
 
 	lbDistributionType := hcn.LoadBalancerDistributionNone
 

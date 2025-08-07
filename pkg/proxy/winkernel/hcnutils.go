@@ -50,6 +50,7 @@ type HcnService interface {
 	// Policy functions
 	DeleteAllHnsLoadBalancerPolicy()
 	RemoteSubnetSupported() error
+	IsNotImplemented(err error) bool
 }
 
 type hcnImpl struct{}
@@ -143,4 +144,8 @@ func (hcnObj hcnImpl) DeleteAllHnsLoadBalancerPolicy() {
 
 func (hcnObj hcnImpl) RemoteSubnetSupported() error {
 	return hcn.RemoteSubnetSupported()
+}
+
+func (hcnObj hcnImpl) IsNotImplemented(err error) bool {
+	return hcn.IsNotImplemented(err)
 }
