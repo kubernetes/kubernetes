@@ -1044,24 +1044,6 @@ items:
       rbac.authorization.kubernetes.io/autoupdate: "true"
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
-    name: system:controller:podcertificaterequestcleaner
-  rules:
-  - apiGroups:
-    - certificates.k8s.io
-    resources:
-    - podcertificaterequests
-    verbs:
-    - delete
-    - get
-    - list
-    - watch
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: ClusterRole
-  metadata:
-    annotations:
-      rbac.authorization.kubernetes.io/autoupdate: "true"
-    labels:
-      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:pv-protection-controller
   rules:
   - apiGroups:
