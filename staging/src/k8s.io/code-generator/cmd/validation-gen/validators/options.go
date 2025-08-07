@@ -80,7 +80,8 @@ func (itv ifTagValidator) GetValidations(context Context, tag codetags.Tag) (Val
 
 func (itv ifTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag: itv.TagName(),
+		Tag:            itv.TagName(),
+		StabilityLevel: Alpha,
 		Args: []TagArgDoc{{
 			Description: "<option>",
 			Type:        codetags.ArgTypeString,

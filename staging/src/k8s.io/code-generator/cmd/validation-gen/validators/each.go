@@ -225,9 +225,10 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 
 func (evtv eachValTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:         evtv.TagName(),
-		Scopes:      evtv.ValidScopes().UnsortedList(),
-		Description: "Declares a validation for each value in a map or list.",
+		Tag:            evtv.TagName(),
+		StabilityLevel: Alpha,
+		Scopes:         evtv.ValidScopes().UnsortedList(),
+		Description:    "Declares a validation for each value in a map or list.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<validation-tag>",
 			Docs:        "The tag to evaluate for each value.",
@@ -306,9 +307,10 @@ func ForEachKey(_ *field.Path, t *types.Type, fn FunctionGen) (Validations, erro
 
 func (ektv eachKeyTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:         ektv.TagName(),
-		Scopes:      ektv.ValidScopes().UnsortedList(),
-		Description: "Declares a validation for each value in a map or list.",
+		Tag:            ektv.TagName(),
+		Scopes:         ektv.ValidScopes().UnsortedList(),
+		StabilityLevel: Alpha,
+		Description:    "Declares a validation for each value in a map or list.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<validation-tag>",
 			Docs:        "The tag to evaluate for each key.",
