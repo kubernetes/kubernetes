@@ -2430,3 +2430,30 @@ func TestCalculateRequests(t *testing.T) {
 		})
 	}
 }
+func TestCalculatePodRequestsFromContainers_NonExistentContainer(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: testNamespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	request, err := calculatePodRequestsFromContainers(pod, "non-existent-container", v1.ResourceCPU)
+
+	require.Error(t, err, "expected error for non-existent container")
+	expectedErr := "container non-existent-container not found in Pod test-pod"
+	assert.Equal(t, expectedErr, err.Error(), "error message should match expected format")
+	assert.Equal(t, int64(0), request, "request should be 0 when container does not exist")
+}
