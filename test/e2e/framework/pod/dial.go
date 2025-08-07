@@ -102,7 +102,9 @@ func (d *Dialer) DialContainerPort(ctx context.Context, addr Addr) (conn net.Con
 			framework.Logf("fallback to secondary dialer from primary dialer err: %v", err)
 			return true
 		}
-		framework.Logf("unexpected error trying to use websockets for portforward: %v", err)
+		if err != nil {
+			framework.Logf("unexpected error trying to use websockets for portforward: %v", err)
+		}
 		return false
 	})
 

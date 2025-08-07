@@ -198,7 +198,9 @@ func execute(ctx context.Context, url *url.URL, config *restclient.Config, stdin
 			framework.Logf("fallback to secondary dialer from primary dialer err: %v", err)
 			return true
 		}
-		framework.Logf("unexpected error trying to use websockets for pod exec: %v", err)
+		if err != nil {
+			framework.Logf("unexpected error trying to use websockets for pod exec: %v", err)
+		}
 		return false
 	})
 	if err != nil {
