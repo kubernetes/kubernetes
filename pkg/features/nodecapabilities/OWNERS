@@ -1,0 +1,7 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# TODO: Add actual approvers and reviewers before merging.
+approvers:
+  - "approver-github-handle-or-alias"
+reviewers:
+  - "approver-github-handle-or-alias"
