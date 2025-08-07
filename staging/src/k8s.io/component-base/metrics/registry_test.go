@@ -73,16 +73,84 @@ func TestShouldHide(t *testing.T) {
 	var tests = []struct {
 		desc              string
 		deprecatedVersion string
+		stabilityLevel    StabilityLevel
 		shouldHide        bool
 	}{
+		// Current version tests
 		{
-			desc:              "current minor release should not be hidden",
+			desc:              "current INTERNAL version should be hidden",
 			deprecatedVersion: "1.17.0",
+			stabilityLevel:    INTERNAL,
+			shouldHide:        true,
+		},
+		{
+			desc:              "current ALPHA version should be hidden",
+			deprecatedVersion: "1.17.0",
+			stabilityLevel:    ALPHA,
+			shouldHide:        true,
+		},
+		{
+			desc:              "current BETA version should not be hidden",
+			deprecatedVersion: "1.17.0",
+			stabilityLevel:    BETA,
 			shouldHide:        false,
 		},
 		{
-			desc:              "older minor release should be hidden",
+			desc:              "current STABLE version should not be hidden",
+			deprecatedVersion: "1.17.0",
+			stabilityLevel:    STABLE,
+			shouldHide:        false,
+		},
+
+		// Current version - 1 (BETA) tests
+		{
+			desc:              "n-1 INTERNAL version should *remain* hidden",
 			deprecatedVersion: "1.16.0",
+			stabilityLevel:    INTERNAL,
+			shouldHide:        true,
+		},
+		{
+			desc:              "n-1 ALPHA version should *remain* hidden",
+			deprecatedVersion: "1.16.0",
+			stabilityLevel:    ALPHA,
+			shouldHide:        true,
+		},
+		{
+			desc:              "n-1 BETA version should be hidden",
+			deprecatedVersion: "1.16.0",
+			stabilityLevel:    BETA,
+			shouldHide:        true,
+		},
+		{
+			desc:              "n-1 STABLE version should not be hidden",
+			deprecatedVersion: "1.16.0",
+			stabilityLevel:    STABLE,
+			shouldHide:        false,
+		},
+
+		// Current version - 3 (STABLE) tests
+		{
+			desc:              "n-3 INTERNAL version should *remain* hidden",
+			deprecatedVersion: "1.14.0",
+			stabilityLevel:    INTERNAL,
+			shouldHide:        true,
+		},
+		{
+			desc:              "n-3 ALPHA version should *remain* hidden",
+			deprecatedVersion: "1.14.0",
+			stabilityLevel:    ALPHA,
+			shouldHide:        true,
+		},
+		{
+			desc:              "n-3 BETA version should *remain* hidden",
+			deprecatedVersion: "1.14.0",
+			stabilityLevel:    BETA,
+			shouldHide:        true,
+		},
+		{
+			desc:              "n-3 STABLE version should *remain* hidden",
+			deprecatedVersion: "1.14.0",
+			stabilityLevel:    STABLE,
 			shouldHide:        true,
 		},
 	}
@@ -90,7 +158,7 @@ func TestShouldHide(t *testing.T) {
 	for _, test := range tests {
 		tc := test
 		t.Run(tc.desc, func(t *testing.T) {
-			result := shouldHide(&currentVersion, parseSemver(tc.deprecatedVersion))
+			result := shouldHide(tc.stabilityLevel, &currentVersion, parseSemver(tc.deprecatedVersion))
 			assert.Equalf(t, tc.shouldHide, result, "expected should hide %v, but got %v", tc.shouldHide, result)
 		})
 	}

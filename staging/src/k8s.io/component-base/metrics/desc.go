@@ -120,7 +120,7 @@ func (d *Desc) determineDeprecationStatus(version semver.Version) {
 			klog.Warningf("Hidden metrics(%s) have been manually overridden, showing this very deprecated metric.", d.fqName)
 			return
 		}
-		if shouldHide(&version, selfVersion) {
+		if shouldHide(d.stabilityLevel, &version, selfVersion) {
 			// TODO(RainbowMango): Remove this log temporarily. https://github.com/kubernetes/kubernetes/issues/85369
 			// klog.Warningf("This metric(%s) has been deprecated for more than one release, hiding.", d.fqName)
 			d.isHidden = true

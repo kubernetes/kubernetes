@@ -24,6 +24,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	apimachineryutilversion "k8s.io/apimachinery/pkg/util/version"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/version"
@@ -73,17 +74,28 @@ var (
 
 // shouldHide be used to check if a specific metric with deprecated version should be hidden
 // according to metrics deprecation lifecycle.
-func shouldHide(currentVersion *semver.Version, deprecatedVersion *semver.Version) bool {
+// This follows rule #11b as stated here: https://kubernetes.io/docs/reference/using-api/deprecation-policy/#deprecating-a-metric
+func shouldHide(stabilityLevel StabilityLevel, currentVersion, deprecatedVersion *semver.Version) bool {
 	guardVersion, err := semver.Make(fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor))
 	if err != nil {
 		panic("failed to make version from current version")
 	}
 
-	if deprecatedVersion.LT(guardVersion) {
-		return true
+	var deprecationCycleReleaseWindow uint
+	switch stabilityLevel {
+	case STABLE:
+		deprecationCycleReleaseWindow = 3
+	case BETA:
+		deprecationCycleReleaseWindow = 1
+	default:
+		deprecationCycleReleaseWindow = 0 // ALPHA, INTERNAL
 	}
 
-	return false
+	deprecationVersionParsed := apimachineryutilversion.MustParse(deprecatedVersion.String())
+	guardVersionParsed := apimachineryutilversion.MustParse(guardVersion.String())
+	hiddenVersion := deprecationVersionParsed.AddMinor(deprecationCycleReleaseWindow)
+
+	return guardVersionParsed.AtLeast(hiddenVersion)
 }
 
 // ValidateShowHiddenMetricsVersion checks invalid version for which show hidden metrics.
