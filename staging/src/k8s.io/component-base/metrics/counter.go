@@ -107,14 +107,6 @@ func (c *Counter) WithContext(ctx context.Context) CounterMetric {
 	return &exemplarCounterMetric{ctx: ctx, delegate: c.CounterMetric}
 }
 
-func (c *Counter) Add(v float64) {
-	c.CounterMetric.Add(v)
-}
-
-func (c *Counter) Inc() {
-	c.CounterMetric.Add(1)
-}
-
 // Add attaches an exemplar to the metric and then calls the delegate.
 func (e *exemplarCounterMetric) Add(v float64) {
 	if m, ok := e.delegate.(prometheus.ExemplarAdder); ok {
