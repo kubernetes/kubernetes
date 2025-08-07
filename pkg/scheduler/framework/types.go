@@ -386,6 +386,8 @@ func removeFromSlice(logger klog.Logger, s []fwk.PodInfo, k string) ([]fwk.PodIn
 			removedPod = s[i]
 			// delete the element
 			s[i] = s[len(s)-1]
+			// clear the reference to prevent potential memory leak
+			s[len(s)-1] = nil
 			s = s[:len(s)-1]
 			break
 		}
