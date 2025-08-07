@@ -326,7 +326,8 @@ func newTestKubeletWithImageList(
 	}
 
 	kubelet.allocationManager = allocation.NewInMemoryManager(
-		kubelet.containerManager,
+		kubelet.containerManager.GetNodeConfig(),
+		kubelet.containerManager.GetNodeAllocatableAbsolute(),
 		kubelet.statusManager,
 		func(pod *v1.Pod) { kubelet.HandlePodSyncs([]*v1.Pod{pod}) },
 		kubelet.GetActivePods,
