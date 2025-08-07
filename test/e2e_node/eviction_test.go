@@ -103,48 +103,176 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 	})
 })
 
+// pullTestImages pulls a list of images that are not used by any test pod.
+// These images are meant to be garbage collected to relieve pressure.
+func pullTestImages(ctx context.Context, images []string) {
+	puller, err := getPuller()
+	gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+	for _, image := range images {
+		_, err = puller.Pull(ctx, image)
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred(), "failed to pull image %s", image)
+	}
+}
+
+// removeTestImages removes images pulled by pullTestImages.
+func removeTestImages(ctx context.Context, images []string) {
+	puller, err := getPuller()
+	gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+	for _, image := range images {
+		err = puller.Remove(ctx, image)
+		if err != nil {
+			framework.Logf("Failed to remove image %s: %v. This might be expected if it was garbage collected.", image, err)
+		}
+	}
+}
+
 // ImageGCNoEviction tests that the eviction manager is able to prevent eviction
 // by reclaiming resources(inodes) through image garbage collection.
 // Disk pressure is induced by consuming a lot of inodes on the node.
-// Images are pre-pulled before running the test workload to ensure
-// that the image garbage collerctor can remove them to avoid eviction.
+// A few unused images are pulled before running the test workload to ensure
+// that the image garbage collector can remove them to avoid eviction.
 var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
 	f := framework.NewDefaultFramework("image-gc-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
-	expectedStarvedResource := resourceInodes
-	inodesConsumed := uint64(100000)
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		prepull := func(ctx context.Context) {
-			// Prepull images for image garbage collector to remove them
-			// when reclaiming resources
-			err := PrePullAllImages(ctx)
-			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-		}
-		ginkgo.BeforeEach(prepull)
-		if framework.TestContext.PrepullImages {
-			ginkgo.AfterEach(prepull)
-		}
 
+	// A few images to pull that are not used by the test pod.
+	// These are expected to be garbage collected.
+	imagesToPullAndRemove := []string{
+		imageutils.GetE2EImage(imageutils.Nginx),
+		imageutils.GetE2EImage(imageutils.Perl),
+	}
+
+	var testPod *v1.Pod
+	var testSpecs []podEvictSpec
+
+	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
-			summary := eventuallyGetSummary(ctx)
-			inodesFree := *summary.Node.Fs.InodesFree
-			if inodesFree <= inodesConsumed {
-				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
+			// Step 1: Measure inodes before pulling images to establish a baseline.
+			summaryBeforePull := eventuallyGetSummary(ctx)
+			inodesFreeBeforePull := *summaryBeforePull.Node.Fs.InodesFree
+			framework.Logf("ImageGCNoEviction: Step 1: Inodes free before pulling images: %d", inodesFreeBeforePull)
+
+			// Step 2: Pull test images that will be garbage collected.
+			framework.Logf("ImageGCNoEviction: Step 2: Pulling test images %v to be used for GC", imagesToPullAndRemove)
+			pullTestImages(ctx, imagesToPullAndRemove)
+
+			// Step 3: Measure inodes after pulling images to determine their footprint.
+			summaryAfterPull := eventuallyGetSummary(ctx)
+			inodesFreeAfterPull := *summaryAfterPull.Node.Fs.InodesFree
+			framework.Logf("ImageGCNoEviction: Step 3: Inodes free after pulling images: %d", inodesFreeAfterPull)
+
+			// Step 4: Calculate how many inodes can be reclaimed by garbage collecting the images.
+			reclaimableInodes := inodesFreeBeforePull - inodesFreeAfterPull
+			framework.Logf("ImageGCNoEviction: Step 4: Calculated reclaimable inodes from images: %d", reclaimableInodes)
+
+			// Step 5: Check if the test is viable. If the images didn't consume enough inodes, we can't test reclamation.
+			const minInodesForTest = 1000
+			if reclaimableInodes < minInodesForTest {
+				e2eskipper.Skipf("Not enough reclaimable inodes from test images (%d) to run test; need at least %d", reclaimableInodes, minInodesForTest)
 			}
-			framework.Logf("Setting eviction threshold to %d inodes", inodesFree-inodesConsumed)
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed)}
+
+			// Step 6: Define consumption and threshold dynamically.
+			// We want to consume enough inodes to trigger pressure, but fewer than what GC can reclaim.
+			// Let's consume 90% of what's reclaimable to leave a safety margin.
+			inodesToConsume := uint64(float64(reclaimableInodes) * 0.9)
+			// The eviction threshold must be set so that consuming `inodesToConsume` crosses it.
+			// After consumption, inodes free will be (inodesFreeAfterPull - inodesToConsume).
+			// We need threshold > (inodesFreeAfterPull - inodesToConsume).
+			const pressureBuffer = 100 // Create pressure by this many inodes.
+			evictionThreshold := inodesFreeAfterPull - inodesToConsume - pressureBuffer
+			framework.Logf("ImageGCNoEviction: Step 6: Dynamically setting test parameters. Inodes to consume: %d. Eviction threshold (inodes free): %d", inodesToConsume, evictionThreshold)
+
+			initialConfig.EvictionSoft = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", evictionThreshold)}
+			initialConfig.EvictionSoftGracePeriod = map[string]string{string(evictionapi.SignalNodeFsInodesFree): "240s"}
+			initialConfig.EvictionHard = map[string]string{}
+			initialConfig.ImageGCHighThresholdPercent = 90
+			initialConfig.ImageGCLowThresholdPercent = 60
+			initialConfig.ImageMinimumGCAge = metav1.Duration{Duration: time.Second * 0}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
+
+			// Step 7: Define the pod that will consume inodes.
+			// This pod should not be evicted (priority 0).
+			framework.Logf("ImageGCNoEviction: Step 7: Defining test pod to consume %d inodes.", inodesToConsume)
+			testPod = inodeConsumingPod("container-inode", int(inodesToConsume), &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}})
+			testSpecs = []podEvictSpec{
+				{
+					evictionPriority: 0,
+					pod:              testPod,
+				},
+			}
 		})
-		// Consume enough inodes to induce disk pressure,
-		// but expect that image garbage collection can reduce it enough to avoid an eviction
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
-			{
-				evictionPriority: 0,
-				pod:              inodeConsumingPod("container-inode", 110000, nil),
-			},
+
+		// This section is an inlined and simplified version of runEvictionTest to handle the dynamic pod definition.
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			ginkgo.By("setting up pod to be used by test")
+			e2epod.NewPodClient(f).Create(ctx, testPod)
+		})
+
+		ginkgo.It("should not evict the pod, because image garbage collection should relieve pressure", func(ctx context.Context) {
+			ginkgo.By(fmt.Sprintf("Waiting for node to have NodeCondition: %s", expectedNodeCondition))
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				logInodeMetrics(ctx)
+				if hasNodeCondition(ctx, f, expectedNodeCondition) {
+					return nil
+				}
+				return fmt.Errorf("NodeCondition: %s not encountered", expectedNodeCondition)
+			}, pressureTimeout, evictionPollInterval).Should(gomega.BeNil())
+
+			// We expect pressure to be triggered, but then resolved by image GC, so no evictions should occur.
+			// Consistently verify that the pod is not evicted.
+			ginkgo.By("Verifying that the pod is not evicted while pressure is resolved")
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				logInodeMetrics(ctx)
+				return verifyEvictionOrdering(ctx, f, testSpecs)
+			}, 1*time.Minute, evictionPollInterval).Should(gomega.Succeed())
+
+			ginkgo.By("making sure pressure from test has surfaced before continuing")
+			time.Sleep(pressureDelay)
+
+			ginkgo.By(fmt.Sprintf("Waiting for NodeCondition: %s to no longer exist on the node", expectedNodeCondition))
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				logInodeMetrics(ctx)
+				logKubeletLatencyMetrics(ctx, kubeletmetrics.EvictionStatsAgeKey)
+				if hasNodeCondition(ctx, f, expectedNodeCondition) {
+					return fmt.Errorf("Conditions haven't returned to normal, node still has %s", expectedNodeCondition)
+				}
+				return nil
+			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
+
+			ginkgo.By("checking for stable, pressure-free condition without unexpected pod failures")
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				if hasNodeCondition(ctx, f, expectedNodeCondition) {
+					return fmt.Errorf("%s disappeared and then reappeared", expectedNodeCondition)
+				}
+				logInodeMetrics(ctx)
+				logKubeletLatencyMetrics(ctx, kubeletmetrics.EvictionStatsAgeKey)
+				return verifyEvictionOrdering(ctx, f, testSpecs)
+			}, postTestConditionMonitoringPeriod, evictionPollInterval).Should(gomega.Succeed())
+		})
+
+		ginkgo.AfterEach(func(ctx context.Context) {
+			ginkgo.By("deleting pod")
+			e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, 10*time.Minute)
+
+			ginkgo.By(fmt.Sprintf("making sure NodeCondition %s no longer exists on the node", expectedNodeCondition))
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				if hasNodeCondition(ctx, f, expectedNodeCondition) {
+					return fmt.Errorf("Conditions haven't returned to normal, node still has %s", expectedNodeCondition)
+				}
+				return nil
+			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
+
+			ginkgo.By("cleaning up test images")
+			removeTestImages(ctx, imagesToPullAndRemove)
+
+			if ginkgo.CurrentSpecReport().Failed() {
+				if framework.TestContext.DumpLogsOnFailure {
+					logPodEvents(ctx, f)
+					logNodeEvents(ctx, f)
+				}
+			}
 		})
 	})
 })
@@ -1228,8 +1356,9 @@ func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirem
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers: []v1.Container{
 				{
-					Image: busyboxImage,
-					Name:  fmt.Sprintf("%s-container", name),
+					Image:           busyboxImage,
+					ImagePullPolicy: v1.PullAlways, // ensure the image is always pulled for eviction tests.
+					Name:            fmt.Sprintf("%s-container", name),
 					Command: []string{
 						"sh",
 						"-c",
