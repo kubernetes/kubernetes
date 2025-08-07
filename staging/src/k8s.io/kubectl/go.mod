@@ -28,7 +28,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	go.yaml.in/yaml/v2 v2.4.2
 	golang.org/x/sys v0.33.0
-	gopkg.in/evanphx/json-patch.v4 v4.12.0
+	gopkg.in/evanphx/json-patch.v4 v4.13.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/cli-runtime v0.0.0
@@ -76,7 +76,6 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
