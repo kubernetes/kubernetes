@@ -363,6 +363,10 @@ func podWithRequiredAntiAffinity(p *v1.Pod) bool {
 func removeFromSlice(logger klog.Logger, s []fwk.PodInfo, k string) ([]fwk.PodInfo, fwk.PodInfo) {
 	var removedPod fwk.PodInfo
 	for i := range s {
+		if s[i] == nil {
+			utilruntime.HandleErrorWithLogger(logger, nil, "Found nil pod in slice", "index", i)
+			continue
+		}
 		tmpKey, err := GetPodKey(s[i].GetPod())
 		if err != nil {
 			utilruntime.HandleErrorWithLogger(logger, err, "Cannot get pod key", "pod", klog.KObj(s[i].GetPod()))
@@ -371,7 +375,11 @@ func removeFromSlice(logger klog.Logger, s []fwk.PodInfo, k string) ([]fwk.PodIn
 		if k == tmpKey {
 			removedPod = s[i]
 			// delete the element
-			s[i] = s[len(s)-1]
+			if i != len(s)-1 {
+				s[i] = s[len(s)-1]
+			}
+			// clear the reference to prevent potential memory leak
+			s[len(s)-1] = nil
 			s = s[:len(s)-1]
 			break
 		}

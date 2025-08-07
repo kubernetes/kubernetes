@@ -292,6 +292,9 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 	// Count CSI volumes from existing pods
 	attachedVolumes := make(map[string]string)
 	for _, existingPod := range nodeInfo.GetPods() {
+		if existingPod == nil {
+			continue
+		}
 		if err := pl.filterAttachableVolumes(logger, existingPod.GetPod(), csiNode, false /* existing pod */, attachedVolumes); err != nil {
 			return fwk.AsStatus(err)
 		}

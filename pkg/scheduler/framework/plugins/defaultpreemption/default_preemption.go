@@ -244,6 +244,9 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	// As the first step, remove all pods eligible for preemption from the node and
 	// check if the given pod can be scheduled without them present.
 	for _, pi := range nodeInfo.GetPods() {
+		if pi == nil {
+			continue
+		}
 		if pl.isPreemptionAllowed(nodeInfo, pi, pod) {
 			potentialVictims = append(potentialVictims, pi)
 			if err := removePod(pi); err != nil {
@@ -341,6 +344,9 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
 			for _, p := range nodeInfo.GetPods() {
+				if p == nil {
+					continue
+				}
 				if pl.isPreemptionAllowed(nodeInfo, p, pod) && podTerminatingByPreemption(p.GetPod()) {
 					// There is a terminating pod on the nominated node.
 					return false, "not eligible due to a terminating pod on the nominated node."
