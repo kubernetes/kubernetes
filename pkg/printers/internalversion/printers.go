@@ -1306,7 +1306,7 @@ func printCronJob(obj *batch.CronJob, options printers.GenerateOptions) ([]metav
 
 	if options.Wide {
 		// Show Next Schedule Time - use status value or calculate dynamically
-		nextScheduleTime := "<none>"
+		var nextScheduleTime string
 		if obj.Status.NextScheduleTime != nil {
 			nextScheduleTime = translateTimestampUntil(*obj.Status.NextScheduleTime)
 		} else {
