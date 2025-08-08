@@ -29,13 +29,11 @@ import (
 
 var (
 	port        int
-	host        string
 	registryDir = "/var/registry"
 )
 
 func init() {
 	CmdFakeRegistryServer.Flags().IntVar(&port, "port", 5000, "Port number.")
-	CmdFakeRegistryServer.Flags().StringVar(&host, "host", "0.0.0.0", "Host address.")
 }
 
 // CmdFakeRegistryServer is the cobra command for the fake registry server
@@ -49,7 +47,7 @@ var CmdFakeRegistryServer = &cobra.Command{
 func main(cmd *cobra.Command, args []string) {
 	registryMux := NewRegistryServerMux()
 
-	addr := fmt.Sprintf("%s:%d", host, port)
+	addr := fmt.Sprintf(":%d", port)
 	log.Printf("HTTP server starting to listen on %s", addr)
 	if err := http.ListenAndServe(addr, registryMux); err != nil {
 		log.Fatalf("Error while starting the HTTP server: %v", err)
