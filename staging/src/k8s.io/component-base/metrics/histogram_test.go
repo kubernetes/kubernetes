@@ -63,8 +63,7 @@ func TestHistogram(t *testing.T) {
 				Buckets:           prometheus.DefBuckets,
 			},
 			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedMetricCount: 0,
 		},
 		{
 			desc: "Test hidden",
@@ -167,8 +166,7 @@ func TestHistogramVec(t *testing.T) {
 			},
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedMetricCount: 0,
 		},
 		{
 			desc: "Test hidden",

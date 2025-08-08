@@ -64,8 +64,7 @@ func TestTimingHistogram(t *testing.T) {
 				InitialValue:      3,
 			},
 			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "EXPERIMENTAL: [ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedMetricCount: 0,
 		},
 		{
 			desc: "Test hidden",
@@ -189,8 +188,7 @@ func TestTimingHistogramVec(t *testing.T) {
 			},
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "EXPERIMENTAL: [ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedMetricCount: 0,
 		},
 		{
 			desc: "Test hidden",

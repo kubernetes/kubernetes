@@ -51,6 +51,16 @@ var (
 			DeprecatedVersion: "1.15.0",
 		},
 	)
+	betaDeprecatedCounter = NewCounter(
+		&CounterOpts{
+			Namespace:         "some_namespace",
+			Name:              "test_alpha_dep_counter",
+			Subsystem:         "subsystem",
+			StabilityLevel:    BETA,
+			Help:              "counter help",
+			DeprecatedVersion: "1.15.0",
+		},
+	)
 	alphaHiddenCounter = NewCounter(
 		&CounterOpts{
 			Namespace:         "some_namespace",
@@ -193,6 +203,15 @@ func TestRegister(t *testing.T) {
 			desc:                    "test alpha deprecated metric",
 			metrics:                 []*Counter{alphaDeprecatedCounter},
 			expectedErrors:          []error{nil},
+			expectedIsCreatedValues: []bool{false},
+			expectedIsDeprecated:    []bool{true},
+			expectedIsHidden:        []bool{true},
+		},
+
+		{
+			desc:                    "test beta deprecated metric",
+			metrics:                 []*Counter{betaDeprecatedCounter},
+			expectedErrors:          []error{nil},
 			expectedIsCreatedValues: []bool{true},
 			expectedIsDeprecated:    []bool{true},
 			expectedIsHidden:        []bool{false},
@@ -226,7 +245,7 @@ func TestRegister(t *testing.T) {
 					t.Errorf("Got IsDeprecated == %v, wanted IsDeprecated to be %v", m.IsDeprecated(), test.expectedIsDeprecated[i])
 				}
 				if m.IsHidden() != test.expectedIsHidden[i] {
-					t.Errorf("Got IsHidden == %v, wanted IsHidden to be %v", m.IsHidden(), test.expectedIsDeprecated[i])
+					t.Errorf("Got IsHidden == %v, wanted IsHidden to be %v", m.IsHidden(), test.expectedIsHidden[i])
 				}
 			}
 		})
@@ -259,8 +278,14 @@ func TestMustRegister(t *testing.T) {
 			expectedPanics:  []bool{false},
 		},
 		{
-			desc:            "test must registering same deprecated metric",
+			desc:            "test must registering same deprecated ALPHA metric",
 			metrics:         []*Counter{alphaDeprecatedCounter, alphaDeprecatedCounter},
+			registryVersion: &v115,
+			expectedPanics:  []bool{false, false},
+		},
+		{
+			desc:            "test must registering same deprecated BETA metric",
+			metrics:         []*Counter{betaDeprecatedCounter, betaDeprecatedCounter},
 			registryVersion: &v115,
 			expectedPanics:  []bool{false, true},
 		},
@@ -313,7 +338,7 @@ func TestShowHiddenMetric(t *testing.T) {
 			Namespace:         "some_namespace",
 			Name:              "test_alpha_show_hidden_counter",
 			Subsystem:         "subsystem",
-			StabilityLevel:    ALPHA,
+			StabilityLevel:    BETA,
 			Help:              "counter help",
 			DeprecatedVersion: "1.14.0",
 		},
@@ -398,12 +423,12 @@ func TestEnableHiddenMetrics(t *testing.T) {
 			counter: NewCounter(&CounterOpts{
 				Name:              "hidden_metric_register",
 				Help:              "counter help",
-				StabilityLevel:    STABLE,
+				StabilityLevel:    BETA,
 				DeprecatedVersion: "1.16.0",
 			}),
 			mustRegister: false,
 			expectedMetric: `
-				# HELP hidden_metric_register [STABLE] (Deprecated since 1.16.0) counter help
+				# HELP hidden_metric_register [BETA] (Deprecated since 1.16.0) counter help
 				# TYPE hidden_metric_register counter
 				hidden_metric_register 1
 				`,
@@ -414,12 +439,12 @@ func TestEnableHiddenMetrics(t *testing.T) {
 			counter: NewCounter(&CounterOpts{
 				Name:              "hidden_metric_must_register",
 				Help:              "counter help",
-				StabilityLevel:    STABLE,
+				StabilityLevel:    BETA,
 				DeprecatedVersion: "1.16.0",
 			}),
 			mustRegister: true,
 			expectedMetric: `
-				# HELP hidden_metric_must_register [STABLE] (Deprecated since 1.16.0) counter help
+				# HELP hidden_metric_must_register [BETA] (Deprecated since 1.16.0) counter help
 				# TYPE hidden_metric_must_register counter
 				hidden_metric_must_register 1
 				`,
@@ -462,8 +487,8 @@ func TestEnableHiddenStableCollector(t *testing.T) {
 		GitVersion: "v1.17.0-alpha-1.12345",
 	}
 	var normal = NewDesc("test_enable_hidden_custom_metric_normal", "this is a normal metric", []string{"name"}, nil, STABLE, "")
-	var hiddenA = NewDesc("test_enable_hidden_custom_metric_hidden_a", "this is the hidden metric A", []string{"name"}, nil, STABLE, "1.16.0")
-	var hiddenB = NewDesc("test_enable_hidden_custom_metric_hidden_b", "this is the hidden metric B", []string{"name"}, nil, STABLE, "1.16.0")
+	var hiddenA = NewDesc("test_enable_hidden_custom_metric_hidden_a", "this is the hidden metric A", []string{"name"}, nil, STABLE, "1.14.0")
+	var hiddenB = NewDesc("test_enable_hidden_custom_metric_hidden_b", "this is the hidden metric B", []string{"name"}, nil, STABLE, "1.14.0")
 
 	var tests = []struct {
 		name                      string
@@ -479,10 +504,10 @@ func TestEnableHiddenStableCollector(t *testing.T) {
 				"test_enable_hidden_custom_metric_hidden_b"},
 			expectMetricsBeforeEnable: "",
 			expectMetricsAfterEnable: `
-        		# HELP test_enable_hidden_custom_metric_hidden_a [STABLE] (Deprecated since 1.16.0) this is the hidden metric A
+        		# HELP test_enable_hidden_custom_metric_hidden_a [STABLE] (Deprecated since 1.14.0) this is the hidden metric A
         		# TYPE test_enable_hidden_custom_metric_hidden_a gauge
         		test_enable_hidden_custom_metric_hidden_a{name="value"} 1
-        		# HELP test_enable_hidden_custom_metric_hidden_b [STABLE] (Deprecated since 1.16.0) this is the hidden metric B
+        		# HELP test_enable_hidden_custom_metric_hidden_b [STABLE] (Deprecated since 1.14.0) this is the hidden metric B
         		# TYPE test_enable_hidden_custom_metric_hidden_b gauge
         		test_enable_hidden_custom_metric_hidden_b{name="value"} 1
 			`,
@@ -502,10 +527,10 @@ func TestEnableHiddenStableCollector(t *testing.T) {
         		# HELP test_enable_hidden_custom_metric_normal [STABLE] this is a normal metric
         		# TYPE test_enable_hidden_custom_metric_normal gauge
         		test_enable_hidden_custom_metric_normal{name="value"} 1
-        		# HELP test_enable_hidden_custom_metric_hidden_a [STABLE] (Deprecated since 1.16.0) this is the hidden metric A
+        		# HELP test_enable_hidden_custom_metric_hidden_a [STABLE] (Deprecated since 1.14.0) this is the hidden metric A
         		# TYPE test_enable_hidden_custom_metric_hidden_a gauge
         		test_enable_hidden_custom_metric_hidden_a{name="value"} 1
-        		# HELP test_enable_hidden_custom_metric_hidden_b [STABLE] (Deprecated since 1.16.0) this is the hidden metric B
+        		# HELP test_enable_hidden_custom_metric_hidden_b [STABLE] (Deprecated since 1.14.0) this is the hidden metric B
         		# TYPE test_enable_hidden_custom_metric_hidden_b gauge
         		test_enable_hidden_custom_metric_hidden_b{name="value"} 1
 			`,

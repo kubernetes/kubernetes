@@ -36,6 +36,7 @@ func TestNewFakeKubeRegistry(t *testing.T) {
 			Name:              "test_deprecated_total",
 			Help:              "counter help",
 			DeprecatedVersion: "1.18.0",
+			StabilityLevel:    metrics.BETA,
 		},
 	)
 	hiddenCounter := metrics.NewCounter(
@@ -43,6 +44,7 @@ func TestNewFakeKubeRegistry(t *testing.T) {
 			Name:              "test_hidden_counter",
 			Help:              "counter help",
 			DeprecatedVersion: "1.17.0",
+			StabilityLevel:    metrics.BETA,
 		},
 	)
 
@@ -64,7 +66,7 @@ func TestNewFakeKubeRegistry(t *testing.T) {
 			name:   "deprecated",
 			metric: deprecatedCounter,
 			expected: `
-				# HELP test_deprecated_total [ALPHA] (Deprecated since 1.18.0) counter help
+				# HELP test_deprecated_total [BETA] (Deprecated since 1.18.0) counter help
 				# TYPE test_deprecated_total counter
 				test_deprecated_total 0
 				`,

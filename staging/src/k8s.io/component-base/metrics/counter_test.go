@@ -60,8 +60,7 @@ func TestCounter(t *testing.T) {
 				StabilityLevel:    ALPHA,
 				DeprecatedVersion: "1.15.0",
 			},
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) counter help",
+			expectedMetricCount: 0,
 		},
 		{
 			desc: "Test hidden",
@@ -148,8 +147,7 @@ func TestCounterVec(t *testing.T) {
 				DeprecatedVersion: "1.15.0",
 			},
 			labels:                    []string{"label_a", "label_b"},
-			expectedMetricFamilyCount: 1,
-			expectedHelp:              "[ALPHA] (Deprecated since 1.15.0) counter help",
+			expectedMetricFamilyCount: 0,
 		},
 		{
 			desc: "Test hidden",

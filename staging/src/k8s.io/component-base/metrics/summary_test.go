@@ -59,8 +59,7 @@ func TestSummary(t *testing.T) {
 				StabilityLevel:    ALPHA,
 			},
 			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) summary help message",
+			expectedMetricCount: 0,
 		},
 		{
 			desc: "Test hidden",
@@ -147,8 +146,7 @@ func TestSummaryVec(t *testing.T) {
 			},
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) summary help message",
+			expectedMetricCount: 0,
 		},
 		{
 			desc: "Test hidden",
