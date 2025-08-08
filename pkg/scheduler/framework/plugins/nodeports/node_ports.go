@@ -35,9 +35,9 @@ type NodePorts struct {
 	enableSchedulingQueueHint bool
 }
 
-var _ framework.PreFilterPlugin = &NodePorts{}
-var _ framework.FilterPlugin = &NodePorts{}
-var _ framework.EnqueueExtensions = &NodePorts{}
+var _ fwk.PreFilterPlugin = &NodePorts{}
+var _ fwk.FilterPlugin = &NodePorts{}
+var _ fwk.EnqueueExtensions = &NodePorts{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -65,7 +65,7 @@ func (pl *NodePorts) Name() string {
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	s := util.GetHostPorts(pod)
 	// Skip if a pod has no ports.
 	if len(s) == 0 {
@@ -76,7 +76,7 @@ func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, p
 }
 
 // PreFilterExtensions do not exist for this plugin.
-func (pl *NodePorts) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *NodePorts) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
@@ -185,7 +185,7 @@ func fitsPorts(wantPorts []v1.ContainerPort, nodeInfo fwk.NodeInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &NodePorts{
 		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
 	}, nil
