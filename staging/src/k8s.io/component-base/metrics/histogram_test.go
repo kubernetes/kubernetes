@@ -21,7 +21,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
@@ -33,52 +32,141 @@ import (
 )
 
 func TestHistogram(t *testing.T) {
-	v115 := semver.MustParse("1.15.0")
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*HistogramOpts
-		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			HistogramOpts: &HistogramOpts{
-				Namespace: "namespace",
-				Name:      "metric_test_name",
-				Subsystem: "subsystem",
-				Help:      "histogram help message",
-				Buckets:   prometheus.DefBuckets,
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: ALPHA,
+				Help:           "histogram help message",
+				Buckets:        prometheus.DefBuckets,
 			},
-			registryVersion:     &v115,
 			expectedMetricCount: 1,
 			expectedHelp:        "[ALPHA] histogram help message",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			HistogramOpts: &HistogramOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: BETA,
+				Help:           "histogram help message",
+				Buckets:        prometheus.DefBuckets,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] histogram help message",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			HistogramOpts: &HistogramOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: STABLE,
+				Help:           "histogram help message",
+				Buckets:        prometheus.DefBuckets,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] histogram help message",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			HistogramOpts: &HistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.15.0",
 				Buckets:           prometheus.DefBuckets,
 			},
-			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedMetricCount: 0,
+			expectedHelp:        "histogram help message",
 		},
 		{
-			desc: "Test hidden",
+			desc: "BETA metric deprecated",
 			HistogramOpts: &HistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           prometheus.DefBuckets,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) histogram help message",
+		},
+		{
+			desc: "STABLE metric deprecated",
+			HistogramOpts: &HistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           prometheus.DefBuckets,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.15.0) histogram help message",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
+			HistogramOpts: &HistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           prometheus.DefBuckets,
+			},
+			expectedMetricCount: 0,
+			expectedHelp:        "histogram help message",
+		},
+		{
+			desc: "BETA metric hidden",
+			HistogramOpts: &HistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.14.0",
 				Buckets:           prometheus.DefBuckets,
 			},
-			registryVersion:     &v115,
+			expectedMetricCount: 0,
+			expectedHelp:        "histogram help message",
+		},
+		{
+			desc: "STABLE metric hidden",
+			HistogramOpts: &HistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.12.0",
+				Buckets:           prometheus.DefBuckets,
+			},
 			expectedMetricCount: 0,
 			expectedHelp:        "histogram help message",
 		},
@@ -86,11 +174,7 @@ func TestHistogram(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			c := NewHistogram(test.HistogramOpts)
 			registry.MustRegister(c)
 			cm := c.ObserverMetric.(prometheus.Metric)
@@ -134,17 +218,22 @@ func TestHistogram(t *testing.T) {
 }
 
 func TestHistogramVec(t *testing.T) {
-	v115 := semver.MustParse("1.15.0")
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*HistogramOpts
 		labels              []string
-		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			HistogramOpts: &HistogramOpts{
 				Namespace: "namespace",
 				Name:      "metric_test_name",
@@ -153,37 +242,115 @@ func TestHistogramVec(t *testing.T) {
 				Buckets:   prometheus.DefBuckets,
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
 			expectedMetricCount: 1,
 			expectedHelp:        "[ALPHA] histogram help message",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			HistogramOpts: &HistogramOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: BETA,
+				Help:           "histogram help message",
+				Buckets:        prometheus.DefBuckets,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] histogram help message",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			HistogramOpts: &HistogramOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: STABLE,
+				Help:           "histogram help message",
+				Buckets:        prometheus.DefBuckets,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] histogram help message",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			HistogramOpts: &HistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.15.0",
 				Buckets:           prometheus.DefBuckets,
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedMetricCount: 0,
+			expectedHelp:        "histogram help message",
 		},
 		{
-			desc: "Test hidden",
+			desc: "BETA metric deprecated",
 			HistogramOpts: &HistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           prometheus.DefBuckets,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) histogram help message",
+		},
+		{
+			desc: "STABLE metric deprecated",
+			HistogramOpts: &HistogramOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: STABLE,
+				Help:           "histogram help message",
+
+				DeprecatedVersion: "1.15.0",
+				Buckets:           prometheus.DefBuckets,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.15.0) histogram help message",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
+			HistogramOpts: &HistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.14.0",
 				Buckets:           prometheus.DefBuckets,
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
+			expectedMetricCount: 0,
+			expectedHelp:        "histogram help message",
+		},
+		{
+			desc: "BETA metric hidden",
+			HistogramOpts: &HistogramOpts{
+				Namespace: "namespace",
+				Name:      "metric_test_name",
+
+				Subsystem:      "subsystem",
+				StabilityLevel: BETA,
+
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.14.0",
+				Buckets:           prometheus.DefBuckets,
+			},
+
+			labels:              []string{"label_a", "label_b"},
 			expectedMetricCount: 0,
 			expectedHelp:        "histogram help message",
 		},
@@ -191,11 +358,7 @@ func TestHistogramVec(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			c := NewHistogramVec(test.HistogramOpts, test.labels)
 			registry.MustRegister(c)
 			ov12 := c.WithLabelValues("1", "2")
