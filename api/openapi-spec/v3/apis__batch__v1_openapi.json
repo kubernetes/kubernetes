@@ -176,6 +176,14 @@
               }
             ],
             "description": "Information when was the last time the job successfully completed."
+          },
+          "nextScheduleTime": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
+            "description": "Information when was the next time the job will be scheduled."
           }
         },
         "type": "object"
