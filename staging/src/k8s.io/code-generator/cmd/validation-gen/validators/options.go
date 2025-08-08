@@ -18,7 +18,6 @@ package validators
 
 import (
 	"fmt"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -80,7 +79,8 @@ func (itv ifTagValidator) GetValidations(context Context, tag codetags.Tag) (Val
 
 func (itv ifTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag: itv.TagName(),
+		Tag:            itv.TagName(),
+		StabilityLevel: Alpha,
 		Args: []TagArgDoc{{
 			Description: "<option>",
 			Type:        codetags.ArgTypeString,
