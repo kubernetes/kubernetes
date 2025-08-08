@@ -47,10 +47,13 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
+	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -836,7 +839,13 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 		}
 	} else {
 		if !podHasContainerWithName(pod, container) {
-			return "", errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, pod.Name))
+			coreV1Pod := &apiv1.Pod{}
+			if err := apiscorev1.Convert_core_Pod_To_v1_Pod(pod, coreV1Pod, nil); err != nil {
+				// This should never happen, but if it does, we want to log an error.
+				klog.ErrorS(err, "Pod failed to convert to v1", "pod", klog.KObj(pod))
+				return "", errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, pod.Name))
+			}
+			return "", errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s out of: %s", container, pod.Name, podcmd.AllContainerNames(coreV1Pod)))
 		}
 	}
 
