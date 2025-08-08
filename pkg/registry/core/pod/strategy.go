@@ -19,6 +19,10 @@ package pod
 import (
 	"context"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/cmd/util/podcmd"
+	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"net"
 	"net/http"
 	"net/url"
@@ -836,7 +840,10 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 		}
 	} else {
 		if !podHasContainerWithName(pod, container) {
-			return "", errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, pod.Name))
+			coreV1Pod := &corev1.Pod{}
+			err := apiscorev1.Convert_core_Pod_To_v1_Pod(pod, coreV1Pod, nil)
+			klog.ErrorS(err, "Pod failed to convert to v1", "pod", klog.KObj(pod))
+			return "", errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s out of: %s", container, pod.Name, podcmd.AllContainerNames(coreV1Pod)))
 		}
 	}
 
