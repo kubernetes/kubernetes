@@ -127,8 +127,9 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 	}
 	wsConn, resp, err := dialer.DialContext(request.Context(), request.URL.String(), request.Header)
 	if err != nil {
-		// BadHandshake error becomes an "UpgradeFailureError" (used for streaming fallback).
-		if errors.Is(err, gwebsocket.ErrBadHandshake) {
+		// BadHandshake error and WebSocket server incompatibility error during establishment
+		// become "UpgradeFailureError" (used for streaming fallback).
+		if errors.Is(err, gwebsocket.ErrBadHandshake) || errors.Is(err, wsstream.ErrWebSocketServerNotReady) {
 			cause := err
 			// Enhance the error message with the error response if possible.
 			if resp != nil && len(resp.Status) > 0 {

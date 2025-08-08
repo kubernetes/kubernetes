@@ -18,6 +18,7 @@ package wsstream
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -64,6 +65,10 @@ const ChannelWebSocketProtocol = "channel.k8s.io"
 //	READ  []byte{49, 67, 103, 61, 61} # receive "\n" (base64: "Cg==") on channel '1' (STDOUT)
 //	CLOSE
 const Base64ChannelWebSocketProtocol = "base64.channel.k8s.io"
+
+// ErrWebSocketServerNotReady indicates the WebSocket server terminated before completing initialization.
+// This typically occurs when a server doesn't support the requested WebSocket protocol version.
+var ErrWebSocketServerNotReady = errors.New("websocket server finished before becoming ready")
 
 type codecType int
 
@@ -240,7 +245,7 @@ func (conn *Conn) Open(w http.ResponseWriter, req *http.Request) (string, []io.R
 	case <-serveHTTPComplete:
 		// websocket server returned before completing initialization; cleanup and return error.
 		conn.closeNonThreadSafe() //nolint:errcheck
-		return "", nil, fmt.Errorf("websocket server finished before becoming ready")
+		return "", nil, ErrWebSocketServerNotReady
 	case p := <-panicChan:
 		panic(p)
 	}
