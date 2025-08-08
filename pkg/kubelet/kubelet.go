@@ -1915,6 +1915,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		otelSpan.End()
 	}()
 
+	klog.InfoS("Debug SyncPod", "podStatus", podStatus)
+
 	// Latency measurements for the main workflow are relative to the
 	// first time the pod was seen by kubelet.
 	var firstSeenTime time.Time
