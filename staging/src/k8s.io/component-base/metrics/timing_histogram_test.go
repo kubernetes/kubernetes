@@ -53,7 +53,7 @@ func TestTimingHistogram(t *testing.T) {
 			expectedHelp:        "EXPERIMENTAL: [ALPHA] histogram help message",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "Test deprecated ALPHA",
 			TimingHistogramOpts: &TimingHistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
@@ -65,6 +65,38 @@ func TestTimingHistogram(t *testing.T) {
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 0,
+		},
+		{
+			desc: "Test deprecated BETA",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           DefBuckets,
+				InitialValue:      3,
+				StabilityLevel:    BETA,
+			},
+			registryVersion:     &v115,
+			expectedMetricCount: 1,
+			expectedHelp:        "EXPERIMENTAL: [BETA] (Deprecated since 1.15.0) histogram help message",
+		},
+		{
+			desc: "Test deprecated STABLE",
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           DefBuckets,
+				InitialValue:      3,
+				StabilityLevel:    STABLE,
+			},
+			registryVersion:     &v115,
+			expectedMetricCount: 1,
+			expectedHelp:        "EXPERIMENTAL: [STABLE] (Deprecated since 1.15.0) histogram help message",
 		},
 		{
 			desc: "Test hidden",

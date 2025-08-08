@@ -135,7 +135,7 @@ func TestGaugeVec(t *testing.T) {
 			expectedHelp:        "[ALPHA] gauge help",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "Test deprecated ALPHA",
 			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
@@ -146,6 +146,36 @@ func TestGaugeVec(t *testing.T) {
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
 			expectedMetricCount: 0,
+		},
+		{
+			desc: "Test deprecated BETA",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				DeprecatedVersion: "1.15.0",
+				StabilityLevel:    BETA,
+			},
+			labels:              []string{"label_a", "label_b"},
+			registryVersion:     &v115,
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) gauge help",
+		},
+		{
+			desc: "Test deprecated STABLE",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				DeprecatedVersion: "1.15.0",
+				StabilityLevel:    STABLE,
+			},
+			labels:              []string{"label_a", "label_b"},
+			registryVersion:     &v115,
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.15.0) gauge help",
 		},
 		{
 			desc: "Test hidden",

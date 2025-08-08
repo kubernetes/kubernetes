@@ -53,7 +53,7 @@ func TestHistogram(t *testing.T) {
 			expectedHelp:        "[ALPHA] histogram help message",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "Test deprecated ALPHA",
 			HistogramOpts: &HistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
@@ -64,6 +64,36 @@ func TestHistogram(t *testing.T) {
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 0,
+		},
+		{
+			desc: "Test deprecated BETA",
+			HistogramOpts: &HistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           prometheus.DefBuckets,
+				StabilityLevel:    BETA,
+			},
+			registryVersion:     &v115,
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) histogram help message",
+		},
+		{
+			desc: "Test deprecated STABLE",
+			HistogramOpts: &HistogramOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "histogram help message",
+				DeprecatedVersion: "1.15.0",
+				Buckets:           prometheus.DefBuckets,
+				StabilityLevel:    STABLE,
+			},
+			registryVersion:     &v115,
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.15.0) histogram help message",
 		},
 		{
 			desc: "Test hidden",

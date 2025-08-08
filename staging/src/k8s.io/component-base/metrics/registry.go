@@ -76,7 +76,7 @@ var (
 // according to metrics deprecation lifecycle.
 // This follows rule #11b as stated here: https://kubernetes.io/docs/reference/using-api/deprecation-policy/#deprecating-a-metric
 func shouldHide(stabilityLevel StabilityLevel, currentVersion, deprecatedVersion *semver.Version) bool {
-	guardVersion, err := semver.Make(fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor))
+	guardVersion, err := semver.Make(fmt.Sprintf("%d.%d.0-alpha.1", currentVersion.Major, currentVersion.Minor))
 	if err != nil {
 		panic("failed to make version from current version")
 	}

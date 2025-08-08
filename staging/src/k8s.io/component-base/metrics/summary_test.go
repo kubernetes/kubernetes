@@ -49,7 +49,7 @@ func TestSummary(t *testing.T) {
 			expectedHelp:        "[ALPHA] summary help message",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "Test deprecated ALPHA",
 			SummaryOpts: &SummaryOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
@@ -60,6 +60,34 @@ func TestSummary(t *testing.T) {
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 0,
+		},
+		{
+			desc: "Test deprecated BETA",
+			SummaryOpts: &SummaryOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "summary help message",
+				DeprecatedVersion: "1.15.0",
+				StabilityLevel:    BETA,
+			},
+			registryVersion:     &v115,
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) summary help message",
+		},
+		{
+			desc: "Test deprecated STABLE",
+			SummaryOpts: &SummaryOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "summary help message",
+				DeprecatedVersion: "1.15.0",
+				StabilityLevel:    STABLE,
+			},
+			registryVersion:     &v115,
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.15.0) summary help message",
 		},
 		{
 			desc: "Test hidden",

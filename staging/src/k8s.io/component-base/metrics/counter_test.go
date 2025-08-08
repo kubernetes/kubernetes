@@ -51,7 +51,7 @@ func TestCounter(t *testing.T) {
 			expectedHelp:        "[ALPHA] counter help",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "Test deprecated ALPHA",
 			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
@@ -61,6 +61,32 @@ func TestCounter(t *testing.T) {
 				DeprecatedVersion: "1.15.0",
 			},
 			expectedMetricCount: 0,
+		},
+		{
+			desc: "Test deprecated BETA",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "counter help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.15.0",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) counter help",
+		},
+		{
+			desc: "Test deprecated STABLE",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "counter help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.15.0",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.15.0) counter help",
 		},
 		{
 			desc: "Test hidden",
