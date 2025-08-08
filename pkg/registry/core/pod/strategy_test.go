@@ -582,7 +582,7 @@ func TestCheckLogLocation(t *testing.T) {
 			opts: &api.PodLogOptions{
 				Container: "unknown",
 			},
-			expectedErr:       errors.NewBadRequest("container unknown is not valid for pod test"),
+			expectedErr:       errors.NewBadRequest("container unknown is not valid for pod test out of: container1, container2"),
 			expectedTransport: nil,
 		},
 		{

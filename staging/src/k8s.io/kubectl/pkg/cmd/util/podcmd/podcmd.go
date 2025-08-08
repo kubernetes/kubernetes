@@ -59,7 +59,7 @@ func FindOrDefaultContainerByName(pod *v1.Pod, name string, quiet bool, warn io.
 	if len(name) > 0 {
 		container, _ = FindContainerByName(pod, name)
 		if container == nil {
-			return nil, fmt.Errorf("container %s not found in pod %s", name, pod.Name)
+			return nil, fmt.Errorf("container %s not found in pod %s out of: %s", name, pod.Name, AllContainerNames(pod))
 		}
 		return container, nil
 	}
