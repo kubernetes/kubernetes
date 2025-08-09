@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -194,7 +194,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 
 func getEventsFromFakeRecorder(t *testing.T, am Manager) string {
 	select {
-	case e := <-am.(*manager).recorder.(*record.FakeRecorder).Events:
+	case e := <-am.(*manager).recorder.(*events.FakeRecorder).Events:
 		return e
 	default:
 		return ""
@@ -485,7 +485,7 @@ func TestCheckPodResizeInProgress(t *testing.T) {
 			}
 			require.NoError(t, am.SetAllocatedResources(pod))
 
-			am.(*manager).recorder = record.NewFakeRecorder(200)
+			am.(*manager).recorder = events.NewFakeRecorder(200)
 
 			// Set old Pod condition as Inprogress, so that ClearPodResizeInProgressCondition is true and emit resize completed event
 			if test.oldPodResizeInProgressCondition {
