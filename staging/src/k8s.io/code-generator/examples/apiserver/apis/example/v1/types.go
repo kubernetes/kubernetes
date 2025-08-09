@@ -70,3 +70,23 @@ type MemoryDifferent struct {
 
 	Bool *bool `json:"bool"` // differs from internal representation
 }
+
+type ConversionPrivate struct {
+	PublicField  string `json:"publicField"`
+	privateField string `json:"privateField"`
+}
+
+type ConversionCustomContainer struct {
+	// +listType=atomic
+	Slice []ConversionCustom `json:"slice"`
+	// +listType=atomic
+	SliceP  []*ConversionCustom          `json:"sliceP"`
+	Map     map[string]ConversionCustom  `json:"map"`
+	MapP    map[string]*ConversionCustom `json:"mapP"`
+	Struct  ConversionCustom             `json:"struct"`
+	StructP *ConversionCustom            `json:"structP"`
+}
+type ConversionCustom struct {
+	PublicField  string `json:"publicField"`
+	privateField string `json:"privateField"`
+}
