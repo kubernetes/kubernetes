@@ -259,6 +259,7 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 			}
 			shouldSendPLEGEvent = true
 		} else {
+			e.logger.Info("DEBUG Status", "status", status)
 			if e.cache.Set(podID, status, nil, time.Unix(0, event.GetCreatedAt())) {
 				shouldSendPLEGEvent = true
 			}
