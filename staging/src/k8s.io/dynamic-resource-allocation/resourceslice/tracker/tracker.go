@@ -466,7 +466,7 @@ func (t *Tracker) deviceTaintUpdate(ctx context.Context) func(oldObj, newObj any
 		slicesToSync := sets.New[string]()
 		slicesToSync.Insert(t.sliceNamesForPatch(ctx, oldPatch)...)
 		slicesToSync.Insert(t.sliceNamesForPatch(ctx, newPatch)...)
-		for _, sliceName := range slicesToSync.UnsortedList() {
+		for sliceName := range slicesToSync {
 			t.syncSlice(ctx, sliceName, false)
 		}
 	}
