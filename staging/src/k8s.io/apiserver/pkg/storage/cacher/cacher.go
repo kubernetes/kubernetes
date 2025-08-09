@@ -426,7 +426,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers,
 		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion)
-	listerWatcher := NewListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc, contextMetadata)
+	listerWatcher := NewListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc, contextMetadata, utilfeature.DefaultFeatureGate.Enabled(features.WatchFromStorageWithoutPrevKV))
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
 	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0)
