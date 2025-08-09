@@ -55,6 +55,7 @@ type Reader interface {
 
 type writer interface {
 	SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error
+	SetContainerCPUResources(podUID types.UID, containerName string, request int64) error
 	SetPodResourceInfo(podUID types.UID, resourceInfo PodResourceInfo) error
 	RemovePod(podUID types.UID) error
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.

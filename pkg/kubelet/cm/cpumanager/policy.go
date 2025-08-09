@@ -42,4 +42,7 @@ type Policy interface {
 	GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs(m state.State) cpuset.CPUSet
+
+	GetReusableUnallocatedCPUs(pod *v1.Pod) cpuset.CPUSet
+	ClearCPUsToReuse(pod *v1.Pod)
 }
