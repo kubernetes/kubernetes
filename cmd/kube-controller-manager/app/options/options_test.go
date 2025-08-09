@@ -447,9 +447,10 @@ func TestAddFlags(t *testing.T) {
 			AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
 			AlwaysAllowGroups:            []string{"system:masters"},
 		},
-		Master:  "192.168.4.20",
-		Metrics: &metrics.Options{},
-		Logs:    logs.NewOptions(),
+		Master:                    "192.168.4.20",
+		ControllerShutdownTimeout: 10 * time.Second,
+		Metrics:                   &metrics.Options{},
+		Logs:                      logs.NewOptions(),
 		// ignores comparing ComponentGlobalsRegistry in this test.
 		ComponentGlobalsRegistry: s.ComponentGlobalsRegistry,
 	}
@@ -722,6 +723,7 @@ func TestApplyTo(t *testing.T) {
 				ConcurrentPolicySyncs: 9,
 			},
 		},
+		ControllerShutdownTimeout: 10 * time.Second,
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
