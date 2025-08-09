@@ -19,6 +19,7 @@ package get
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -619,6 +620,9 @@ func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 		TransformRequests(o.transformRequests).
 		Do()
 	if err := r.Err(); err != nil {
+		if errors.Is(err, resource.ErrMultipleResourceTypes) {
+			return i18n.Errorf("watch is only supported on individual resources and resource collections - more than 1 resource was found")
+		}
 		return err
 	}
 	infos, err := r.Infos()
@@ -628,9 +632,6 @@ func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 			return nil
 		}
 		return err
-	}
-	if multipleGVKsRequested(infos) {
-		return i18n.Errorf("watch is only supported on individual resources and resource collections - more than 1 resource was found")
 	}
 
 	info := infos[0]
