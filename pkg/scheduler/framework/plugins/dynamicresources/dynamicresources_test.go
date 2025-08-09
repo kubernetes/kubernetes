@@ -58,21 +58,22 @@ import (
 var (
 	podKind = v1.SchemeGroupVersion.WithKind("Pod")
 
-	nodeName             = "worker"
-	node2Name            = "worker-2"
-	node3Name            = "worker-3"
-	driver               = "some-driver"
-	driver2              = "some-driver-2"
-	podName              = "my-pod"
-	podUID               = "1234"
-	resourceName         = "my-resource"
-	resourceName2        = resourceName + "-2"
-	claimName            = podName + "-" + resourceName
-	claimName2           = podName + "-" + resourceName2
-	className            = "my-resource-class"
-	namespace            = "default"
-	attrName             = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
-	extendedResourceName = "example.com/gpu"
+	nodeName                     = "worker"
+	node2Name                    = "worker-2"
+	node3Name                    = "worker-3"
+	driver                       = "some-driver"
+	driver2                      = "some-driver-2"
+	podName                      = "my-pod"
+	podUID                       = "1234"
+	resourceName                 = "my-resource"
+	resourceName2                = resourceName + "-2"
+	claimName                    = podName + "-" + resourceName
+	claimName2                   = podName + "-" + resourceName2
+	className                    = "my-resource-class"
+	namespace                    = "default"
+	attrName                     = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
+	extendedResourceName         = "example.com/gpu"
+	implicitExtendedResourceName = "deviceclass.resource.kubernetes.io/my-resource-class"
 
 	deviceClass = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -120,6 +121,12 @@ var (
 					UID(podUID).
 					Req(map[v1.ResourceName]string{
 			v1.ResourceName(extendedResourceName): "1",
+		}).
+		Obj()
+	podWithImplicitExtendedResourceName = st.MakePod().Name(podName).Namespace(namespace).
+						UID(podUID).
+						Req(map[v1.ResourceName]string{
+			v1.ResourceName(implicitExtendedResourceName): "1",
 		}).
 		Obj()
 
@@ -1300,6 +1307,24 @@ func TestPlugin(t *testing.T) {
 				},
 				postbind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+				},
+			},
+		},
+		"implicit-extended-resource-name-with-resources": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithImplicitExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClass},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithImplicitExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaim: extendedResourceClaimNoName,
+				},
+				prebind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithImplicitExtendedResourceName),
+					added:        []metav1.Object{reserve(extendedResourceClaim, podWithImplicitExtendedResourceName)},
+				},
+				postbind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithImplicitExtendedResourceName),
 				},
 			},
 		},
