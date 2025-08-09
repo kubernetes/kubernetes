@@ -133,11 +133,12 @@ type manager struct {
 	allocated state.State
 	actuated  state.State
 
-	admitHandlers    lifecycle.PodAdmitHandlers
-	containerManager cm.ContainerManager
-	containerRuntime kubecontainer.Runtime
-	statusManager    status.Manager
-	sourcesReady     config.SourcesReady
+	admitHandlers           lifecycle.PodAdmitHandlers
+	containerRuntime        kubecontainer.Runtime
+	statusManager           status.Manager
+	sourcesReady            config.SourcesReady
+	nodeConfig              cm.NodeConfig
+	nodeAllocatableAbsolute v1.ResourceList
 
 	ticker         *time.Ticker
 	triggerPodSync func(pod *v1.Pod)
@@ -151,7 +152,8 @@ type manager struct {
 }
 
 func NewManager(checkpointDirectory string,
-	containerManager cm.ContainerManager,
+	nodeConfig cm.NodeConfig,
+	nodeAllocatableAbsolute v1.ResourceList,
 	statusManager status.Manager,
 	triggerPodSync func(pod *v1.Pod),
 	getActivePods func() []*v1.Pod,
@@ -163,10 +165,11 @@ func NewManager(checkpointDirectory string,
 		allocated: newStateImpl(checkpointDirectory, allocatedPodsStateFile),
 		actuated:  newStateImpl(checkpointDirectory, actuatedPodsStateFile),
 
-		containerManager: containerManager,
-		statusManager:    statusManager,
-		admitHandlers:    lifecycle.PodAdmitHandlers{},
-		sourcesReady:     sourcesReady,
+		statusManager:           statusManager,
+		admitHandlers:           lifecycle.PodAdmitHandlers{},
+		sourcesReady:            sourcesReady,
+		nodeConfig:              nodeConfig,
+		nodeAllocatableAbsolute: nodeAllocatableAbsolute,
 
 		ticker:         time.NewTicker(initialRetryDelay),
 		triggerPodSync: triggerPodSync,
@@ -205,7 +208,8 @@ func newStateImpl(checkpointDirectory, checkpointName string) state.State {
 
 // NewInMemoryManager returns an allocation manager that doesn't persist state.
 // For testing purposes only!
-func NewInMemoryManager(containerManager cm.ContainerManager,
+func NewInMemoryManager(nodeConfig cm.NodeConfig,
+	nodeAllocatableAbsolute v1.ResourceList,
 	statusManager status.Manager,
 	triggerPodSync func(pod *v1.Pod),
 	getActivePods func() []*v1.Pod,
@@ -216,10 +220,11 @@ func NewInMemoryManager(containerManager cm.ContainerManager,
 		allocated: state.NewStateMemory(nil),
 		actuated:  state.NewStateMemory(nil),
 
-		containerManager: containerManager,
-		statusManager:    statusManager,
-		admitHandlers:    lifecycle.PodAdmitHandlers{},
-		sourcesReady:     sourcesReady,
+		statusManager:           statusManager,
+		admitHandlers:           lifecycle.PodAdmitHandlers{},
+		sourcesReady:            sourcesReady,
+		nodeConfig:              nodeConfig,
+		nodeAllocatableAbsolute: nodeAllocatableAbsolute,
 
 		ticker:         time.NewTicker(initialRetryDelay),
 		triggerPodSync: triggerPodSync,
@@ -716,7 +721,7 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 	// lifecycle.PodAdmitAttributes, and combine canResizePod with canAdmitPod.
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) &&
-			m.containerManager.GetNodeConfig().CPUManagerPolicy == string(cpumanager.PolicyStatic) &&
+			m.nodeConfig.CPUManagerPolicy == string(cpumanager.PolicyStatic) &&
 			m.guaranteedPodResourceResizeRequired(pod, v1.ResourceCPU) {
 			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods alongside CPU Manager policy \"%s\"", string(cpumanager.PolicyStatic))
 			klog.V(3).InfoS(msg, "pod", format.Pod(pod))
@@ -725,7 +730,7 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) &&
 			!utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveMemory) &&
-			m.containerManager.GetNodeConfig().MemoryManagerPolicy == string(memorymanager.PolicyTypeStatic) &&
+			m.nodeConfig.MemoryManagerPolicy == string(memorymanager.PolicyTypeStatic) &&
 			m.guaranteedPodResourceResizeRequired(pod, v1.ResourceMemory) {
 			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods alongside Memory Manager policy \"%s\"", string(memorymanager.PolicyTypeStatic))
 			klog.V(3).InfoS(msg, "pod", format.Pod(pod))
@@ -734,9 +739,8 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 		}
 	}
 
-	allocatable := m.containerManager.GetNodeAllocatableAbsolute()
-	cpuAvailable := allocatable.Cpu().MilliValue()
-	memAvailable := allocatable.Memory().Value()
+	cpuAvailable := m.nodeAllocatableAbsolute.Cpu().MilliValue()
+	memAvailable := m.nodeAllocatableAbsolute.Memory().Value()
 	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
 	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
 	if cpuRequests > cpuAvailable || memRequests > memAvailable {

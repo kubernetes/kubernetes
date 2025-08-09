@@ -688,7 +688,8 @@ func NewMainKubelet(ctx context.Context,
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 	klet.allocationManager = allocation.NewManager(
 		klet.getRootDir(),
-		klet.containerManager,
+		klet.containerManager.GetNodeConfig(),
+		klet.containerManager.GetNodeAllocatableAbsolute(),
 		klet.statusManager,
 		func(pod *v1.Pod) { klet.HandlePodSyncs([]*v1.Pod{pod}) },
 		klet.GetActivePods,
