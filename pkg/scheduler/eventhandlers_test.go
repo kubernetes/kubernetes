@@ -47,11 +47,11 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
@@ -171,7 +171,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				queue := internalqueue.NewPriorityQueue(
 					newDefaultQueueSort(),
 					informerFactory,
-					internalqueue.WithMetricsRecorder(*recorder),
+					internalqueue.WithMetricsRecorder(recorder),
 					internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
 					internalqueue.WithAPIDispatcher(apiDispatcher),
 					// disable backoff queue
