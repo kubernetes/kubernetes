@@ -58,3 +58,18 @@ For example:
 
 Some of the definitions may have these extensions. For more information about PatchStrategy and PatchMergeKey see
 [strategic-merge-patch](https://git.k8s.io/community/contributors/devel/sig-api-machinery/strategic-merge-patch.md).
+
+### `x-kubernetes-list-type`
+
+Specifies how lists behave in CRDs. Possible values:
+- `atomic`: List is replaced as a whole.
+- `set`: List must have unique items.
+- `map`: Each item is identified by unique keys defined by `x-kubernetes-map-key`.
+
+### `x-kubernetes-map-key`
+
+Specifies one or more key fields used to uniquely identify elements in a list when list-type is `map`.
+
+### `x-kubernetes-unions`
+
+Declares mutually exclusive fields. Only one of the listed fields should be set. Helps model union types.
