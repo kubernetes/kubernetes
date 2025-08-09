@@ -45,6 +45,27 @@ func ClusterTrustBundle(name string) *ClusterTrustBundleApplyConfiguration {
 	return b
 }
 
+// ExtractClusterTrustBundleFrom extracts the applied configuration owned by fieldManager from
+// clusterTrustBundle for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// clusterTrustBundle must be a unmodified ClusterTrustBundle API object that was retrieved from the Kubernetes API.
+// ExtractClusterTrustBundleFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractClusterTrustBundleFrom(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string, subresource string) (*ClusterTrustBundleApplyConfiguration, error) {
+	b := &ClusterTrustBundleApplyConfiguration{}
+	err := managedfields.ExtractInto(clusterTrustBundle, internal.Parser().Type("io.k8s.api.certificates.v1alpha1.ClusterTrustBundle"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(clusterTrustBundle.Name)
+
+	b.WithKind("ClusterTrustBundle")
+	b.WithAPIVersion("certificates.k8s.io/v1alpha1")
+	return b, nil
+}
+
 // ExtractClusterTrustBundle extracts the applied configuration owned by fieldManager from
 // clusterTrustBundle. If no managedFields are found in clusterTrustBundle for fieldManager, a
 // ClusterTrustBundleApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func ClusterTrustBundle(name string) *ClusterTrustBundleApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractClusterTrustBundle(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string) (*ClusterTrustBundleApplyConfiguration, error) {
-	return extractClusterTrustBundle(clusterTrustBundle, fieldManager, "")
+	return ExtractClusterTrustBundleFrom(clusterTrustBundle, fieldManager, "")
 }
 
-// ExtractClusterTrustBundleStatus is the same as ExtractClusterTrustBundle except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractClusterTrustBundleStatus(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string) (*ClusterTrustBundleApplyConfiguration, error) {
-	return extractClusterTrustBundle(clusterTrustBundle, fieldManager, "status")
-}
-
-func extractClusterTrustBundle(clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, fieldManager string, subresource string) (*ClusterTrustBundleApplyConfiguration, error) {
-	b := &ClusterTrustBundleApplyConfiguration{}
-	err := managedfields.ExtractInto(clusterTrustBundle, internal.Parser().Type("io.k8s.api.certificates.v1alpha1.ClusterTrustBundle"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(clusterTrustBundle.Name)
-
-	b.WithKind("ClusterTrustBundle")
-	b.WithAPIVersion("certificates.k8s.io/v1alpha1")
-	return b, nil
-}
 func (b ClusterTrustBundleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

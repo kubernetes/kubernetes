@@ -45,6 +45,27 @@ func IngressClass(name string) *IngressClassApplyConfiguration {
 	return b
 }
 
+// ExtractIngressClassFrom extracts the applied configuration owned by fieldManager from
+// ingressClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// ingressClass must be a unmodified IngressClass API object that was retrieved from the Kubernetes API.
+// ExtractIngressClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractIngressClassFrom(ingressClass *networkingv1beta1.IngressClass, fieldManager string, subresource string) (*IngressClassApplyConfiguration, error) {
+	b := &IngressClassApplyConfiguration{}
+	err := managedfields.ExtractInto(ingressClass, internal.Parser().Type("io.k8s.api.networking.v1beta1.IngressClass"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(ingressClass.Name)
+
+	b.WithKind("IngressClass")
+	b.WithAPIVersion("networking.k8s.io/v1beta1")
+	return b, nil
+}
+
 // ExtractIngressClass extracts the applied configuration owned by fieldManager from
 // ingressClass. If no managedFields are found in ingressClass for fieldManager, a
 // IngressClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func IngressClass(name string) *IngressClassApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractIngressClass(ingressClass *networkingv1beta1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
-	return extractIngressClass(ingressClass, fieldManager, "")
+	return ExtractIngressClassFrom(ingressClass, fieldManager, "")
 }
 
-// ExtractIngressClassStatus is the same as ExtractIngressClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractIngressClassStatus(ingressClass *networkingv1beta1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
-	return extractIngressClass(ingressClass, fieldManager, "status")
-}
-
-func extractIngressClass(ingressClass *networkingv1beta1.IngressClass, fieldManager string, subresource string) (*IngressClassApplyConfiguration, error) {
-	b := &IngressClassApplyConfiguration{}
-	err := managedfields.ExtractInto(ingressClass, internal.Parser().Type("io.k8s.api.networking.v1beta1.IngressClass"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(ingressClass.Name)
-
-	b.WithKind("IngressClass")
-	b.WithAPIVersion("networking.k8s.io/v1beta1")
-	return b, nil
-}
 func (b IngressClassApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

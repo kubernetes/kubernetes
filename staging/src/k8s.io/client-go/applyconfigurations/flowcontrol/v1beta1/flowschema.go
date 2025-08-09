@@ -46,6 +46,27 @@ func FlowSchema(name string) *FlowSchemaApplyConfiguration {
 	return b
 }
 
+// ExtractFlowSchemaFrom extracts the applied configuration owned by fieldManager from
+// flowSchema for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// flowSchema must be a unmodified FlowSchema API object that was retrieved from the Kubernetes API.
+// ExtractFlowSchemaFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractFlowSchemaFrom(flowSchema *flowcontrolv1beta1.FlowSchema, fieldManager string, subresource string) (*FlowSchemaApplyConfiguration, error) {
+	b := &FlowSchemaApplyConfiguration{}
+	err := managedfields.ExtractInto(flowSchema, internal.Parser().Type("io.k8s.api.flowcontrol.v1beta1.FlowSchema"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(flowSchema.Name)
+
+	b.WithKind("FlowSchema")
+	b.WithAPIVersion("flowcontrol.apiserver.k8s.io/v1beta1")
+	return b, nil
+}
+
 // ExtractFlowSchema extracts the applied configuration owned by fieldManager from
 // flowSchema. If no managedFields are found in flowSchema for fieldManager, a
 // FlowSchemaApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -58,28 +79,16 @@ func FlowSchema(name string) *FlowSchemaApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractFlowSchema(flowSchema *flowcontrolv1beta1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
-	return extractFlowSchema(flowSchema, fieldManager, "")
+	return ExtractFlowSchemaFrom(flowSchema, fieldManager, "")
 }
 
-// ExtractFlowSchemaStatus is the same as ExtractFlowSchema except
-// that it extracts the status subresource applied configuration.
+// ExtractFlowSchemaStatus extracts the applied configuration owned by fieldManager from
+// flowSchema for the status subresource.
 // Experimental!
 func ExtractFlowSchemaStatus(flowSchema *flowcontrolv1beta1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
-	return extractFlowSchema(flowSchema, fieldManager, "status")
+	return ExtractFlowSchemaFrom(flowSchema, fieldManager, "status")
 }
 
-func extractFlowSchema(flowSchema *flowcontrolv1beta1.FlowSchema, fieldManager string, subresource string) (*FlowSchemaApplyConfiguration, error) {
-	b := &FlowSchemaApplyConfiguration{}
-	err := managedfields.ExtractInto(flowSchema, internal.Parser().Type("io.k8s.api.flowcontrol.v1beta1.FlowSchema"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(flowSchema.Name)
-
-	b.WithKind("FlowSchema")
-	b.WithAPIVersion("flowcontrol.apiserver.k8s.io/v1beta1")
-	return b, nil
-}
 func (b FlowSchemaApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
