@@ -675,203 +675,205 @@ func TestPrepareCandidate(t *testing.T) {
 
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, asyncAPICallsEnabled := range []bool{true, false} {
-			for _, tt := range tests {
-				t.Run(fmt.Sprintf("%v (Async preemption enabled: %v, Async API calls enabled: %v)", tt.name, asyncPreemptionEnabled, asyncAPICallsEnabled), func(t *testing.T) {
-					metrics.Register()
-					logger, ctx := ktesting.NewTestContext(t)
-					ctx, cancel := context.WithCancel(ctx)
-					defer cancel()
+			for _, nominatedNodeNameForExpectationEnabled := range []bool{true, false} {
+				for _, tt := range tests {
+					t.Run(fmt.Sprintf("%v (Async preemption enabled: %v, Async API calls enabled: %v, NominatedNodeNameForExpectation: %v)", tt.name, asyncPreemptionEnabled, asyncAPICallsEnabled, nominatedNodeNameForExpectationEnabled), func(t *testing.T) {
+						metrics.Register()
+						logger, ctx := ktesting.NewTestContext(t)
+						ctx, cancel := context.WithCancel(ctx)
+						defer cancel()
 
-					nodes := make([]*v1.Node, len(tt.nodeNames))
-					for i, nodeName := range tt.nodeNames {
-						nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
-					}
-					registeredPlugins := append([]tf.RegisterPluginFunc{
-						tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
-						tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-					)
-					var objs []runtime.Object
-					for _, pod := range tt.testPods {
-						objs = append(objs, pod)
-					}
-
-					mu := &sync.RWMutex{}
-					deletedPods := sets.New[string]()
-					deletionFailure := false // whether any request to delete pod failed
-					patchFailure := false    // whether any request to patch pod status failed
-
-					cs := clientsetfake.NewClientset(objs...)
-					cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-						mu.Lock()
-						defer mu.Unlock()
-						name := action.(clienttesting.DeleteAction).GetName()
-						if name == "fail-victim" {
-							deletionFailure = true
-							return true, nil, errDeletePodFailed
+						nodes := make([]*v1.Node, len(tt.nodeNames))
+						for i, nodeName := range tt.nodeNames {
+							nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
 						}
-						// fake clientset does not return an error for not-found pods, so we simulate it here.
-						if name == "not-found-victim" {
-							// Simulate a not-found error.
-							return true, nil, apierrors.NewNotFound(v1.Resource("pods"), name)
+						registeredPlugins := append([]tf.RegisterPluginFunc{
+							tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
+							tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+						)
+						var objs []runtime.Object
+						for _, pod := range tt.testPods {
+							objs = append(objs, pod)
 						}
 
-						deletedPods.Insert(name)
-						return true, nil, nil
-					})
+						mu := &sync.RWMutex{}
+						deletedPods := sets.New[string]()
+						deletionFailure := false // whether any request to delete pod failed
+						patchFailure := false    // whether any request to patch pod status failed
 
-					cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-						mu.Lock()
-						defer mu.Unlock()
-						if action.(clienttesting.PatchAction).GetName() == "fail-victim" {
-							patchFailure = true
-							return true, nil, errPatchStatusFailed
-						}
-						// fake clientset does not return an error for not-found pods, so we simulate it here.
-						if action.(clienttesting.PatchAction).GetName() == "not-found-victim" {
-							return true, nil, apierrors.NewNotFound(v1.Resource("pods"), "not-found-victim")
-						}
-						return true, nil, nil
-					})
-
-					informerFactory := informers.NewSharedInformerFactory(cs, 0)
-					eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
-					fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod), mu: mu}
-
-					// Note: NominatedPodsForNode is called at the beginning of the goroutine in any case.
-					// fakePodNominator can delay the response of NominatedPodsForNode until the channel is closed,
-					// which allows us to test the preempting map before the goroutine does nothing yet.
-					requestStopper := make(chan struct{})
-					nominator := &fakePodNominator{
-						SchedulingQueue: internalqueue.NewSchedulingQueue(nil, informerFactory),
-						requestStopper:  requestStopper,
-					}
-					var apiDispatcher *apidispatcher.APIDispatcher
-					if asyncAPICallsEnabled {
-						apiDispatcher = apidispatcher.New(cs, 16, apicalls.Relevances)
-						apiDispatcher.Run(logger)
-						defer apiDispatcher.Close()
-					}
-
-					fwk, err := tf.NewFramework(
-						ctx,
-						registeredPlugins, "",
-						frameworkruntime.WithClientSet(cs),
-						frameworkruntime.WithAPIDispatcher(apiDispatcher),
-						frameworkruntime.WithLogger(logger),
-						frameworkruntime.WithInformerFactory(informerFactory),
-						frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
-						frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.testPods, nodes)),
-						frameworkruntime.WithPodNominator(nominator),
-						frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
-						frameworkruntime.WithPodActivator(fakeActivator),
-					)
-					if err != nil {
-						t.Fatal(err)
-					}
-					informerFactory.Start(ctx.Done())
-					informerFactory.WaitForCacheSync(ctx.Done())
-					fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
-					if asyncAPICallsEnabled {
-						cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
-						fwk.SetAPICacher(apicache.New(nil, cache))
-					}
-
-					pe := NewEvaluator("FakePreemptionScorePostFilter", fwk, fakePreemptionScorePostFilterPlugin, asyncPreemptionEnabled)
-
-					if asyncPreemptionEnabled {
-						pe.prepareCandidateAsync(tt.candidate, tt.preemptor, "test-plugin")
-						pe.mu.Lock()
-						// The preempting map should be registered synchronously
-						// so we don't need wait.Poll.
-						if !tt.expectedPreemptingMap.Equal(pe.preempting) {
-							t.Errorf("expected preempting map %v, got %v", tt.expectedPreemptingMap, pe.preempting)
-							close(requestStopper)
-							pe.mu.Unlock()
-							return
-						}
-						pe.mu.Unlock()
-						// make the requests complete
-						close(requestStopper)
-					} else {
-						close(requestStopper) // no need to stop requests
-						status := pe.prepareCandidate(ctx, tt.candidate, tt.preemptor, "test-plugin")
-						if tt.expectedStatus == nil {
-							if status != nil {
-								t.Errorf("expect nil status, but got %v", status)
+						cs := clientsetfake.NewClientset(objs...)
+						cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+							mu.Lock()
+							defer mu.Unlock()
+							name := action.(clienttesting.DeleteAction).GetName()
+							if name == "fail-victim" {
+								deletionFailure = true
+								return true, nil, errDeletePodFailed
 							}
-						} else {
-							if !cmp.Equal(status, tt.expectedStatus) {
-								t.Errorf("expect status %v, but got %v", tt.expectedStatus, status)
+							// fake clientset does not return an error for not-found pods, so we simulate it here.
+							if name == "not-found-victim" {
+								// Simulate a not-found error.
+								return true, nil, apierrors.NewNotFound(v1.Resource("pods"), name)
 							}
-						}
-					}
 
-					var lastErrMsg string
-					if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-						mu.RLock()
-						defer mu.RUnlock()
+							deletedPods.Insert(name)
+							return true, nil, nil
+						})
 
-						pe.mu.Lock()
-						defer pe.mu.Unlock()
-						if len(pe.preempting) != 0 {
-							// The preempting map should be empty after the goroutine in all test cases.
-							lastErrMsg = fmt.Sprintf("expected no preempting pods, got %v", pe.preempting)
-							return false, nil
+						cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+							mu.Lock()
+							defer mu.Unlock()
+							if action.(clienttesting.PatchAction).GetName() == "fail-victim" {
+								patchFailure = true
+								return true, nil, errPatchStatusFailed
+							}
+							// fake clientset does not return an error for not-found pods, so we simulate it here.
+							if action.(clienttesting.PatchAction).GetName() == "not-found-victim" {
+								return true, nil, apierrors.NewNotFound(v1.Resource("pods"), "not-found-victim")
+							}
+							return true, nil, nil
+						})
+
+						informerFactory := informers.NewSharedInformerFactory(cs, 0)
+						eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
+						fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod), mu: mu}
+
+						// Note: NominatedPodsForNode is called at the beginning of the goroutine in any case.
+						// fakePodNominator can delay the response of NominatedPodsForNode until the channel is closed,
+						// which allows us to test the preempting map before the goroutine does nothing yet.
+						requestStopper := make(chan struct{})
+						nominator := &fakePodNominator{
+							SchedulingQueue: internalqueue.NewSchedulingQueue(nil, informerFactory),
+							requestStopper:  requestStopper,
+						}
+						var apiDispatcher *apidispatcher.APIDispatcher
+						if asyncAPICallsEnabled {
+							apiDispatcher = apidispatcher.New(cs, 16, apicalls.Relevances)
+							apiDispatcher.Run(logger)
+							defer apiDispatcher.Close()
 						}
 
-						if tt.expectedDeletionError != deletionFailure {
-							lastErrMsg = fmt.Sprintf("expected deletion error %v, got %v", tt.expectedDeletionError, deletionFailure)
-							return false, nil
+						fwk, err := tf.NewFramework(
+							ctx,
+							registeredPlugins, "",
+							frameworkruntime.WithClientSet(cs),
+							frameworkruntime.WithAPIDispatcher(apiDispatcher),
+							frameworkruntime.WithLogger(logger),
+							frameworkruntime.WithInformerFactory(informerFactory),
+							frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+							frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.testPods, nodes)),
+							frameworkruntime.WithPodNominator(nominator),
+							frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
+							frameworkruntime.WithPodActivator(fakeActivator),
+						)
+						if err != nil {
+							t.Fatal(err)
 						}
-						if tt.expectedPatchError != patchFailure {
-							lastErrMsg = fmt.Sprintf("expected patch error %v, got %v", tt.expectedPatchError, patchFailure)
-							return false, nil
+						informerFactory.Start(ctx.Done())
+						informerFactory.WaitForCacheSync(ctx.Done())
+						fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
+						if asyncAPICallsEnabled {
+							cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
+							fwk.SetAPICacher(apicache.New(nil, cache))
 						}
+
+						pe := NewEvaluator("FakePreemptionScorePostFilter", fwk, fakePreemptionScorePostFilterPlugin, asyncPreemptionEnabled, nominatedNodeNameForExpectationEnabled)
 
 						if asyncPreemptionEnabled {
-							if diff := cmp.Diff(tt.expectedActivatedPods, fakeActivator.activatedPods); tt.expectedActivatedPods != nil && diff != "" {
-								lastErrMsg = fmt.Sprintf("Unexpected activated pods (-want,+got):\n%s", diff)
-								return false, nil
+							pe.prepareCandidateAsync(tt.candidate, tt.preemptor, "test-plugin")
+							pe.mu.Lock()
+							// The preempting map should be registered synchronously
+							// so we don't need wait.Poll.
+							if !tt.expectedPreemptingMap.Equal(pe.preempting) {
+								t.Errorf("expected preempting map %v, got %v", tt.expectedPreemptingMap, pe.preempting)
+								close(requestStopper)
+								pe.mu.Unlock()
+								return
 							}
-							if tt.expectedActivatedPods == nil && len(fakeActivator.activatedPods) != 0 {
-								lastErrMsg = fmt.Sprintf("expected no activated pods, got %v", fakeActivator.activatedPods)
-								return false, nil
+							pe.mu.Unlock()
+							// make the requests complete
+							close(requestStopper)
+						} else {
+							close(requestStopper) // no need to stop requests
+							status := pe.prepareCandidate(ctx, tt.candidate, tt.preemptor, "test-plugin")
+							if tt.expectedStatus == nil {
+								if status != nil {
+									t.Errorf("expect nil status, but got %v", status)
+								}
+							} else {
+								if !cmp.Equal(status, tt.expectedStatus) {
+									t.Errorf("expect status %v, but got %v", tt.expectedStatus, status)
+								}
 							}
 						}
 
-						if deletedPods.Len() > 1 {
-							// For now, we only expect at most one pod to be deleted in all test cases.
-							// If we need to test multiple pods deletion, we need to update the test table definition.
-							return false, fmt.Errorf("expected at most one pod to be deleted, got %v", deletedPods.UnsortedList())
-						}
+						var lastErrMsg string
+						if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+							mu.RLock()
+							defer mu.RUnlock()
 
-						if len(tt.expectedDeletedPod) == 0 {
-							if deletedPods.Len() != 0 {
-								// When tt.expectedDeletedPod is empty, we expect no pod to be deleted.
-								return false, fmt.Errorf("expected no pod to be deleted, got %v", deletedPods.UnsortedList())
+							pe.mu.Lock()
+							defer pe.mu.Unlock()
+							if len(pe.preempting) != 0 {
+								// The preempting map should be empty after the goroutine in all test cases.
+								lastErrMsg = fmt.Sprintf("expected no preempting pods, got %v", pe.preempting)
+								return false, nil
 							}
-							// nothing further to check.
+
+							if tt.expectedDeletionError != deletionFailure {
+								lastErrMsg = fmt.Sprintf("expected deletion error %v, got %v", tt.expectedDeletionError, deletionFailure)
+								return false, nil
+							}
+							if tt.expectedPatchError != patchFailure {
+								lastErrMsg = fmt.Sprintf("expected patch error %v, got %v", tt.expectedPatchError, patchFailure)
+								return false, nil
+							}
+
+							if asyncPreemptionEnabled {
+								if diff := cmp.Diff(tt.expectedActivatedPods, fakeActivator.activatedPods); tt.expectedActivatedPods != nil && diff != "" {
+									lastErrMsg = fmt.Sprintf("Unexpected activated pods (-want,+got):\n%s", diff)
+									return false, nil
+								}
+								if tt.expectedActivatedPods == nil && len(fakeActivator.activatedPods) != 0 {
+									lastErrMsg = fmt.Sprintf("expected no activated pods, got %v", fakeActivator.activatedPods)
+									return false, nil
+								}
+							}
+
+							if deletedPods.Len() > 1 {
+								// For now, we only expect at most one pod to be deleted in all test cases.
+								// If we need to test multiple pods deletion, we need to update the test table definition.
+								return false, fmt.Errorf("expected at most one pod to be deleted, got %v", deletedPods.UnsortedList())
+							}
+
+							if len(tt.expectedDeletedPod) == 0 {
+								if deletedPods.Len() != 0 {
+									// When tt.expectedDeletedPod is empty, we expect no pod to be deleted.
+									return false, fmt.Errorf("expected no pod to be deleted, got %v", deletedPods.UnsortedList())
+								}
+								// nothing further to check.
+								return true, nil
+							}
+
+							found := false
+							for _, podName := range tt.expectedDeletedPod {
+								if deletedPods.Has(podName) ||
+									// If podName is empty, we expect no pod to be deleted.
+									(deletedPods.Len() == 0 && podName == "") {
+									found = true
+								}
+							}
+							if !found {
+								lastErrMsg = fmt.Sprintf("expected pod %v to be deleted, but %v is deleted", strings.Join(tt.expectedDeletedPod, " or "), deletedPods.UnsortedList())
+								return false, nil
+							}
+
 							return true, nil
+						}); err != nil {
+							t.Fatal(lastErrMsg)
 						}
-
-						found := false
-						for _, podName := range tt.expectedDeletedPod {
-							if deletedPods.Has(podName) ||
-								// If podName is empty, we expect no pod to be deleted.
-								(deletedPods.Len() == 0 && podName == "") {
-								found = true
-							}
-						}
-						if !found {
-							lastErrMsg = fmt.Sprintf("expected pod %v to be deleted, but %v is deleted", strings.Join(tt.expectedDeletedPod, " or "), deletedPods.UnsortedList())
-							return false, nil
-						}
-
-						return true, nil
-					}); err != nil {
-						t.Fatal(lastErrMsg)
-					}
-				})
+					})
+				}
 			}
 		}
 	}
