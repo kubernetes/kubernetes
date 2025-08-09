@@ -145,8 +145,8 @@ func newWorker(
 }
 
 // run periodically probes the container.
-func (w *worker) run() {
-	ctx := context.Background()
+func (w *worker) run(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
 
 	// If kubelet restarted the probes could be started in rapid succession.
@@ -185,7 +185,7 @@ probeLoop:
 			// Updating the periodic timer to run the probe again at intervals of probeTickerPeriod
 			// starting from the moment a manual run occurs.
 			probeTicker.Reset(probeTickerPeriod)
-			klog.V(4).InfoS("Triggered Probe by manual run", "probeType", w.probeType, "pod", klog.KObj(w.pod), "podUID", w.pod.UID, "containerName", w.container.Name)
+			logger.V(4).Info("Triggered Probe by manual run", "probeType", w.probeType, "pod", klog.KObj(w.pod), "podUID", w.pod.UID, "containerName", w.container.Name)
 			// continue
 		}
 	}
@@ -206,17 +206,18 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrash(func(_ interface{}) { keepGoing = true })
 
+	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
 	if !ok {
 		// Either the pod has not been created yet, or it was already deleted.
-		klog.V(3).InfoS("No status for pod", "pod", klog.KObj(w.pod))
+		logger.V(3).Info("No status for pod", "pod", klog.KObj(w.pod))
 		return true
 	}
 
 	// Worker should terminate if pod is terminated.
 	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded {
-		klog.V(3).InfoS("Pod is terminated, exiting probe worker",
+		logger.V(3).Info("Pod is terminated, exiting probe worker",
 			"pod", klog.KObj(w.pod), "phase", status.Phase)
 		return false
 	}
@@ -226,7 +227,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		c, ok = podutil.GetContainerStatus(status.InitContainerStatuses, w.container.Name)
 		if !ok || len(c.ContainerID) == 0 {
 			// Either the container has not been created yet, or it was deleted.
-			klog.V(3).InfoS("Probe target container not found",
+			logger.V(3).Info("Probe target container not found",
 				"pod", klog.KObj(w.pod), "containerName", w.container.Name)
 			return true // Wait for more information.
 		}
@@ -248,7 +249,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	if c.State.Running == nil {
-		klog.V(3).InfoS("Non-running container probed",
+		logger.V(3).Info("Non-running container probed",
 			"pod", klog.KObj(w.pod), "containerName", w.container.Name)
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Set(w.containerID, results.Failure, w.pod)
@@ -263,10 +264,10 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 
 	// Graceful shutdown of the pod.
 	if w.pod.ObjectMeta.DeletionTimestamp != nil && (w.probeType == liveness || w.probeType == startup) {
-		klog.V(3).InfoS("Pod deletion requested, setting probe result to success",
+		logger.V(3).Info("Pod deletion requested, setting probe result to success",
 			"probeType", w.probeType, "pod", klog.KObj(w.pod), "containerName", w.container.Name)
 		if w.probeType == startup {
-			klog.InfoS("Pod deletion requested before container has fully started",
+			logger.Info("Pod deletion requested before container has fully started",
 				"pod", klog.KObj(w.pod), "containerName", w.container.Name)
 		}
 		// Set a last result to ensure quiet shutdown.
