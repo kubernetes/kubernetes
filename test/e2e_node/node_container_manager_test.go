@@ -45,6 +45,7 @@ import (
 )
 
 func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration, cgroupManager cm.CgroupManager) {
+	initialConfig.ReservedSystemCPUs = ""
 	initialConfig.EnforceNodeAllocatable = []string{"pods", kubeReservedCgroup, systemReservedCgroup}
 	initialConfig.SystemReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
@@ -71,9 +72,9 @@ func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration, 
 var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("node-container-manager")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
 	f.Describe("Validate Node Allocatable", feature.NodeAllocatable, func() {
 		ginkgo.It("sets up the node and runs the test", func(ctx context.Context) {
-			ginkgo.Skip("currently broken")
 			framework.ExpectNoError(runTest(ctx, f))
 		})
 	})
@@ -117,18 +118,10 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			newCfg.CgroupDriver = "systemd"
 			newCfg.FailCgroupV1 = true // extra safety. We want to avoid false negatives though, so we added the skip check earlier
 
-			// Update the Kubelet configuration.
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-
-			ginkgo.By("Restarting the kubelet")
-			restartKubelet(ctx, true)
-
-			waitForKubeletToStart(ctx, f)
-			ginkgo.By("Started the kubelet")
-
-			gomega.Consistently(ctx, func(ctx context.Context) bool {
-				return getNodeReadyStatus(ctx, f) && kubeletHealthCheck(kubeletHealthCheckURL)
-			}).WithTimeout(2 * time.Minute).WithPolling(2 * time.Second).Should(gomega.BeTrueBecause("node keeps reporting ready status"))
+			updateKubeletConfigWithOptions(ctx, f, newCfg, updateKubeletOptions{
+				deleteStateFiles:          true,
+				ensureConsistentReadyNode: true,
+			})
 		})
 	})
 })
