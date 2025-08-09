@@ -1161,21 +1161,14 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 }
 
 func (m *ManagerImpl) isContainerAlreadyRunning(podUID, cntName string) bool {
-	cntID, err := m.containerMap.GetContainerID(podUID, cntName)
-	if err != nil {
-		klog.ErrorS(err, "Container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName)
-		return false
-	}
+	found := false
+	m.containerMap.Visit(func(uid, name, containerID string) {
+		if uid == podUID && name == cntName && m.containerRunningSet.Has(containerID) {
+			// Once we make it here we know we have a running container.
+			klog.V(4).InfoS("container found in the initial set, assumed running", "podUID", podUID, "containerName", cntName, "containerID", containerID)
+			found = true
+		}
+	})
 
-	// note that if container runtime is down when kubelet restarts, this set will be empty,
-	// so on kubelet restart containers will again fail admission, hitting https://github.com/kubernetes/kubernetes/issues/118559 again.
-	// This scenario should however be rare enough.
-	if !m.containerRunningSet.Has(cntID) {
-		klog.V(4).InfoS("Container not present in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", cntID)
-		return false
-	}
-
-	// Once we make it here we know we have a running container.
-	klog.V(4).InfoS("Container found in the initial set, assumed running", "podUID", podUID, "containerName", cntName, "containerID", cntID)
-	return true
+	return found
 }
