@@ -83,10 +83,13 @@ func TestPeerProxiedRequest(t *testing.T) {
 		ProxyCA:        &proxyCA},
 		[]string{"--runtime-config=api/all=true,batch/v1=false"}, etcd)
 	t.Cleanup(serverB.TearDownFn)
-
+	t.Logf("first clientconfig: %#v", serverA.ClientConfig)
+	klog.Infof("first clientconfig: %#v", serverA.ClientConfig)
 	kubeClientSetA, err := kubernetes.NewForConfig(serverA.ClientConfig)
 	require.NoError(t, err)
 
+	t.Logf("first clientconfig: %#v", serverB.ClientConfig)
+	klog.Infof("first clientconfig: %#v", serverB.ClientConfig)
 	kubeClientSetB, err := kubernetes.NewForConfig(serverB.ClientConfig)
 	require.NoError(t, err)
 
