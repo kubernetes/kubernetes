@@ -93,26 +93,32 @@ func TestLabelsConflict(t *testing.T) {
 			conflict: false,
 		},
 		{
-			name:     "empty string  don't conflict with anything",
+			name:     "empty strings don't conflict with anything except the level",
 			a:        "",
 			b:        "system_u:system_r:container_t",
 			conflict: false,
 		},
 		{
+			name:     "empty string conflicts with level",
+			a:        "",
+			b:        "system_u:system_r:container_t:s0:c1,c2",
+			conflict: true,
+		},
+		{
 			name:     "empty parts don't conflict with anything",
-			a:        ":::::::::::::",
+			a:        ":::",
 			b:        "system_u:system_r:container_t",
 			conflict: false,
 		},
 		{
 			name:     "different lengths don't conflict if the common parts are the same",
-			a:        "system_u:system_r:container_t:c0,c2",
-			b:        "system_u:system_r:container_t",
+			a:        "system_u:system_r:container_t:",
+			b:        "system_u:system_r",
 			conflict: false,
 		},
 		{
 			name:     "different lengths conflict if the common parts differ",
-			a:        "system_u:system_r:conflict_t:c0,c2",
+			a:        "system_u:system_r:conflict_t:",
 			b:        "system_u:system_r:container_t",
 			conflict: true,
 		},
@@ -125,8 +131,14 @@ func TestLabelsConflict(t *testing.T) {
 		{
 			name:     "non-conflicting empty parts",
 			a:        "system_u::container_t",
-			b:        ":system_r::c0,c2",
+			b:        ":system_r::",
 			conflict: false,
+		},
+		{
+			name:     "empty level conflicts with non-empty level",
+			a:        ":::s0:c1,c2",
+			b:        "",
+			conflict: true,
 		},
 	}
 	for _, test := range tests {
