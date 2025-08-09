@@ -264,7 +264,6 @@ case "${GINKGO_SHOW_COMMAND:-${CI:-no}}" in y|yes|true) set -x ;; esac
   --kube-master="${KUBE_MASTER:-}" \
   --cluster-tag="${CLUSTER_ID:-}" \
   --cloud-config-file="${CLOUD_CONFIG:-}" \
-  --repo-root="${KUBE_ROOT}" \
   --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
   --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
   --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" \
