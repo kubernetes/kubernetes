@@ -165,13 +165,7 @@ type MutableVersionedFeatureGate interface {
 	// Otherwise, the emulationVersion will be the same as the binary version.
 	// If set, the feature defaults and availability will be as if the binary is at the emulated version.
 	SetEmulationVersion(emulationVersion *version.Version) error
-	// SetEmulationVersionWithContext is like SetEmulationVersion but accepts a context for controlling behavior.
-	// When features have been queried and would change value due to the emulation version change,
-	// warnings will be logged. If a test logger is provided in the context via WithTestLoggerContext,
-	// warnings will be redirected to the test output instead of the global klog.
-	// If features would change and no test logger is provided, an error will be returned to prevent
-	// unexpected behavior in production environments.
-	SetEmulationVersionWithContext(ctx context.Context, emulationVersion *version.Version) error
+
 	// GetAll returns a copy of the map of known feature names to versioned feature specs.
 	GetAllVersioned() map[Feature]VersionedSpecs
 	// AddVersioned adds versioned feature specs to the featureGate.
@@ -550,10 +544,16 @@ func (f *featureGate) GetAllVersioned() map[Feature]VersionedSpecs {
 }
 
 func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) error {
-	return f.SetEmulationVersionWithContext(context.Background(), emulationVersion)
+	return f.setEmulationVersionWithContext(context.Background(), emulationVersion)
 }
 
+// SetEmulationVersionWithContext allows passing a context for test logger support.
+// This is primarily intended for testing scenarios.
 func (f *featureGate) SetEmulationVersionWithContext(ctx context.Context, emulationVersion *version.Version) error {
+	return f.setEmulationVersionWithContext(ctx, emulationVersion)
+}
+
+func (f *featureGate) setEmulationVersionWithContext(ctx context.Context, emulationVersion *version.Version) error {
 	if emulationVersion.EqualTo(f.EmulationVersion()) {
 		return nil
 	}
@@ -572,14 +572,12 @@ func (f *featureGate) SetEmulationVersionWithContext(ctx context.Context, emulat
 
 	queriedFeatures := f.queriedFeatures.Load().(sets.Set[Feature])
 	known := f.known.Load().(map[Feature]VersionedSpecs)
-	changingFeatures := []string{}
 	contextLogger := getContextLogger(ctx)
 
 	for feature := range queriedFeatures {
 		newVal := featureEnabled(feature, enabled, known, emulationVersion)
 		oldVal := featureEnabled(feature, f.enabled.Load().(map[Feature]bool), known, f.EmulationVersion())
 		if newVal != oldVal {
-			changingFeatures = append(changingFeatures, fmt.Sprintf("%s (from %v to %v)", feature, oldVal, newVal))
 			warningMsg := fmt.Sprintf("SetEmulationVersion will change already queried feature:%s from %v to %v", feature, oldVal, newVal)
 			// Try to log to context logger first, fallback to global klog
 			if contextLogger != nil {
@@ -588,11 +586,6 @@ func (f *featureGate) SetEmulationVersionWithContext(ctx context.Context, emulat
 				klog.Warningf("%s", warningMsg)
 			}
 		}
-	}
-
-	// If features would change and no context logger is provided, return an error
-	if len(changingFeatures) > 0 && contextLogger == nil {
-		return fmt.Errorf("SetEmulationVersion would change already queried features: %s", strings.Join(changingFeatures, ", "))
 	}
 
 	if len(errs) == 0 {
