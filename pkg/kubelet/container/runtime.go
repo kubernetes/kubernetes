@@ -287,6 +287,15 @@ const (
 // ContainerReasonStatusUnknown indicates a container the status of the container cannot be determined.
 const ContainerReasonStatusUnknown string = "ContainerStatusUnknown"
 
+// ContainerStartupThreshold is the duration during which a container in the 'Created' state
+// is considered to be in its startup phase if no further status updates are received.
+// This threshold addresses the issue where podCache may return stale data,
+// showing containers as 'Created' even after they have been started via syncPod.
+// Without this threshold, syncPod might incorrectly attempt to restart containers based on outdated states.
+// The value is set to 3 seconds to exceed the previous 1-second podWorkerLoop iteration interval,
+// allowing sufficient time for runtime state updates while minimizing false exemptions for truly stuck containers.
+const ContainerStartupThreshold = 3 * time.Second
+
 // Container provides the runtime information for a container, such as ID, hash,
 // state of the container.
 type Container struct {
