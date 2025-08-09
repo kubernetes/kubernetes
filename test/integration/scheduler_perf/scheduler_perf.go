@@ -1203,9 +1203,6 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					informerFactory, tCtx := setupTestCase(b, tc, featureGates, outOfTreePluginRegistry)
 
-					// TODO(#93795): make sure each workload within a test case has a unique
-					// name? The name is used to identify the stats in benchmark reports.
-					// TODO(#94404): check for unused template parameters? Probably a typo.
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
 						b.Fatalf("workload %s is not valid: %v", w.Name, err)
