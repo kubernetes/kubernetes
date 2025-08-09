@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -91,46 +90,35 @@ var _ = SIGDescribe("Events", func() {
 			framework.Failf("Failed to get pod: %v", err)
 		}
 		framework.Logf("%+v\n", podWithUID)
-		var events *v1.EventList
+
 		// Check for scheduler event about the pod.
 		ginkgo.By("checking for scheduler event about the pod")
-		framework.ExpectNoError(wait.Poll(framework.Poll, 5*time.Minute, func() (bool, error) {
-			selector := fields.Set{
-				"involvedObject.kind":      "Pod",
-				"involvedObject.uid":       string(podWithUID.UID),
-				"involvedObject.namespace": f.Namespace.Name,
-				"source":                   v1.DefaultSchedulerName,
-			}.AsSelector().String()
-			options := metav1.ListOptions{FieldSelector: selector}
-			events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, options)
-			if err != nil {
-				return false, err
-			}
-			if len(events.Items) > 0 {
-				framework.Logf("Saw scheduler event for our pod.")
-				return true, nil
-			}
-			return false, nil
-		}))
+		schedulerSelector := fields.Set{
+			"involvedObject.kind":      "Pod",
+			"involvedObject.uid":       string(podWithUID.UID),
+			"involvedObject.namespace": f.Namespace.Name,
+			"source":                   v1.DefaultSchedulerName,
+		}.AsSelector().String()
+		options = metav1.ListOptions{FieldSelector: schedulerSelector}
+		gomega.Eventually(ctx, framework.ListObjects(f.ClientSet.CoreV1().Events(f.Namespace.Name).List, options)).
+			WithContext(ctx).
+			WithTimeout(5*time.Minute).
+			ShouldNot(gomega.BeEmpty(), "expected at least one scheduler event")
+		framework.Logf("Saw scheduler event for our pod.")
+
 		// Check for kubelet event about the pod.
 		ginkgo.By("checking for kubelet event about the pod")
-		framework.ExpectNoError(wait.Poll(framework.Poll, 5*time.Minute, func() (bool, error) {
-			selector := fields.Set{
-				"involvedObject.uid":       string(podWithUID.UID),
-				"involvedObject.kind":      "Pod",
-				"involvedObject.namespace": f.Namespace.Name,
-				"source":                   "kubelet",
-			}.AsSelector().String()
-			options := metav1.ListOptions{FieldSelector: selector}
-			events, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, options)
-			if err != nil {
-				return false, err
-			}
-			if len(events.Items) > 0 {
-				framework.Logf("Saw kubelet event for our pod.")
-				return true, nil
-			}
-			return false, nil
-		}))
+		kubeletSelector := fields.Set{
+			"involvedObject.uid":       string(podWithUID.UID),
+			"involvedObject.kind":      "Pod",
+			"involvedObject.namespace": f.Namespace.Name,
+			"source":                   "kubelet",
+		}.AsSelector().String()
+		options = metav1.ListOptions{FieldSelector: kubeletSelector}
+		gomega.Eventually(framework.ListObjects(f.ClientSet.CoreV1().Events(f.Namespace.Name).List, options)).
+			WithContext(ctx).
+			WithTimeout(5*time.Minute).
+			ShouldNot(gomega.BeEmpty(), "expected atleast one kubelet event")
+		framework.Logf("Saw kubelet event for our pod.")
 	})
 })
