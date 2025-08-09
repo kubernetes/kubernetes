@@ -516,3 +516,31 @@ type ConversionResponse struct {
 	// will be used to construct an error message for the end user.
 	Result metav1.Status `json:"result" protobuf:"bytes,3,name=result"`
 }
+
+// +k8s:deepcopy-gen=true
+// Union represents a union of fields.
+// At most one of the fields across all union members may be set.
+type Union struct {
+	// discriminator is the name of the field that determines which type is used.
+	// Required when multiple members are specified.
+	// +optional
+	Discriminator string `json:"discriminator,omitempty" protobuf:"bytes,1,opt,name=discriminator"`
+	// members lists the members of the union.
+	// +listType=map
+	// +listMapKey=fieldName
+	Members []UnionMember `json:"members" protobuf:"bytes,2,rep,name=members"`
+	// zeroOrOneOf indicates that at most one of the members of a non-discriminated union may be specified.
+	// This is for non-discriminated unions.
+	// This field is mutually exclusive with discriminator.
+	// +optional
+	ZeroOrOneOf bool `json:"zeroOrOneOf,omitempty" protobuf:"varint,3,opt,name=zeroOrOneOf"`
+}
+
+// +k8s:deepcopy-gen=true
+// UnionMember represents a single member of a union.
+type UnionMember struct {
+	// fieldName is the name of the field.
+	FieldName string `json:"fieldName" protobuf:"bytes,1,opt,name=fieldName"`
+	// discriminatorValue is the value of the discriminator field that indicates that this member is active.
+	DiscriminatorValue string `json:"discriminatorValue" protobuf:"bytes,2,opt,name=discriminatorValue"`
+}
