@@ -153,6 +153,8 @@ type ImageID int
 const (
 	// None is to be used for unset/default images
 	None ImageID = iota
+	// AgnhostPrev image
+	AgnhostPrev
 	// Agnhost image
 	Agnhost
 	// AgnhostPrivate image
@@ -173,10 +175,6 @@ const (
 	DistrolessIptables
 	// Etcd image
 	Etcd
-	// Httpd image
-	Httpd
-	// HttpdNew image
-	HttpdNew
 	// InvalidRegistryImage image
 	InvalidRegistryImage
 	// IpcUtils image
@@ -220,6 +218,7 @@ const (
 
 func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
 	configs := map[ImageID]Config{}
+	configs[AgnhostPrev] = Config{list.PromoterE2eRegistry, "agnhost", "2.55"}
 	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.56"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
@@ -228,8 +227,6 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.37.0-1"}
 	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.7.7"}
 	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.6.4-0"}
-	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-4"}
-	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-4"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.3"}
 	configs[JessieDnsutils] = Config{list.PromoterE2eRegistry, "jessie-dnsutils", "1.7"}
