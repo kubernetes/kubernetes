@@ -133,26 +133,12 @@ func (kl *Kubelet) HandlerSupportsUserNamespaces(rtHandler string) (bool, error)
 }
 
 // GetKubeletMappings gets the additional IDs allocated for the Kubelet.
-func (kl *Kubelet) GetKubeletMappings() (uint32, uint32, error) {
-	return kl.getKubeletMappings()
+func (kl *Kubelet) GetKubeletMappings(idsPerPod uint32) (uint32, uint32, error) {
+	return kl.getKubeletMappings(idsPerPod)
 }
 
 func (kl *Kubelet) GetMaxPods() int {
 	return kl.maxPods
-}
-
-func (kl *Kubelet) GetUserNamespacesIDsPerPod() uint32 {
-	userNs := kl.kubeletConfiguration.UserNamespaces
-	if userNs == nil {
-		return config.DefaultKubeletUserNamespacesIDsPerPod
-	}
-	idsPerPod := userNs.IDsPerPod
-	if idsPerPod == nil || *idsPerPod == 0 {
-		return config.DefaultKubeletUserNamespacesIDsPerPod
-	}
-	// The value is already validated to be <= MaxUint32,
-	// so we can safely drop the upper bits.
-	return uint32(*idsPerPod)
 }
 
 // getPodDir returns the full path to the per-pod directory for the pod with

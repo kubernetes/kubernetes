@@ -22,19 +22,32 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"os/user"
+	"strconv"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+)
+
+var (
+	customIDsPerPod int64 = 65536 * 2
+	// kubelet user used for userns mapping.
+	kubeletUserForUsernsMapping = "kubelet"
+	getsubuidsBinary            = "getsubids"
 )
 
 var _ = SIGDescribe("UserNamespaces", "[LinuxOnly]", feature.UserNamespacesSupport, framework.WithSerial(), func() {
@@ -87,3 +100,69 @@ var _ = SIGDescribe("UserNamespaces", "[LinuxOnly]", feature.UserNamespacesSuppo
 		})
 	})
 })
+
+var _ = SIGDescribe("user namespaces kubeconfig tests", "[LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(kubefeatures.UserNamespacesSupport), func() {
+	f := framework.NewDefaultFramework("userns-kubeconfig")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.Context("test config using userNamespaces.idsPerPod", func() {
+		ginkgo.BeforeEach(func() {
+			if hasKubeletUsernsMappings() {
+				// idsPerPod needs to be in sync with the kubelet's user namespace
+				// mappings. Let's skip the test if there are mappings present.
+				e2eskipper.Skipf("kubelet is configured with custom user namespace mappings, skipping test")
+			}
+		})
+
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			if initialConfig.UserNamespaces == nil {
+				initialConfig.UserNamespaces = &kubeletconfig.UserNamespaces{}
+			}
+			initialConfig.UserNamespaces.IDsPerPod = &customIDsPerPod
+		})
+		f.It("honors idsPerPod in userns pods", func(ctx context.Context) {
+			if !supportsUserNS(ctx, f) {
+				e2eskipper.Skipf("runtime does not support user namespaces")
+			}
+			falseVar := false
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "userns-pod" + string(uuid.NewUUID())},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "container",
+							Image: imageutils.GetE2EImage(imageutils.BusyBox),
+							// The third field is the mapping length, that must be equal to idsPerPod.
+							Command: []string{"awk", "{ print $3 }", "/proc/self/uid_map"},
+						},
+					},
+					HostUsers:     &falseVar,
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+			expected := []string{strconv.FormatInt(customIDsPerPod, 10)}
+			e2eoutput.TestContainerOutput(ctx, f, "idsPerPod is configured correctly", pod, 0, expected)
+		})
+	})
+})
+
+func hasKubeletUsernsMappings() bool {
+	if _, err := user.Lookup(kubeletUserForUsernsMapping); err != nil {
+		return false
+	}
+	cmd, err := exec.LookPath(getsubuidsBinary)
+	if err != nil {
+		return false
+	}
+	outUids, err := exec.Command(cmd, kubeletUserForUsernsMapping).Output()
+	if err != nil {
+		return false
+	}
+	outGids, err := exec.Command(cmd, "-g", kubeletUserForUsernsMapping).Output()
+	if err != nil {
+		return false
+	}
+	if string(outUids) != string(outGids) {
+		return false
+	}
+	return true
+}
