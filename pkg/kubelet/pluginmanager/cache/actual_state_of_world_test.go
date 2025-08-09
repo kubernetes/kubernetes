@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Calls AddPlugin() to add a plugin
@@ -30,6 +31,7 @@ import (
 // Verifies PluginExistsWithCorrectUUID returns true for the plugin
 // Verifies PluginExistsWithCorrectTimestamp returns true for the plugin (excluded on Windows)
 func Test_ASW_AddPlugin_Positive_NewPlugin(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pluginInfo := PluginInfo{
 		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
 		Timestamp:  time.Now(),
@@ -38,7 +40,7 @@ func Test_ASW_AddPlugin_Positive_NewPlugin(t *testing.T) {
 		Name:       "test",
 	}
 	asw := NewActualStateOfWorld()
-	err := asw.AddPlugin(pluginInfo)
+	err := asw.AddPlugin(tCtx, pluginInfo)
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPlugin failed. Expected: <no error> Actual: <%v>", err)
@@ -71,6 +73,7 @@ func Test_ASW_AddPlugin_Positive_NewPlugin(t *testing.T) {
 // Verifies PluginExistsWithCorrectUUID returns false
 // Verifies PluginExistsWithCorrectTimestamp returns false (excluded on Windows)
 func Test_ASW_AddPlugin_Negative_EmptySocketPath(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
 		SocketPath: "",
@@ -79,7 +82,7 @@ func Test_ASW_AddPlugin_Negative_EmptySocketPath(t *testing.T) {
 		Handler:    nil,
 		Name:       "test",
 	}
-	err := asw.AddPlugin(pluginInfo)
+	err := asw.AddPlugin(tCtx, pluginInfo)
 	require.EqualError(t, err, "socket path is empty")
 
 	// Get registered plugins and check the newly added plugin is there
@@ -106,6 +109,7 @@ func Test_ASW_AddPlugin_Negative_EmptySocketPath(t *testing.T) {
 // Verifies PluginExistsWithCorrectUUID returns false
 // Verifies PluginExistsWithCorrectTimestamp returns false (excluded on Windows)
 func Test_ASW_RemovePlugin_Positive(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
@@ -115,7 +119,7 @@ func Test_ASW_RemovePlugin_Positive(t *testing.T) {
 		Handler:    nil,
 		Name:       "test",
 	}
-	err := asw.AddPlugin(pluginInfo)
+	err := asw.AddPlugin(tCtx, pluginInfo)
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPlugin failed. Expected: <no error> Actual: <%v>", err)
@@ -146,6 +150,7 @@ func Test_ASW_RemovePlugin_Positive(t *testing.T) {
 // Verifies PluginExistsWithCorrectUUID returns false for an existing
 // plugin with the wrong UUID
 func Test_ASW_PluginExistsWithCorrectUUID_Negative_WrongUUID(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
@@ -155,7 +160,7 @@ func Test_ASW_PluginExistsWithCorrectUUID_Negative_WrongUUID(t *testing.T) {
 		Handler:    nil,
 		Name:       "test",
 	}
-	err := asw.AddPlugin(pluginInfo)
+	err := asw.AddPlugin(tCtx, pluginInfo)
 	// Assert
 	if err != nil {
 		t.Fatalf("AddPlugin failed. Expected: <no error> Actual: <%v>", err)
