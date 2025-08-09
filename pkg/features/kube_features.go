@@ -622,6 +622,12 @@ const (
 	// calculating pod topology spread skew.
 	NodeInclusionPolicyInPodTopologySpread featuregate.Feature = "NodeInclusionPolicyInPodTopologySpread"
 
+	// owner: @pravk03, @tallclair
+	// kep: https://kep.k8s.io/5328
+	//
+	// Enables the Kubelet to report node capabilities that are tied to the lifecycle of Kubernetes features.
+	NodeCapabilities featuregate.Feature = "NodeCapabilities"
+
 	// owner: @aravindhp @LorbusChris
 	// kep: http://kep.k8s.io/2271
 	//
@@ -1495,6 +1501,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	NodeCapabilities: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	NodeInclusionPolicyInPodTopologySpread: {
