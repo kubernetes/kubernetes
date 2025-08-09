@@ -25,6 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
+	apimachineryversionutil "k8s.io/apimachinery/pkg/util/version"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/version"
 )
@@ -71,19 +72,57 @@ var (
 	)
 )
 
-// shouldHide be used to check if a specific metric with deprecated version should be hidden
+// shouldHide is used to check if a specific metric with deprecated version should be hidden
 // according to metrics deprecation lifecycle.
-func shouldHide(currentVersion *semver.Version, deprecatedVersion *semver.Version) bool {
-	guardVersion, err := semver.Make(fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor))
-	if err != nil {
-		panic("failed to make version from current version")
-	}
+func shouldHide(stabilityLevel StabilityLevel, currentVersion *semver.Version, deprecatedVersion *semver.Version) bool {
+	deprecationReleaseWindow := getDeprecationReleaseWindow(stabilityLevel)
+	deprecationVersionParsed := apimachineryversionutil.MustParse(deprecatedVersion.String())
+	hiddenVersion := deprecationVersionParsed.AddMinor(deprecationReleaseWindow)
 
-	if deprecatedVersion.LT(guardVersion) {
+	// Parse the current major.minor version, ignoring pre-release tags for the comparison.
+	currentVersionWithoutPreParsed := apimachineryversionutil.MustParse(fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor))
+
+	if currentVersionWithoutPreParsed.AtLeast(hiddenVersion) {
+		// Delay the hiding till v1.x.0-alpha.1 or later,
+		// to avoid issues during the release branch's fast-forward window.
+		if isAlpha0PreRelease(currentVersion) && currentVersionWithoutPreParsed.EqualTo(hiddenVersion) {
+			return false
+		}
 		return true
 	}
 
 	return false
+}
+
+// getDeprecationReleaseWindow returns the number of minor releases a metric should be served
+// after its deprecated version, based on its stability level.
+func getDeprecationReleaseWindow(stabilityLevel StabilityLevel) uint {
+	switch stabilityLevel {
+	case STABLE:
+		return 3
+	case BETA:
+		return 1
+	default: // ALPHA, INTERNAL
+		return 0
+	}
+}
+
+// isAlpha0PreRelease returns true if the current version is an "alpha.0" pre-release.
+func isAlpha0PreRelease(version *semver.Version) bool {
+	return len(version.Pre) == 2 &&
+		!version.Pre[0].IsNumeric() && version.Pre[0].VersionStr == "alpha" &&
+		version.Pre[1].IsNumeric() && version.Pre[1].VersionNum == 0
+}
+
+// isDeprecated returns true if the current version, ignoring pre-release tags,
+// is greater than or equal to the deprecated version.
+func isDeprecated(currentVersion, deprecatedVersion semver.Version) bool {
+	currentVersionWithoutPre, err := semver.New(fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor))
+	if err != nil {
+		panic(fmt.Sprintf("Failed to parse current version %q: %v", fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor), err))
+	}
+
+	return currentVersionWithoutPre.GTE(deprecatedVersion)
 }
 
 // ValidateShowHiddenMetricsVersion checks invalid version for which show hidden metrics.

@@ -21,7 +21,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/blang/semver/v4"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/assert"
@@ -32,14 +31,22 @@ import (
 )
 
 func TestCounter(t *testing.T) {
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*CounterOpts
+		currentVersion      apimachineryversion.Info
 		expectedMetricCount int
 		expectedHelp        string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			CounterOpts: &CounterOpts{
 				Namespace:      "namespace",
 				Name:           "metric_test_name",
@@ -51,7 +58,32 @@ func TestCounter(t *testing.T) {
 			expectedHelp:        "[ALPHA] counter help",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: BETA,
+				Help:           "counter help",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] counter help",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: STABLE,
+				Help:           "counter help",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] counter help",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
@@ -60,30 +92,78 @@ func TestCounter(t *testing.T) {
 				StabilityLevel:    ALPHA,
 				DeprecatedVersion: "1.15.0",
 			},
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) counter help",
+			expectedMetricCount: 0,
+			expectedHelp:        "counter help",
 		},
 		{
-			desc: "Test hidden",
+			desc: "BETA metric deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "counter help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.15.0",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) counter help",
+		},
+		{
+			desc: "STABLE metric deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "counter help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.14.0",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.14.0) counter help",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
 			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
 				Help:              "counter help",
 				StabilityLevel:    ALPHA,
-				DeprecatedVersion: "1.14.0",
+				DeprecatedVersion: "1.15.0",
 			},
 			expectedMetricCount: 0,
+			expectedHelp:        "counter help",
+		},
+		{
+			desc: "BETA metric hidden",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "counter help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.14.0",
+			},
+			expectedMetricCount: 0},
+		{
+			desc: "STABLE metric hidden",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "counter help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.12.0",
+			},
+			expectedMetricCount: 0,
+			expectedHelp:        "counter help",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			// c is a pointer to a Counter
 			c := NewCounter(test.CounterOpts)
 			registry.MustRegister(c)
@@ -118,45 +198,110 @@ func TestCounter(t *testing.T) {
 }
 
 func TestCounterVec(t *testing.T) {
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*CounterOpts
 		labels                    []string
-		registryVersion           *semver.Version
 		expectedMetricFamilyCount int
 		expectedHelp              string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			CounterOpts: &CounterOpts{
-				Namespace: "namespace",
-				Name:      "metric_test_name",
-				Subsystem: "subsystem",
-				Help:      "counter help",
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: ALPHA,
+				Help:           "counter help",
 			},
 			labels:                    []string{"label_a", "label_b"},
 			expectedMetricFamilyCount: 1,
 			expectedHelp:              "[ALPHA] counter help",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: BETA,
+				Help:           "counter help",
+			},
+			labels:                    []string{"label_a", "label_b"},
+			expectedMetricFamilyCount: 1,
+			expectedHelp:              "[BETA] counter help",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: STABLE,
+				Help:           "counter help",
+			},
+			labels:                    []string{"label_a", "label_b"},
+			expectedMetricFamilyCount: 1,
+			expectedHelp:              "[STABLE] counter help",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
+				Help:              "counter help",
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:                    []string{"label_a", "label_b"},
+			expectedMetricFamilyCount: 0,
+			expectedHelp:              "counter help",
+		},
+		{
+			desc: "BETA metric deprecated",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
 				Help:              "counter help",
 				DeprecatedVersion: "1.15.0",
 			},
 			labels:                    []string{"label_a", "label_b"},
 			expectedMetricFamilyCount: 1,
-			expectedHelp:              "[ALPHA] (Deprecated since 1.15.0) counter help",
+			expectedHelp:              "[BETA] (Deprecated since 1.15.0) counter help",
 		},
 		{
-			desc: "Test hidden",
+			desc: "STABLE metric deprecated",
 			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "counter help",
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:                    []string{"label_a", "label_b"},
+			expectedMetricFamilyCount: 1,
+			expectedHelp:              "[STABLE] (Deprecated since 1.15.0) counter help",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
 				Help:              "counter help",
 				DeprecatedVersion: "1.14.0",
 			},
@@ -165,27 +310,38 @@ func TestCounterVec(t *testing.T) {
 			expectedHelp:              "counter help",
 		},
 		{
-			desc: "Test alpha",
+			desc: "BETA metric hidden",
 			CounterOpts: &CounterOpts{
-				StabilityLevel: ALPHA,
-				Namespace:      "namespace",
-				Name:           "metric_test_name",
-				Subsystem:      "subsystem",
-				Help:           "counter help",
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "counter help",
+				DeprecatedVersion: "1.14.0",
 			},
 			labels:                    []string{"label_a", "label_b"},
-			expectedMetricFamilyCount: 1,
-			expectedHelp:              "[ALPHA] counter help",
+			expectedMetricFamilyCount: 0,
+			expectedHelp:              "counter help",
+		},
+		{
+			desc: "STABLE metric hidden",
+			CounterOpts: &CounterOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "counter help",
+				DeprecatedVersion: "1.12.0",
+			},
+			labels:                    []string{"label_a", "label_b"},
+			expectedMetricFamilyCount: 0,
+			expectedHelp:              "counter help",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			c := NewCounterVec(test.CounterOpts, test.labels)
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Inc()
