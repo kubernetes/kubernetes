@@ -24,10 +24,12 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type mockEncoder struct {
@@ -187,5 +189,102 @@ func TestCachingObjectLazyDeepCopy(t *testing.T) {
 	object.SetResourceVersion("234")
 	if object.deepCopied != true {
 		t.Errorf("object not deep-copied on change")
+	}
+}
+
+func TestMutateObject(t *testing.T) {
+	tests := []struct {
+		name          string
+		initialObject *v1.Pod
+		newObject     *v1.Pod
+		expectChanged bool
+	}{
+		{
+			name: "object with same content should not trigger update",
+			initialObject: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "default",
+				},
+			},
+			newObject: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "default",
+				},
+			},
+			expectChanged: false,
+		},
+		{
+			name: "object with different content should trigger update",
+			initialObject: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "default",
+				},
+			},
+			newObject: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-changed",
+					Namespace: "default",
+				},
+			},
+			expectChanged: true,
+		},
+		{
+			name: "object with different UID should trigger update",
+			initialObject: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					UID:  types.UID("uid1"),
+				},
+			},
+			newObject: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					UID:  types.UID("uid2"),
+				},
+			},
+			expectChanged: true,
+		},
+		{
+			name: "object with different annotations should trigger update",
+			initialObject: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test",
+					Annotations: map[string]string{"key1": "value1"},
+				},
+			},
+			newObject: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test",
+					Annotations: map[string]string{"key2": "value2"},
+				},
+			},
+			expectChanged: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup initial cachingObject
+			cachingObj, err := newCachingObject(tt.initialObject)
+			assert.NoError(t, err, "couldn't create cachingObject")
+
+			// Capture initial state
+			initialObj := cachingObj.object.(*v1.Pod)
+
+			// Perform mutation
+			cachingObj.MutateObject(tt.newObject)
+
+			// Verify results
+			if tt.expectChanged {
+				assert.NotEqual(t, initialObj, cachingObj.object, "object should have changed")
+				assert.Equal(t, tt.newObject.Name, cachingObj.object.(*v1.Pod).Name, "name should be updated")
+				assert.Equal(t, tt.newObject.UID, cachingObj.object.(*v1.Pod).UID, "UID should be updated")
+			} else {
+				assert.Equal(t, initialObj, cachingObj.object, "object should not have changed")
+			}
+		})
 	}
 }
