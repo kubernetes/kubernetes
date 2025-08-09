@@ -22,54 +22,26 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"go.opentelemetry.io/otel/trace"
 )
 
-// Histogram is our internal representation for our wrapping struct around prometheus
-// histograms. Summary implements both kubeCollector and ObserverMetric
+// Histogram is our internal representation for our wrapping struct around prometheus histograms.
 type Histogram struct {
-	ctx context.Context
 	ObserverMetric
 	*HistogramOpts
 	lazyMetric
 	selfCollector
 }
 
-// exemplarHistogramMetric holds a context to extract exemplar labels from, and a historgram metric to attach them to. It implements the metricWithExemplar interface.
-type exemplarHistogramMetric struct {
-	*Histogram
-}
+// The metric must be register-able.
+var _ Registerable = &Histogram{}
 
-type exemplarHistogramVec struct {
-	*HistogramVecWithContext
-	observer prometheus.Observer
-}
+// The implementation of the Metric interface is expected by testutil.GetHistogramMetricValue.
+var _ Metric = &Histogram{}
 
-func (h *Histogram) Observe(v float64) {
-	h.withExemplar(v)
-}
-
-// withExemplar initializes the exemplarMetric object and sets the exemplar value.
-func (h *Histogram) withExemplar(v float64) {
-	(&exemplarHistogramMetric{h}).withExemplar(v)
-}
-
-// withExemplar attaches an exemplar to the metric.
-func (e *exemplarHistogramMetric) withExemplar(v float64) {
-	if m, ok := e.Histogram.ObserverMetric.(prometheus.ExemplarObserver); ok {
-		maybeSpanCtx := trace.SpanContextFromContext(e.ctx)
-		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
-			exemplarLabels := prometheus.Labels{
-				"trace_id": maybeSpanCtx.TraceID().String(),
-				"span_id":  maybeSpanCtx.SpanID().String(),
-			}
-			m.ObserveWithExemplar(v, exemplarLabels)
-			return
-		}
-	}
-
-	e.ObserverMetric.Observe(v)
-}
+// The implementation of kubeCollector is expected for collector registration.
+var _ kubeCollector = &Histogram{}
 
 // NewHistogram returns an object which is Histogram-like. However, nothing
 // will be measured until the histogram is registered somewhere.
@@ -85,15 +57,11 @@ func NewHistogram(opts *HistogramOpts) *Histogram {
 	return h
 }
 
-// setPrometheusHistogram sets the underlying KubeGauge object, i.e. the thing that does the measurement.
-func (h *Histogram) setPrometheusHistogram(histogram prometheus.Histogram) {
-	h.ObserverMetric = histogram
-	h.initSelfCollection(histogram)
-}
-
-// DeprecatedVersion returns a pointer to the Version or nil
-func (h *Histogram) DeprecatedVersion() *semver.Version {
-	return parseSemver(h.HistogramOpts.DeprecatedVersion)
+// initializeDeprecatedMetric invokes the actual prometheus.Histogram object instantiation
+// but modifies the Help description prior to object instantiation.
+func (h *Histogram) initializeDeprecatedMetric() {
+	h.HistogramOpts.markDeprecated()
+	h.initializeMetric()
 }
 
 // initializeMetric invokes the actual prometheus.Histogram object instantiation
@@ -104,17 +72,74 @@ func (h *Histogram) initializeMetric() {
 	h.setPrometheusHistogram(prometheus.NewHistogram(h.HistogramOpts.toPromHistogramOpts()))
 }
 
-// initializeDeprecatedMetric invokes the actual prometheus.Histogram object instantiation
-// but modifies the Help description prior to object instantiation.
-func (h *Histogram) initializeDeprecatedMetric() {
-	h.HistogramOpts.markDeprecated()
-	h.initializeMetric()
+// setPrometheusHistogram sets the underlying KubeGauge object, i.e. the thing that does the measurement.
+func (h *Histogram) setPrometheusHistogram(histogram prometheus.Histogram) {
+	h.ObserverMetric = histogram
+	h.initSelfCollection(histogram)
 }
 
-// WithContext allows the normal Histogram metric to pass in context. The context is no-op now.
-func (h *Histogram) WithContext(ctx context.Context) ObserverMetric {
-	h.ctx = ctx
-	return h.ObserverMetric
+// Desc returns the prometheus.Desc for the metric.
+// This method is required by the Metric interface.
+func (h *Histogram) Desc() *prometheus.Desc {
+	return h.metric.Desc()
+}
+
+// Write writes the metric to the provided dto.Metric.
+// This method is required by the Metric interface.
+func (h *Histogram) Write(to *dto.Metric) error {
+	return h.metric.Write(to)
+}
+
+// DeprecatedVersion returns a pointer to the Version or nil
+func (h *Histogram) DeprecatedVersion() *semver.Version {
+	return parseSemver(h.HistogramOpts.DeprecatedVersion)
+}
+
+// Observe is the method that implements the ObserverMetric interface.
+func (h *Histogram) Observe(v float64) {
+	h.ObserverMetric.Observe(v)
+}
+
+// HistogramWithContext holds a context to extract exemplar labels from, and a historgram metric to attach them to. It implements the metricWithExemplar interface.
+type HistogramWithContext struct {
+	ctx context.Context
+	*Histogram
+}
+
+// Post-equipping a histogram with context, folks should be able to use it as a regular histogram, with exemplar support.
+var _ Metric = &HistogramWithContext{}
+var _ metricWithExemplar = &HistogramWithContext{}
+
+// WithContext allows a Counter to bind to a context.
+func (h *Histogram) WithContext(ctx context.Context) *HistogramWithContext {
+	// Return reference to a new histogram as modifying the existing one overrides the older context,
+	// and blocks with semaphores. So this is a better option, see:
+	// https://github.com/kubernetes/kubernetes/pull/128575#discussion_r1829509144.
+	return &HistogramWithContext{
+		ctx:       ctx,
+		Histogram: h,
+	}
+}
+
+// withExemplar attaches an exemplar to the metric.
+func (e *HistogramWithContext) withExemplar(v float64) {
+	if m, ok := e.Histogram.ObserverMetric.(prometheus.ExemplarObserver); ok {
+		maybeSpanCtx := trace.SpanContextFromContext(e.ctx)
+		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
+			exemplarLabels := prometheus.Labels{
+				"trace_id": maybeSpanCtx.TraceID().String(),
+				"span_id":  maybeSpanCtx.SpanID().String(),
+			}
+			m.ObserveWithExemplar(v, exemplarLabels)
+			return
+		}
+	}
+
+	e.ObserverMetric.Observe(v)
+}
+
+func (e *HistogramWithContext) Observe(v float64) {
+	e.withExemplar(v)
 }
 
 // HistogramVec is the internal representation of our wrapping struct around prometheus
@@ -126,12 +151,13 @@ type HistogramVec struct {
 	originalLabels []string
 }
 
-// NewHistogramVec returns an object which satisfies kubeCollector and wraps the
-// prometheus.HistogramVec object. However, the object returned will not measure
-// anything unless the collector is first registered, since the metric is lazily instantiated,
-// and only members extracted after
-// registration will actually measure anything.
+// The implementation of kubeCollector is expected for collector registration.
+// HistogramVec implements the kubeCollector interface, and not ObserverMetric interface.
+var _ kubeCollector = &HistogramVec{}
 
+// NewHistogramVec returns an object which satisfies kubeCollector and wraps the prometheus.HistogramVec object.
+// However, the object returned will not measure anything unless the collector is first registered, since the metric is
+// lazily instantiated, and only members extracted after registration will actually measure anything.
 func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 	opts.StabilityLevel.setDefaults()
 
@@ -254,51 +280,10 @@ func (v *HistogramVec) ResetLabelAllowLists() {
 	v.LabelValueAllowLists = nil
 }
 
-// WithContext returns wrapped HistogramVec with context
-func (v *HistogramVec) WithContext(ctx context.Context) *HistogramVecWithContext {
-	return &HistogramVecWithContext{
-		ctx:          ctx,
-		HistogramVec: v,
-	}
-}
-
-// HistogramVecWithContext is the wrapper of HistogramVec with context.
-type HistogramVecWithContext struct {
-	*HistogramVec
-	ctx context.Context
-}
-
-func (h *exemplarHistogramVec) Observe(v float64) {
-	h.withExemplar(v)
-}
-
-func (h *exemplarHistogramVec) withExemplar(v float64) {
-	if m, ok := h.observer.(prometheus.ExemplarObserver); ok {
-		maybeSpanCtx := trace.SpanContextFromContext(h.HistogramVecWithContext.ctx)
-		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
-			m.ObserveWithExemplar(v, prometheus.Labels{
-				"trace_id": maybeSpanCtx.TraceID().String(),
-				"span_id":  maybeSpanCtx.SpanID().String(),
-			})
-			return
-		}
-	}
-
-	h.observer.Observe(v)
-}
-
-// WithLabelValues is the wrapper of HistogramVec.WithLabelValues.
-func (vc *HistogramVecWithContext) WithLabelValues(lvs ...string) *exemplarHistogramVec {
-	return &exemplarHistogramVec{
-		HistogramVecWithContext: vc,
-		observer:                vc.HistogramVec.WithLabelValues(lvs...),
-	}
-}
-
-// With is the wrapper of HistogramVec.With.
-func (vc *HistogramVecWithContext) With(labels map[string]string) *exemplarHistogramVec {
-	return &exemplarHistogramVec{
-		HistogramVecWithContext: vc,
-		observer:                vc.HistogramVec.With(labels),
-	}
+// WithContext is a no-op for now, users should still attach this to vectors for seamless future API upgrades (which rely on the context).
+// This is done to keep extensions (such as exemplars) on the counter and not its derivatives.
+// Note that there are no actual uses for this in the codebase except for chaining it with `WithLabelValues`, which makes no use of the context.
+// Furthermore, Prometheus, which is upstream from this library, does not support contextual vectors, so we don't want to diverge.
+func (v *HistogramVec) WithContext(_ context.Context) *HistogramVec {
+	return v
 }
