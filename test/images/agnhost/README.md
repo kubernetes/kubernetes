@@ -182,6 +182,26 @@ Usage:
     kubectl exec test-agnhost -- /agnhost fake-gitserver
 ```
 
+### fake-registry-server
+
+Starts a fake OCI registry server that serves static image files. This can be used to test
+pulling images from a private or public registry.
+
+Registry serving two APIs:
+
+- `/v2/` - public registry
+- `/private/v2` - private registry, protected by basic auth with `test:test` credentials
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost fake-registry-server
+```
+
+#### Adding new image to the registry
+
+Adding a new image requires a new version of agnhost. To add new image, add a new line 
+to `test/images/agnhost/fakeregistryserver/images.txt` in format `<image> <tag> <internal tag>`
 
 ### guestbook
 
