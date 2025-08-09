@@ -210,6 +210,9 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, p
 
 		antiAffinityCounts := make(topologyToMatchedTermCountList, 0)
 		for _, existingPod := range nodeInfo.GetPodsWithRequiredAntiAffinity() {
+			if existingPod == nil {
+				continue
+			}
 			antiAffinityCounts.appendWithAntiAffinityTerms(existingPod.GetRequiredAntiAffinityTerms(), pod, nsLabels, node, 1)
 		}
 		if len(antiAffinityCounts) != 0 {
@@ -248,6 +251,9 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 		affinity := make(topologyToMatchedTermCountList, 0)
 		antiAffinity := make(topologyToMatchedTermCountList, 0)
 		for _, existingPod := range nodeInfo.GetPods() {
+			if existingPod == nil {
+				continue
+			}
 			affinity.appendWithAffinityTerms(podInfo.GetRequiredAffinityTerms(), existingPod.GetPod(), node, 1)
 			// The incoming pod's terms have the namespaceSelector merged into the namespaces, and so
 			// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
