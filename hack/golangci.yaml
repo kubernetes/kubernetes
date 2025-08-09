@@ -329,6 +329,7 @@ linters:
     staticcheck:
       checks:
         - "all"
+        - "-QF1008"  # Omit embedded fields from selector expression
         - "-QF1001"  # Apply De Morgan’s law
         - "-QF1002"  # Convert untagged switch to tagged switch
         - "-QF1003"  # Convert if/else-if chain to tagged switch
