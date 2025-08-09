@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/utils/ptr"
 )
@@ -76,6 +77,10 @@ const (
 	// BindingTimeoutDefaultSeconds is the default timeout for waiting for
 	// BindingConditions to be ready.
 	BindingTimeoutDefaultSeconds = 600
+
+	// AssumeExtendedResourceTimeoutDefaultSeconds is the default timeout for waiting
+	// for the extended resource claim to be updated in assumed cache.
+	AssumeExtendedResourceTimeoutDefaultSeconds = 120
 )
 
 // The state is initialized in PreFilter phase. Because we save the pointer in
@@ -1446,8 +1451,28 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			if finalErr == nil {
 				// This can fail, but only for reasons that are okay (concurrent delete or update).
 				// Shouldn't happen in this case.
+				if isExtendedResourceClaim {
+					// Unlike other claims, extended resource claim is created in API server below.
+					// AssumeClaimAfterAPICall returns ErrNotFound when the informer update has not reached assumed cache yet.
+					// Hence we must poll and wait for it.
+					pollErr := wait.PollUntilContextTimeout(ctx, 1*time.Second, time.Duration(AssumeExtendedResourceTimeoutDefaultSeconds)*time.Second, true,
+						func(ctx context.Context) (bool, error) {
+							if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
+								if errors.Is(err, assumecache.ErrNotFound) {
+									return false, nil
+								}
+								logger.V(5).Info("Claim not stored in assume cache", "claim", klog.KObj(claim), "err", err)
+								return false, err
+							}
+							return true, nil
+						})
+					if pollErr != nil {
+						logger.V(5).Info("Claim not stored in assume cache after retries", "claim", klog.KObj(claim), "err", pollErr)
+					}
+				}
+			} else {
 				if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
-					logger.V(5).Info("Claim not stored in assume cache", "err", finalErr)
+					logger.V(5).Info("Claim not stored in assume cache", "err", err)
 				}
 			}
 			for _, claimUID := range claimUIDs {
@@ -1576,6 +1601,9 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 // and no binding failure conditions are true,
 // which includes the case that there are no binding conditions.
 func (pl *DynamicResources) isClaimReadyForBinding(claim *resourceapi.ResourceClaim) (bool, error) {
+	if claim.Status.Allocation == nil {
+		return false, nil
+	}
 	for _, deviceRequest := range claim.Status.Allocation.Devices.Results {
 		if len(deviceRequest.BindingConditions) == 0 {
 			continue
