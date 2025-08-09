@@ -501,7 +501,6 @@ func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, er
 // resource by summing requests from all containers in the pod.
 // If a container name is specified, it uses only that container.
 func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource v1.ResourceName) (int64, error) {
-	// Calculate all regular containers and restartable init containers requests.
 	containers := append([]v1.Container{}, pod.Spec.Containers...)
 	for _, c := range pod.Spec.InitContainers {
 		if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
@@ -509,15 +508,26 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 		}
 	}
 
+	if container != "" {
+		for _, c := range containers {
+			if c.Name == container {
+				containerRequest, ok := c.Resources.Requests[resource]
+				if !ok {
+					return 0, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.Name)
+				}
+				return containerRequest.MilliValue(), nil
+			}
+		}
+		return 0, fmt.Errorf("container %s not found in Pod %s", container, pod.Name)
+	}
+
 	request := int64(0)
 	for _, c := range containers {
-		if container == "" || container == c.Name {
-			containerRequest, ok := c.Resources.Requests[resource]
-			if !ok {
-				return 0, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.Name)
-			}
-			request += containerRequest.MilliValue()
+		containerRequest, ok := c.Resources.Requests[resource]
+		if !ok {
+			return 0, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.Name)
 		}
+		request += containerRequest.MilliValue()
 	}
 	return request, nil
 }
