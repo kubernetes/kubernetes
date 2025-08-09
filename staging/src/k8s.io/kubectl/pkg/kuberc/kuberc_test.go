@@ -912,7 +912,7 @@ func TestApplyOverride(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
-			_, err := pref.Apply(rootCmd, test.args, errWriter)
+			_, _, err := pref.Apply(rootCmd, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -1152,7 +1152,7 @@ func TestApplOverrideBool(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
-			_, err := pref.Apply(rootCmd, test.args, errWriter)
+			_, _, err := pref.Apply(rootCmd, test.args, errWriter)
 			if err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -1437,7 +1437,7 @@ func TestApplyAliasBool(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
-			lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
+			lastArgs, _, err := pref.Apply(rootCmd, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -2580,7 +2580,7 @@ func TestApplyAlias(t *testing.T) {
 			addCommands(rootCmd, test.nestedCmds)
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
-			lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
+			lastArgs, _, err := pref.Apply(rootCmd, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
@@ -2709,7 +2709,6 @@ func addCommands[T supportedTypes](rootCmd *cobra.Command, commands []fakeCmds[T
 				subCmd.Flags().Bool(flg.name, v, "")
 			}
 		}
-
 	}
 	rootCmd.AddCommand(subCmd)
 
