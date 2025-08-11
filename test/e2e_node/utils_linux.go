@@ -22,14 +22,8 @@ package e2enode
 import (
 	"fmt"
 
-	libcontainercgroups "github.com/opencontainers/cgroups"
 	"k8s.io/kubernetes/test/e2e_node/criproxy"
 )
-
-// IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
-func IsCgroup2UnifiedMode() bool {
-	return libcontainercgroups.IsCgroup2UnifiedMode()
-}
 
 // addCRIProxyInjector registers an injector function for the CRIProxy.
 func addCRIProxyInjector(proxy *criproxy.RemoteRuntime, injector func(apiName string) error) error {
