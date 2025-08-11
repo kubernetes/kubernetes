@@ -18,14 +18,8 @@ package e2enode
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -232,62 +226,6 @@ func waitForContainerRemoval(ctx context.Context, containerName, podName, podNS 
 		}
 		return len(containers) == 0
 	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrueBecause("Containers were expected to be removed"))
-}
-
-func isHTEnabled() bool {
-	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Thread(s) per core:\" | cut -d \":\" -f 2").Output()
-	framework.ExpectNoError(err)
-
-	threadsPerCore, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
-
-	return threadsPerCore > 1
-}
-
-func isMultiNUMA() bool {
-	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"NUMA node(s):\" | cut -d \":\" -f 2").Output()
-	framework.ExpectNoError(err)
-
-	numaNodes, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
-
-	return numaNodes > 1
-}
-
-func getSMTLevel() int {
-	cpuID := 0 // this is just the most likely cpu to be present in a random system. No special meaning besides this.
-	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/thread_siblings_list | tr -d \"\n\r\"", cpuID)).Output()
-	framework.ExpectNoError(err)
-	// how many thread sibling you have = SMT level
-	// example: 2-way SMT means 2 threads sibling for each thread
-	cpus, err := cpuset.Parse(strings.TrimSpace(string(out)))
-	framework.ExpectNoError(err)
-	return cpus.Size()
-}
-
-func getUncoreCPUGroupSize() int {
-	cpuID := 0 // this is just the most likely cpu to be present in a random system. No special meaning besides this.
-	out, err := os.ReadFile(fmt.Sprintf("/sys/devices/system/cpu/cpu%d/cache/index3/shared_cpu_list", cpuID))
-	if errors.Is(err, fs.ErrNotExist) {
-		return 0 // no Uncore/LLC cache detected, nothing to do
-	}
-	framework.ExpectNoError(err)
-	// how many cores share a same Uncore/LLC block?
-	cpus, err := cpuset.Parse(strings.TrimSpace(string(out)))
-	framework.ExpectNoError(err)
-	return cpus.Size()
-}
-
-func getCPUSiblingList(cpuRes int64) string {
-	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/thread_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
-	framework.ExpectNoError(err)
-	return string(out)
-}
-
-func getCoreSiblingList(cpuRes int64) string {
-	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/core_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
-	framework.ExpectNoError(err)
-	return string(out)
 }
 
 type cpuManagerKubeletArguments struct {
@@ -1398,33 +1336,6 @@ func validateSMTAlignment(cpus cpuset.CPUSet, smtLevel int, pod *v1.Pod, cnt *v1
 func isSMTAlignmentError(pod *v1.Pod) bool {
 	re := regexp.MustCompile(`SMT.*Alignment.*Error`)
 	return re.MatchString(pod.Status.Reason)
-}
-
-// getNumaNodeCPUs retrieves CPUs for each NUMA node.
-func getNumaNodeCPUs() (map[int]cpuset.CPUSet, error) {
-	numaNodes := make(map[int]cpuset.CPUSet)
-	nodePaths, err := filepath.Glob("/sys/devices/system/node/node*/cpulist")
-	if err != nil {
-		return nil, err
-	}
-
-	for _, nodePath := range nodePaths {
-		data, err := os.ReadFile(nodePath)
-		framework.ExpectNoError(err, "Error obtaning CPU information from the node")
-		cpuSet := strings.TrimSpace(string(data))
-		cpus, err := cpuset.Parse(cpuSet)
-		framework.ExpectNoError(err, "Error parsing CPUset")
-
-		// Extract node ID from path (e.g., "node0" -> 0)
-		base := filepath.Base(filepath.Dir(nodePath))
-		nodeID, err := strconv.Atoi(strings.TrimPrefix(base, "node"))
-		if err != nil {
-			continue
-		}
-		numaNodes[nodeID] = cpus
-	}
-
-	return numaNodes, nil
 }
 
 func getContainerAllowedCPUsFromLogs(podName, cntName, logs string) cpuset.CPUSet {
