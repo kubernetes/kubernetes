@@ -52,7 +52,7 @@ func registerCredentialProviderPlugin(name string, p *pluginProvider) {
 	seenProviderNames.Insert(name)
 
 	providers = append(providers, provider{name, p})
-	klog.V(4).Infof("Registered credential provider %q", name)
+	klog.V(4).InfoS("Registered credential provider", "provider", name)
 }
 
 type externalCredentialProviderKeyring struct {
@@ -69,7 +69,6 @@ func NewExternalCredentialProviderDockerKeyring(podNamespace, podName, podUID, s
 
 	for _, p := range providers {
 		pp := &perPodPluginProvider{
-			name:     p.name,
 			provider: p.impl,
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {

@@ -373,6 +373,7 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 			name: "[service account mode] sa name required but empty",
 			pluginProvider: &perPodPluginProvider{
 				provider: &pluginProvider{
+					name:        "test-plugin",
 					matchImages: []string{"test.registry.io"},
 					serviceAccountProvider: &serviceAccountProvider{
 						requireServiceAccount: true,
@@ -380,15 +381,17 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 				},
 				podName:      "pod-name",
 				podNamespace: "ns",
+				podUID:       "pod-uid",
 			},
 			image:        "test.registry.io/foo/bar",
 			dockerconfig: credentialprovider.DockerConfig{},
-			wantLog:      "Service account name is empty for pod ns/pod-name",
+			wantLog:      `Service account name is empty" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid"`,
 		},
 		{
 			name: "[service account mode] sa does not have required annotations",
 			pluginProvider: &perPodPluginProvider{
 				provider: &pluginProvider{
+					name:        "test-plugin",
 					matchImages: []string{"test.registry.io"},
 					serviceAccountProvider: &serviceAccountProvider{
 						requireServiceAccount: true,
@@ -408,16 +411,18 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 				},
 				podName:            "pod-name",
 				podNamespace:       "ns",
+				podUID:             "pod-uid",
 				serviceAccountName: "sa-name",
 			},
 			image:        "test.registry.io/foo/bar",
 			dockerconfig: credentialprovider.DockerConfig{},
-			wantLog:      "Failed to get service account data ns/sa-name: required annotation domain.io/identity-id not found",
+			wantLog:      `"Failed to get service account data" err="required annotation domain.io/identity-id not found" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
 		},
 		{
 			name: "[service account mode] failed to get service account token",
 			pluginProvider: &perPodPluginProvider{
 				provider: &pluginProvider{
+					name:        "test-plugin",
 					matchImages: []string{"test.registry.io"},
 					serviceAccountProvider: &serviceAccountProvider{
 						requireServiceAccount: true,
@@ -445,16 +450,18 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 				},
 				podName:            "pod-name",
 				podNamespace:       "ns",
+				podUID:             "pod-uid",
 				serviceAccountName: "sa-name",
 			},
 			image:        "test.registry.io/foo/bar",
 			dockerconfig: credentialprovider.DockerConfig{},
-			wantLog:      "Error getting service account token ns/sa-name: failed to get token",
+			wantLog:      `"Failed to provide credentials for image" err="failed to get service account token: failed to get token" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
 		},
 		{
 			name: "[service account mode] cache type not token but service account echoed back",
 			pluginProvider: &perPodPluginProvider{
 				provider: &pluginProvider{
+					name:           "test-plugin",
 					clock:          tclock,
 					lastCachePurge: tclock.Now(),
 					matchImages:    []string{"test.registry.io"},
@@ -494,11 +501,12 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 				},
 				podName:            "pod-name",
 				podNamespace:       "ns",
+				podUID:             "pod-uid",
 				serviceAccountName: "sa-name",
 			},
 			image:        "test.registry.io/foo/bar",
 			dockerconfig: credentialprovider.DockerConfig{},
-			wantLog:      `Credential provider plugin returned the service account token as the password for image "test.registry.io/foo/bar", which is not allowed when service account cache type is not set to 'Token'`,
+			wantLog:      `"Failed to provide credentials for image" err="credential provider plugin returned the service account token as the password which is not allowed when service account cache type is not set to 'Token'" provider="test-plugin" image="test.registry.io/foo/bar" pod="ns/pod-name" podUID="pod-uid" serviceAccount="ns/sa-name"`,
 		},
 		{
 			name: "[service account mode] exact image match",
@@ -588,6 +596,7 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 			capturedOutput := buf.String()
 
 			if len(testcase.wantLog) > 0 && !strings.Contains(capturedOutput, testcase.wantLog) {
+				t.Log("Captured output:", capturedOutput)
 				t.Errorf("expected log message %q not found in captured output: %q", testcase.wantLog, capturedOutput)
 			}
 		})
