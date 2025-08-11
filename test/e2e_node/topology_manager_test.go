@@ -1564,7 +1564,7 @@ func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap 
 	cpuListString = "0"
 	if cpuAlloc > 2 {
 		cset = mustParseCPUSet(fmt.Sprintf("0-%d", cpuCap-1))
-		cpuListString = fmt.Sprintf("%s", cset.Difference(cpuset.New(cpu1)))
+		cpuListString = cset.Difference(cpuset.New(cpu1)).String()
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
 	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -1603,14 +1603,14 @@ func runMultipleCPUGuPod(ctx context.Context, f *framework.Framework) {
 			if !isHTEnabled() && len(cpuList) > 2 {
 				cset = mustParseCPUSet(fmt.Sprintf("%d-%d", cpuList[1], cpuList[2]))
 			}
-			cpuListString = fmt.Sprintf("%s", cset)
+			cpuListString = cset.String()
 		}
 	} else if isHTEnabled() {
 		cpuListString = "2-3"
 		cpuList = mustParseCPUSet(getCPUSiblingList(0)).List()
 		if cpuList[1] != 1 {
 			cset = mustParseCPUSet(getCPUSiblingList(1))
-			cpuListString = fmt.Sprintf("%s", cset)
+			cpuListString = cset.String()
 		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
