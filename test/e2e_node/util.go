@@ -38,7 +38,6 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 
 	v1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -64,7 +63,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo/v2"
@@ -166,12 +164,6 @@ func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResour
 	return resp, nil
 }
 
-// Returns the current KubeletConfiguration
-func getCurrentKubeletConfig(ctx context.Context) (*kubeletconfig.KubeletConfiguration, error) {
-	// namespace only relevant if useProxy==true, so we don't bother
-	return e2enodekubelet.GetCurrentKubeletConfig(ctx, framework.TestContext.NodeName, "", false, framework.TestContext.StandaloneMode)
-}
-
 func addAfterEachForCleaningUpPods(f *framework.Framework) {
 	ginkgo.AfterEach(func(ctx context.Context) {
 		ginkgo.By("Deleting any Pods created by the test in namespace: " + f.Namespace.Name)
@@ -185,50 +177,6 @@ func addAfterEachForCleaningUpPods(f *framework.Framework) {
 			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		}
 	})
-}
-
-// Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
-// The change is reverted in the AfterEach of the context.
-func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration)) {
-	var oldCfg *kubeletconfig.KubeletConfiguration
-
-	ginkgo.BeforeEach(func(ctx context.Context) {
-		var err error
-		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
-
-		newCfg := oldCfg.DeepCopy()
-		updateFunction(ctx, newCfg)
-		if apiequality.Semantic.DeepEqual(*newCfg, *oldCfg) {
-			return
-		}
-
-		updateKubeletConfig(ctx, f, newCfg, true)
-	})
-
-	ginkgo.AfterEach(func(ctx context.Context) {
-		if oldCfg != nil {
-			// Update the Kubelet configuration.
-			updateKubeletConfig(ctx, f, oldCfg, true)
-		}
-	})
-}
-
-func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {
-	// Update the Kubelet configuration.
-	ginkgo.By("Stopping the kubelet")
-	restartKubelet := mustStopKubelet(ctx, f)
-
-	// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
-	if deleteStateFiles {
-		deleteStateFile(cpuManagerStateFile)
-		deleteStateFile(memoryManagerStateFile)
-	}
-
-	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
-
-	ginkgo.By("Restarting the kubelet")
-	restartKubelet(ctx)
 }
 
 func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
