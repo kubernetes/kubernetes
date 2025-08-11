@@ -254,10 +254,14 @@ func (a *admitTestCase) run(t *testing.T) {
 
 func Test_nodePlugin_Admit(t *testing.T) {
 	var (
-		mynode = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
-		bob    = &user.DefaultInfo{Name: "bob"}
+		trueRef = true
+		mynode  = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
+		bob     = &user.DefaultInfo{Name: "bob"}
 
-		mynodeObjMeta    = metav1.ObjectMeta{Name: "mynode", UID: "mynode-uid"}
+		mynodeObjMeta          = metav1.ObjectMeta{Name: "mynode", UID: "mynode-uid"}
+		mynodeObjMetaOwnerRefA = metav1.ObjectMeta{Name: "mynode", UID: "mynode-uid", OwnerReferences: []metav1.OwnerReference{{Name: "fooerA", Controller: &trueRef}}}
+		mynodeObjMetaOwnerRefB = metav1.ObjectMeta{Name: "mynode", UID: "mynode-uid", OwnerReferences: []metav1.OwnerReference{{Name: "fooerB", Controller: &trueRef}}}
+
 		mynodeObj        = &api.Node{ObjectMeta: mynodeObjMeta}
 		mynodeObjConfigA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
 			ConfigMap: &api.ConfigMapNodeConfigSource{
@@ -274,9 +278,11 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				KubeletConfigKey: "kubelet",
 			}}}}
 
-		mynodeObjTaintA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "A"}}}}
-		mynodeObjTaintB = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "B"}}}}
-		othernodeObj    = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "othernode"}}
+		mynodeObjTaintA    = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "A"}}}}
+		mynodeObjTaintB    = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "B"}}}}
+		mynodeObjOwnerRefA = &api.Node{ObjectMeta: mynodeObjMetaOwnerRefA}
+		mynodeObjOwnerRefB = &api.Node{ObjectMeta: mynodeObjMetaOwnerRefB}
+		othernodeObj       = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "othernode"}}
 
 		coremymirrorpod, v1mymirrorpod           = makeTestPod("ns", "mymirrorpod", "mynode", true)
 		coreothermirrorpod, v1othermirrorpod     = makeTestPod("ns", "othermirrorpod", "othernode", true)
@@ -1166,6 +1172,24 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(setForbiddenUpdateLabels(mynodeObj, "new"), setForbiddenUpdateLabels(mynodeObj, "old"), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, &metav1.UpdateOptions{}, false, mynode),
 			err:        `is not allowed to modify labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
+		},
+		{
+			name:       "forbid update of my node: add owner reference",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjOwnerRefA, mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "node \"mynode\" is not allowed to modify ownerReferences",
+		},
+		{
+			name:       "forbid update of my node: remove owner reference",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObjOwnerRefA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "node \"mynode\" is not allowed to modify ownerReferences",
+		},
+		{
+			name:       "forbid update of my node: change owner reference",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjOwnerRefA, mynodeObjOwnerRefB, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "node \"mynode\" is not allowed to modify ownerReferences",
 		},
 
 		// Other node object
