@@ -53,7 +53,6 @@ type activeQueuer interface {
 	done(pod types.UID)
 	close()
 	broadcast()
-	tryNotify()
 }
 
 // unlockedActiveQueuer defines activeQ methods that are not protected by the lock itself.
@@ -274,13 +273,6 @@ func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) error {
 // // pop removes the head of the queue and returns it.
 // // It blocks if the queue is empty and waits until a new item is added to the queue.
 // // It increments scheduling cycle when a pod is popped.
-// func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
-// 	aq.lock.Lock()
-// 	defer aq.lock.Unlock()
-
-// 	return aq.unlockedPop(logger)
-// }
-
 func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 	for {
 		aq.lock.Lock()

@@ -75,8 +75,6 @@ type backoffQueuer interface {
 	list() []*v1.Pod
 	// len returns length of the queue.
 	len() int
-
-	setNotifyFunc(f func())
 }
 
 // backoffQueue implements backoffQueuer and wraps two queues inside,
