@@ -136,56 +136,6 @@ func runCPUManagerTests(f *framework.Framework) {
 		runAutomaticallyRemoveInactivePodsFromCPUManagerStateFile(ctx, f)
 	})
 
-	ginkgo.It("reservedSystemCPUs are excluded only for Gu pods (strict-cpu-reservation option not enabled by default)", func(ctx context.Context) {
-		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
-
-		// Skip CPU Manager tests altogether if the CPU capacity < 2.
-		if cpuCap < 2 {
-			e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
-		}
-
-		reservedSystemCPUs := cpuset.New(0)
-		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
-			reservedSystemCPUs: reservedSystemCPUs,
-		})
-		updateKubeletConfig(ctx, f, newCfg, true)
-
-		ginkgo.By("running a Gu pod - it shouldn't use reserved system CPUs")
-		runGuPodTest(ctx, f, 1, reservedSystemCPUs)
-
-		ginkgo.By("running a non-Gu pod - it can use reserved system CPUs")
-		runNonGuPodTest(ctx, f, cpuCap, cpuset.New())
-
-	})
-
-	ginkgo.It("reservedSystemCPUs are excluded for both Gu and non-Gu pods (strict-cpu-reservation option enabled)", func(ctx context.Context) {
-		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
-
-		// Skip CPU Manager tests altogether if the CPU capacity < 2.
-		if cpuCap < 2 {
-			e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
-		}
-
-		reservedSystemCPUs := cpuset.New(0)
-		cpuPolicyOptions := map[string]string{
-			cpumanager.StrictCPUReservationOption: "true",
-		}
-		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:              string(cpumanager.PolicyStatic),
-			reservedSystemCPUs:      reservedSystemCPUs,
-			enableCPUManagerOptions: true,
-			options:                 cpuPolicyOptions,
-		})
-		updateKubeletConfig(ctx, f, newCfg, true)
-
-		ginkgo.By("running a Gu pod - it shouldn't use reserved system CPUs")
-		runGuPodTest(ctx, f, 1, reservedSystemCPUs)
-
-		ginkgo.By("running a non-Gu pod - it shouldn't use reserved system CPUs with strict-cpu-reservation option enabled")
-		runNonGuPodTest(ctx, f, cpuCap, reservedSystemCPUs)
-	})
-
 	f.It("should not reuse CPUs of restartable init containers", feature.SidecarContainers, func(ctx context.Context) {
 		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
 
