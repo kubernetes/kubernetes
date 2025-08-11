@@ -27,7 +27,6 @@ import (
 	"k8s.io/utils/cpuset"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -134,70 +133,6 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		ginkgo.By("test for automatically remove inactive pods from cpumanager state file.")
 		runAutomaticallyRemoveInactivePodsFromCPUManagerStateFile(ctx, f)
-	})
-
-	f.It("should not reuse CPUs of restartable init containers", feature.SidecarContainers, func(ctx context.Context) {
-		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
-
-		// Skip rest of the tests if CPU capacity < 3.
-		if cpuCap < 3 {
-			e2eskipper.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3, got %d", cpuCap)
-		}
-
-		// Enable CPU Manager in the kubelet.
-		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
-			reservedSystemCPUs: cpuset.CPUSet{},
-		})
-		updateKubeletConfig(ctx, f, newCfg, true)
-
-		ginkgo.By("running a Gu pod with a regular init container and a restartable init container")
-		ctrAttrs := []ctnAttribute{
-			{
-				ctnName:    "gu-init-container1",
-				cpuRequest: "1000m",
-				cpuLimit:   "1000m",
-			},
-			{
-				ctnName:       "gu-restartable-init-container2",
-				cpuRequest:    "1000m",
-				cpuLimit:      "1000m",
-				restartPolicy: &containerRestartPolicyAlways,
-			},
-		}
-		pod := makeCPUManagerInitContainersPod("gu-pod", ctrAttrs)
-		pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-
-		ginkgo.By("checking if the expected cpuset was assigned")
-		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.InitContainers[0].Name)
-		framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", pod.Spec.InitContainers[0].Name, pod.Name)
-
-		reusableCPUs := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.InitContainers[0].Name, logs)
-
-		gomega.Expect(reusableCPUs.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", reusableCPUs.String())
-
-		logs, err = e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.InitContainers[1].Name)
-		framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", pod.Spec.InitContainers[1].Name, pod.Name)
-
-		nonReusableCPUs := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.InitContainers[1].Name, logs)
-
-		gomega.Expect(nonReusableCPUs.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", nonReusableCPUs.String())
-
-		logs, err = e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", pod.Spec.Containers[0].Name, pod.Name)
-
-		cpus := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.Containers[0].Name, logs)
-
-		gomega.Expect(cpus.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", cpus.String())
-
-		gomega.Expect(reusableCPUs.Equals(nonReusableCPUs)).To(gomega.BeTrueBecause("expected reusable cpuset [%s] to be equal to non-reusable cpuset [%s]", reusableCPUs.String(), nonReusableCPUs.String()))
-		gomega.Expect(nonReusableCPUs.Intersection(cpus).IsEmpty()).To(gomega.BeTrueBecause("expected non-reusable cpuset [%s] to be disjoint from cpuset [%s]", nonReusableCPUs.String(), cpus.String()))
-
-		ginkgo.By("by deleting the pods and waiting for container removal")
-		deletePods(ctx, f, []string{pod.Name})
-		waitForContainerRemoval(ctx, pod.Spec.InitContainers[0].Name, pod.Name, pod.Namespace)
-		waitForContainerRemoval(ctx, pod.Spec.InitContainers[1].Name, pod.Name, pod.Namespace)
-		waitForContainerRemoval(ctx, pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 	})
 
 	ginkgo.AfterEach(func(ctx context.Context) {
