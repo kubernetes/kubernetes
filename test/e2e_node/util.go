@@ -247,6 +247,20 @@ func getLocalTestNode(ctx context.Context, f *framework.Framework) (*v1.Node, bo
 	return node, ready && schedulable
 }
 
+func getLocalNodeCPUDetails(ctx context.Context, f *framework.Framework) (cpuCapVal int64, cpuAllocVal int64, cpuResVal int64) {
+	localNodeCap := getLocalNode(ctx, f).Status.Capacity
+	cpuCap := localNodeCap[v1.ResourceCPU]
+	localNodeAlloc := getLocalNode(ctx, f).Status.Allocatable
+	cpuAlloc := localNodeAlloc[v1.ResourceCPU]
+	cpuRes := cpuCap.DeepCopy()
+	cpuRes.Sub(cpuAlloc)
+
+	// RoundUp reserved CPUs to get only integer cores.
+	cpuRes.RoundUp(0)
+
+	return cpuCap.Value(), cpuCap.Value() - cpuRes.Value(), cpuRes.Value()
+}
+
 // logKubeletLatencyMetrics logs KubeletLatencyMetrics computed from the Prometheus
 // metrics exposed on the current node and identified by the metricNames.
 // The Kubelet subsystem prefix is automatically prepended to these metric names.
@@ -578,4 +592,36 @@ func WaitForPodInitContainerToFail(ctx context.Context, c clientset.Interface, n
 
 func nodeNameOrIP() string {
 	return "localhost"
+}
+
+func deletePodSyncByName(ctx context.Context, f *framework.Framework, podName string) {
+	gp := int64(0)
+	delOpts := metav1.DeleteOptions{
+		GracePeriodSeconds: &gp,
+	}
+	e2epod.NewPodClient(f).DeleteSync(ctx, podName, delOpts, f.Timeouts.PodDelete)
+}
+
+func deletePods(ctx context.Context, f *framework.Framework, podNames []string) {
+	for _, podName := range podNames {
+		deletePodSyncByName(ctx, f, podName)
+	}
+}
+
+func waitForContainerRemoval(ctx context.Context, containerName, podName, podNS string) {
+	rs, _, err := getCRIClient()
+	framework.ExpectNoError(err)
+	gomega.Eventually(ctx, func(ctx context.Context) bool {
+		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{
+			LabelSelector: map[string]string{
+				types.KubernetesPodNameLabel:       podName,
+				types.KubernetesPodNamespaceLabel:  podNS,
+				types.KubernetesContainerNameLabel: containerName,
+			},
+		})
+		if err != nil {
+			return false
+		}
+		return len(containers) == 0
+	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrueBecause("Containers were expected to be removed"))
 }
