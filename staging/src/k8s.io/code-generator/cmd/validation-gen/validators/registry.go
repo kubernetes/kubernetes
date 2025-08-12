@@ -136,6 +136,25 @@ func (reg *registry) ExtractTags(_ Context, comments []string) ([]codetags.Tag, 
 	return tags, nil
 }
 
+// checkTags checks all tags and their chained tags recursively for tag processing issues
+func (reg *registry) checkTags(tags []codetags.Tag) []string {
+	var errors []string
+	for _, tag := range tags {
+		// Check the current tag
+		if tv, exists := reg.tagValidators[tag.Name]; !exists {
+			errors = append(errors, fmt.Sprintf("unknown tag %q", tag.Name))
+		} else if tv == nil {
+			errors = append(errors, fmt.Sprintf("nil validator for tag %q", tag.Name))
+		}
+
+		// Recursively check ValueTag if it exists
+		if tag.ValueTag != nil {
+			errors = append(errors, reg.checkTags([]codetags.Tag{*tag.ValueTag})...)
+		}
+	}
+	return errors
+}
+
 // ExtractValidations considers the given context (e.g. a type definition) and
 // evaluates registered validators.  This includes type validators (which run
 // against all types) and tag validators which run only if a specific tag is
@@ -148,15 +167,8 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 	}
 	validations := Validations{}
 
-	// Check all tags first for tag processing issues
-	var errors []string
-	for _, tag := range tags {
-		if tv, exists := reg.tagValidators[tag.Name]; !exists {
-			errors = append(errors, fmt.Sprintf("unknown tag %q", tag.Name))
-		} else if tv == nil {
-			errors = append(errors, fmt.Sprintf("nil validator for tag %q", tag.Name))
-		}
-	}
+	// Check all tags first for tag processing issues, including chained tags
+	errors := reg.checkTags(tags)
 
 	// If there are tag processing issues, report them all together
 	if len(errors) > 0 {

@@ -66,6 +66,53 @@ func TestExtractValidations_TagValidator(t *testing.T) {
 			},
 			wantErr: "tag processing errors: nil validator for tag \"nil:tag1\"; nil validator for tag \"nil:tag2\"; unknown tag \"unknown:tag1\"; unknown tag \"unknown:tag2\"; unknown tag \"unknown:tag3\"",
 		},
+		{
+			name: "chained tag errors",
+			tags: []codetags.Tag{
+				{
+					Name:     "valid:tag",
+					ValueTag: &codetags.Tag{Name: "unknown:chained"},
+				},
+			},
+			setup: func(r *registry) {
+				r.tagValidators["valid:tag"] = &mockTagValidator{tagName: "valid:tag", scopes: sets.New(ScopeType)}
+			},
+			wantErr: "tag processing errors: unknown tag \"unknown:chained\"",
+		},
+		{
+			name: "deeply chained tags",
+			tags: []codetags.Tag{
+				{
+					Name: "valid:tag1",
+					ValueTag: &codetags.Tag{
+						Name: "valid:tag2",
+						ValueTag: &codetags.Tag{
+							Name: "unknown:deeply:chained",
+						},
+					},
+				},
+			},
+			setup: func(r *registry) {
+				r.tagValidators["valid:tag1"] = &mockTagValidator{tagName: "valid:tag1", scopes: sets.New(ScopeType)}
+				r.tagValidators["valid:tag2"] = &mockTagValidator{tagName: "valid:tag2", scopes: sets.New(ScopeType)}
+			},
+			wantErr: "tag processing errors: unknown tag \"unknown:deeply:chained\"",
+		},
+		{
+			name: "mixed chained tag errors",
+			tags: []codetags.Tag{
+				{Name: "unknown:top"},
+				{
+					Name:     "valid:tag",
+					ValueTag: &codetags.Tag{Name: "nil:validator"},
+				},
+			},
+			setup: func(r *registry) {
+				r.tagValidators["valid:tag"] = &mockTagValidator{tagName: "valid:tag", scopes: sets.New(ScopeType)}
+				r.tagValidators["nil:validator"] = nil
+			},
+			wantErr: "tag processing errors: unknown tag \"unknown:top\"; nil validator for tag \"nil:validator\"",
+		},
 	}
 
 	for _, tt := range tests {
