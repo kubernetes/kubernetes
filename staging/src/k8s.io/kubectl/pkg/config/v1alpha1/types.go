@@ -62,6 +62,12 @@ type Preference struct {
 	// "kubectl getn control-plane-1 --output=json" expands to "kubectl get node --output=json control-plane-1"
 	// +listType=atomic
 	Aliases []AliasOverride `json:"aliases"`
+
+	CredPluginAllowlist *[]AllowlistItem `json:"credPluginAllowlist,omitempty"`
+}
+
+type AllowlistItem struct {
+	Name string `json:"name"`
 }
 
 // AliasOverride stores the alias definitions.

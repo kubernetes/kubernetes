@@ -1340,10 +1340,12 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kube-scheduler/config/v1.UtilizationShapePoint":                                                 schema_k8sio_kube_scheduler_config_v1_UtilizationShapePoint(ref),
 		"k8s.io/kube-scheduler/config/v1.VolumeBindingArgs":                                                     schema_k8sio_kube_scheduler_config_v1_VolumeBindingArgs(ref),
 		"k8s.io/kubectl/pkg/config/v1alpha1.AliasOverride":                                                      schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref),
+		"k8s.io/kubectl/pkg/config/v1alpha1.AllowlistItem":                                                      schema_kubectl_pkg_config_v1alpha1_AllowlistItem(ref),
 		"k8s.io/kubectl/pkg/config/v1alpha1.CommandDefaults":                                                    schema_kubectl_pkg_config_v1alpha1_CommandDefaults(ref),
 		"k8s.io/kubectl/pkg/config/v1alpha1.CommandOptionDefault":                                               schema_kubectl_pkg_config_v1alpha1_CommandOptionDefault(ref),
 		"k8s.io/kubectl/pkg/config/v1alpha1.Preference":                                                         schema_kubectl_pkg_config_v1alpha1_Preference(ref),
 		"k8s.io/kubectl/pkg/config/v1beta1.AliasOverride":                                                       schema_kubectl_pkg_config_v1beta1_AliasOverride(ref),
+		"k8s.io/kubectl/pkg/config/v1beta1.AllowlistItem":                                                       schema_kubectl_pkg_config_v1beta1_AllowlistItem(ref),
 		"k8s.io/kubectl/pkg/config/v1beta1.CommandDefaults":                                                     schema_kubectl_pkg_config_v1beta1_CommandDefaults(ref),
 		"k8s.io/kubectl/pkg/config/v1beta1.CommandOptionDefault":                                                schema_kubectl_pkg_config_v1beta1_CommandOptionDefault(ref),
 		"k8s.io/kubectl/pkg/config/v1beta1.Preference":                                                          schema_kubectl_pkg_config_v1beta1_Preference(ref),
@@ -69355,6 +69357,26 @@ func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallba
 	}
 }
 
+func schema_kubectl_pkg_config_v1alpha1_AllowlistItem(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
 func schema_kubectl_pkg_config_v1alpha1_CommandDefaults(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -69487,12 +69509,25 @@ func schema_kubectl_pkg_config_v1alpha1_Preference(ref common.ReferenceCallback)
 							},
 						},
 					},
+					"credPluginAllowlist": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.AllowlistItem"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"overrides", "aliases"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kubectl/pkg/config/v1alpha1.AliasOverride", "k8s.io/kubectl/pkg/config/v1alpha1.CommandDefaults"},
+			"k8s.io/kubectl/pkg/config/v1alpha1.AliasOverride", "k8s.io/kubectl/pkg/config/v1alpha1.AllowlistItem", "k8s.io/kubectl/pkg/config/v1alpha1.CommandDefaults"},
 	}
 }
 
@@ -69584,6 +69619,26 @@ func schema_kubectl_pkg_config_v1beta1_AliasOverride(ref common.ReferenceCallbac
 		},
 		Dependencies: []string{
 			"k8s.io/kubectl/pkg/config/v1beta1.CommandOptionDefault"},
+	}
+}
+
+func schema_kubectl_pkg_config_v1beta1_AllowlistItem(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
 	}
 }
 
@@ -69719,12 +69774,25 @@ func schema_kubectl_pkg_config_v1beta1_Preference(ref common.ReferenceCallback) 
 							},
 						},
 					},
+					"credPluginAllowlist": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1beta1.AllowlistItem"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"defaults", "aliases"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kubectl/pkg/config/v1beta1.AliasOverride", "k8s.io/kubectl/pkg/config/v1beta1.CommandDefaults"},
+			"k8s.io/kubectl/pkg/config/v1beta1.AliasOverride", "k8s.io/kubectl/pkg/config/v1beta1.AllowlistItem", "k8s.io/kubectl/pkg/config/v1beta1.CommandDefaults"},
 	}
 }
 

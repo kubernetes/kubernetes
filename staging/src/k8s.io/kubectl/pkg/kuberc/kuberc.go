@@ -17,6 +17,7 @@ limitations under the License.
 package kuberc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -320,11 +321,13 @@ func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference,
 		// if not explicitly requested, silently ignore missing kuberc
 		return nil, nil
 
+	case !explicitly && errors.Is(err, pluginAllowlistError):
+		return nil, err
+
 	case !explicitly && err != nil:
 		// if not explicitly requested, only warn on any other error
 		fmt.Fprintf(errOut, "kuberc: no preferences loaded from %s: %v", kubeRCFile, err) //nolint:errcheck
 		return nil, nil
-
 	default:
 		return preference, nil
 	}

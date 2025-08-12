@@ -23,12 +23,21 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/config"
 	"k8s.io/kubectl/pkg/config/scheme"
+	"sigs.k8s.io/json"
+)
+
+var (
+	pluginAllowlistError = errors.New("plugin allowlist error")
+	credPluginYamlPath   = regexp.MustCompile(`^credPluginAllowlist\[[0-9]+\]\.`)
 )
 
 // decodePreference iterates over the yamls in kuberc file to find the supported kuberc version.
@@ -59,6 +68,12 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 		attemptedItems++
 		pref, gvk, strictDecodeErr := scheme.StrictCodecs.UniversalDecoder().Decode(doc, nil, nil)
 		if strictDecodeErr != nil {
+			// check whether the client-go credential plugin allowlist is
+			// causing the strict parsing failure
+			if pluginPathErr, ok := asAllowlistErr(strictDecodeErr); ok {
+				return nil, fmt.Errorf("%w: %w", pluginAllowlistError, pluginPathErr)
+			}
+
 			var lenientDecodeErr error
 			pref, gvk, lenientDecodeErr = scheme.LenientCodecs.UniversalDecoder().Decode(doc, nil, nil)
 			if lenientDecodeErr != nil {
@@ -98,4 +113,32 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 	// empty doc
 	klog.V(5).Infof("kuberc: no preferences found in %s", kubercFile)
 	return nil, nil
+}
+
+func asAllowlistErr(err error) (error, bool) {
+	const credPluginAllowlistKey = "credPluginAllowlist"
+
+	decodingErr, ok := runtime.AsStrictDecodingError(err)
+	if !ok {
+		return err, false
+	}
+
+	var fieldError json.FieldError
+	for _, subErr := range decodingErr.Errors() {
+		if errors.As(subErr, &fieldError) {
+			topLevel, subFields, hasSubfields := strings.Cut(fieldError.FieldPath(), ".")
+			if !strings.HasPrefix(topLevel, credPluginAllowlistKey) {
+				continue
+			}
+
+			retErr := pluginAllowlistError
+			if hasSubfields {
+				retErr = fmt.Errorf("%w: field %q is invalid", pluginAllowlistError, subFields)
+			}
+
+			return retErr, true
+		}
+	}
+
+	return err, false
 }
