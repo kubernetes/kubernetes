@@ -11,8 +11,8 @@ This document lists the supported validation tags and their related information.
 | [`k8s:enum`](#k8senum) | k8s:enum | N/A | Indicates that a string type is an enum. All const values of this type are considered values in the enum. | type definitions |
 | [`k8s:forbidden`](#k8sforbidden) | k8s:forbidden | N/A | Indicates that a field may not be specified. | struct fields |
 | [`k8s:format`](#k8sformat) | k8s:format=\<payload\> | N/A | Indicates that a string field has a particular format. | anywhere |
-| [`k8s:ifDisabled`](#k8sifoptiondisabled) | k8s:ifDisabled(\<option\>)=\<validation-tag\> | <option> | Declares a validation that only applies when an option is disabled. | anywhere |
-| [`k8s:ifEnabled`](#k8sifoptionenabled) | k8s:ifEnabled(\<option\>)=\<validation-tag\> | <option> | Declares a validation that only applies when an option is enabled. | anywhere |
+| [`k8s:ifDisabled`](#k8sifdisabled) | k8s:ifDisabled(\<option\>)=\<validation-tag\> | <option> | Declares a validation that only applies when an option is disabled. | anywhere |
+| [`k8s:ifEnabled`](#k8sifenabled) | k8s:ifEnabled(\<option\>)=\<validation-tag\> | <option> | Declares a validation that only applies when an option is enabled. | anywhere |
 | [`k8s:immutable`](#k8simmutable) | k8s:immutable | N/A | Indicates that a field may not be updated. | list values, map values, struct fields, type definitions |
 | [`k8s:listMapKey`](#k8slistmapkey) | k8s:listMapKey=\<field-json-name\> | N/A | Declares a named sub-field of a list's value-type to be part of the list-map key. | anywhere |
 | [`k8s:listType`](#k8slisttype) | k8s:listType=\<type\> | N/A | Declares a list field's semantic type. | anywhere |
