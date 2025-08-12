@@ -351,12 +351,6 @@ func Convert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s con
 		return err
 	}
 
-	// We support DeprecatedServiceAccount as an alias for ServiceAccountName.
-	// If both are specified, ServiceAccountName (the new field) wins.
-	if in.ServiceAccountName == "" {
-		out.ServiceAccountName = in.DeprecatedServiceAccount
-	}
-
 	// the host namespace fields have to be handled specially for backward compatibility
 	// with v1.0.0
 	if out.SecurityContext == nil {

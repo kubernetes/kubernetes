@@ -165,8 +165,6 @@ func TestPodSpecConversion(t *testing.T) {
 	testCases := []*v1.PodSpec{
 		// New
 		{ServiceAccountName: name},
-		// Alias
-		{DeprecatedServiceAccount: name},
 		// Both: same
 		{ServiceAccountName: name, DeprecatedServiceAccount: name},
 		// Both: different
