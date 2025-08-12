@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -147,6 +148,21 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 	}
 	validations := Validations{}
 
+	// Check all tags first for tag processing issues
+	var errors []string
+	for _, tag := range tags {
+		if tv, exists := reg.tagValidators[tag.Name]; !exists {
+			errors = append(errors, fmt.Sprintf("unknown tag %q", tag.Name))
+		} else if tv == nil {
+			errors = append(errors, fmt.Sprintf("nil validator for tag %q", tag.Name))
+		}
+	}
+
+	// If there are tag processing issues, report them all together
+	if len(errors) > 0 {
+		return Validations{}, fmt.Errorf("tag processing errors: %s", strings.Join(errors, "; "))
+	}
+
 	// Run tag-validators first.
 	phases := reg.sortTagsIntoPhases(tags)
 	for _, tags := range phases {
@@ -225,6 +241,8 @@ func (reg *registry) sortTagsIntoPhases(tags []codetags.Tag) [][]codetags.Tag {
 	phase1 := []codetags.Tag{} // "late" tags
 	for _, tn := range sortedTags {
 		tv := reg.tagValidators[tn.Name]
+		// Note: We don't filter out unknown tags here since ExtractValidations
+		// handles all tag processing logic upfront.
 		if _, ok := tv.(LateTagValidator); ok {
 			phase1 = append(phase1, tn)
 		} else {
@@ -238,7 +256,12 @@ func (reg *registry) sortTagsIntoPhases(tags []codetags.Tag) [][]codetags.Tag {
 func (reg *registry) Docs() []TagDoc {
 	var result []TagDoc
 	for _, k := range reg.tagIndex {
-		v := reg.tagValidators[k]
+		v, exists := reg.tagValidators[k]
+		if !exists {
+			// Skip unknown tags - this shouldn't happen in normal operation
+			// but provides safety against data corruption
+			continue
+		}
 		result = append(result, v.Docs())
 	}
 	return result
