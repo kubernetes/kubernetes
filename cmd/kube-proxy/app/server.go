@@ -486,7 +486,11 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(proxyMux, kubeProxy, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
+		reg := statusz.NewRegistry(
+			compatibility.DefaultBuildEffectiveVersion(),
+			statusz.WithListedPaths(proxyMux.ListedPaths()),
+		)
+		statusz.Install(proxyMux, kubeProxy, reg)
 	}
 
 	fn := func() {
