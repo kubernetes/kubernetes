@@ -29,10 +29,10 @@ func Test(t *testing.T) {
 	st.Value(&Struct{M2: &M2{}}).ExpectValid()
 
 	st.Value(&Struct{M1: &M1{}, M2: &M2{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Invalid(nil, nil, "must specify exactly one of"),
+		field.Invalid(nil, nil, "must specify exactly one of").WithOrigin("union"),
 	})
 	st.Value(&Struct{}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Invalid(nil, nil, "must specify one of"),
+		field.Invalid(nil, nil, "must specify one of").WithOrigin("union"),
 	})
 
 	// Test validation ratcheting

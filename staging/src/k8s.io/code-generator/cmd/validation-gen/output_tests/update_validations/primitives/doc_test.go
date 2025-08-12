@@ -43,9 +43,9 @@ func Test(t *testing.T) {
 	st.Value(&structA).OldValue(&structA).ExpectValid()
 
 	st.Value(&structA).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Forbidden(field.NewPath("s"), ""),
-		field.Forbidden(field.NewPath("i"), ""),
-		field.Forbidden(field.NewPath("b"), ""),
-		field.Forbidden(field.NewPath("f"), ""),
+		field.Forbidden(field.NewPath("s"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("i"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("b"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("f"), "").WithOrigin("immutable"),
 	})
 }

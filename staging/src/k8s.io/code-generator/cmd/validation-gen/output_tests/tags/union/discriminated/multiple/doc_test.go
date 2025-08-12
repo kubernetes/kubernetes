@@ -41,24 +41,24 @@ func Test(t *testing.T) {
 		D1: U1M2, U1M1: &M1{}, U1M2: &M2{},
 		D2: U2M2, // no value
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("u1m1"), nil, "may only be specified when"),
-		field.Invalid(field.NewPath("u2m2"), nil, "must be specified when"),
+		field.Invalid(field.NewPath("u1m1"), nil, "may only be specified when").WithOrigin("union"),
+		field.Invalid(field.NewPath("u2m2"), nil, "must be specified when").WithOrigin("union"),
 	})
 
 	st.Value(&Struct{
 		D1: U1M2, // no value
 		D2: U2M2, U2M1: &M1{}, U2M2: &M2{},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("u1m2"), nil, "must be specified when"),
-		field.Invalid(field.NewPath("u2m1"), nil, "may only be specified when"),
+		field.Invalid(field.NewPath("u1m2"), nil, "must be specified when").WithOrigin("union"),
+		field.Invalid(field.NewPath("u2m1"), nil, "may only be specified when").WithOrigin("union"),
 	})
 
 	st.Value(&Struct{
 		D1: U1M2, // no value
 		D2: U2M2, // no value
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("u1m2"), nil, "must be specified when"),
-		field.Invalid(field.NewPath("u2m2"), nil, "must be specified when"),
+		field.Invalid(field.NewPath("u1m2"), nil, "must be specified when").WithOrigin("union"),
+		field.Invalid(field.NewPath("u2m2"), nil, "must be specified when").WithOrigin("union"),
 	})
 
 	// Test validation ratcheting

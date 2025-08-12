@@ -41,7 +41,7 @@ func ImmutableByCompare[T comparable](_ context.Context, op operation.Operation,
 	}
 	if value == nil || oldValue == nil || *value != *oldValue {
 		return field.ErrorList{
-			field.Forbidden(fldPath, "field is immutable"),
+			field.Forbidden(fldPath, "field is immutable").WithOrigin("immutable"),
 		}
 	}
 	return nil
@@ -57,7 +57,7 @@ func ImmutableByReflect[T any](_ context.Context, op operation.Operation, fldPat
 	}
 	if !equality.Semantic.DeepEqual(value, oldValue) {
 		return field.ErrorList{
-			field.Forbidden(fldPath, "field is immutable"),
+			field.Forbidden(fldPath, "field is immutable").WithOrigin("immutable"),
 		}
 	}
 	return nil
