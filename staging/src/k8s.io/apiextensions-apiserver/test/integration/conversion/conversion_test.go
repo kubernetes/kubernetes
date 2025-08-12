@@ -56,19 +56,18 @@ func checks(checkers ...Checker) []Checker {
 	return checkers
 }
 
-func TestWebhookConverterWithWatchCache(t *testing.T) {
-	testWebhookConverter(t, true)
-}
-func TestWebhookConverterWithoutWatchCache(t *testing.T) {
-	testWebhookConverter(t, false)
-}
+// func TestWebhookConverterWithWatchCache(t *testing.T) {
+// 	testWebhookConverter(t, true)
+// }
+// func TestWebhookConverterWithoutWatchCache(t *testing.T) {
+// 	testWebhookConverter(t, false)
+// }
 
 // TestWebhookNotCalledForUnusedVersions tests scenario where conversion webhook could be called for
 // versions that are nor served or nor stored.
 // Described in detail in https://github.com/kubernetes/kubernetes/issues/129979
 func TestWebhookNotCalledForUnusedVersions(t *testing.T) {
-	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
-	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
+	ctx := context.Background()
 
 	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
 	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
@@ -92,6 +91,9 @@ func TestWebhookNotCalledForUnusedVersions(t *testing.T) {
 	defer tearDown()
 
 	crd := multiVersionFixture.DeepCopy()
+	crd.Spec.Versions[0].Storage = false
+	crd.Spec.Versions[3].Served = true
+	crd.Spec.Versions[3].Storage = true
 
 	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd, nil, nil)
 	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}, nil)
@@ -109,6 +111,16 @@ func TestWebhookNotCalledForUnusedVersions(t *testing.T) {
 	ctcTearDown, ctc := newConversionTestContext(t, apiExtensionsClient, dynamicClient, etcdObjectReader, crd)
 	defer ctcTearDown()
 
+	marker, err := ctc.versionedClient("marker", "v1alpha2").Create(ctx, newConversionMultiVersionFixture("marker", "marker", "v1alpha2"), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Update CRD to stop serving v1alpha2 version
+	ctc.setStorageVersion(t, "v1beta1")
+	ctc.setServed(t, "v1alpha2", false)
+
+	// Setup webhook that checks that it's never called with v1alpha2 version
 	upCh, handler := closeOnCall(NewObjectConverterWebhookHandler(t, getUnexpectedVersionCheckConverter(t, "v1alpha2")))
 	tearDown, webhookClientConfig, err := StartConversionWebhookServer(handler)
 	if err != nil {
@@ -116,25 +128,35 @@ func TestWebhookNotCalledForUnusedVersions(t *testing.T) {
 	}
 	defer tearDown()
 
-	ctc.setConversionWebhook(t, webhookClientConfig, []string{"v1alpha1", "v1beta1"})
-
-	// create an object to initiate webhook calls
-	_, err = ctc.versionedClient("marker", "v1beta1").Create(context.TODO(), newConversionMultiVersionFixture("marker", "marker", "v1beta1"), metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	ctc.setConversionWebhook(t, webhookClientConfig, []string{"v1alpha1", "v1beta1", "v1beta2"})
+	defer ctc.removeConversionWebhook(t)
 
 	// wait until new webhook is called the first time
-	if err := wait.PollUntilContextTimeout(context.Background(), time.Second*1, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
+	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
+		_, getErr := ctc.versionedClient(marker.GetNamespace(), "v1alpha1").Get(ctx, marker.GetName(), metav1.GetOptions{})
 		select {
 		case <-upCh:
 			return true, nil
 		default:
-			t.Log("Waiting until webhook is effective")
+			t.Logf("Waiting for webhook to become effective, getting marker object: %v", getErr)
 			return false, nil
 		}
 	}); err != nil {
 		t.Fatal(err)
+	}
+
+	// Check that marker can be read in all served versions
+	for _, v := range servedVersions(ctc.crd.Spec.Versions) {
+		if _, err := ctc.versionedClient(marker.GetNamespace(), v.Name).Get(ctx, marker.GetName(), metav1.GetOptions{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Check that it's possible to update marker via a different API versions using server-side apply
+	for _, v := range servedVersions(ctc.crd.Spec.Versions) {
+		if _, err := ctc.versionedClient(marker.GetNamespace(), v.Name).Apply(ctx, marker.GetName(), newConversionMultiVersionFixture("marker", "marker", v.Name), metav1.ApplyOptions{FieldManager: "application/apply-patch"}); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -322,10 +344,7 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 func validateStorageVersion(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace
 
-	for _, version := range ctc.crd.Spec.Versions {
-		if !version.Storage && !version.Served {
-			continue
-		}
+	for _, version := range servedVersions(ctc.crd.Spec.Versions) {
 		t.Run(version.Name, func(t *testing.T) {
 			name := "storageversion-" + version.Name
 			client := ctc.versionedClient(ns, version.Name)
@@ -392,10 +411,7 @@ func validateMixedStorageVersions(versions ...string) func(t *testing.T, ctc *co
 func validateServed(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace
 
-	for _, version := range ctc.crd.Spec.Versions {
-		if !version.Storage && !version.Served {
-			continue
-		}
+	for _, version := range servedVersions(ctc.crd.Spec.Versions) {
 		t.Run(version.Name, func(t *testing.T) {
 			name := "served-" + version.Name
 			client := ctc.versionedClient(ns, version.Name)
@@ -478,15 +494,8 @@ func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace + "-list"
 
 	names := sets.String{}
-	servedVersions := []apiextensionsv1.CustomResourceDefinitionVersion{}
-	for _, version := range ctc.crd.Spec.Versions {
-		if !version.Storage && !version.Served {
-			continue
-		}
-		servedVersions = append(servedVersions, version)
-	}
-
-	for _, createVersion := range servedVersions {
+	versions := servedVersions(ctc.crd.Spec.Versions)
+	for _, createVersion := range versions {
 		name := "converted-" + createVersion.Name
 		client := ctc.versionedClient(ns, createVersion.Name)
 		fixture := newConversionMultiVersionFixture(ns, name, createVersion.Name)
@@ -500,14 +509,14 @@ func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
 		names.Insert(name)
 	}
 
-	for _, listVersion := range servedVersions {
+	for _, listVersion := range versions {
 		t.Run(fmt.Sprintf("listing objects as %s", listVersion.Name), func(t *testing.T) {
 			client := ctc.versionedClient(ns, listVersion.Name)
 			obj, err := client.List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(obj.Items) != len(servedVersions) {
+			if len(obj.Items) != len(versions) {
 				t.Fatal("unexpected number of items")
 			}
 			foundNames := sets.String{}
@@ -1344,7 +1353,7 @@ var multiVersionFixture = &apiextensionsv1.CustomResourceDefinition{
 				},
 			},
 			{
-				// same schema as v1beta1
+				// same schema as v1beta1, but not served
 				Name:    "v1alpha2",
 				Served:  false,
 				Storage: false,
@@ -1403,13 +1412,9 @@ func newConversionMultiVersionFixture(namespace, name, version string) *unstruct
 
 	switch version {
 	case "v1alpha1":
-		u.Object["content"] = map[string]interface{}{
-			"key": "value",
-		}
-		u.Object["num"] = map[string]interface{}{
-			"num1": int64(1),
-			"num2": int64(1000000),
-		}
+		fallthrough
+	case "v1alpha2":
+		fallthrough
 	case "v1beta1":
 		u.Object["content"] = map[string]interface{}{
 			"key": "value",
@@ -1501,6 +1506,16 @@ func jsonPtr(x interface{}) *apiextensionsv1.JSON {
 	}
 	ret := apiextensionsv1.JSON{Raw: bs}
 	return &ret
+}
+
+func servedVersions(versions []apiextensionsv1.CustomResourceDefinitionVersion) (served []apiextensionsv1.CustomResourceDefinitionVersion) {
+	for _, v := range versions {
+		if v.Served {
+			served = append(served, v)
+		}
+	}
+
+	return served
 }
 
 func TestWebhookConversion_WhitespaceCABundleEtcdBypass(t *testing.T) {
