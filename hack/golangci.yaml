@@ -394,6 +394,9 @@ linters:
     forbidigo:
       analyze-types: true
       forbid:
+        - pattern: md5\.*
+          # https://github.com/kubernetes/kubernetes/issues/129652
+          msg: md5 is oudated, insecure, prefer a secure hash (such as sha256) or a non-cryptographic hash
         - pattern: ^managedfields\.ExtractInto$
           pkg: ^k8s\.io/apimachinery/pkg/util/managedfields$
           msg: should not be used because managedFields was removed
