@@ -1529,6 +1529,9 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 			tc := tests[tcIndex]
 			testName := fmt.Sprintf("%s [%s]", tc.name, mode)
 			uniqueTestString := fmt.Sprintf("global-mount-%s", testName)
+			// TODO: finish removing existing md5 usage
+			// https://github.com/kubernetes/kubernetes/issues/129652
+			//nolint:forbidigo
 			uniquePodDir := fmt.Sprintf("%s-%x", kubeletPodsDir, md5.Sum([]byte(uniqueTestString)))
 			t.Run(testName+"[", func(t *testing.T) {
 				t.Parallel()
@@ -1742,6 +1745,9 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			tc := tests[tcIndex]
 			testName := fmt.Sprintf("%s [%s]", tc.name, mode)
 			uniqueTestString := fmt.Sprintf("local-mount-%s", testName)
+			// TODO: finish removing existing md5 usage
+			// https://github.com/kubernetes/kubernetes/issues/129652
+			//nolint:forbidigo
 			uniquePodDir := fmt.Sprintf("%s-%x", kubeletPodsDir, md5.Sum([]byte(uniqueTestString)))
 			t.Run(testName, func(t *testing.T) {
 				t.Parallel()

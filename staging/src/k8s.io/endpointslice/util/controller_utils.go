@@ -165,6 +165,9 @@ func NewPortMapKey(endpointPorts []discovery.EndpointPort) PortMapKey {
 
 // deepHashObjectToString creates a unique hash string from a go object.
 func deepHashObjectToString(objectToWrite interface{}) string {
+	// TODO: finish removing existing md5 usage
+	// https://github.com/kubernetes/kubernetes/issues/129652
+	//nolint:forbidigo
 	hasher := md5.New()
 	deepHashObject(hasher, objectToWrite)
 	return hex.EncodeToString(hasher.Sum(nil)[0:])
