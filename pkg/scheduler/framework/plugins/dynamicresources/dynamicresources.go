@@ -1469,12 +1469,13 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 					if pollErr != nil {
 						logger.V(5).Info("Claim not stored in assume cache after retries", "claim", klog.KObj(claim), "err", pollErr)
 					}
-				}
-			} else {
-				if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
-					logger.V(5).Info("Claim not stored in assume cache", "err", err)
+				} else {
+					if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
+						logger.V(5).Info("Claim not stored in assume cache", "err", err)
+					}
 				}
 			}
+
 			for _, claimUID := range claimUIDs {
 				pl.draManager.ResourceClaims().RemoveClaimPendingAllocation(claimUID)
 			}
