@@ -18,7 +18,9 @@ package describe
 
 import (
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
@@ -41,7 +43,7 @@ type DescriberFunc func(restClientGetter genericclioptions.RESTClientGetter, map
 // if the output could not be generated. Implementers typically
 // abstract the retrieval of the named object from a remote server.
 type ResourceDescriber interface {
-	Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error)
+	Describe(object runtime.Object, describerSettings DescriberSettings) (output string, err error)
 }
 
 // DescriberSettings holds display configuration for each object

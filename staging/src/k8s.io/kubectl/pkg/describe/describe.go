@@ -40,6 +40,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	v1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -57,6 +58,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -282,10 +284,10 @@ type genericDescriber struct {
 	events  corev1client.EventsGetter
 }
 
-func (g *genericDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error) {
-	obj, err := g.dynamic.Resource(g.mapping.Resource).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (g *genericDescriber) Describe(obj runtime.Object, describerSettings DescriberSettings) (output string, err error) {
+	unstructuredObj, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return "", fmt.Errorf("object is not an Unstructured")
 	}
 
 	var events *corev1.EventList
@@ -295,11 +297,11 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings De
 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", obj.GetName())
-		w.Write(LEVEL_0, "Namespace:\t%s\n", obj.GetNamespace())
-		printLabelsMultiline(w, "Labels", obj.GetLabels())
-		printAnnotationsMultiline(w, "Annotations", obj.GetAnnotations())
-		printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), "", ".metadata.managedFields", ".metadata.name",
+		w.Write(LEVEL_0, "Name:\t%s\n", unstructuredObj.GetName())
+		w.Write(LEVEL_0, "Namespace:\t%s\n", unstructuredObj.GetNamespace())
+		printLabelsMultiline(w, "Labels", unstructuredObj.GetLabels())
+		printAnnotationsMultiline(w, "Annotations", unstructuredObj.GetAnnotations())
+		printUnstructuredContent(w, LEVEL_0, unstructuredObj.UnstructuredContent(), "", ".metadata.managedFields", ".metadata.name",
 			".metadata.namespace", ".metadata.labels", ".metadata.annotations")
 		if events != nil {
 			DescribeEvents(events, w)
@@ -427,16 +429,25 @@ type NamespaceDescriber struct {
 	clientset.Interface
 }
 
-func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	ns, err := d.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *NamespaceDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	ns := &corev1.Namespace{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, ns, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to Namespace: %w", err)
+		}
+	} else {
+		ns, ok = object.(*corev1.Namespace)
+		if !ok {
+			return "", fmt.Errorf("object is not a Namespace")
+		}
 	}
 
 	resourceQuotaList := &corev1.ResourceQuotaList{}
-	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
+	err := runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
 		func(options metav1.ListOptions) (runtime.Object, error) {
-			newList, err := d.CoreV1().ResourceQuotas(name).List(context.TODO(), options)
+			newList, err := d.CoreV1().ResourceQuotas(ns.Name).List(context.TODO(), options)
 			if err != nil {
 				return nil, runtimeresource.EnhanceListError(err, options, corev1.ResourceQuotas.String())
 			}
@@ -456,7 +467,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 	limitRangeList := &corev1.LimitRangeList{}
 	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
 		func(options metav1.ListOptions) (runtime.Object, error) {
-			newList, err := d.CoreV1().LimitRanges(name).List(context.TODO(), options)
+			newList, err := d.CoreV1().LimitRanges(ns.Name).List(context.TODO(), options)
 			if err != nil {
 				return nil, runtimeresource.EnhanceListError(err, options, "limitranges")
 			}
@@ -637,12 +648,19 @@ type LimitRangeDescriber struct {
 	clientset.Interface
 }
 
-func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	lr := d.CoreV1().LimitRanges(namespace)
-
-	limitRange, err := lr.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *LimitRangeDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	limitRange := &corev1.LimitRange{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, limitRange, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to LimitRange: %w", err)
+		}
+	} else {
+		limitRange, ok = object.(*corev1.LimitRange)
+		if !ok {
+			return "", fmt.Errorf("object is not a LimitRange")
+		}
 	}
 	return describeLimitRange(limitRange)
 }
@@ -664,14 +682,20 @@ type ResourceQuotaDescriber struct {
 	clientset.Interface
 }
 
-func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	rq := d.CoreV1().ResourceQuotas(namespace)
-
-	resourceQuota, err := rq.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *ResourceQuotaDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	resourceQuota := &corev1.ResourceQuota{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, resourceQuota, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to ResourceQuota: %w", err)
+		}
+	} else {
+		resourceQuota, ok = object.(*corev1.ResourceQuota)
+		if !ok {
+			return "", fmt.Errorf("object is not a ResourceQuota")
+		}
 	}
-
 	return describeQuota(resourceQuota)
 }
 
@@ -737,37 +761,19 @@ type PodDescriber struct {
 	clientset.Interface
 }
 
-func (d *PodDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	pod, err := d.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		if describerSettings.ShowEvents {
-			eventsInterface := d.CoreV1().Events(namespace)
-			selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
-			initialOpts := metav1.ListOptions{
-				FieldSelector: selector.String(),
-				Limit:         describerSettings.ChunkSize,
-			}
-			events := &corev1.EventList{}
-			err2 := runtimeresource.FollowContinue(&initialOpts,
-				func(options metav1.ListOptions) (runtime.Object, error) {
-					newList, err := eventsInterface.List(context.TODO(), options)
-					if err != nil {
-						return nil, runtimeresource.EnhanceListError(err, options, "events")
-					}
-					events.Items = append(events.Items, newList.Items...)
-					return newList, nil
-				})
-
-			if err2 == nil && len(events.Items) > 0 {
-				return tabbedString(func(out io.Writer) error {
-					w := NewPrefixWriter(out)
-					w.Write(LEVEL_0, "Pod '%v': error '%v', but found events.\n", name, err)
-					DescribeEvents(events, w)
-					return nil
-				})
-			}
+func (d *PodDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	pod := &corev1.Pod{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, pod, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
 		}
-		return "", err
+	} else {
+		pod, ok = object.(*corev1.Pod)
+		if !ok {
+			return "", fmt.Errorf("object is not a Pod")
+		}
 	}
 
 	var events *corev1.EventList
@@ -1504,12 +1510,19 @@ type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
 
-func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().PersistentVolumes()
-
-	pv, err := c.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *PersistentVolumeDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	pv := &corev1.PersistentVolume{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, pv, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to PersistentVolume: %w", err)
+		}
+	} else {
+		pv, ok = object.(*corev1.PersistentVolume)
+		if !ok {
+			return "", fmt.Errorf("object is not a PersistentVolume")
+		}
 	}
 
 	var events *corev1.EventList
@@ -1652,16 +1665,22 @@ type PersistentVolumeClaimDescriber struct {
 	clientset.Interface
 }
 
-func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().PersistentVolumeClaims(namespace)
-
-	pvc, err := c.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *PersistentVolumeClaimDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	pvc := &corev1.PersistentVolumeClaim{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, pvc, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to PersistentVolumeClaim: %w", err)
+		}
+	} else {
+		pvc, ok = object.(*corev1.PersistentVolumeClaim)
+		if !ok {
+			return "", fmt.Errorf("object is not a PersistentVolumeClaim")
+		}
 	}
 
-	pc := d.CoreV1().Pods(namespace)
-
+	pc := d.CoreV1().Pods(pvc.Namespace)
 	pods, err := getPodsForPVC(pc, pvc, describerSettings)
 	if err != nil {
 		return "", err
@@ -2174,15 +2193,22 @@ type ReplicationControllerDescriber struct {
 	clientset.Interface
 }
 
-func (d *ReplicationControllerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	rc := d.CoreV1().ReplicationControllers(namespace)
-	pc := d.CoreV1().Pods(namespace)
-
-	controller, err := rc.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *ReplicationControllerDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	controller := &corev1.ReplicationController{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, controller, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to ReplicationController: %w", err)
+		}
+	} else {
+		controller, ok = object.(*corev1.ReplicationController)
+		if !ok {
+			return "", fmt.Errorf("object is not a ReplicationController")
+		}
 	}
 
+	pc := d.CoreV1().Pods(controller.Namespace)
 	selector := labels.SelectorFromSet(controller.Spec.Selector)
 	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector, controller.UID, describerSettings)
 	if err != nil {
@@ -2253,13 +2279,19 @@ type ReplicaSetDescriber struct {
 	clientset.Interface
 }
 
-func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	rsc := d.AppsV1().ReplicaSets(namespace)
-	pc := d.CoreV1().Pods(namespace)
-
-	rs, err := rsc.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *ReplicaSetDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	rs := &appsv1.ReplicaSet{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, rs, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to ReplicaSet: %w", err)
+		}
+	} else {
+		rs, ok = object.(*appsv1.ReplicaSet)
+		if !ok {
+			return "", fmt.Errorf("object is not a ReplicaSet")
+		}
 	}
 
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
@@ -2267,6 +2299,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 		return "", err
 	}
 
+	pc := d.CoreV1().Pods(rs.Namespace)
 	running, waiting, succeeded, failed, getPodErr := getPodStatusForController(pc, selector, rs.UID, describerSettings)
 
 	var events *corev1.EventList
@@ -2315,10 +2348,19 @@ type JobDescriber struct {
 	clientset.Interface
 }
 
-func (d *JobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	job, err := d.BatchV1().Jobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *JobDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	job := &batchv1.Job{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, job, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to Job: %w", err)
+		}
+	} else {
+		job, ok = object.(*batchv1.Job)
+		if !ok {
+			return "", fmt.Errorf("object is not a Job")
+		}
 	}
 
 	var events *corev1.EventList
@@ -2413,14 +2455,22 @@ type CronJobDescriber struct {
 	client clientset.Interface
 }
 
-func (d *CronJobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	var events *corev1.EventList
-
-	cronJob, err := d.client.BatchV1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *CronJobDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	cronJob := &batchv1.CronJob{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, cronJob, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to CronJob: %w", err)
+		}
+	} else {
+		cronJob, ok = object.(*batchv1.CronJob)
+		if !ok {
+			return "", fmt.Errorf("object is not a CronJob")
+		}
 	}
 
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = searchEvents(d.client.CoreV1(), cronJob, describerSettings.ChunkSize)
 	}
@@ -2513,15 +2563,22 @@ type DaemonSetDescriber struct {
 	clientset.Interface
 }
 
-func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	dc := d.AppsV1().DaemonSets(namespace)
-	pc := d.CoreV1().Pods(namespace)
-
-	daemon, err := dc.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *DaemonSetDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	daemon := &appsv1.DaemonSet{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, daemon, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to DaemonSet: %w", err)
+		}
+	} else {
+		daemon, ok = object.(*appsv1.DaemonSet)
+		if !ok {
+			return "", fmt.Errorf("object is not a DaemonSet")
+		}
 	}
 
+	pc := d.CoreV1().Pods(daemon.Namespace)
 	selector, err := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
 	if err != nil {
 		return "", err
@@ -2567,12 +2624,19 @@ type SecretDescriber struct {
 	clientset.Interface
 }
 
-func (d *SecretDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().Secrets(namespace)
-
-	secret, err := c.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *SecretDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	secret := &corev1.Secret{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, secret, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to Secret: %w", err)
+		}
+	} else {
+		secret, ok = object.(*corev1.Secret)
+		if !ok {
+			return "", fmt.Errorf("object is not a Secret")
+		}
 	}
 
 	return describeSecret(secret)
@@ -2606,18 +2670,18 @@ type IngressDescriber struct {
 	client clientset.Interface
 }
 
-func (i *IngressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (i *IngressDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
 	// try ingress/v1 first (v1.19) and fallback to ingress/v1beta if an err occurs
-	netV1, err := i.client.NetworkingV1().Ingresses(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	netV1, err := i.tryCastNetworkingV1Ingress(object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
 		}
 		return i.describeIngressV1(netV1, events)
 	}
-	netV1beta1, err := i.client.NetworkingV1beta1().Ingresses(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	netV1beta1, err := i.tryCastNetworkingV1Beta1Ingress(object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(i.client.CoreV1(), netV1beta1, describerSettings.ChunkSize)
@@ -2625,6 +2689,40 @@ func (i *IngressDescriber) Describe(namespace, name string, describerSettings De
 		return i.describeIngressV1beta1(netV1beta1, events)
 	}
 	return "", err
+}
+
+func (i *IngressDescriber) tryCastNetworkingV1Ingress(object runtime.Object) (*networkingv1.Ingress, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	ingress := &networkingv1.Ingress{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, ingress, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to Ingress: %w", err)
+		}
+	} else {
+		ingress, ok = object.(*networkingv1.Ingress)
+		if !ok {
+			return nil, fmt.Errorf("object is not a Ingress")
+		}
+	}
+	return ingress, nil
+}
+
+func (i *IngressDescriber) tryCastNetworkingV1Beta1Ingress(object runtime.Object) (*networkingv1beta1.Ingress, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	ingress := &networkingv1beta1.Ingress{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, ingress, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to Ingress: %w", err)
+		}
+	} else {
+		ingress, ok = object.(*networkingv1beta1.Ingress)
+		if !ok {
+			return nil, fmt.Errorf("object is not a Ingress")
+		}
+	}
+	return ingress, nil
 }
 
 func (i *IngressDescriber) describeBackendV1beta1(ns string, backend *networkingv1beta1.IngressBackend) string {
@@ -2822,17 +2920,17 @@ type IngressClassDescriber struct {
 	client clientset.Interface
 }
 
-func (i *IngressClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (i *IngressClassDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 	// try IngressClass/v1 first (v1.19) and fallback to IngressClass/v1beta if an err occurs
-	netV1, err := i.client.NetworkingV1().IngressClasses().Get(context.TODO(), name, metav1.GetOptions{})
+	netV1, err := i.tryCastNetworkingV1IngressClass(object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
 		}
 		return i.describeIngressClassV1(netV1, events)
 	}
-	netV1beta1, err := i.client.NetworkingV1beta1().IngressClasses().Get(context.TODO(), name, metav1.GetOptions{})
+	netV1beta1, err := i.tryCastNetworkingV1Beta1IngressClass(object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(i.client.CoreV1(), netV1beta1, describerSettings.ChunkSize)
@@ -2840,6 +2938,40 @@ func (i *IngressClassDescriber) Describe(namespace, name string, describerSettin
 		return i.describeIngressClassV1beta1(netV1beta1, events)
 	}
 	return "", err
+}
+
+func (i *IngressClassDescriber) tryCastNetworkingV1IngressClass(object runtime.Object) (*networkingv1.IngressClass, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	ingress := &networkingv1.IngressClass{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, ingress, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to IngressClass: %w", err)
+		}
+	} else {
+		ingress, ok = object.(*networkingv1.IngressClass)
+		if !ok {
+			return nil, fmt.Errorf("object is not a IngressClass")
+		}
+	}
+	return ingress, nil
+}
+
+func (i *IngressClassDescriber) tryCastNetworkingV1Beta1IngressClass(object runtime.Object) (*networkingv1beta1.IngressClass, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	ingress := &networkingv1beta1.IngressClass{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, ingress, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to IngressClass: %w", err)
+		}
+	} else {
+		ingress, ok = object.(*networkingv1beta1.IngressClass)
+		if !ok {
+			return nil, fmt.Errorf("object is not a IngressClass")
+		}
+	}
+	return ingress, nil
 }
 
 func (i *IngressClassDescriber) describeIngressClassV1beta1(ic *networkingv1beta1.IngressClass, events *corev1.EventList) (string, error) {
@@ -2893,10 +3025,10 @@ type ServiceCIDRDescriber struct {
 	client clientset.Interface
 }
 
-func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (c *ServiceCIDRDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	svcV1, err := c.client.NetworkingV1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
+	svcV1, err := c.tryCastNetworkingV1ServiceCIDR(object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(c.client.CoreV1(), svcV1, describerSettings.ChunkSize)
@@ -2904,7 +3036,7 @@ func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSetting
 		return c.describeServiceCIDRV1(svcV1, events)
 	}
 
-	svcV1beta1, err := c.client.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
+	svcV1beta1, err := c.tryCastNetworkingV1Beta1ServiceCIDR(object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(c.client.CoreV1(), svcV1beta1, describerSettings.ChunkSize)
@@ -2912,6 +3044,40 @@ func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSetting
 		return c.describeServiceCIDRV1beta1(svcV1beta1, events)
 	}
 	return "", err
+}
+
+func (c *ServiceCIDRDescriber) tryCastNetworkingV1ServiceCIDR(object runtime.Object) (*networkingv1.ServiceCIDR, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	serviceCIDR := &networkingv1.ServiceCIDR{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, serviceCIDR, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to ServiceCIDR: %w", err)
+		}
+	} else {
+		serviceCIDR, ok = object.(*networkingv1.ServiceCIDR)
+		if !ok {
+			return nil, fmt.Errorf("object is not a ServiceCIDR")
+		}
+	}
+	return serviceCIDR, nil
+}
+
+func (c *ServiceCIDRDescriber) tryCastNetworkingV1Beta1ServiceCIDR(object runtime.Object) (*networkingv1beta1.ServiceCIDR, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	serviceCIDR := &networkingv1beta1.ServiceCIDR{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, serviceCIDR, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to ServiceCIDR: %w", err)
+		}
+	} else {
+		serviceCIDR, ok = object.(*networkingv1beta1.ServiceCIDR)
+		if !ok {
+			return nil, fmt.Errorf("object is not a ServiceCIDR")
+		}
+	}
+	return serviceCIDR, nil
 }
 
 func (c *ServiceCIDRDescriber) describeServiceCIDRV1(svc *networkingv1.ServiceCIDR, events *corev1.EventList) (string, error) {
@@ -2981,10 +3147,10 @@ type IPAddressDescriber struct {
 	client clientset.Interface
 }
 
-func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (c *IPAddressDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	ipV1, err := c.client.NetworkingV1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
+	ipV1, err := c.tryCastNetworkingV1IPAddress(object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(c.client.CoreV1(), ipV1, describerSettings.ChunkSize)
@@ -2992,7 +3158,7 @@ func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings 
 		return c.describeIPAddressV1(ipV1, events)
 	}
 
-	ipV1beta1, err := c.client.NetworkingV1beta1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
+	ipV1beta1, err := c.tryCastNetworkingV1Beta1IPAddress(object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(c.client.CoreV1(), ipV1beta1, describerSettings.ChunkSize)
@@ -3000,6 +3166,40 @@ func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings 
 		return c.describeIPAddressV1beta1(ipV1beta1, events)
 	}
 	return "", err
+}
+
+func (c *IPAddressDescriber) tryCastNetworkingV1IPAddress(object runtime.Object) (*networkingv1.IPAddress, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	ipAddress := &networkingv1.IPAddress{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, ipAddress, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to IPAddress: %w", err)
+		}
+	} else {
+		ipAddress, ok = object.(*networkingv1.IPAddress)
+		if !ok {
+			return nil, fmt.Errorf("object is not a IPAddress")
+		}
+	}
+	return ipAddress, nil
+}
+
+func (c *IPAddressDescriber) tryCastNetworkingV1Beta1IPAddress(object runtime.Object) (*networkingv1beta1.IPAddress, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	ipAddress := &networkingv1beta1.IPAddress{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, ipAddress, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to IPAddress: %w", err)
+		}
+	} else {
+		ipAddress, ok = object.(*networkingv1beta1.IPAddress)
+		if !ok {
+			return nil, fmt.Errorf("object is not a IPAddress")
+		}
+	}
+	return ipAddress, nil
 }
 
 func (c *IPAddressDescriber) describeIPAddressV1(ip *networkingv1.IPAddress, events *corev1.EventList) (string, error) {
@@ -3051,16 +3251,23 @@ type ServiceDescriber struct {
 	clientset.Interface
 }
 
-func (d *ServiceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().Services(namespace)
-
-	service, err := c.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *ServiceDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	service := &corev1.Service{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, service, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to Service: %w", err)
+		}
+	} else {
+		service, ok = object.(*corev1.Service)
+		if !ok {
+			return "", fmt.Errorf("object is not a Service")
+		}
 	}
 
-	endpointSliceList, _ := d.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, name),
+	endpointSliceList, _ := d.DiscoveryV1().EndpointSlices(service.Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, service.Name),
 	})
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
@@ -3179,12 +3386,19 @@ type EndpointsDescriber struct {
 	clientset.Interface
 }
 
-func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().Endpoints(namespace)
-
-	ep, err := c.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *EndpointsDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	ep := &corev1.Endpoints{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, ep, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to Endpoints: %w", err)
+		}
+	} else {
+		ep, ok = object.(*corev1.Endpoints)
+		if !ok {
+			return "", fmt.Errorf("object is not Endpoints")
+		}
 	}
 
 	var events *corev1.EventList
@@ -3254,11 +3468,11 @@ type EndpointSliceDescriber struct {
 	clientset.Interface
 }
 
-func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *EndpointSliceDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 	// try endpointslice/v1 first (v1.21) and fallback to v1beta1 if error occurs
 
-	epsV1, err := d.DiscoveryV1().EndpointSlices(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	epsV1, err := d.tryCastDiscoveryV1EndpointSlice(object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(d.CoreV1(), epsV1, describerSettings.ChunkSize)
@@ -3266,7 +3480,7 @@ func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSetti
 		return describeEndpointSliceV1(epsV1, events)
 	}
 
-	epsV1beta1, err := d.DiscoveryV1beta1().EndpointSlices(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	epsV1beta1, err := d.tryCastDiscoveryV1Beta1EndpointSlice(object)
 	if err != nil {
 		return "", err
 	}
@@ -3276,6 +3490,40 @@ func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSetti
 	}
 
 	return describeEndpointSliceV1beta1(epsV1beta1, events)
+}
+
+func (d *EndpointSliceDescriber) tryCastDiscoveryV1EndpointSlice(object runtime.Object) (*discoveryv1.EndpointSlice, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	endpointSlice := &discoveryv1.EndpointSlice{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, endpointSlice, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to EndpointSlice: %w", err)
+		}
+	} else {
+		endpointSlice, ok = object.(*discoveryv1.EndpointSlice)
+		if !ok {
+			return nil, fmt.Errorf("object is not a EndpointSlice")
+		}
+	}
+	return endpointSlice, nil
+}
+
+func (d *EndpointSliceDescriber) tryCastDiscoveryV1Beta1EndpointSlice(object runtime.Object) (*discoveryv1beta1.EndpointSlice, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	endpointSlice := &discoveryv1beta1.EndpointSlice{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, endpointSlice, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to EndpointSlice: %w", err)
+		}
+	} else {
+		endpointSlice, ok = object.(*discoveryv1beta1.EndpointSlice)
+		if !ok {
+			return nil, fmt.Errorf("object is not a EndpointSlice")
+		}
+	}
+	return endpointSlice, nil
 }
 
 func describeEndpointSliceV1(eps *discoveryv1.EndpointSlice, events *corev1.EventList) (string, error) {
@@ -3437,12 +3685,19 @@ type ServiceAccountDescriber struct {
 	clientset.Interface
 }
 
-func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().ServiceAccounts(namespace)
-
-	serviceAccount, err := c.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *ServiceAccountDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	serviceAccount := &corev1.ServiceAccount{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, serviceAccount, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to ServiceAccount: %w", err)
+		}
+	} else {
+		serviceAccount, ok = object.(*corev1.ServiceAccount)
+		if !ok {
+			return "", fmt.Errorf("object is not a ServiceAccount")
+		}
 	}
 
 	tokens := []corev1.Secret{}
@@ -3451,9 +3706,9 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	// serviceAccount but not present in the set of existing secrets.
 	missingSecrets := sets.New[string]()
 	secrets := corev1.SecretList{}
-	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
+	err := runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
 		func(options metav1.ListOptions) (runtime.Object, error) {
-			newList, err := d.CoreV1().Secrets(namespace).List(context.TODO(), options)
+			newList, err := d.CoreV1().Secrets(serviceAccount.Namespace).List(context.TODO(), options)
 			if err != nil {
 				return nil, runtimeresource.EnhanceListError(err, options, corev1.ResourceSecrets.String())
 			}
@@ -3563,10 +3818,19 @@ type RoleDescriber struct {
 	clientset.Interface
 }
 
-func (d *RoleDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	role, err := d.RbacV1().Roles(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *RoleDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	role := &rbacv1.Role{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, role, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to Role: %w", err)
+		}
+	} else {
+		role, ok = object.(*rbacv1.Role)
+		if !ok {
+			return "", fmt.Errorf("object is not a Role")
+		}
 	}
 
 	breakdownRules := []rbacv1.PolicyRule{}
@@ -3602,10 +3866,19 @@ type ClusterRoleDescriber struct {
 	clientset.Interface
 }
 
-func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	role, err := d.RbacV1().ClusterRoles().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *ClusterRoleDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	role := &rbacv1.ClusterRole{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, role, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to ClusterRole: %w", err)
+		}
+	} else {
+		role, ok = object.(*rbacv1.ClusterRole)
+		if !ok {
+			return "", fmt.Errorf("object is not a ClusterRole")
+		}
 	}
 
 	breakdownRules := []rbacv1.PolicyRule{}
@@ -3658,10 +3931,19 @@ type RoleBindingDescriber struct {
 	clientset.Interface
 }
 
-func (d *RoleBindingDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	binding, err := d.RbacV1().RoleBindings(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *RoleBindingDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	binding := &rbacv1.RoleBinding{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, binding, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to RoleBinding: %w", err)
+		}
+	} else {
+		binding, ok = object.(*rbacv1.RoleBinding)
+		if !ok {
+			return "", fmt.Errorf("object is not a RoleBinding")
+		}
 	}
 
 	return tabbedString(func(out io.Writer) error {
@@ -3690,10 +3972,19 @@ type ClusterRoleBindingDescriber struct {
 	clientset.Interface
 }
 
-func (d *ClusterRoleBindingDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	binding, err := d.RbacV1().ClusterRoleBindings().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *ClusterRoleBindingDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	binding := &rbacv1.ClusterRoleBinding{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, binding, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to ClusterRoleBinding: %w", err)
+		}
+	} else {
+		binding, ok = object.(*rbacv1.ClusterRoleBinding)
+		if !ok {
+			return "", fmt.Errorf("object is not a ClusterRoleBinding")
+		}
 	}
 
 	return tabbedString(func(out io.Writer) error {
@@ -3722,15 +4013,23 @@ type NodeDescriber struct {
 	clientset.Interface
 }
 
-func (d *NodeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	mc := d.CoreV1().Nodes()
-	node, err := mc.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *NodeDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	node := &corev1.Node{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, node, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to Node: %w", err)
+		}
+	} else {
+		node, ok = object.(*corev1.Node)
+		if !ok {
+			return "", fmt.Errorf("object is not a Node")
+		}
 	}
 
 	fieldSelector := fields.AndSelectors(
-		fields.OneTermEqualSelector("spec.nodeName", name),
+		fields.OneTermEqualSelector("spec.nodeName", node.Name),
 		fields.OneTermNotEqualSelector("status.phase", string(corev1.PodSucceeded)),
 		fields.OneTermNotEqualSelector("status.phase", string(corev1.PodFailed)),
 	)
@@ -3741,7 +4040,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		FieldSelector: fieldSelector.String(),
 		Limit:         describerSettings.ChunkSize,
 	}
-	nodeNonTerminatedPodsList, err := getPodsInChunks(d.CoreV1().Pods(namespace), initialOpts)
+	nodeNonTerminatedPodsList, err := getPodsInChunks(d.CoreV1().Pods(node.Namespace), initialOpts)
 	if err != nil {
 		if !apierrors.IsForbidden(err) {
 			return "", err
@@ -3898,12 +4197,21 @@ type StatefulSetDescriber struct {
 	client clientset.Interface
 }
 
-func (p *StatefulSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	ps, err := p.client.AppsV1().StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (p *StatefulSetDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	ps := &appsv1.StatefulSet{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, ps, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to StatefulSet: %w", err)
+		}
+	} else {
+		ps, ok = object.(*appsv1.StatefulSet)
+		if !ok {
+			return "", fmt.Errorf("object is not a StatefulSet")
+		}
 	}
-	pc := p.client.CoreV1().Pods(namespace)
+	pc := p.client.CoreV1().Pods(ps.Namespace)
 
 	selector, err := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
 	if err != nil {
@@ -3959,7 +4267,7 @@ type CertificateSigningRequestDescriber struct {
 	client clientset.Interface
 }
 
-func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (p *CertificateSigningRequestDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 
 	var (
 		crBytes           []byte
@@ -3971,7 +4279,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		events            *corev1.EventList
 	)
 
-	if csr, err := p.client.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+	if csr, err := p.tryCastV1CertificateSigningRequest(object); err == nil {
 		crBytes = csr.Spec.Request
 		metadata = csr.ObjectMeta
 		conditionTypes := []string{}
@@ -3985,7 +4293,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(p.client.CoreV1(), csr, describerSettings.ChunkSize)
 		}
-	} else if csr, err := p.client.CertificatesV1beta1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+	} else if csr, err := p.tryCastCertificatesV1Beta1CertificateSigningRequest(object); err == nil {
 		crBytes = csr.Spec.Request
 		metadata = csr.ObjectMeta
 		conditionTypes := []string{}
@@ -4011,6 +4319,40 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 	}
 
 	return describeCertificateSigningRequest(metadata, signerName, expirationSeconds, username, cr, status, events)
+}
+
+func (p *CertificateSigningRequestDescriber) tryCastV1CertificateSigningRequest(object runtime.Object) (*v1.CertificateSigningRequest, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	csr := &v1.CertificateSigningRequest{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, csr, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to CertificateSigningRequest: %w", err)
+		}
+	} else {
+		csr, ok = object.(*v1.CertificateSigningRequest)
+		if !ok {
+			return nil, fmt.Errorf("object is not a CertificateSigningRequest")
+		}
+	}
+	return csr, nil
+}
+
+func (p *CertificateSigningRequestDescriber) tryCastCertificatesV1Beta1CertificateSigningRequest(object runtime.Object) (*certificatesv1beta1.CertificateSigningRequest, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	csr := &certificatesv1beta1.CertificateSigningRequest{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, csr, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to CertificateSigningRequest: %w", err)
+		}
+	} else {
+		csr, ok = object.(*certificatesv1beta1.CertificateSigningRequest)
+		if !ok {
+			return nil, fmt.Errorf("object is not a CertificateSigningRequest")
+		}
+	}
+	return csr, nil
 }
 
 func describeCertificateSigningRequest(csr metav1.ObjectMeta, signerName string, expirationSeconds *int32, username string, cr *x509.CertificateRequest, status string, events *corev1.EventList) (string, error) {
@@ -4078,13 +4420,13 @@ type HorizontalPodAutoscalerDescriber struct {
 	client clientset.Interface
 }
 
-func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *HorizontalPodAutoscalerDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
 	// autoscaling/v2 is introduced since v1.23 and autoscaling/v1 does not have full backward compatibility
 	// with autoscaling/v2, so describer will try to get and describe hpa v2 object firstly, if it fails,
 	// describer will fall back to do with hpa v1 object
-	hpaV2, err := d.client.AutoscalingV2().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	hpaV2, err := d.tryCastV2HorizontalPodAutoscalerInterface(object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(d.client.CoreV1(), hpaV2, describerSettings.ChunkSize)
@@ -4092,7 +4434,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 		return describeHorizontalPodAutoscalerV2(hpaV2, events, d)
 	}
 
-	hpaV1, err := d.client.AutoscalingV1().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	hpaV1, err := d.tryCastAutoscalingV1HorizontalPodAutoscaler(object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(d.client.CoreV1(), hpaV1, describerSettings.ChunkSize)
@@ -4101,6 +4443,40 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 	}
 
 	return "", err
+}
+
+func (d *HorizontalPodAutoscalerDescriber) tryCastV2HorizontalPodAutoscalerInterface(object runtime.Object) (*autoscalingv2.HorizontalPodAutoscaler, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	autoscaler := &autoscalingv2.HorizontalPodAutoscaler{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, autoscaler, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to HorizontalPodAutoscaler: %w", err)
+		}
+	} else {
+		autoscaler, ok = object.(*autoscalingv2.HorizontalPodAutoscaler)
+		if !ok {
+			return nil, fmt.Errorf("object is not a HorizontalPodAutoscaler")
+		}
+	}
+	return autoscaler, nil
+}
+
+func (d *HorizontalPodAutoscalerDescriber) tryCastAutoscalingV1HorizontalPodAutoscaler(object runtime.Object) (*autoscalingv1.HorizontalPodAutoscaler, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	autoscaler := &autoscalingv1.HorizontalPodAutoscaler{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, autoscaler, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to HorizontalPodAutoscaler: %w", err)
+		}
+	} else {
+		autoscaler, ok = object.(*autoscalingv1.HorizontalPodAutoscaler)
+		if !ok {
+			return nil, fmt.Errorf("object is not a HorizontalPodAutoscaler")
+		}
+	}
+	return autoscaler, nil
 }
 
 func describeHorizontalPodAutoscalerV2(hpa *autoscalingv2.HorizontalPodAutoscaler, events *corev1.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
@@ -4436,10 +4812,19 @@ type DeploymentDescriber struct {
 	client clientset.Interface
 }
 
-func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	d, err := dd.client.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (dd *DeploymentDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	d := &appsv1.Deployment{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, d, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to Deployment: %w", err)
+		}
+	} else {
+		d, ok = object.(*appsv1.Deployment)
+		if !ok {
+			return "", fmt.Errorf("object is not a Deployment")
+		}
 	}
 
 	var events *corev1.EventList
@@ -4559,12 +4944,19 @@ type ConfigMapDescriber struct {
 	clientset.Interface
 }
 
-func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().ConfigMaps(namespace)
-
-	configMap, err := c.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *ConfigMapDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	configMap := &corev1.ConfigMap{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, configMap, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to ConfigMap: %w", err)
+		}
+	} else {
+		configMap, ok = object.(*corev1.ConfigMap)
+		if !ok {
+			return "", fmt.Errorf("object is not a ConfigMap")
+		}
 	}
 
 	return tabbedString(func(out io.Writer) error {
@@ -4606,12 +4998,19 @@ type NetworkPolicyDescriber struct {
 	clientset.Interface
 }
 
-func (d *NetworkPolicyDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.NetworkingV1().NetworkPolicies(namespace)
-
-	networkPolicy, err := c.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *NetworkPolicyDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	networkPolicy := &networkingv1.NetworkPolicy{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, networkPolicy, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to NetworkPolicy: %w", err)
+		}
+	} else {
+		networkPolicy, ok = object.(*networkingv1.NetworkPolicy)
+		if !ok {
+			return "", fmt.Errorf("object is not a NetworkPolicy")
+		}
 	}
 
 	return describeNetworkPolicy(networkPolicy)
@@ -4770,10 +5169,19 @@ type StorageClassDescriber struct {
 	clientset.Interface
 }
 
-func (s *StorageClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	sc, err := s.StorageV1().StorageClasses().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (s *StorageClassDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	sc := &storagev1.StorageClass{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, sc, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to StorageClass: %w", err)
+		}
+	} else {
+		sc, ok = object.(*storagev1.StorageClass)
+		if !ok {
+			return "", fmt.Errorf("object is not a StorageClass")
+		}
 	}
 
 	var events *corev1.EventList
@@ -4822,10 +5230,19 @@ type VolumeAttributesClassDescriber struct {
 	clientset.Interface
 }
 
-func (d *VolumeAttributesClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	vac, err := d.StorageV1().VolumeAttributesClasses().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (d *VolumeAttributesClassDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	vac := &storagev1.VolumeAttributesClass{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, vac, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to VolumeAttributesClass: %w", err)
+		}
+	} else {
+		vac, ok = object.(*storagev1.VolumeAttributesClass)
+		if !ok {
+			return "", fmt.Errorf("object is not a VolumeAttributesClass")
+		}
 	}
 
 	var events *corev1.EventList
@@ -4856,10 +5273,19 @@ type CSINodeDescriber struct {
 	clientset.Interface
 }
 
-func (c *CSINodeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	csi, err := c.StorageV1().CSINodes().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (c *CSINodeDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	csi := &storagev1.CSINode{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, csi, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to CSINode: %w", err)
+		}
+	} else {
+		csi, ok = object.(*storagev1.CSINode)
+		if !ok {
+			return "", fmt.Errorf("object is not a CSINode")
+		}
 	}
 
 	var events *corev1.EventList
@@ -4935,14 +5361,14 @@ type PodDisruptionBudgetDescriber struct {
 	clientset.Interface
 }
 
-func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (p *PodDisruptionBudgetDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var (
 		pdbv1      *policyv1.PodDisruptionBudget
 		pdbv1beta1 *policyv1beta1.PodDisruptionBudget
 		err        error
 	)
 
-	pdbv1, err = p.PolicyV1().PodDisruptionBudgets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	pdbv1, err = p.tryCastPolicyV1PodDisruptionBudget(object)
 	if err == nil {
 		var events *corev1.EventList
 		if describerSettings.ShowEvents {
@@ -4952,9 +5378,7 @@ func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describe
 	}
 
 	// try falling back to v1beta1 in NotFound error cases
-	if apierrors.IsNotFound(err) {
-		pdbv1beta1, err = p.PolicyV1beta1().PodDisruptionBudgets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	}
+	pdbv1beta1, err = p.tryCastPolicyV1Beta1PodDisruptionBudget(object)
 	if err == nil {
 		var events *corev1.EventList
 		if describerSettings.ShowEvents {
@@ -4964,6 +5388,40 @@ func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describe
 	}
 
 	return "", err
+}
+
+func (p *PodDisruptionBudgetDescriber) tryCastPolicyV1PodDisruptionBudget(object runtime.Object) (*policyv1.PodDisruptionBudget, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	budget := &policyv1.PodDisruptionBudget{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, budget, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to PodDisruptionBudget: %w", err)
+		}
+	} else {
+		budget, ok = object.(*policyv1.PodDisruptionBudget)
+		if !ok {
+			return nil, fmt.Errorf("object is not a PodDisruptionBudget")
+		}
+	}
+	return budget, nil
+}
+
+func (p *PodDisruptionBudgetDescriber) tryCastPolicyV1Beta1PodDisruptionBudget(object runtime.Object) (*policyv1beta1.PodDisruptionBudget, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	budget := &policyv1beta1.PodDisruptionBudget{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, budget, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert unstructured object to PodDisruptionBudget: %w", err)
+		}
+	} else {
+		budget, ok = object.(*policyv1beta1.PodDisruptionBudget)
+		if !ok {
+			return nil, fmt.Errorf("object is not a PodDisruptionBudget")
+		}
+	}
+	return budget, nil
 }
 
 func describePodDisruptionBudgetV1(pdb *policyv1.PodDisruptionBudget, events *corev1.EventList) (string, error) {
@@ -5031,10 +5489,19 @@ type PriorityClassDescriber struct {
 	clientset.Interface
 }
 
-func (s *PriorityClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	pc, err := s.SchedulingV1().PriorityClasses().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+func (s *PriorityClassDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	unstructuredObj, ok := object.(*unstructured.Unstructured)
+	pc := &schedulingv1.PriorityClass{}
+	if ok {
+		err := scheme.Scheme.Convert(unstructuredObj, pc, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert unstructured object to PriorityClass: %w", err)
+		}
+	} else {
+		pc, ok = object.(*schedulingv1.PriorityClass)
+		if !ok {
+			return "", fmt.Errorf("object is not a PriorityClass")
+		}
 	}
 
 	var events *corev1.EventList
