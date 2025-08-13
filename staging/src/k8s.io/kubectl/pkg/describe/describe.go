@@ -42,6 +42,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -59,6 +60,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -284,8 +286,8 @@ type genericDescriber struct {
 	events  corev1client.EventsGetter
 }
 
-func (g *genericDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error) {
-	obj, err := g.dynamic.Resource(g.mapping.Resource).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (g *genericDescriber) Describe(obj runtime.Object, describerSettings DescriberSettings) (output string, err error) {
+	unstructuredObj, err := convertObject[*unstructured.Unstructured](obj)
 	if err != nil {
 		return "", err
 	}
@@ -297,11 +299,11 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings De
 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", obj.GetName())
-		w.Write(LEVEL_0, "Namespace:\t%s\n", obj.GetNamespace())
-		printLabelsMultiline(w, "Labels", obj.GetLabels())
-		printAnnotationsMultiline(w, "Annotations", obj.GetAnnotations())
-		printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), "", ".metadata.managedFields", ".metadata.name",
+		w.Write(LEVEL_0, "Name:\t%s\n", unstructuredObj.GetName())
+		w.Write(LEVEL_0, "Namespace:\t%s\n", unstructuredObj.GetNamespace())
+		printLabelsMultiline(w, "Labels", unstructuredObj.GetLabels())
+		printAnnotationsMultiline(w, "Annotations", unstructuredObj.GetAnnotations())
+		printUnstructuredContent(w, LEVEL_0, unstructuredObj.UnstructuredContent(), "", ".metadata.managedFields", ".metadata.name",
 			".metadata.namespace", ".metadata.labels", ".metadata.annotations")
 		if events != nil {
 			DescribeEvents(events, w)
@@ -429,8 +431,8 @@ type NamespaceDescriber struct {
 	clientset.Interface
 }
 
-func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	ns, err := d.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
+func (d *NamespaceDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	ns, err := convertObject[*corev1.Namespace](object)
 	if err != nil {
 		return "", err
 	}
@@ -438,7 +440,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 	resourceQuotaList := &corev1.ResourceQuotaList{}
 	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
 		func(options metav1.ListOptions) (runtime.Object, error) {
-			newList, err := d.CoreV1().ResourceQuotas(name).List(context.TODO(), options)
+			newList, err := d.CoreV1().ResourceQuotas(ns.Name).List(context.TODO(), options)
 			if err != nil {
 				return nil, runtimeresource.EnhanceListError(err, options, corev1.ResourceQuotas.String())
 			}
@@ -458,7 +460,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 	limitRangeList := &corev1.LimitRangeList{}
 	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
 		func(options metav1.ListOptions) (runtime.Object, error) {
-			newList, err := d.CoreV1().LimitRanges(name).List(context.TODO(), options)
+			newList, err := d.CoreV1().LimitRanges(ns.Name).List(context.TODO(), options)
 			if err != nil {
 				return nil, runtimeresource.EnhanceListError(err, options, "limitranges")
 			}
@@ -639,10 +641,8 @@ type LimitRangeDescriber struct {
 	clientset.Interface
 }
 
-func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	lr := d.CoreV1().LimitRanges(namespace)
-
-	limitRange, err := lr.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *LimitRangeDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	limitRange, err := convertObject[*corev1.LimitRange](object)
 	if err != nil {
 		return "", err
 	}
@@ -666,14 +666,11 @@ type ResourceQuotaDescriber struct {
 	clientset.Interface
 }
 
-func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	rq := d.CoreV1().ResourceQuotas(namespace)
-
-	resourceQuota, err := rq.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *ResourceQuotaDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	resourceQuota, err := convertObject[*corev1.ResourceQuota](object)
 	if err != nil {
 		return "", err
 	}
-
 	return describeQuota(resourceQuota)
 }
 
@@ -739,36 +736,9 @@ type PodDescriber struct {
 	clientset.Interface
 }
 
-func (d *PodDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	pod, err := d.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (d *PodDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	pod, err := convertObject[*corev1.Pod](object)
 	if err != nil {
-		if describerSettings.ShowEvents {
-			eventsInterface := d.CoreV1().Events(namespace)
-			selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
-			initialOpts := metav1.ListOptions{
-				FieldSelector: selector.String(),
-				Limit:         describerSettings.ChunkSize,
-			}
-			events := &corev1.EventList{}
-			err2 := runtimeresource.FollowContinue(&initialOpts,
-				func(options metav1.ListOptions) (runtime.Object, error) {
-					newList, err := eventsInterface.List(context.TODO(), options)
-					if err != nil {
-						return nil, runtimeresource.EnhanceListError(err, options, "events")
-					}
-					events.Items = append(events.Items, newList.Items...)
-					return newList, nil
-				})
-
-			if err2 == nil && len(events.Items) > 0 {
-				return tabbedString(func(out io.Writer) error {
-					w := NewPrefixWriter(out)
-					w.Write(LEVEL_0, "Pod '%v': error '%v', but found events.\n", name, err)
-					DescribeEvents(events, w)
-					return nil
-				})
-			}
-		}
 		return "", err
 	}
 
@@ -1506,10 +1476,8 @@ type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
 
-func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().PersistentVolumes()
-
-	pv, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *PersistentVolumeDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	pv, err := convertObject[*corev1.PersistentVolume](object)
 	if err != nil {
 		return "", err
 	}
@@ -1654,16 +1622,13 @@ type PersistentVolumeClaimDescriber struct {
 	clientset.Interface
 }
 
-func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().PersistentVolumeClaims(namespace)
-
-	pvc, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *PersistentVolumeClaimDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	pvc, err := convertObject[*corev1.PersistentVolumeClaim](object)
 	if err != nil {
 		return "", err
 	}
 
-	pc := d.CoreV1().Pods(namespace)
-
+	pc := d.CoreV1().Pods(pvc.Namespace)
 	pods, err := getPodsForPVC(pc, pvc, describerSettings)
 	if err != nil {
 		return "", err
@@ -2176,15 +2141,13 @@ type ReplicationControllerDescriber struct {
 	clientset.Interface
 }
 
-func (d *ReplicationControllerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	rc := d.CoreV1().ReplicationControllers(namespace)
-	pc := d.CoreV1().Pods(namespace)
-
-	controller, err := rc.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *ReplicationControllerDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	controller, err := convertObject[*corev1.ReplicationController](object)
 	if err != nil {
 		return "", err
 	}
 
+	pc := d.CoreV1().Pods(controller.Namespace)
 	selector := labels.SelectorFromSet(controller.Spec.Selector)
 	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector, controller.UID, describerSettings)
 	if err != nil {
@@ -2255,11 +2218,8 @@ type ReplicaSetDescriber struct {
 	clientset.Interface
 }
 
-func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	rsc := d.AppsV1().ReplicaSets(namespace)
-	pc := d.CoreV1().Pods(namespace)
-
-	rs, err := rsc.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *ReplicaSetDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	rs, err := convertObject[*appsv1.ReplicaSet](object)
 	if err != nil {
 		return "", err
 	}
@@ -2269,6 +2229,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 		return "", err
 	}
 
+	pc := d.CoreV1().Pods(rs.Namespace)
 	running, waiting, succeeded, failed, getPodErr := getPodStatusForController(pc, selector, rs.UID, describerSettings)
 
 	var events *corev1.EventList
@@ -2317,8 +2278,8 @@ type JobDescriber struct {
 	clientset.Interface
 }
 
-func (d *JobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	job, err := d.BatchV1().Jobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (d *JobDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	job, err := convertObject[*batchv1.Job](object)
 	if err != nil {
 		return "", err
 	}
@@ -2415,14 +2376,13 @@ type CronJobDescriber struct {
 	client clientset.Interface
 }
 
-func (d *CronJobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	var events *corev1.EventList
-
-	cronJob, err := d.client.BatchV1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (d *CronJobDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	cronJob, err := convertObject[*batchv1.CronJob](object)
 	if err != nil {
 		return "", err
 	}
 
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = searchEvents(d.client.CoreV1(), cronJob, describerSettings.ChunkSize)
 	}
@@ -2515,15 +2475,13 @@ type DaemonSetDescriber struct {
 	clientset.Interface
 }
 
-func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	dc := d.AppsV1().DaemonSets(namespace)
-	pc := d.CoreV1().Pods(namespace)
-
-	daemon, err := dc.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *DaemonSetDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	daemon, err := convertObject[*appsv1.DaemonSet](object)
 	if err != nil {
 		return "", err
 	}
 
+	pc := d.CoreV1().Pods(daemon.Namespace)
 	selector, err := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
 	if err != nil {
 		return "", err
@@ -2569,10 +2527,8 @@ type SecretDescriber struct {
 	clientset.Interface
 }
 
-func (d *SecretDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().Secrets(namespace)
-
-	secret, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *SecretDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	secret, err := convertObject[*corev1.Secret](object)
 	if err != nil {
 		return "", err
 	}
@@ -2608,18 +2564,18 @@ type IngressDescriber struct {
 	client clientset.Interface
 }
 
-func (i *IngressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (i *IngressDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
 	// try ingress/v1 first (v1.19) and fallback to ingress/v1beta if an err occurs
-	netV1, err := i.client.NetworkingV1().Ingresses(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	netV1, err := convertObject[*networkingv1.Ingress](object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
 		}
 		return i.describeIngressV1(netV1, events)
 	}
-	netV1beta1, err := i.client.NetworkingV1beta1().Ingresses(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	netV1beta1, err := convertObject[*networkingv1beta1.Ingress](object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(i.client.CoreV1(), netV1beta1, describerSettings.ChunkSize)
@@ -2824,17 +2780,17 @@ type IngressClassDescriber struct {
 	client clientset.Interface
 }
 
-func (i *IngressClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (i *IngressClassDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 	// try IngressClass/v1 first (v1.19) and fallback to IngressClass/v1beta if an err occurs
-	netV1, err := i.client.NetworkingV1().IngressClasses().Get(context.TODO(), name, metav1.GetOptions{})
+	netV1, err := convertObject[*networkingv1.IngressClass](object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
 		}
 		return i.describeIngressClassV1(netV1, events)
 	}
-	netV1beta1, err := i.client.NetworkingV1beta1().IngressClasses().Get(context.TODO(), name, metav1.GetOptions{})
+	netV1beta1, err := convertObject[*networkingv1beta1.IngressClass](object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(i.client.CoreV1(), netV1beta1, describerSettings.ChunkSize)
@@ -2895,10 +2851,10 @@ type ServiceCIDRDescriber struct {
 	client clientset.Interface
 }
 
-func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (c *ServiceCIDRDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	svcV1, err := c.client.NetworkingV1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
+	svcV1, err := convertObject[*networkingv1.ServiceCIDR](object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(c.client.CoreV1(), svcV1, describerSettings.ChunkSize)
@@ -2906,7 +2862,7 @@ func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSetting
 		return c.describeServiceCIDRV1(svcV1, events)
 	}
 
-	svcV1beta1, err := c.client.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
+	svcV1beta1, err := convertObject[*networkingv1beta1.ServiceCIDR](object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(c.client.CoreV1(), svcV1beta1, describerSettings.ChunkSize)
@@ -2983,10 +2939,10 @@ type IPAddressDescriber struct {
 	client clientset.Interface
 }
 
-func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (c *IPAddressDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	ipV1, err := c.client.NetworkingV1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
+	ipV1, err := convertObject[*networkingv1.IPAddress](object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(c.client.CoreV1(), ipV1, describerSettings.ChunkSize)
@@ -2994,7 +2950,7 @@ func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings 
 		return c.describeIPAddressV1(ipV1, events)
 	}
 
-	ipV1beta1, err := c.client.NetworkingV1beta1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
+	ipV1beta1, err := convertObject[*networkingv1beta1.IPAddress](object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(c.client.CoreV1(), ipV1beta1, describerSettings.ChunkSize)
@@ -3053,16 +3009,14 @@ type ServiceDescriber struct {
 	clientset.Interface
 }
 
-func (d *ServiceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().Services(namespace)
-
-	service, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *ServiceDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	service, err := convertObject[*corev1.Service](object)
 	if err != nil {
 		return "", err
 	}
 
-	endpointSliceList, _ := d.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, name),
+	endpointSliceList, _ := d.DiscoveryV1().EndpointSlices(service.Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, service.Name),
 	})
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
@@ -3181,10 +3135,8 @@ type EndpointsDescriber struct {
 	clientset.Interface
 }
 
-func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().Endpoints(namespace)
-
-	ep, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *EndpointsDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	ep, err := convertObject[*corev1.Endpoints](object)
 	if err != nil {
 		return "", err
 	}
@@ -3256,11 +3208,11 @@ type EndpointSliceDescriber struct {
 	clientset.Interface
 }
 
-func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *EndpointSliceDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 	// try endpointslice/v1 first (v1.21) and fallback to v1beta1 if error occurs
 
-	epsV1, err := d.DiscoveryV1().EndpointSlices(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	epsV1, err := convertObject[*discoveryv1.EndpointSlice](object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(d.CoreV1(), epsV1, describerSettings.ChunkSize)
@@ -3268,7 +3220,7 @@ func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSetti
 		return describeEndpointSliceV1(epsV1, events)
 	}
 
-	epsV1beta1, err := d.DiscoveryV1beta1().EndpointSlices(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	epsV1beta1, err := convertObject[*discoveryv1beta1.EndpointSlice](object)
 	if err != nil {
 		return "", err
 	}
@@ -3439,12 +3391,56 @@ type ServiceAccountDescriber struct {
 	clientset.Interface
 }
 
-func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().ServiceAccounts(namespace)
-
-	serviceAccount, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *ServiceAccountDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	serviceAccount, err := convertObject[*corev1.ServiceAccount](object)
 	if err != nil {
 		return "", err
+	}
+
+	tokens := []corev1.Secret{}
+
+	// missingSecrets is the set of all secrets present in the
+	// serviceAccount but not present in the set of existing secrets.
+	missingSecrets := sets.New[string]()
+	secrets := corev1.SecretList{}
+	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
+		func(options metav1.ListOptions) (runtime.Object, error) {
+			newList, err := d.CoreV1().Secrets(serviceAccount.Namespace).List(context.TODO(), options)
+			if err != nil {
+				return nil, runtimeresource.EnhanceListError(err, options, corev1.ResourceSecrets.String())
+			}
+			secrets.Items = append(secrets.Items, newList.Items...)
+			return newList, nil
+		})
+
+	// errors are tolerated here in order to describe the serviceAccount with all
+	// of the secrets that it references, even if those secrets cannot be fetched.
+	if err == nil {
+		// existingSecrets is the set of all secrets remaining on a
+		// service account that are not present in the "tokens" slice.
+		existingSecrets := sets.New[string]()
+
+		for _, s := range secrets.Items {
+			if s.Type == corev1.SecretTypeServiceAccountToken {
+				name := s.Annotations[corev1.ServiceAccountNameKey]
+				uid := s.Annotations[corev1.ServiceAccountUIDKey]
+				if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
+					tokens = append(tokens, s)
+				}
+			}
+			existingSecrets.Insert(s.Name)
+		}
+
+		for _, s := range serviceAccount.Secrets {
+			if !existingSecrets.Has(s.Name) {
+				missingSecrets.Insert(s.Name)
+			}
+		}
+		for _, s := range serviceAccount.ImagePullSecrets {
+			if !existingSecrets.Has(s.Name) {
+				missingSecrets.Insert(s.Name)
+			}
+		}
 	}
 
 	var events *corev1.EventList
@@ -3503,8 +3499,8 @@ type RoleDescriber struct {
 	clientset.Interface
 }
 
-func (d *RoleDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	role, err := d.RbacV1().Roles(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (d *RoleDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	role, err := convertObject[*rbacv1.Role](object)
 	if err != nil {
 		return "", err
 	}
@@ -3542,8 +3538,8 @@ type ClusterRoleDescriber struct {
 	clientset.Interface
 }
 
-func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	role, err := d.RbacV1().ClusterRoles().Get(context.TODO(), name, metav1.GetOptions{})
+func (d *ClusterRoleDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	role, err := convertObject[*rbacv1.ClusterRole](object)
 	if err != nil {
 		return "", err
 	}
@@ -3598,8 +3594,8 @@ type RoleBindingDescriber struct {
 	clientset.Interface
 }
 
-func (d *RoleBindingDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	binding, err := d.RbacV1().RoleBindings(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (d *RoleBindingDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	binding, err := convertObject[*rbacv1.RoleBinding](object)
 	if err != nil {
 		return "", err
 	}
@@ -3630,8 +3626,8 @@ type ClusterRoleBindingDescriber struct {
 	clientset.Interface
 }
 
-func (d *ClusterRoleBindingDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	binding, err := d.RbacV1().ClusterRoleBindings().Get(context.TODO(), name, metav1.GetOptions{})
+func (d *ClusterRoleBindingDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	binding, err := convertObject[*rbacv1.ClusterRoleBinding](object)
 	if err != nil {
 		return "", err
 	}
@@ -3662,15 +3658,14 @@ type NodeDescriber struct {
 	clientset.Interface
 }
 
-func (d *NodeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	mc := d.CoreV1().Nodes()
-	node, err := mc.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *NodeDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	node, err := convertObject[*corev1.Node](object)
 	if err != nil {
 		return "", err
 	}
 
 	fieldSelector := fields.AndSelectors(
-		fields.OneTermEqualSelector("spec.nodeName", name),
+		fields.OneTermEqualSelector("spec.nodeName", node.Name),
 		fields.OneTermNotEqualSelector("status.phase", string(corev1.PodSucceeded)),
 		fields.OneTermNotEqualSelector("status.phase", string(corev1.PodFailed)),
 	)
@@ -3681,7 +3676,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		FieldSelector: fieldSelector.String(),
 		Limit:         describerSettings.ChunkSize,
 	}
-	nodeNonTerminatedPodsList, err := getPodsInChunks(d.CoreV1().Pods(namespace), initialOpts)
+	nodeNonTerminatedPodsList, err := getPodsInChunks(d.CoreV1().Pods(node.Namespace), initialOpts)
 	if err != nil {
 		if !apierrors.IsForbidden(err) {
 			return "", err
@@ -3838,12 +3833,13 @@ type StatefulSetDescriber struct {
 	client clientset.Interface
 }
 
-func (p *StatefulSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	ps, err := p.client.AppsV1().StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (p *StatefulSetDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	ps, err := convertObject[*appsv1.StatefulSet](object)
 	if err != nil {
 		return "", err
 	}
-	pc := p.client.CoreV1().Pods(namespace)
+
+	pc := p.client.CoreV1().Pods(ps.Namespace)
 
 	selector, err := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
 	if err != nil {
@@ -3899,7 +3895,7 @@ type CertificateSigningRequestDescriber struct {
 	client clientset.Interface
 }
 
-func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (p *CertificateSigningRequestDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 
 	var (
 		crBytes           []byte
@@ -3911,7 +3907,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		events            *corev1.EventList
 	)
 
-	if csr, err := p.client.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+	if csr, err := convertObject[*certificatesv1.CertificateSigningRequest](object); err == nil {
 		crBytes = csr.Spec.Request
 		metadata = csr.ObjectMeta
 		conditionTypes := []string{}
@@ -3925,7 +3921,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(p.client.CoreV1(), csr, describerSettings.ChunkSize)
 		}
-	} else if csr, err := p.client.CertificatesV1beta1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+	} else if csr, err := convertObject[*certificatesv1beta1.CertificateSigningRequest](object); err == nil {
 		crBytes = csr.Spec.Request
 		metadata = csr.ObjectMeta
 		conditionTypes := []string{}
@@ -4018,13 +4014,13 @@ type HorizontalPodAutoscalerDescriber struct {
 	client clientset.Interface
 }
 
-func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (d *HorizontalPodAutoscalerDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
 	// autoscaling/v2 is introduced since v1.23 and autoscaling/v1 does not have full backward compatibility
 	// with autoscaling/v2, so describer will try to get and describe hpa v2 object firstly, if it fails,
 	// describer will fall back to do with hpa v1 object
-	hpaV2, err := d.client.AutoscalingV2().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	hpaV2, err := convertObject[*autoscalingv2.HorizontalPodAutoscaler](object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(d.client.CoreV1(), hpaV2, describerSettings.ChunkSize)
@@ -4032,7 +4028,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 		return describeHorizontalPodAutoscalerV2(hpaV2, events, d)
 	}
 
-	hpaV1, err := d.client.AutoscalingV1().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	hpaV1, err := convertObject[*autoscalingv1.HorizontalPodAutoscaler](object)
 	if err == nil {
 		if describerSettings.ShowEvents {
 			events, _ = searchEvents(d.client.CoreV1(), hpaV1, describerSettings.ChunkSize)
@@ -4380,8 +4376,8 @@ type DeploymentDescriber struct {
 	client clientset.Interface
 }
 
-func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	d, err := dd.client.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (dd *DeploymentDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	d, err := convertObject[*appsv1.Deployment](object)
 	if err != nil {
 		return "", err
 	}
@@ -4503,10 +4499,8 @@ type ConfigMapDescriber struct {
 	clientset.Interface
 }
 
-func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.CoreV1().ConfigMaps(namespace)
-
-	configMap, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *ConfigMapDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	configMap, err := convertObject[*corev1.ConfigMap](object)
 	if err != nil {
 		return "", err
 	}
@@ -4550,10 +4544,8 @@ type NetworkPolicyDescriber struct {
 	clientset.Interface
 }
 
-func (d *NetworkPolicyDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	c := d.NetworkingV1().NetworkPolicies(namespace)
-
-	networkPolicy, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+func (d *NetworkPolicyDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	networkPolicy, err := convertObject[*networkingv1.NetworkPolicy](object)
 	if err != nil {
 		return "", err
 	}
@@ -4714,8 +4706,8 @@ type StorageClassDescriber struct {
 	clientset.Interface
 }
 
-func (s *StorageClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	sc, err := s.StorageV1().StorageClasses().Get(context.TODO(), name, metav1.GetOptions{})
+func (s *StorageClassDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	sc, err := convertObject[*storagev1.StorageClass](object)
 	if err != nil {
 		return "", err
 	}
@@ -4766,8 +4758,8 @@ type VolumeAttributesClassDescriber struct {
 	clientset.Interface
 }
 
-func (d *VolumeAttributesClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	vac, err := d.StorageV1().VolumeAttributesClasses().Get(context.TODO(), name, metav1.GetOptions{})
+func (d *VolumeAttributesClassDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	vac, err := convertObject[*storagev1.VolumeAttributesClass](object)
 	if err != nil {
 		return "", err
 	}
@@ -4800,8 +4792,8 @@ type CSINodeDescriber struct {
 	clientset.Interface
 }
 
-func (c *CSINodeDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	csi, err := c.StorageV1().CSINodes().Get(context.TODO(), name, metav1.GetOptions{})
+func (c *CSINodeDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	csi, err := convertObject[*storagev1.CSINode](object)
 	if err != nil {
 		return "", err
 	}
@@ -4879,14 +4871,14 @@ type PodDisruptionBudgetDescriber struct {
 	clientset.Interface
 }
 
-func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+func (p *PodDisruptionBudgetDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	var (
 		pdbv1      *policyv1.PodDisruptionBudget
 		pdbv1beta1 *policyv1beta1.PodDisruptionBudget
 		err        error
 	)
 
-	pdbv1, err = p.PolicyV1().PodDisruptionBudgets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	pdbv1, err = convertObject[*policyv1.PodDisruptionBudget](object)
 	if err == nil {
 		var events *corev1.EventList
 		if describerSettings.ShowEvents {
@@ -4896,9 +4888,7 @@ func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describe
 	}
 
 	// try falling back to v1beta1 in NotFound error cases
-	if apierrors.IsNotFound(err) {
-		pdbv1beta1, err = p.PolicyV1beta1().PodDisruptionBudgets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	}
+	pdbv1beta1, err = convertObject[*policyv1beta1.PodDisruptionBudget](object)
 	if err == nil {
 		var events *corev1.EventList
 		if describerSettings.ShowEvents {
@@ -4975,8 +4965,8 @@ type PriorityClassDescriber struct {
 	clientset.Interface
 }
 
-func (s *PriorityClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	pc, err := s.SchedulingV1().PriorityClasses().Get(context.TODO(), name, metav1.GetOptions{})
+func (s *PriorityClassDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
+	pc, err := convertObject[*schedulingv1.PriorityClass](object)
 	if err != nil {
 		return "", err
 	}
@@ -5682,4 +5672,28 @@ func searchEvents(client corev1client.EventsGetter, objOrRef runtime.Object, lim
 			return newEvents, nil
 		})
 	return eventList, err
+}
+
+func convertObject[T runtime.Object](object any) (T, error) {
+	var zero T
+
+	if typedObj, ok := object.(T); ok {
+		return typedObj, nil
+	}
+
+	if unstructuredObj, ok := object.(*unstructured.Unstructured); ok {
+		elemType := reflect.TypeOf(zero).Elem()
+		typedObjInstance := reflect.New(elemType).Interface()
+		err := scheme.Scheme.Convert(unstructuredObj, typedObjInstance, nil)
+		if err != nil {
+			return zero, fmt.Errorf("failed to convert unstructured to %s: %w", elemType.Name(), err)
+		}
+		return typedObjInstance.(T), nil
+	}
+
+	typeName := "unknown"
+	if reflect.TypeOf(zero) != nil {
+		typeName = reflect.TypeOf(zero).Elem().Name()
+	}
+	return zero, fmt.Errorf("object of type %T could not be cast or converted to %s", object, typeName)
 }
