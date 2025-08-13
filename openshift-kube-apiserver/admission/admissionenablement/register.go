@@ -24,6 +24,7 @@ import (
 	projectnodeenv "k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/nodeenv"
 	schedulerpodnodeconstraints "k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/podnodeconstraints"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/storage/csiinlinevolumesecurity"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/storage/performantsecuritypolicy"
 )
 
 func RegisterOpenshiftKubeAdmissionPlugins(plugins *admission.Plugins) {
@@ -44,6 +45,7 @@ func RegisterOpenshiftKubeAdmissionPlugins(plugins *admission.Plugins) {
 	externalipranger.RegisterExternalIP(plugins)
 	restrictedendpoints.RegisterRestrictedEndpoints(plugins)
 	csiinlinevolumesecurity.Register(plugins)
+	performantsecuritypolicy.Register(plugins)
 }
 
 var (
@@ -73,10 +75,11 @@ var (
 		"security.openshift.io/SecurityContextConstraint",
 		"security.openshift.io/SCCExecRestrictions",
 		"route.openshift.io/IngressAdmission",
-		hostassignment.PluginName,          // "route.openshift.io/RouteHostAssignment"
-		csiinlinevolumesecurity.PluginName, // "storage.openshift.io/CSIInlineVolumeSecurity"
-		managednode.PluginName,             // "autoscaling.openshift.io/ManagedNode"
-		mixedcpus.PluginName,               // "autoscaling.openshift.io/MixedCPUs"
+		hostassignment.PluginName,           // "route.openshift.io/RouteHostAssignment"
+		csiinlinevolumesecurity.PluginName,  // "storage.openshift.io/CSIInlineVolumeSecurity"
+		managednode.PluginName,              // "autoscaling.openshift.io/ManagedNode"
+		mixedcpus.PluginName,                // "autoscaling.openshift.io/MixedCPUs"
+		performantsecuritypolicy.PluginName, // "storage.openshift.io/PerformantSecurityPolicy"
 	}
 
 	// openshiftAdmissionPluginsForKubeAfterResourceQuota are the plugins to add after ResourceQuota plugin
