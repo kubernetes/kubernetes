@@ -105,8 +105,8 @@ func (pvcr *persistentVolumeClaimResize) Validate(ctx context.Context, a admissi
 	// Growing Persistent volumes is only allowed for PVCs for which their StorageClass
 	// explicitly allows it
 	if !pvcr.allowResize(pvc, oldPvc) {
-		return admission.NewForbidden(a, fmt.Errorf("only dynamically provisioned pvc can be resized and "+
-			"the storageclass that provisions the pvc must support resize"))
+		return admission.NewForbidden(a, fmt.Errorf("for resizing, the PVC must have a storageclass that "+
+			"has the AllowVolumeExpansion field set to true"))
 	}
 
 	return nil
