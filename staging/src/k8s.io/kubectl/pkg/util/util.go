@@ -47,6 +47,9 @@ func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// TODO: finish removing existing md5 usage
+	// https://github.com/kubernetes/kubernetes/issues/129652
+	//nolint:forbidigo
 	return fmt.Sprintf("%x", md5.Sum(data)), nil
 }
 

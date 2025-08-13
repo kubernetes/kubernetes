@@ -59,6 +59,9 @@ func generatePodName(name string, nodeName types.NodeName) string {
 
 func applyDefaults(logger klog.Logger, pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
 	if len(pod.UID) == 0 {
+		// TODO: finish removing existing md5 usage
+		// https://github.com/kubernetes/kubernetes/issues/129652
+		//nolint:forbidigo
 		hasher := md5.New()
 		hash.DeepHashObject(hasher, pod)
 		// DeepHashObject resets the hash, so we should write the pod source
