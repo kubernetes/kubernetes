@@ -40,7 +40,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	v1 "k8s.io/api/certificates/v1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -3921,7 +3921,7 @@ func (p *CertificateSigningRequestDescriber) Describe(object runtime.Object, des
 		events            *corev1.EventList
 	)
 
-	if csr, err := convertObject[*v1.CertificateSigningRequest](object); err == nil {
+	if csr, err := convertObject[*certificatesv1.CertificateSigningRequest](object); err == nil {
 		crBytes = csr.Spec.Request
 		metadata = csr.ObjectMeta
 		conditionTypes := []string{}
