@@ -77,7 +77,7 @@ dependencies:
     - path: staging/src/k8s.io/sample-apiserver/artifacts/example/deployment.yaml
       match: gcr.io/etcd-development/etcd
     - path: test/utils/image/manifest.go
-      match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
+      match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "v?\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
 
   - name: "etcd-image"
     version: 3.6.4
