@@ -22,9 +22,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -59,6 +62,11 @@ type PortForwardOptions struct {
 	PortForwarder portForwarder
 	StopChannel   chan struct{}
 	ReadyChannel  chan struct{}
+	// ExecCommand, if set, will be executed after the port forward is ready.
+	// When the command exits, the port forward will be terminated.
+	ExecCommand string
+	// IOStreams are used for the optional exec'ed command's stdio.
+	IOStreams genericiooptions.IOStreams
 }
 
 var (
@@ -91,7 +99,10 @@ var (
 		kubectl port-forward --address localhost,10.19.21.23 pod/mypod 8888:5000
 
 		# Listen on a random port locally, forwarding to 5000 in the pod
-		kubectl port-forward pod/mypod :5000`))
+		kubectl port-forward pod/mypod :5000
+
+		# Forward, run a command, and stop forwarding when the command exits
+		kubectl port-forward --exec "curl http://127.0.0.1:8888/server/info" pod/mypod 8888:5000`))
 )
 
 const (
@@ -116,6 +127,7 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericiooptions.IOStreams) *c
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodPortForwardWaitTimeout)
 	cmd.Flags().StringSliceVar(&opts.Address, "address", []string{"localhost"}, "Addresses to listen on (comma separated). Only accepts IP addresses or localhost as a value. When localhost is supplied, kubectl will try to bind on both 127.0.0.1 and ::1 and will fail if neither of these addresses are available to bind.")
+	cmd.Flags().StringVar(&opts.ExecCommand, "exec", "", "Command to run after establishing the port forward. The port forward will be terminated when the command exits.")
 	// TODO support UID
 	return cmd
 }
@@ -125,6 +137,7 @@ func NewDefaultPortForwardOptions(streams genericiooptions.IOStreams) *PortForwa
 		PortForwarder: &defaultPortForwarder{
 			IOStreams: streams,
 		},
+		IOStreams: streams,
 	}
 }
 
@@ -436,13 +449,23 @@ func (o PortForwardOptions) RunPortForwardContext(ctx context.Context) error {
 	returnCtx, returnCtxCancel := context.WithCancel(ctx)
 	defer returnCtxCancel()
 
+	// Ensure StopChannel is closed at most once
+	var stopOnce sync.Once
+	closeStop := func() {
+		if o.StopChannel != nil {
+			stopOnce.Do(func() { close(o.StopChannel) })
+		}
+	}
+
 	go func() {
 		select {
 		case <-signals:
 		case <-returnCtx.Done():
 		}
-		if o.StopChannel != nil {
-			close(o.StopChannel)
+		closeStop()
+		// If running an exec command, cancel it on Ctrl-C
+		if o.ExecCommand != "" {
+			returnCtxCancel()
 		}
 	}()
 
@@ -452,5 +475,46 @@ func (o PortForwardOptions) RunPortForwardContext(ctx context.Context) error {
 		Name(pod.Name).
 		SubResource("portforward")
 
-	return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+	if o.ExecCommand == "" {
+		return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+	}
+
+	// With --exec: start port-forward in background, wait for readiness, then exec command.
+	// When the command exits, stop the port-forward and return the command's error (if any).
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+	}()
+
+	select {
+	case <-o.ReadyChannel:
+		// proceed to execute command
+	case err := <-errCh:
+		// port-forward failed before ready
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	// Build command using shell for portability of complex strings
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.CommandContext(returnCtx, "cmd", "/C", o.ExecCommand)
+	} else {
+		cmd = exec.CommandContext(returnCtx, "sh", "-c", o.ExecCommand)
+	}
+	cmd.Stdin = o.IOStreams.In
+	cmd.Stdout = o.IOStreams.Out
+	cmd.Stderr = o.IOStreams.ErrOut
+
+	runErr := cmd.Run()
+	closeStop()
+
+	// Wait for port-forward goroutine to finish
+	pfErr := <-errCh
+	if runErr != nil {
+		return runErr
+	}
+	
+	return pfErr
 }
