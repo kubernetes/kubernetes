@@ -194,12 +194,12 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 	m := map[schema.GroupKind]ResourceDescriber{
 		{Group: corev1.GroupName, Kind: "Pod"}:                            &PodDescriber{c},
 		{Group: corev1.GroupName, Kind: "ReplicationController"}:          &ReplicationControllerDescriber{c},
-		{Group: corev1.GroupName, Kind: "Secret"}:                         &SecretDescriber{c},
+		{Group: corev1.GroupName, Kind: "Secret"}:                         &SecretDescriber{},
 		{Group: corev1.GroupName, Kind: "Service"}:                        &ServiceDescriber{c},
 		{Group: corev1.GroupName, Kind: "ServiceAccount"}:                 &ServiceAccountDescriber{c},
 		{Group: corev1.GroupName, Kind: "Node"}:                           &NodeDescriber{c},
-		{Group: corev1.GroupName, Kind: "LimitRange"}:                     &LimitRangeDescriber{c},
-		{Group: corev1.GroupName, Kind: "ResourceQuota"}:                  &ResourceQuotaDescriber{c},
+		{Group: corev1.GroupName, Kind: "LimitRange"}:                     &LimitRangeDescriber{},
+		{Group: corev1.GroupName, Kind: "ResourceQuota"}:                  &ResourceQuotaDescriber{},
 		{Group: corev1.GroupName, Kind: "PersistentVolume"}:               &PersistentVolumeDescriber{c},
 		{Group: corev1.GroupName, Kind: "PersistentVolumeClaim"}:          &PersistentVolumeClaimDescriber{c},
 		{Group: corev1.GroupName, Kind: "Namespace"}:                      &NamespaceDescriber{c},
@@ -224,11 +224,11 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: storagev1.GroupName, Kind: "CSINode"}:                     &CSINodeDescriber{c},
 		{Group: storagev1.GroupName, Kind: "VolumeAttributesClass"}:       &VolumeAttributesClassDescriber{c},
 		{Group: policyv1.GroupName, Kind: "PodDisruptionBudget"}:          &PodDisruptionBudgetDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "Role"}:                           &RoleDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                    &ClusterRoleDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                    &RoleBindingDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:             &ClusterRoleBindingDescriber{c},
-		{Group: networkingv1.GroupName, Kind: "NetworkPolicy"}:            &NetworkPolicyDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "Role"}:                           &RoleDescriber{},
+		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                    &ClusterRoleDescriber{},
+		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                    &RoleBindingDescriber{},
+		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:             &ClusterRoleBindingDescriber{},
+		{Group: networkingv1.GroupName, Kind: "NetworkPolicy"}:            &NetworkPolicyDescriber{},
 		{Group: schedulingv1.GroupName, Kind: "PriorityClass"}:            &PriorityClassDescriber{c},
 	}
 
@@ -622,9 +622,7 @@ func DescribeResourceQuotas(quotas *corev1.ResourceQuotaList, w PrefixWriter) {
 }
 
 // LimitRangeDescriber generates information about a limit range
-type LimitRangeDescriber struct {
-	clientset.Interface
-}
+type LimitRangeDescriber struct{}
 
 func (d *LimitRangeDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	limitRange, err := convertObject[*corev1.LimitRange](object)
@@ -647,9 +645,7 @@ func describeLimitRange(limitRange *corev1.LimitRange) (string, error) {
 }
 
 // ResourceQuotaDescriber generates information about a resource quota
-type ResourceQuotaDescriber struct {
-	clientset.Interface
-}
+type ResourceQuotaDescriber struct{}
 
 func (d *ResourceQuotaDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	resourceQuota, err := convertObject[*corev1.ResourceQuota](object)
@@ -2508,9 +2504,7 @@ func describeDaemonSet(daemon *appsv1.DaemonSet, selector labels.Selector, event
 }
 
 // SecretDescriber generates information about a secret
-type SecretDescriber struct {
-	clientset.Interface
-}
+type SecretDescriber struct{}
 
 func (d *SecretDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	secret, err := convertObject[*corev1.Secret](object)
@@ -3217,9 +3211,7 @@ func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []core
 }
 
 // RoleDescriber generates information about a node.
-type RoleDescriber struct {
-	clientset.Interface
-}
+type RoleDescriber struct{}
 
 func (d *RoleDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	role, err := convertObject[*rbacv1.Role](object)
@@ -3256,9 +3248,7 @@ func (d *RoleDescriber) Describe(object runtime.Object, describerSettings Descri
 }
 
 // ClusterRoleDescriber generates information about a node.
-type ClusterRoleDescriber struct {
-	clientset.Interface
-}
+type ClusterRoleDescriber struct{}
 
 func (d *ClusterRoleDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	role, err := convertObject[*rbacv1.ClusterRole](object)
@@ -3312,9 +3302,7 @@ func CombineResourceGroup(resource, group []string) string {
 }
 
 // RoleBindingDescriber generates information about a node.
-type RoleBindingDescriber struct {
-	clientset.Interface
-}
+type RoleBindingDescriber struct{}
 
 func (d *RoleBindingDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	binding, err := convertObject[*rbacv1.RoleBinding](object)
@@ -3344,9 +3332,7 @@ func (d *RoleBindingDescriber) Describe(object runtime.Object, describerSettings
 }
 
 // ClusterRoleBindingDescriber generates information about a node.
-type ClusterRoleBindingDescriber struct {
-	clientset.Interface
-}
+type ClusterRoleBindingDescriber struct{}
 
 func (d *ClusterRoleBindingDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	binding, err := convertObject[*rbacv1.ClusterRoleBinding](object)
@@ -4243,9 +4229,7 @@ func (d *ConfigMapDescriber) Describe(object runtime.Object, describerSettings D
 }
 
 // NetworkPolicyDescriber generates information about a networkingv1.NetworkPolicy
-type NetworkPolicyDescriber struct {
-	clientset.Interface
-}
+type NetworkPolicyDescriber struct{}
 
 func (d *NetworkPolicyDescriber) Describe(object runtime.Object, describerSettings DescriberSettings) (string, error) {
 	networkPolicy, err := convertObject[*networkingv1.NetworkPolicy](object)
