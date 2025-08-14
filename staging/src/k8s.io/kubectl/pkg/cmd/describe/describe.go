@@ -174,6 +174,7 @@ func (o *DescribeOptions) Run() error {
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
+		Latest().
 		LabelSelectorParam(o.Selector).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		RequestChunksOf(o.DescriberSettings.ChunkSize).
