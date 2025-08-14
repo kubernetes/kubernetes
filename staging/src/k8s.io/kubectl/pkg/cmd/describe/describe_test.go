@@ -136,7 +136,10 @@ func TestDescribeObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
+				copy := rc.Items[0].DeepCopy()
+				var replicas int32 = 10
+				copy.Spec.Replicas = &replicas
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, copy)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -158,6 +161,24 @@ func TestDescribeObject(t *testing.T) {
 	actualGvk := d.Object.GetObjectKind().GroupVersionKind()
 	if !reflect.DeepEqual(actualGvk, expectedGvk) {
 		t.Errorf("The described object does not match the expected object.\nExpected: %+v\nGot: %+v", expectedGvk, actualGvk)
+	}
+
+	unstructuredObj, ok := d.Object.(*unstructured.Unstructured)
+	if !ok {
+		t.Fatalf("The object described was not an unstructured.Unstructured, but a %T", d.Object)
+	}
+
+	replicas, found, err := unstructured.NestedInt64(unstructuredObj.Object, "spec", "replicas")
+	if err != nil {
+		t.Fatalf("Error while accessing nested field 'spec.replicas': %v", err)
+	}
+	if !found {
+		t.Errorf("Field 'spec.replicas' was not found in the object")
+	}
+
+	expectedReplicas := int64(10)
+	if replicas != expectedReplicas {
+		t.Errorf("Replica count mismatch: expected %d, but got %d", expectedReplicas, replicas)
 	}
 
 	if buf.String() != d.Output {
