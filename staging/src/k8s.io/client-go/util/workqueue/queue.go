@@ -17,6 +17,7 @@ limitations under the License.
 package workqueue
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -169,12 +170,22 @@ func newQueue[T comparable](c clock.WithTicker, queue Queue[T], metrics queueMet
 		cond:                       sync.NewCond(&sync.Mutex{}),
 		metrics:                    metrics,
 		unfinishedWorkUpdatePeriod: updatePeriod,
+		wg:                         &sync.WaitGroup{},
+		cancel:                     func() {},
 	}
 
 	// Don't start the goroutine for a type of noMetrics so we don't consume
 	// resources unnecessarily
 	if _, ok := metrics.(noMetrics[T]); !ok {
-		go t.updateUnfinishedWorkLoop()
+		ctx, cancel := context.WithCancel(context.Background())
+		t.cancel = cancel
+		t.wg.Add(1)
+		go func() {
+			// Ensure our context is cancelled and let waiters of the waitgroup know once we exit.
+			defer cancel()
+			defer t.wg.Done()
+			t.updateUnfinishedWorkLoop(ctx)
+		}()
 	}
 
 	return t
@@ -208,6 +219,11 @@ type Typed[t comparable] struct {
 
 	metrics queueMetrics[t]
 
+	// A goroutine updates the "unfinished work" metric. Cancel cancels the context this goroutine
+	// consults for exiting cleanly, wg is the WaitGroup than can be waited on to ensure the
+	// goroutine has exited.
+	cancel                     context.CancelFunc
+	wg                         *sync.WaitGroup
 	unfinishedWorkUpdatePeriod time.Duration
 	clock                      clock.WithTicker
 }
@@ -301,6 +317,7 @@ func (q *Typed[T]) ShutDown() {
 
 	q.drain = false
 	q.shuttingDown = true
+	q.cancel()
 	q.cond.Broadcast()
 }
 
@@ -312,7 +329,6 @@ func (q *Typed[T]) ShutDown() {
 // ShutDownWithDrain will block indefinitely.
 func (q *Typed[T]) ShutDownWithDrain() {
 	q.cond.L.Lock()
-	defer q.cond.L.Unlock()
 
 	q.drain = true
 	q.shuttingDown = true
@@ -321,6 +337,9 @@ func (q *Typed[T]) ShutDownWithDrain() {
 	for q.processing.Len() != 0 && q.drain {
 		q.cond.Wait()
 	}
+	q.cancel()
+	q.cond.L.Unlock()
+	q.wg.Wait()
 }
 
 func (q *Typed[T]) ShuttingDown() bool {
@@ -330,21 +349,25 @@ func (q *Typed[T]) ShuttingDown() bool {
 	return q.shuttingDown
 }
 
-func (q *Typed[T]) updateUnfinishedWorkLoop() {
+func (q *Typed[T]) updateUnfinishedWorkLoop(ctx context.Context) {
 	t := q.clock.NewTicker(q.unfinishedWorkUpdatePeriod)
 	defer t.Stop()
-	for range t.C() {
-		if !func() bool {
-			q.cond.L.Lock()
-			defer q.cond.L.Unlock()
-			if !q.shuttingDown {
-				q.metrics.updateUnfinishedWork()
-				return true
-			}
-			return false
-
-		}() {
+	for {
+		select {
+		case <-ctx.Done():
 			return
+		case <-t.C():
+			if !func() bool {
+				q.cond.L.Lock()
+				defer q.cond.L.Unlock()
+				if !q.shuttingDown {
+					q.metrics.updateUnfinishedWork()
+					return true
+				}
+				return false
+			}() {
+				return
+			}
 		}
 	}
 }
