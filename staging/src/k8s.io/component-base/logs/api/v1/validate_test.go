@@ -19,9 +19,11 @@ package v1
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-base/featuregate"
 )
@@ -145,6 +147,15 @@ func TestValidation(t *testing.T) {
 			config:      jsonOptionsEnabled,
 			featureGate: enabledFeatureGate,
 		},
+		"Invalid flush frequency": {
+			config: LoggingConfiguration{
+				Format: "text",
+				FlushFrequency: TimeOrMetaDuration{
+					Duration: metav1.Duration{Duration: -1 * time.Second},
+				},
+			},
+			expectErrors: `flushFrequency: Invalid value: -1000000000: Must be greater than zero`,
+		},
 	}
 
 	for name, test := range testcases {
@@ -153,6 +164,7 @@ func TestValidation(t *testing.T) {
 			if featureGate == nil {
 				featureGate = defaultFeatureGate
 			}
+			SetRecommendedLoggingConfiguration(&test.config)
 			err := Validate(&test.config, featureGate, test.path)
 			if len(err) == 0 {
 				if test.expectErrors != "" {
