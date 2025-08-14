@@ -591,7 +591,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	// Is this a simple kubelet restart (scenario 2)? To distinguish, we use the information we got for runtime. If we are asked to allocate devices for containers reported
 	// running, then it can only be a kubelet restart. On node reboot the runtime and the containers were also shut down. Then, if the container was running, it can only be
 	// because it already has access to all the required devices, so we got nothing to do and we can bail out.
-	if !m.sourcesReady.AllReady() && m.isContainerAlreadyRunning(podUID, contName) {
+	if m.isContainerAlreadyRunning(podUID, contName) {
 		klog.V(3).InfoS("Container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
 		return nil, nil
 	}
