@@ -26,10 +26,10 @@ func TestTaintToString(t *testing.T) {
 		{
 			taint: &Taint{
 				Key:    "foo",
-				Value:  "bar",
+				Value:  "baz",
 				Effect: TaintEffectNoSchedule,
 			},
-			expectedString: "foo=bar:NoSchedule",
+			expectedString: "foo=baz:NoSchedule",
 		},
 		{
 			taint: &Taint{
