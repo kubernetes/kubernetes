@@ -396,8 +396,7 @@ func TestDescribeSecret(t *testing.T) {
 				},
 				Data: testCase.data,
 			}
-			c := &describeClient{T: t, Namespace: "foo"}
-			d := SecretDescriber{c}
+			d := SecretDescriber{}
 
 			out, err := d.Describe(secret, DescriberSettings{})
 			if err != nil {
@@ -776,9 +775,7 @@ func TestDescribeLimitRange(t *testing.T) {
 			},
 		},
 	}
-	fake := fake.NewSimpleClientset(limitRange)
-	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
-	d := LimitRangeDescriber{c}
+	d := LimitRangeDescriber{}
 	out, err := d.Describe(limitRange, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -5514,9 +5511,7 @@ func TestDescribeResourceQuota(t *testing.T) {
 			},
 		},
 	}
-	fake := fake.NewSimpleClientset(resourceQuota)
-	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
-	d := ResourceQuotaDescriber{c}
+	d := ResourceQuotaDescriber{}
 	out, err := d.Describe(resourceQuota, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -5787,8 +5782,8 @@ Spec:
 			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress},
 		},
 	}
-	versionedFake := fake.NewSimpleClientset(networkPolicy)
-	d := NetworkPolicyDescriber{versionedFake}
+
+	d := NetworkPolicyDescriber{}
 	out, err := d.Describe(networkPolicy, DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
@@ -5915,8 +5910,7 @@ Spec:
 			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
 		},
 	}
-	versionedFake := fake.NewSimpleClientset(networkPolicy)
-	d := NetworkPolicyDescriber{versionedFake}
+	d := NetworkPolicyDescriber{}
 	out, err := d.Describe(networkPolicy, DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
@@ -6044,8 +6038,7 @@ Spec:
 			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress},
 		},
 	}
-	versionedFake := fake.NewSimpleClientset(networkPolicy)
-	d := NetworkPolicyDescriber{versionedFake}
+	d := NetworkPolicyDescriber{}
 	out, err := d.Describe(networkPolicy, DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
@@ -6244,8 +6237,7 @@ Spec:
 			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress},
 		},
 	}
-	versionedFake := fake.NewSimpleClientset(networkPolicy)
-	d := NetworkPolicyDescriber{versionedFake}
+	d := NetworkPolicyDescriber{}
 	out, err := d.Describe(networkPolicy, DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
