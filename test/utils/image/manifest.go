@@ -129,7 +129,6 @@ func readFromURL(url string, writer io.Writer) error {
 
 var (
 	initRegistry = RegistryList{
-		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
 		PromoterE2eRegistry:      "registry.k8s.io/e2e-test-images",
 		BuildImageRegistry:       "registry.k8s.io/build-image",
 		InvalidRegistry:          "invalid.registry.k8s.io/invalid",
@@ -159,10 +158,6 @@ const (
 	APIServer
 	// AppArmorLoader image
 	AppArmorLoader
-	// AuthenticatedAlpine image
-	AuthenticatedAlpine
-	// AuthenticatedWindowsNanoServer image
-	AuthenticatedWindowsNanoServer
 	// BusyBox image
 	BusyBox
 	// DistrolessIptables Image
@@ -213,10 +208,8 @@ const (
 func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
 	configs := map[ImageID]Config{}
 	configs[AgnhostPrev] = Config{list.PromoterE2eRegistry, "agnhost", "2.55"}
-	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.56"}
+	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.57"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
-	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
-	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.29.2"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.37.0-1"}
@@ -263,8 +256,7 @@ func GetMappedImageConfigs(originalImageConfigs map[ImageID]Config, repo string)
 	configs := make(map[ImageID]Config)
 	for i, config := range originalImageConfigs {
 		switch i {
-		case InvalidRegistryImage, AuthenticatedAlpine,
-			AuthenticatedWindowsNanoServer, AgnhostPrivate:
+		case InvalidRegistryImage, AgnhostPrivate:
 			// These images are special and can't be run out of the cloud - some because they
 			// are authenticated, and others because they are not real images. Tests that depend
 			// on these images can't be run without access to the public internet.
