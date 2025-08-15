@@ -27,7 +27,7 @@ import (
 	"net/url"
 	"sync/atomic"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
+	jose "github.com/go-jose/go-jose/v4"
 
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"

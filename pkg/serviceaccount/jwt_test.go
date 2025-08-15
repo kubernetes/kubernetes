@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
+	jose "github.com/go-jose/go-jose/v4"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +36,7 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/kubernetes/pkg/apis/core"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -444,6 +445,49 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 }
 
+func TestTokenClaims(t *testing.T) {
+	// Related API objects
+	serviceAccount := core.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-service-account",
+			UID:       "12345",
+			Namespace: "test",
+		},
+	}
+	pod := &core.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "myns",
+			Name:      "mypod",
+			UID:       "mypod-uid",
+		},
+	}
+	node := &core.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mynode",
+			UID:  "mynode-uid",
+		},
+	}
+
+	// Generate the RSA token
+	rsaGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(rsaPrivateKey))
+	if err != nil {
+		t.Fatalf("error making generator: %v", err)
+	}
+	c, pc, err := serviceaccount.Claims(serviceAccount, pod, nil, node, 100, 60*60, []string{"1"})
+	if err != nil {
+		t.Fatalf("error getting claims: %v", err)
+	}
+	rsaToken, err := rsaGenerator.GenerateToken(context.TODO(), c, pc)
+	if err != nil {
+		t.Fatalf("error generating token: %v", err)
+	}
+	if len(rsaToken) == 0 {
+		t.Fatalf("no token generated")
+	}
+
+	checkJSONWebSignatureHasCorrectClaims(t, rsaToken)
+}
+
 type keyIDPrefixer struct {
 	serviceaccount.PublicKeysGetter
 	keyIDPrefix string
@@ -465,7 +509,7 @@ func (k *keyIDPrefixer) GetPublicKeys(ctx context.Context, keyIDHint string) []s
 }
 
 func checkJSONWebSignatureHasKeyID(t *testing.T, jwsString string, expectedKeyID string) {
-	jws, err := jose.ParseSigned(jwsString)
+	jws, err := jose.ParseSigned(jwsString, []jose.SignatureAlgorithm{jose.EdDSA, jose.HS256, jose.HS384, jose.HS512, jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.ES256})
 	if err != nil {
 		t.Fatalf("Error checking for key ID: couldn't parse token: %v", err)
 	}
@@ -473,6 +517,29 @@ func checkJSONWebSignatureHasKeyID(t *testing.T, jwsString string, expectedKeyID
 	if jws.Signatures[0].Header.KeyID != expectedKeyID {
 		t.Errorf("Token %q has the wrong KeyID (got %q, want %q)", jwsString, jws.Signatures[0].Header.KeyID, expectedKeyID)
 	}
+}
+
+func checkJSONWebSignatureHasCorrectClaims(t *testing.T, jwsString string) {
+	t.Helper()
+	parts := strings.Split(jwsString, ".")
+	if len(parts) != 3 {
+		t.Fatalf("token did not have three parts: %v", jwsString)
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("failed to base64 decode token: %v", err)
+	}
+	obj := make(map[string]interface{})
+	if err := json.Unmarshal(payload, &obj); err != nil {
+		t.Fatalf("unmarshal err: %v", err)
+	}
+	if _, ok := obj["aud"]; !ok {
+		t.Fatalf("no aud found in claims")
+	}
+	if _, ok := obj["aud"].([]interface{}); !ok {
+		t.Fatalf("claim aud is not an array: %+v\n", obj["aud"])
+	}
+
 }
 
 func newIndexer(get func(namespace, name string) (interface{}, error)) cache.Indexer {
@@ -524,7 +591,7 @@ func generateECDSATokenWithMalformedIss(t *testing.T, serviceAccount *v1.Service
 
 	ecdsaToken := generateECDSAToken(t, "panda", serviceAccount, ecdsaSecret)
 
-	ecdsaTokenJWS, err := jose.ParseSigned(ecdsaToken)
+	ecdsaTokenJWS, err := jose.ParseSigned(ecdsaToken, []jose.SignatureAlgorithm{jose.EdDSA, jose.HS256, jose.HS384, jose.HS512, jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.ES256})
 	if err != nil {
 		t.Fatal(err)
 	}

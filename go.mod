@@ -26,6 +26,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/emicklei/go-restful/v3 v3.13.0
 	github.com/fsnotify/fsnotify v1.9.0
+	github.com/go-jose/go-jose/v4 v4.1.3
 	github.com/go-logr/logr v1.4.3
 	github.com/go-openapi/jsonreference v0.20.2
 	github.com/godbus/dbus/v5 v5.2.2
