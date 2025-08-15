@@ -38,7 +38,7 @@ import (
 // without applying any field management, validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
 //
-// DEPRECATED: NewClientset replaces this with support for field management, which significantly improves
+// Deprecated: NewClientset replaces this with support for field management, which significantly improves
 // server side apply testing. NewClientset is only available when apply configurations are generated (e.g.
 // via --with-applyconfig).
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
