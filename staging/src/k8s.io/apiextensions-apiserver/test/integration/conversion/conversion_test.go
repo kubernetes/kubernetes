@@ -56,12 +56,12 @@ func checks(checkers ...Checker) []Checker {
 	return checkers
 }
 
-// func TestWebhookConverterWithWatchCache(t *testing.T) {
-// 	testWebhookConverter(t, true)
-// }
-// func TestWebhookConverterWithoutWatchCache(t *testing.T) {
-// 	testWebhookConverter(t, false)
-// }
+func TestWebhookConverterWithWatchCache(t *testing.T) {
+	testWebhookConverter(t, true)
+}
+func TestWebhookConverterWithoutWatchCache(t *testing.T) {
+	testWebhookConverter(t, false)
+}
 
 // TestWebhookNotCalledForUnusedVersions tests scenario where conversion webhook could be called for
 // versions that are nor served or nor stored.
@@ -119,6 +119,15 @@ func TestWebhookNotCalledForUnusedVersions(t *testing.T) {
 	// Update CRD to stop serving v1alpha2 version
 	ctc.setStorageVersion(t, "v1beta1")
 	ctc.setServed(t, "v1alpha2", false)
+
+	// Clear managed fields to avoid known problem: https://github.com/kubernetes/kubernetes/issues/111937
+	v1alpha1marker := newConversionMultiVersionFixture("marker", "marker", "v1alpha1")
+	v1alpha1marker.SetResourceVersion(marker.GetResourceVersion())
+	v1alpha1marker.SetManagedFields([]metav1.ManagedFieldsEntry{{}})
+	marker, err = ctc.versionedClient(marker.GetNamespace(), "v1alpha1").Update(ctx, v1alpha1marker, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Setup webhook that checks that it's never called with v1alpha2 version
 	upCh, handler := closeOnCall(NewObjectConverterWebhookHandler(t, getUnexpectedVersionCheckConverter(t, "v1alpha2")))
@@ -1044,7 +1053,7 @@ func getUnexpectedVersionCheckConverter(t *testing.T, version string) ObjectConv
 			t.Fatalf("webhook received unexpected version: %s", version)
 		}
 
-		return noopConverter(desiredAPIVersion, obj)
+		return nontrivialConverter(desiredAPIVersion, obj)
 	}
 }
 
