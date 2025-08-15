@@ -217,18 +217,15 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	}
 
 	singleZone := true
-	zoneKey := ""
+	zones := sets.New[string]()
 
-	// For each PV‐topology constraint on the pod…
+	// For each check if there exists multiple zones
 	for _, pvTopology := range podPVTopologies {
-		if _, ok := node.Labels[pvTopology.key]; !ok {
-			continue
-		}
-		if zoneKey == "" {
-			zoneKey = pvTopology.key
-		} else if zoneKey != pvTopology.key {
+		if len(pvTopology.values) > 1 || len(zones) > 1 {
 			singleZone = false
 			break
+		} else if len(pvTopology.values) == 1 {
+			zones.Union(pvTopology.values)
 		}
 	}
 

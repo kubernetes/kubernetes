@@ -347,6 +347,7 @@ func TestMultiZone(t *testing.T) {
 					Name: "host1",
 				},
 			},
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "missing topology label"),
 		},
 		{
 			name: "beta zone label matched",
