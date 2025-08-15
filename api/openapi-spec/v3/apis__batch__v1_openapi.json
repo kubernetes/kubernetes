@@ -582,8 +582,7 @@
           }
         },
         "required": [
-          "type",
-          "status"
+          "type"
         ],
         "type": "object"
       },
