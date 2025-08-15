@@ -22,6 +22,9 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	clientgofeaturegate "k8s.io/client-go/features"
 )
 
 func (f *RealFIFO) getItems() []Delta {
@@ -565,6 +568,85 @@ func TestRealFIFO_DeleteExistingNonPropagated(t *testing.T) {
 	}
 	if deltas[len(deltas)-1].Type != Deleted {
 		t.Errorf("unexpected delta: %v", deltas[len(deltas)-1])
+	}
+}
+
+func newFeatureGatesForTest(t *testing.T) *fakeRegistry {
+	t.Helper()
+	// build a fake FeatureGate registry for tests
+	registry := &fakeRegistry{
+		specs:   make(map[clientgofeaturegate.Feature]clientgofeaturegate.FeatureSpec),
+		enabled: sets.New[clientgofeaturegate.Feature](),
+	}
+	oldGates := clientgofeaturegate.FeatureGates()    // preserve old Gates
+	clientgofeaturegate.ReplaceFeatureGates(registry) // set new registry and add gates to it
+	t.Cleanup(func() {
+		// revert featuregate state back to pre-test state
+		clientgofeaturegate.ReplaceFeatureGates(oldGates)
+	})
+	return registry
+}
+
+type fakeRegistry struct {
+	specs   map[clientgofeaturegate.Feature]clientgofeaturegate.FeatureSpec
+	enabled sets.Set[clientgofeaturegate.Feature]
+}
+
+func (f *fakeRegistry) Add(specs map[clientgofeaturegate.Feature]clientgofeaturegate.FeatureSpec) error {
+	f.specs = specs
+	return nil
+}
+
+func (f *fakeRegistry) Enabled(g clientgofeaturegate.Feature) bool {
+	s, ok := f.specs[g]
+	if !ok {
+		panic("unknown feature " + g)
+	}
+	if f.enabled != nil && f.enabled.Has(g) {
+		return true
+	}
+	return s.Default
+}
+
+func TestRealFIFO_ReplaceWithNewUIDMakesDeletions(t *testing.T) {
+	// This test attempts to simulate the sequence of events that occurs when a reflector
+	// is run with a RealFIFO alongside something like an informer that is continuously
+	// popping events off of the queue.
+	gates := newFeatureGatesForTest(t)
+	// Enable the InformerDeleteEventsByUID feature for this test.
+	gates.enabled.Insert(clientgofeaturegate.InformerDeleteEventsByUID)
+
+	f := NewStrictFIFO(
+		testFifoObjectKeyFunc,
+		testFifoObjectUIDFunc,
+		literalListerGetter(func() []testFifoObject {
+			return []testFifoObject{mkFifoUID("foo", "foo-1", 1), mkFifoUID("baz", "baz-1", 3)}
+		}),
+		nil,
+	)
+
+	startingState := []interface{}{mkFifoUID("foo", "foo-1", 1), mkFifoUID("baz", "baz-1", 3)}
+	// Replace the queue with the starting state.
+	_ = f.Replace(startingState, "3" /* not (currently) used */)
+	// Pop the starting state from the queue.
+	_ = Pop(f).(Deltas)
+	_ = Pop(f).(Deltas)
+
+	// apiserver and our pretend informer are in sync
+	// now our informer disconnects, and the state of the world changes:
+	// baz@4 is a DELETE request
+	// foo@5 is a DELETE request
+	// baz@6 is a new object altogether (with a new UID)
+	newState := []interface{}{mkFifoUID("baz", "baz-2", 6)}
+	_ = f.Replace(newState, "6")
+	if a, e := Pop(f).(Deltas), (Deltas{{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: mkFifoUID("foo", "foo-1", 1)}}}); !reflect.DeepEqual(a, e) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+	if a, e := Pop(f).(Deltas), (Deltas{{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoUID("baz", "baz-1", 3)}}}); !reflect.DeepEqual(a, e) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+	if a, e := Pop(f).(Deltas), (Deltas{{Replaced, mkFifoUID("baz", "baz-2", 6)}}); !reflect.DeepEqual(a, e) {
+		t.Errorf("Expected %#v, got %#v", e, a)
 	}
 }
 

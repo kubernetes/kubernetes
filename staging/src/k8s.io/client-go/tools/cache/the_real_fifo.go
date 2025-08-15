@@ -17,10 +17,13 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiltrace "k8s.io/utils/trace"
@@ -46,6 +49,12 @@ type RealFIFO struct {
 	// keyFunc is used to make the key used for queued item insertion and retrieval, and
 	// should be deterministic.
 	keyFunc KeyFunc
+	// uidKeyFunc is an optional keying function used to identify an items uniqueness.
+	// Used to ensure delete events are generated for items that have changed UID
+	// when Replace() is called.
+	// If not set/a UIDFunc is not provided, objects that may have changed UID while
+	// the client is disconnected from the server may miss DELETE events.
+	uidKeyFunc UIDFunc
 
 	// knownObjects list keys that are "known" --- affecting Delete(),
 	// Replace(), and Resync()
@@ -88,6 +97,32 @@ func (f *RealFIFO) keyOf(obj interface{}) (string, error) {
 		return d.Key, nil
 	}
 	return f.keyFunc(obj)
+}
+
+var ErrUIDKeyUnsupported = errors.New("no UIDFunc provided, unable to determine UID of object")
+
+// uidSupported checks if a uidKeyFunc has been configured.
+func (f *RealFIFO) uidSupported() bool {
+	return f.uidKeyFunc != nil
+}
+
+func (f *RealFIFO) uidOf(obj interface{}) (types.UID, error) {
+	if !f.uidSupported() {
+		return "", ErrUIDKeyUnsupported
+	}
+	if d, ok := obj.(Deltas); ok {
+		if len(d) == 0 {
+			return "", KeyError{obj, ErrZeroLengthDeltasObject}
+		}
+		obj = d.Newest().Object
+	}
+	if d, ok := obj.(Delta); ok {
+		obj = d.Object
+	}
+	if d, ok := obj.(DeletedFinalStateUnknown); ok {
+		obj = d.Obj
+	}
+	return f.uidKeyFunc(obj)
 }
 
 // HasSynced returns true if an Add/Update/Delete are called first,
@@ -246,12 +281,20 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	// determine the keys of everything we're adding.  We cannot add the items until after the synthetic deletes have been
 	// created for items that don't existing in newItems
 	newKeys := sets.Set[string]{}
+	newUIDs := sets.Set[types.UID]{}
 	for _, obj := range newItems {
 		key, err := f.keyOf(obj)
 		if err != nil {
 			return KeyError{obj, err}
 		}
 		newKeys.Insert(key)
+		if f.uidSupported() {
+			uid, err := f.uidOf(obj)
+			if err != nil {
+				return KeyError{obj, err}
+			}
+			newUIDs.Insert(uid)
+		}
 	}
 
 	queuedItems := f.items
@@ -274,8 +317,11 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	// 2. queuedItems has a delete for key/X and newItems does NOT have key/X.  This means the queued item was deleted.
 	// Do deletion detection against objects in the queue.
 	for _, queuedKey := range queuedKeys {
-		if newKeys.Has(queuedKey) {
-			continue
+		if !f.uidSupported() {
+			// only skip enqueuing a delete early if UID checking is not supported and the queuedKey is present in newKeys.
+			if newKeys.Has(queuedKey) {
+				continue // still present
+			}
 		}
 
 		// Delete pre-existing items not in the new list.
@@ -285,6 +331,19 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 		// if we've already got the item marked as deleted, no need to add another delete
 		if lastQueuedItem.Type == Deleted {
 			continue
+		}
+
+		// if a UID func is provided, compare the UID of the lastQueuedItem to see if its UID exists in newUIDs.
+		// if we are _not_ in UID mode, the check at the start of the for loop iteration will already have checked
+		// if the regular key is still present (i.e. still uses previous behaviour).
+		if f.uidSupported() {
+			uid, err := f.uidOf(lastQueuedItem.Object)
+			if err != nil {
+				return KeyError{Obj: lastQueuedItem.Object, Err: err}
+			}
+			if newUIDs.Has(uid) { // still present
+				continue
+			}
 		}
 
 		// if we got here, then the last entry we have for the queued item is *not* a deletion and we need to add a delete
@@ -302,24 +361,45 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	// Detect deletions for objects not present in the queue, but present in KnownObjects
 	knownKeys := f.knownObjects.ListKeys()
 	for _, knownKey := range knownKeys {
-		if newKeys.Has(knownKey) { // still present
-			continue
-		}
 		if _, inQueuedItems := lastQueuedItemForKey[knownKey]; inQueuedItems { // already added delete for these
 			continue
 		}
+		if !f.uidSupported() && newKeys.Has(knownKey) { // still present and no UID checking enabled
+			continue
+		}
 
-		deletedObj, exists, err := f.knownObjects.GetByKey(knownKey)
+		var knownObject interface{}
+		if newKeys.Has(knownKey) {
+			if !f.uidSupported() {
+				continue // skip further lookup if not supported and key is still present
+			}
+		}
+
+		// the key is either not present in newKeys OR is present but needs its UID checking
+		knownObject, exists, err := f.knownObjects.GetByKey(knownKey)
 		if err != nil {
-			deletedObj = nil
+			knownObject = nil
 			utilruntime.HandleError(fmt.Errorf("error during lookup, placing DeleteFinalStateUnknown marker without object: key=%q, err=%w", knownKey, err))
 		} else if !exists {
-			deletedObj = nil
+			knownObject = nil
 			utilruntime.HandleError(fmt.Errorf("key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object: key=%q", knownKey))
 		}
+
+		// if UID checking is enabled, determine the uid of the new object and check to see if it is a member of knownUIDs.
+		// if it is not enabled, we have already verified the key is not present in newKeys so go ahead and generate a delete event.
+		if f.uidSupported() {
+			knownUID, err := f.uidOf(knownObject)
+			if err != nil {
+				return KeyError{knownObject, err}
+			}
+			if newUIDs.Has(knownUID) {
+				continue // still present
+			}
+		}
+
 		retErr := f.addToItems_locked(Deleted, false, DeletedFinalStateUnknown{
 			Key: knownKey,
-			Obj: deletedObj,
+			Obj: knownObject,
 		})
 		if retErr != nil {
 			return fmt.Errorf("couldn't enqueue object: %w", retErr)
@@ -410,4 +490,38 @@ func NewRealFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter, transformer Tran
 	}
 	f.cond.L = &f.lock
 	return f
+}
+
+func NewStrictFIFO(keyFunc KeyFunc, uidKeyFunc UIDFunc, knownObjects KeyListerGetter, transformer TransformFunc) *RealFIFO {
+	if knownObjects == nil {
+		panic("coding error: knownObjects must be provided")
+	}
+	if uidKeyFunc == nil {
+		panic("coding error: uidKeyFunc must be provided to NewStrictFIFO")
+	}
+
+	f := &RealFIFO{
+		items:        make([]Delta, 0, 10),
+		keyFunc:      keyFunc,
+		uidKeyFunc:   uidKeyFunc,
+		knownObjects: knownObjects,
+		transformer:  transformer,
+	}
+	f.cond.L = &f.lock
+	return f
+}
+
+// UIDFunc knows how to determine the UID of an object.
+// Implementations must be deterministic.
+type UIDFunc func(interface{}) (types.UID, error)
+
+// MetaUIDKeyFunc is a convenient default UIDFunc which knows how to make
+// keys for API objects which implement meta.Interface.
+// Unlike MetaNamespaceKeyFunc, The key uses the UID of the object.
+func MetaUIDKeyFunc(obj interface{}) (types.UID, error) {
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return "", fmt.Errorf("object has no meta: %v", err)
+	}
+	return meta.GetUID(), nil
 }

@@ -58,6 +58,13 @@ const (
 	// alpha: v1.30
 	InformerResourceVersion Feature = "InformerResourceVersion"
 
+	// owner: @munnerz
+	// alpha: v1.35
+	//
+	// Ensure deletion events are sent for objects whose UID has changed after a disconnect
+	// and re-list to apiservers.
+	InformerDeleteEventsByUID Feature = "InformerDeleteEventsByUID"
+
 	// owner: @p0lyn0mial
 	// beta: v1.30
 	//
@@ -75,9 +82,10 @@ const (
 // After registering with the binary, the features are, by default, controllable using environment variables.
 // For more details, please see envVarFeatureGates implementation.
 var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{
-	ClientsAllowCBOR:        {Default: false, PreRelease: Alpha},
-	ClientsPreferCBOR:       {Default: false, PreRelease: Alpha},
-	InOrderInformers:        {Default: true, PreRelease: Beta},
-	InformerResourceVersion: {Default: false, PreRelease: Alpha},
-	WatchListClient:         {Default: false, PreRelease: Beta},
+	ClientsAllowCBOR:          {Default: false, PreRelease: Alpha},
+	ClientsPreferCBOR:         {Default: false, PreRelease: Alpha},
+	InOrderInformers:          {Default: true, PreRelease: Beta},
+	InformerResourceVersion:   {Default: false, PreRelease: Alpha},
+	InformerDeleteEventsByUID: {Default: false, PreRelease: Alpha},
+	WatchListClient:           {Default: false, PreRelease: Beta},
 }
