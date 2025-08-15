@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -1618,4 +1619,58 @@ func createDswpWithVolumeWithCustomPluginMgr(pv *v1.PersistentVolume, pvc *v1.Pe
 		volumePluginMgr:          fakeVolumePluginMgr,
 	}
 	return dswp, fakePodManager, fakesDSW, fakeRuntime, fakeStateProvider
+}
+
+func TestStaticPodWithPVC_ShouldBeRejected(t *testing.T) {
+	ctx := ktesting.Init(t)
+	dswp, fakePodManager, _ := prepareDswpWithVolume(t)
+
+	// Create a static pod (identified by config source annotation) that references a PVC
+	staticPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "static-test-pod",
+			UID:       kubetypes.UID("static-test-pod-uid"),
+			Namespace: "default",
+			Annotations: map[string]string{
+				kubelettypes.ConfigSourceAnnotationKey: kubelettypes.FileSource,
+			},
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "pvc-volume",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-pvc",
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name: "test-container",
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "pvc-volume",
+							MountPath: "/data",
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	fakePodManager.AddPod(staticPod)
+	mountsMap, devicesMap, _ := util.GetPodVolumeNames(staticPod, false /* collectSELinuxOptions */)
+
+	// Attempt to create volume spec for the static pod's PVC volume
+	_, _, _, err := dswp.createVolumeSpec(ctx, staticPod.Spec.Volumes[0], staticPod, mountsMap, devicesMap)
+
+	// Assert: should return an error indicating static pods cannot reference PVCs
+	require.Error(t, err, "expected error when static pod references PVC")
+	require.Contains(t, err.Error(), "static pods may not reference persistentvolumeclaims",
+		"error message should indicate static pods cannot use PVCs")
 }
