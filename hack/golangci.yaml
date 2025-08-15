@@ -284,6 +284,7 @@ linters:
               - '*'
             enable:
               # - "commentstart" # Ensure comments start with the serialized version of the field name.
+              - "conditions" # Ensure conditions have the correct json tags and markers.
               # - "conflictingmarkers" - Detect mutually exclusive markers on the same field.
               # - "integers" # Ensure only int32 and int64 are used for integers.
               # - "jsontags" # Ensure every field has a json tag.
@@ -299,6 +300,10 @@ linters:
               # - "ssatags" # Ensure lists have a listType tag.
               # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
           lintersConfig:
+            conditions:
+              isFirstField: Ignore
+              usePatchStrategy: SuggestFix
+              useProtobuf: SuggestFix
             # conflictingMarkers:
             #   conflicts:
             #   - name: "default_vs_required"
