@@ -205,7 +205,7 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 //
 // It is typically used like this:
 //
-//	ctx, cancel := context.Background()
+//	ctx, cancel := context.WithCancel(context.Background())
 //	defer cancel()
 //	factory := NewSharedInformerFactory(client, resyncPeriod)
 //	defer factory.WaitForStop()    // Returns immediately if nothing was started.
