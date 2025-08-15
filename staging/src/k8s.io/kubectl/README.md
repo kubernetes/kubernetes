@@ -1,5 +1,5 @@
 > ⚠️ **This is a [staging repository](https://git.k8s.io/kubernetes/staging#external-repository-staging-area) for Kubernetes**.  
-> Contributions, including issues and pull requests, should be made to the main Kubernetes repository: [https://github.com/kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).  
+> Pull requests, should be made to the main Kubernetes repository: [https://github.com/kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).  
 > This repository is not for direct contributions.
 
 # Kubectl
