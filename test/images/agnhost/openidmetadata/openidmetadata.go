@@ -30,9 +30,10 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 )
@@ -100,7 +101,7 @@ func main(cmd *cobra.Command, args []string) {
 }
 
 func validate(ctx context.Context, raw string) error {
-	tok, err := jwt.ParseSigned(raw)
+	tok, err := jwt.ParseSigned(raw, []jose.SignatureAlgorithm{jose.EdDSA, jose.HS256, jose.HS384, jose.HS512, jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.ES256})
 	if err != nil {
 		log.Fatal(err)
 	}
