@@ -497,7 +497,8 @@ func TestImpersonationFilter(t *testing.T) {
 		}
 
 	})
-	handler := func(delegate http.Handler) http.Handler {
+
+	delegateHandler := func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -519,53 +520,62 @@ func TestImpersonationFilter(t *testing.T) {
 
 			delegate.ServeHTTP(w, req)
 		})
-	}(WithImpersonation(doNothingHandler, impersonateAuthorizer{}, serializer.NewCodecFactory(runtime.NewScheme())))
+	}
 
-	server := httptest.NewServer(handler)
-	defer server.Close()
+	handlersToTest := map[string]http.Handler{
+		"impersonation":            delegateHandler(WithImpersonation(doNothingHandler, impersonateAuthorizer{}, serializer.NewCodecFactory(runtime.NewScheme()))),
+		"constrainedImpersonation": delegateHandler(WithConstrainedImpersonation(doNothingHandler, impersonateAuthorizer{}, serializer.NewCodecFactory(runtime.NewScheme()))),
+	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			func() {
-				lock.Lock()
-				defer lock.Unlock()
-				ctx = request.WithUser(request.NewContext(), tc.user)
-			}()
+	for name, handler := range handlersToTest {
+		func() {
+			server := httptest.NewServer(handler)
+			defer server.Close()
 
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", tc.name, err)
-				return
-			}
-			if len(tc.impersonationUser) > 0 {
-				req.Header.Add(authenticationapi.ImpersonateUserHeader, tc.impersonationUser)
-			}
-			for _, group := range tc.impersonationGroups {
-				req.Header.Add(authenticationapi.ImpersonateGroupHeader, group)
-			}
-			for extraKey, values := range tc.impersonationUserExtras {
-				for _, value := range values {
-					req.Header.Add(authenticationapi.ImpersonateUserExtraHeaderPrefix+extraKey, value)
-				}
-			}
-			if len(tc.impersonationUid) > 0 {
-				req.Header.Add(authenticationapi.ImpersonateUIDHeader, tc.impersonationUid)
-			}
+			for _, tc := range testCases {
+				t.Run(name+"/"+tc.name, func(t *testing.T) {
+					func() {
+						lock.Lock()
+						defer lock.Unlock()
+						ctx = request.WithUser(request.NewContext(), tc.user)
+					}()
 
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", tc.name, err)
-				return
-			}
-			if resp.StatusCode != tc.expectedCode {
-				t.Errorf("%s: expected %v, actual %v", tc.name, tc.expectedCode, resp.StatusCode)
-				return
-			}
+					req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
+					if err != nil {
+						t.Errorf("%s: unexpected error: %v", tc.name, err)
+						return
+					}
+					if len(tc.impersonationUser) > 0 {
+						req.Header.Add(authenticationapi.ImpersonateUserHeader, tc.impersonationUser)
+					}
+					for _, group := range tc.impersonationGroups {
+						req.Header.Add(authenticationapi.ImpersonateGroupHeader, group)
+					}
+					for extraKey, values := range tc.impersonationUserExtras {
+						for _, value := range values {
+							req.Header.Add(authenticationapi.ImpersonateUserExtraHeaderPrefix+extraKey, value)
+						}
+					}
+					if len(tc.impersonationUid) > 0 {
+						req.Header.Add(authenticationapi.ImpersonateUIDHeader, tc.impersonationUid)
+					}
 
-			if !reflect.DeepEqual(actualUser, tc.expectedUser) {
-				t.Errorf("%s: expected %#v, actual %#v", tc.name, tc.expectedUser, actualUser)
-				return
+					resp, err := http.DefaultClient.Do(req)
+					if err != nil {
+						t.Errorf("%s: unexpected error: %v", tc.name, err)
+						return
+					}
+					if resp.StatusCode != tc.expectedCode {
+						t.Errorf("%s: expected %v, actual %v", tc.name, tc.expectedCode, resp.StatusCode)
+						return
+					}
+
+					if !reflect.DeepEqual(actualUser, tc.expectedUser) {
+						t.Errorf("%s: expected %#v, actual %#v", tc.name, tc.expectedUser, actualUser)
+						return
+					}
+				})
 			}
-		})
+		}()
 	}
 }
