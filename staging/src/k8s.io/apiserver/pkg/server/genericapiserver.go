@@ -459,6 +459,9 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 		klog.Errorf("Failed to install readyz shutdown check %s", err)
 	}
 	s.installReadyz()
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
+		s.installStatusz()
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
 		statusz.Install(s.Handler.NonGoRestfulMux, "apiserver", statusz.NewRegistry(s.EffectiveVersion, statusz.WithListedPaths(s.ListedPaths())))
@@ -1083,4 +1086,9 @@ func getResourceNamesForGroup(apiPrefix string, apiGroupInfo *APIGroupInfo, path
 	}
 
 	return resourceNames, nil
+}
+
+func (s *GenericAPIServer) installStatusz() {
+	klog.Infof("apiserver paths: %v", s.ListedPaths())
+	statusz.Install(s.Handler.NonGoRestfulMux, "apiserver", statusz.NewRegistry(s.EffectiveVersion))
 }
