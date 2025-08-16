@@ -49,7 +49,7 @@ func fetchPath(handler http.Handler, path, accept string) string {
 	req.Header.Set("Accept", accept)
 
 	handler.ServeHTTP(w, req)
-	return string(w.Body.Bytes())
+	return w.Body.String()
 }
 
 type fakeHTTPHandler struct {
