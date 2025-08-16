@@ -104,6 +104,8 @@ type backoffQueue struct {
 
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
 	isPopFromBackoffQEnabled bool
+
+	notify func()
 }
 
 func newBackoffQueue(clock clock.WithTicker, podInitialBackoffDuration time.Duration, podMaxBackoffDuration time.Duration, activeQLessFn framework.LessFunc, popFromBackoffQEnabled bool) *backoffQueue {
@@ -293,7 +295,15 @@ func (bq *backoffQueue) popAllBackoffCompleted(logger klog.Logger) []*framework.
 // It also ensures that pInfo is not in both queues.
 func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) {
 	bq.lock.Lock()
-	defer bq.lock.Unlock()
+
+	preEmpty := (bq.podBackoffQ.Len()+bq.podErrorBackoffQ.Len() == 0)
+	needNotify := false
+	defer func() {
+		bq.lock.Unlock()
+		if needNotify && bq.notify != nil {
+			bq.notify()
+		}
+	}()
 
 	// If pod has empty both unschedulable plugins and pending plugins,
 	// it means that it failed because of error and should be moved to podErrorBackoffQ.
@@ -306,9 +316,15 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 			return
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
+		if preEmpty {
+			needNotify = true
+		}
 		return
 	}
 	bq.podBackoffQ.AddOrUpdate(pInfo)
+	if preEmpty {
+		needNotify = true
+	}
 	// Ensure the pod is not in the podErrorBackoffQ and report the error if it happens.
 	err := bq.podErrorBackoffQ.Delete(pInfo)
 	if err == nil {
@@ -316,6 +332,11 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 		return
 	}
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
+}
+
+// setNotifyFunc injects the activeQ-side notifier.
+func (bq *backoffQueue) setNotifyFunc(f func()) {
+	bq.notify = f
 }
 
 // update updates the pod in backoffQueue if oldPodInfo is already in the queue.
