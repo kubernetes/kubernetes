@@ -19,7 +19,6 @@ package procfs
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -29,7 +28,7 @@ import (
 )
 
 var (
-	// match the header line before each mapped zone in `/proc/pid/smaps`.
+	// Match the header line before each mapped zone in `/proc/pid/smaps`.
 	procSMapsHeaderLine = regexp.MustCompile(`^[a-f0-9].*$`)
 )
 
@@ -117,7 +116,6 @@ func (p Proc) procSMapsRollupManual() (ProcSMapsRollup, error) {
 func (s *ProcSMapsRollup) parseLine(line string) error {
 	kv := strings.SplitN(line, ":", 2)
 	if len(kv) != 2 {
-		fmt.Println(line)
 		return errors.New("invalid net/dev line, missing colon")
 	}
 

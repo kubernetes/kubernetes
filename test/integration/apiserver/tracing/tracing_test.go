@@ -361,6 +361,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 	defer srv.Stop()
 
 	// Start the API Server with our tracing configuration
+	_ = os.Setenv("OTEL_SEMCONV_STABILITY_OPT_IN", "http/dup")
 	testServer := kubeapiservertesting.StartTestServerOrDie(t,
 		kubeapiservertesting.NewDefaultTestServerOptions(),
 		[]string{"--tracing-config-file=" + tracingConfigFile.Name()},
