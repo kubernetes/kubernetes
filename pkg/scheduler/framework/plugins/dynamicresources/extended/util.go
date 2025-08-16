@@ -18,7 +18,7 @@ package extended
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -29,11 +29,10 @@ func DeviceClassMapping(draManager framework.SharedDRAManager) (map[v1.ResourceN
 		return nil, err
 	}
 	for _, c := range classes {
-		if c.Spec.ExtendedResourceName == nil {
-			extendedResources[v1.ResourceName(v1beta1.ResourceDeviceClassPrefix+c.Name)] = c.Name
-		} else {
+		if c.Spec.ExtendedResourceName != nil {
 			extendedResources[v1.ResourceName(*c.Spec.ExtendedResourceName)] = c.Name
 		}
+		extendedResources[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+c.Name)] = c.Name
 	}
 	return extendedResources, nil
 }

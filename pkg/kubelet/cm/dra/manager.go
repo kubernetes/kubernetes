@@ -39,7 +39,6 @@ import (
 
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
@@ -48,6 +47,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // draManagerStateFileName is the file name where dra manager stores its state
@@ -526,7 +526,7 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 					// We only care about the resources requested by the pod
 					continue
 				}
-				if v1helper.IsExtendedResourceName(rName) {
+				if util.IsDRAExtendedResourceName(rName) {
 					requestName := ""
 					for _, rm := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
 						if rm.ContainerName == container.Name && rm.ResourceName == rName.String() {

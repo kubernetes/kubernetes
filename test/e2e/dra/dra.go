@@ -1910,6 +1910,25 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		b := drautils.NewBuilder(f, driver)
 		b.UseExtendedResourceName = true
 
+		ginkgo.It("must run a pod with both implicit and explicit extended resource with one container two resources", func(ctx context.Context) {
+			pod := b.Pod()
+			res := v1.ResourceList{}
+			// drautils.ExtendedResourceName(0) is added to the deivce class with name: b.ClassName()+"0"
+			res[v1.ResourceName("deviceclass.resource.kubernetes.io/"+b.ClassName()+"0")] = resource.MustParse("1")
+			res[v1.ResourceName(drautils.ExtendedResourceName(0))] = resource.MustParse("1")
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+
+			b.Create(ctx, pod)
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+			containerEnv := []string{
+				"container_0_request_0", "true",
+				"container_0_request_1", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+		})
+
 		ginkgo.It("must run a pod with extended resource with one container one resource", func(ctx context.Context) {
 			pod := b.Pod()
 			res := v1.ResourceList{}
