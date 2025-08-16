@@ -175,18 +175,21 @@ func Run(ctx context.Context, opts options.CompletedOptions) error {
 // CreateServerChain creates the apiservers connected via delegation.
 func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregator, error) {
 	notFoundHandler := notfoundhandler.New(config.KubeAPIs.ControlPlane.Generic.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
+	fmt.Println("Creating apiExtensionsServer...")
 	apiExtensionsServer, err := config.ApiExtensions.New(genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))
 	if err != nil {
 		return nil, err
 	}
 	crdAPIEnabled := config.ApiExtensions.GenericConfig.MergedResourceConfig.ResourceEnabled(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"))
 
+	fmt.Println("Creating kubeAPIServer...")	
 	kubeAPIServer, err := config.KubeAPIs.New(apiExtensionsServer.GenericAPIServer)
 	if err != nil {
 		return nil, err
 	}
 
 	// aggregator comes last in the chain
+	fmt.Println("Creating aggregator Server...")		
 	aggregatorServer, err := controlplaneapiserver.CreateAggregatorServer(config.Aggregator, kubeAPIServer.ControlPlane.GenericAPIServer, apiExtensionsServer.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdAPIEnabled, apiVersionPriorities)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
@@ -213,15 +216,18 @@ func CreateKubeAPIServerConfig(
 
 	// additional admission initializers
 	kubeAdmissionConfig := &kubeapiserveradmission.Config{}
+	fmt.Println("Create kube admissionConfig...")
 	kubeInitializers, err := kubeAdmissionConfig.New()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
 	}
 
+	fmt.Println("Build service Resolver...")
 	serviceResolver, err := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error building service resolver: %w", err)
 	}
+	fmt.Println("Create control plane config...")
 	controlplaneConfig, admissionInitializers, err := controlplaneapiserver.CreateConfig(opts.CompletedOptions, genericConfig, versionedInformers, storageFactory, serviceResolver, kubeInitializers)
 	if err != nil {
 		return nil, nil, nil, err
