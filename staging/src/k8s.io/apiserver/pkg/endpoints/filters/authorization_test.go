@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"testing"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -240,6 +241,7 @@ func TestAuditAnnotation(t *testing.T) {
 		authorizer         fakeAuthorizer
 		decisionAnnotation string
 		reasonAnnotation   string
+		statusCode         int
 	}{
 		"decision allow": {
 			fakeAuthorizer{
@@ -249,6 +251,7 @@ func TestAuditAnnotation(t *testing.T) {
 			},
 			"allow",
 			"RBAC: allowed to patch pod",
+			http.StatusOK,
 		},
 		"decision forbid": {
 			fakeAuthorizer{
@@ -258,6 +261,7 @@ func TestAuditAnnotation(t *testing.T) {
 			},
 			"forbid",
 			"RBAC: not allowed to patch pod",
+			http.StatusForbidden,
 		},
 		"error": {
 			fakeAuthorizer{
@@ -267,6 +271,17 @@ func TestAuditAnnotation(t *testing.T) {
 			},
 			"",
 			reasonError,
+			http.StatusInternalServerError,
+		},
+		"unauthorized": {
+			fakeAuthorizer{
+				authorizer.DecisionNoOpinion,
+				"",
+				apierrors.NewUnauthorized("must be logged in"),
+			},
+			"", // decision
+			"", // error
+			http.StatusUnauthorized,
 		},
 	}
 
@@ -281,7 +296,8 @@ func TestAuditAnnotation(t *testing.T) {
 		req = withTestContext(req, nil, &auditinternal.Event{Level: auditinternal.LevelMetadata})
 		ae := audit.AuditContextFrom(req.Context())
 		req.RemoteAddr = "127.0.0.1"
-		handler.ServeHTTP(httptest.NewRecorder(), req)
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, req)
 
 		var annotation string
 		var ok bool
@@ -294,6 +310,6 @@ func TestAuditAnnotation(t *testing.T) {
 		annotation, ok = ae.GetEventAnnotation(reasonAnnotationKey)
 		assert.True(t, ok, k+": reason annotation not found")
 		assert.Equal(t, tc.reasonAnnotation, annotation, k+": unexpected reason annotation")
+		assert.Equal(t, tc.statusCode, recorder.Code, k+": unexpected response status")
 	}
-
 }
