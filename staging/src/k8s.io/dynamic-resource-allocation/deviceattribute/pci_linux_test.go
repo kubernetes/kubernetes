@@ -29,9 +29,10 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 )
 
-func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
-	pciBusID := "0000:01:02.3"
-	pcieRoot := "pci0000:01"
+func TestGetPCIeRootAttributePCIBusID(t *testing.T) {
+	pcieRoot := "pci0000:00"
+	intermediateBusID := "0000:01:00.0"
+	pciBusID := "0000:02:00.0"
 	expectedAttribute := DeviceAttribute{
 		Name:  StandardDeviceAttributePCIeRoot,
 		Value: resourceapi.DeviceAttribute{StringValue: ptr.To(pcieRoot)},
@@ -46,7 +47,7 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 	}{
 		"valid": {
 			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
-				devicePath := mockSysfs.devices(filepath.Join(pcieRoot, "0000:00:13.1", pciBusID))
+				devicePath := mockSysfs.devices(filepath.Join(pcieRoot, intermediateBusID, pciBusID))
 				touchFile(t, devicePath)
 				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
 				createSymlink(t, devicePath, busPath)
@@ -75,7 +76,7 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 		},
 		"invalid symlink (invalid prefix)": {
 			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
-				devicePath := mockSysfs.devices(filepath.Join("invalid-pci-root", "0000:00:13.1", pciBusID))
+				devicePath := mockSysfs.devices(filepath.Join("invalid-pci-root", intermediateBusID, pciBusID))
 				touchFile(t, devicePath)
 				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
 				createSymlink(t, devicePath, busPath)
@@ -87,7 +88,7 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 		},
 		"invalid symlink (invalid suffix)": {
 			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
-				devicePath := mockSysfs.devices(filepath.Join(pcieRoot, "0000:00:13.1", "0000:01:02.4")) // different PCI Bus ID
+				devicePath := mockSysfs.devices(filepath.Join(pcieRoot, intermediateBusID, "0000:00:13.1")) // different PCI Bus ID
 				touchFile(t, devicePath)
 				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
 				createSymlink(t, devicePath, busPath)
