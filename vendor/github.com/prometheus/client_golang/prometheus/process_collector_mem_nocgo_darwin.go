@@ -16,7 +16,7 @@
 package prometheus
 
 func getMemory() (*memoryInfo, error) {
-	return nil, notImplementedErr
+	return nil, errNotImplemented
 }
 
 // describe returns all descriptions of the collector for Darwin.
