@@ -19,10 +19,14 @@ package describe
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -47,7 +51,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("kind", "version", "foo"))},
 	}
 
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
@@ -55,8 +59,16 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"type", "foo"})
 
-	if d.Name != "foo" || d.Namespace != "" {
-		t.Errorf("unexpected describer: %#v", d)
+	expectedObj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apitest/unlikelyversion",
+			"kind":       "Type",
+			"name":       "foo",
+		},
+	}
+
+	if !reflect.DeepEqual(expectedObj, d.Object) {
+		t.Errorf("The described object does not match the expected object.\nExpected: %+v\nGot: %+v", expectedObj, d.Object)
 	}
 
 	if buf.String() != d.Output {
@@ -88,8 +100,17 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"namespacedtype", "foo"})
 
-	if d.Name != "foo" || d.Namespace != "non-default" {
-		t.Errorf("unexpected describer: %#v", d)
+	expectedObj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apitest/unlikelyversion",
+			"kind":       "NamespacedType",
+			"name":       "foo",
+			"namespace":  "non-default",
+		},
+	}
+
+	if !reflect.DeepEqual(expectedObj, d.Object) {
+		t.Errorf("The described object does not match the expected object.\nExpected: %+v\nGot: %+v", expectedObj, d.Object)
 	}
 
 	if buf.String() != d.Output {
@@ -115,7 +136,10 @@ func TestDescribeObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
+				copy := rc.Items[0].DeepCopy()
+				var replicas int32 = 10
+				copy.Spec.Replicas = &replicas
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, copy)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -129,8 +153,32 @@ func TestDescribeObject(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
-	if d.Name != "redis-master" || d.Namespace != "test" {
-		t.Errorf("unexpected describer: %#v", d)
+	expectedGvk := schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "ReplicationController",
+	}
+	actualGvk := d.Object.GetObjectKind().GroupVersionKind()
+	if !reflect.DeepEqual(actualGvk, expectedGvk) {
+		t.Errorf("The described object does not match the expected object.\nExpected: %+v\nGot: %+v", expectedGvk, actualGvk)
+	}
+
+	unstructuredObj, ok := d.Object.(*unstructured.Unstructured)
+	if !ok {
+		t.Fatalf("The object described was not an unstructured.Unstructured, but a %T", d.Object)
+	}
+
+	replicas, found, err := unstructured.NestedInt64(unstructuredObj.Object, "spec", "replicas")
+	if err != nil {
+		t.Fatalf("Error while accessing nested field 'spec.replicas': %v", err)
+	}
+	if !found {
+		t.Errorf("Field 'spec.replicas' was not found in the object")
+	}
+
+	expectedReplicas := int64(10)
+	if replicas != expectedReplicas {
+		t.Errorf("Replica count mismatch: expected %d, but got %d", expectedReplicas, replicas)
 	}
 
 	if buf.String() != d.Output {
@@ -326,14 +374,14 @@ func TestDescribeNoResourcesFound(t *testing.T) {
 }
 
 type testDescriber struct {
-	Name, Namespace string
-	Settings        describe.DescriberSettings
-	Output          string
-	Err             error
+	Object   runtime.Object
+	Settings describe.DescriberSettings
+	Output   string
+	Err      error
 }
 
-func (t *testDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (output string, err error) {
-	t.Namespace, t.Name = namespace, name
+func (t *testDescriber) Describe(object runtime.Object, describerSettings describe.DescriberSettings) (output string, err error) {
+	t.Object = object
 	t.Settings = describerSettings
 	return t.Output, t.Err
 }
