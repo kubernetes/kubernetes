@@ -253,6 +253,65 @@ func (_c *MockRuntime_GarbageCollect_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// GeneratePodEvents provides a mock function with given fields: ctx, id
+func (_m *MockRuntime) GeneratePodEvents(ctx context.Context, id string) (*v1.ContainerEventResponse, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GeneratePodEvents")
+	}
+
+	var r0 *v1.ContainerEventResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*v1.ContainerEventResponse, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *v1.ContainerEventResponse); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.ContainerEventResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntime_GeneratePodEvents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GeneratePodEvents'
+type MockRuntime_GeneratePodEvents_Call struct {
+	*mock.Call
+}
+
+// GeneratePodEvents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+func (_e *MockRuntime_Expecter) GeneratePodEvents(ctx interface{}, id interface{}) *MockRuntime_GeneratePodEvents_Call {
+	return &MockRuntime_GeneratePodEvents_Call{Call: _e.mock.On("GeneratePodEvents", ctx, id)}
+}
+
+func (_c *MockRuntime_GeneratePodEvents_Call) Run(run func(ctx context.Context, id string)) *MockRuntime_GeneratePodEvents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRuntime_GeneratePodEvents_Call) Return(_a0 *v1.ContainerEventResponse, _a1 error) *MockRuntime_GeneratePodEvents_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntime_GeneratePodEvents_Call) RunAndReturn(run func(context.Context, string) (*v1.ContainerEventResponse, error)) *MockRuntime_GeneratePodEvents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GeneratePodStatus provides a mock function with given fields: event
 func (_m *MockRuntime) GeneratePodStatus(event *v1.ContainerEventResponse) *container.PodStatus {
 	ret := _m.Called(event)
