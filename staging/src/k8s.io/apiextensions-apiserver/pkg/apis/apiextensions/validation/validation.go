@@ -45,6 +45,7 @@ import (
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	"k8s.io/apiserver/pkg/util/webhook"
 )
 
@@ -963,7 +964,7 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 
 	// if validation passed otherwise, make sure we can actually construct a schema validator from this custom resource validation.
 	if len(allErrs) == 0 {
-		if _, _, err := apiservervalidation.NewSchemaValidator(customResourceValidation.OpenAPIV3Schema); err != nil {
+		if _, _, err := apiservervalidation.NewSchemaValidatorForVersion(customResourceValidation.OpenAPIV3Schema, compatibility.KubeComponentEffectiveVersion(compatibility.DefaultComponentGlobalsRegistry).EmulationVersion()); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", fmt.Sprintf("error building validator: %v", err)))
 		}
 	}

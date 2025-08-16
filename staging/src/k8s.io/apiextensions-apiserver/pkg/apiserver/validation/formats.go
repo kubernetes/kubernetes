@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
 // supportedVersionedFormats tracks the formats supported by CRD schemas, and the version at which support was introduced.
@@ -90,14 +91,14 @@ func StripUnsupportedFormatsPostProcess(s *spec.Schema) error {
 
 // StripUnsupportedFormatsPostProcessorForVersion determines the supported formats at the given compatibility version and
 // sets unsupported formats to empty string.
-func StripUnsupportedFormatsPostProcessorForVersion(compatibilityVersion *version.Version) func(s *spec.Schema) error {
+func StripUnsupportedFormatsPostProcessorForVersion(emulationVersion *version.Version) func(s *spec.Schema) error {
 	return func(s *spec.Schema) error {
 		if len(s.Format) == 0 {
 			return nil
 		}
 
 		normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
-		if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+		if !supportedFormatsAtVersion(emulationVersion).supported.Has(normalized) {
 			s.Format = ""
 		}
 
@@ -175,3 +176,25 @@ var (
 )
 
 var legacyPostProcessor = StripUnsupportedFormatsPostProcessorForVersion(version.MajorMinor(1, 0))
+
+// NewVersionedRegistry returns a format registry with only the formats for the given Kubernetes version.
+func NewVersionedRegistry(emulationVersion *version.Version) strfmt.Registry {
+	registry := strfmt.NewFormats() // This creates a copy of the default registry
+	supported := supportedFormatsAtVersion(emulationVersion).supported
+
+	allKnownFormats := sets.New[string]()
+	for _, vf := range supportedVersionedFormats {
+		for format := range vf.formats {
+			allKnownFormats.Insert(format)
+		}
+	}
+
+	for formatName := range allKnownFormats {
+		normalized := strings.ReplaceAll(formatName, "-", "")
+		if !supported.Has(normalized) {
+			registry.DelByName(formatName)
+		}
+	}
+
+	return registry
+}
