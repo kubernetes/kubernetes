@@ -48,29 +48,15 @@ func ServiceAccount(name, namespace string) *ServiceAccountApplyConfiguration {
 	return b
 }
 
-// ExtractServiceAccount extracts the applied configuration owned by fieldManager from
-// serviceAccount. If no managedFields are found in serviceAccount for fieldManager, a
-// ServiceAccountApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractServiceAccountFrom extracts the applied configuration owned by fieldManager from
+// serviceAccount for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // serviceAccount must be a unmodified ServiceAccount API object that was retrieved from the Kubernetes API.
-// ExtractServiceAccount provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractServiceAccountFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
-	return extractServiceAccount(serviceAccount, fieldManager, "")
-}
-
-// ExtractServiceAccountStatus is the same as ExtractServiceAccount except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractServiceAccountStatus(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
-	return extractServiceAccount(serviceAccount, fieldManager, "status")
-}
-
-func extractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager string, subresource string) (*ServiceAccountApplyConfiguration, error) {
+func ExtractServiceAccountFrom(serviceAccount *corev1.ServiceAccount, fieldManager string, subresource string) (*ServiceAccountApplyConfiguration, error) {
 	b := &ServiceAccountApplyConfiguration{}
 	err := managedfields.ExtractInto(serviceAccount, internal.Parser().Type("io.k8s.api.core.v1.ServiceAccount"), fieldManager, b, subresource)
 	if err != nil {
@@ -83,6 +69,29 @@ func extractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager s
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractServiceAccount extracts the applied configuration owned by fieldManager from
+// serviceAccount. If no managedFields are found in serviceAccount for fieldManager, a
+// ServiceAccountApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// serviceAccount must be a unmodified ServiceAccount API object that was retrieved from the Kubernetes API.
+// ExtractServiceAccount provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+	return ExtractServiceAccountFrom(serviceAccount, fieldManager, "")
+}
+
+// ExtractServiceAccountToken extracts the applied configuration owned by fieldManager from
+// serviceAccount for the token subresource.
+// Experimental!
+func ExtractServiceAccountToken(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+	return ExtractServiceAccountFrom(serviceAccount, fieldManager, "token")
+}
+
 func (b ServiceAccountApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
