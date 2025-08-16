@@ -23,26 +23,49 @@ import (
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/emicklei/go-restful/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 type WrappedHandler struct {
-	s          runtime.NegotiatedSerializer
-	handler    http.Handler
-	aggHandler http.Handler
+	s             runtime.NegotiatedSerializer
+	handler       http.Handler
+	aggHandler    http.Handler
+	mergedHandler http.Handler
 }
 
 func (wrapped *WrappedHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	mediaType, _ := negotiation.NegotiateMediaTypeOptions(req.Header.Get("Accept"), wrapped.s.SupportedMediaTypes(), DiscoveryEndpointRestrictions)
+	isAggregatedRequest := IsAggregatedDiscoveryGVK(mediaType.Convert)
+
+	// Check if merged discovery feature is enabled and client hasn't explicitly requested unmerged discovery
+	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) && isAggregatedRequest {
+		if mediaType.Profile == "unmerged" {
+			serveUnmergedDiscovery(wrapped, resp, req, isAggregatedRequest)
+			return
+		}
+		// Default to merged aggregated discovery
+		if wrapped.mergedHandler != nil {
+			wrapped.mergedHandler.ServeHTTP(resp, req)
+			return
+		}
+	}
+
+	serveUnmergedDiscovery(wrapped, resp, req, isAggregatedRequest)
+}
+
+func serveUnmergedDiscovery(wrapped *WrappedHandler, resp http.ResponseWriter, req *http.Request, isAggregateDiscoveryRequest bool) {
 	// mediaType.Convert looks at the request accept headers and is used to control whether the discovery document will be aggregated.
-	if IsAggregatedDiscoveryGVK(mediaType.Convert) {
+	if isAggregateDiscoveryRequest {
 		wrapped.aggHandler.ServeHTTP(resp, req)
 		return
 	}
+
 	wrapped.handler.ServeHTTP(resp, req)
 }
 
@@ -73,5 +96,14 @@ func WrapAggregatedDiscoveryToHandler(handler http.Handler, aggHandler http.Hand
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
 	codecs := serializer.NewCodecFactory(scheme)
-	return &WrappedHandler{codecs, handler, aggHandler}
+	return &WrappedHandler{codecs, handler, aggHandler, nil} // mergedHandler is nil
+}
+
+// WrapMergedDiscoveryToHandler creates a wrapper with merged discovery support
+func WrapMergedDiscoveryToHandler(handler http.Handler, aggHandler http.Handler, mergedHandler http.Handler) *WrappedHandler {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
+	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
+	codecs := serializer.NewCodecFactory(scheme)
+	return &WrappedHandler{codecs, handler, aggHandler, mergedHandler}
 }

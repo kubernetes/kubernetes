@@ -28,6 +28,7 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const discoveryPath = "/apis"
@@ -40,6 +41,8 @@ const aggregatedV2Beta1JSONAccept = jsonAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedV2Beta1ProtoAccept = protobufAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedJSONAccept = jsonAccept + aggregatedAcceptSuffix
 const aggregatedProtoAccept = protobufAccept + aggregatedAcceptSuffix
+
+const unmergedAccept = ";profile=unmerged"
 
 func fetchPath(handler http.Handler, path, accept string) string {
 	w := httptest.NewRecorder()
@@ -112,5 +115,107 @@ func TestAggregationEnabled(t *testing.T) {
 		}
 		body := fetchPath(wrapped, discoveryPath, tc.accept)
 		assert.Equal(t, tc.expected, body)
+	}
+}
+
+func TestMergedDiscoveryEnabled(t *testing.T) {
+	unaggregated := fakeHTTPHandler{data: "unaggregated"}
+	aggregated := fakeHTTPHandler{data: "aggregated"}
+	merged := fakeHTTPHandler{data: "merged"}
+	wrapped := WrapMergedDiscoveryToHandler(unaggregated, aggregated, merged)
+
+	testCases := []struct {
+		name                 string
+		accept               string
+		mergedFeatureEnabled bool
+		expected             string
+	}{
+		{
+			name:                 "merged feature disabled - default JSON",
+			accept:               jsonAccept,
+			mergedFeatureEnabled: false,
+			expected:             "unaggregated",
+		}, {
+			name:                 "merged feature disabled - aggregated JSON",
+			accept:               aggregatedJSONAccept,
+			mergedFeatureEnabled: false,
+			expected:             "aggregated",
+		}, {
+			name:                 "merged feature enabled - default JSON without profile",
+			accept:               jsonAccept,
+			mergedFeatureEnabled: true,
+			expected:             "unaggregated",
+		}, {
+			name:                 "merged feature enabled - default JSON profile=merged",
+			accept:               jsonAccept + ";profile=merged",
+			mergedFeatureEnabled: true,
+			expected:             "unaggregated",
+		}, {
+			name:                 "merged feature enabled - default JSON profile=unmerged",
+			accept:               jsonAccept + unmergedAccept,
+			mergedFeatureEnabled: true,
+			expected:             "unaggregated",
+		}, {
+			name:                 "merged feature enabled - aggregated JSON without profile",
+			accept:               aggregatedJSONAccept,
+			mergedFeatureEnabled: true,
+			expected:             "merged",
+		}, {
+			name:                 "merged feature enabled - aggregated JSON profile=unmerged",
+			accept:               aggregatedJSONAccept + unmergedAccept,
+			mergedFeatureEnabled: true,
+			expected:             "aggregated",
+		}, {
+			name:                 "merged feature enabled - aggregated JSON profile=merged",
+			accept:               aggregatedJSONAccept + ";profile=merged",
+			mergedFeatureEnabled: true,
+			expected:             "merged",
+		}, {
+			name:                 "merged feature enabled - default protobuf",
+			accept:               protobufAccept,
+			mergedFeatureEnabled: true,
+			expected:             "unaggregated",
+		}, {
+			name:                 "merged feature enabled - default protobuf profile=merged",
+			accept:               protobufAccept + ";profile=merged",
+			mergedFeatureEnabled: true,
+			expected:             "unaggregated",
+		}, {
+			name:                 "merged feature enabled - default protobuf profile=unmerged",
+			accept:               protobufAccept + ";profile=unmerged",
+			mergedFeatureEnabled: true,
+			expected:             "unaggregated",
+		},
+		{
+			name:                 "merged feature enabled - aggregated protobuf without profile",
+			accept:               aggregatedProtoAccept,
+			mergedFeatureEnabled: true,
+			expected:             "merged",
+		}, {
+			name:                 "merged feature enabled - aggregated protobuf profile=unmerged",
+			accept:               aggregatedProtoAccept + ";profile=unmerged",
+			mergedFeatureEnabled: true,
+			expected:             "aggregated",
+		}, {
+			name:                 "merged feature enabled - aggregated protobuf profile=merged",
+			accept:               aggregatedProtoAccept + ";profile=merged",
+			mergedFeatureEnabled: true,
+			expected:             "merged",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set the merged discovery feature gate
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UnknownVersionInteroperabilityProxy, tc.mergedFeatureEnabled)
+
+			// Handle beta type feature gate if needed
+			if tc.accept == aggregatedV2Beta1JSONAccept || tc.accept == aggregatedV2Beta1ProtoAccept {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryRemoveBetaType, false)
+			}
+
+			body := fetchPath(wrapped, discoveryPath, tc.accept)
+			assert.Equal(t, tc.expected, body)
+		})
 	}
 }
