@@ -3763,3 +3763,86 @@ func TestStatefulSetPartitionRollingUpdateWithMinReadySeconds(t *testing.T) {
 		t.Errorf("expected 4 pods to still exist (partition update blocked), got %d", len(newPods))
 	}
 }
+
+// TestInconsistentStatusForViolationReporting tests using inconsistentStatus to determine when
+// MaxUnavailableViolations should be reported to avoid false positives.
+func TestInconsistentStatusForViolationReporting(t *testing.T) {
+	// Base StatefulSet with typical configuration
+	baseSet := &apps.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Generation: 1},
+		Spec:       apps.StatefulSetSpec{Replicas: ptr.To(int32(3))},
+		Status: apps.StatefulSetStatus{
+			Replicas:           3,
+			ReadyReplicas:      3,
+			AvailableReplicas:  3,
+			ObservedGeneration: 1,
+		},
+	}
+
+	testCases := []struct {
+		name               string
+		setStatus          apps.StatefulSetStatus
+		newStatus          apps.StatefulSetStatus
+		expectInconsistent bool
+		description        string
+	}{
+		{
+			name:      "initial deployment",
+			setStatus: apps.StatefulSetStatus{}, // Empty initial status
+			newStatus: apps.StatefulSetStatus{
+				Replicas:      3,
+				ReadyReplicas: 1,
+			},
+			expectInconsistent: true,
+			description:        "Initial deployment with changing status should not report violations",
+		},
+		{
+			name: "scaling operation",
+			setStatus: apps.StatefulSetStatus{
+				Replicas:      3, // Was 3
+				ReadyReplicas: 3,
+			},
+			newStatus: apps.StatefulSetStatus{
+				Replicas:      5, // Now 5
+				ReadyReplicas: 3,
+			},
+			expectInconsistent: true,
+			description:        "Scaling operation should not report violations",
+		},
+		{
+			name: "stable StatefulSet",
+			setStatus: apps.StatefulSetStatus{
+				Replicas:          3,
+				ReadyReplicas:     3,
+				AvailableReplicas: 3,
+			},
+			newStatus: apps.StatefulSetStatus{
+				Replicas:          3,
+				ReadyReplicas:     3,
+				AvailableReplicas: 3,
+			},
+			expectInconsistent: false,
+			description:        "Stable StatefulSet should report violations",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create test StatefulSet with specific status
+			set := baseSet.DeepCopy()
+			set.Status = tc.setStatus
+
+			result := inconsistentStatus(set, &tc.newStatus)
+			shouldReport := !result // We report violations when status is NOT inconsistent
+
+			if result != tc.expectInconsistent {
+				t.Errorf("%s: Expected inconsistentStatus=%v, got %v", tc.description, tc.expectInconsistent, result)
+			}
+
+			expectedShouldReport := !tc.expectInconsistent
+			if shouldReport != expectedShouldReport {
+				t.Errorf("%s: Expected shouldReport=%v, got %v", tc.description, expectedShouldReport, shouldReport)
+			}
+		})
+	}
+}
