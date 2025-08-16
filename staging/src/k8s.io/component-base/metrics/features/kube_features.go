@@ -25,6 +25,11 @@ const (
 	// owner: @logicalhan
 	// kep: https://kep.k8s.io/3466
 	ComponentSLIs featuregate.Feature = "ComponentSLIs"
+
+	// owner: @xigang
+	//
+	// Enables the collection of metrics for informers.
+	InformerMetrics featuregate.Feature = "InformerMetrics"
 )
 
 func featureGates() map[featuregate.Feature]featuregate.VersionedSpecs {
@@ -35,6 +40,9 @@ func featureGates() map[featuregate.Feature]featuregate.VersionedSpecs {
 			// ComponentSLIs officially graduated to GA in v1.29 but the gate was not updated until v1.32.
 			// To support emulated versions, keep the gate until v1.35.
 			{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+		},
+		InformerMetrics: {
+			{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		},
 	}
 }
