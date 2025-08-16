@@ -104,7 +104,7 @@ func (sc ServiceCheck) Name() string {
 	if sc.Label != "" {
 		return sc.Label
 	}
-	return fmt.Sprintf("Service-%s", strings.Title(sc.Service))
+	return fmt.Sprintf("Service-%s", sc.Service)
 }
 
 // Check validates if the service is enabled and active.
