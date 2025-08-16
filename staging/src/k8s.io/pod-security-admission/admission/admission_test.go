@@ -702,7 +702,7 @@ func TestValidatePodAndController(t *testing.T) {
 	config.Exemptions.RuntimeClasses = []string{exemptRuntimeClass}
 	config.Exemptions.Usernames = []string{exemptUser}
 
-	evaluator, err := policy.NewEvaluator(policy.DefaultChecks())
+	evaluator, err := policy.NewEvaluator(policy.DefaultChecks(), nil)
 	assert.NoError(t, err)
 
 	type testCase struct {
