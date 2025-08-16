@@ -72,7 +72,7 @@ func TestDescCreate(t *testing.T) {
 			fqName:                "hidden_stable_descriptor",
 			help:                  "this is a hidden descriptor",
 			stabilityLevel:        STABLE,
-			deprecatedVersion:     "1.16.0",
+			deprecatedVersion:     "1.14.0",
 			shouldCreate:          false,
 			expectedAnnotatedHelp: "this is a hidden descriptor", // hidden descriptor shall not be annotated.
 		},
