@@ -25,7 +25,7 @@ import (
 
 type UsernsManager struct{}
 
-func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
+func MakeUserNsManager(kl userNsPodsManager, idsPerPod *int64) (*UsernsManager, error) {
 	return nil, nil
 }
 
