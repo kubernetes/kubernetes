@@ -38,7 +38,7 @@ func TestDeclarativeValidationMismatchMetric(t *testing.T) {
 	apiserver_validation_declarative_validation_mismatch_total 1
 	`
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "declarative_validation_mismatch_total"); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_declarative_validation_mismatch_total"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -57,7 +57,26 @@ func TestDeclarativeValidationPanicMetric(t *testing.T) {
 	apiserver_validation_declarative_validation_panic_total 1
 	`
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "declarative_validation_panic_total"); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_declarative_validation_panic_total"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestDuplicateValidationErrorMetric tests that the duplicate error metric correctly increments once
+func TestDuplicateValidationErrorMetric(t *testing.T) {
+	defer legacyregistry.Reset()
+	defer ResetValidationMetricsInstance()
+
+	// Increment the metric once
+	Metrics.IncDuplicateValidationErrorMetric()
+
+	expected := `
+	# HELP apiserver_validation_duplicate_validation_error_total [INTERNAL] Number of duplicate validation errors during validation.
+	# TYPE apiserver_validation_duplicate_validation_error_total counter
+	apiserver_validation_duplicate_validation_error_total 1
+	`
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_duplicate_validation_error_total"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -78,7 +97,7 @@ func TestDeclarativeValidationMismatchMetricMultiple(t *testing.T) {
 	apiserver_validation_declarative_validation_mismatch_total 3
 	`
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "declarative_validation_mismatch_total"); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_declarative_validation_mismatch_total"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -99,7 +118,28 @@ func TestDeclarativeValidationPanicMetricMultiple(t *testing.T) {
 	apiserver_validation_declarative_validation_panic_total 3
 	`
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "declarative_validation_panic_total"); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_declarative_validation_panic_total"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestDuplicateValidationErrorMetricMultiple tests that the duplicate error metric correctly increments multiple times
+func TestDuplicateValidationErrorMetricMultiple(t *testing.T) {
+	defer legacyregistry.Reset()
+	defer ResetValidationMetricsInstance()
+
+	// Increment the metric three times
+	Metrics.IncDuplicateValidationErrorMetric()
+	Metrics.IncDuplicateValidationErrorMetric()
+	Metrics.IncDuplicateValidationErrorMetric()
+
+	expected := `
+	# HELP apiserver_validation_duplicate_validation_error_total [INTERNAL] Number of duplicate validation errors during validation.
+	# TYPE apiserver_validation_duplicate_validation_error_total counter
+	apiserver_validation_duplicate_validation_error_total 3
+	`
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_validation_duplicate_validation_error_total"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -112,6 +152,7 @@ func TestDeclarativeValidationMetricsReset(t *testing.T) {
 	// Increment both metrics
 	Metrics.IncDeclarativeValidationMismatchMetric()
 	Metrics.IncDeclarativeValidationPanicMetric()
+	Metrics.IncDuplicateValidationErrorMetric()
 
 	// Reset the metrics
 	Metrics.Reset()
@@ -124,15 +165,22 @@ func TestDeclarativeValidationMetricsReset(t *testing.T) {
 	# HELP apiserver_validation_declarative_validation_panic_total [BETA] Number of times declarative validation has panicked during validation.
 	# TYPE apiserver_validation_declarative_validation_panic_total counter
 	apiserver_validation_declarative_validation_panic_total 0
+	# HELP apiserver_validation_duplicate_validation_error_total [INTERNAL] Number of duplicate validation errors during validation.
+	# TYPE apiserver_validation_duplicate_validation_error_total counter
+	apiserver_validation_duplicate_validation_error_total 0
 	`
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "declarative_validation_mismatch_total", "declarative_validation_panic_total"); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+		"apiserver_validation_declarative_validation_mismatch_total",
+		"apiserver_validation_declarative_validation_panic_total",
+		"apiserver_validation_duplicate_validation_error_total"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Increment the metrics again to ensure they're still functional
 	Metrics.IncDeclarativeValidationMismatchMetric()
 	Metrics.IncDeclarativeValidationPanicMetric()
+	Metrics.IncDuplicateValidationErrorMetric()
 
 	// Verify they've been incremented correctly
 	expected = `
@@ -142,9 +190,15 @@ func TestDeclarativeValidationMetricsReset(t *testing.T) {
 	# HELP apiserver_validation_declarative_validation_panic_total [BETA] Number of times declarative validation has panicked during validation.
 	# TYPE apiserver_validation_declarative_validation_panic_total counter
 	apiserver_validation_declarative_validation_panic_total 1
+	# HELP apiserver_validation_duplicate_validation_error_total [INTERNAL] Number of duplicate validation errors during validation.
+	# TYPE apiserver_validation_duplicate_validation_error_total counter
+	apiserver_validation_duplicate_validation_error_total 1
 	`
 
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "declarative_validation_mismatch_total", "declarative_validation_panic_total"); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+		"apiserver_validation_declarative_validation_mismatch_total",
+		"apiserver_validation_declarative_validation_panic_total",
+		"apiserver_validation_duplicate_validation_error_total"); err != nil {
 		t.Fatal(err)
 	}
 }
