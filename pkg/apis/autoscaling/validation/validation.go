@@ -31,9 +31,9 @@ import (
 
 const (
 	// MaxPeriodSeconds is the largest allowed scaling policy period (in seconds)
-	MaxPeriodSeconds int32 = 1800
+	MaxPeriodSeconds int32 = 3600
 	// MaxStabilizationWindowSeconds is the largest allowed stabilization window (in seconds)
-	MaxStabilizationWindowSeconds int32 = 3600
+	MaxStabilizationWindowSeconds int32 = 7200
 )
 
 // ValidateScale validates a Scale and returns an ErrorList with any errors.
