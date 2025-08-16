@@ -45,7 +45,7 @@ aggregator_discovery_aggregation_count_total %d
 
 func TestBasicMetrics(t *testing.T) {
 	legacyregistry.Reset()
-	manager := discoveryendpoint.NewResourceManager("apis")
+	manager := discoveryendpoint.NewResourceManager("apis", "test-server")
 
 	apis := fuzzAPIGroups(1, 3, 10)
 	manager.SetGroups(apis.Items)
@@ -66,7 +66,7 @@ func TestBasicMetrics(t *testing.T) {
 
 func TestMetricsModified(t *testing.T) {
 	legacyregistry.Reset()
-	manager := discoveryendpoint.NewResourceManager("apis")
+	manager := discoveryendpoint.NewResourceManager("apis", "test-server")
 
 	apis := fuzzAPIGroups(1, 3, 10)
 	manager.SetGroups(apis.Items)

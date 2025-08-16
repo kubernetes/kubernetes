@@ -310,6 +310,9 @@ type Config struct {
 	// AggregatedDiscoveryGroupManager serves /apis in an aggregated form.
 	AggregatedDiscoveryGroupManager discoveryendpoint.ResourceManager
 
+	// MergedDiscoveryHandler serves aggregated discovery that combines both local and peer server resources.
+	MergedDiscoveryHandler discoveryendpoint.MergedResourceManager
+
 	// ShutdownWatchTerminationGracePeriod, if set to a positive value,
 	// is the maximum duration the apiserver will wait for all active
 	// watch request(s) to drain.
@@ -859,10 +862,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 	manager := c.AggregatedDiscoveryGroupManager
 	if manager == nil {
-		manager = discoveryendpoint.NewResourceManager("apis")
+		manager = discoveryendpoint.NewResourceManager("apis", c.APIServerID)
 	}
 	s.AggregatedDiscoveryGroupManager = manager
-	s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager("api")
+	s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager("api", c.APIServerID)
 	for {
 		if c.JSONPatchMaxCopyBytes <= 0 {
 			break

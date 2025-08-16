@@ -42,6 +42,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -77,7 +78,7 @@ func TestPeerProxy(t *testing.T) {
 		peerproxiedHeader    string
 		reconcilerConfig     reconciler
 		localCache           map[schema.GroupVersionResource]bool
-		peerCache            map[string]map[schema.GroupVersionResource]bool
+		peerCache            map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery
 		wantStatus           int
 		wantMetricsData      string
 	}{
@@ -116,9 +117,11 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 if no endpoint fetched from lease",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]map[schema.GroupVersionResource]bool{
+			peerCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
 				remoteServerID1: {
-					{Group: "core", Version: "foo", Resource: "bar"}: true,
+					{Group: "core", Version: "foo", Resource: "bar"}: {
+						Resource: "bar",
+					},
 				},
 			},
 			wantStatus: http.StatusServiceUnavailable,
@@ -127,9 +130,11 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 unreachable peer bind address",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]map[schema.GroupVersionResource]bool{
+			peerCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
 				remoteServerID1: {
-					{Group: "core", Version: "foo", Resource: "bar"}: true,
+					{Group: "core", Version: "foo", Resource: "bar"}: {
+						Resource: "bar",
+					},
 				},
 			},
 			reconcilerConfig: reconciler{
@@ -152,12 +157,16 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 if one apiserver's endpoint lease wasnt found but another valid (unreachable) apiserver was found",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]map[schema.GroupVersionResource]bool{
+			peerCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
 				remoteServerID1: {
-					{Group: "core", Version: "foo", Resource: "bar"}: true,
+					{Group: "core", Version: "foo", Resource: "bar"}: {
+						Resource: "bar",
+					},
 				},
 				remoteServerID2: {
-					{Group: "core", Version: "foo", Resource: "bar"}: true,
+					{Group: "core", Version: "foo", Resource: "bar"}: {
+						Resource: "bar",
+					},
 				},
 			},
 			reconcilerConfig: reconciler{
@@ -252,7 +261,7 @@ func newFakePeerEndpointReconciler(t *testing.T) reconcilers.PeerEndpointLeaseRe
 
 func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handler,
 	reconciler reconcilers.PeerEndpointLeaseReconciler,
-	localCache map[schema.GroupVersionResource]bool, peerCache map[string]map[schema.GroupVersionResource]bool) http.Handler {
+	localCache map[schema.GroupVersionResource]bool, peerCache map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery) http.Handler {
 	// Add peerproxy handler
 	s := serializer.NewCodecFactory(runtime.NewScheme()).WithoutConversion()
 	peerProxyHandler, err := newFakePeerProxyHandler(informerFinishedSync, reconciler, localServerID, s, localCache, peerCache)
@@ -273,7 +282,7 @@ func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handl
 
 func newFakePeerProxyHandler(informerFinishedSync bool,
 	reconciler reconcilers.PeerEndpointLeaseReconciler, id string, s runtime.NegotiatedSerializer,
-	localCache map[schema.GroupVersionResource]bool, peerCache map[string]map[schema.GroupVersionResource]bool) (*peerProxyHandler, error) {
+	localCache map[schema.GroupVersionResource]bool, peerCache map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery) (*peerProxyHandler, error) {
 	clientset := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 	leaseInformer := informerFactory.Coordination().V1().Leases()
@@ -284,7 +293,7 @@ func newFakePeerProxyHandler(informerFinishedSync bool,
 	loopbackClientConfig := &rest.Config{
 		Host: "localhost:1010",
 	}
-	ppH, err := NewPeerProxyHandler(id, "identity=testserver", leaseInformer, reconciler, s, loopbackClientConfig, clientConfig)
+	ppH, err := NewPeerProxyHandler(id, nil, "identity=testserver", leaseInformer, reconciler, s, loopbackClientConfig, clientConfig)
 	if err != nil {
 		return nil, err
 	}

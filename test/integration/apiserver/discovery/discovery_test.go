@@ -187,7 +187,7 @@ func TestReadinessAggregatedAPIServiceDiscovery(t *testing.T) {
 	defer cleanup()
 
 	// Create a resource manager whichs serves our GroupVersion
-	resourceManager := discoveryendpoint.NewResourceManager("apis")
+	resourceManager := discoveryendpoint.NewResourceManager("apis", "test-server")
 	resourceManager.SetGroups([]apidiscoveryv2.APIGroupDiscovery{basicTestGroup})
 
 	apiServiceWaitCh := make(chan struct{})
@@ -284,7 +284,7 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 	defer cleanup()
 
 	// Create a resource manager whichs serves our GroupVersion
-	resourceManager := discoveryendpoint.NewResourceManager("apis")
+	resourceManager := discoveryendpoint.NewResourceManager("apis", "test-server")
 	resourceManager.SetGroups([]apidiscoveryv2.APIGroupDiscovery{basicTestGroup})
 
 	// Install our ResourceManager as an Aggregated APIService to the

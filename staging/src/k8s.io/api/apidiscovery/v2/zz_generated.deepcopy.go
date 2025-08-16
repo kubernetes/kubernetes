@@ -122,6 +122,11 @@ func (in *APIResourceDiscovery) DeepCopyInto(out *APIResourceDiscovery) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ServerIDs != nil {
+		in, out := &in.ServerIDs, &out.ServerIDs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
