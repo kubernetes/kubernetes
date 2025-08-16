@@ -3343,7 +3343,6 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.containerManager,
 		kubelet.containerLogManager,
 		kubelet.runtimeClassManager,
-		kubelet.allocationManager,
 		false,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubelet.containerManager.GetNodeAllocatableAbsolute,
