@@ -65,9 +65,9 @@ func waitForQueueComplete(stopCh <-chan struct{}, dm *discoveryManager) bool {
 
 // Test that the discovery manager starts and aggregates from two local API services
 func TestBasic(t *testing.T) {
-	service1 := discoveryendpoint.NewResourceManager("apis")
-	service2 := discoveryendpoint.NewResourceManager("apis")
-	service3 := discoveryendpoint.NewResourceManager("apis")
+	service1 := discoveryendpoint.NewResourceManager("apis", "test-server")
+	service2 := discoveryendpoint.NewResourceManager("apis", "test-server")
+	service3 := discoveryendpoint.NewResourceManager("apis", "test-server")
 	apiGroup1 := fuzzAPIGroups(2, 5, 25)
 	apiGroup2 := fuzzAPIGroups(2, 5, 50)
 	apiGroup3 := apidiscoveryv2.APIGroupDiscoveryList{Items: []apidiscoveryv2.APIGroupDiscovery{
@@ -140,7 +140,7 @@ func TestBasic(t *testing.T) {
 	service1.SetGroups(apiGroup1.Items)
 	service2.SetGroups(apiGroup2.Items)
 	service3.SetGroups(apiGroup3.Items)
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis", "test-server")
 	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
 
 	for _, g := range apiGroup1.Items {
@@ -247,8 +247,8 @@ func checkAPIGroups(t *testing.T, api apidiscoveryv2.APIGroupDiscoveryList, resp
 func TestInitialRunHasAllAPIServices(t *testing.T) {
 	neverReturnCh := make(chan struct{})
 	defer close(neverReturnCh)
-	service := discoveryendpoint.NewResourceManager("apis")
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	service := discoveryendpoint.NewResourceManager("apis", "test-server")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis", "test-server")
 
 	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
 
@@ -299,9 +299,9 @@ func TestInitialRunHasAllAPIServices(t *testing.T) {
 }
 
 func TestServiceGC(t *testing.T) {
-	service := discoveryendpoint.NewResourceManager("apis")
+	service := discoveryendpoint.NewResourceManager("apis", "test-server")
 
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis", "test-server")
 	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -374,7 +374,7 @@ func TestV2Beta1Skew(t *testing.T) {
 		},
 	}}
 
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis", "test-server")
 
 	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
 
@@ -428,8 +428,8 @@ func TestV2Beta1Skew(t *testing.T) {
 // APIService has been marked as dirty
 func TestDirty(t *testing.T) {
 	var pinged atomic.Bool
-	service := discoveryendpoint.NewResourceManager("apis")
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	service := discoveryendpoint.NewResourceManager("apis", "test-server")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis", "test-server")
 
 	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
 
@@ -464,8 +464,8 @@ func TestDirty(t *testing.T) {
 // complete by artificially making the sync handler take a long time
 func TestWaitForSync(t *testing.T) {
 	pinged := atomic.Bool{}
-	service := discoveryendpoint.NewResourceManager("apis")
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	service := discoveryendpoint.NewResourceManager("apis", "test-server")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis", "test-server")
 
 	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
 
@@ -500,8 +500,8 @@ func TestWaitForSync(t *testing.T) {
 // Show that an APIService can be removed and that its group no longer remains
 // if there are no versions
 func TestRemoveAPIService(t *testing.T) {
-	aggyService := discoveryendpoint.NewResourceManager("apis")
-	service := discoveryendpoint.NewResourceManager("apis")
+	aggyService := discoveryendpoint.NewResourceManager("apis", "test-server")
+	service := discoveryendpoint.NewResourceManager("apis", "test-server")
 	apiGroup := fuzzAPIGroups(2, 3, 10)
 	service.SetGroups(apiGroup.Items)
 
@@ -553,7 +553,7 @@ func TestRemoveAPIService(t *testing.T) {
 }
 
 func TestLegacyFallbackNoCache(t *testing.T) {
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis", "test-server")
 	rootAPIsHandler := discovery.NewRootAPIsHandler(discovery.DefaultAddresses{DefaultAddress: "192.168.1.1"}, scheme.Codecs)
 
 	legacyGroupHandler := discovery.NewAPIGroupHandler(scheme.Codecs, metav1.APIGroup{
@@ -781,7 +781,7 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 }
 
 func testLegacyFallbackWithCustomRootHandler(t *testing.T, rootHandlerFn func(http.ResponseWriter, *http.Request)) {
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis", "test-server")
 
 	legacyGroupHandler := discovery.NewAPIGroupHandler(scheme.Codecs, metav1.APIGroup{
 		Name: "stable.example.com",
@@ -910,7 +910,7 @@ func TestLegacyFallback(t *testing.T) {
 }
 
 func TestAPIServiceStale(t *testing.T) {
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis", "test-server")
 	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
 	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{
@@ -954,8 +954,8 @@ func TestAPIServiceStale(t *testing.T) {
 // This path in 1.26.0 would result in a deadlock if an aggregated APIService
 // returned a 304 Not Modified response for its own aggregated discovery document.
 func TestNotModified(t *testing.T) {
-	aggyService := discoveryendpoint.NewResourceManager("apis")
-	service := discoveryendpoint.NewResourceManager("apis")
+	aggyService := discoveryendpoint.NewResourceManager("apis", "test-server")
+	service := discoveryendpoint.NewResourceManager("apis", "test-server")
 	apiGroup := fuzzAPIGroups(2, 3, 10)
 	service.SetGroups(apiGroup.Items)
 

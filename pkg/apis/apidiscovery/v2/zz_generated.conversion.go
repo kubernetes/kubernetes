@@ -144,6 +144,7 @@ func autoConvert_v2_APIResourceDiscovery_To_apidiscovery_APIResourceDiscovery(in
 	out.ShortNames = *(*[]string)(unsafe.Pointer(&in.ShortNames))
 	out.Categories = *(*[]string)(unsafe.Pointer(&in.Categories))
 	out.Subresources = *(*[]apidiscovery.APISubresourceDiscovery)(unsafe.Pointer(&in.Subresources))
+	out.ServerIDs = *(*[]string)(unsafe.Pointer(&in.ServerIDs))
 	return nil
 }
 
@@ -161,6 +162,7 @@ func autoConvert_apidiscovery_APIResourceDiscovery_To_v2_APIResourceDiscovery(in
 	out.ShortNames = *(*[]string)(unsafe.Pointer(&in.ShortNames))
 	out.Categories = *(*[]string)(unsafe.Pointer(&in.Categories))
 	out.Subresources = *(*[]apidiscoveryv2.APISubresourceDiscovery)(unsafe.Pointer(&in.Subresources))
+	out.ServerIDs = *(*[]string)(unsafe.Pointer(&in.ServerIDs))
 	return nil
 }
 
