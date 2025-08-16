@@ -437,16 +437,6 @@ func loadSystemSpecFromFile(filename string) (*system.SysSpec, error) {
 	return spec, nil
 }
 
-// isNodeReady returns true if a node is ready; false otherwise.
-func isNodeReady(node *v1.Node) bool {
-	for _, c := range node.Status.Conditions {
-		if c.Type == v1.NodeReady {
-			return c.Status == v1.ConditionTrue
-		}
-	}
-	return false
-}
-
 func setExtraEnvs() {
 	for name, value := range framework.TestContext.ExtraEnvs {
 		os.Setenv(name, value)

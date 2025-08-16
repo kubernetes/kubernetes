@@ -2320,7 +2320,59 @@ func HaveContainerCPUsShareUncoreCacheWith(ctnName string, ref cpuset.CPUSet) ty
 	)
 }
 
+// Custom matcher for checking packed CPUs.
+func BePackedCPUs() types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(allocatedCPUs cpuset.CPUSet) (bool, error) {
+		distribution := computeNUMADistribution(allocatedCPUs)
+		for _, count := range distribution {
+			// This assumption holds true if there are enough CPUs on a single NUMA node.
+			// We are intentionally limiting the CPU request to 2 to minimize the number
+			// of CPUs required to fulfill this case and therefore maximize the chances
+			// of correctly validating this case.
+			if count == allocatedCPUs.Size() {
+				return true, nil
+			}
+		}
+		return false, nil
+	}).WithMessage("expected CPUs to be packed")
+}
+
+// Custom matcher for checking distributed CPUs.
+func BeDistributedCPUs(expectedSpread int) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(allocatedCPUs cpuset.CPUSet) (bool, error) {
+		distribution := computeNUMADistribution(allocatedCPUs)
+		for _, count := range distribution {
+			if count != expectedSpread {
+				return false, nil
+			}
+		}
+		return true, nil
+	}).WithTemplate("expected CPUs to be evenly distributed across NUMA nodes\nExpected: {{.Data}}\nGot:\n{{.FormattedActual}}\nDistribution: {{.Data}}\n").WithTemplateData(expectedSpread)
+}
+
 // Other helpers
+
+func getContainerAllowedCPUsFromLogs(podName, cntName, logs string) cpuset.CPUSet {
+	framework.Logf("got pod logs: <%v>", logs)
+	cpus, err := cpuset.Parse(strings.TrimSpace(logs))
+	framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cntName, podName)
+	return cpus
+}
+
+// computeNUMADistribution calculates CPU distribution per NUMA node.
+func computeNUMADistribution(allocatedCPUs cpuset.CPUSet) map[int]int {
+	numaCPUs, err := getNumaNodeCPUs()
+	framework.ExpectNoError(err, "Error retrieving NUMA nodes")
+	framework.Logf("NUMA Node CPUs allocation: %v", numaCPUs)
+
+	distribution := make(map[int]int)
+	for node, cpus := range numaCPUs {
+		distribution[node] = cpus.Intersection(allocatedCPUs).Size()
+	}
+
+	framework.Logf("allocated CPUs %s distribution: %v", allocatedCPUs.String(), distribution)
+	return distribution
+}
 
 func getContainerAllowedCPUs(pod *v1.Pod, ctnName string, isInit bool) (cpuset.CPUSet, error) {
 	cgPath, err := makeCgroupPathForContainer(pod, ctnName, isInit, e2enodeCgroupV2Enabled)
@@ -2609,4 +2661,190 @@ func requireCGroupV2() {
 	}
 	e2eskipper.Skipf("Skipping since CgroupV2 not used")
 
+}
+
+const (
+	minSMTLevel    = 2
+	minCPUCapacity = 2
+)
+
+// Helper for makeCPUManagerPod().
+type ctnAttribute struct {
+	ctnName       string
+	ctnCommand    string
+	cpuRequest    string
+	cpuLimit      string
+	restartPolicy *v1.ContainerRestartPolicy
+}
+
+// makeCPUMangerPod returns a pod with the provided ctnAttributes.
+func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
+	var containers []v1.Container
+	for _, ctnAttr := range ctnAttributes {
+		cpusetCmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+		ctn := v1.Container{
+			Name:  ctnAttr.ctnName,
+			Image: busyboxImage,
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuRequest),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuLimit),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			Command: []string{"sh", "-c", cpusetCmd},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "sysfscgroup",
+					MountPath: "/sysfscgroup",
+				},
+				{
+					Name:      "podinfo",
+					MountPath: "/podinfo",
+				},
+			},
+		}
+		containers = append(containers, ctn)
+	}
+
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers:    containers,
+			Volumes: []v1.Volume{
+				{
+					Name: "sysfscgroup",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+					},
+				},
+				{
+					Name: "podinfo",
+					VolumeSource: v1.VolumeSource{
+						DownwardAPI: &v1.DownwardAPIVolumeSource{
+							Items: []v1.DownwardAPIVolumeFile{
+								{
+									Path: "uid",
+									FieldRef: &v1.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "metadata.uid",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// makeCPUMangerInitContainersPod returns a pod with init containers with the
+// provided ctnAttributes.
+func makeCPUManagerInitContainersPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
+	var containers []v1.Container
+	cpusetCmd := "grep Cpus_allowed_list /proc/self/status | cut -f2"
+	cpusetAndSleepCmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+	for _, ctnAttr := range ctnAttributes {
+		ctn := v1.Container{
+			Name:  ctnAttr.ctnName,
+			Image: busyboxImage,
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuRequest),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuLimit),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			Command:       []string{"sh", "-c", cpusetCmd},
+			RestartPolicy: ctnAttr.restartPolicy,
+		}
+		if ctnAttr.restartPolicy != nil && *ctnAttr.restartPolicy == v1.ContainerRestartPolicyAlways {
+			ctn.Command = []string{"sh", "-c", cpusetAndSleepCmd}
+		}
+		containers = append(containers, ctn)
+	}
+
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy:  v1.RestartPolicyNever,
+			InitContainers: containers,
+			Containers: []v1.Container{
+				{
+					Name:  "regular",
+					Image: busyboxImage,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1000m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1000m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+					Command: []string{"sh", "-c", cpusetAndSleepCmd},
+				},
+			},
+		},
+	}
+}
+
+type cpuManagerKubeletArguments struct {
+	policyName                       string
+	enableCPUManagerOptions          bool
+	disableCPUQuotaWithExclusiveCPUs bool
+	enablePodLevelResources          bool
+	reservedSystemCPUs               cpuset.CPUSet
+	options                          map[string]string
+}
+
+func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, kubeletArguments *cpuManagerKubeletArguments) *kubeletconfig.KubeletConfiguration {
+	newCfg := oldCfg.DeepCopy()
+	if newCfg.FeatureGates == nil {
+		newCfg.FeatureGates = make(map[string]bool)
+	}
+
+	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = kubeletArguments.enableCPUManagerOptions
+	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
+	newCfg.FeatureGates["DisableCPUQuotaWithExclusiveCPUs"] = kubeletArguments.disableCPUQuotaWithExclusiveCPUs
+	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
+
+	newCfg.CPUManagerPolicy = kubeletArguments.policyName
+	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
+
+	if kubeletArguments.options != nil {
+		newCfg.CPUManagerPolicyOptions = kubeletArguments.options
+	}
+
+	if kubeletArguments.reservedSystemCPUs.Size() > 0 {
+		cpus := kubeletArguments.reservedSystemCPUs.String()
+		framework.Logf("configureCPUManagerInKubelet: using reservedSystemCPUs=%q", cpus)
+		newCfg.ReservedSystemCPUs = cpus
+	} else {
+		// The Kubelet panics if either kube-reserved or system-reserved is not set
+		// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
+		// kubelet doesn't panic.
+		if newCfg.KubeReserved == nil {
+			newCfg.KubeReserved = map[string]string{}
+		}
+
+		if _, ok := newCfg.KubeReserved["cpu"]; !ok {
+			newCfg.KubeReserved["cpu"] = "200m"
+		}
+	}
+
+	return newCfg
 }
