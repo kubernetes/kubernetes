@@ -64,6 +64,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiextensionsv1.SelectableFieldApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("ServiceReference"):
 		return &apiextensionsv1.ServiceReferenceApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("Union"):
+		return &apiextensionsv1.UnionApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("UnionMember"):
+		return &apiextensionsv1.UnionMemberApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("ValidationRule"):
 		return &apiextensionsv1.ValidationRuleApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("WebhookClientConfig"):
@@ -102,6 +106,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiextensionsv1beta1.SelectableFieldApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("ServiceReference"):
 		return &apiextensionsv1beta1.ServiceReferenceApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("Union"):
+		return &apiextensionsv1beta1.UnionApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("UnionMember"):
+		return &apiextensionsv1beta1.UnionMemberApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("ValidationRule"):
 		return &apiextensionsv1beta1.ValidationRuleApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("WebhookClientConfig"):
