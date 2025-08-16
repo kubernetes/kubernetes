@@ -47,6 +47,9 @@ func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 	out.CACertificateValidityPeriod = nil
 	// Set default timeouts.
 	kubeadm.SetDefaultTimeouts(&out.Timeouts)
+	if kubeadm.GetConversionTimeoutControlPlane() != nil {
+		out.Timeouts.ControlPlaneComponentHealthCheck = kubeadm.GetConversionTimeoutControlPlane()
+	}
 	return err
 }
 
