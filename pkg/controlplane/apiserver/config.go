@@ -55,7 +55,6 @@ import (
 	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
@@ -315,7 +314,7 @@ func CreateConfig(
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
 		var err error
 		config.PeerEndpointLeaseReconciler, err = CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
 		if err != nil {
@@ -324,6 +323,7 @@ func CreateConfig(
 		if opts.PeerCAFile != "" {
 			leaseInformer := versionedInformers.Coordination().V1().Leases()
 			config.PeerProxy, err = BuildPeerProxy(
+				config.Generic.AggregatedDiscoveryGroupManager,
 				leaseInformer,
 				genericConfig.LoopbackClientConfig,
 				opts.ProxyClientCertFile,
@@ -335,6 +335,10 @@ func CreateConfig(
 			if err != nil {
 				return nil, nil, err
 			}
+		}
+
+		if config.Generic.AggregatedDiscoveryGroupManager != nil {
+			config.Generic.AggregatedDiscoveryGroupManager.SetPeerDiscoveryProvider(config.PeerProxy)
 		}
 	}
 
