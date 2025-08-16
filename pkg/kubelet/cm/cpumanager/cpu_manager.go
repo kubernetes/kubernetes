@@ -37,6 +37,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
@@ -405,12 +406,49 @@ func (m *manager) removeStaleState() {
 	})
 }
 
+func (m *manager) releasePodUnallocatedCPUs() {
+	for _, pod := range m.activePods() {
+		runningPod := false
+		pstatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
+		if !ok {
+			klog.V(5).InfoS("releasePodUnallocatedCPUs: skipping pod; status not found", "pod", klog.KObj(pod))
+			continue
+		}
+		for _, container := range pod.Spec.Containers {
+			cstatus, err := findContainerStatusByName(&pstatus, container.Name)
+			if err != nil {
+				klog.V(5).InfoS("releasePodUnallocatedCPUs: skipping container; container status not found in pod status", "pod", klog.KObj(pod), "containerName", container.Name, "err", err)
+				continue
+			}
+
+			if cstatus.State.Running != nil {
+				runningPod = true
+				break
+			}
+		}
+		if runningPod == true {
+			if toRelease := m.policy.GetReusableUnallocatedCPUs(pod); toRelease.Size() > 0 {
+				for _, initC := range pod.Spec.InitContainers {
+					if podutil.IsRestartableInitContainer(&initC) {
+						continue
+					}
+					m.state.Delete(string(pod.UID), initC.Name)
+				}
+				klog.V(3).InfoS("releasePodUnallocatedCPUs: found reusable and unallocated CPUs, returning to default cpuset", "pod", klog.KObj(pod), "cpus", toRelease)
+				m.state.SetDefaultCPUSet(m.state.GetDefaultCPUSet().Union(toRelease))
+				m.policy.ClearCPUsToReuse(pod)
+			}
+		}
+	}
+}
+
 func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {
 	ctx := context.Background()
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
 
 	m.removeStaleState()
+	m.releasePodUnallocatedCPUs()
 	for _, pod := range m.activePods() {
 		pstatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
 		if !ok {

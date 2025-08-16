@@ -993,6 +993,30 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 	return nil
 }
 
+func (m *kubeGenericRuntimeManager) IsPodRestart(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	changed, attempt, _ := runtimeutil.PodSandboxChanged(pod, podStatus)
+	if changed {
+		if !shouldRestartOnFailure(pod) && attempt != 0 && len(podStatus.ContainerStatuses) != 0 {
+			return false
+		}
+		return true
+	}
+	return false
+}
+
+func (m *kubeGenericRuntimeManager) IsInitContainerRestart(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	if len(pod.Spec.InitContainers) == 0 {
+		return false
+	}
+	ctx := context.Background()
+	var actions podActions
+	hasInitialized := m.computeInitContainerActions(ctx, pod, podStatus, &actions)
+	if m.IsPodRestart(pod, podStatus) || !hasInitialized {
+		return true
+	}
+	return false
+}
+
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	logger := klog.FromContext(ctx)

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 type stateMemory struct {
@@ -85,6 +86,22 @@ func (s *stateMemory) SetContainerResources(podUID types.UID, containerName stri
 
 	s.podResources[podUID].ContainerResources[containerName] = resources
 	klog.V(3).InfoS("Updated container resource information", "podUID", podUID, "containerName", containerName, "resources", resources)
+	return nil
+}
+
+func (s *stateMemory) SetContainerCPUResources(podUID types.UID, containerName string, request int64) error {
+	s.Lock()
+	defer s.Unlock()
+
+	if _, ok := s.podResources[podUID]; !ok {
+		s.podResources[podUID] = PodResourceInfo{
+			ContainerResources: make(map[string]v1.ResourceRequirements),
+		}
+	}
+
+	s.podResources[podUID].ContainerResources[containerName].Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(request, resource.DecimalSI)
+	s.podResources[podUID].ContainerResources[containerName].Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(request, resource.DecimalSI)
+	klog.V(3).InfoS("Updated container resource information", "podUID", podUID, "containerName", containerName, "request", request)
 	return nil
 }
 

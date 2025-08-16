@@ -74,3 +74,10 @@ func (p *nonePolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string]
 func (p *nonePolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.New()
 }
+
+func (p *nonePolicy) GetReusableUnallocatedCPUs(pod *v1.Pod) cpuset.CPUSet {
+	return cpuset.New()
+}
+
+func (p *nonePolicy) ClearCPUsToReuse(pod *v1.Pod) {
+}
