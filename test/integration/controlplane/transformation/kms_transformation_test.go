@@ -621,7 +621,9 @@ resources:
 `
 
 	t.Run("encrypt all resources", func(t *testing.T) {
-		_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
+		socket := "@encrypt-all-kms-provider.sock"
+		_ = os.Remove(socket)
+		_ = mock.NewBase64Plugin(t, socket)
 		// To ensure we are checking all REST resources
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 			"AllAlpha": true,

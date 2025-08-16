@@ -29,8 +29,17 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	mergedRequestCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "aggregator_discovery_merged_count_total",
+			Help:           "Counter of number of times discovery was merged across all API servers",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 func init() {
 	legacyregistry.MustRegister(regenerationCounter)
+	legacyregistry.MustRegister(mergedRequestCounter)
 }

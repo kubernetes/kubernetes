@@ -72,7 +72,7 @@ func validateAPIPriorityAndFairness(options *Options) []error {
 
 func validateUnknownVersionInteroperabilityProxyFlags(options *Options) []error {
 	err := []error{}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
 		if options.PeerCAFile != "" {
 			err = append(err, fmt.Errorf("--peer-ca-file requires UnknownVersionInteroperabilityProxy feature to be turned on"))
 		}
