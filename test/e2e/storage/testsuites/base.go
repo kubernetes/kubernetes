@@ -87,6 +87,7 @@ var CSISuites = append(BaseSuites,
 	InitReadWriteOncePodTestSuite,
 	InitVolumeModifyTestSuite,
 	InitVolumeModifyStressTestSuite,
+	InitSELinuxMountTestSuite,
 )
 
 func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) opCounts {
