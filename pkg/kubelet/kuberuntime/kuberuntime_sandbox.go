@@ -116,7 +116,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 
 	portMappings := []*runtimeapi.PortMapping{}
 	for _, c := range pod.Spec.Containers {
-		containerPortMappings := kubecontainer.MakePortMappings(&c)
+		containerPortMappings := kubecontainer.MakePortMappings(logger, &c)
 
 		for idx := range containerPortMappings {
 			port := containerPortMappings[idx]
