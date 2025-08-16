@@ -305,7 +305,7 @@
       "type": "object"
     },
     "io.k8s.api.admissionregistration.v1.ValidatingWebhookConfiguration": {
-      "description": "ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.",
+      "description": "ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects an object without changing it.",
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
