@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"slices"
 	"testing"
 	"time"
 )
@@ -79,7 +80,7 @@ func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err err
 	if exists {
 		// Copy item's slice so operations on this slice
 		// won't interfere with the object we return.
-		d = copyDeltas(d)
+		d = slices.Clone(d)
 	}
 	return d, exists, nil
 }
