@@ -16,7 +16,7 @@ ARG BASEIMAGE
 ARG REGISTRY
 
 # We're using a Linux image to unpack the archive, then we're copying it over to Windows.
-FROM --platform=linux/amd64 alpine:3.6 as prep
+FROM --platform=linux/amd64 alpine:3.21 as prep
 
 ADD https://home.apache.org/~steffenal/VC14/binaries/httpd-2.4.41-win64-VC14.zip /httpd.zip
 ADD https://windows.php.net/downloads/releases/archives/php-7.4.14-Win32-vc15-x64.zip /php.zip
