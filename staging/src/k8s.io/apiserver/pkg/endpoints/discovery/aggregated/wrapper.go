@@ -17,6 +17,7 @@ limitations under the License.
 package aggregated
 
 import (
+	"context"
 	"net/http"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
@@ -30,6 +31,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 )
 
+type discoveryProfileKey struct{}
+
 type WrappedHandler struct {
 	s          runtime.NegotiatedSerializer
 	handler    http.Handler
@@ -38,6 +41,10 @@ type WrappedHandler struct {
 
 func (wrapped *WrappedHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	mediaType, _ := negotiation.NegotiateMediaTypeOptions(req.Header.Get("Accept"), wrapped.s.SupportedMediaTypes(), DiscoveryEndpointRestrictions)
+	if mediaType.Profile == "unmerged" {
+		req = req.WithContext(SetDiscoveryProfileInContext(req.Context(), "unmerged"))
+	}
+
 	// mediaType.Convert looks at the request accept headers and is used to control whether the discovery document will be aggregated.
 	if IsAggregatedDiscoveryGVK(mediaType.Convert) {
 		wrapped.aggHandler.ServeHTTP(resp, req)
@@ -74,4 +81,8 @@ func WrapAggregatedDiscoveryToHandler(handler http.Handler, aggHandler http.Hand
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
 	codecs := serializer.NewCodecFactory(scheme)
 	return &WrappedHandler{codecs, handler, aggHandler}
+}
+
+func SetDiscoveryProfileInContext(ctx context.Context, profile string) context.Context {
+	return context.WithValue(ctx, discoveryProfileKey{}, profile)
 }

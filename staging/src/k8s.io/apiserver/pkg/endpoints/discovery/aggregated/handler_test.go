@@ -46,6 +46,8 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 var scheme = runtime.NewScheme()
@@ -133,7 +135,7 @@ func fetchPath(handler http.Handler, acceptPrefix string, path string, etag stri
 func fetchPathHelper(handler http.Handler, accept string, path string, etag string) (*http.Response, []byte) {
 	// Expect json-formatted apis group list
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(request.MethodGet, discoveryPath, nil)
+	req := httptest.NewRequest(request.MethodGet, path, nil)
 
 	// Ask for JSON response
 	req.Header.Set("Accept", accept)
@@ -151,6 +153,49 @@ func fetchPathHelper(handler http.Handler, accept string, path string, etag stri
 
 	bytes := w.Body.Bytes()
 	return w.Result(), bytes
+}
+
+type mockPeerDiscoveryProvider struct {
+	resources map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery
+}
+
+func (m *mockPeerDiscoveryProvider) GetPeerResources() map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery {
+	if m.resources == nil {
+		return make(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+	}
+	return m.resources
+}
+
+func (m *mockPeerDiscoveryProvider) addResource(serverID string, gvr schema.GroupVersionResource, resource *apidiscoveryv2.APIResourceDiscovery) {
+	if m.resources == nil {
+		m.resources = make(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+	}
+	if _, ok := m.resources[serverID]; !ok {
+		m.resources[serverID] = make(map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+	}
+	m.resources[serverID][gvr] = resource
+}
+
+func newAPIGroup(groupName, versionName, resourceName string) apidiscoveryv2.APIGroupDiscovery {
+	return apidiscoveryv2.APIGroupDiscovery{
+		ObjectMeta: metav1.ObjectMeta{Name: groupName},
+		Versions: []apidiscoveryv2.APIVersionDiscovery{
+			{
+				Version: versionName,
+				Resources: []apidiscoveryv2.APIResourceDiscovery{
+					{Resource: resourceName},
+				},
+			},
+		},
+	}
+}
+
+func newAPIResource(gvr schema.GroupVersionResource) *apidiscoveryv2.APIResourceDiscovery {
+	return &apidiscoveryv2.APIResourceDiscovery{
+		Resource: gvr.Resource,
+		Scope:    apidiscoveryv2.ScopeCluster,
+		Verbs:    []string{"get", "list", "watch"},
+	}
 }
 
 // Add all builtin APIServices to the manager and check the output
@@ -771,4 +816,45 @@ func TestStatelessGroupPriorityMinimum(t *testing.T) {
 
 	assert.Equal(t, "stable.example.com", decoded.Items[0].Name)
 	assert.Equal(t, "experimental.example.com", decoded.Items[1].Name)
+}
+
+func TestMergedAndUnmergedDiscovery(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, true)
+	legacyregistry.Reset()
+	manager := discoveryendpoint.NewResourceManager("apis")
+	peerProvider := &mockPeerDiscoveryProvider{}
+	manager.SetPeerDiscoveryProvider(peerProvider)
+
+	// Add local resource.
+	localGroup := newAPIGroup("local.example.com", "v1", "local-resource")
+	manager.AddGroupVersion(localGroup.Name, localGroup.Versions[0])
+
+	// Add peer resource.
+	peerGVR := schema.GroupVersionResource{Group: "peer.example.com", Version: "v1", Resource: "peer-resource"}
+	peerProvider.addResource("peer-server-1", peerGVR, newAPIResource(peerGVR))
+
+	// Merged request (no profile=unmerged).
+	wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(manager, manager)
+	respMerged, _, mergedDecoded := fetchPath(wrapped, "application/json", "/apis", "")
+	require.Equal(t, http.StatusOK, respMerged.StatusCode)
+	require.NotNil(t, mergedDecoded)
+	assert.Len(t, mergedDecoded.Items, 2, "should have both local and peer groups in merged response")
+
+	// Unmerged request (profile=unmerged).
+	acceptHeader := "application/json;profile=unmerged"
+	respUnmerged, _, unmergedDecoded := fetchPath(wrapped, acceptHeader, "/apis", "")
+	require.Equal(t, http.StatusOK, respUnmerged.StatusCode)
+	require.NotNil(t, unmergedDecoded)
+	assert.Len(t, unmergedDecoded.Items, 1, "should have only local group in unmerged response")
+	assert.Equal(t, "local.example.com", unmergedDecoded.Items[0].Name)
+
+	// Check merged request metric.
+	metric := `
+# HELP aggregator_discovery_merged_count_total Counter of number of times a merged discovery response was served
+# TYPE aggregator_discovery_merged_count_total counter
+aggregator_discovery_merged_count_total 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(metric), "aggregator_discovery_merged_request_count_total"); err != nil {
+		t.Errorf("unexpected metrics output: %v", err)
+	}
 }
