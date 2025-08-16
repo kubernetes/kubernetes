@@ -18030,6 +18030,12 @@ func schema_k8sio_api_batch_v1_CronJobStatus(ref common.ReferenceCallback) commo
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
+					"nextScheduleTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Information when was the next time the job will be scheduled.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 				},
 			},
 		},
@@ -18945,6 +18951,12 @@ func schema_k8sio_api_batch_v1beta1_CronJobStatus(ref common.ReferenceCallback) 
 					"lastSuccessfulTime": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Information when was the last time the job successfully completed.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"nextScheduleTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Information when was the next time the job will be scheduled.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},

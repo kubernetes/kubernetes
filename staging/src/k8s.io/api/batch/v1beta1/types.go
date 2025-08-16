@@ -165,4 +165,8 @@ type CronJobStatus struct {
 	// Information when was the last time the job successfully completed.
 	// +optional
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty" protobuf:"bytes,5,opt,name=lastSuccessfulTime"`
+
+	// Information when was the next time the job will be scheduled.
+	// +optional
+	NextScheduleTime *metav1.Time `json:"nextScheduleTime,omitempty" protobuf:"bytes,6,opt,name=nextScheduleTime"`
 }
