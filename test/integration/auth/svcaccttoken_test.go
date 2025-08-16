@@ -33,8 +33,8 @@ import (
 	"testing"
 	"time"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -279,7 +279,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		}
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "pod")
 		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "secret")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -439,7 +439,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, nil)
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `"test-pod"`, "kubernetes.io", "pod", "name")
 		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "secret")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -521,7 +521,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			warningHandler.assertEqual(t, nil)
 
 			checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-			checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+			checkPayload(t, treq.Status.Token, `"api"`, "aud")
 			checkPayload(t, treq.Status.Token, `"test-pod"`, "kubernetes.io", "pod", "name")
 			checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "secret")
 			checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -644,7 +644,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, nil)
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
 		checkPayload(t, treq.Status.Token, `"test-node"`, "kubernetes.io", "node", "name")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -708,7 +708,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, nil)
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
 		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -930,7 +930,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		}
 		warningHandler.assertEqual(t, nil)
 
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 
 		doTokenReview(t, cs, treq, false)
 	})
@@ -960,7 +960,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, nil)
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `"test-pod"`, "kubernetes.io", "pod", "name")
 		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "secret")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -1003,7 +1003,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, nil)
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
 		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -1048,7 +1048,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, nil)
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
 		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -1094,7 +1094,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, []string{fmt.Sprintf("requested expiration of %d seconds shortened to %d seconds", tooLongExpirationTime, maxExpirationSeconds)})
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
 		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -1224,7 +1224,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			t.Fatalf("len(jwks.Keys) = %d, want 1", len(jwks.Keys))
 		}
 		key := jwks.Keys[0]
-		tok, err := jwt.ParseSigned(token)
+		tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.EdDSA, jose.HS256, jose.HS384, jose.HS512, jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.ES256})
 		if err != nil {
 			t.Fatalf("could not parse token %q: %v", token, err)
 		}

@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
+	jose "github.com/go-jose/go-jose/v4"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -465,7 +465,7 @@ func (k *keyIDPrefixer) GetPublicKeys(ctx context.Context, keyIDHint string) []s
 }
 
 func checkJSONWebSignatureHasKeyID(t *testing.T, jwsString string, expectedKeyID string) {
-	jws, err := jose.ParseSigned(jwsString)
+	jws, err := jose.ParseSigned(jwsString, []jose.SignatureAlgorithm{jose.EdDSA, jose.HS256, jose.HS384, jose.HS512, jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.ES256})
 	if err != nil {
 		t.Fatalf("Error checking for key ID: couldn't parse token: %v", err)
 	}
@@ -524,7 +524,7 @@ func generateECDSATokenWithMalformedIss(t *testing.T, serviceAccount *v1.Service
 
 	ecdsaToken := generateECDSAToken(t, "panda", serviceAccount, ecdsaSecret)
 
-	ecdsaTokenJWS, err := jose.ParseSigned(ecdsaToken)
+	ecdsaTokenJWS, err := jose.ParseSigned(ecdsaToken, []jose.SignatureAlgorithm{jose.EdDSA, jose.HS256, jose.HS384, jose.HS512, jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.ES256})
 	if err != nil {
 		t.Fatal(err)
 	}
