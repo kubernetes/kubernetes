@@ -109,7 +109,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 
 	endTime := time.Now().Add(o.Timeout)
 	timeout := time.Until(endTime)
-	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info) // nolint:staticcheck // SA1019
+	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrorInterrupted(nil), info) // nolint:staticcheck // SA1019
 	if o.Timeout == 0 {
 		// If timeout is zero we will fetch the object(s) once only and check
 		gottenObj, initObjGetErr := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(context.Background(), info.Name, metav1.GetOptions{})
