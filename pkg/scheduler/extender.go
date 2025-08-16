@@ -212,6 +212,9 @@ func (h *HTTPExtender) convertPodUIDToPod(
 	metaPod *extenderv1.MetaPod,
 	nodeInfo fwk.NodeInfo) (*v1.Pod, error) {
 	for _, p := range nodeInfo.GetPods() {
+		if p == nil {
+			continue
+		}
 		if string(p.GetPod().UID) == metaPod.UID {
 			return p.GetPod(), nil
 		}

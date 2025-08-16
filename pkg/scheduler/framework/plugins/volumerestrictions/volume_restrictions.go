@@ -272,6 +272,9 @@ func satisfyVolumeConflicts(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
 			continue
 		}
 		for _, ev := range nodeInfo.GetPods() {
+			if ev == nil {
+				continue
+			}
 			if isVolumeConflict(&v, ev.GetPod()) {
 				return false
 			}

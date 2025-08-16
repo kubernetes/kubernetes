@@ -252,6 +252,9 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 	// check if the given pod can be scheduled.
 	podPriority := corev1helpers.PodPriority(pod)
 	for _, p := range nodeInfoCopy.GetPods() {
+		if p == nil {
+			continue
+		}
 		if corev1helpers.PodPriority(p.GetPod()) < podPriority {
 			potentialVictims = append(potentialVictims, p.GetPod())
 			if err := removePod(p.GetPod()); err != nil {
