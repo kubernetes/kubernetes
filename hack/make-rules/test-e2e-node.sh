@@ -18,7 +18,6 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
-kube::golang::setup_gomaxprocs
 
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
@@ -231,7 +230,7 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
     --target-build-arch="${target_build_arch}" \
     --extra-envs="${extra_envs}" --kubelet-config-file="${kubelet_config_file}"  --test-suite="${test_suite}" \
     "${timeout_arg}" \
-    2>&1 | tee -i "${artifacts}/build-log.txt"
+    2>&1 | tee -i "${artifacts}/log.txt"
   exit $?
 
 elif [ "${remote}" = true ] && [ "${remote_mode}" = ssh ] ; then
@@ -253,7 +252,7 @@ elif [ "${remote}" = true ] && [ "${remote_mode}" = ssh ] ; then
     --ssh-user="${ssh_user}" --ssh-key="${ssh_key}" --ssh-options="${ssh_options}" \
     --extra-envs="${extra_envs}" --test-suite="${test_suite}" \
     "${timeout_arg}" \
-    2>&1 | tee -i "${artifacts}/build-log.txt"
+    2>&1 | tee -i "${artifacts}/log.txt"
   exit $?
 
 else
@@ -285,6 +284,6 @@ else
     --test-flags="--v 4 --report-dir=${artifacts} --node-name $(hostname) ${test_args}" \
     --runtime-config="${runtime_config}" \
     --kubelet-config-file="${kubelet_config_file}" \
-    --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
+    --build-dependencies=true 2>&1 | tee -i "${artifacts}/log.txt"
   exit $?
 fi
