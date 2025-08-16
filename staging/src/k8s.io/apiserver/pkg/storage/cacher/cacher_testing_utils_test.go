@@ -57,7 +57,7 @@ func init() {
 func newPod() runtime.Object     { return &example.Pod{} }
 func newPodList() runtime.Object { return &example.PodList{} }
 
-func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
+func newEtcdTestStorage(t testing.TB, prefix string, reverseKeyFunc func(string) (string, string, error)) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	versioner := storage.APIObjectVersioner{}
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
@@ -69,6 +69,7 @@ func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServ
 		codec,
 		newPod,
 		newPodList,
+		reverseKeyFunc,
 		prefix,
 		"/pods",
 		schema.GroupResource{Resource: "pods"},
