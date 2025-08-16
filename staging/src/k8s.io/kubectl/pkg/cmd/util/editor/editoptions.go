@@ -670,8 +670,23 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 		versionedObject, err := scheme.Scheme.New(info.Mapping.GroupVersionKind)
 		var patchType types.PatchType
 		var patch []byte
+
+		originalAnnotations := getAnnotations(originalJS)
+		editedAnnotations := getAnnotations(editedJS)
+
+		// Detect AppArmor annotation change
+		apparmorChanged := false
+		for key, editedVal := range editedAnnotations {
+			if strings.HasPrefix(key, "container.apparmor.security.beta.kubernetes.io/") {
+				if originalAnnotations[key] != editedVal {
+					apparmorChanged = true
+					klog.V(4).Infof("AppArmor annotation change detected; using MergePatch strategy")
+					break
+				}
+			}
+		}
 		switch {
-		case runtime.IsNotRegisteredError(err):
+		case runtime.IsNotRegisteredError(err) || apparmorChanged:
 			// fall back to generic JSON merge patch
 			patchType = types.MergePatchType
 			patch, err = jsonpatch.CreateMergePatch(originalJS, editedJS)
@@ -726,6 +741,29 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 		return printer.PrintObj(info.Object, o.Out)
 	})
 	return err
+}
+
+func getAnnotations(objJSON []byte) map[string]string {
+	var objMap map[string]interface{}
+	_ = json.Unmarshal(objJSON, &objMap)
+
+	meta, ok := objMap["metadata"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	annotations, ok := meta["annotations"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	result := make(map[string]string)
+	for k, v := range annotations {
+		if strVal, ok := v.(string); ok {
+			result[k] = strVal
+		}
+	}
+	return result
 }
 
 func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
