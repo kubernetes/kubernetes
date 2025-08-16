@@ -406,8 +406,6 @@ type NodeLifecycleControllerConfiguration struct {
 	// to post node status. This value should also be greater than the sum of
 	// HTTP2_PING_TIMEOUT_SECONDS and HTTP2_READ_IDLE_TIMEOUT_SECONDS.
 	NodeMonitorGracePeriod metav1.Duration
-	// podEvictionTimeout is the grace period for deleting pods on failed nodes.
-	PodEvictionTimeout metav1.Duration
 	// secondaryNodeEvictionRate is implicitly overridden to 0 for clusters smaller than or equal to largeClusterSizeThreshold
 	LargeClusterSizeThreshold int32
 	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
