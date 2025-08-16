@@ -1608,7 +1608,7 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 	logger := klog.FromContext(ctx)
 	var cStatus *kubecontainer.Status
 	for _, c := range podStatus.ContainerStatuses {
-		if c.Name == container.Name && c.State == kubecontainer.ContainerStateExited {
+		if c.Name == container.Name && c.State == kubecontainer.ContainerStateExited && c.ExitCode != 0 {
 			cStatus = c
 			break
 		}
@@ -1623,6 +1623,13 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 	ts := cStatus.FinishedAt
 	// backOff requires a unique key to identify the container.
 	key := GetBackoffKey(pod, container)
+
+	// If we're not currently in backoff, advance the backoff counter.
+	// This ensures that even the first crash will establish a backoff period.
+	if !backOff.IsInBackOffSince(key, ts) {
+		backOff.Next(key, ts)
+	}
+
 	if backOff.IsInBackOffSince(key, ts) {
 		if containerRef, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
 			m.recorder.Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer,
@@ -1633,7 +1640,6 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 		return true, err.Error(), kubecontainer.ErrCrashLoopBackOff
 	}
 
-	backOff.Next(key, ts)
 	return false, "", nil
 }
 
