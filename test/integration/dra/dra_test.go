@@ -1619,9 +1619,9 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 
 	// fail the binding condition for the second claim, so that it gets scheduled later.
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		latest, getErr := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim2.Name, metav1.GetOptions{})
-		if getErr != nil {
-			return getErr
+		latest, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim2.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
 		latest.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
 			Driver: driverName,
@@ -1636,8 +1636,8 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 				Message:            "The test has seen the allocation and is failing the binding.",
 			}},
 		}}
-		_, updateErr := tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, latest, metav1.UpdateOptions{})
-		return updateErr
+		_, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, latest, metav1.UpdateOptions{})
+		return err
 	})
 	tCtx.ExpectNoError(err, "add binding failure condition to second claim")
 
@@ -1660,9 +1660,9 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 
 	// Allow the scheduler to proceed.
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		latest, getErr := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim2.Name, metav1.GetOptions{})
-		if getErr != nil {
-			return getErr
+		latest, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim2.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
 		latest.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
 			Driver: driverName,
@@ -1677,8 +1677,8 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 				Message:            "The test has seen the allocation.",
 			}},
 		}}
-		_, updateErr := tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, latest, metav1.UpdateOptions{})
-		return updateErr
+		_, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, latest, metav1.UpdateOptions{})
+		return err
 	})
 	tCtx.ExpectNoError(err, "add binding condition to second claim")
 	err = waitForPodScheduled(tCtx, tCtx.Client(), namespace, pod.Name)
