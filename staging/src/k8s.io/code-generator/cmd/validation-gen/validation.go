@@ -148,21 +148,60 @@ func (g *genValidations) GenerateType(c *generator.Context, t *types.Type, w io.
 
 // typeDiscoverer contains fields necessary to build graphs of types.
 type typeDiscoverer struct {
-	validator  validators.Validator
-	inputToPkg map[string]string
+	initialized bool
+	validator   validators.Validator
+	inputToPkg  map[string]string
+
+	// constantsByType holds a map of type to constants of that type.
+	constantsByType map[*types.Type][]*validators.Constant
 
 	// typeNodes holds a map of gengo Type to typeNode for all of the types
 	// encountered during discovery.
 	typeNodes map[*types.Type]*typeNode
 }
 
-// NewTypeDiscoverer creates and initializes a NewTypeDiscoverer.
+// NewTypeDiscoverer creates a NewTypeDiscoverer.
+// Init must be called before calling DiscoverType.
 func NewTypeDiscoverer(validator validators.Validator, inputToPkg map[string]string) *typeDiscoverer {
 	return &typeDiscoverer{
-		validator:  validator,
-		inputToPkg: inputToPkg,
-		typeNodes:  map[*types.Type]*typeNode{},
+		validator:       validator,
+		inputToPkg:      inputToPkg,
+		constantsByType: map[*types.Type][]*validators.Constant{},
+		typeNodes:       map[*types.Type]*typeNode{},
 	}
+}
+
+// Init uses the generator context to prepare for type discovery.
+func (td *typeDiscoverer) Init(c *generator.Context) error {
+	packages := c.Universe
+	for _, pkg := range packages {
+		// We only care about packages we are generating for or are readonly.
+		if _, ok := td.inputToPkg[pkg.Path]; !ok {
+			continue
+		}
+		for _, cnst := range pkg.Constants {
+			context := validators.Context{
+				Scope:      validators.ScopeConst,
+				Type:       cnst.Underlying,
+				Path:       nil, // NA when discovering a constant
+				Member:     nil, // NA when discovering a constant
+				ParentPath: nil, // NA when discovering a constant
+			}
+			tgs, err := td.validator.ExtractTags(context, cnst.CommentLines)
+			if err != nil {
+				return fmt.Errorf("constant %s: %w", cnst.Name, err)
+			}
+			if len(tgs) > 0 {
+				// Also check that the tgs are valid.
+				if _, err := td.validator.ExtractValidations(context, tgs...); err != nil {
+					return fmt.Errorf("constant %s: %w", cnst.Name, err)
+				}
+			}
+			td.constantsByType[cnst.Underlying] = append(td.constantsByType[cnst.Underlying], &validators.Constant{Constant: cnst, Tags: tgs})
+		}
+	}
+	td.initialized = true
+	return nil
 }
 
 // childNode represents a type which is used in another type (e.g. a struct
@@ -210,6 +249,9 @@ type typeNode struct {
 // typeDiscoverer.  If this is called multiple times for different types, the
 // graphs will be will be merged.
 func (td *typeDiscoverer) DiscoverType(t *types.Type) error {
+	if !td.initialized {
+		return fmt.Errorf("typeDiscoverer not initialized")
+	}
 	if t.Kind == types.Pointer {
 		return fmt.Errorf("type %v: pointer root-types are not supported", t)
 	}
@@ -349,11 +391,14 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		if fldPath.String() != t.String() {
 			panic(fmt.Sprintf("path for type != the type name: %s, %s", t.String(), fldPath.String()))
 		}
+		consts, _ := td.constantsByType[t]
 		context := validators.Context{
 			Scope:      validators.ScopeType,
 			Type:       t,
-			ParentPath: nil,
 			Path:       fldPath,
+			Member:     nil, // NA when discovering a type
+			ParentPath: nil, // NA when discovering a type
+			Constants:  consts,
 		}
 		extractedTags, err := td.validator.ExtractTags(context, t.CommentLines)
 		if err != nil {
@@ -1440,6 +1485,29 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			sw.Do(")", nil)
 		}
 		sw.Do(" { $.$ }", v.Body)
+	case validators.StructLiteral:
+		targs := generator.Args{
+			"type": c.Universe.Type(v.Type),
+		}
+		sw.Do("$.type|raw$", targs)
+		if len(v.TypeArgs) > 0 {
+			sw.Do("[", nil)
+			for i, typeArg := range v.TypeArgs {
+				if i > 0 {
+					sw.Do(", ", nil)
+				}
+				sw.Do("$.|raw$", typeArg)
+			}
+			sw.Do("]", nil)
+		}
+		sw.Do("{\n", nil)
+		for _, f := range v.Fields {
+			sw.Do(f.Name, nil)
+			sw.Do(": ", nil)
+			toGolangSourceDataLiteral(sw, c, f.Value)
+			sw.Do(", ", nil)
+		}
+		sw.Do("}", targs)
 	default:
 		rv := reflect.ValueOf(value)
 		switch rv.Kind() {

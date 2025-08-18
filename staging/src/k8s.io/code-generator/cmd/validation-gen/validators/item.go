@@ -58,7 +58,7 @@ func (itemTagValidator) TagName() string {
 	return itemTagName
 }
 
-var itemTagValidScopes = sets.New(ScopeAny)
+var itemTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 
 func (itemTagValidator) ValidScopes() sets.Set[Scope] {
 	return itemTagValidScopes

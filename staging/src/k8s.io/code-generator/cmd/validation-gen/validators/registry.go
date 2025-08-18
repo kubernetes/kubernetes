@@ -152,7 +152,8 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 	for _, tags := range phases {
 		for _, tag := range tags {
 			tv := reg.tagValidators[tag.Name]
-			if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) && !scopes.Has(ScopeAny) {
+			// At this point we know tv exists and is not nil due to the upfront check
+			if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
 				return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
 			}
 			if err := typeCheck(tag, tv.Docs()); err != nil {
