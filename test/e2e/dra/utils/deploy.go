@@ -94,8 +94,6 @@ type Nodes struct {
 	// requested via NumReservedNodes. Those nodes are
 	// different than the nodes listed in NodeNames.
 	ExtraNodeNames []string
-
-	claimStore cache.Store
 }
 
 // NewNodes selects nodes to run the test on.
@@ -179,7 +177,6 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 		0,
 		nil,
 	)
-	nodes.claimStore = claimInformer.GetStore()
 	cancelCtx, cancel := context.WithCancelCause(context.Background())
 	var wg sync.WaitGroup
 	ginkgo.DeferCleanup(func() {
@@ -215,15 +212,6 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 		defer wg.Done()
 		claimInformer.Run(cancelCtx.Done())
 	}()
-}
-
-func (nodes *Nodes) ListCachedResourceClaims() []*resourceapi.ResourceClaim {
-	objs := nodes.claimStore.List()
-	claims := make([]*resourceapi.ResourceClaim, len(objs))
-	for i := range objs {
-		claims[i] = objs[i].(*resourceapi.ResourceClaim)
-	}
-	return claims
 }
 
 type watchWrapper struct {
