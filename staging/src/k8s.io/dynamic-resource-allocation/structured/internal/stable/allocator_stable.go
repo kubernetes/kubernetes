@@ -56,7 +56,6 @@ var SupportedFeatures = internal.Features{}
 
 type Allocator struct {
 	features         Features
-	claimsToAllocate []*resourceapi.ResourceClaim
 	allocatedDevices sets.Set[DeviceID]
 	classLister      DeviceClassLister
 	slices           []*resourceapi.ResourceSlice
@@ -101,13 +100,13 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		ctx:                  ctx, // all methods share the same a and thus ctx
 		logger:               klog.FromContext(ctx),
 		node:                 node,
+		claimsToAllocate:     claims,
 		deviceMatchesRequest: make(map[matchKey]bool),
 		constraints:          make([][]constraint, len(claims)),
 		consumedCounters:     make(map[string]counterSets),
 		requestData:          make(map[requestIndices]requestData),
 		result:               make([]internalAllocationResult, len(claims)),
 	}
-	alloc.claimsToAllocate = claims
 	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate))
 	defer alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
 
@@ -453,6 +452,7 @@ type allocator struct {
 	ctx                  context.Context
 	logger               klog.Logger
 	node                 *v1.Node
+	claimsToAllocate     []*resourceapi.ResourceClaim
 	pools                []*Pool
 	deviceMatchesRequest map[matchKey]bool
 	constraints          [][]constraint // one list of constraints per claim
