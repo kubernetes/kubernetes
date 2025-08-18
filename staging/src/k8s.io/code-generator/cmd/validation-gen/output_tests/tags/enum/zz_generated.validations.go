@@ -38,6 +38,13 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	scheme.AddValidationFunc((*ConditionalStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ConditionalStruct(ctx, op, nil /* fldPath */, obj.(*ConditionalStruct), safe.Cast[*ConditionalStruct](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -48,6 +55,47 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+var exclusionsForConditionalEnum = validate.NewExclusions[ConditionalEnum](validate.EnumExclusion[ConditionalEnum]{
+	Value: ConditionalA, Option: "FeatureA", ExcludeWhenEnabled: true}, validate.EnumExclusion[ConditionalEnum]{
+	Value: ConditionalB, Option: "FeatureB", ExcludeWhenEnabled: false}, validate.EnumExclusion[ConditionalEnum]{
+	Value: ConditionalD, Option: "FeatureA", ExcludeWhenEnabled: true}, validate.EnumExclusion[ConditionalEnum]{
+	Value: ConditionalD, Option: "FeatureB", ExcludeWhenEnabled: true}, validate.EnumExclusion[ConditionalEnum]{
+	Value: ConditionalE, Option: "FeatureC", ExcludeWhenEnabled: false}, validate.EnumExclusion[ConditionalEnum]{
+	Value: ConditionalE, Option: "FeatureD", ExcludeWhenEnabled: false}, validate.EnumExclusion[ConditionalEnum]{
+	Value: ConditionalF, Option: "FeatureC", ExcludeWhenEnabled: false}, validate.EnumExclusion[ConditionalEnum]{
+	Value: ConditionalF, Option: "FeatureD", ExcludeWhenEnabled: true})
+var symbolsForConditionalEnum = sets.New[ConditionalEnum](ConditionalA, ConditionalB, ConditionalC, ConditionalD, ConditionalE, ConditionalF)
+
+func Validate_ConditionalEnum(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ConditionalEnum) (errs field.ErrorList) {
+	// type ConditionalEnum
+	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+		return nil // no changes
+	}
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForConditionalEnum, exclusionsForConditionalEnum)...)
+
+	return errs
+}
+
+func Validate_ConditionalStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ConditionalStruct) (errs field.ErrorList) {
+	// field ConditionalStruct.TypeMeta has no validation
+
+	// field ConditionalStruct.ConditionalEnumField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *ConditionalEnum) (errs field.ErrorList) {
+			errs = append(errs, Validate_ConditionalEnum(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("conditionalEnumField"), &obj.ConditionalEnumField, safe.Field(oldObj, func(oldObj *ConditionalStruct) *ConditionalEnum { return &oldObj.ConditionalEnumField }))...)
+
+	// field ConditionalStruct.ConditionalEnumPtrField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *ConditionalEnum) (errs field.ErrorList) {
+			errs = append(errs, Validate_ConditionalEnum(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("conditionalEnumPtrField"), obj.ConditionalEnumPtrField, safe.Field(oldObj, func(oldObj *ConditionalStruct) *ConditionalEnum { return oldObj.ConditionalEnumPtrField }))...)
+
+	return errs
+}
+
 var symbolsForEnum0 = sets.New[Enum0]()
 
 func Validate_Enum0(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Enum0) (errs field.ErrorList) {
@@ -55,7 +103,7 @@ func Validate_Enum0(ctx context.Context, op operation.Operation, fldPath *field.
 	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 		return nil // no changes
 	}
-	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum0)...)
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum0, nil)...)
 
 	return errs
 }
@@ -67,7 +115,7 @@ func Validate_Enum1(ctx context.Context, op operation.Operation, fldPath *field.
 	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 		return nil // no changes
 	}
-	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum1)...)
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum1, nil)...)
 
 	return errs
 }
@@ -79,7 +127,19 @@ func Validate_Enum2(ctx context.Context, op operation.Operation, fldPath *field.
 	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 		return nil // no changes
 	}
-	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum2)...)
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum2, nil)...)
+
+	return errs
+}
+
+var symbolsForEnumWithExclude = sets.New[EnumWithExclude](EnumWithExclude1)
+
+func Validate_EnumWithExclude(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *EnumWithExclude) (errs field.ErrorList) {
+	// type EnumWithExclude
+	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+		return nil // no changes
+	}
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnumWithExclude, nil)...)
 
 	return errs
 }
@@ -131,5 +191,20 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.NotEnumField has no validation
 	// field Struct.NotEnumPtrField has no validation
+
+	// field Struct.EnumWithExcludeField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *EnumWithExclude) (errs field.ErrorList) {
+			errs = append(errs, Validate_EnumWithExclude(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("enumWithExcludeField"), &obj.EnumWithExcludeField, safe.Field(oldObj, func(oldObj *Struct) *EnumWithExclude { return &oldObj.EnumWithExcludeField }))...)
+
+	// field Struct.EnumWithExcludePtrField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *EnumWithExclude) (errs field.ErrorList) {
+			errs = append(errs, Validate_EnumWithExclude(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("enumWithExcludePtrField"), obj.EnumWithExcludePtrField, safe.Field(oldObj, func(oldObj *Struct) *EnumWithExclude { return oldObj.EnumWithExcludePtrField }))...)
+
 	return errs
 }
