@@ -1279,25 +1279,29 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 		logger.V(4).Info("Creating PodSandbox for pod", "pod", klog.KObj(pod))
 		metrics.StartedPodsTotal.Inc()
-		if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		isUserNamespaced := utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers
+		if isUserNamespaced {
 			metrics.StartedUserNamespacedPodsTotal.Inc()
-			// Failures in user namespace creation could happen at any point in the pod lifecycle,
-			// but usually will be caught in container creation.
-			// To avoid specifically handling each error case, loop through the result after the sync finishes
-			defer func() {
-				// catch unhandled errors
+		}
+		defer func() {
+			hasError := result.SyncError != nil
+			// catch unhandled errors
+			if !hasError {
 				for _, res := range result.SyncResults {
 					if res.Error != nil {
-						metrics.StartedUserNamespacedPodsErrorsTotal.Inc()
-						return
+						hasError = true
+						break
 					}
 				}
-				// catch handled error
-				if result.SyncError != nil {
+			}
+
+			if hasError {
+				metrics.StartedPodsErrorsTotal.Inc()
+				if isUserNamespaced {
 					metrics.StartedUserNamespacedPodsErrorsTotal.Inc()
 				}
-			}()
-		}
+			}
+		}()
 		createSandboxResult := kubecontainer.NewSyncResult(kubecontainer.CreatePodSandbox, format.Pod(pod))
 		result.AddSyncResult(createSandboxResult)
 
@@ -1338,7 +1342,6 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 				logger.V(4).Info("Pod was deleted and sandbox failed to be created", "pod", klog.KObj(pod), "podUID", pod.UID)
 				return
 			}
-			metrics.StartedPodsErrorsTotal.Inc()
 			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
 			logger.Error(err, "CreatePodSandbox for pod failed", "pod", klog.KObj(pod))
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)

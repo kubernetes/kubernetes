@@ -707,7 +707,7 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	// StartedPodsErrorsTotal is a counter that tracks the number of errors creating pod sandboxes
+	// StartedPodsErrorsTotal is a counter that tracks the number of errors creating pods.
 	StartedPodsErrorsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
