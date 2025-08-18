@@ -955,7 +955,7 @@ type EmptyDirVolumeSource struct {
 	// StickyBit set the emptyDir permission to 1777, not 0777
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 	// +optional
-	StickyBit *bool `json:"stickyBit,omitempty"`
+	StickyBit *bool `json:"stickyBit,omitempty" protobuf:"varint,3,opt,name=stickyBit"`
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.

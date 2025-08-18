@@ -21405,6 +21405,13 @@ func schema_k8sio_api_core_v1_EmptyDirVolumeSource(ref common.ReferenceCallback)
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
+					"stickyBit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "StickyBit set the emptyDir permission to 1777, not 0777 More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
