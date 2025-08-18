@@ -169,3 +169,13 @@ kube::log::status() {
     echo "    ${message}"
   done
 }
+
+# Log a command and run it. Uses a subshell which gets replaced by the command after logging.
+kube::log::run() (
+  V="${V:-0}"
+  if (( KUBE_VERBOSE >= V )); then
+    timestamp=$(date +"[%m%d %H:%M:%S]")
+    echo "+++ ${timestamp} ${*}"
+  fi
+  exec "${@}"
+)
