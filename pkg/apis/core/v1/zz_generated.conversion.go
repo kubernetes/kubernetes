@@ -3723,7 +3723,7 @@ func Convert_core_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource(in *core
 func autoConvert_v1_EmptyDirVolumeSource_To_core_EmptyDirVolumeSource(in *corev1.EmptyDirVolumeSource, out *core.EmptyDirVolumeSource, s conversion.Scope) error {
 	out.Medium = core.StorageMedium(in.Medium)
 	out.SizeLimit = (*resource.Quantity)(unsafe.Pointer(in.SizeLimit))
-	out.StickyBit = in.StickyBit
+	out.StickyBit = (*bool)(unsafe.Pointer(in.StickyBit))
 	return nil
 }
 
@@ -3735,7 +3735,7 @@ func Convert_v1_EmptyDirVolumeSource_To_core_EmptyDirVolumeSource(in *corev1.Emp
 func autoConvert_core_EmptyDirVolumeSource_To_v1_EmptyDirVolumeSource(in *core.EmptyDirVolumeSource, out *corev1.EmptyDirVolumeSource, s conversion.Scope) error {
 	out.Medium = corev1.StorageMedium(in.Medium)
 	out.SizeLimit = (*resource.Quantity)(unsafe.Pointer(in.SizeLimit))
-	out.StickyBit = in.StickyBit
+	out.StickyBit = (*bool)(unsafe.Pointer(in.StickyBit))
 	return nil
 }
 
