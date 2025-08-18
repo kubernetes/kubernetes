@@ -321,7 +321,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 					return
 				}
 
-				freshPod, err := getPodFn(pod.Namespace, pod.Name)
+				freshPod, err := getPodFn(activePod.Namespace, activePod.Name)
 				// we ignore errors and let eviction sort it out with the original pod.
 				if err == nil {
 					activePod = *freshPod
