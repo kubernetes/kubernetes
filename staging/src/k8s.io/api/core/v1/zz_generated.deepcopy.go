@@ -1266,6 +1266,11 @@ func (in *EmptyDirVolumeSource) DeepCopyInto(out *EmptyDirVolumeSource) {
 		x := (*in).DeepCopy()
 		*out = &x
 	}
+	if in.StickyBit != nil {
+		in, out := &in.StickyBit, &out.StickyBit
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
