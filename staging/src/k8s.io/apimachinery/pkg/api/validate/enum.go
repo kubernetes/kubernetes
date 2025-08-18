@@ -28,17 +28,12 @@ import (
 // Enum verifies that a given value is a member of a set of enum values.
 // Exclude Rules that apply when options are enabled or disabled are also considered.
 // If ANY exclude rule matches for a value, that value is excluded from the enum when validating.
-func Enum[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T, values sets.Set[T], exclusions []EnumExclusion[T]) field.ErrorList {
+func Enum[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T, validValues sets.Set[T], exclusions []EnumExclusion[T]) field.ErrorList {
 	if value == nil {
 		return nil
 	}
-	if !values.Has(*value) {
-		return field.ErrorList{field.NotSupported[T](fldPath, *value, supportedValues(op, values, exclusions))}
-	}
-	for _, rule := range exclusions {
-		if rule.ExcludeWhenEnabled == op.HasOption(rule.Option) && *value == rule.Value {
-			return field.ErrorList{field.NotSupported[T](fldPath, *value, supportedValues(op, values, exclusions))}
-		}
+	if !validValues.Has(*value) || isExcluded(op, exclusions, *value) {
+		return field.ErrorList{field.NotSupported[T](fldPath, *value, supportedValues(op, validValues, exclusions))}
 	}
 	return nil
 }
@@ -66,17 +61,17 @@ func NewExclusions[T ~string](rules ...EnumExclusion[T]) []EnumExclusion[T] {
 type EnumExclusion[T ~string] struct {
 	// Value specifies the enum value to be conditionally excluded.
 	Value T
-	// ExcludeWhenEnabled determines the condition for exclusion.
+	// ExcludeWhen determines the condition for exclusion.
 	// If true, the value is excluded if the option is present.
 	// If false, the value is excluded if the option is NOT present.
-	ExcludeWhenEnabled bool
+	ExcludeWhen bool
 	// Option is the name of the feature option that controls the exclusion.
 	Option string
 }
 
 func isExcluded[T ~string](op operation.Operation, exclusions []EnumExclusion[T], value T) bool {
 	for _, rule := range exclusions {
-		if rule.Value == value && rule.ExcludeWhenEnabled == op.HasOption(rule.Option) {
+		if rule.Value == value && rule.ExcludeWhen == op.HasOption(rule.Option) {
 			return true
 		}
 	}
