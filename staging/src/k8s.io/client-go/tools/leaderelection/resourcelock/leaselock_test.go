@@ -278,6 +278,8 @@ func TestUpdateWithNilLabelsOnLease(t *testing.T) {
 		t.Fatalf("Failed to get lease: %v", err)
 	}
 
+	leaseLock.lease.Labels = nil
+
 	leaseLock.Labels = map[string]string{"custom-key": "custom-val"}
 
 	// Update should succeed even with nil Labels on the lease itself
@@ -285,7 +287,6 @@ func TestUpdateWithNilLabelsOnLease(t *testing.T) {
 		t.Errorf("Update failed with nil Labels: %v", err)
 	}
 }
-
 
 func TestUpdateWithNilLabelsOnLeaseLock(t *testing.T) {
 	setup()
@@ -298,6 +299,8 @@ func TestUpdateWithNilLabelsOnLeaseLock(t *testing.T) {
 	if _, _, err := leaseLock.Get(context.Background()); err != nil {
 		t.Fatalf("Failed to get lease: %v", err)
 	}
+
+	leaseLock.Labels = nil
 
 	leaseLock.lease.Labels = map[string]string{"custom-key": "custom-val"}
 
