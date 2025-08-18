@@ -42,9 +42,7 @@ func (minimumTagValidator) TagName() string {
 	return minimumTagName
 }
 
-var minimumTagValidScopes = sets.New(
-	ScopeAny,
-)
+var minimumTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 
 func (minimumTagValidator) ValidScopes() sets.Set[Scope] {
 	return minimumTagValidScopes
