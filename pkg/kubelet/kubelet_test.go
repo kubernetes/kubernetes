@@ -474,34 +474,6 @@ func newTestPods(count int) []*v1.Pod {
 	return pods
 }
 
-func newTestPodsWithResources(count int) (pods []*v1.Pod, containerNames []string) {
-	pods = make([]*v1.Pod, count)
-	containerNames = make([]string, count)
-	for i := 0; i < count; i++ {
-		containerName := fmt.Sprintf("container%d", i)
-		containerNames[i] = containerName
-		pods[i] = &v1.Pod{
-			Spec: v1.PodSpec{
-				HostNetwork: true,
-				Containers: []v1.Container{{
-					Name: containerName,
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("1m"),
-							v1.ResourceMemory: resource.MustParse("1Mi"),
-						},
-					},
-				}},
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				UID:  types.UID(strconv.Itoa(10000 + i)),
-				Name: fmt.Sprintf("pod%d", i),
-			},
-		}
-	}
-	return pods, containerNames
-}
-
 func TestSyncLoopAbort(t *testing.T) {
 	ctx := context.Background()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -844,6 +816,34 @@ func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
 			t.Fatalf("allocation for pod %q container %q not released", p.Name, cn)
 		}
 	}
+}
+
+func newTestPodsWithResources(count int) (pods []*v1.Pod, containerNames []string) {
+	pods = make([]*v1.Pod, count)
+	containerNames = make([]string, count)
+	for i := 0; i < count; i++ {
+		containerName := fmt.Sprintf("container%d", i)
+		containerNames[i] = containerName
+		pods[i] = &v1.Pod{
+			Spec: v1.PodSpec{
+				HostNetwork: true,
+				Containers: []v1.Container{{
+					Name: containerName,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1m"),
+							v1.ResourceMemory: resource.MustParse("1Mi"),
+						},
+					},
+				}},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  types.UID(strconv.Itoa(10000 + i)),
+				Name: fmt.Sprintf("pod%d", i),
+			},
+		}
+	}
+	return pods, containerNames
 }
 
 func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
