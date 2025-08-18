@@ -190,12 +190,12 @@ pulling images from a private or public registry.
 Registry serving two APIs:
 
 - `/v2/` - public registry
-- `/private/v2` - private registry, protected by basic auth with `test:test` credentials
+- `/private/v2` - private registry, protected by basic auth with `user:password` credentials
 
 Usage:
 
 ```console
-    kubectl exec test-agnhost -- /agnhost fake-registry-server
+kubectl exec test-agnhost -- /agnhost fake-registry-server
 ```
 
 #### Adding new image to the registry

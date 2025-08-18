@@ -266,7 +266,7 @@ func TestRegistryServer(t *testing.T) {
 		t.Run("GET with correct auth", func(t *testing.T) {
 			url := fmt.Sprintf("%s/private/v2/%s/blobs/%s", server.URL, testImageName, testBlobDigest)
 			req, _ := http.NewRequest(http.MethodGet, url, nil)
-			req.SetBasicAuth("test", "test")
+			req.SetBasicAuth("user", "password")
 			resp, err := client.Do(req)
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)

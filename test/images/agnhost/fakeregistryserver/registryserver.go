@@ -67,7 +67,7 @@ func NewRegistryServerMux() *http.ServeMux {
 func auth(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
-		if !ok || user != "test" || pass != "test" {
+		if !ok || user != "user" || pass != "password" {
 			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte("Unauthorized\n"))
