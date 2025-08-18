@@ -317,10 +317,10 @@ linters:
         - pattern: \.Add$
           pkg: ^k8s\.io/component-base/featuregate$         
           msg: should not use Add, use AddVersioned instead
-    gocritic:	
-      enabled-checks:	
-        - equalFold	
-        - boolExprSimplify	
+    gocritic:
+      enabled-checks:
+        - equalFold
+        - boolExprSimplify
         - deprecatedComment
     revive:
       # Only these rules are enabled.
