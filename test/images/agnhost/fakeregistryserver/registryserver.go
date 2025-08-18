@@ -32,6 +32,11 @@ var (
 	registryDir = "/var/registry"
 )
 
+const (
+	privateRegistryUser = "user"
+	privateRegistryPass = "password"
+)
+
 func init() {
 	CmdFakeRegistryServer.Flags().IntVar(&port, "port", 5000, "Port number.")
 }
@@ -67,7 +72,7 @@ func NewRegistryServerMux() *http.ServeMux {
 func auth(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
-		if !ok || user != "user" || pass != "password" {
+		if !ok || user != privateRegistryUser || pass != privateRegistryPass {
 			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte("Unauthorized\n"))
