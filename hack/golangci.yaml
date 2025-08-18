@@ -319,7 +319,8 @@ linters:
     gocritic:	
       enabled-checks:	
         - equalFold	
-        - boolExprSimplify
+        - boolExprSimplify	
+        - deprecatedComment
     revive:
       # Only these rules are enabled.
       rules:
