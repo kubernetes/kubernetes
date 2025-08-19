@@ -128,42 +128,20 @@ linters:
       # Pre-existing issues from the conditions linter
       
       # Conditions generally should be a metav1.Condition, and should not use custom condition types.
-      - text: "Conditions field in StorageVersionStatus must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/apiserverinternal/"
-      - text: "Conditions field in StatefulSetStatus|DeploymentStatus|DaemonSetStatus|ReplicaSetStatus must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/apps/"
-      - text: "Conditions field in HorizontalPodAutoscalerStatus must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/autoscaling/"
-      - text: "Conditions field in JobStatus must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/batch/"
-      - text: "Conditions field in CertificateSigningRequestStatus must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/certificates/"
-      - text: "Conditions field in PersistentVolumeClaimStatus|ReplicationControllerStatus|ServiceStatus|NodeStatus|NamespaceStatus|ComponentStatus|PodStatus must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/core/"
-      - text: "Conditions field in FlowSchemaStatus|PriorityLevelConfigurationStatus must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/flowcontrol/"
-      - text: "Conditions field in PodDisruptionBudgetStatus must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/policy/"
-      - text: "Conditions field in AllocatedDeviceStatus must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/resource/"
-      - text: "Conditions field in Endpoint must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/discovery/"
-      - text: "Conditions field in StatefulSetStatus|DeploymentStatus|DaemonSetStatus|ReplicaSetStatus must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/extensions/"
-      - text: "Conditions field in StorageVersionMigrationStatus must be a slice of metav1.Condition"
-        path: "staging/src/k8s.io/api/storagemigration/"
+      - text: "Conditions field in StorageVersionStatus|StatefulSetStatus|DeploymentStatus|DaemonSetStatus|ReplicaSetStatus|HorizontalPodAutoscalerStatus|JobStatus|CertificateSigningRequestStatus|PersistentVolumeClaimStatus|ReplicationControllerStatus|ServiceStatus|NodeStatus|NamespaceStatus|ComponentStatus|PodStatus|FlowSchemaStatus|PriorityLevelConfigurationStatus|FlowSchemaStatus|PriorityLevelConfigurationStatus|PodDisruptionBudgetStatus|AllocatedDeviceStatus|Endpoint|StatefulSetStatus|DeploymentStatus|DaemonSetStatus|ReplicaSetStatus|HorizontalPodAutoscalerStatus|JobStatus|CertificateSigningRequestStatus|PersistentVolumeClaimStatus|ReplicationControllerStatus|ServiceStatus|NodeStatus|NamespaceStatus|ComponentStatus|PodStatus|FlowSchemaStatus|PriorityLevelConfigurationStatus|FlowSchemaStatus|PriorityLevelConfigurationStatus|PodDisruptionBudgetStatus|AllocatedDeviceStatus|Endpoint|StorageVersionMigrationStatus must be a slice of metav1.Condition"
+        path: "staging/src/k8s.io/api/"
       
       # Conditions should have patch strategy markers, but changing these after shipping a client is a breaking change.
       # Clients would treat these as atomic, when the patch strategy should be merge.
       - text: "Conditions field in ValidatingAdmissionPolicyStatus is missing the following markers: patchStrategy=merge, patchMergeKey=type"
         path: "staging/src/k8s.io/api/admissionregistration/"
-      - text: "Conditions field in ValidatingAdmissionPolicyStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`"
+      - text: "Conditions field in ValidatingAdmissionPolicyStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,3,rep,name=conditions\"`"
         path: "staging/src/k8s.io/api/admissionregistration/"
       - text: "Conditions field in PodDisruptionBudgetStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`"
         path: "staging/src/k8s.io/api/policy/"
       - text: "Conditions field in AllocatedDeviceStatus is missing the following markers: patchStrategy=merge, patchMergeKey=type"
         path: "staging/src/k8s.io/api/resource/"
-      - text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`"
+      - text: "Conditions field in AllocatedDeviceStatus has incorrect tags, should be: `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,5,rep,name=conditions\"`"
         path: "staging/src/k8s.io/api/resource/"
 
   default: standard
