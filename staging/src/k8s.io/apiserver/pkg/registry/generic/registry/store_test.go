@@ -2369,48 +2369,6 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	}
 }
 
-// Test whether objects deleted are correctly delivered
-// to watchers without watch-prev-kv.
-func TestStoreWatchWithoutWatchPrevKv(t *testing.T) {
-	podA := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-
-	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, true)
-	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
-	defer destroyFunc()
-
-	objCreated, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	podCreated := objCreated.(*example.Pod)
-
-	watcher, err := registry.WatchPredicate(testContext, matchEverything(), podCreated.ResourceVersion, nil)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	defer watcher.Stop()
-	if _, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{}); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	got, open := <-watcher.ResultChan()
-	if !open {
-		t.Errorf("Unexpected channel close")
-	} else {
-		if got.Type != "DELETED" {
-			t.Errorf("Unexpected event type: %s", got.Type)
-		}
-
-		gotObject := got.Object.(*example.Pod)
-		gotObject.ResourceVersion = ""
-		tomb := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"}}
-		if !reflect.DeepEqual(gotObject, tomb) {
-			t.Errorf("Expected: %#v, got: %#v", tomb, gotObject)
-		}
-	}
-}
-
 func TestStoreWatch(t *testing.T) {
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	noNamespaceContext := genericapirequest.NewContext()
@@ -2477,7 +2435,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	newListFunc := func() runtime.Object { return &example.PodList{} }
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, NamespaceReverseKeyFunc, "/pods")
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, NamespaceReverseKeyFunc(podPrefix), "/pods")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -3104,29 +3062,30 @@ func TestStoreCreateGenerateNameConflict(t *testing.T) {
 }
 
 func TestReverseKeyFunc(t *testing.T) {
+	keyPrefix := "/example"
 	testcases := []struct {
 		name           string
 		pod            *example.Pod
 		keyFunc        func(ctx context.Context, prefix string, name string) (string, error)
-		reverseKeyFunc ReverseKeyFunc
+		reverseKeyFunc storage.ReverseKeyFunc
 	}{
 		{
 			name:           "NamespaceReverseKeyFunc should work",
 			pod:            &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"}},
 			keyFunc:        NamespaceKeyFunc,
-			reverseKeyFunc: NamespaceReverseKeyFunc,
+			reverseKeyFunc: NamespaceReverseKeyFunc(keyPrefix),
 		},
 		{
 			name:           "NoNamespaceReverseKeyFunc should work",
 			pod:            &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			keyFunc:        NoNamespaceKeyFunc,
-			reverseKeyFunc: NoNamespaceReverseKeyFunc,
+			reverseKeyFunc: NoNamespaceReverseKeyFunc(keyPrefix),
 		},
 	}
 
 	for _, tc := range testcases {
 		ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), tc.pod.Namespace)
-		key, err := tc.keyFunc(ctx, "/example", tc.pod.Name)
+		key, err := tc.keyFunc(ctx, keyPrefix, tc.pod.Name)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}

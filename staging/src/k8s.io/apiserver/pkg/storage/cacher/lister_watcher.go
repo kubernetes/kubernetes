@@ -35,21 +35,19 @@ import (
 
 // listerWatcher opaques storage.Interface to expose cache.ListerWatcher.
 type listerWatcher struct {
-	storage            storage.Interface
-	resourcePrefix     string
-	newListFunc        func() runtime.Object
-	contextMetadata    metadata.MD
-	watchWithoutPrevKV bool
+	storage         storage.Interface
+	resourcePrefix  string
+	newListFunc     func() runtime.Object
+	contextMetadata metadata.MD
 }
 
 // NewListerWatcher returns a storage.Interface backed ListerWatcher.
-func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD, watchWithoutPrevKV bool) cache.ListerWatcher {
+func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD) cache.ListerWatcher {
 	return &listerWatcher{
-		storage:            storage,
-		resourcePrefix:     resourcePrefix,
-		newListFunc:        newListFunc,
-		contextMetadata:    contextMetadata,
-		watchWithoutPrevKV: watchWithoutPrevKV,
+		storage:         storage,
+		resourcePrefix:  resourcePrefix,
+		newListFunc:     newListFunc,
+		contextMetadata: contextMetadata,
 	}
 }
 
@@ -88,7 +86,7 @@ func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, err
 		Recursive:          true,
 		ProgressNotify:     true,
 		SendInitialEvents:  options.SendInitialEvents,
-		WatchWithoutPrevKV: lw.watchWithoutPrevKV,
+		WatchWithoutPrevKV: utilfeature.DefaultFeatureGate.Enabled(features.WatchFromStorageWithoutPrevKV),
 	}
 	ctx := context.Background()
 	if lw.contextMetadata != nil {

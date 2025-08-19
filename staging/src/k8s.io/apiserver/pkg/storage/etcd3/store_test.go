@@ -565,7 +565,7 @@ type setupOptions struct {
 	codec          runtime.Codec
 	newFunc        func() runtime.Object
 	newListFunc    func() runtime.Object
-	reverseKeyFunc func(string) (string, string, error)
+	reverseKeyFunc storage.ReverseKeyFunc
 	prefix         string
 	resourcePrefix string
 	groupResource  schema.GroupResource

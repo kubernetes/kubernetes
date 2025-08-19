@@ -74,7 +74,7 @@ type watcher struct {
 	codec   runtime.Codec
 	newFunc func() runtime.Object
 	// reverseKeyFunc decodes storage key to get object name and namespace
-	reverseKeyFunc      func(key string) (name string, namespace string, err error)
+	reverseKeyFunc      storage.ReverseKeyFunc
 	objectType          string
 	groupResource       schema.GroupResource
 	versioner           storage.Versioner

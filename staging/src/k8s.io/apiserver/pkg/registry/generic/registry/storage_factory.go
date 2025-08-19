@@ -40,7 +40,7 @@ func StorageWithCacher() generic.StorageDecorator {
 		keyFunc func(obj runtime.Object) (string, error),
 		newFunc func() runtime.Object,
 		newListFunc func() runtime.Object,
-		reverseKeyFunc func(string) (string, string, error),
+		reverseKeyFunc storage.ReverseKeyFunc,
 		getAttrsFunc storage.AttrFunc,
 		triggerFuncs storage.IndexerFuncs,
 		indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error) {

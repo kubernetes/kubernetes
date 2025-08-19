@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,8 +57,23 @@ func init() {
 
 func newPod() runtime.Object     { return &example.Pod{} }
 func newPodList() runtime.Object { return &example.PodList{} }
+func reverseKeyFunc(prefix string) storage.ReverseKeyFunc {
+	return func(key string) (name string, namespace string, err error) {
+		if !strings.HasPrefix(key, prefix) {
+			err = fmt.Errorf("invalid key %s, expecting prefix %s", key, prefix)
+			return
+		}
 
-func newEtcdTestStorage(t testing.TB, prefix string, reverseKeyFunc func(string) (string, string, error)) (*etcd3testing.EtcdTestServer, storage.Interface) {
+		tokens := strings.Split(key[len(prefix):], "/")
+		if len(tokens) != 2 {
+			err = fmt.Errorf("invalid key %q, requiring namspace/", key)
+			return
+		}
+		return tokens[1], tokens[0], nil
+	}
+}
+
+func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	versioner := storage.APIObjectVersioner{}
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
@@ -69,7 +85,7 @@ func newEtcdTestStorage(t testing.TB, prefix string, reverseKeyFunc func(string)
 		codec,
 		newPod,
 		newPodList,
-		reverseKeyFunc,
+		reverseKeyFunc(prefix+"/pods/"),
 		prefix,
 		"/pods",
 		schema.GroupResource{Resource: "pods"},

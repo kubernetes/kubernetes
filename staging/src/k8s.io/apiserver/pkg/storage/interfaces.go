@@ -395,3 +395,5 @@ type Stats struct {
 	// Value is an estimate, meaning it doesn't need to provide accurate nor consistent.
 	EstimatedAverageObjectSizeBytes int64
 }
+
+type ReverseKeyFunc func(key string) (name string, namespace string, err error)
