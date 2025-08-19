@@ -52,11 +52,6 @@ func supportedValues[T ~string](op operation.Operation, values sets.Set[T], excl
 	return res
 }
 
-// NewExclusions prepares a set of enum exclusion rules for validation.
-func NewExclusions[T ~string](rules ...EnumExclusion[T]) []EnumExclusion[T] {
-	return rules
-}
-
 // EnumExclusion represents a single enum exclusion rule.
 type EnumExclusion[T ~string] struct {
 	// Value specifies the enum value to be conditionally excluded.

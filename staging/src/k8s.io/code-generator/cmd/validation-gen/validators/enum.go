@@ -89,7 +89,6 @@ func (enumTagValidator) ValidScopes() sets.Set[Scope] {
 
 var (
 	enumValidator     = types.Name{Package: libValidationPkg, Name: "Enum"}
-	newExclusions     = types.Name{Package: libValidationPkg, Name: "NewExclusions"}
 	enumExclusionType = types.Name{Package: libValidationPkg, Name: "EnumExclusion"}
 	setsNew           = types.Name{Package: "k8s.io/apimachinery/pkg/util/sets", Name: "New"}
 )
@@ -175,7 +174,11 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 	var exclusions any = Literal("nil")
 	if len(exclusionRules) > 0 {
 		exclusionsVar := PrivateVar{Name: "ExclusionsFor" + context.Type.Name.Name, Package: "local"}
-		result.AddVariable(Variable(exclusionsVar, Function("newExclusions", DefaultFlags, newExclusions, exclusionRules...).WithTypeArgs(enum.Name)))
+		result.AddVariable(Variable(exclusionsVar, SliceLiteral{
+			ElementType:     enumExclusionType,
+			ElementTypeArgs: []*types.Type{context.Type},
+			Elements:        exclusionRules,
+		}))
 		exclusions = exclusionsVar
 	}
 	fn := Function(enumTagName, DefaultFlags, enumValidator, symbolsVarName, exclusions)
