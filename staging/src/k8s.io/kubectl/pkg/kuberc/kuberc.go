@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -48,7 +49,7 @@ var (
 // arguments based on user's kuberc configuration.
 type PreferencesHandler interface {
 	AddFlags(flags *pflag.FlagSet)
-	Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error)
+	Apply(rootCmd *cobra.Command, cfg clientcmd.ClientConfig, args []string, errOut io.Writer) ([]string, error)
 }
 
 // Preferences stores the kuberc file coming either from environment variable
@@ -79,9 +80,9 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 	flags.String("kuberc", "", "Path to the kuberc file to use for preferences. This can be disabled by exporting KUBECTL_KUBERC=false feature gate or turning off the feature KUBERC=off.")
 }
 
-// Apply firstly applies the aliases in the preferences file and secondly overrides
-// the default values of flags.
-func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
+// Apply applies the aliases in the preferences file, overrides the default
+// values of flags, and checks configured credential plugins against the allowlist
+func (p *Preferences) Apply(rootCmd *cobra.Command, cfg clientcmd.ClientConfig, args []string, errOut io.Writer) ([]string, error) {
 	if len(args) <= 1 {
 		return args, nil
 	}
@@ -112,7 +113,62 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 	if err != nil {
 		return args, err
 	}
+	err = p.applyAllowlist(cfg, kuberc)
+	if err != nil {
+		return args, err
+	}
+
 	return args, nil
+}
+
+// applyAllowlist compares the configured credential plugin against all
+// criteria for each entry in the allowlist
+func (p *Preferences) applyAllowlist(cfg clientcmd.ClientConfig, kuberc *config.Preference) error {
+	if kuberc.CredPluginAllowlist == nil {
+		return nil
+	}
+
+	allowlist := *kuberc.CredPluginAllowlist
+
+	rcfg, err := cfg.ClientConfig()
+	if err != nil {
+		return err
+	}
+
+	if rcfg.ExecProvider == nil || rcfg.ExecProvider.Command == "" {
+		return nil
+	}
+
+	absBin, err := exec.LookPath(rcfg.ExecProvider.Command)
+	if err != nil {
+		return err
+	}
+
+	for _, e := range allowlist {
+		if isGreenlit(absBin, &e) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("%q is not permitted by the credential plugin allowlist", absBin)
+}
+
+// isGreenlit looks up the binary found at `absBin` and compares it against the
+// criteria specified in `alEntry`. All checks against nonempty criteria must
+// succeed for the binary to be greenlit.
+func isGreenlit(absBin string, alEntry *config.AllowlistItem) bool {
+	if n := alEntry.Name; n != "" {
+		alAbsBin, err := exec.LookPath(alEntry.Name)
+		if err != nil {
+			return false
+		}
+
+		if absBin != alAbsBin {
+			return false
+		}
+	}
+
+	return true
 }
 
 // applyOverrides finds the command and sets the defaulted flag values in kuberc.

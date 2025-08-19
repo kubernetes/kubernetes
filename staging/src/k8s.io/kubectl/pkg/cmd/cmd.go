@@ -496,7 +496,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
 	if !cmdutil.KubeRC.IsDisabled() {
-		_, err := pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
+		_, err := pref.Apply(cmds, f.ToRawKubeConfigLoader(), o.Arguments, o.IOStreams.ErrOut)
 		if err != nil {
 			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
 			os.Exit(1)
