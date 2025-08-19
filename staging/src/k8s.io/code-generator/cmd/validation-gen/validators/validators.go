@@ -495,11 +495,11 @@ func (fg FunctionGen) WithComment(comment string) FunctionGen {
 	return fg
 }
 
-// Variable creates a VariableGen for a given function name and extraArgs.
-func Variable(variable PrivateVar, initFunc FunctionGen) VariableGen {
+// Variable creates a VariableGen for a given variable name and init value.
+func Variable(variable PrivateVar, initializer any) VariableGen {
 	return VariableGen{
-		Variable: variable,
-		InitFunc: initFunc,
+		Variable:    variable,
+		Initializer: initializer,
 	}
 }
 
@@ -507,8 +507,9 @@ type VariableGen struct {
 	// Variable holds the variable identifier.
 	Variable PrivateVar
 
-	// InitFunc describes the function call that the variable is assigned to.
-	InitFunc FunctionGen
+	// Initializer is the value to initialize the variable with.
+	// Initializer may be any function call or literal type supported by toGolangSourceDataLiteral.
+	Initializer any
 }
 
 // WrapperFunction describes a function literal which has the fingerprint of a
@@ -541,6 +542,16 @@ type StructLiteral struct {
 	// TypeArgs are the generic type arguments for the struct type.
 	TypeArgs []*types.Type
 	Fields   []StructLiteralField
+}
+
+// SliceLiteral represents a slice literal expression that can be used as
+// an argument to a validator.
+type SliceLiteral struct {
+	// ElementType is the type of the elements in the slice.
+	ElementType types.Name
+	// ElementTypeArgs are the generic type arguments for the element type.
+	ElementTypeArgs []*types.Type
+	Elements        []any
 }
 
 type StructLiteralField struct {

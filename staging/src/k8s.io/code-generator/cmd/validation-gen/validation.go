@@ -1331,33 +1331,13 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 			return cmp.Compare(a.Variable.Name, b.Variable.Name)
 		})
 		for _, variable := range variables {
-			fn := variable.InitFunc
 			targs := generator.Args{
 				"varName": c.Universe.Type(types.Name(variable.Variable)),
-				"initFn":  c.Universe.Type(fn.Function),
 			}
-			for _, comment := range fn.Comments {
-				sw.Do("// $.$\n", comment)
-			}
-			sw.Do("var $.varName|private$ = $.initFn|raw$", targs)
-			if typeArgs := fn.TypeArgs; len(typeArgs) > 0 {
-				sw.Do("[", nil)
-				for i, typeArg := range typeArgs {
-					sw.Do("$.|raw$", c.Universe.Type(typeArg))
-					if i < len(typeArgs)-1 {
-						sw.Do(",", nil)
-					}
-				}
-				sw.Do("]", nil)
-			}
-			sw.Do("(", targs)
-			for i, arg := range fn.Args {
-				if i != 0 {
-					sw.Do(", ", nil)
-				}
-				toGolangSourceDataLiteral(sw, c, arg)
-			}
-			sw.Do(")\n", nil)
+
+			sw.Do("var $.varName|private$ = ", targs)
+			toGolangSourceDataLiteral(sw, c, variable.Initializer)
+			sw.Do("\n", nil)
 		}
 	}
 	// TODO: Handle potential variable name collisions when multiple validators
@@ -1424,37 +1404,23 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 				targs["objTypePfx"] = ""
 			}
 
-			emitCall := func() {
-				sw.Do("return $.funcName|raw$", targs)
-				typeArgs := v.Function.TypeArgs
-				if len(typeArgs) > 0 {
-					sw.Do("[", nil)
-					for i, typeArg := range typeArgs {
-						sw.Do("$.|raw$", c.Universe.Type(typeArg))
-						if i < len(typeArgs)-1 {
-							sw.Do(",", nil)
-						}
-					}
-					sw.Do("]", nil)
-				}
-				sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
-				for _, arg := range extraArgs {
-					sw.Do(", ", nil)
-					toGolangSourceDataLiteral(sw, c, arg)
-				}
-				sw.Do(")", targs)
-			}
 			sw.Do("func(", targs)
 			sw.Do("    ctx $.context.Context|raw$, ", targs)
 			sw.Do("    op $.operation.Operation|raw$, ", targs)
 			sw.Do("    fldPath *$.field.Path|raw$, ", targs)
 			sw.Do("    obj, oldObj $.objTypePfx$$.objType|raw$ ", targs)
 			sw.Do(")    $.field.ErrorList|raw$ {\n", targs)
-			emitCall()
+			sw.Do("return ", nil)
+			emitFunctionCall(sw, c, v.Function, "ctx", "op", "fldPath", "obj", "oldObj")
 			sw.Do("\n}", targs)
 		}
 	case validators.Literal:
 		sw.Do("$.$", v)
+	case validators.FunctionGen:
+		for _, comment := range v.Comments {
+			sw.Do("// $.$\\n", comment)
+		}
+		emitFunctionCall(sw, c, v)
 	case validators.FunctionLiteral:
 		sw.Do("func(", nil)
 		for i, param := range v.Parameters {
@@ -1508,10 +1474,32 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			sw.Do(", ", nil)
 		}
 		sw.Do("}", targs)
+	case validators.SliceLiteral:
+		sw.Do("[]", nil)
+		targs := generator.Args{
+			"type": c.Universe.Type(v.ElementType),
+		}
+		sw.Do("$.type|raw$", targs)
+		if len(v.ElementTypeArgs) > 0 {
+			sw.Do("[", nil)
+			for i, typeArg := range v.ElementTypeArgs {
+				if i > 0 {
+					sw.Do(", ", nil)
+				}
+				sw.Do("$.|raw$", typeArg)
+			}
+			sw.Do("]", nil)
+		}
+		sw.Do("{\n", nil)
+		for _, e := range v.Elements {
+			toGolangSourceDataLiteral(sw, c, e)
+			sw.Do(",\n", nil)
+		}
+		sw.Do("}", nil)
 	default:
 		rv := reflect.ValueOf(value)
 		switch rv.Kind() {
-		case reflect.Slice, reflect.Array:
+		case reflect.Array:
 			arraySize := ""
 			if rv.Kind() == reflect.Array {
 				arraySize = strconv.Itoa(rv.Len())
@@ -1538,6 +1526,37 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			panic(fmt.Sprintf("Unsupported extraArg type: %T", value))
 		}
 	}
+}
+
+func emitFunctionCall(sw *generator.SnippetWriter, c *generator.Context, v validators.FunctionGen, leadingArgs ...string) {
+	targs := generator.Args{
+		"funcName": c.Universe.Type(v.Function),
+	}
+	sw.Do("$.funcName|raw$", targs)
+	if typeArgs := v.TypeArgs; len(typeArgs) > 0 {
+		sw.Do("[", nil)
+		for i, typeArg := range typeArgs {
+			sw.Do("$.|raw$", c.Universe.Type(typeArg))
+			if i < len(typeArgs)-1 {
+				sw.Do(",", nil)
+			}
+		}
+		sw.Do("]", nil)
+	}
+	sw.Do("(", nil)
+	if len(leadingArgs) > 0 {
+		sw.Do(strings.Join(leadingArgs, ", "), nil)
+	}
+	if len(leadingArgs) > 0 && len(v.Args) > 0 {
+		sw.Do(", ", nil)
+	}
+	for i, arg := range v.Args {
+		if i != 0 {
+			sw.Do(", ", nil)
+		}
+		toGolangSourceDataLiteral(sw, c, arg)
+	}
+	sw.Do(")", nil)
 }
 
 // getLeafTypeAndPrefixes returns the "leaf value type" for a given type, as
