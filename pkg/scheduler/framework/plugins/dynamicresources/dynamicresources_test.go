@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
@@ -2062,7 +2063,21 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	require.NoError(t, err, "couldn't start resource slice tracker")
-	tc.draManager = NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil), resourceSliceTracker, tc.informerFactory)
+
+	claimsCache := assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
+	// NewAssumeCache calls the informer's AddEventHandler method to register
+	// a handler in order to stay in sync with the informer's store, but
+	// NewAssumeCache does not return the ResourceEventHandlerRegistration.
+	// We call AddEventHandler of the assume cache, passing it a noop
+	// ResourceEventHandler in order to get access to the
+	// ResourceEventHandlerRegistration returned by the informer.
+	//
+	// This is not the registered handler that is used by the DRA
+	// manager, but it is close enough because the assume cache
+	// uses a single boolean for "is synced" for all handlers.
+	registeredHandler := claimsCache.AddEventHandler(cache.ResourceEventHandlerFuncs{})
+
+	tc.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, tc.informerFactory)
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(tc.informerFactory),
@@ -2103,6 +2118,11 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	})
 
 	tc.informerFactory.WaitForCacheSync(tc.ctx.Done())
+	// The above does not tell us if the registered handler (from NewAssumeCache)
+	// is synced, we need to wait until HasSynced of the handler returns
+	// true, this ensures that the assume cache is in sync with the informer's
+	// store which has been informed by at least one full LIST of the underlying storage.
+	cache.WaitForCacheSync(tc.ctx.Done(), registeredHandler.HasSynced)
 
 	for _, node := range nodes {
 		nodeInfo := framework.NewNodeInfo()
