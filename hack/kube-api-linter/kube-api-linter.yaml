@@ -21,7 +21,7 @@ linters:
     # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
 lintersConfig:
   conditions:
-    isFirstField: Warn
+    isFirstField: Ignore
     usePatchStrategy: SuggestFix
     useProtobuf: SuggestFix
   # conflictingMarkers:
