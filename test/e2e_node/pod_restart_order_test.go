@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 /*
 Copyright 2024 The Kubernetes Authors.
 
@@ -43,11 +40,11 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("Pod Restart with PodStartingOrderByPriority Featuregate [testFocusHere2]", func() {
+var _ = SIGDescribe("Pod Restart with PodStartingOrderByPriority Featuregate", func() {
 	f := framework.NewDefaultFramework("pod-restart-order-by-priority")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	f.Context("simulate node reboot by shutting off kubelet remove containers and turning kubelet back on. Check pods become running after \"node reboot\" [testFocusHere2]", func() {
+	f.Context("simulate node reboot by shutting off kubelet remove containers and turning kubelet back on. Check pods become running after \"node reboot\"", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates = map[string]bool{
 				string(features.PodStartingOrderByPriority): true,
@@ -90,10 +87,10 @@ var _ = SIGDescribe("Pod Restart with PodStartingOrderByPriority Featuregate [te
 					}
 				}
 				return nil
-			}, priorityClassesCreateTimeout, pollInterval).Should(gomega.Succeed())
+			}).WithTimeout(priorityClassesCreateTimeout).WithPolling(pollInterval).Should(gomega.Succeed())
 		})
 
-		ginkgo.It("should create pods with custom priority classes and restart kubelet and pods [testFocusHere2]", func(ctx context.Context) {
+		ginkgo.It("should create pods with custom priority classes and restart kubelet and pods", func(ctx context.Context) {
 			nodeName := getNodeName(ctx, f)
 			nodeSelector := fields.Set{
 				"spec.nodeName": nodeName,
@@ -165,7 +162,7 @@ var _ = SIGDescribe("Pod Restart with PodStartingOrderByPriority Featuregate [te
 					}
 				}
 				return nil
-			}, podStatusUpdateTimeout+(nodeShutdownGracePeriod), pollInterval).Should(gomega.Succeed())
+			}).WithTimeout(podStatusUpdateTimeout + nodeShutdownGracePeriod).WithPolling(pollInterval).Should(gomega.Succeed())
 		})
 	})
 })
@@ -193,7 +190,7 @@ func getPodWithPriority(name string, node string, priority string) *v1.Pod {
 						echo "Caught SIGTERM signal!"
 						wait $PID
 					}
-					
+
 					trap _term SIGTERM
 					wait $PID
 					`},
