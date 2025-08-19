@@ -485,17 +485,18 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		})
 
-		ginkgo.It("should support exec through an HTTP proxy", func(ctx context.Context) {
+		ginkgo.It("should support exec through an HTTP proxy using environment variables", func(ctx context.Context) {
 			// testContextHost is a KUBECONFIG URL
 			testContextHost := getTestContextHost()
 
-			// check if testContextHost is on localhost and skip the tests for env vars only
+			// check if testContextHost is on localhost and skip the tests
 			// proxy env vars are always ignored on localhost and loopback IPs
 			// https://pkg.go.dev/golang.org/x/net/http/httpproxy#Config.ProxyFunc
-			// Note: --proxy-url flag works with localhost, so we test it regardless
 			u, err := url.Parse(testContextHost)
 			framework.ExpectNoError(err, "parsing test context host: %s", testContextHost)
-			isLocalhost := hostIsLocal(u.Hostname())
+			if hostIsLocal(u.Hostname()) {
+				e2eskipper.Skipf("Test host %q is on localhost and would not be proxied by HTTP_PROXY, skipping test", testContextHost)
+			}
 
 			ginkgo.By("Starting http_proxy")
 			var proxyLogs bytes.Buffer
@@ -506,36 +507,44 @@ var _ = SIGDescribe("Kubectl client", func() {
 			defer testSrv.Close()
 			proxyAddr := testSrv.URL
 
-			// Test environment variables (skip if localhost)
-			if !isLocalhost {
-				for _, proxyVar := range []string{"https_proxy", "HTTPS_PROXY"} {
-					proxyLogs.Reset()
-					ginkgo.By("Running kubectl via an HTTP proxy using " + proxyVar)
-					output := e2ekubectl.NewKubectlCommand(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").
-						AppendEnv([]string{fmt.Sprintf("%s=%s", proxyVar, proxyAddr)}).
-						ExecOrDie(ns)
+			for _, proxyVar := range []string{"https_proxy", "HTTPS_PROXY"} {
+				proxyLogs.Reset()
+				ginkgo.By("Running kubectl via an HTTP proxy using " + proxyVar)
+				output := e2ekubectl.NewKubectlCommand(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").
+					AppendEnv([]string{fmt.Sprintf("%s=%s", proxyVar, proxyAddr)}).
+					ExecOrDie(ns)
 
-					// Verify we got the normal output captured by the exec server
-					expectedExecOutput := "running in container\n"
-					if output != expectedExecOutput {
-						framework.Failf("Unexpected kubectl exec output. Wanted %q, got  %q", expectedExecOutput, output)
-					}
-
-					// Verify the proxy server logs saw the connection
-					expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(testContextHost, "https://"), "/api"))
-
-					proxyLog := proxyLogs.String()
-					if !strings.Contains(proxyLog, expectedProxyLog) {
-						framework.Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
-					}
+				// Verify we got the normal output captured by the exec server
+				expectedExecOutput := "running in container\n"
+				if output != expectedExecOutput {
+					framework.Failf("Unexpected kubectl exec output. Wanted %q, got  %q", expectedExecOutput, output)
 				}
-			} else {
-				ginkgo.By("Skipping env var proxy tests for localhost target")
-			}
 
-			// Test --proxy-url flag (works with localhost)
-			proxyLogs.Reset()
-			ginkgo.By("Running kubectl via an HTTP proxy using --proxy-url flag")
+				// Verify the proxy server logs saw the connection
+				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(testContextHost, "https://"), "/api"))
+
+				proxyLog := proxyLogs.String()
+				if !strings.Contains(proxyLog, expectedProxyLog) {
+					framework.Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
+				}
+			}
+		})
+
+		ginkgo.It("should support exec through --proxy-url flag", func(ctx context.Context) {
+			// testContextHost is a KUBECONFIG URL
+			testContextHost := getTestContextHost()
+
+			// Note: Unlike HTTP_PROXY env vars, --proxy-url works with localhost
+			ginkgo.By("Starting http_proxy")
+			var proxyLogs bytes.Buffer
+			testSrv := httptest.NewServer(utilnettesting.NewHTTPProxyHandler(ginkgo.GinkgoTB(), func(req *http.Request) bool {
+				fmt.Fprintf(&proxyLogs, "Accepting %s to %s\n", req.Method, req.Host)
+				return true
+			}))
+			defer testSrv.Close()
+			proxyAddr := testSrv.URL
+
+			ginkgo.By("Running kubectl via --proxy-url flag")
 			output := e2ekubectl.NewKubectlCommand(ns, "--proxy-url="+proxyAddr, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").
 				ExecOrDie(ns)
 
