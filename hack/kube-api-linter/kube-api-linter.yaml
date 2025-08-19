@@ -17,7 +17,7 @@ linters:
     # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
     # - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
     # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
-    # - "ssatags" # Ensure lists have a listType tag.
+    - "ssatags" # Ensure lists have a listType tag.
     # - "uniquemarkers" # Ensure markers are not duplicated across field and type definitions.
 lintersConfig:
   conditions:
@@ -55,8 +55,8 @@ lintersConfig:
   #      policy: SuggestFix | Warn | Ignore # The policy for omitempty in required fields. Defaults to `SuggestFix`.
   #  omitzero:
   #      policy: SuggestFix | Warn | Forbid # The policy for omitzero in required fields. Defaults to `SuggestFix`.
-  # ssatags:
-  #  listTypeSetUsage: Warn | Ignore # The policy for listType=set usage on object arrays. Defaults to `Warn`.
+  ssatags:
+   listTypeSetUsage: Ignore # The policy for listType=set usage on object arrays. Defaults to `Warn`.
   # uniquemarkers:
   #   customMarkers:
   #     - identifier: custom:SomeCustomMarker
