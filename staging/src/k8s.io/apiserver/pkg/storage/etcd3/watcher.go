@@ -743,7 +743,8 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 			if err != nil {
 				return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
 			}
-		} else if wc.watcher.reverseKeyFunc != nil {
+		} else if !wc.prevKV {
+			// WatchWithoutPrevKV is enabled, we need to parse etcd key to get object name and namespace.
 			name, namespace, err := wc.watcher.reverseKeyFunc(e.key)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failure to reverse event key: %w", err)

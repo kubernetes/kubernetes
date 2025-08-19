@@ -73,6 +73,11 @@ func TestWatchFromNoneZero(t *testing.T) {
 	storagetesting.RunTestWatchFromNonZero(ctx, t, store)
 }
 
+func TestWatchWithoutPrevKV(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchWithoutPrevKV(ctx, t, store)
+}
+
 func TestDelayedWatchDelivery(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestDelayedWatchDelivery(ctx, t, store)

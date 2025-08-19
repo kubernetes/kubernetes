@@ -76,6 +76,16 @@ func newPodList() runtime.Object {
 	return &example.PodList{}
 }
 
+func reverseKeyFunc(key string) (name string, namespace string, err error) {
+	prefix := "/pods/"
+	tokens := strings.Split(key[len(prefix):], "/")
+	if len(tokens) != 2 {
+		err = fmt.Errorf("invalid key %q, requiring namspace/", key)
+		return
+	}
+	return tokens[1], tokens[0], nil
+}
+
 func checkStorageInvariants(etcdClient *clientv3.Client, codec runtime.Codec) storagetesting.KeyValidation {
 	return func(ctx context.Context, t *testing.T, key string) {
 		getResp, err := etcdClient.KV.Get(ctx, key)
@@ -602,6 +612,7 @@ func withDefaults(options *setupOptions) {
 	options.codec = apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	options.newFunc = newPod
 	options.newListFunc = newPodList
+	options.reverseKeyFunc = reverseKeyFunc
 	options.prefix = ""
 	options.resourcePrefix = "/pods"
 	options.groupResource = schema.GroupResource{Resource: "pods"}
