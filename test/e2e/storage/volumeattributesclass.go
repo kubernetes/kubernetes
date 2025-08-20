@@ -40,7 +40,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(fea
 	f := framework.NewDefaultFramework("csi-volumeattributesclass")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	/*
-		Release: v1.29
+		Release: v1.35
 		Testname: VolumeAttributesClass, lifecycle
 		Description: Creating a VolumeAttributesClass MUST succeed. Reading the VolumeAttributesClass MUST
 		succeed. Patching the VolumeAttributesClass MUST succeed with its new label found. Deleting
@@ -48,7 +48,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(fea
 		MUST be created. Updating the VolumeAttributesClass MUST succeed with its new label found.
 		Deleting the VolumeAttributesClass via deleteCollection MUST succeed and it MUST be confirmed.
 	*/
-	framework.It("should run through the lifecycle of a VolumeAttributesClass", func(ctx context.Context) {
+	framework.ConformanceIt("should run through the lifecycle of a VolumeAttributesClass", func(ctx context.Context) {
 
 		vacClient := f.ClientSet.StorageV1().VolumeAttributesClasses()
 		var initialVAC, replacementVAC *storagev1.VolumeAttributesClass
