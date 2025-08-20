@@ -17,7 +17,7 @@ ARG REGISTRY
 ARG OS_VERSION
 
 # We're using a Linux image to unpack the archive, then we're copying it over to Windows.
-FROM --platform=linux/amd64 alpine:3.6 as prep
+FROM --platform=linux/amd64 alpine:3.22 as prep
 
 ENV CURL_VERSION=8.12.1_4
 

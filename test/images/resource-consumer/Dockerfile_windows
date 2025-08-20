@@ -15,7 +15,7 @@
 ARG BASEIMAGE
 
 # We're using a Linux image to unpack the archives, then we're copying them over to Windows.
-FROM --platform=linux/amd64 alpine:3.6 as prep
+FROM --platform=linux/amd64 alpine:3.22 as prep
 
 ADD https://download.sysinternals.com/files/Testlimit.zip /Testlimit.zip
 RUN unzip /Testlimit.zip -d /
