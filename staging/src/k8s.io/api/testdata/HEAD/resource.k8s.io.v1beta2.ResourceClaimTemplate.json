@@ -111,7 +111,12 @@
                   "effect": "effectValue",
                   "tolerationSeconds": 5
                 }
-              ]
+              ],
+              "capacity": {
+                "requests": {
+                  "requestsKey": "0"
+                }
+              }
             },
             "firstAvailable": [
               {
@@ -134,7 +139,12 @@
                     "effect": "effectValue",
                     "tolerationSeconds": 5
                   }
-                ]
+                ],
+                "capacity": {
+                  "requests": {
+                    "requestsKey": "0"
+                  }
+                }
               }
             ]
           }
@@ -144,7 +154,8 @@
             "requests": [
               "requestsValue"
             ],
-            "matchAttribute": "matchAttributeValue"
+            "matchAttribute": "matchAttributeValue",
+            "distinctAttribute": "distinctAttributeValue"
           }
         ],
         "config": [

@@ -239,6 +239,17 @@ items:
     - patch
     - update
     - watch
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceclaims
+    - resourceclaimtemplates
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - patch
+    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -371,6 +382,16 @@ items:
     - ingresses
     - ingresses/status
     - networkpolicies
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceclaims
+    - resourceclaims/status
+    - resourceclaimtemplates
     verbs:
     - get
     - list
@@ -863,6 +884,48 @@ items:
     - get
     - list
     - watch
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - deviceclasses
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceclaims
+    verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceclaims/status
+    verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - pods/finalizers
+    verbs:
+    - update
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceslices
+    verbs:
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1105,6 +1168,24 @@ items:
     - get
     - list
     - watch
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceclaims
+    verbs:
+    - get
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceslices
+    verbs:
+    - deletecollection
+  - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts
+    verbs:
+    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

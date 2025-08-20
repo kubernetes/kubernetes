@@ -29,6 +29,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
@@ -332,7 +333,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, time.Duration(0))
+			cache := internalcache.New(ctx, time.Duration(0), nil)
 			for _, name := range test.nodes {
 				cache.AddNode(logger, createNode(name))
 			}
@@ -552,7 +553,7 @@ func TestConvertToVictims(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// nodeInfos instantiations
-			nodeInfoList := make([]*framework.NodeInfo, 0, len(tt.nodeNames))
+			nodeInfoList := make([]fwk.NodeInfo, 0, len(tt.nodeNames))
 			for i, nm := range tt.nodeNames {
 				nodeInfo := framework.NewNodeInfo()
 				node := createNode(nm)

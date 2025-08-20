@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -178,7 +179,7 @@ func isHugePageAvailable(hugepagesSize int) bool {
 	return true
 }
 
-func getHugepagesTestPod(f *framework.Framework, podLimits v1.ResourceList, containerLimits v1.ResourceList, mounts []v1.VolumeMount, volumes []v1.Volume) *v1.Pod {
+func getHugepagesTestPod(f *framework.Framework, podResources *v1.ResourceRequirements, containerLimits v1.ResourceList, mounts []v1.VolumeMount, volumes []v1.Volume) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "hugepages-",
@@ -200,10 +201,12 @@ func getHugepagesTestPod(f *framework.Framework, podLimits v1.ResourceList, cont
 		},
 	}
 
-	if podLimits != nil {
-		pod.Spec.Resources = &v1.ResourceRequirements{
-			Limits: podLimits,
-		}
+	if podResources == nil {
+		return pod
+	}
+
+	if podResources.Requests != nil || podResources.Limits != nil {
+		pod.Spec.Resources = podResources
 	}
 
 	return pod
@@ -519,7 +522,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, func
 })
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), feature.PodLevelResources, func() {
+var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
 	f := framework.NewDefaultFramework("pod-level-hugepages-resources")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -527,7 +530,7 @@ var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), fea
 		var (
 			testpod                *v1.Pod
 			expectedHugepageLimits v1.ResourceList
-			podLimits              v1.ResourceList
+			podResources           *v1.ResourceRequirements
 			containerLimits        v1.ResourceList
 			mounts                 []v1.VolumeMount
 			volumes                []v1.Volume
@@ -545,11 +548,45 @@ var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), fea
 
 			waitForHugepages(f, ctx, hugepages)
 
-			pod := getHugepagesTestPod(f, podLimits, containerLimits, mounts, volumes)
+			pod := getHugepagesTestPod(f, podResources, containerLimits, mounts, volumes)
+
+			// Capture the initial containers spec resources before deployment
+			initialContainerResources := make(map[string]*v1.ResourceRequirements)
+			for _, container := range pod.Spec.Containers {
+				initialContainerResources[container.Name] = container.Resources.DeepCopy()
+			}
 
 			ginkgo.By("by running a test pod that requests hugepages")
 
 			testpod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			// Verify that the testpod container spec resources were not modified after being deployed
+			// This has the objective to explicitly show that the the pod level hugepage
+			// resources are not propagated to the containers, only pod level cgroup values
+			// are propagated to the containers when they do not specify hugepage resources.
+			ginkgo.By("Verifying that the testpod spec resources were not modified after being deployed")
+			retrievedPod, err := e2epod.NewPodClient(f).Get(ctx, testpod.Name, metav1.GetOptions{})
+			gomega.Expect(err).To(gomega.Succeed(), "Failed to get the deployed pod")
+
+			// Iterate over the containers and check that the resources are equal to the initial spec before deploying
+			for _, container := range retrievedPod.Spec.Containers {
+				initialResources, ok := initialContainerResources[container.Name]
+				gomega.Expect(ok).To(gomega.BeTrueBecause("Container %s not found in initialContainerResources", container.Name))
+
+				// The container limits must be maintained equally to the initial spec
+				for resourceName, resourceValue := range initialResources.Limits {
+					if corev1helper.IsHugePageResourceName(resourceName) {
+						gomega.Expect(container.Resources.Limits[resourceName]).To(gomega.Equal(resourceValue), fmt.Sprintf("Pod.Spec.Containers.Resources.Limits.%s should remain unchanged after deployment", resourceName))
+					}
+				}
+
+				// Since container requests were not specified, they are defaulted to the limits
+				for resourceName, resourceValue := range initialResources.Limits {
+					if corev1helper.IsHugePageResourceName(resourceName) {
+						gomega.Expect(container.Resources.Requests[resourceName]).To(gomega.Equal(resourceValue), fmt.Sprintf("Pod.Spec.Containers.Resources.Requests.%s should default to limits after deployment", resourceName))
+					}
+				}
+			}
 
 			framework.Logf("Test pod name: %s", testpod.Name)
 		})
@@ -575,10 +612,12 @@ var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), fea
 				expectedHugepageLimits = v1.ResourceList{
 					hugepagesResourceName2Mi: resource.MustParse("6Mi"),
 				}
-				podLimits = v1.ResourceList{
-					v1.ResourceCPU:           resource.MustParse("10m"),
-					v1.ResourceMemory:        resource.MustParse("100Mi"),
-					hugepagesResourceName2Mi: resource.MustParse("6Mi"),
+				podResources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:           resource.MustParse("10m"),
+						v1.ResourceMemory:        resource.MustParse("100Mi"),
+						hugepagesResourceName2Mi: resource.MustParse("6Mi"),
+					},
 				}
 				containerLimits = v1.ResourceList{}
 				mounts = []v1.VolumeMount{
@@ -618,10 +657,12 @@ var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), fea
 				expectedHugepageLimits = v1.ResourceList{
 					hugepagesResourceName2Mi: resource.MustParse("6Mi"),
 				}
-				podLimits = v1.ResourceList{
-					v1.ResourceCPU:           resource.MustParse("10m"),
-					v1.ResourceMemory:        resource.MustParse("100Mi"),
-					hugepagesResourceName2Mi: resource.MustParse("6Mi"),
+				podResources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:           resource.MustParse("10m"),
+						v1.ResourceMemory:        resource.MustParse("100Mi"),
+						hugepagesResourceName2Mi: resource.MustParse("6Mi"),
+					},
 				}
 				containerLimits = v1.ResourceList{
 					v1.ResourceCPU:           resource.MustParse("10m"),
@@ -665,9 +706,59 @@ var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), fea
 				expectedHugepageLimits = v1.ResourceList{
 					hugepagesResourceName2Mi: resource.MustParse("4Mi"),
 				}
-				podLimits = v1.ResourceList{
-					v1.ResourceCPU:    resource.MustParse("10m"),
-					v1.ResourceMemory: resource.MustParse("100Mi"),
+				podResources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("10m"),
+						v1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				}
+				containerLimits = v1.ResourceList{
+					v1.ResourceCPU:           resource.MustParse("10m"),
+					v1.ResourceMemory:        resource.MustParse("100Mi"),
+					hugepagesResourceName2Mi: resource.MustParse("4Mi"),
+				}
+				mounts = []v1.VolumeMount{
+					{
+						Name:      "hugepages-2mi",
+						MountPath: "/hugepages-2Mi",
+					},
+				}
+				volumes = []v1.Volume{
+					{
+						Name: "hugepages-2mi",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium: mediumHugepages2Mi,
+							},
+						},
+					},
+				}
+			})
+
+			ginkgo.It("should set correct hugetlb mount and limit under the container cgroup", func(ctx context.Context) {
+				runHugePagesTests(f, ctx, testpod, expectedHugepageLimits, mounts, hugepages)
+			})
+
+			ginkgo.JustAfterEach(func() {
+				hugepages = map[string]int{
+					hugepagesResourceName2Mi: 0,
+				}
+			})
+		})
+
+		ginkgo.Context("only pod level requests no pod hugepages, container hugepages, single page size", func() {
+			ginkgo.BeforeEach(func() {
+				hugepages = map[string]int{
+					hugepagesResourceName2Mi: 5,
+				}
+				expectedHugepageLimits = v1.ResourceList{
+					hugepagesResourceName2Mi: resource.MustParse("4Mi"),
+				}
+				podResources = &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("10m"),
+						v1.ResourceMemory: resource.MustParse("100Mi"),
+					},
 				}
 				containerLimits = v1.ResourceList{
 					v1.ResourceCPU:           resource.MustParse("10m"),
@@ -713,11 +804,13 @@ var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), fea
 					hugepagesResourceName2Mi: resource.MustParse("6Mi"),
 					hugepagesResourceName1Gi: resource.MustParse("1Gi"),
 				}
-				podLimits = v1.ResourceList{
-					v1.ResourceCPU:           resource.MustParse("10m"),
-					v1.ResourceMemory:        resource.MustParse("100Mi"),
-					hugepagesResourceName2Mi: resource.MustParse("6Mi"),
-					hugepagesResourceName1Gi: resource.MustParse("1Gi"),
+				podResources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:           resource.MustParse("10m"),
+						v1.ResourceMemory:        resource.MustParse("100Mi"),
+						hugepagesResourceName2Mi: resource.MustParse("6Mi"),
+						hugepagesResourceName1Gi: resource.MustParse("1Gi"),
+					},
 				}
 				containerLimits = v1.ResourceList{}
 				mounts = []v1.VolumeMount{
@@ -772,11 +865,13 @@ var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), fea
 					hugepagesResourceName2Mi: resource.MustParse("6Mi"),
 					hugepagesResourceName1Gi: resource.MustParse("1Gi"),
 				}
-				podLimits = v1.ResourceList{
-					v1.ResourceCPU:           resource.MustParse("10m"),
-					v1.ResourceMemory:        resource.MustParse("100Mi"),
-					hugepagesResourceName2Mi: resource.MustParse("6Mi"),
-					hugepagesResourceName1Gi: resource.MustParse("1Gi"),
+				podResources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:           resource.MustParse("10m"),
+						v1.ResourceMemory:        resource.MustParse("100Mi"),
+						hugepagesResourceName2Mi: resource.MustParse("6Mi"),
+						hugepagesResourceName1Gi: resource.MustParse("1Gi"),
+					},
 				}
 				containerLimits = v1.ResourceList{
 					v1.ResourceCPU:           resource.MustParse("10m"),
@@ -836,9 +931,75 @@ var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), fea
 					hugepagesResourceName2Mi: resource.MustParse("4Mi"),
 					hugepagesResourceName1Gi: resource.MustParse("1Gi"),
 				}
-				podLimits = v1.ResourceList{
-					v1.ResourceCPU:    resource.MustParse("10m"),
-					v1.ResourceMemory: resource.MustParse("100Mi"),
+				podResources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("10m"),
+						v1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				}
+				containerLimits = v1.ResourceList{
+					v1.ResourceCPU:           resource.MustParse("10m"),
+					v1.ResourceMemory:        resource.MustParse("100Mi"),
+					hugepagesResourceName2Mi: resource.MustParse("4Mi"),
+					hugepagesResourceName1Gi: resource.MustParse("1Gi"),
+				}
+				mounts = []v1.VolumeMount{
+					{
+						Name:      "hugepages-2mi",
+						MountPath: "/hugepages-2Mi",
+					},
+					{
+						Name:      "hugepages-1gi",
+						MountPath: "/hugepages-1Gi",
+					},
+				}
+				volumes = []v1.Volume{
+					{
+						Name: "hugepages-2mi",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium: mediumHugepages2Mi,
+							},
+						},
+					},
+					{
+						Name: "hugepages-1gi",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium: mediumHugepages1Gi,
+							},
+						},
+					},
+				}
+			})
+
+			ginkgo.It("should set correct hugetlb mount and limit under the container cgroup", func(ctx context.Context) {
+				runHugePagesTests(f, ctx, testpod, expectedHugepageLimits, mounts, hugepages)
+			})
+
+			ginkgo.JustAfterEach(func() {
+				hugepages = map[string]int{
+					hugepagesResourceName2Mi: 0,
+					hugepagesResourceName1Gi: 0,
+				}
+			})
+		})
+
+		ginkgo.Context("only pod level requests no pod hugepages, container hugepages, multiple page size", func() {
+			ginkgo.BeforeEach(func() {
+				hugepages = map[string]int{
+					hugepagesResourceName2Mi: 5,
+					hugepagesResourceName1Gi: 1,
+				}
+				expectedHugepageLimits = v1.ResourceList{
+					hugepagesResourceName2Mi: resource.MustParse("4Mi"),
+					hugepagesResourceName1Gi: resource.MustParse("1Gi"),
+				}
+				podResources = &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("10m"),
+						v1.ResourceMemory: resource.MustParse("100Mi"),
+					},
 				}
 				containerLimits = v1.ResourceList{
 					v1.ResourceCPU:           resource.MustParse("10m"),
@@ -898,10 +1059,12 @@ var _ = SIGDescribe("Pod Level HugePages Resources", framework.WithSerial(), fea
 					hugepagesResourceName2Mi: resource.MustParse("6Mi"),
 					hugepagesResourceName1Gi: resource.MustParse("1Gi"),
 				}
-				podLimits = v1.ResourceList{
-					v1.ResourceCPU:           resource.MustParse("10m"),
-					v1.ResourceMemory:        resource.MustParse("100Mi"),
-					hugepagesResourceName2Mi: resource.MustParse("6Mi"),
+				podResources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:           resource.MustParse("10m"),
+						v1.ResourceMemory:        resource.MustParse("100Mi"),
+						hugepagesResourceName2Mi: resource.MustParse("6Mi"),
+					},
 				}
 				containerLimits = v1.ResourceList{
 					v1.ResourceCPU:           resource.MustParse("10m"),

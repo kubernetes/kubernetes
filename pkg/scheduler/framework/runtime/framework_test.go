@@ -139,7 +139,7 @@ func (pl *TestScoreWithNormalizePlugin) NormalizeScore(ctx context.Context, stat
 	return injectNormalizeRes(pl.inj, scores)
 }
 
-func (pl *TestScoreWithNormalizePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *TestScoreWithNormalizePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	return setScoreRes(pl.inj)
 }
 
@@ -157,11 +157,11 @@ func (pl *TestScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestScorePlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
+func (pl *TestScorePlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Code(pl.inj.PreScoreStatus), injectReason)
 }
 
-func (pl *TestScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *TestScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	return setScoreRes(pl.inj)
 }
 
@@ -186,10 +186,10 @@ type TestPlugin struct {
 	inj  injectedResult
 }
 
-func (pl *TestPlugin) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *TestPlugin) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Code(pl.inj.PreFilterAddPodStatus), injectReason)
 }
-func (pl *TestPlugin) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *TestPlugin) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Code(pl.inj.PreFilterRemovePodStatus), injectReason)
 }
 
@@ -197,11 +197,11 @@ func (pl *TestPlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestPlugin) Less(*framework.QueuedPodInfo, *framework.QueuedPodInfo) bool {
+func (pl *TestPlugin) Less(fwk.QueuedPodInfo, fwk.QueuedPodInfo) bool {
 	return false
 }
 
-func (pl *TestPlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *TestPlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	return 0, fwk.NewStatus(fwk.Code(pl.inj.ScoreStatus), injectReason)
 }
 
@@ -209,7 +209,7 @@ func (pl *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	return pl.inj.PreFilterResult, fwk.NewStatus(fwk.Code(pl.inj.PreFilterStatus), injectReason)
 }
 
@@ -217,7 +217,7 @@ func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
 	return pl
 }
 
-func (pl *TestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *TestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Code(pl.inj.FilterStatus), injectFilterReason)
 }
 
@@ -225,7 +225,7 @@ func (pl *TestPlugin) PostFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod,
 	return nil, fwk.NewStatus(fwk.Code(pl.inj.PostFilterStatus), injectReason)
 }
 
-func (pl *TestPlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
+func (pl *TestPlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Code(pl.inj.PreScoreStatus), injectReason)
 }
 
@@ -236,12 +236,12 @@ func (pl *TestPlugin) Reserve(ctx context.Context, state fwk.CycleState, p *v1.P
 func (pl *TestPlugin) Unreserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
 }
 
-func (pl *TestPlugin) PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
-	return fwk.NewStatus(fwk.Code(pl.inj.PreBindStatus), injectReason)
+func (pl *TestPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+	return fwk.NewStatus(fwk.Code(pl.inj.PreBindPreFlightStatus), injectReason)
 }
 
-func (pl *TestPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
-	return nil
+func (pl *TestPlugin) PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+	return fwk.NewStatus(fwk.Code(pl.inj.PreBindStatus), injectReason)
 }
 
 func (pl *TestPlugin) PostBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
@@ -283,7 +283,7 @@ func (pl *TestPreFilterPlugin) Name() string {
 	return preFilterPluginName
 }
 
-func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	pl.PreFilterCalled++
 	return nil, nil
 }
@@ -303,19 +303,19 @@ func (pl *TestPreFilterWithExtensionsPlugin) Name() string {
 	return preFilterWithExtensionsPluginName
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	pl.PreFilterCalled++
 	return nil, nil
 }
 
 func (pl *TestPreFilterWithExtensionsPlugin) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod,
-	podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+	podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	pl.AddCalled++
 	return nil
 }
 
 func (pl *TestPreFilterWithExtensionsPlugin) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod,
-	podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+	podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	pl.RemoveCalled++
 	return nil
 }
@@ -331,7 +331,7 @@ func (dp *TestDuplicatePlugin) Name() string {
 	return duplicatePluginName
 }
 
-func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	return nil, nil
 }
 
@@ -382,7 +382,7 @@ func (pl *TestQueueSortPlugin) Name() string {
 	return queueSortPlugin
 }
 
-func (pl *TestQueueSortPlugin) Less(_, _ *framework.QueuedPodInfo) bool {
+func (pl *TestQueueSortPlugin) Less(_, _ fwk.QueuedPodInfo) bool {
 	return false
 }
 
@@ -1942,7 +1942,8 @@ func TestRunPreFilterExtensionAddPod(t *testing.T) {
 
 			state := framework.NewCycleState()
 			state.SetSkipFilterPlugins(tt.skippedPluginNames)
-			status := f.RunPreFilterExtensionAddPod(ctx, state, nil, nil, nil)
+			ni := framework.NewNodeInfo()
+			status := f.RunPreFilterExtensionAddPod(ctx, state, nil, nil, ni)
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("wrong status code. got: %v, want: %v", status, tt.wantStatusCode)
 			}
@@ -2605,6 +2606,110 @@ func TestPreBindPlugins(t *testing.T) {
 			}()
 
 			status := f.RunPreBindPlugins(ctx, state, pod, "")
+
+			if diff := cmp.Diff(tt.wantStatus, status, statusCmpOpts...); diff != "" {
+				t.Errorf("Wrong status code (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPreBindPreFlightPlugins(t *testing.T) {
+	tests := []struct {
+		name       string
+		plugins    []*TestPlugin
+		wantStatus *fwk.Status
+	}{
+		{
+			name:       "Skip when there's no PreBind Plugin",
+			plugins:    []*TestPlugin{},
+			wantStatus: fwk.NewStatus(fwk.Skip),
+		},
+		{
+			name: "Success when PreBindPreFlight returns Success",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Skip)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Success)},
+				},
+			},
+			wantStatus: nil,
+		},
+		{
+			name: "Skip when all PreBindPreFlight returns Skip",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Skip)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Skip)},
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.Skip),
+		},
+		{
+			name: "Error when PreBindPreFlight returns Error",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Skip)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Error)},
+				},
+			},
+			wantStatus: fwk.AsStatus(fmt.Errorf(`running PreBindPreFlight "TestPlugin2": %w`, errInjectedStatus)),
+		},
+		{
+			name: "Error when PreBindPreFlight returns Unschedulable",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Unschedulable)},
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.Error, "PreBindPreFlight TestPlugin returned \"Unschedulable\", which is unsupported. It is supposed to return Success, Skip, or Error status"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			registry := Registry{}
+			configPlugins := &config.Plugins{}
+
+			for _, pl := range tt.plugins {
+				tmpPl := pl
+				if err := registry.Register(pl.name, func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+					return tmpPl, nil
+				}); err != nil {
+					t.Fatalf("Unable to register pre bind plugins: %s", pl.name)
+				}
+
+				configPlugins.PreBind.Enabled = append(
+					configPlugins.PreBind.Enabled,
+					config.Plugin{Name: pl.name},
+				)
+			}
+			profile := config.KubeSchedulerProfile{Plugins: configPlugins}
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+			if err != nil {
+				t.Fatalf("fail to create framework: %s", err)
+			}
+			defer func() {
+				_ = f.Close()
+			}()
+
+			status := f.RunPreBindPreFlights(ctx, state, pod, "")
 
 			if diff := cmp.Diff(tt.wantStatus, status, statusCmpOpts...); diff != "" {
 				t.Errorf("Wrong status code (-want,+got):\n%s", diff)
@@ -3607,6 +3712,7 @@ type injectedResult struct {
 	PostFilterStatus         int                        `json:"postFilterStatus,omitempty"`
 	PreScoreStatus           int                        `json:"preScoreStatus,omitempty"`
 	ReserveStatus            int                        `json:"reserveStatus,omitempty"`
+	PreBindPreFlightStatus   int                        `json:"preBindPreFlightStatus,omitempty"`
 	PreBindStatus            int                        `json:"preBindStatus,omitempty"`
 	BindStatus               int                        `json:"bindStatus,omitempty"`
 	PermitStatus             int                        `json:"permitStatus,omitempty"`
@@ -3696,8 +3802,8 @@ func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
 }
 
 // BuildNodeInfos build NodeInfo slice from a v1.Node slice
-func BuildNodeInfos(nodes []*v1.Node) []*framework.NodeInfo {
-	res := make([]*framework.NodeInfo, len(nodes))
+func BuildNodeInfos(nodes []*v1.Node) []fwk.NodeInfo {
+	res := make([]fwk.NodeInfo, len(nodes))
 	for i := 0; i < len(nodes); i++ {
 		res[i] = framework.NewNodeInfo()
 		res[i].SetNode(nodes[i])

@@ -41,6 +41,7 @@ import (
 	nosnatproxy "k8s.io/kubernetes/test/images/agnhost/no-snat-test-proxy"
 	"k8s.io/kubernetes/test/images/agnhost/openidmetadata"
 	"k8s.io/kubernetes/test/images/agnhost/pause"
+	"k8s.io/kubernetes/test/images/agnhost/podcertificatesigner"
 	portforwardtester "k8s.io/kubernetes/test/images/agnhost/port-forward-tester"
 	"k8s.io/kubernetes/test/images/agnhost/porter"
 	resconsumerctrl "k8s.io/kubernetes/test/images/agnhost/resource-consumer-controller"
@@ -88,6 +89,7 @@ func main() {
 	rootCmd.AddCommand(openidmetadata.CmdTestServiceAccountIssuerDiscovery)
 	rootCmd.AddCommand(grpchealthchecking.CmdGrpcHealthChecking)
 	rootCmd.AddCommand(vishhstress.CmdStress)
+	rootCmd.AddCommand(podcertificatesigner.CmdPodCertificateSigner)
 
 	// NOTE(claudiub): Some tests are passing logging related flags, so we need to be able to
 	// accept them. This will also include them in the printed help.

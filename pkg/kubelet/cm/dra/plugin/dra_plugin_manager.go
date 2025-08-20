@@ -29,14 +29,16 @@ import (
 	grpcstats "google.golang.org/grpc/stats"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction" // TODO (?): move this common helper somewhere else?
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/utils/ptr"
 )
@@ -58,6 +60,7 @@ type DRAPluginManager struct {
 	kubeClient    kubernetes.Interface
 	getNode       func() (*v1.Node, error)
 	wipingDelay   time.Duration
+	streamHandler StreamHandler
 
 	wg    sync.WaitGroup
 	mutex sync.RWMutex
@@ -134,7 +137,7 @@ func (m *monitoredPlugin) HandleConn(_ context.Context, stats grpcstats.ConnStat
 // The context can be used to cancel all background activities.
 // If desired, Stop can be called in addition or instead of canceling
 // the context. It then also waits for background activities to stop.
-func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *DRAPluginManager {
+func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), streamHandler StreamHandler, wipingDelay time.Duration) *DRAPluginManager {
 	ctx, cancel := context.WithCancelCause(ctx)
 	pm := &DRAPluginManager{
 		backgroundCtx: klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA registration handler")),
@@ -142,6 +145,7 @@ func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, g
 		kubeClient:    kubeClient,
 		getNode:       getNode,
 		wipingDelay:   wipingDelay,
+		streamHandler: streamHandler,
 	}
 	pm.pendingWipes = timedworkers.CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *timedworkers.WorkArgs) error {
 		pm.wipeResourceSlices(ctx, args.Object.Name)
@@ -228,7 +232,7 @@ func (pm *DRAPluginManager) wipeResourceSlices(ctx context.Context, driver strin
 			fieldSelector[resourceapi.ResourceSliceSelectorDriver] = driver
 		}
 
-		err = pm.kubeClient.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
+		err = pm.kubeClient.ResourceV1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
 		switch {
 		case err == nil:
 			logger.V(3).Info("Deleted ResourceSlices", "fieldSelector", fieldSelector)
@@ -238,6 +242,9 @@ func (pm *DRAPluginManager) wipeResourceSlices(ctx context.Context, driver strin
 			// its credentials.
 			logger.V(5).Info("Deleting ResourceSlice failed, retrying", "fieldSelector", fieldSelector, "err", err)
 			return false, nil
+		case apierrors.IsNotFound(err):
+			logger.V(5).Info("ResourceSlices not found, nothing to delete.", "fieldSelector", fieldSelector)
+			return true, nil
 		default:
 			// Log and retry for other errors.
 			logger.V(3).Info("Deleting ResourceSlice failed, retrying", "fieldSelector", fieldSelector, "err", err)
@@ -332,6 +339,7 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 		endpoint:          endpoint,
 		chosenService:     chosenService,
 		clientCallTimeout: clientCallTimeout,
+		backgroundCtx:     pm.backgroundCtx,
 	}
 	if pm.store == nil {
 		pm.store = make(map[string][]*monitoredPlugin)
@@ -364,6 +372,30 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 	}
 	p.conn = conn
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
+		pm.wg.Add(1)
+		go func() {
+			defer pm.wg.Done()
+			streamCtx, streamCancel := context.WithCancel(p.backgroundCtx)
+			p.SetHealthStream(streamCtx, streamCancel)
+
+			wait.UntilWithContext(streamCtx, func(ctx context.Context) {
+				logger.V(4).Info("Attempting to start WatchResources health stream")
+				stream, err := p.NodeWatchResources(ctx)
+				if err != nil {
+					logger.V(3).Error(err, "Failed to establish WatchResources stream, will retry")
+					return
+				}
+
+				logger.V(2).Info("Successfully started WatchResources health stream")
+
+				err = pm.streamHandler.HandleWatchResourcesStream(ctx, stream, driverName)
+				logger.V(2).Info("WatchResources health stream has ended", "error", err)
+
+			}, 5*time.Second)
+		}()
+	}
+
 	// Ensure that gRPC tries to connect even if we don't call any gRPC method.
 	// This is necessary to detect early whether a plugin is really available.
 	// This is currently an experimental gRPC method. Should it be removed we
@@ -387,6 +419,20 @@ func (pm *DRAPluginManager) DeRegisterPlugin(driverName, endpoint string) {
 }
 
 func (pm *DRAPluginManager) remove(driverName, endpoint string) {
+	logger := klog.FromContext(pm.backgroundCtx)
+	var p *monitoredPlugin
+	defer func() {
+		// Defer is used to avoid holding the mutex while closing the connection.
+		// This is necessary because closing the connection may cause deadlock
+		// with DRAPlugin.HandleConn, which can be called while holding the mutex.
+		if p != nil && p.conn != nil {
+			// Close the gRPC connection, so that it doesn't leak and
+			// doesn't try to reconnect to an unregistered plugin.
+			if err := p.conn.Close(); err != nil {
+				logger.Error(err, "Closing gRPC connection", "driverName", driverName, "endpoint", endpoint)
+			}
+		}
+	}()
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
@@ -395,15 +441,23 @@ func (pm *DRAPluginManager) remove(driverName, endpoint string) {
 	if i == -1 {
 		return
 	}
-	p := plugins[i]
+	p = plugins[i]
+
 	last := len(plugins) == 1
 	if last {
 		delete(pm.store, driverName)
 	} else {
 		pm.store[driverName] = slices.Delete(plugins, i, i+1)
 	}
-	logger := klog.FromContext(pm.backgroundCtx)
-	logger.V(3).Info("Unregistered DRA plugin", "driverName", p.driverName, "endpoint", p.endpoint, "numPlugins", len(pm.store[driverName]))
+
+	// Cancel the plugin's health stream if it was active.
+	healthCancel := p.HealthStreamCancel()
+	if healthCancel != nil {
+		logger.V(4).Info("Canceling health stream during deregistration")
+		healthCancel()
+	}
+
+	logger.V(3).Info("Unregistered DRA plugin", "driverName", driverName, "endpoint", endpoint, "numPlugins", len(pm.store[driverName]))
 	pm.sync(driverName)
 }
 

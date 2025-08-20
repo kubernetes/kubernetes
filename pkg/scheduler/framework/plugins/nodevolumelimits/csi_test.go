@@ -1198,7 +1198,7 @@ func getFakeCSINodeLister(csiNode *storagev1.CSINode) tf.CSINodeLister {
 	return csiNodeLister
 }
 
-func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int32, driverNames ...string) (*framework.NodeInfo, *storagev1.CSINode) {
+func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int32, driverNames ...string) (fwk.NodeInfo, *storagev1.CSINode) {
 	nodeInfo := framework.NewNodeInfo(pods...)
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},

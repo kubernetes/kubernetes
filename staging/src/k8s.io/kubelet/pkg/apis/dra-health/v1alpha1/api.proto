@@ -1,0 +1,67 @@
+// Copyright 2025 The Kubernetes Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+package v1alpha1;
+option go_package = "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1";
+
+
+// DRAResourceHealth service is implemented by DRA plugins and called by Kubelet.
+service DRAResourceHealth {
+  // NodeWatchResources allows a DRA plugin to stream health updates for its devices to Kubelet.
+  rpc NodeWatchResources(NodeWatchResourcesRequest) returns (stream NodeWatchResourcesResponse) {}
+}
+
+message NodeWatchResourcesRequest {
+  // Reserved for future use.
+}
+
+// HealthStatus defines the possible health states of a device.
+enum HealthStatus {
+  // UNKNOWN indicates that the health of the device cannot be determined.
+  UNKNOWN = 0;
+  // HEALTHY indicates that the device is operating normally.
+  HEALTHY = 1;
+  // UNHEALTHY indicates that the device has reported a problem.
+  UNHEALTHY = 2;
+}
+
+// DeviceIdentifier uniquely identifies a device within the scope of a driver.
+message DeviceIdentifier {
+  // The pool which contains the device.
+  string pool_name = 1;
+
+  // The unique name of the device within the pool.
+  string device_name = 2;
+}
+
+// DeviceHealth represents the health of a single device.
+message DeviceHealth {
+  // The identifier for the device.
+  DeviceIdentifier device = 1;
+
+  // The health status of the device.
+  HealthStatus health = 2;
+
+  // The Unix time (in seconds) of when this health status was last determined by the plugin.
+  int64 last_updated_time = 3;
+}
+
+// NodeWatchResourcesResponse contains a list of devices and their current health.
+// This should be a complete list for the driver; Kubelet will reconcile this
+// state with its internal cache. Any devices managed by the driver that are
+// not in this list will be considered to have an "Unknown" health status after a timeout.
+message NodeWatchResourcesResponse {
+  repeated DeviceHealth devices = 1;
+}

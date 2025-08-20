@@ -55,9 +55,11 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/volume"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -2031,7 +2033,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				testPod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 			}
 
-			result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP, tc.podIPs)
+			result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP, tc.podIPs, kubecontainer.VolumeMap{})
 			select {
 			case e := <-fakeRecorder.Events:
 				assert.Equal(t, tc.expectedEvent, e)
@@ -3294,6 +3296,210 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 	for _, test := range tests {
 		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
+	}
+}
+
+func TestPodPhaseWithContainerRestartPolicy(t *testing.T) {
+	var (
+		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
+	)
+	tests := []struct {
+		name          string
+		spec          *v1.PodSpec
+		statuses      []v1.ContainerStatus
+		podIsTerminal bool
+		expectedPhase v1.PodPhase
+	}{
+		{
+			name: "container with restart policy Never failed",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyNever,
+				}},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses:      []v1.ContainerStatus{failedState("failed-container")},
+			expectedPhase: v1.PodFailed,
+		},
+		{
+			name: "container with restart policy OnFailure failed",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyOnFailure,
+				}},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses: []v1.ContainerStatus{
+				failedState("failed-container"),
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "container with restart policy Always failed",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyAlways,
+				}},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses: []v1.ContainerStatus{
+				failedState("failed-container"),
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "At least one container with restartable container-level restart policy failed",
+			// Spec to simulate containerB having RestartPolicy: Always
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:          "containerA",
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+					{Name: "containerB"},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				succeededState("containerA"),
+				failedState("containerB"),
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "All containers without restartable container-level restart policy failed",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:          "containerA",
+						RestartPolicy: &containerRestartPolicyNever,
+					},
+					{
+						Name:          "containerB",
+						RestartPolicy: &containerRestartPolicyOnFailure,
+					},
+				},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses: []v1.ContainerStatus{
+				failedState("containerA"),
+				succeededState("containerB"),
+			},
+			expectedPhase: v1.PodFailed,
+		},
+		{
+			name: "All containers succeeded",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:          "containerA",
+						RestartPolicy: &containerRestartPolicyNever,
+					},
+					{
+						Name:          "containerB",
+						RestartPolicy: &containerRestartPolicyOnFailure,
+					},
+				},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses: []v1.ContainerStatus{
+				succeededState("containerA"),
+				succeededState("containerB"),
+			},
+			expectedPhase: v1.PodSucceeded,
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: *tc.spec,
+				Status: v1.PodStatus{
+					ContainerStatuses: tc.statuses,
+				},
+			}
+			phase := getPhase(pod, tc.statuses, tc.podIsTerminal, true)
+			assert.Equal(t, tc.expectedPhase, phase)
+		})
+	}
+}
+
+func TestPodPhaseWithContainerRestartPolicyInitContainers(t *testing.T) {
+	var (
+		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
+	)
+	tests := []struct {
+		name          string
+		spec          *v1.PodSpec
+		statuses      []v1.ContainerStatus
+		podIsTerminal bool
+		expectedPhase v1.PodPhase
+	}{
+		{
+			name: "init container with restart policy Never failed",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyNever,
+				}},
+				Containers:    []v1.Container{{Name: "container"}},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses:      []v1.ContainerStatus{failedState("failed-container")},
+			expectedPhase: v1.PodFailed,
+		},
+		{
+			name: "init container with restart policy OnFailure failed",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyOnFailure,
+				}},
+				Containers:    []v1.Container{{Name: "container"}},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				failedState("failed-container"),
+			},
+			expectedPhase: v1.PodPending,
+		},
+		{
+			name: "container with restart policy Always failed",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyAlways,
+				}},
+				Containers:    []v1.Container{{Name: "container"}},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				failedState("failed-container"),
+			},
+			expectedPhase: v1.PodPending,
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: *tc.spec,
+				Status: v1.PodStatus{
+					ContainerStatuses: tc.statuses,
+				},
+			}
+			phase := getPhase(pod, tc.statuses, tc.podIsTerminal, true)
+			assert.Equal(t, tc.expectedPhase, phase)
+		})
 	}
 }
 
@@ -6729,5 +6935,627 @@ func TestResolveRecursiveReadOnly(t *testing.T) {
 		} else {
 			assert.ErrorContains(t, err, tc.expectedErr)
 		}
+	}
+}
+
+// testVolumeMounter is a mock volume mounter for testing FileKeyRef functionality
+type testVolumeMounter struct {
+	path string
+}
+
+func (tvm *testVolumeMounter) GetMetrics() (*volume.Metrics, error) {
+	return &volume.Metrics{}, nil
+}
+
+func (tvm *testVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return nil
+}
+
+func (tvm *testVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+	return nil
+}
+
+func (tvm *testVolumeMounter) GetAttributes() volume.Attributes {
+	return volume.Attributes{}
+}
+
+func (tvm *testVolumeMounter) GetPath() string {
+	return tvm.path
+}
+
+func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
+	// Create a temporary directory for test files
+	tmpDir, err := os.MkdirTemp("", "filekeyref-test")
+	require.NoError(t, err)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	// Create test environment variable files
+	createEnvFile := func(filename, content string) string {
+		filePath := filepath.Join(tmpDir, filename)
+		err := os.WriteFile(filePath, []byte(content), 0644)
+		require.NoError(t, err)
+		return filePath
+	}
+
+	// Test cases for FileKeyRef feature gate
+	testCases := []struct {
+		name          string
+		container     *v1.Container
+		podVolumes    kubecontainer.VolumeMap
+		expectedEnvs  []kubecontainer.EnvVar
+		expectedError bool
+		errorContains string
+		setupFiles    func() []string // returns created file paths
+	}{
+		{
+			name: "successful file key reference",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "DATABASE",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "database.env",
+								Key:        "DATABASE",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "DATABASE", Value: "mydb"},
+			},
+			setupFiles: func() []string {
+				content := "DATABASE=mydb\nAPI_KEY=secret123\n"
+				return []string{createEnvFile("database.env", content)}
+			},
+		},
+		{
+			name: "file key reference with comments and empty lines",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "API_KEY",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "config.env",
+								Key:        "API_KEY",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "API_KEY", Value: "secret123"},
+			},
+			setupFiles: func() []string {
+				content := "# This is a comment\n\nDATABASE=mydb\nAPI_KEY=secret123\n\n# Another comment\n"
+				return []string{createEnvFile("config.env", content)}
+			},
+		},
+		{
+			name: "file key reference with spaces around equals sign",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "DEBUG_MODE",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "debug.env",
+								Key:        "DEBUG_MODE",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "DEBUG_MODE", Value: "true"},
+			},
+			setupFiles: func() []string {
+				content := "DEBUG_MODE = true\nLOG_LEVEL = info\n"
+				return []string{createEnvFile("debug.env", content)}
+			},
+		},
+		{
+			name: "key not found in file",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "MISSING_KEY",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "config.env",
+								Key:        "MISSING_KEY",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedError: true,
+			errorContains: "environment variable key \"MISSING_KEY\" not found in file",
+			setupFiles: func() []string {
+				content := "EXISTING_KEY=value\n"
+				return []string{createEnvFile("config.env", content)}
+			},
+		},
+		{
+			name: "key not found in file with optional flag",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "OPTIONAL_KEY",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "config.env",
+								Key:        "OPTIONAL_KEY",
+								Optional:   ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedEnvs: nil,
+			setupFiles: func() []string {
+				content := "EXISTING_KEY=value\n"
+				return []string{createEnvFile("config.env", content)}
+			},
+		},
+		{
+			name: "file does not exist",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "DATABASE",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "nonexistent.env",
+								Key:        "DATABASE",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedError: true,
+			errorContains: "couldn't parse env file",
+			setupFiles: func() []string {
+				return []string{} // No files created
+			},
+		},
+		{
+			name: "key length exceeds 128 characters",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "LONG_KEY",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "config.env",
+								Key:        strings.Repeat("A", 129),
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedError: true,
+			errorContains: "exceeds maximum length of 128 characters",
+			setupFiles: func() []string {
+				content := "EXISTING_KEY=value\n"
+				return []string{createEnvFile("config.env", content)}
+			},
+		},
+		{
+			name: "value size exceeds 32KB",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "LARGE_VALUE",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "large.env",
+								Key:        "LARGE_VALUE",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedError: true,
+			errorContains: "environment variable value for key \"LARGE_VALUE\" exceeds maximum size of 32KB",
+			setupFiles: func() []string {
+				largeValue := strings.Repeat("A", 33*1024) // 33KB
+				content := fmt.Sprintf("LARGE_VALUE=%s\n", largeValue)
+				return []string{createEnvFile("large.env", content)}
+			},
+		},
+		{
+			name: "volume not found",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "DATABASE",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "nonexistent-volume",
+								Path:       "database.env",
+								Key:        "DATABASE",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedError: true,
+			errorContains: "cannot find the volume \"nonexistent-volume\" referenced by FileKeyRef",
+			setupFiles: func() []string {
+				return []string{}
+			},
+		},
+		{
+			name: "volume mounter is nil",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "DATABASE",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "database.env",
+								Key:        "DATABASE",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: nil,
+				},
+			},
+			expectedError: true,
+			errorContains: "cannot find the volume \"config-volume\" referenced by FileKeyRef",
+			setupFiles: func() []string {
+				return []string{}
+			},
+		},
+		{
+			name: "multiple file key references",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "DATABASE",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "database.env",
+								Key:        "DATABASE",
+							},
+						},
+					},
+					{
+						Name: "API_KEY",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "api.env",
+								Key:        "API_KEY",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "DATABASE", Value: "mydb"},
+				{Name: "API_KEY", Value: "secret123"},
+			},
+			setupFiles: func() []string {
+				dbContent := "DATABASE=mydb\n"
+				apiContent := "API_KEY=secret123\n"
+				return []string{
+					createEnvFile("database.env", dbContent),
+					createEnvFile("api.env", apiContent),
+				}
+			},
+		},
+		{
+			name: "mixed environment variable sources",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name:  "STATIC_VAR",
+						Value: "static_value",
+					},
+					{
+						Name: "FILE_VAR",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "config.env",
+								Key:        "FILE_VAR",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "STATIC_VAR", Value: "static_value"},
+				{Name: "FILE_VAR", Value: "file_value"},
+			},
+			setupFiles: func() []string {
+				content := "FILE_VAR=file_value\n"
+				return []string{createEnvFile("config.env", content)}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnvFiles, true)
+
+			if tc.setupFiles != nil {
+				tc.setupFiles()
+			}
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test-namespace",
+					UID:       "test-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					Containers:         []v1.Container{*tc.container},
+					EnableServiceLinks: ptr.To(false),
+				},
+			}
+
+			envs, err := kl.makeEnvironmentVariables(pod, tc.container, "192.168.1.1", []string{"192.168.1.1"}, tc.podVolumes)
+
+			if tc.expectedError {
+				require.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				require.NoError(t, err)
+
+				// Sort both slices for comparison
+				sort.Sort(Envs(envs))
+				sort.Sort(Envs(tc.expectedEnvs))
+
+				assert.Equal(t, tc.expectedEnvs, envs)
+			}
+		})
+	}
+}
+
+type Envs []kubecontainer.EnvVar
+
+func (e Envs) Len() int           { return len(e) }
+func (e Envs) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
+func (e Envs) Less(i, j int) bool { return e[i].Name < e[j].Name }
+
+func TestGeneratePodHostNameAndDomain(t *testing.T) {
+	kubelet := &Kubelet{}
+	kubelet.dnsConfigurer = &dns.Configurer{
+		ClusterDomain: "cluster.local",
+	}
+
+	testCases := []struct {
+		name                string
+		podName             string
+		podHostname         string
+		podSubdomain        string
+		podHostnameOverride *string
+		featureGateEnabled  bool
+		expectedHostname    string
+		expectedDomain      string
+		expectError         bool
+		errorContains       string
+	}{
+		{
+			name:             "Default behavior - pod name as hostname",
+			podName:          "test-pod",
+			podHostname:      "",
+			podSubdomain:     "",
+			expectedHostname: "test-pod",
+			expectedDomain:   "",
+		},
+		{
+			name:             "Custom Hostname - uses pod.Spec.Hostname",
+			podName:          "test-pod",
+			podHostname:      "custom-hostname",
+			podSubdomain:     "",
+			expectedHostname: "custom-hostname",
+			expectedDomain:   "",
+		},
+		{
+			name:             "Custom Subdomain - constructs FQDN",
+			podName:          "test-pod",
+			podHostname:      "",
+			podSubdomain:     "my-subdomain",
+			expectedHostname: "test-pod",
+			expectedDomain:   "my-subdomain.default.svc.cluster.local",
+		},
+		{
+			name:             "Custom Hostname and Subdomain - uses both",
+			podName:          "test-pod",
+			podHostname:      "custom-hostname",
+			podSubdomain:     "my-subdomain",
+			expectedHostname: "custom-hostname",
+			expectedDomain:   "my-subdomain.default.svc.cluster.local",
+		},
+		{
+			name:                "HostnameOverride - enabled - overrides all",
+			podName:             "test-pod",
+			podHostname:         "custom-hostname",
+			podSubdomain:        "my-subdomain",
+			podHostnameOverride: ptr.To("override-hostname"),
+			featureGateEnabled:  true,
+			expectedHostname:    "override-hostname",
+			expectedDomain:      "",
+		},
+		{
+			name:                "HostnameOverride - enabled - overrides all - invalid hostname",
+			podName:             "test-pod",
+			podHostname:         "custom-hostname",
+			podSubdomain:        "my-subdomain",
+			podHostnameOverride: ptr.To("Invalid-Hostname-!"),
+			featureGateEnabled:  true,
+			expectError:         true,
+			errorContains:       "pod HostnameOverride \"Invalid-Hostname-!\" is not a valid DNS subdomain",
+		},
+		{
+			name:                "HostnameOverride - enabled - overrides all - valid DNS hostname",
+			podName:             "test-pod",
+			podHostnameOverride: ptr.To("valid.hostname"),
+			expectedHostname:    "valid.hostname",
+			featureGateEnabled:  true,
+			errorContains:       "",
+		},
+		{
+			name:                "HostnameOverride - disabled - is ignored",
+			podName:             "test-pod",
+			podHostname:         "custom-hostname",
+			podSubdomain:        "my-subdomain",
+			podHostnameOverride: ptr.To("override-hostname"),
+			featureGateEnabled:  false,
+			expectedHostname:    "custom-hostname",
+			expectedDomain:      "my-subdomain.default.svc.cluster.local",
+		},
+		{
+			name:             "Hostname Truncation - pod name is too long",
+			podName:          strings.Repeat("a", 65),
+			podHostname:      "",
+			podSubdomain:     "",
+			expectedHostname: strings.Repeat("a", 63),
+			expectedDomain:   "",
+		},
+		{
+			name:          "Validation - invalid hostname",
+			podName:       "test-pod",
+			podHostname:   "Invalid-Hostname-!",
+			expectError:   true,
+			errorContains: "pod Hostname \"Invalid-Hostname-!\" is not a valid DNS label",
+		},
+		{
+			name:          "Validation - invalid subdomain",
+			podName:       "test-pod",
+			podSubdomain:  "invalid_subdomain",
+			expectError:   true,
+			errorContains: "pod Subdomain \"invalid_subdomain\" is not a valid DNS label",
+		},
+		{
+			name:          "Validation - too long hostname",
+			podName:       "test-pod",
+			podHostname:   strings.Repeat("a", 64),
+			expectError:   true,
+			errorContains: "must be no more than 63 characters",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HostnameOverride, tc.featureGateEnabled)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tc.podName,
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Hostname:         tc.podHostname,
+					Subdomain:        tc.podSubdomain,
+					HostnameOverride: tc.podHostnameOverride,
+				},
+			}
+
+			hostname, domain, err := kubelet.GeneratePodHostNameAndDomain(pod)
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("expected an error but got none")
+					return
+				}
+				if tc.errorContains != "" && !strings.Contains(err.Error(), tc.errorContains) {
+					t.Errorf("expected error to contain %q, but got %q", tc.errorContains, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if hostname != tc.expectedHostname {
+				t.Errorf("expected hostname %q, but got %q", tc.expectedHostname, hostname)
+			}
+			if domain != tc.expectedDomain {
+				t.Errorf("expected domain %q, but got %q", tc.expectedDomain, domain)
+			}
+		})
 	}
 }

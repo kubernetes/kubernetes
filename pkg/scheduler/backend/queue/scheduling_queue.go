@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -128,6 +129,10 @@ type SchedulingQueue interface {
 	// Run starts the goroutines managing the queue.
 	Run(logger klog.Logger)
 
+	// PatchPodStatus handles the pod status update by sending an update API call through API dispatcher.
+	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+	PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) (<-chan error, error)
+
 	// The following functions are supposed to be used only for testing or debugging.
 	GetPod(name, namespace string) (*framework.QueuedPodInfo, bool)
 	PendingPods() ([]*v1.Pod, string)
@@ -193,6 +198,10 @@ type PriorityQueue struct {
 	// pluginMetricsSamplePercent is the percentage of plugin metrics to be sampled.
 	pluginMetricsSamplePercent int
 
+	// apiDispatcher is used for the methods that are expected to send API calls.
+	// It's non-nil only if the SchedulerAsyncAPICalls feature gate is enabled.
+	apiDispatcher fwk.APIDispatcher
+
 	// isSchedulingQueueHintEnabled indicates whether the feature gate for the scheduling queue is enabled.
 	isSchedulingQueueHintEnabled bool
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
@@ -224,6 +233,7 @@ type priorityQueueOptions struct {
 	pluginMetricsSamplePercent        int
 	preEnqueuePluginMap               map[string]map[string]framework.PreEnqueuePlugin
 	queueingHintMap                   QueueingHintMapPerProfile
+	apiDispatcher                     fwk.APIDispatcher
 }
 
 // Option configures a PriorityQueue
@@ -298,6 +308,13 @@ func WithPluginMetricsSamplePercent(percent int) Option {
 	}
 }
 
+// WithAPIDispatcher sets the API dispatcher.
+func WithAPIDispatcher(apiDispatcher fwk.APIDispatcher) Option {
+	return func(o *priorityQueueOptions) {
+		o.apiDispatcher = apiDispatcher
+	}
+}
+
 var defaultPriorityQueueOptions = priorityQueueOptions{
 	clock:                             clock.RealClock{},
 	podInitialBackoffDuration:         DefaultPodInitialBackoffDuration,
@@ -334,6 +351,7 @@ func NewPriorityQueue(
 
 	isSchedulingQueueHintEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints)
 	isPopFromBackoffQEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPopFromBackoffQ)
+	lessConverted := convertLessFn(lessFn)
 
 	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessFn, isPopFromBackoffQEnabled)
 	pq := &PriorityQueue{
@@ -348,6 +366,7 @@ func NewPriorityQueue(
 		metricsRecorder:                   options.metricsRecorder,
 		pluginMetricsSamplePercent:        options.pluginMetricsSamplePercent,
 		moveRequestCycle:                  -1,
+		apiDispatcher:                     options.apiDispatcher,
 		isSchedulingQueueHintEnabled:      isSchedulingQueueHintEnabled,
 		isPopFromBackoffQEnabled:          isPopFromBackoffQEnabled,
 	}
@@ -355,11 +374,18 @@ func NewPriorityQueue(
 	if isPopFromBackoffQEnabled {
 		backoffQPopper = backoffQ
 	}
-	pq.activeQ = newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](lessFn), metrics.NewActivePodsRecorder()), isSchedulingQueueHintEnabled, options.metricsRecorder, backoffQPopper)
+	pq.activeQ = newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](lessConverted), metrics.NewActivePodsRecorder()), isSchedulingQueueHintEnabled, options.metricsRecorder, backoffQPopper)
 	pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
 	pq.nominator = newPodNominator(options.podLister)
 
 	return pq
+}
+
+// Helper function that wraps framework.LessFunc and converts it to take *framework.QueuedPodInfo as arguments.
+func convertLessFn(lessFn framework.LessFunc) func(podInfo1, podInfo2 *framework.QueuedPodInfo) bool {
+	return func(podInfo1, podInfo2 *framework.QueuedPodInfo) bool {
+		return lessFn(podInfo1, podInfo2)
+	}
 }
 
 func buildEventMap(qHintMap QueueingHintMapPerProfile) map[string][]fwk.ClusterEvent {
@@ -950,7 +976,8 @@ func (p *PriorityQueue) InFlightPods() []*v1.Pod {
 
 // isPodUpdated checks if the pod is updated in a way that it may have become
 // schedulable. It drops status of the pod and compares it with old version,
-// except for pod.status.resourceClaimStatuses: changing that may have an
+// except for pod.status.resourceClaimStatuses and
+// pod.status.extendedResourceClaimStatus: changing that may have an
 // effect on scheduling.
 func isPodUpdated(oldPod, newPod *v1.Pod) bool {
 	strip := func(pod *v1.Pod) *v1.Pod {
@@ -958,7 +985,8 @@ func isPodUpdated(oldPod, newPod *v1.Pod) bool {
 		p.ResourceVersion = ""
 		p.Generation = 0
 		p.Status = v1.PodStatus{
-			ResourceClaimStatuses: pod.Status.ResourceClaimStatuses,
+			ResourceClaimStatuses:       pod.Status.ResourceClaimStatuses,
+			ExtendedResourceClaimStatus: pod.Status.ExtendedResourceClaimStatus,
 		}
 		p.ManagedFields = nil
 		p.Finalizers = nil
@@ -1299,6 +1327,20 @@ func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 	return result, fmt.Sprintf(pendingPodsSummary, activeQLen, backoffQLen, len(p.unschedulablePods.podInfoMap))
 }
 
+// PatchPodStatus handles the pod status update by sending an update API call through API dispatcher.
+// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) (<-chan error, error) {
+	// Don't store anything in the cache. This might be extended in the next releases.
+	onFinish := make(chan error, 1)
+	err := p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, condition, nominatingInfo), fwk.APICallOptions{
+		OnFinish: onFinish,
+	})
+	if fwk.IsUnexpectedError(err) {
+		return onFinish, err
+	}
+	return onFinish, nil
+}
+
 // Note: this function assumes the caller locks both p.lock.RLock and p.activeQ.getLock().RLock.
 func (p *PriorityQueue) nominatedPodToInfo(np podRef, unlockedActiveQ unlockedActiveQueueReader) *framework.PodInfo {
 	pod := np.toPod()
@@ -1334,12 +1376,12 @@ func (p *PriorityQueue) Close() {
 // NominatedPodsForNode returns a copy of pods that are nominated to run on the given node,
 // but they are waiting for other pods to be removed from the node.
 // CAUTION: Make sure you don't call this function while taking any queue's lock in any scenario.
-func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []*framework.PodInfo {
+func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []fwk.PodInfo {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	nominatedPods := p.nominator.nominatedPodsForNode(nodeName)
 
-	pods := make([]*framework.PodInfo, len(nominatedPods))
+	pods := make([]fwk.PodInfo, len(nominatedPods))
 	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
 		for i, np := range nominatedPods {
 			pods[i] = p.nominatedPodToInfo(np, unlockedActiveQ).DeepCopy()

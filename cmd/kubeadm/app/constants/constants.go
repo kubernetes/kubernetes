@@ -326,7 +326,7 @@ const (
 	MinExternalEtcdVersion = "3.5.21-0"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.6.1-1"
+	DefaultEtcdVersion = "3.6.4-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -442,7 +442,7 @@ const (
 	ModeNode string = "Node"
 
 	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "3.10"
+	PauseVersion = "3.10.1"
 
 	// CgroupDriverSystemd holds the systemd driver type
 	CgroupDriverSystemd = "systemd"
@@ -501,7 +501,7 @@ var (
 		31: "3.5.21-0",
 		32: "3.5.21-0",
 		33: "3.5.21-0",
-		34: "3.6.1-1",
+		34: "3.6.4-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

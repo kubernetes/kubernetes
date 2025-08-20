@@ -121,7 +121,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	logger := klog.FromContext(ctx)
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
-		klog.ErrorS(err, "Cannot get Node info")
+		logger.Error(err, "Cannot get Node info")
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  InvalidNodeInfo,
@@ -148,7 +148,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 
 	if rejectPodAdmissionBasedOnSupplementalGroupsPolicy(admitPod, node) {
 		message := fmt.Sprintf("SupplementalGroupsPolicy=%s is not supported in this node", v1.SupplementalGroupsPolicyStrict)
-		klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
+		logger.Info("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  SupplementalGroupsPolicyNotSupported,
@@ -173,7 +173,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 
 	// Remove the requests of the extended resources that are missing in the
 	// node info. This is required to support cluster-level resources, which
-	// are extended resources unknown to nodes.
+	// are extended resources unknown to nodes, and also extended resources
+	// backed by DRA.
 	//
 	// Caveat: If a pod was manually bound to a node (e.g., static pod) where a
 	// node-level extended resource it requires is not found, then kubelet will

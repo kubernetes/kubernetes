@@ -55,7 +55,7 @@ func (pl *fooPlugin) Name() string {
 	return "foo"
 }
 
-func (pl *fooPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *fooPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	taints := nodeInfo.Node().Spec.Taints
 	if len(taints) == 0 {
 		return nil
@@ -212,80 +212,89 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 
 	for _, tt := range tests {
 		for _, qHintEnabled := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s, with queuehint(%v)", tt.name, qHintEnabled), func(t *testing.T) {
-				if !qHintEnabled {
-					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+			for _, asyncAPICallsEnabled := range []bool{false, true} {
+				if !qHintEnabled && asyncAPICallsEnabled {
+					// This can't happen.
+					continue
 				}
-				// Set the SchedulerPopFromBackoffQ feature to false, because when it's enabled, we can't be sure the pod won't be popped from the backoffQ.
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, false)
+				t.Run(fmt.Sprintf("%s (Queueing hints enabled: %v, Async API calls enabled: %v)", tt.name, qHintEnabled, asyncAPICallsEnabled), func(t *testing.T) {
+					if !qHintEnabled {
+						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+					} else {
+						// Handle SchedulerAsyncAPICalls feature only in 1.34+.
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
+					}
+					// Set the SchedulerPopFromBackoffQ feature to false, because when it's enabled, we can't be sure the pod won't be popped from the backoffQ.
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, false)
 
-				testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 0, true,
-					scheduler.WithClock(fakeClock),
-					// UpdateFunc needs to be called when the nominated pod is still in the backoff queue, thus small, but non 0 value.
-					scheduler.WithPodInitialBackoffSeconds(int64(testBackoff.Seconds())),
-					scheduler.WithPodMaxBackoffSeconds(int64(testBackoff.Seconds())),
-				)
-				defer teardown()
+					testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 0, true,
+						scheduler.WithClock(fakeClock),
+						// UpdateFunc needs to be called when the nominated pod is still in the backoff queue, thus small, but non 0 value.
+						scheduler.WithPodInitialBackoffSeconds(int64(testBackoff.Seconds())),
+						scheduler.WithPodMaxBackoffSeconds(int64(testBackoff.Seconds())),
+					)
+					defer teardown()
 
-				_, err := testutils.CreateNode(testCtx.ClientSet, testNode)
-				if err != nil {
-					t.Fatalf("Creating node error: %v", err)
-				}
+					_, err := testutils.CreateNode(testCtx.ClientSet, testNode)
+					if err != nil {
+						t.Fatalf("Creating node error: %v", err)
+					}
 
-				// Ensure node is present in scheduler cache.
-				if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 1); err != nil {
-					t.Fatalf("Waiting for node in cache error: %v", err)
-				}
+					// Ensure node is present in scheduler cache.
+					if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 1); err != nil {
+						t.Fatalf("Waiting for node in cache error: %v", err)
+					}
 
-				// Create initial low-priority pod and wait until it's scheduled.
-				pod, err := testutils.CreatePausePod(testCtx.ClientSet, podLow)
-				if err != nil {
-					t.Fatalf("Creating pod error: %v", err)
-				}
-				if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
-				}
+					// Create initial low-priority pod and wait until it's scheduled.
+					pod, err := testutils.CreatePausePod(testCtx.ClientSet, podLow)
+					if err != nil {
+						t.Fatalf("Creating pod error: %v", err)
+					}
+					if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+						t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
+					}
 
-				// Create mid-priority pod and wait until it becomes nominated (preempt low-priority pod) and remain uschedulable.
-				pod, err = testutils.CreatePausePod(testCtx.ClientSet, podMidNominated)
-				if err != nil {
-					t.Fatalf("Creating pod error: %v", err)
-				}
-				if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Errorf("NominatedNodeName field was not set for pod %v: %v", pod.Name, err)
-				}
-				if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Errorf("Pod %v haven't become unschedulabe: %v", pod.Name, err)
-				}
+					// Create mid-priority pod and wait until it becomes nominated (preempt low-priority pod) and remain uschedulable.
+					pod, err = testutils.CreatePausePod(testCtx.ClientSet, podMidNominated)
+					if err != nil {
+						t.Fatalf("Creating pod error: %v", err)
+					}
+					if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+						t.Errorf("NominatedNodeName field was not set for pod %v: %v", pod.Name, err)
+					}
+					if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+						t.Errorf("Pod %v haven't become unschedulabe: %v", pod.Name, err)
+					}
 
-				// Remove the initial low-priority pod, which will move the nominated unschedulable pod back to the backoff queue.
-				if err := testutils.DeletePod(testCtx.ClientSet, podLow.Name, podLow.Namespace); err != nil {
-					t.Fatalf("Deleting pod error: %v", err)
-				}
+					// Remove the initial low-priority pod, which will move the nominated unschedulable pod back to the backoff queue.
+					if err := testutils.DeletePod(testCtx.ClientSet, podLow.Name, podLow.Namespace); err != nil {
+						t.Fatalf("Deleting pod error: %v", err)
+					}
 
-				// Create another low-priority pods which cannot be scheduled because the mid-priority pod is nominated on the node and the node doesn't have enough resource to have two pods both.
-				pod, err = testutils.CreatePausePod(testCtx.ClientSet, podLow)
-				if err != nil {
-					t.Fatalf("Creating pod error: %v", err)
-				}
-				if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
-				}
+					// Create another low-priority pods which cannot be scheduled because the mid-priority pod is nominated on the node and the node doesn't have enough resource to have two pods both.
+					pod, err = testutils.CreatePausePod(testCtx.ClientSet, podLow)
+					if err != nil {
+						t.Fatalf("Creating pod error: %v", err)
+					}
+					if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+						t.Fatalf("Pod %v was not scheduled: %v", pod.Name, err)
+					}
 
-				// Update causing the nominated pod to be removed or to get its nominated node name removed, which should trigger scheduling of the low priority pod.
-				// Note that the update has to happen since the nominated pod is still in the backoffQ to actually test updates of nominated, but not bound yet pods.
-				tt.updateFunc(testCtx)
+					// Update causing the nominated pod to be removed or to get its nominated node name removed, which should trigger scheduling of the low priority pod.
+					// Note that the update has to happen since the nominated pod is still in the backoffQ to actually test updates of nominated, but not bound yet pods.
+					tt.updateFunc(testCtx)
 
-				// Advance time by the 2 * maxPodBackoffSeconds to move low priority pod out of the backoff queue.
-				fakeClock.Step(2 * testBackoff)
+					// Advance time by the 2 * maxPodBackoffSeconds to move low priority pod out of the backoff queue.
+					fakeClock.Step(2 * testBackoff)
 
-				// Expect the low-priority pod is notified about unnominated mid-pririty pod and gets scheduled, as it should fit this time.
-				if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podLow); err != nil {
-					t.Fatalf("Pod %v was not scheduled: %v", podLow.Name, err)
-				}
-				testutils.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, cleanupPods)
-			})
+					// Expect the low-priority pod is notified about unnominated mid-pririty pod and gets scheduled, as it should fit this time.
+					if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podLow); err != nil {
+						t.Fatalf("Pod %v was not scheduled: %v", podLow.Name, err)
+					}
+					testutils.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, cleanupPods)
+				})
+			}
 		}
 	}
 }

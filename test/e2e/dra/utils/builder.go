@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,12 +31,15 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
+	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -44,11 +48,27 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// ExtendedResourceName returns hard coded extended resource name with a variable
+// suffix from the input integer when it's greater than or equal to 0.
+// "example.com/resource" is not special, any valid extended resource name can be used
+// instead, except when using example device plugin in the test, which hard coded it,
+// see test/e2e/dra/deploy_device_plugin.go.
+// i == -1 is special, the extended resource name has no extra suffix, it is
+// used in the test where a cluster has both DRA driver and device plugin.
+func ExtendedResourceName(i int) string {
+	suffix := ""
+	if i >= 0 {
+		suffix = strconv.Itoa(i)
+	}
+	return "example.com/resource" + suffix
+}
+
 // Builder contains a running counter to make objects unique within thir
 // namespace.
 type Builder struct {
-	f      *framework.Framework
-	driver *Driver
+	f                       *framework.Framework
+	driver                  *Driver
+	UseExtendedResourceName bool
 
 	podCounter      int
 	claimCounter    int
@@ -62,11 +82,25 @@ func (b *Builder) ClassName() string {
 
 // Class returns the device Class that the builder's other objects
 // reference.
-func (b *Builder) Class() *resourceapi.DeviceClass {
+// The input i is used to pick the extended resource name whose suffix has the
+// same i for the device class.
+// i == -1 is special, the extended resource name has no extra suffix, it is
+// used in the test where a cluster has both DRA driver and device plugin.
+func (b *Builder) Class(i int) *resourceapi.DeviceClass {
+	ern := ExtendedResourceName(i)
+	name := b.ClassName()
+	if i >= 0 {
+		name = b.ClassName() + strconv.Itoa(i)
+	}
 	class := &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: b.ClassName(),
+			Name: name,
 		},
+	}
+	if b.UseExtendedResourceName {
+		class.Spec = resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &ern,
+		}
 	}
 	class.Spec.Selectors = []resourceapi.DeviceSelector{{
 		CEL: &resourceapi.CELDeviceSelector{
@@ -115,6 +149,34 @@ func (b *Builder) claimSpecWithV1beta1() resourcev1beta1.ResourceClaimSpec {
 			Config: []resourcev1beta1.DeviceClaimConfiguration{{
 				DeviceConfiguration: resourcev1beta1.DeviceConfiguration{
 					Opaque: &resourcev1beta1.OpaqueDeviceConfiguration{
+						Driver: b.driver.Name,
+						Parameters: runtime.RawExtension{
+							Raw: []byte(parameters),
+						},
+					},
+				},
+			}},
+		},
+	}
+
+	return spec
+}
+
+// claimSpec returns the device request for a claim or claim template
+// with the associated config using the v1beta1 API.
+func (b *Builder) claimSpecWithV1beta2() resourcev1beta2.ResourceClaimSpec {
+	parameters, _ := b.ParametersEnv()
+	spec := resourcev1beta2.ResourceClaimSpec{
+		Devices: resourcev1beta2.DeviceClaim{
+			Requests: []resourcev1beta2.DeviceRequest{{
+				Name: "my-request",
+				Exactly: &resourcev1beta2.ExactDeviceRequest{
+					DeviceClassName: b.ClassName(),
+				},
+			}},
+			Config: []resourcev1beta2.DeviceClaimConfiguration{{
+				DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+					Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 						Driver: b.driver.Name,
 						Parameters: runtime.RawExtension{
 							Raw: []byte(parameters),
@@ -218,7 +280,20 @@ func (b *Builder) PodInlineWithV1beta1() (*v1.Pod, *resourcev1beta1.ResourceClai
 	return pod, template
 }
 
-// PodInlineMultiple returns a pod with inline resource claim referenced by 3 containers
+func (b *Builder) PodInlineWithV1beta2() (*v1.Pod, *resourcev1beta2.ResourceClaimTemplate) {
+	pod, _ := b.PodInline()
+	template := &resourcev1beta2.ResourceClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+		},
+		Spec: resourcev1beta2.ResourceClaimTemplateSpec{
+			Spec: b.claimSpecWithV1beta2(),
+		},
+	}
+	return pod, template
+}
+
 func (b *Builder) PodInlineMultiple() (*v1.Pod, *resourceapi.ResourceClaimTemplate) {
 	pod, template := b.PodInline()
 	pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy(), *pod.Spec.Containers[0].DeepCopy())
@@ -261,9 +336,9 @@ func (b *Builder) Create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 		var createdObj klog.KMetadata
 		switch obj := obj.(type) {
 		case *resourceapi.DeviceClass:
-			createdObj, err = b.f.ClientSet.ResourceV1beta2().DeviceClasses().Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = b.ClientV1().DeviceClasses().Create(ctx, obj, metav1.CreateOptions{})
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				err := b.f.ClientSet.ResourceV1beta2().DeviceClasses().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
+				err := b.ClientV1().DeviceClasses().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "delete device class")
 			})
 		case *v1.Pod:
@@ -271,17 +346,21 @@ func (b *Builder) Create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 		case *v1.ConfigMap:
 			createdObj, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceClaim:
-			createdObj, err = b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = b.ClientV1().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourcev1beta1.ResourceClaim:
 			createdObj, err = b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *resourcev1beta2.ResourceClaim:
+			createdObj, err = b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceClaimTemplate:
-			createdObj, err = b.f.ClientSet.ResourceV1beta2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = b.ClientV1().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourcev1beta1.ResourceClaimTemplate:
 			createdObj, err = b.f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *resourcev1beta2.ResourceClaimTemplate:
+			createdObj, err = b.f.ClientSet.ResourceV1beta2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceSlice:
-			createdObj, err = b.f.ClientSet.ResourceV1beta2().ResourceSlices().Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = b.ClientV1().ResourceSlices().Create(ctx, obj, metav1.CreateOptions{})
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				err := b.f.ClientSet.ResourceV1beta2().ResourceSlices().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
+				err := b.ClientV1().ResourceSlices().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "delete node resource slice")
 			})
 		case *resourcealphaapi.DeviceTaintRule:
@@ -367,7 +446,7 @@ func TestContainerEnv(ctx context.Context, f *framework.Framework, pod *v1.Pod, 
 		gomega.Expect(actualEnv).To(gomega.Equal(expectEnv), fmt.Sprintf("container %s env output:\n%s", containerName, stdout))
 	} else {
 		for i := 0; i < len(env); i += 2 {
-			envStr := fmt.Sprintf("\n%s=%s\n", env[i], env[i+1])
+			envStr := fmt.Sprintf("%s=%s\n", env[i], env[i+1])
 			gomega.Expect(stdout).To(gomega.ContainSubstring(envStr), fmt.Sprintf("container %s env variables", containerName))
 		}
 	}
@@ -388,8 +467,15 @@ func NewBuilderNow(ctx context.Context, f *framework.Framework, driver *Driver) 
 func (b *Builder) setUp(ctx context.Context) {
 	b.podCounter = 0
 	b.claimCounter = 0
-	b.Create(ctx, b.Class())
+	for i := -1; i < 6; i++ {
+		b.Create(ctx, b.Class(i))
+	}
 	ginkgo.DeferCleanup(b.tearDown)
+}
+
+// ClientV1 returns a wrapper for client-go which provides the V1 API on top of whatever is enabled in the cluster.
+func (b *Builder) ClientV1() cgoresource.ResourceV1Interface {
+	return draclient.New(b.f.ClientSet)
 }
 
 func (b *Builder) tearDown(ctx context.Context) {
@@ -414,14 +500,14 @@ func (b *Builder) tearDown(ctx context.Context) {
 		return b.listTestPods(ctx)
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining pods despite deletion")
 
-	claims, err := b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+	claims, err := b.ClientV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err, "get resource claims")
 	for _, claim := range claims.Items {
 		if claim.DeletionTimestamp != nil {
 			continue
 		}
 		ginkgo.By(fmt.Sprintf("deleting %T %s", &claim, klog.KObj(&claim)))
-		err := b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+		err := b.ClientV1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.ExpectNoError(err, "delete claim")
 		}
@@ -434,7 +520,7 @@ func (b *Builder) tearDown(ctx context.Context) {
 
 	ginkgo.By("waiting for claims to be deallocated and deleted")
 	gomega.Eventually(func() ([]resourceapi.ResourceClaim, error) {
-		claims, err := b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		claims, err := b.ClientV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}

@@ -271,6 +271,11 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie())
 	}
+	// Kubelet needs to create arbitrary PodCertificateRequests to implement
+	// podCertificate volumes.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch", "create").Groups(certificatesGroup).Resources("podcertificaterequests").RuleOrDie())
+	}
 
 	return nodePolicyRules
 }
@@ -628,10 +633,15 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("deviceclasses").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims/status").RuleOrDie(),
-			rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
+			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
 		)
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+			kubeSchedulerRules = append(kubeSchedulerRules,
+				rbacv1helpers.NewRule("create", "delete").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
 			kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie())
 		}
 	}

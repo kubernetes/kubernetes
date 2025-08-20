@@ -54,7 +54,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -218,8 +217,8 @@ func (h *hostpathCSIDriver) GetSnapshotClass(ctx context.Context, config *storag
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (h *hostpathCSIDriver) GetVolumeAttributesClass(_ context.Context, config *storageframework.PerTestConfig) *storagev1beta1.VolumeAttributesClass {
-	return storageframework.CopyVolumeAttributesClass(&storagev1beta1.VolumeAttributesClass{
+func (h *hostpathCSIDriver) GetVolumeAttributesClass(_ context.Context, config *storageframework.PerTestConfig) *storagev1.VolumeAttributesClass {
+	return storageframework.CopyVolumeAttributesClass(&storagev1.VolumeAttributesClass{
 		DriverName: config.GetUniqueDriverName(),
 		Parameters: map[string]string{
 			hostpathCSIDriverMutableParameterName: hostpathCSIDriverMutableParameterValue,

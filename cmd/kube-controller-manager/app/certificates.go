@@ -22,6 +22,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"time"
 
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
 )
 
 func newCertificateSigningRequestSigningControllerDescriptor() *ControllerDescriptor {
@@ -196,6 +198,28 @@ func startCertificateSigningRequestCleanerController(ctx context.Context, contro
 	cleaner := cleaner.NewCSRCleanerController(
 		controllerContext.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
 		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
+	)
+	go cleaner.Run(ctx, 1)
+	return nil, true, nil
+}
+
+func newPodCertificateRequestCleanerControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.PodCertificateRequestCleanerController,
+		initFunc: startPodCertificateRequestCleanerController,
+		requiredFeatureGates: []featuregate.Feature{
+			features.PodCertificateRequest,
+		},
+	}
+}
+
+func startPodCertificateRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	cleaner := cleaner.NewPCRCleanerController(
+		controllerContext.ClientBuilder.ClientOrDie("podcertificaterequestcleaner"),
+		controllerContext.InformerFactory.Certificates().V1alpha1().PodCertificateRequests(),
+		clock.RealClock{},
+		15*time.Minute, // We expect all PodCertificateRequest flows to complete faster than this.
+		5*time.Minute,
 	)
 	go cleaner.Run(ctx, 1)
 	return nil, true, nil

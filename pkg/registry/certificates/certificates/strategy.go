@@ -277,7 +277,25 @@ func populateConditionTimestamps(newCSR, oldCSR *certificates.CertificateSigning
 }
 
 func (csrStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateCertificateSigningRequestStatusUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest))
+	newCSR := obj.(*certificates.CertificateSigningRequest)
+	oldCSR := old.(*certificates.CertificateSigningRequest)
+	errs := validation.ValidateCertificateSigningRequestStatusUpdate(newCSR, oldCSR)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+		// Determine if takeover is enabled
+		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+
+		// Run declarative update validation with panic recovery
+		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover))
+
+		// Compare imperative and declarative errors and emit metric if there's a mismatch
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
+
+		// Only apply declarative errors if takeover is enabled
+		if takeover {
+			errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
+		}
+	}
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -329,7 +347,25 @@ func (csrApprovalStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 }
 
 func (csrApprovalStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateCertificateSigningRequestApprovalUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest))
+	newCSR := obj.(*certificates.CertificateSigningRequest)
+	oldCSR := old.(*certificates.CertificateSigningRequest)
+	errs := validation.ValidateCertificateSigningRequestApprovalUpdate(newCSR, oldCSR)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+		// Determine if takeover is enabled
+		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+
+		// Run declarative update validation with panic recovery
+		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover))
+
+		// Compare imperative and declarative errors and emit metric if there's a mismatch
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
+
+		// Only apply declarative errors if takeover is enabled
+		if takeover {
+			errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
+		}
+	}
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.

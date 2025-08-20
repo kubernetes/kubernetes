@@ -72,6 +72,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.CertificateSigningRequestSigningController,
 		names.CertificateSigningRequestApprovingController,
 		names.CertificateSigningRequestCleanerController,
+		names.PodCertificateRequestCleanerController,
 		names.TTLController,
 		names.BootstrapSignerController,
 		names.TokenCleanerController,

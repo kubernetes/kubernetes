@@ -32,6 +32,6 @@ import (
 func (m *kubeGenericRuntimeManager) ReadLogs(ctx context.Context, path, containerID string, apiOpts *v1.PodLogOptions, stdout, stderr io.Writer) error {
 	// Convert v1.PodLogOptions into internal log options.
 	opts := logs.NewLogOptions(apiOpts, time.Now())
-	logger := klog.Background()
+	logger := klog.FromContext(ctx)
 	return logs.ReadLogs(ctx, &logger, path, containerID, opts, m.runtimeService, stdout, stderr)
 }

@@ -41,23 +41,27 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery/cached/memory"
-	resourceapiinformer "k8s.io/client-go/informers/resource/v1beta2"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
+	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
@@ -76,14 +80,20 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-const (
-	NodePrepareResourcesMethod   = "/k8s.io.kubelet.pkg.apis.dra.v1beta1.DRAPlugin/NodePrepareResources"
-	NodeUnprepareResourcesMethod = "/k8s.io.kubelet.pkg.apis.dra.v1beta1.DRAPlugin/NodeUnprepareResources"
-)
-
 type Nodes struct {
+	// NodeNames has the main set of node names.
 	NodeNames []string
 	tempDir   string
+	// NumReservedNodes specifies the desired number of
+	// extra nodes that get set aside. That many node names
+	// will be stored in ExtraNodeNames.
+	//
+	// Must be <= the minimum number of requested nodes.
+	NumReservedNodes int
+	// ExtraNodeNames has exactly as many node names as
+	// requested via NumReservedNodes. Those nodes are
+	// different than the nodes listed in NodeNames.
+	ExtraNodeNames []string
 }
 
 // NewNodes selects nodes to run the test on.
@@ -118,10 +128,14 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 	framework.ExpectNoError(err, "get nodes")
 	numNodes := int32(len(nodeList.Items))
 	if int(numNodes) < minNodes {
-		e2eskipper.Skipf("%d ready nodes required, only have %d", minNodes, numNodes)
+		e2eskipper.Skipf("%d ready nodes required, only have %d", minNodes+nodes.NumReservedNodes, numNodes)
 	}
 	nodes.NodeNames = nil
-	for _, node := range nodeList.Items {
+	for i, node := range nodeList.Items {
+		if i < nodes.NumReservedNodes {
+			nodes.ExtraNodeNames = append(nodes.ExtraNodeNames, node.Name)
+			continue
+		}
 		nodes.NodeNames = append(nodes.NodeNames, node.Name)
 	}
 	sort.Strings(nodes.NodeNames)
@@ -129,7 +143,40 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 
 	// Watch claims in the namespace. This is useful for monitoring a test
 	// and enables additional sanity checks.
-	claimInformer := resourceapiinformer.NewResourceClaimInformer(f.ClientSet, f.Namespace.Name, 100*time.Hour /* resync */, nil)
+	resourceClaimLogger := klog.LoggerWithName(klog.FromContext(ctx), "ResourceClaimListWatch")
+	var resourceClaimWatchCounter atomic.Int32
+	resourceClient := draclient.New(f.ClientSet)
+	claimInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				slices, err := resourceClient.ResourceClaims("").List(ctx, options)
+				if err == nil {
+					resourceClaimLogger.Info("Listed ResourceClaims", "resourceAPI", resourceClient.CurrentAPI(), "numClaims", len(slices.Items), "listMeta", slices.ListMeta)
+				} else {
+					resourceClaimLogger.Info("Listing ResourceClaims failed", "resourceAPI", resourceClient.CurrentAPI(), "err", err)
+				}
+				return slices, err
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				w, err := resourceClient.ResourceClaims("").Watch(ctx, options)
+				if err == nil {
+					resourceClaimLogger.Info("Started watching ResourceClaims", "resourceAPI", resourceClient.CurrentAPI())
+					wrapper := newWatchWrapper(klog.LoggerWithName(resourceClaimLogger, fmt.Sprintf("%d", resourceClaimWatchCounter.Load())), w)
+					resourceClaimWatchCounter.Add(1)
+					go wrapper.run()
+					w = wrapper
+				} else {
+					resourceClaimLogger.Info("Watching ResourceClaims failed", "resourceAPI", resourceClient.CurrentAPI(), "err", err)
+				}
+				return w, err
+			},
+		},
+		&resourceapi.ResourceClaim{},
+		// No resync because all it would do is periodically trigger syncing pools
+		// again by reporting all slices as updated with the object as old/new.
+		0,
+		nil,
+	)
 	cancelCtx, cancel := context.WithCancelCause(context.Background())
 	var wg sync.WaitGroup
 	ginkgo.DeferCleanup(func() {
@@ -140,20 +187,23 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 		AddFunc: func(obj any) {
 			defer ginkgo.GinkgoRecover()
 			claim := obj.(*resourceapi.ResourceClaim)
-			framework.Logf("New claim:\n%s", format.Object(claim, 1))
+			resourceClaimLogger.Info("New claim", "claim", format.Object(claim, 0))
 			validateClaim(claim)
 		},
 		UpdateFunc: func(oldObj, newObj any) {
 			defer ginkgo.GinkgoRecover()
 			oldClaim := oldObj.(*resourceapi.ResourceClaim)
 			newClaim := newObj.(*resourceapi.ResourceClaim)
-			framework.Logf("Updated claim:\n%s\nDiff:\n%s", format.Object(newClaim, 1), cmp.Diff(oldClaim, newClaim))
+			resourceClaimLogger.Info("Updated claim", "newClaim", format.Object(newClaim, 0), "diff", cmp.Diff(oldClaim, newClaim))
 			validateClaim(newClaim)
 		},
 		DeleteFunc: func(obj any) {
 			defer ginkgo.GinkgoRecover()
+			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+				obj = tombstone.Obj
+			}
 			claim := obj.(*resourceapi.ResourceClaim)
-			framework.Logf("Deleted claim:\n%s", format.Object(claim, 1))
+			resourceClaimLogger.Info("Deleted claim", "claim", format.Object(claim, 0))
 		},
 	})
 	framework.ExpectNoError(err, "AddEventHandler")
@@ -162,6 +212,43 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 		defer wg.Done()
 		claimInformer.Run(cancelCtx.Done())
 	}()
+}
+
+type watchWrapper struct {
+	logger     klog.Logger
+	delegate   watch.Interface
+	resultChan chan watch.Event
+}
+
+func newWatchWrapper(logger klog.Logger, delegate watch.Interface) *watchWrapper {
+	return &watchWrapper{
+		logger:     logger,
+		delegate:   delegate,
+		resultChan: make(chan watch.Event, 100),
+	}
+}
+
+func (w *watchWrapper) run() {
+	defer utilruntime.HandleCrashWithLogger(w.logger)
+	defer close(w.resultChan)
+	inputChan := w.delegate.ResultChan()
+	for {
+		event, ok := <-inputChan
+		if !ok {
+			w.logger.Info("Wrapped result channel was closed, stopping event forwarding")
+			return
+		}
+		w.logger.Info("Received event", "event", event.Type, "content", fmt.Sprintf("%T", event.Object))
+		w.resultChan <- event
+	}
+}
+
+func (w *watchWrapper) Stop() {
+	w.delegate.Stop()
+}
+
+func (w *watchWrapper) ResultChan() <-chan watch.Event {
+	return w.resultChan
 }
 
 func validateClaim(claim *resourceapi.ResourceClaim) {
@@ -214,9 +301,10 @@ func NewDriverInstance(f *framework.Framework) *Driver {
 		f:          f,
 		fail:       map[MethodInstance]bool{},
 		callCounts: map[MethodInstance]int64{},
-		// By default, test only with the latest gRPC API.
-		NodeV1alpha4: false,
-		NodeV1beta1:  true,
+		// By default, test with all gRPC APIs.
+		// TODO: should setting this be optional to test the actual helper defaults?
+		NodeV1:      true,
+		NodeV1beta1: true,
 		// By default, assume that the kubelet supports DRA and that
 		// the driver's removal causes ResourceSlice cleanup.
 		WithKubelet:                true,
@@ -224,6 +312,11 @@ func NewDriverInstance(f *framework.Framework) *Driver {
 	}
 	d.initName()
 	return d
+}
+
+// ClientV1 returns a wrapper for client-go which provides the V1 API on top of whatever is enabled in the cluster.
+func (d *Driver) ClientV1() cgoresource.ResourceV1Interface {
+	return draclient.New(d.f.ClientSet)
 }
 
 func (d *Driver) Run(nodes *Nodes, driverResources map[string]resourceslice.DriverResources) {
@@ -234,7 +327,7 @@ func (d *Driver) Run(nodes *Nodes, driverResources map[string]resourceslice.Driv
 // NewGetSlices generates a function for gomega.Eventually/Consistently which
 // returns the ResourceSliceList.
 func (d *Driver) NewGetSlices() framework.GetFunc[*resourceapi.ResourceSliceList] {
-	return framework.ListObjects(d.f.ClientSet.ResourceV1beta2().ResourceSlices().List, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
+	return framework.ListObjects(d.ClientV1().ResourceSlices().List, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
 }
 
 type MethodInstance struct {
@@ -279,8 +372,8 @@ type Driver struct {
 	// /var/run/cdi are writable by the current user.
 	IsLocal bool
 
-	NodeV1alpha4 bool
-	NodeV1beta1  bool
+	NodeV1      bool
+	NodeV1beta1 bool
 
 	// Register the DRA test driver with the kubelet and expect DRA to work (= feature.DynamicResourceAllocation).
 	WithKubelet bool
@@ -326,7 +419,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 		// We have to remove ResourceSlices ourselves.
 		// Otherwise the kubelet does it after unregistering the driver.
 		ginkgo.DeferCleanup(func(ctx context.Context) {
-			err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
+			err := d.f.ClientSet.ResourceV1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
 			framework.ExpectNoError(err, "delete ResourceSlices of the driver")
 		})
 	}
@@ -352,7 +445,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 						Devices:      slice.Devices,
 					},
 				}
-				_, err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().Create(ctx, resourceSlice, metav1.CreateOptions{})
+				_, err := d.f.ClientSet.ResourceV1().ResourceSlices().Create(ctx, resourceSlice, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 			}
 		}
@@ -527,6 +620,8 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 			kubeletplugin.GRPCStreamInterceptor(func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 				return d.streamInterceptor(nodename, srv, ss, info, handler)
 			}),
+			kubeletplugin.NodeV1(d.NodeV1),
+			kubeletplugin.NodeV1beta1(d.NodeV1beta1),
 
 			kubeletplugin.RollingUpdate(rollingUpdateUID),
 			kubeletplugin.Serialize(serialize),

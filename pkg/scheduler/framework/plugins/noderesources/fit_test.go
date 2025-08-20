@@ -26,26 +26,43 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 var (
-	extendedResourceA     = v1.ResourceName("example.com/aaa")
-	extendedResourceB     = v1.ResourceName("example.com/bbb")
-	kubernetesIOResourceA = v1.ResourceName("kubernetes.io/something")
-	kubernetesIOResourceB = v1.ResourceName("subdomain.kubernetes.io/something")
-	hugePageResourceA     = v1.ResourceName(v1.ResourceHugePagesPrefix + "2Mi")
+	extendedResourceA                 = v1.ResourceName("example.com/aaa")
+	extendedResourceB                 = v1.ResourceName("example.com/bbb")
+	kubernetesIOResourceA             = v1.ResourceName("kubernetes.io/something")
+	kubernetesIOResourceB             = v1.ResourceName("subdomain.kubernetes.io/something")
+	hugePageResourceA                 = v1.ResourceName(v1.ResourceHugePagesPrefix + "2Mi")
+	extendedResourceName              = "extended.resource.dra.io/something"
+	extendedResourceDRA               = v1.ResourceName(extendedResourceName)
+	deviceClassName                   = "device-class-name"
+	deviceClassWithExtendResourceName = &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: deviceClassName,
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &extendedResourceName,
+		},
+	}
 )
 
 var clusterEventCmpOpts = []cmp.Option{
@@ -130,13 +147,15 @@ func newPodLevelResourcesPod(pod *v1.Pod, podResources v1.ResourceRequirements) 
 
 func TestEnoughRequests(t *testing.T) {
 	enoughPodsTests := []struct {
-		pod                       *v1.Pod
-		nodeInfo                  *framework.NodeInfo
-		name                      string
-		args                      config.NodeResourcesFitArgs
-		podLevelResourcesEnabled  bool
-		wantInsufficientResources []InsufficientResource
-		wantStatus                *fwk.Status
+		pod                        *v1.Pod
+		nodeInfo                   *framework.NodeInfo
+		name                       string
+		args                       config.NodeResourcesFitArgs
+		podLevelResourcesEnabled   bool
+		draExtendedResourceEnabled bool
+		nilResourceToDeviceClass   bool
+		wantInsufficientResources  []InsufficientResource
+		wantStatus                 *fwk.Status
 	}{
 		{
 			pod: &v1.Pod{},
@@ -602,6 +621,62 @@ func TestEnoughRequests(t *testing.T) {
 				ResourceName: v1.ResourceMemory, Reason: getErrReason(v1.ResourceMemory), Requested: 2, Used: 19, Capacity: 20},
 			},
 		},
+		{
+			draExtendedResourceEnabled: true,
+			pod:                        newResourcePod(framework.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo:                   framework.NewNodeInfo(newResourcePod(framework.Resource{})),
+			name:                       "extended resource backed by device plugin",
+			wantInsufficientResources:  []InsufficientResource{},
+		},
+		{
+			draExtendedResourceEnabled: true,
+			pod: newResourcePod(
+				framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceDRA: 1}}),
+			nodeInfo:                  framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
+			name:                      "extended resource backed by DRA",
+			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
+			draExtendedResourceEnabled: true,
+			pod: newResourcePod(
+				framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceDRA: 1}}),
+			nodeInfo:                  framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
+			name:                      "extended resource backed by DRA, nil resourceToDeviceClass",
+			nilResourceToDeviceClass:  true,
+			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
+			draExtendedResourceEnabled: false,
+			pod: newResourcePod(
+				framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceDRA: 1}}),
+			nodeInfo:   framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
+			name:       "extended resource backed by DRA not enabled",
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, getErrReason(extendedResourceDRA)),
+			wantInsufficientResources: []InsufficientResource{
+				{
+					ResourceName: "extended.resource.dra.io/something",
+					Reason:       "Insufficient extended.resource.dra.io/something",
+					Requested:    1,
+					Unresolvable: true,
+				},
+			},
+		},
+		{
+			draExtendedResourceEnabled: true,
+			pod: newResourcePod(
+				framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
+			nodeInfo:   framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
+			name:       "extended resource NOT backed by DRA",
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, getErrReason(extendedResourceB)),
+			wantInsufficientResources: []InsufficientResource{
+				{
+					ResourceName: "example.com/bbb",
+					Reason:       "Insufficient example.com/bbb",
+					Requested:    1,
+					Unresolvable: true,
+				},
+			},
+		},
 	}
 
 	for _, test := range enoughPodsTests {
@@ -614,10 +689,24 @@ func TestEnoughRequests(t *testing.T) {
 				test.args.ScoringStrategy = defaultScoringStrategy
 			}
 
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			p, err := NewFit(ctx, &test.args, nil, plfeature.Features{EnablePodLevelResources: test.podLevelResourcesEnabled})
+
+			client := fake.NewSimpleClientset(deviceClassWithExtendResourceName)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			draManager := dynamicresources.NewDRAManager(ctx, assumecache.NewAssumeCache(logger, informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil), nil, informerFactory)
+			informerFactory.Start(ctx.Done())
+			t.Cleanup(func() {
+				// Now we can wait for all goroutines to stop.
+				informerFactory.Shutdown()
+			})
+			informerFactory.WaitForCacheSync(ctx.Done())
+			runOpts := []runtime.Option{
+				runtime.WithSharedDRAManager(draManager),
+			}
+			fh, _ := runtime.NewFramework(ctx, nil, nil, runOpts...)
+			p, err := NewFit(ctx, &test.args, fh, plfeature.Features{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -632,7 +721,12 @@ func TestEnoughRequests(t *testing.T) {
 				t.Errorf("status does not match (-want,+got):\n%s", diff)
 			}
 
-			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod, ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled}), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
+			opts := ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled}
+			state := computePodResourceRequest(test.pod, opts)
+			if test.draExtendedResourceEnabled && !test.nilResourceToDeviceClass {
+				state.resourceToDeviceClass = map[v1.ResourceName]string{extendedResourceDRA: deviceClassName}
+			}
+			gotInsufficientResources := fitsRequest(state, test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, opts)
 			if diff := cmp.Diff(test.wantInsufficientResources, gotInsufficientResources); diff != "" {
 				t.Errorf("insufficient resources do not match (-want,+got):\n%s", diff)
 			}
@@ -1612,7 +1706,7 @@ func TestIsFit(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if got := isFit(tc.pod, tc.node, ResourceRequestsOptions{tc.podLevelResourcesEnabled}); got != tc.expected {
+			if got := isFit(tc.pod, tc.node, ResourceRequestsOptions{EnablePodLevelResources: tc.podLevelResourcesEnabled}); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})
@@ -1621,10 +1715,11 @@ func TestIsFit(t *testing.T) {
 
 func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 	testCases := map[string]struct {
-		pod          *v1.Pod
-		originalNode *v1.Node
-		modifiedNode *v1.Node
-		expected     bool
+		pod                        *v1.Pod
+		originalNode               *v1.Node
+		modifiedNode               *v1.Node
+		draExtendedResourceEnabled bool
+		expected                   bool
 	}{
 		"no-requested-resources": {
 			pod: newResourcePod(framework.Resource{}),
@@ -1661,6 +1756,68 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 				extendedResourceA:           "1",
 			}).Obj(),
 			expected: true,
+		},
+		"requested-resources-dra-in-node": {
+			pod: newResourcePod(framework.Resource{
+				MilliCPU:         2,
+				Memory:           2,
+				EphemeralStorage: 2,
+				ScalarResources:  map[v1.ResourceName]int64{extendedResourceA: 2},
+			}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "3",
+				extendedResourceA:           "4",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "1",
+				extendedResourceA:           "1",
+			}).Obj(),
+			draExtendedResourceEnabled: true,
+			expected:                   false,
+		},
+		"requested-resources-dra-not-in-node": {
+			pod: newResourcePod(framework.Resource{
+				MilliCPU:         2,
+				Memory:           2,
+				EphemeralStorage: 2,
+				ScalarResources:  map[v1.ResourceName]int64{extendedResourceA: 2},
+			}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "3",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "1",
+			}).Obj(),
+			draExtendedResourceEnabled: true,
+			expected:                   true,
+		},
+		"scalar-resources-not-in-node": {
+			pod: newResourcePod(framework.Resource{
+				MilliCPU:         2,
+				Memory:           2,
+				EphemeralStorage: 2,
+				ScalarResources:  map[v1.ResourceName]int64{extendedResourceA: 2},
+			}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "3",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:              "1",
+				v1.ResourceMemory:           "2",
+				v1.ResourceEphemeralStorage: "1",
+			}).Obj(),
+			draExtendedResourceEnabled: false,
+			expected:                   false,
 		},
 		"requested-resources-decreased": {
 			pod: newResourcePod(framework.Resource{
@@ -1745,7 +1902,7 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, ResourceRequestsOptions{}); got != tc.expected {
+			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, ResourceRequestsOptions{EnableDRAExtendedResource: tc.draExtendedResourceEnabled}); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})

@@ -881,6 +881,244 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 	}
 }
 
+func TestNextPodAvailabilityCheck(t *testing.T) {
+	newPodWithReadyCond := func(now metav1.Time, ready bool, beforeSec int) *v1.Pod {
+		conditionStatus := v1.ConditionFalse
+		if ready {
+			conditionStatus = v1.ConditionTrue
+		}
+		return &v1.Pod{
+			Status: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:               v1.PodReady,
+						LastTransitionTime: metav1.NewTime(now.Add(-1 * time.Duration(beforeSec) * time.Second)),
+						Status:             conditionStatus,
+					},
+				},
+			},
+		}
+	}
+
+	now := metav1.Now()
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		minReadySeconds int32
+		expected        *time.Duration
+	}{
+		{
+			name:            "not ready",
+			pod:             newPodWithReadyCond(now, false, 0),
+			minReadySeconds: 0,
+			expected:        nil,
+		},
+		{
+			name:            "no minReadySeconds defined",
+			pod:             newPodWithReadyCond(now, true, 0),
+			minReadySeconds: 0,
+			expected:        nil,
+		},
+		{
+			name: "lastTransitionTime is zero",
+			pod: func() *v1.Pod {
+				pod := newPodWithReadyCond(now, true, 0)
+				pod.Status.Conditions[0].LastTransitionTime = metav1.Time{}
+				return pod
+			}(),
+			minReadySeconds: 1,
+			expected:        nil,
+		},
+		{
+			name:            "just became ready - available in 1s",
+			pod:             newPodWithReadyCond(now, true, 0),
+			minReadySeconds: 1,
+			expected:        ptr.To(time.Second),
+		},
+		{
+			name:            "ready for 20s - available in 10s",
+			pod:             newPodWithReadyCond(now, true, 20),
+			minReadySeconds: 30,
+			expected:        ptr.To(10 * time.Second),
+		},
+		{
+			name:            "available",
+			pod:             newPodWithReadyCond(now, true, 51),
+			minReadySeconds: 50,
+			expected:        nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nextAvailable := nextPodAvailabilityCheck(test.pod, test.minReadySeconds, now.Time)
+			if !ptr.Equal(nextAvailable, test.expected) {
+				t.Errorf("expected next pod availability check: %v, got: %v", test.expected, nextAvailable)
+			}
+		})
+	}
+}
+
+func TestFindMinNextPodAvailabilitySimpleCheck(t *testing.T) {
+	now := metav1.Now()
+
+	pod := func(name string, ready bool, beforeSec int) *v1.Pod {
+		p := testutil.NewPod(name, "node0")
+		if ready {
+			p.Status.Conditions[0].LastTransitionTime = metav1.NewTime(now.Add(-1 * time.Duration(beforeSec) * time.Second))
+		} else {
+			p.Status.Conditions[0].Status = v1.ConditionFalse
+		}
+		return p
+	}
+
+	tests := []struct {
+		name            string
+		pods            []*v1.Pod
+		minReadySeconds int32
+		expected        *time.Duration
+		expectedPod     *string
+	}{
+		{
+			name:            "no pods",
+			pods:            nil,
+			minReadySeconds: 0,
+			expected:        nil,
+			expectedPod:     nil,
+		},
+		{
+			name: "unready pods",
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", false, 0),
+			},
+			minReadySeconds: 0,
+			expected:        nil,
+			expectedPod:     nil,
+		},
+		{
+			name: "ready pods with no minReadySeconds",
+			pods: []*v1.Pod{
+				pod("pod1", true, 0),
+				pod("pod2", true, 0),
+			},
+			minReadySeconds: 0,
+			expected:        nil,
+			expectedPod:     nil,
+		},
+		{
+			name: "unready and ready pods should find min next availability check",
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", true, 2),
+				pod("pod3", true, 0),
+				pod("pod4", true, 4),
+				pod("pod5", false, 0),
+			},
+			minReadySeconds: 10,
+			expected:        ptr.To(6 * time.Second),
+			expectedPod:     ptr.To("pod4"),
+		},
+		{
+			name: "unready and available pods do not require min next availability check", // only after pods become ready we can schedule one
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", true, 15),
+				pod("pod3", true, 11),
+				pod("pod4", true, 10),
+				pod("pod5", false, 0),
+			},
+			minReadySeconds: 10,
+			expected:        nil,
+			expectedPod:     nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nextAvailable, checkPod := findMinNextPodAvailabilitySimpleCheck(test.pods, test.minReadySeconds, now.Time)
+			var checkPodName *string
+			if checkPod != nil {
+				checkPodName = ptr.To(checkPod.Name)
+			}
+			if !ptr.Equal(nextAvailable, test.expected) {
+				t.Errorf("expected next min pod availability check: %v, got: %v", test.expected, nextAvailable)
+			}
+			if !ptr.Equal(checkPodName, test.expectedPod) {
+				t.Errorf("expected next min pod availability check for pod: %v, got: %v", test.expectedPod, checkPodName)
+			}
+
+			// using the same now for status evaluation and the clock should return the same result as findMinNextPodAvailabilitySimpleCheck
+			nextAvailable = FindMinNextPodAvailabilityCheck(test.pods, test.minReadySeconds, now.Time, testingclock.NewFakeClock(now.Time))
+
+			if !ptr.Equal(nextAvailable, test.expected) {
+				t.Errorf("expected next min pod availability check when status evaluation and clock is now: %v, got: %v", test.expected, nextAvailable)
+			}
+		})
+	}
+}
+
+func TestFindMinNextPodAvailability(t *testing.T) {
+	now := metav1.Now()
+
+	pod := func(name string, ready bool, beforeSec int) *v1.Pod {
+		p := testutil.NewPod(name, "node0")
+		if ready {
+			p.Status.Conditions[0].LastTransitionTime = metav1.NewTime(now.Add(-1 * time.Duration(beforeSec) * time.Second))
+		} else {
+			p.Status.Conditions[0].Status = v1.ConditionFalse
+		}
+		return p
+	}
+
+	tests := []struct {
+		name                         string
+		pods                         []*v1.Pod
+		minReadySeconds              int32
+		statusEvaluationDelaySeconds int
+		expected                     *time.Duration
+	}{
+		{
+			name: "unready and ready pods should find min next availability check considering status evaluation/update delay",
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", true, 2),
+				pod("pod3", true, 0),
+				pod("pod4", true, 4),
+				pod("pod5", false, 0),
+			},
+			minReadySeconds:              10,
+			statusEvaluationDelaySeconds: 2, // total is 4+2 since the pod4 became ready
+			expected:                     ptr.To(4 * time.Second),
+		},
+		{
+			name: "unready and ready pods should find min next availability check even if the status evaluation delay is longer than minReadySeconds",
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", true, 2),
+				pod("pod3", true, 0),
+				pod("pod4", true, 4),
+				pod("pod5", false, 0),
+			},
+			minReadySeconds:              10,
+			statusEvaluationDelaySeconds: 7, // total is 4+7 since the pod4 became ready
+			expected:                     ptr.To(0 * time.Second),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			oldNow := now.Time
+			newNow := testingclock.NewFakePassiveClock(now.Add(time.Duration(test.statusEvaluationDelaySeconds) * time.Second))
+			nextAvailable := FindMinNextPodAvailabilityCheck(test.pods, test.minReadySeconds, oldNow, newNow)
+
+			if !ptr.Equal(nextAvailable, test.expected) {
+				t.Errorf("expected next min pod availability check: %v, got: %v", test.expected, nextAvailable)
+			}
+		})
+	}
+}
+
 func TestActiveReplicaSetsFiltering(t *testing.T) {
 
 	rsUuid := uuid.NewUUID()

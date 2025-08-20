@@ -25,6 +25,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -37,6 +38,7 @@ import (
 // Verifies newly added pod/volume exists via
 // PodExistsInVolume() VolumeExists() and GetVolumesToMount()
 func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
@@ -65,7 +67,7 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
+		logger, podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 
 	// Assert
 	if err != nil {
@@ -83,6 +85,7 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 // Verifies newly added pod/volume exists via
 // PodExistsInVolume() VolumeExists() and GetVolumesToMount() and no errors.
 func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
@@ -111,12 +114,12 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
+		logger, podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 	generatedVolumeName2, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
+		logger, podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -136,6 +139,7 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 // Verities generated names are same for different pods if volume is device mountable or attachable
 // Verities generated names are different for different pods if volume is not device mountble and attachable
 func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// Arrange
 	fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,
 		"",  /* rootDir */
@@ -274,8 +278,8 @@ func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *te
 	for name, v := range testcases {
 		volumeSpec1 := &volume.Spec{Volume: &v.pod1.Spec.Volumes[0]}
 		volumeSpec2 := &volume.Spec{Volume: &v.pod2.Spec.Volumes[0]}
-		generatedVolumeName1, err1 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod1), v.pod1, volumeSpec1, volumeSpec1.Name(), "", nil)
-		generatedVolumeName2, err2 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod2), v.pod2, volumeSpec2, volumeSpec2.Name(), "", nil)
+		generatedVolumeName1, err1 := dsw.AddPodToVolume(logger, util.GetUniquePodName(v.pod1), v.pod1, volumeSpec1, volumeSpec1.Name(), "", nil)
+		generatedVolumeName2, err2 := dsw.AddPodToVolume(logger, util.GetUniquePodName(v.pod2), v.pod2, volumeSpec2, volumeSpec2.Name(), "", nil)
 		if err1 != nil {
 			t.Fatalf("test %q: AddPodToVolume failed. Expected: <no error> Actual: <%v>", name, err1)
 		}
@@ -299,6 +303,7 @@ func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *te
 // Calls DeletePodFromVolume() to removes the pod
 // Verifies newly added pod/volume are deleted
 func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
@@ -325,7 +330,7 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
+		logger, podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -352,6 +357,7 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 // Marks only first volume as reported in use.
 // Verifies only that volume is marked reported in use
 func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
@@ -424,19 +430,19 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 	pod3Name := util.GetUniquePodName(pod3)
 
 	generatedVolume1Name, err := dsw.AddPodToVolume(
-		pod1Name, pod1, volume1Spec, volume1Spec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
+		logger, pod1Name, pod1, volume1Spec, volume1Spec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	generatedVolume2Name, err := dsw.AddPodToVolume(
-		pod2Name, pod2, volume2Spec, volume2Spec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
+		logger, pod2Name, pod2, volume2Spec, volume2Spec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	generatedVolume3Name, err := dsw.AddPodToVolume(
-		pod3Name, pod3, volume3Spec, volume3Spec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
+		logger, pod3Name, pod3, volume3Spec, volume3Spec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -479,6 +485,7 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 }
 
 func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	dsw := NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
@@ -598,14 +605,14 @@ func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 	}
 	for i := range pod1.Spec.Volumes {
 		volumeSpec := &volume.Spec{Volume: &pod1.Spec.Volumes[i]}
-		_, err := dsw.AddPodToVolume(pod1Name, pod1, volumeSpec, volumeSpec.Name(), "", nil /* seLinuxContainerContexts */)
+		_, err := dsw.AddPodToVolume(logger, pod1Name, pod1, volumeSpec, volumeSpec.Name(), "", nil /* seLinuxContainerContexts */)
 		if err != nil {
 			t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 		}
 	}
 	for i := range pod2.Spec.Volumes {
 		volumeSpec := &volume.Spec{Volume: &pod2.Spec.Volumes[i]}
-		_, err := dsw.AddPodToVolume(pod2Name, pod2, volumeSpec, volumeSpec.Name(), "", nil /* seLinuxContainerContexts */)
+		_, err := dsw.AddPodToVolume(logger, pod2Name, pod2, volumeSpec, volumeSpec.Name(), "", nil /* seLinuxContainerContexts */)
 		if err != nil {
 			t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 		}
@@ -616,6 +623,7 @@ func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 
 // Calls AddPodToVolume() in an empty DSW with various SELinux settings / access modes.
 func Test_AddPodToVolume_SELinuxSinglePod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	completeSELinuxOpts := v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",
@@ -872,7 +880,7 @@ func Test_AddPodToVolume_SELinuxSinglePod(t *testing.T) {
 
 			// Act
 			generatedVolumeName, err := dsw.AddPodToVolume(
-				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, seLinuxContainerContexts)
+				logger, podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, seLinuxContainerContexts)
 
 			// Assert
 			if tc.expectError {
@@ -896,6 +904,7 @@ func Test_AddPodToVolume_SELinuxSinglePod(t *testing.T) {
 
 // Calls AddPodToVolume() twice to add two pods with various SELinux settings and access modes.
 func Test_AddPodToVolume_SELinux_MultiplePods(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	completeSELinuxOpts := v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",
@@ -1221,7 +1230,7 @@ func Test_AddPodToVolume_SELinux_MultiplePods(t *testing.T) {
 
 			// Act
 			generatedVolumeName, err := dsw.AddPodToVolume(
-				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, seLinuxContainerContexts)
+				logger, podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, seLinuxContainerContexts)
 
 			// Assert
 			if err != nil {
@@ -1245,7 +1254,7 @@ func Test_AddPodToVolume_SELinux_MultiplePods(t *testing.T) {
 
 			// Act
 			generatedVolumeName2, err := dsw.AddPodToVolume(
-				pod2Name, pod2, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, seLinuxContainerContexts)
+				logger, pod2Name, pod2, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, seLinuxContainerContexts)
 			// Assert
 			if tc.expectError {
 				if err == nil {

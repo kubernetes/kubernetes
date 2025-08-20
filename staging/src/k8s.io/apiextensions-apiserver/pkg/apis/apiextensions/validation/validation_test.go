@@ -4040,7 +4040,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 												},
 												"generation": {
 													Type:    "integer",
-													Minimum: float64Ptr(42.0), // does not make sense, but is allowed for nested ObjectMeta
+													Minimum: ptr.To[float64](42.0), // does not make sense, but is allowed for nested ObjectMeta
 												},
 											},
 										},
@@ -4065,7 +4065,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 												},
 												"generation": {
 													Type:    "integer",
-													Minimum: float64Ptr(42.0), // does not make sense, but is allowed for nested ObjectMeta
+													Minimum: ptr.To[float64](42.0), // does not make sense, but is allowed for nested ObjectMeta
 												},
 											},
 										},
@@ -4094,7 +4094,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 														},
 														"generation": {
 															Type:    "integer",
-															Minimum: float64Ptr(42.0), // does not make sense, but is allowed for nested ObjectMeta
+															Minimum: ptr.To[float64](42.0), // does not make sense, but is allowed for nested ObjectMeta
 														},
 													},
 												},
@@ -11136,16 +11136,16 @@ var validValidationSchema = &apiextensions.JSONSchemaProps{
 	Type:             "object",
 	Format:           "date-time",
 	Title:            "This is a title",
-	Maximum:          float64Ptr(10),
+	Maximum:          ptr.To[float64](10),
 	ExclusiveMaximum: true,
-	Minimum:          float64Ptr(5),
+	Minimum:          ptr.To[float64](5),
 	ExclusiveMinimum: true,
 	MaxLength:        ptr.To[int64](10),
 	MinLength:        ptr.To[int64](5),
 	Pattern:          "^[a-z]$",
 	MaxItems:         ptr.To[int64](10),
 	MinItems:         ptr.To[int64](5),
-	MultipleOf:       float64Ptr(3),
+	MultipleOf:       ptr.To[float64](3),
 	Required:         []string{"spec", "status"},
 	Properties: map[string]apiextensions.JSONSchemaProps{
 		"spec": {
@@ -11172,16 +11172,16 @@ var validUnstructuralValidationSchema = &apiextensions.JSONSchemaProps{
 	Type:             "object",
 	Format:           "date-time",
 	Title:            "This is a title",
-	Maximum:          float64Ptr(10),
+	Maximum:          ptr.To[float64](10),
 	ExclusiveMaximum: true,
-	Minimum:          float64Ptr(5),
+	Minimum:          ptr.To[float64](5),
 	ExclusiveMinimum: true,
 	MaxLength:        ptr.To[int64](10),
 	MinLength:        ptr.To[int64](5),
 	Pattern:          "^[a-z]$",
 	MaxItems:         ptr.To[int64](10),
 	MinItems:         ptr.To[int64](5),
-	MultipleOf:       float64Ptr(3),
+	MultipleOf:       ptr.To[float64](3),
 	Required:         []string{"spec", "status"},
 	Items: &apiextensions.JSONSchemaPropsOrArray{
 		Schema: &apiextensions.JSONSchemaProps{
@@ -11196,10 +11196,6 @@ var validUnstructuralValidationSchema = &apiextensions.JSONSchemaProps{
 		Description: "This is an external documentation description",
 	},
 	Example: &example,
-}
-
-func float64Ptr(f float64) *float64 {
-	return &f
 }
 
 func jsonPtr(x interface{}) *apiextensions.JSON {

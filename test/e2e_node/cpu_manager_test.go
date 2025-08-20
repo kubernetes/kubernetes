@@ -294,6 +294,7 @@ type cpuManagerKubeletArguments struct {
 	policyName                       string
 	enableCPUManagerOptions          bool
 	disableCPUQuotaWithExclusiveCPUs bool
+	enablePodLevelResources          bool
 	reservedSystemCPUs               cpuset.CPUSet
 	options                          map[string]string
 }
@@ -307,6 +308,7 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["DisableCPUQuotaWithExclusiveCPUs"] = kubeletArguments.disableCPUQuotaWithExclusiveCPUs
+	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
 
 	newCfg.CPUManagerPolicy = kubeletArguments.policyName
 	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}

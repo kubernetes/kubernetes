@@ -71,7 +71,7 @@ type genValidations struct {
 	schemeRegistry types.Name
 }
 
-// NewGenValidations cretes a new generator for the specified package.
+// NewGenValidations creates a new generator for the specified package.
 func NewGenValidations(outputFilename, outputPackage string, rootTypes []*types.Type, discovered *typeDiscoverer, inputToPkg map[string]string, schemeRegistry types.Name) generator.Generator {
 	return &genValidations{
 		GoGenerator: generator.GoGenerator{
@@ -1126,11 +1126,9 @@ func (g *genValidations) emitCallToOtherTypeFunc(c *generator.Context, node *typ
 	sw.Do("errs = append(errs, $.funcName|raw$(ctx, op, fldPath, obj, oldObj)...)\n", targs)
 }
 
-// emitRachetingCheck emits a equivalence check for default ratcheting.
+// emitRatchetingCheck emits an equivalence check for default ratcheting.
 func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.SnippetWriter) {
 	// Emit equivalence check for default ratcheting.
-	// TODO: Need to have a follow-up PR to handle the default behavior
-	// for slices and maps.
 	targs := generator.Args{
 		"operation": mkSymbolArgs(c, operationPkgSymbols),
 	}

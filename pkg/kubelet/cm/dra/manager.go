@@ -18,23 +18,32 @@ package dra
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"path/filepath"
 	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
+
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -91,6 +100,12 @@ type Manager struct {
 
 	// KubeClient reference
 	kubeClient clientset.Interface
+
+	// healthInfoCache contains cached health info
+	healthInfoCache *healthInfoCache
+
+	// update channel for resource updates
+	update chan resourceupdates.Update
 }
 
 // NewManager creates a new DRA manager.
@@ -108,6 +123,11 @@ func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDir
 		return nil, fmt.Errorf("create ResourceClaim cache: %w", err)
 	}
 
+	healthInfoCache, err := newHealthInfoCache(filepath.Join(stateFileDirectory, "dra_health_state"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create healthInfo cache: %w", err)
+	}
+
 	// TODO: for now the reconcile period is not configurable.
 	// We should consider making it configurable in the future.
 	reconcilePeriod := defaultReconcilePeriod
@@ -118,6 +138,8 @@ func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDir
 		reconcilePeriod: reconcilePeriod,
 		activePods:      nil,
 		sourcesReady:    nil,
+		healthInfoCache: healthInfoCache,
+		update:          make(chan resourceupdates.Update, 100),
 	}
 
 	return manager, nil
@@ -145,7 +167,7 @@ func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode 
 // initPluginManager can be used instead of Start to make the manager useable
 // for calls to prepare/unprepare. It exists primarily for testing purposes.
 func (m *Manager) initDRAPluginManager(ctx context.Context, getNode GetNodeFunc, wipingDelay time.Duration) {
-	m.draPlugins = draplugin.NewDRAPluginManager(ctx, m.kubeClient, getNode, wipingDelay)
+	m.draPlugins = draplugin.NewDRAPluginManager(ctx, m.kubeClient, getNode, m, wipingDelay)
 }
 
 // reconcileLoop ensures that any stale state in the manager's claimInfoCache gets periodically reconciled.
@@ -226,14 +248,25 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	// try to call NodeUnprepareResources. This is particularly bad
 	// when the driver never has been installed on the node and
 	// remains unavailable.
+	podResourceClaims := pod.Spec.ResourceClaims
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) {
+		if pod.Status.ExtendedResourceClaimStatus != nil {
+			extendedResourceClaim := v1.PodResourceClaim{
+				ResourceClaimName: &pod.Status.ExtendedResourceClaimStatus.ResourceClaimName,
+			}
+			podResourceClaims = make([]v1.PodResourceClaim, 0, len(pod.Spec.ResourceClaims)+1)
+			podResourceClaims = append(podResourceClaims, pod.Spec.ResourceClaims...)
+			podResourceClaims = append(podResourceClaims, extendedResourceClaim)
+		}
+	}
 	infos := make([]struct {
 		resourceClaim *resourceapi.ResourceClaim
 		podClaim      *v1.PodResourceClaim
 		claimInfo     *ClaimInfo
 		plugins       map[string]*draplugin.DRAPlugin
-	}, len(pod.Spec.ResourceClaims))
-	for i := range pod.Spec.ResourceClaims {
-		podClaim := &pod.Spec.ResourceClaims[i]
+	}, len(podResourceClaims))
+	for i := range podResourceClaims {
+		podClaim := &podResourceClaims[i]
 		infos[i].podClaim = podClaim
 		logger.V(3).Info("Processing resource", "pod", klog.KObj(pod), "podClaim", podClaim.Name)
 		claimName, mustCheckOwner, err := resourceclaim.Name(pod, podClaim)
@@ -246,7 +279,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			continue
 		}
 		// Query claim object from the API server
-		resourceClaim, err := m.kubeClient.ResourceV1beta1().ResourceClaims(pod.Namespace).Get(
+		resourceClaim, err := m.kubeClient.ResourceV1().ResourceClaims(pod.Namespace).Get(
 			ctx,
 			*claimName,
 			metav1.GetOptions{})
@@ -294,7 +327,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	// Now that we have everything that we need, we can update the claim info cache.
 	// Almost nothing can go wrong anymore at this point.
 	err = m.cache.withLock(func() error {
-		for i := range pod.Spec.ResourceClaims {
+		for i := range podResourceClaims {
 			resourceClaim := infos[i].resourceClaim
 			podClaim := infos[i].podClaim
 			if resourceClaim == nil {
@@ -476,6 +509,43 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 			}
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) && pod.Status.ExtendedResourceClaimStatus != nil {
+		claimName := pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
+		// if the container has requests for extended resources backed by DRA,
+		// they must have been allocated via the extendedResourceClaim created
+		// by the kube-scheduler.
+		err := m.cache.withRLock(func() error {
+			claimInfo, exists := m.cache.get(claimName, pod.Namespace)
+			if !exists {
+				return fmt.Errorf("unable to get claim info for claim %s in namespace %s", claimName, pod.Namespace)
+			}
+
+			for rName, rValue := range container.Resources.Requests {
+				if rValue.IsZero() {
+					// We only care about the resources requested by the pod
+					continue
+				}
+				if v1helper.IsExtendedResourceName(rName) {
+					requestName := ""
+					for _, rm := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
+						if rm.ContainerName == container.Name && rm.ResourceName == rName.String() {
+							requestName = rm.RequestName
+							break
+						}
+					}
+					if requestName != "" {
+						// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
+						cdiDevices = append(cdiDevices, claimInfo.cdiDevicesAsList(requestName)...)
+					}
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &ContainerInfo{CDIDevices: cdiDevices}, nil
 }
 
@@ -509,6 +579,12 @@ func (m *Manager) unprepareResourcesForPod(ctx context.Context, pod *v1.Pod) err
 		}
 		claimNames = append(claimNames, *claimName)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) {
+		if pod.Status.ExtendedResourceClaimStatus != nil {
+			claimNames = append(claimNames, pod.Status.ExtendedResourceClaimStatus.ResourceClaimName)
+		}
+	}
+
 	return m.unprepareResources(ctx, pod.UID, pod.Namespace, claimNames)
 }
 
@@ -595,6 +671,12 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 
 	// Atomically perform some operations on the claimInfo cache.
 	err := m.cache.withLock(func() error {
+		// TODO(#132978): Re-evaluate this logic to support post-mortem health updates.
+		// As of the initial implementation, we immediately delete the claim info upon
+		// unprepare. This means a late-arriving health update for a terminated pod
+		// will be missed. A future enhancement could be to "tombstone" this entry for
+		// a grace period instead of deleting it.
+
 		// Delete all claimInfos from the cache that have just been unprepared.
 		for _, claimName := range claimNamesMap {
 			claimInfo, _ := m.cache.get(claimName, namespace)
@@ -661,5 +743,246 @@ func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) (
 			}
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) {
+		// Handle the special claim for extended resources backed by DRA in the pod
+		if pod.Status.ExtendedResourceClaimStatus != nil {
+			var hasExtendedResourceClaim bool
+			for _, n := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
+				if n.ContainerName == container.Name {
+					hasExtendedResourceClaim = true
+					break
+				}
+			}
+			if !hasExtendedResourceClaim {
+				return claimInfos, nil
+			}
+			claimName := &pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
+			err := m.cache.withRLock(func() error {
+				claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
+				if !exists {
+					return fmt.Errorf("unable to get claim info for claim %s in namespace %s", *claimName, pod.Namespace)
+				}
+				claimInfos = append(claimInfos, claimInfo.DeepCopy())
+				return nil
+			})
+			if err != nil {
+				// No wrapping, this is the error above.
+				return nil, err
+			}
+		}
+	}
 	return claimInfos, nil
+}
+
+// UpdateAllocatedResourcesStatus updates the health status of allocated DRA resources in the pod's container statuses.
+func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
+	logger := klog.FromContext(context.Background())
+	for _, container := range pod.Spec.Containers {
+		// Get all the DRA claim details associated with this specific container.
+		claimInfos, err := m.GetContainerClaimInfos(pod, &container)
+		if err != nil {
+			logger.Error(err, "Failed to get claim infos for container", "pod", klog.KObj(pod), "container", container.Name)
+			continue
+		}
+
+		// Find the corresponding container status
+		for i, containerStatus := range status.ContainerStatuses {
+			if containerStatus.Name != container.Name {
+				continue
+			}
+
+			// Ensure the slice exists. Use a map for efficient updates by resource name.
+			resourceStatusMap := make(map[v1.ResourceName]*v1.ResourceStatus)
+			if status.ContainerStatuses[i].AllocatedResourcesStatus != nil {
+				for idx := range status.ContainerStatuses[i].AllocatedResourcesStatus {
+					// Store pointers to modify in place
+					resourceStatusMap[status.ContainerStatuses[i].AllocatedResourcesStatus[idx].Name] = &status.ContainerStatuses[i].AllocatedResourcesStatus[idx]
+				}
+			} else {
+				status.ContainerStatuses[i].AllocatedResourcesStatus = []v1.ResourceStatus{}
+			}
+
+			// Loop through each claim associated with the container
+			for _, claimInfo := range claimInfos {
+				var resourceName v1.ResourceName
+				foundClaimInSpec := false
+				for _, cClaim := range container.Resources.Claims {
+					if cClaim.Name == claimInfo.ClaimName {
+						if cClaim.Request == "" {
+							resourceName = v1.ResourceName(fmt.Sprintf("claim:%s", cClaim.Name))
+						} else {
+							resourceName = v1.ResourceName(fmt.Sprintf("claim:%s/%s", cClaim.Name, cClaim.Request))
+						}
+						foundClaimInSpec = true
+						break
+					}
+				}
+				if !foundClaimInSpec {
+					logger.V(4).Info("Could not find matching resource claim in container spec", "pod", klog.KObj(pod), "container", container.Name, "claimName", claimInfo.ClaimName)
+					continue
+				}
+
+				// Get or create the ResourceStatus entry for this claim
+				resStatus, ok := resourceStatusMap[resourceName]
+
+				if !ok {
+					// Create a new entry and add it to the map and the slice
+					newStatus := v1.ResourceStatus{
+						Name:      resourceName,
+						Resources: []v1.ResourceHealth{},
+					}
+					status.ContainerStatuses[i].AllocatedResourcesStatus = append(status.ContainerStatuses[i].AllocatedResourcesStatus, newStatus)
+					// Get pointer to the newly added element *after* appending
+					resStatus = &status.ContainerStatuses[i].AllocatedResourcesStatus[len(status.ContainerStatuses[i].AllocatedResourcesStatus)-1]
+					resourceStatusMap[resourceName] = resStatus
+				}
+
+				// Clear previous health entries for this resource before adding current ones
+				// Ensures we only report current health for allocated devices.
+				resStatus.Resources = []v1.ResourceHealth{}
+
+				// Iterate through the map holding the state specific to each driver
+				for driverName, driverState := range claimInfo.DriverState {
+					// Iterate through each specific device allocated by this driver
+					for _, device := range driverState.Devices {
+
+						healthStr := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
+
+						// Convert internal health string to API type
+						var health v1.ResourceHealthStatus
+						switch healthStr {
+						case "Healthy":
+							health = v1.ResourceHealthStatusHealthy
+						case "Unhealthy":
+							health = v1.ResourceHealthStatusUnhealthy
+						default: // Catches "Unknown" or any other case
+							health = v1.ResourceHealthStatusUnknown
+						}
+
+						// Create the ResourceHealth entry
+						resourceHealth := v1.ResourceHealth{
+							Health: health,
+						}
+
+						// Use first CDI device ID as ResourceID, with fallback
+						if len(device.CDIDeviceIDs) > 0 {
+							resourceHealth.ResourceID = v1.ResourceID(device.CDIDeviceIDs[0])
+						} else {
+							// Fallback ID if no CDI ID is present
+							resourceHealth.ResourceID = v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, device.PoolName, device.DeviceName))
+						}
+
+						// Append the health status for this specific device/resource ID
+						resStatus.Resources = append(resStatus.Resources, resourceHealth)
+					}
+				}
+			}
+			// Rebuild the slice from the map values to ensure correctness
+			finalStatuses := make([]v1.ResourceStatus, 0, len(resourceStatusMap))
+			for _, rs := range resourceStatusMap {
+				// Only add if it actually has resource health entries populated
+				if len(rs.Resources) > 0 {
+					finalStatuses = append(finalStatuses, *rs)
+				}
+			}
+			status.ContainerStatuses[i].AllocatedResourcesStatus = finalStatuses
+		}
+	}
+}
+
+// HandleWatchResourcesStream processes health updates from the DRA plugin.
+func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, pluginName string) error {
+	logger := klog.FromContext(ctx)
+
+	defer func() {
+		logger.V(4).Info("Clearing health cache for driver upon stream exit", "pluginName", pluginName)
+		// Use a separate context for clearDriver if needed, though background should be fine.
+		if err := m.healthInfoCache.clearDriver(pluginName); err != nil {
+			logger.Error(err, "Failed to clear health info cache for driver", "pluginName", pluginName)
+		}
+	}()
+
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			// Context canceled, normal shutdown.
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				logger.V(4).Info("Stopping health monitoring due to context cancellation", "pluginName", pluginName, "reason", err)
+				return err
+			}
+			// Stream closed cleanly by the server, get normal EOF.
+			if errors.Is(err, io.EOF) {
+				logger.V(4).Info("Stream ended with EOF", "pluginName", pluginName)
+				return nil
+			}
+			// Other errors are unexpected, log & return.
+			logger.Error(err, "Error receiving from WatchResources stream", "pluginName", pluginName)
+			return err
+		}
+
+		// Convert drahealthv1alpha1.DeviceHealth to state.DeviceHealth
+		devices := make([]state.DeviceHealth, len(resp.GetDevices()))
+		for i, d := range resp.GetDevices() {
+			var health state.DeviceHealthStatus
+			switch d.GetHealth() {
+			case drahealthv1alpha1.HealthStatus_HEALTHY:
+				health = state.DeviceHealthStatusHealthy
+			case drahealthv1alpha1.HealthStatus_UNHEALTHY:
+				health = state.DeviceHealthStatusUnhealthy
+			default:
+				health = state.DeviceHealthStatusUnknown
+			}
+			devices[i] = state.DeviceHealth{
+				PoolName:    d.GetDevice().GetPoolName(),
+				DeviceName:  d.GetDevice().GetDeviceName(),
+				Health:      health,
+				LastUpdated: time.Unix(d.GetLastUpdatedTime(), 0),
+			}
+		}
+
+		changedDevices, updateErr := m.healthInfoCache.updateHealthInfo(pluginName, devices)
+		if updateErr != nil {
+			logger.Error(updateErr, "Failed to update health info cache", "pluginName", pluginName)
+		}
+		if len(changedDevices) > 0 {
+			logger.V(4).Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
+
+			podsToUpdate := sets.New[string]()
+
+			m.cache.RLock()
+			for _, dev := range changedDevices {
+				for _, cInfo := range m.cache.claimInfo {
+					if driverState, ok := cInfo.DriverState[pluginName]; ok {
+						for _, allocatedDevice := range driverState.Devices {
+							if allocatedDevice.PoolName == dev.PoolName && allocatedDevice.DeviceName == dev.DeviceName {
+								podsToUpdate.Insert(cInfo.PodUIDs.UnsortedList()...)
+								break
+							}
+						}
+					}
+				}
+			}
+			m.cache.RUnlock()
+
+			if podsToUpdate.Len() > 0 {
+				podUIDs := podsToUpdate.UnsortedList()
+				logger.Info("Sending health update notification for pods", "pluginName", pluginName, "pods", podUIDs)
+				select {
+				case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
+				default:
+					logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pluginName", pluginName, "pods", podUIDs)
+				}
+			} else {
+				logger.V(4).Info("Health info changed, but no active pods found using the affected devices", "pluginName", pluginName)
+			}
+		}
+
+	}
+}
+
+// Updates returns the channel that provides resource updates.
+func (m *Manager) Updates() <-chan resourceupdates.Update {
+	// Return the internal channel that HandleWatchResourcesStream writes to.
+	return m.update
 }

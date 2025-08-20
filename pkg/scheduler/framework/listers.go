@@ -17,22 +17,23 @@ limitations under the License.
 package framework
 
 import (
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
 // NodeInfoLister interface represents anything that can list/get NodeInfo objects from node name.
 type NodeInfoLister interface {
 	// List returns the list of NodeInfos.
-	List() ([]*NodeInfo, error)
+	List() ([]fwk.NodeInfo, error)
 	// HavePodsWithAffinityList returns the list of NodeInfos of nodes with pods with affinity terms.
-	HavePodsWithAffinityList() ([]*NodeInfo, error)
+	HavePodsWithAffinityList() ([]fwk.NodeInfo, error)
 	// HavePodsWithRequiredAntiAffinityList returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
-	HavePodsWithRequiredAntiAffinityList() ([]*NodeInfo, error)
+	HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error)
 	// Get returns the NodeInfo of the given node name.
-	Get(nodeName string) (*NodeInfo, error)
+	Get(nodeName string) (fwk.NodeInfo, error)
 }
 
 // StorageInfoLister interface represents anything that handles storage-related operations and resources.
@@ -83,6 +84,9 @@ type ResourceClaimTracker interface {
 	// ListAllAllocatedDevices lists all allocated Devices from allocated ResourceClaims. The result is guaranteed to immediately include
 	// any changes made via AssumeClaimAfterAPICall(), and SignalClaimPendingAllocation().
 	ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error)
+	// GatherAllocatedState gathers information about allocated devices from allocated ResourceClaims. The result is guaranteed to immediately include
+	// any changes made via AssumeClaimAfterAPICall(), and SignalClaimPendingAllocation().
+	GatherAllocatedState() (*structured.AllocatedState, error)
 
 	// SignalClaimPendingAllocation signals to the tracker that the given ResourceClaim will be allocated via an API call in the
 	// binding phase. This change is immediately reflected in the result of List() and the other accessors.

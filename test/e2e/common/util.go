@@ -86,7 +86,6 @@ type testImagesStruct struct {
 	HttpdImage    string
 	HttpdNewImage string
 	PauseImage    string
-	RedisImage    string
 }
 
 var testImages testImagesStruct
@@ -102,7 +101,6 @@ func init() {
 		imageutils.GetE2EImage(imageutils.Httpd),
 		imageutils.GetE2EImage(imageutils.HttpdNew),
 		imageutils.GetE2EImage(imageutils.Pause),
-		imageutils.GetE2EImage(imageutils.Redis),
 	}
 }
 

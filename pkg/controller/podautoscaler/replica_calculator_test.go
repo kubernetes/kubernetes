@@ -31,13 +31,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/features"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -2225,17 +2228,18 @@ func TestGroupPods(t *testing.T) {
 	}
 }
 
-func TestCalculatePodRequests(t *testing.T) {
+func TestCalculateRequests(t *testing.T) {
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 	testPod := "test-pod"
 
 	tests := []struct {
-		name             string
-		pods             []*v1.Pod
-		container        string
-		resource         v1.ResourceName
-		expectedRequests map[string]int64
-		expectedError    error
+		name                    string
+		pods                    []*v1.Pod
+		container               string
+		resource                v1.ResourceName
+		enablePodLevelResources bool
+		expectedRequests        map[string]int64
+		expectedError           error
 	}{
 		{
 			name:             "void",
@@ -2246,7 +2250,7 @@ func TestCalculatePodRequests(t *testing.T) {
 			expectedError:    nil,
 		},
 		{
-			name: "pod with regular containers",
+			name: "Sum container requests if pod-level feature is disabled",
 			pods: []*v1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPod,
@@ -2265,7 +2269,93 @@ func TestCalculatePodRequests(t *testing.T) {
 			expectedError:    nil,
 		},
 		{
-			name: "calculate requests with special container",
+			name:                    "Pod-level resources are enabled, but not set: fallback to sum container requests",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 150},
+			expectedError:    nil,
+		},
+		{
+			name:                    "Pod-level resources override container requests when feature enabled and pod resources specified",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 800},
+			expectedError:    nil,
+		},
+		{
+			name: "Fail if at least one of the containers is missing requests and pod-level feature/requests are not set",
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: nil,
+			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container1", testPod),
+		},
+		{
+			name:                    "Pod-level resources override missing container requests when feature enabled and pod resources specified",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 800},
+			expectedError:    nil,
+		},
+		{
+			name: "Container: if a container name is specified, calculate requests only for that container",
 			pods: []*v1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPod,
@@ -2284,22 +2374,27 @@ func TestCalculatePodRequests(t *testing.T) {
 			expectedError:    nil,
 		},
 		{
-			name: "container missing requests",
+			name:                    "Container: if a container name is specified, calculate requests only for that container and ignore pod-level requests",
+			enablePodLevelResources: true,
 			pods: []*v1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPod,
 					Namespace: testNamespace,
 				},
 				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
 					Containers: []v1.Container{
-						{Name: "container1"},
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
 					},
 				},
 			}},
-			container:        "",
+			container:        "container1",
 			resource:         v1.ResourceCPU,
-			expectedRequests: nil,
-			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container1", testPod),
+			expectedRequests: map[string]int64{testPod: 100},
+			expectedError:    nil,
 		},
 		{
 			name: "pod with restartable init containers",
@@ -2327,7 +2422,9 @@ func TestCalculatePodRequests(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			requests, err := calculatePodRequests(tc.pods, tc.container, tc.resource)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.enablePodLevelResources)
+
+			requests, err := calculateRequests(tc.pods, tc.container, tc.resource)
 			assert.Equal(t, tc.expectedRequests, requests, "requests should be as expected")
 			assert.Equal(t, tc.expectedError, err, "error should be as expected")
 		})

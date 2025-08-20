@@ -125,7 +125,7 @@ func TestSingleflightProvide(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			result := dynamicProvider.Provide(image)
+			result, _ := dynamicProvider.provideWithCoordinates(image)
 			results[i] = result
 		}(i)
 	}
@@ -158,7 +158,7 @@ func TestSingleflightProvide(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			result := dynamicProvider.Provide(image)
+			result, _ := dynamicProvider.provideWithCoordinates(image)
 			results[i] = result
 		}(i)
 	}
@@ -179,7 +179,7 @@ func TestSingleflightProvide(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			result := dynamicProvider.Provide(image)
+			result, _ := dynamicProvider.provideWithCoordinates(image)
 			results[i] = result
 		}(i)
 	}
@@ -191,7 +191,7 @@ func TestSingleflightProvide(t *testing.T) {
 	}
 }
 
-func Test_Provide(t *testing.T) {
+func Test_ProvideWithCoordinates(t *testing.T) {
 	klog.InitFlags(nil)
 	if err := flag.Set("v", "6"); err != nil {
 		t.Fatalf("failed to set log level: %v", err)
@@ -200,11 +200,12 @@ func Test_Provide(t *testing.T) {
 
 	tclock := clock.RealClock{}
 	testcases := []struct {
-		name           string
-		pluginProvider *perPodPluginProvider
-		image          string
-		dockerconfig   credentialprovider.DockerConfig
-		wantLog        string
+		name                   string
+		pluginProvider         *perPodPluginProvider
+		image                  string
+		dockerconfig           credentialprovider.DockerConfig
+		wantLog                string
+		expectedServiceAccount *credentialprovider.ServiceAccountCoordinates
 	}{
 		{
 			name: "exact image match, with Registry cache key",
@@ -529,6 +530,7 @@ func Test_Provide(t *testing.T) {
 								ObjectMeta: metav1.ObjectMeta{
 									Name:      "sa-name",
 									Namespace: "ns",
+									UID:       "sa-uid",
 									Annotations: map[string]string{
 										"domain.io/identity-id":   "id",
 										"domain.io/identity-type": "type",
@@ -552,6 +554,11 @@ func Test_Provide(t *testing.T) {
 					Password: "password",
 				},
 			},
+			expectedServiceAccount: &credentialprovider.ServiceAccountCoordinates{
+				Namespace: "ns",
+				Name:      "sa-name",
+				UID:       "sa-uid",
+			},
 		},
 	}
 
@@ -563,8 +570,17 @@ func Test_Provide(t *testing.T) {
 			klog.LogToStderr(false)
 			defer klog.LogToStderr(true)
 
-			if got := testcase.pluginProvider.Provide(testcase.image); !reflect.DeepEqual(got, testcase.dockerconfig) {
-				t.Errorf("unexpected docker config: %v, expected: %v", got, testcase.dockerconfig)
+			gotConfig, gotCoordinates := testcase.pluginProvider.provideWithCoordinates(testcase.image)
+			if !reflect.DeepEqual(gotConfig, testcase.dockerconfig) {
+				t.Errorf("unexpected docker config from ProvideWithCoordinates: %v, expected: %v", gotConfig, testcase.dockerconfig)
+			}
+
+			if testcase.expectedServiceAccount != nil {
+				if !reflect.DeepEqual(gotCoordinates, testcase.expectedServiceAccount) {
+					t.Errorf("unexpected service account coordinates: %v, expected: %v", gotCoordinates, testcase.expectedServiceAccount)
+				}
+			} else if gotCoordinates != nil {
+				t.Errorf("expected nil service account coordinates but got: %v", gotCoordinates)
 			}
 
 			klog.Flush()
@@ -641,11 +657,9 @@ func Test_ProvideParallel(t *testing.T) {
 			for i := 0; i < 5; i++ {
 				go func(w *sync.WaitGroup) {
 					image := fmt.Sprintf(testcase.registry+"/%s", rand.String(5))
-					dockerconfigResponse := pluginProvider.Provide(image)
+					dockerconfigResponse, _ := pluginProvider.provideWithCoordinates(image)
 					if !reflect.DeepEqual(dockerconfigResponse, dockerconfig) {
-						t.Logf("actual docker config: %v", dockerconfigResponse)
-						t.Logf("expected docker config: %v", dockerconfig)
-						t.Error("unexpected docker config")
+						t.Errorf("unexpected docker config for image %s: %v, expected: %v", image, dockerconfigResponse, dockerconfig)
 					}
 					w.Done()
 				}(&wg)
@@ -1110,7 +1124,7 @@ func Test_NoCacheResponse(t *testing.T) {
 		},
 	}
 
-	dockerConfig := pluginProvider.Provide("test.registry.io/foo/bar")
+	dockerConfig, _ := pluginProvider.provideWithCoordinates("test.registry.io/foo/bar")
 	if !reflect.DeepEqual(dockerConfig, expectedDockerConfig) {
 		t.Logf("actual docker config: %v", dockerConfig)
 		t.Logf("expected docker config: %v", expectedDockerConfig)
@@ -1544,7 +1558,7 @@ func Test_CacheKeyGeneration(t *testing.T) {
 			if tc.serviceAccountCacheType != "" {
 				saTokenCacheType = &tc.serviceAccountCacheType
 			}
-			pluginProvider := createTestPluginProvider(t, tc.pluginCacheKeyType, saTokenCacheType)
+			pluginProvider := createTestPerPodPluginProvider(t, tc.pluginCacheKeyType, saTokenCacheType)
 
 			// Test image and expected SA parameters
 			testImage := "test.registry.io/foo/bar"
@@ -1566,7 +1580,7 @@ func Test_CacheKeyGeneration(t *testing.T) {
 				cacheType:   cacheTypeValue,
 			}
 
-			dockerConfig := pluginProvider.Provide(testImage)
+			dockerConfig, _ := pluginProvider.provideWithCoordinates(testImage)
 			verifyDockerConfig(t, dockerConfig)
 
 			// Verify the cache key is as expected
@@ -1579,13 +1593,13 @@ func Test_CacheKeyGeneration(t *testing.T) {
 
 			// Test cache hit (nil out plugin to ensure cache is used)
 			pluginProvider.provider.plugin = nil
-			cachedConfig := pluginProvider.Provide(testImage)
+			cachedConfig, _ := pluginProvider.provideWithCoordinates(testImage)
 			verifyDockerConfig(t, cachedConfig)
 		})
 	}
 }
 
-func createTestPluginProvider(t *testing.T, pluginCacheKeyType credentialproviderapi.PluginCacheKeyType, saTokenCacheType *kubeletconfig.ServiceAccountTokenCacheType) *perPodPluginProvider {
+func createTestPerPodPluginProvider(t *testing.T, pluginCacheKeyType credentialproviderapi.PluginCacheKeyType, saTokenCacheType *kubeletconfig.ServiceAccountTokenCacheType) *perPodPluginProvider {
 	t.Helper()
 
 	tclock := clock.RealClock{}
