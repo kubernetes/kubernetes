@@ -63,9 +63,20 @@ type Preference struct {
 	// +listType=atomic
 	Aliases []AliasOverride `json:"aliases"`
 
+	// credPluginAllowlist (the credential plugin allowlist) specifies the
+	// conditions under which client-go credential plugins may be executed. In
+	// order for a credential plugin binary to be allowed, it must match all
+	// criteria specified by at least one entry in the allowlist. Curently, the
+	// only criteria available is the name of the plugin. Name matching is
+	// performed by first resolving the absolute path of both the plugin and
+	// the name in the allowlist entry using `exec.LookPath`. It will be called
+	// on both, and the resulting strings must be equal.
 	CredPluginAllowlist *[]AllowlistItem `json:"credPluginAllowlist,omitempty"`
 }
 
+// AllowlistItem stores the criteria specified by an entry in the credential
+// plugin allowlist. In order for a binary plugin to be permitted, it must meet
+// all criteria specified within an AllowlistItem.
 type AllowlistItem struct {
 	Name string `json:"name"`
 }
