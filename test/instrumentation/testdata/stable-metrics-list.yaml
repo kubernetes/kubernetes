@@ -241,10 +241,19 @@
   - 1310.72
   - 2621.44
   - 5242.88
-- name: statefulset_unavailability_violation
+- name: statefulset_max_unavailable
   subsystem: statefulset_controller
-  help: Number of times maxunavailable has been violated
-  type: Counter
+  help: Maximum number of unavailable pods allowed during StatefulSet rolling updates
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - pod_management_policy
+  - statefulset_name
+  - statefulset_namespace
+- name: statefulset_unavailable_replicas
+  subsystem: statefulset_controller
+  help: Current number of unavailable pods in StatefulSet
+  type: Gauge
   stabilityLevel: BETA
   labels:
   - pod_management_policy

@@ -26,13 +26,38 @@ import (
 const StatefulSetControllerSubsystem = "statefulset_controller"
 
 var (
-	// MaxUnavailableViolations tracks the number of times that
-	// .spec.replicas - .status.availableReplicas > .spec.updateStrategy.rollingUpdate.maxUnavailable.
-	MaxUnavailableViolations = metrics.NewCounterVec(
-		&metrics.CounterOpts{
+	// MaxUnavailable tracks the current maxUnavailable configuration value for StatefulSets with the
+	// MaxUnavailableStatefulSet feature enabled. This gauge reflects the configured maximum number of pods
+	// that can be unavailable during rolling updates, providing visibility into the availability constraints.
+	//
+	// Sample monitoring queries:
+	// - Current maxUnavailable setting: statefulset_max_unavailable
+	// - Compare with actual unavailable: statefulset_unavailable_replicas - statefulset_max_unavailable
+	// - Alert when exceeding limit: statefulset_unavailable_replicas > statefulset_max_unavailable
+	// - Monitor configuration changes: changes(statefulset_max_unavailable[1h])
+	MaxUnavailable = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
 			Subsystem:      StatefulSetControllerSubsystem,
-			Name:           "statefulset_unavailability_violation",
-			Help:           "Number of times maxunavailable has been violated",
+			Name:           "statefulset_max_unavailable",
+			Help:           "Maximum number of unavailable pods allowed during StatefulSet rolling updates",
+			StabilityLevel: metrics.BETA,
+		}, []string{"statefulset_namespace", "statefulset_name", "pod_management_policy"},
+	)
+
+	// UnavailableReplicas tracks the current number of unavailable pods in a StatefulSet.
+	// This gauge reflects the real-time count of pods that are not running and available,
+	// providing immediate visibility into StatefulSet health and availability status.
+	//
+	// Sample monitoring queries:
+	// - Current unavailable pods: statefulset_unavailable_replicas
+	// - Availability percentage: (statefulset_replicas - statefulset_unavailable_replicas) / statefulset_replicas * 100
+	// - Alert on high unavailability: statefulset_unavailable_replicas > statefulset_max_unavailable
+	// - Monitor availability trends: statefulset_unavailable_replicas
+	UnavailableReplicas = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      StatefulSetControllerSubsystem,
+			Name:           "statefulset_unavailable_replicas",
+			Help:           "Current number of unavailable pods in StatefulSet",
 			StabilityLevel: metrics.BETA,
 		}, []string{"statefulset_namespace", "statefulset_name", "pod_management_policy"},
 	)
@@ -42,6 +67,7 @@ var registerMetrics sync.Once
 
 func Register() {
 	registerMetrics.Do(func() {
-		legacyregistry.MustRegister(MaxUnavailableViolations)
+		legacyregistry.MustRegister(MaxUnavailable)
+		legacyregistry.MustRegister(UnavailableReplicas)
 	})
 }
