@@ -188,7 +188,7 @@ func (r *lazyMetric) FQName() string {
 
 /*
 This code is directly lifted from the prometheus codebase. It's a convenience struct which
-allows you satisfy the Collector interface automatically if you already satisfy the Metric interface.
+allows you to satisfy the Collector interface automatically if you already satisfy the Metric interface.
 
 For reference: https://github.com/prometheus/client_golang/blob/v0.9.2/prometheus/collector.go#L98-L120
 */

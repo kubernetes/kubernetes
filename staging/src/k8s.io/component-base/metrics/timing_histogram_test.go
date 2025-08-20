@@ -512,7 +512,7 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 			clk := testclock.NewFakePassiveClock(t0)
 			c := NewTestableTimingHistogramVec(clk.Now, opts, labels)
 			registry.MustRegister(c)
-			SetLabelAllowListFromCLI(labelAllowValues)
+			SetLabelAllowList(labelAllowValues)
 			var v0 float64 = 13
 			for _, lv := range test.labelValues {
 				c.WithLabelValues(lv...).Set(v0)
