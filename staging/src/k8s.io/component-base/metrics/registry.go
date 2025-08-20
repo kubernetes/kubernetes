@@ -19,7 +19,6 @@ package metrics
 import (
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -30,12 +29,8 @@ import (
 )
 
 var (
-	showHiddenOnce      sync.Once
-	disabledMetricsLock sync.RWMutex
-	showHidden          atomic.Bool
-	registries          []*kubeRegistry // stores all registries created by NewKubeRegistry()
-	registriesLock      sync.RWMutex
-	disabledMetrics     = map[string]struct{}{}
+	registries     []*kubeRegistry // stores all registries created by NewKubeRegistry()
+	registriesLock sync.RWMutex
 
 	registeredMetricsTotal = NewCounterVec(
 		&CounterOpts{
@@ -44,30 +39,6 @@ var (
 			StabilityLevel: BETA,
 		},
 		[]string{"stability_level", "deprecated_version"},
-	)
-
-	disabledMetricsTotal = NewCounter(
-		&CounterOpts{
-			Name:           "disabled_metrics_total",
-			Help:           "The count of disabled metrics.",
-			StabilityLevel: BETA,
-		},
-	)
-
-	hiddenMetricsTotal = NewCounter(
-		&CounterOpts{
-			Name:           "hidden_metrics_total",
-			Help:           "The count of hidden metrics.",
-			StabilityLevel: BETA,
-		},
-	)
-
-	cardinalityEnforcementUnexpectedCategorizationsTotal = NewCounter(
-		&CounterOpts{
-			Name:           "cardinality_enforcement_unexpected_categorizations_total",
-			Help:           "The count of unexpected categorizations during cardinality enforcement.",
-			StabilityLevel: ALPHA,
-		},
 	)
 )
 
@@ -123,44 +94,6 @@ func isDeprecated(currentVersion, deprecatedVersion semver.Version) bool {
 
 	// currentVersion.Major == deprecatedVersion.Major
 	return currentVersion.Minor >= deprecatedVersion.Minor
-}
-
-// ValidateShowHiddenMetricsVersion checks invalid version for which show hidden metrics.
-func ValidateShowHiddenMetricsVersion(v string) []error {
-	err := validateShowHiddenMetricsVersion(parseVersion(version.Get()), v)
-	if err != nil {
-		return []error{err}
-	}
-
-	return nil
-}
-
-func SetDisabledMetric(name string) {
-	disabledMetricsLock.Lock()
-	defer disabledMetricsLock.Unlock()
-	disabledMetrics[name] = struct{}{}
-	disabledMetricsTotal.Inc()
-}
-
-// SetShowHidden will enable showing hidden metrics. This will no-opt
-// after the initial call
-func SetShowHidden() {
-	showHiddenOnce.Do(func() {
-		showHidden.Store(true)
-
-		// re-register collectors that has been hidden in phase of last registry.
-		for _, r := range registries {
-			r.enableHiddenCollectors()
-			r.enableHiddenStableCollectors()
-		}
-	})
-}
-
-// shouldShowHidden returns whether showing hidden deprecated metrics
-// is enabled. While the primary usecase for this is internal (to determine
-// registration behavior) this can also be used to introspect
-func shouldShowHidden() bool {
-	return showHidden.Load()
 }
 
 // Registerable is an interface for a collector metric which we
@@ -350,7 +283,7 @@ func (kr *kubeRegistry) trackStableCollectors(cs ...StableCollector) {
 	kr.stableCollectors = append(kr.stableCollectors, cs...)
 }
 
-// enableHiddenCollectors will re-register all of the hidden collectors.
+// enableHiddenCollectors will re-register all the hidden collectors.
 func (kr *kubeRegistry) enableHiddenCollectors() {
 	if len(kr.hiddenCollectors) == 0 {
 		return
