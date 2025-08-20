@@ -48,7 +48,7 @@ type Manager interface {
 // Config represents Manager configuration
 type Config struct {
 	Logger                           klog.Logger
-	VolumeManager                    PodVolumeTeardown
+	VolumeManager                    VolumeWaiter
 	Recorder                         record.EventRecorder
 	NodeRef                          *v1.ObjectReference
 	GetPodsFunc                      eviction.ActivePodsFunc
@@ -94,7 +94,7 @@ type podManager struct {
 	shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 	clock                            clock.Clock
 	killPodFunc                      eviction.KillPodFunc
-	volumeManager                    PodVolumeTeardown
+	volumeManager                    VolumeWaiter
 }
 
 func newPodManager(conf *Config) *podManager {

@@ -22,8 +22,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// PodVolumeTeardown is the minimal surface node shutdown needs from volume handling.
+// VolumeWaiter is the minimal surface node shutdown needs from volume handling.
 // Keeping this tiny avoids importing volumemanager and helps break circular deps.
-type PodVolumeTeardown interface {
+type VolumeWaiter interface {
 	WaitForAllPodsUnmount(ctx context.Context, pods []*v1.Pod) error
 }
