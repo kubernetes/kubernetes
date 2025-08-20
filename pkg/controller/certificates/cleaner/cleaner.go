@@ -175,8 +175,11 @@ func isFailedPastDeadline(logger klog.Logger, csr *capi.CertificateSigningReques
 // creation time of the CSR is passed the deadline that issued requests are
 // maintained for.
 func isIssuedPastDeadline(logger klog.Logger, csr *capi.CertificateSigningRequest) bool {
+	if !isIssued(csr) {
+		return false
+	}
 	for _, c := range csr.Status.Conditions {
-		if c.Type == capi.CertificateApproved && isIssued(csr) && isOlderThan(c.LastUpdateTime, approvedExpiration) {
+		if c.Type == capi.CertificateApproved && isOlderThan(c.LastUpdateTime, approvedExpiration) {
 			logger.Info("Cleaning CSR as it is more than approvedExpiration duration old and approved.", "csr", csr.Name, "approvedExpiration", approvedExpiration)
 			return true
 		}
@@ -188,8 +191,11 @@ func isIssuedPastDeadline(logger klog.Logger, csr *capi.CertificateSigningReques
 // no certificate has been issued, and the approval time has passed the deadline
 // that pending requests are maintained for.
 func isApprovedUnissuedPastDeadline(logger klog.Logger, csr *capi.CertificateSigningRequest) bool {
+	if isIssued(csr) {
+		return false
+	}
 	for _, c := range csr.Status.Conditions {
-		if c.Type == capi.CertificateApproved && !(isIssued(csr) && isOlderThan(c.LastUpdateTime, pendingExpiration)) {
+		if c.Type == capi.CertificateApproved && isOlderThan(c.LastUpdateTime, pendingExpiration) {
 			logger.Info("Cleaning CSR as it is approved but unissued for more than pendingExpiration duration.", "csr", csr.Name, "pendingExpiration", pendingExpiration)
 			return true
 		}
