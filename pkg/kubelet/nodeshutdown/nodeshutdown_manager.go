@@ -33,7 +33,6 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/utils/clock"
 )
 
@@ -49,7 +48,7 @@ type Manager interface {
 // Config represents Manager configuration
 type Config struct {
 	Logger                           klog.Logger
-	VolumeManager                    volumemanager.VolumeManager
+	VolumeManager                    PodVolumeTeardown
 	Recorder                         record.EventRecorder
 	NodeRef                          *v1.ObjectReference
 	GetPodsFunc                      eviction.ActivePodsFunc
@@ -95,7 +94,7 @@ type podManager struct {
 	shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 	clock                            clock.Clock
 	killPodFunc                      eviction.KillPodFunc
-	volumeManager                    volumemanager.VolumeManager
+	volumeManager                    PodVolumeTeardown
 }
 
 func newPodManager(conf *Config) *podManager {
