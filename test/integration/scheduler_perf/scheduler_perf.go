@@ -1053,6 +1053,11 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 			//
 			// This is a major issue because many Kubernetes goroutines get
 			// started without waiting for them to stop :-(
+			//
+			// In practice, klog's own flushing got called out by the race detector.
+			// As we know about that one, we can force it to stop explicitly to
+			// satisfy the race detector.
+			klog.StopFlushDaemon()
 			if err := logsapi.ResetForTest(LoggingFeatureGate); err != nil {
 				t.Errorf("Failed to reset the logging configuration: %v", err)
 			}
