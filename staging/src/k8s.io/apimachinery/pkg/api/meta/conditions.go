@@ -17,10 +17,25 @@ limitations under the License.
 package meta
 
 import (
+	"slices"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// matchCondition returns a predicate function that matches conditions by type and optionally by status.
+// If status is nil, it only matches by type.
+func matchCondition(conditionType string, status *metav1.ConditionStatus) func(metav1.Condition) bool {
+	return func(c metav1.Condition) bool {
+		if c.Type != conditionType {
+			return false
+		}
+		if status != nil {
+			return c.Status == *status
+		}
+		return true
+	}
+}
 
 // SetStatusCondition sets the corresponding condition in conditions to newCondition and returns true
 // if the conditions are changed by this call.
@@ -74,28 +89,18 @@ func RemoveStatusCondition(conditions *[]metav1.Condition, conditionType string)
 	if conditions == nil || len(*conditions) == 0 {
 		return false
 	}
-	newConditions := make([]metav1.Condition, 0, len(*conditions)-1)
-	for _, condition := range *conditions {
-		if condition.Type != conditionType {
-			newConditions = append(newConditions, condition)
-		}
-	}
-
-	removed = len(*conditions) != len(newConditions)
-	*conditions = newConditions
-
-	return removed
+	originalLen := len(*conditions)
+	*conditions = slices.DeleteFunc(*conditions, matchCondition(conditionType, nil))
+	return len(*conditions) != originalLen
 }
 
 // FindStatusCondition finds the conditionType in conditions.
 func FindStatusCondition(conditions []metav1.Condition, conditionType string) *metav1.Condition {
-	for i := range conditions {
-		if conditions[i].Type == conditionType {
-			return &conditions[i]
-		}
+	idx := slices.IndexFunc(conditions, matchCondition(conditionType, nil))
+	if idx == -1 {
+		return nil
 	}
-
-	return nil
+	return &conditions[idx]
 }
 
 // IsStatusConditionTrue returns true when the conditionType is present and set to `metav1.ConditionTrue`
@@ -110,10 +115,5 @@ func IsStatusConditionFalse(conditions []metav1.Condition, conditionType string)
 
 // IsStatusConditionPresentAndEqual returns true when conditionType is present and equal to status.
 func IsStatusConditionPresentAndEqual(conditions []metav1.Condition, conditionType string, status metav1.ConditionStatus) bool {
-	for _, condition := range conditions {
-		if condition.Type == conditionType {
-			return condition.Status == status
-		}
-	}
-	return false
+	return slices.ContainsFunc(conditions, matchCondition(conditionType, &status))
 }
