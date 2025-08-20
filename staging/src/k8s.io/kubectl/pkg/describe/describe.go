@@ -4361,12 +4361,16 @@ func DescribeEvents(el *corev1.EventList, w PrefixWriter) {
 		if source == "" {
 			source = e.ReportingController
 		}
+		message := strings.TrimSpace(e.Message)
+		if len(e.InvolvedObject.FieldPath) > 0 {
+			message = fmt.Sprintf("%s: %s", e.InvolvedObject.FieldPath, message)
+		}
 		w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
 			e.Type,
 			e.Reason,
 			interval,
 			source,
-			strings.TrimSpace(e.Message),
+			message,
 		)
 	}
 }
