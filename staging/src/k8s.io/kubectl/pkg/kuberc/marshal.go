@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,10 +34,7 @@ import (
 	"sigs.k8s.io/json"
 )
 
-var (
-	pluginAllowlistError = errors.New("plugin allowlist error")
-	credPluginYamlPath   = regexp.MustCompile(`^credPluginAllowlist\[[0-9]+\]\.`)
-)
+var pluginAllowlistError = errors.New("plugin allowlist error")
 
 // decodePreference iterates over the yamls in kuberc file to find the supported kuberc version.
 // Once it finds, it returns the compatible kuberc object as well as accumulated errors during the iteration.
