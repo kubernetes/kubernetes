@@ -707,7 +707,7 @@ func updateStatefulSetAfterInvariantEstablished(
 
 	logger := klog.FromContext(ctx)
 	replicaCount := int(*set.Spec.Replicas)
-
+	podManagementPolicy := string(set.Spec.PodManagementPolicy)
 	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
 	updateMin := 0
 	maxUnavailable := 1
@@ -722,6 +722,7 @@ func updateStatefulSetAfterInvariantEstablished(
 		if err != nil {
 			return &status, err
 		}
+		metrics.MaxUnavailable.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(maxUnavailable))
 	}
 
 	// Collect all targets in the range between getStartOrdinal(set) and getEndOrdinal(set). Count any targets in that range
@@ -729,23 +730,20 @@ func updateStatefulSetAfterInvariantEstablished(
 	// (MaxUnavailable - Unavailable) Pods, in order with respect to their ordinal for termination. Delete
 	// those pods and count the successful deletions. Update the status with the correct number of deletions.
 	unavailablePods := 0
+	
 	for target := len(replicas) - 1; target >= 0; target-- {
 		if isUnavailable(replicas[target], set.Spec.MinReadySeconds) {
 			unavailablePods++
 		}
 	}
-
+	metrics.UnavailableReplicas.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(unavailablePods))
+	
 	if unavailablePods > maxUnavailable {
 		logger.V(4).Info("StatefulSet found unavailablePods, more than the allowed maxUnavailable",
 			"statefulSet", klog.KObj(set),
 			"unavailablePods", unavailablePods,
 			"maxUnavailable", maxUnavailable)
 
-		// Only increment metric if StatefulSet status is consistent (not changing) to avoid false positives
-		// during initial rollouts, scaling operations, or updates
-		if !inconsistentStatus(set, &status) {
-			metrics.MaxUnavailableViolations.WithLabelValues(set.Namespace, set.Name, string(set.Spec.PodManagementPolicy)).Inc()
-		}
 		return &status, nil
 	}
 
@@ -756,9 +754,9 @@ func updateStatefulSetAfterInvariantEstablished(
 	deletedPods := 0
 	for target := len(replicas) - 1; target >= updateMin && deletedPods < podsToDelete; target-- {
 
-		// delete the Pod if it is healthy and the revision doesnt match the target
+		// delete the Pod if it is healthy and the revision does not match the target
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
-			// delete the Pod if it is healthy and the revision doesnt match the target
+			// delete the Pod if it is healthy and the revision does not match the target
 			logger.V(2).Info("StatefulSet terminating Pod for update",
 				"statefulSet", klog.KObj(set),
 				"pod", klog.KObj(replicas[target]))
@@ -796,32 +794,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	}
 
 	return nil
-}
-
-// wasStatefulSetPreviouslyHealthy determines if a StatefulSet was previously healthy
-// to distinguish between expected unavailability (during initial rollouts, scaling)
-// and unexpected unavailability that should be reported as violations
-func wasStatefulSetPreviouslyHealthy(set *apps.StatefulSet, status *apps.StatefulSetStatus) bool {
-	// Don't report violations during initial rollout - if ObservedGeneration is 0 or
-	// less than current generation, this is likely an initial deployment
-	if status.ObservedGeneration == 0 || status.ObservedGeneration < set.Generation {
-		return false
-	}
-
-	// Don't report if this is the first time we're seeing this StatefulSet
-	// (no previous status exists)
-	if set.Status.Replicas == 0 && set.Status.ReadyReplicas == 0 {
-		return false
-	}
-
-	// Don't report if we're in a scaling operation (replica count changed)
-	if set.Status.Replicas != *set.Spec.Replicas {
-		return false
-	}
-
-	// Only report if the StatefulSet was previously at desired state
-	// (had all replicas ready and available)
-	return set.Status.ReadyReplicas == *set.Spec.Replicas
 }
 
 var _ StatefulSetControlInterface = &defaultStatefulSetControl{}

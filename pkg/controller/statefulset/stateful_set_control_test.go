@@ -50,9 +50,11 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -2680,6 +2682,26 @@ func (om *fakeObjectManager) setPodReady(set *apps.StatefulSet, ordinal int) ([]
 	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
+func (om *fakeObjectManager) setPodNotReady(set *apps.StatefulSet, ordinal int) ([]*v1.Pod, error) {
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		return nil, err
+	}
+	pod := findPodByOrdinal(pods, ordinal)
+	if pod == nil {
+		return nil, fmt.Errorf("setPodNotReady: pod ordinal %d not found", ordinal)
+	}
+	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionFalse}
+	podutil.UpdatePodCondition(&pod.Status, &condition)
+	fakeResourceVersion(pod)
+	om.podsIndexer.Update(pod)
+	return om.podsLister.Pods(set.Namespace).List(selector)
+}
+
 func (om *fakeObjectManager) setPodAvailable(set *apps.StatefulSet, ordinal int, lastTransitionTime time.Time) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
@@ -3734,85 +3756,188 @@ func TestStatefulSetPartitionRollingUpdateWithMinReadySeconds(t *testing.T) {
 	}
 }
 
-// TestInconsistentStatusForViolationReporting tests using inconsistentStatus to determine when
-// MaxUnavailableViolations should be reported to avoid false positives.
-func TestInconsistentStatusForViolationReporting(t *testing.T) {
-	// Base StatefulSet with typical configuration
-	baseSet := &apps.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Generation: 1},
-		Spec:       apps.StatefulSetSpec{Replicas: ptr.To(int32(3))},
-		Status: apps.StatefulSetStatus{
-			Replicas:           3,
-			ReadyReplicas:      3,
-			AvailableReplicas:  3,
-			ObservedGeneration: 1,
+func TestStatefulSetMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, true)
+	metrics.Register()
+
+	type testcase struct {
+		name                             string
+		totalPods                        int32
+		maxUnavailable                   *intstr.IntOrString
+		podManagementPolicy              apps.PodManagementPolicyType
+		unavailablePodCount              int
+		expectedMaxUnavailableValue      int
+		expectedUnavailableReplicasValue int
+	}
+
+	testFn := func(test *testcase, t *testing.T) {
+
+		// Create StatefulSet
+		set := newStatefulSet(test.totalPods)
+		var partition int32 = 0
+		set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+			Type: apps.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+				Partition:      &partition,
+				MaxUnavailable: test.maxUnavailable,
+			},
+		}
+		set = setupPodManagementPolicy(test.podManagementPolicy, set)
+		set.Status.CollisionCount = new(int32)
+
+		// Setup controller
+		client := fake.NewSimpleClientset(set)
+		spc, _, ssc := setupController(client)
+
+		// Scale up StatefulSet
+		if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
+			t.Fatal(err)
+		}
+		set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Change the image to trigger an update
+		set.Spec.Template.Spec.Containers[0].Image = "foo"
+
+		// Get selector
+		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Make some pods unavailable
+		var pods []*v1.Pod
+		for i := 0; i < test.unavailablePodCount; i++ {
+			if test.podManagementPolicy == apps.OrderedReadyPodManagement {
+				spc.setPodRunning(set, i)
+				pods, _ = spc.setPodNotReady(set, i)
+			} else {
+				pods, _ = spc.addTerminatingPod(set, i)
+			}
+		}
+
+		// Make remaining pods ready
+		for i := test.unavailablePodCount; i < int(test.totalPods); i++ {
+			spc.setPodRunning(set, i)
+			pods, _ = spc.setPodReady(set, i)
+		}
+		sort.Sort(ascendingOrdinal(pods))
+
+		// Update StatefulSet
+		status := apps.StatefulSetStatus{Replicas: test.totalPods}
+		updateRevision := &apps.ControllerRevision{}
+		_, err = updateStatefulSetAfterInvariantEstablished(context.TODO(), ssc.(*defaultStatefulSetControl), set, pods, updateRevision, status)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Get updated pods
+		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sort.Sort(ascendingOrdinal(pods))
+
+		// Verify metrics
+		maxUnavailableValue, err := testutil.GetGaugeMetricValue(
+			metrics.MaxUnavailable.WithLabelValues(set.Namespace, set.Name, string(test.podManagementPolicy)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int(maxUnavailableValue) != test.expectedMaxUnavailableValue {
+			t.Errorf("Expected MaxUnavailable gauge value %d, got %d", test.expectedMaxUnavailableValue, int(maxUnavailableValue))
+		}
+
+		unavailableReplicasValue, err := testutil.GetGaugeMetricValue(
+			metrics.UnavailableReplicas.WithLabelValues(set.Namespace, set.Name, string(test.podManagementPolicy)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if int(unavailableReplicasValue) != test.expectedUnavailableReplicasValue {
+			t.Errorf("Expected UnavailableReplicas gauge value %d, got %d", test.expectedUnavailableReplicasValue, int(unavailableReplicasValue))
+		}
+	}
+
+	tests := []testcase{
+		{
+			name:       "ordered pods within limit",
+			totalPods:  5,
+			maxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+			podManagementPolicy: apps.OrderedReadyPodManagement,
+			unavailablePodCount: 1,
+			expectedMaxUnavailableValue: 2,
+			expectedUnavailableReplicasValue: 1,
+		},
+		{
+			name:       "parallel pods exceeding limit",
+			totalPods:  10,
+			maxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "20%"},
+			podManagementPolicy: apps.ParallelPodManagement,
+			unavailablePodCount: 3, // (20% of 10), violation but gauge shows current values
+			expectedMaxUnavailableValue: 2,
+			expectedUnavailableReplicasValue: 3,
+		},
+		{
+			name:       "ordered pods exactly at limit",
+			totalPods:  6,
+			maxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
+			podManagementPolicy: apps.OrderedReadyPodManagement,
+			unavailablePodCount: 3, // exactly at limit
+			expectedMaxUnavailableValue: 3,
+			expectedUnavailableReplicasValue: 3,
+		},
+		{
+			name:       "parallel pods all available",
+			totalPods:  4,
+			maxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			podManagementPolicy: apps.ParallelPodManagement,
+			unavailablePodCount: 0, // all pods available
+			expectedMaxUnavailableValue: 1,
+			expectedUnavailableReplicasValue: 0,
+		},
+		{
+			name:       "ordered pods with percentage maxUnavailable",
+			totalPods:  8,
+			maxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "25%"},
+			podManagementPolicy: apps.OrderedReadyPodManagement,
+			unavailablePodCount: 1, // (25% of 8), within limit
+			expectedMaxUnavailableValue: 2,
+			expectedUnavailableReplicasValue: 1,
+		},
+		{
+			name:       "parallel pods with large percentage",
+			totalPods:  5,
+			maxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "80%"},
+			podManagementPolicy: apps.ParallelPodManagement,
+			unavailablePodCount: 4, // (80% of 5), exactly at limit
+			expectedMaxUnavailableValue: 4,
+			expectedUnavailableReplicasValue: 4,
+		},
+		{
+			name:       "small statefulset with maxUnavailable 1",
+			totalPods:  2,
+			maxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			podManagementPolicy: apps.OrderedReadyPodManagement,
+			unavailablePodCount: 1, // exactly at limit
+			expectedMaxUnavailableValue: 1,
+			expectedUnavailableReplicasValue: 1,
+		},
+		{
+			name:       "single pod statefulset",
+			totalPods:  1,
+			maxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			podManagementPolicy: apps.ParallelPodManagement,
+			unavailablePodCount: 1, // single pod unavailable
+			expectedMaxUnavailableValue: 1,
+			expectedUnavailableReplicasValue: 1,
 		},
 	}
 
-	testCases := []struct {
-		name               string
-		setStatus          apps.StatefulSetStatus
-		newStatus          apps.StatefulSetStatus
-		expectInconsistent bool
-		description        string
-	}{
-		{
-			name:      "initial deployment",
-			setStatus: apps.StatefulSetStatus{}, // Empty initial status
-			newStatus: apps.StatefulSetStatus{
-				Replicas:      3,
-				ReadyReplicas: 1,
-			},
-			expectInconsistent: true,
-			description:        "Initial deployment with changing status should not report violations",
-		},
-		{
-			name: "scaling operation",
-			setStatus: apps.StatefulSetStatus{
-				Replicas:      3, // Was 3
-				ReadyReplicas: 3,
-			},
-			newStatus: apps.StatefulSetStatus{
-				Replicas:      5, // Now 5
-				ReadyReplicas: 3,
-			},
-			expectInconsistent: true,
-			description:        "Scaling operation should not report violations",
-		},
-		{
-			name: "stable StatefulSet",
-			setStatus: apps.StatefulSetStatus{
-				Replicas:          3,
-				ReadyReplicas:     3,
-				AvailableReplicas: 3,
-			},
-			newStatus: apps.StatefulSetStatus{
-				Replicas:          3,
-				ReadyReplicas:     3,
-				AvailableReplicas: 3,
-			},
-			expectInconsistent: false,
-			description:        "Stable StatefulSet should report violations",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Create test StatefulSet with specific status
-			set := baseSet.DeepCopy()
-			set.Status = tc.setStatus
-
-			result := inconsistentStatus(set, &tc.newStatus)
-			shouldReport := !result // We report violations when status is NOT inconsistent
-
-			if result != tc.expectInconsistent {
-				t.Errorf("%s: Expected inconsistentStatus=%v, got %v", tc.description, tc.expectInconsistent, result)
-			}
-
-			expectedShouldReport := !tc.expectInconsistent
-			if shouldReport != expectedShouldReport {
-				t.Errorf("%s: Expected shouldReport=%v, got %v", tc.description, expectedShouldReport, shouldReport)
-			}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testFn(&test, t)
 		})
 	}
 }
