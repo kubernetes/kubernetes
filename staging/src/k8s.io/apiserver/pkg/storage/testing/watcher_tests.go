@@ -347,9 +347,6 @@ func RunTestDelayedWatchDelivery(ctx context.Context, t *testing.T, store storag
 		}
 	}
 
-	// Now stop the watcher and check if the consecutive events are being delivered.
-	watcher.Stop()
-
 	watched := 0
 	for {
 		event, ok := <-watcher.ResultChan()
@@ -364,11 +361,19 @@ func RunTestDelayedWatchDelivery(ctx context.Context, t *testing.T, store storag
 			t.Errorf("Unexpected object watched: %s, expected %s", a, e)
 		}
 		watched++
+		// Before stopping watcher wait for an event to arrive and give them some time to fill the queue.
+		if watched == 1 {
+			time.Sleep(time.Second)
+			// Stop the watcher to check if the consecutive events will be delivered.
+			watcher.Stop()
+		}
 	}
 	// We expect at least N events to be delivered, depending on the implementation.
 	// For now, this number is smallest for Cacher and it equals 10 (size of the out buffer).
-	if watched < 10 {
-		t.Errorf("Unexpected number of events: %v, expected: %v", watched, totalPods)
+	outBufferSize := 10
+	expectWatched := outBufferSize + 1 // initial event
+	if watched < expectWatched {
+		t.Errorf("Unexpected number of events: %v, expected at least: %v", watched, expectWatched)
 	}
 }
 
