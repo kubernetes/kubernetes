@@ -135,7 +135,7 @@ func (p *Preferences) applyAllowlist(cfg clientcmd.ClientConfig, kuberc *config.
 		return err
 	}
 
-	if rcfg.ExecProvider == nil || rcfg.ExecProvider.Command == "" {
+	if rcfg.ExecProvider == nil || len(rcfg.ExecProvider.Command) == 0 {
 		return nil
 	}
 
@@ -157,7 +157,7 @@ func (p *Preferences) applyAllowlist(cfg clientcmd.ClientConfig, kuberc *config.
 // criteria specified in `alEntry`. All checks against nonempty criteria must
 // succeed for the binary to be greenlit.
 func isGreenlit(absBin string, alEntry *config.AllowlistItem) bool {
-	if n := alEntry.Name; n != "" {
+	if n := alEntry.Name; len(n) > 0 {
 		alAbsBin, err := exec.LookPath(alEntry.Name)
 		if err != nil {
 			return false
