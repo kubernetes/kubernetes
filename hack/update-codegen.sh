@@ -153,6 +153,10 @@ function codegen::protobuf() {
       kube::log::status "protoc ${PROTOC_VERSION} not found (can install with hack/install-protoc.sh); generating containerized..."
       build/run.sh hack/_update-generated-protobuf-dockerized.sh "${apis[@]}"
     fi
+
+    # Run gofmt on generated protobuf files
+    kube::log::status "Running gofmt on generated protobuf files"
+    git_find -z ':(glob)**/generated.pb.go' | xargs -0 gofmt -w -s
 }
 
 # Deep-copy generation
@@ -219,6 +223,10 @@ function codegen::deepcopy() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated deepcopy code"
     fi
+
+    # Run gofmt on generated deepcopy files
+    kube::log::status "Running gofmt on generated deepcopy files"
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 gofmt -w -s
 }
 
 # Generates types_swagger_doc_generated file for the given group version.
@@ -296,6 +304,10 @@ function codegen::swagger() {
     for group_version in "${group_versions[@]}"; do
       gen_types_swagger_doc "${group_version}" "$(kube::util::group-version-to-pkg-path "${group_version}")"
     done
+
+    # Run gofmt on generated swagger files
+    kube::log::status "Running gofmt on generated swagger files"
+    git_find -z ':(glob)**/types_swagger_doc_generated.go' | xargs -0 gofmt -w -s
 }
 
 # prerelease-lifecycle generation
@@ -356,6 +368,10 @@ function codegen::prerelease() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated prerelease-lifecycle code"
     fi
+
+    # Run gofmt on generated prerelease-lifecycle files
+    kube::log::status "Running gofmt on generated prerelease-lifecycle files"
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 gofmt -w -s
 }
 
 # Defaulter generation
@@ -427,6 +443,10 @@ function codegen::defaults() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated defaulter code"
     fi
+
+    # Run gofmt on generated defaulter files
+    kube::log::status "Running gofmt on generated defaulter files"
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 gofmt -w -s
 }
 
 # Validation generation
@@ -510,6 +530,10 @@ function codegen::validation() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated validation code"
     fi
+
+    # Run gofmt on generated validation files
+    kube::log::status "Running gofmt on generated validation files"
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 gofmt -w -s
 }
 
 # Conversion generation
@@ -593,6 +617,10 @@ function codegen::conversions() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated conversion code"
     fi
+
+    # Run gofmt on generated conversion files
+    kube::log::status "Running gofmt on generated conversion files"
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 gofmt -w -s
 }
 
 # Register generation
@@ -654,6 +682,10 @@ function codegen::register() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated register code"
     fi
+
+    # Run gofmt on generated register files
+    kube::log::status "Running gofmt on generated register files"
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 gofmt -w -s
 }
 
 # $@: directories to exclude
@@ -762,6 +794,10 @@ function codegen::openapi() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated openapi code"
     fi
+
+    # Run gofmt on generated openapi files
+    kube::log::status "Running gofmt on generated openapi files"
+    git_find -z ':(glob)pkg/generated/**'/"${output_file}" | xargs -0 gofmt -w -s
 }
 
 function codegen::applyconfigs() {
@@ -811,6 +847,10 @@ function codegen::applyconfigs() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated apply-config code"
     fi
+
+    # Run gofmt on generated applyconfigs files
+    kube::log::status "Running gofmt on generated applyconfigs files"
+    git_find -z ':(glob)staging/src/k8s.io/client-go/**/*.go' | xargs -0 gofmt -w -s
 }
 
 function codegen::clients() {
@@ -873,6 +913,10 @@ function codegen::clients() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated client code"
     fi
+
+    # Run gofmt on generated client files
+    kube::log::status "Running gofmt on generated client files"
+    git_find -z ':(glob)staging/src/k8s.io/client-go/**/*.go' | xargs -0 gofmt -w -s
 }
 
 function codegen::listers() {
@@ -920,6 +964,10 @@ function codegen::listers() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated lister code"
     fi
+
+    # Run gofmt on generated lister files
+    kube::log::status "Running gofmt on generated lister files"
+    git_find -z ':(glob)staging/src/k8s.io/client-go/**/*.go' | xargs -0 gofmt -w -s
 }
 
 function codegen::informers() {
@@ -970,6 +1018,10 @@ function codegen::informers() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated informer code"
     fi
+
+    # Run gofmt on generated informer files
+    kube::log::status "Running gofmt on generated informer files"
+    git_find -z ':(glob)staging/src/k8s.io/client-go/**/*.go' | xargs -0 gofmt -w -s
 }
 
 function indent() {
@@ -1060,6 +1112,12 @@ function codegen::protobindings() {
       build/run.sh hack/_update-generated-proto-bindings-dockerized.sh gogo   "${apis_using_gogo[@]}"
       build/run.sh hack/_update-generated-proto-bindings-dockerized.sh protoc "${apis_using_protoc[@]}"
     fi
+
+    # Run gofmt on generated protobuf binding files
+    kube::log::status "Running gofmt on generated protobuf binding files"
+    for api in "${apis[@]}"; do
+        git_find -z ":(glob)${api}"/'**/api*.pb.go' | xargs -0 gofmt -w -s
+    done
 }
 
 #
