@@ -730,15 +730,15 @@ func updateStatefulSetAfterInvariantEstablished(
 	// (MaxUnavailable - Unavailable) Pods, in order with respect to their ordinal for termination. Delete
 	// those pods and count the successful deletions. Update the status with the correct number of deletions.
 	unavailablePods := 0
-	
+
 	for target := len(replicas) - 1; target >= 0; target-- {
 		if isUnavailable(replicas[target], set.Spec.MinReadySeconds) {
 			unavailablePods++
 		}
 	}
 	metrics.UnavailableReplicas.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(unavailablePods))
-	
-	if unavailablePods > maxUnavailable {
+
+	if unavailablePods >= maxUnavailable {
 		logger.V(4).Info("StatefulSet found unavailablePods, more than the allowed maxUnavailable",
 			"statefulSet", klog.KObj(set),
 			"unavailablePods", unavailablePods,
