@@ -64,12 +64,6 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 		attemptedItems++
 		pref, gvk, strictDecodeErr := scheme.StrictCodecs.UniversalDecoder().Decode(doc, nil, nil)
 		if strictDecodeErr != nil {
-			// check whether the client-go credential plugin allowlist is
-			// causing the strict parsing failure
-			if pluginPathErr, ok := asAllowlistErr(strictDecodeErr); ok {
-				return nil, pluginPathErr
-			}
-
 			var lenientDecodeErr error
 			pref, gvk, lenientDecodeErr = scheme.LenientCodecs.UniversalDecoder().Decode(doc, nil, nil)
 			if lenientDecodeErr != nil {
@@ -97,6 +91,13 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 			continue
 		}
 
+		// if there was a strict decode error, check check whether the
+		// client-go credential plugin allowlist is the cause; if so, the
+		// allowlist is misconfigured and the operation should fail.
+		if pluginPathErr, ok := asAllowlistErr(strictDecodeErr); ok {
+			return nil, pluginPathErr
+		}
+
 		// we have a usable preferences to return
 		klog.V(5).Infof("kuberc: using entry %d (%s) in %s", attemptedItems, gvk.GroupVersion(), kubercFile)
 		return preferences, strictDecodeErr
@@ -111,8 +112,16 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 	return nil, nil
 }
 
+// asAllowlistErr returns a `pluginAllowlistError` and `true` when `err` is at
+// least partially the result of a misconfiguration of the credential plugin
+// allowlist. In all other cases, the boolean return value is `false` and the
+// input `err` is returned unaltered, including when it is `nil`.
 func asAllowlistErr(err error) (error, bool) {
 	const credPluginAllowlistKey = "credPluginAllowlist"
+
+	if err == nil {
+		return err, false
+	}
 
 	decodingErr, ok := runtime.AsStrictDecodingError(err)
 	if !ok {
