@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/config"
 )
 
@@ -160,6 +161,7 @@ func isGreenlit(absBin string, alEntry *config.AllowlistItem) bool {
 	if n := alEntry.Name; len(n) > 0 {
 		alAbsBin, err := exec.LookPath(alEntry.Name)
 		if err != nil {
+			klog.V(5).Infof("error looking up path for %q: %s", alEntry.Name, err)
 			return false
 		}
 
