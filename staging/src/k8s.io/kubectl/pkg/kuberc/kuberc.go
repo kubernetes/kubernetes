@@ -158,6 +158,10 @@ func (p *Preferences) applyAllowlist(cfg clientcmd.ClientConfig, kuberc *config.
 // criteria specified in `alEntry`. All checks against nonempty criteria must
 // succeed for the binary to be greenlit.
 func isGreenlit(absBin string, alEntry *config.AllowlistItem) bool {
+	if entryIsEmpty(alEntry) {
+		return false
+	}
+
 	if n := alEntry.Name; len(n) > 0 {
 		alAbsBin, err := exec.LookPath(alEntry.Name)
 		if err != nil {
@@ -168,6 +172,24 @@ func isGreenlit(absBin string, alEntry *config.AllowlistItem) bool {
 		if absBin != alAbsBin {
 			return false
 		}
+	}
+
+	return true
+}
+
+// entryIsEmpty determines whether all fields in an allowlist entry are empty.
+// This function should return `false` if *any* of the fields of the allowlist
+// are nonempty. This is not strictly needed while the only field in the
+// allowlist entry is `name`, but when other fields are added the empty check
+// will be more involved.
+func entryIsEmpty(entry *config.AllowlistItem) bool {
+	// This should never happen
+	if entry == nil {
+		return true
+	}
+
+	if len(entry.Name) > 0 {
+		return false
 	}
 
 	return true
