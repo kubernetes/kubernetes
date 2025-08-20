@@ -67,7 +67,7 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 			// check whether the client-go credential plugin allowlist is
 			// causing the strict parsing failure
 			if pluginPathErr, ok := asAllowlistErr(strictDecodeErr); ok {
-				return nil, fmt.Errorf("%w: %w", pluginAllowlistError, pluginPathErr)
+				return nil, pluginPathErr
 			}
 
 			var lenientDecodeErr error
