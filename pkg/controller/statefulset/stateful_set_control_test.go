@@ -405,7 +405,7 @@ func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc)
 		if err != nil {
 			t.Fatalf("Error getting updated StatefulSet: %v", err)
 		}
-		if _, err = om.setPodReady(set, i); err != nil {
+		if _, err = om.setPodReady(set, i, true); err != nil {
 			t.Error(err)
 		}
 	}
@@ -1022,7 +1022,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		// if pod 4 ready, start to update pod 3, even though 5 is not ready
 		spc.setPodRunning(set, 4)
 		spc.setPodRunning(set, 5)
-		originalPods, _ := spc.setPodReady(set, 4)
+		originalPods, _ := spc.setPodReady(set, 4, true)
 		sort.Sort(ascendingOrdinal(originalPods))
 		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 			t.Fatal(err)
@@ -1064,7 +1064,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatalf("Expected create pods 5, got pods %v", len(pods))
 		}
 		spc.setPodRunning(set, 4)
-		pods, _ = spc.setPodReady(set, 4)
+		pods, _ = spc.setPodReady(set, 4, true)
 
 		// create new pods 4(only one pod gets created at a time due to OrderedReady)
 		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
@@ -1080,7 +1080,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		}
 		// if pod 4 ready, start to update pod 3
 		spc.setPodRunning(set, 5)
-		originalPods, _ := spc.setPodReady(set, 5)
+		originalPods, _ := spc.setPodReady(set, 5, true)
 		sort.Sort(ascendingOrdinal(originalPods))
 		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 			t.Fatal(err)
@@ -1193,8 +1193,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		// pods 3/4/5 ready, should not update other pods
 		spc.setPodRunning(set, 3)
 		spc.setPodRunning(set, 5)
-		spc.setPodReady(set, 5)
-		originalPods, _ = spc.setPodReady(set, 3)
+		spc.setPodReady(set, 5, true)
+		originalPods, _ = spc.setPodReady(set, 3, true)
 		sort.Sort(ascendingOrdinal(originalPods))
 		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 			t.Fatal(err)
@@ -2692,7 +2692,7 @@ func (om *fakeObjectManager) setPodRunning(set *apps.StatefulSet, ordinal int) (
 	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
-func (om *fakeObjectManager) setPodReady(set *apps.StatefulSet, ordinal int) ([]*v1.Pod, error) {
+func (om *fakeObjectManager) setPodReady(set *apps.StatefulSet, ordinal int, ready bool) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -2705,27 +2705,13 @@ func (om *fakeObjectManager) setPodReady(set *apps.StatefulSet, ordinal int) ([]
 	if pod == nil {
 		return nil, fmt.Errorf("setPodReady: pod ordinal %d not found", ordinal)
 	}
-	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-	podutil.UpdatePodCondition(&pod.Status, &condition)
-	fakeResourceVersion(pod)
-	om.podsIndexer.Update(pod)
-	return om.podsLister.Pods(set.Namespace).List(selector)
-}
+	var condition v1.PodCondition
+	if ready {
+		condition = v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
+	} else {
+		condition = v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionFalse}
+	}
 
-func (om *fakeObjectManager) setPodNotReady(set *apps.StatefulSet, ordinal int) ([]*v1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		return nil, err
-	}
-	pod := findPodByOrdinal(pods, ordinal)
-	if pod == nil {
-		return nil, fmt.Errorf("setPodNotReady: pod ordinal %d not found", ordinal)
-	}
-	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionFalse}
 	podutil.UpdatePodCondition(&pod.Status, &condition)
 	fakeResourceVersion(pod)
 	om.podsIndexer.Update(pod)
@@ -3243,7 +3229,7 @@ func scaleUpStatefulSetControl(set *apps.StatefulSet,
 					return err
 				}
 			case v1.PodRunning:
-				if pods, err = om.setPodReady(set, getOrdinal(pod)); err != nil {
+				if pods, err = om.setPodReady(set, getOrdinal(pod), true); err != nil {
 					return err
 				}
 			default:
@@ -3439,7 +3425,7 @@ func updateStatefulSetControl(set *apps.StatefulSet,
 					return err
 				}
 			case v1.PodRunning:
-				if pods, err = om.setPodReady(set, getOrdinal(pod)); err != nil {
+				if pods, err = om.setPodReady(set, getOrdinal(pod), true); err != nil {
 					return err
 				}
 			default:
@@ -3842,7 +3828,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		for i := 0; i < test.unavailablePodCount; i++ {
 			if test.podManagementPolicy == apps.OrderedReadyPodManagement {
 				spc.setPodRunning(set, i)
-				pods, _ = spc.setPodNotReady(set, i)
+				pods, _ = spc.setPodReady(set, i, false)
 			} else {
 				pods, _ = spc.addTerminatingPod(set, i)
 			}
@@ -3851,7 +3837,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		// Make remaining pods ready
 		for i := test.unavailablePodCount; i < int(test.totalPods); i++ {
 			spc.setPodRunning(set, i)
-			pods, _ = spc.setPodReady(set, i)
+			pods, _ = spc.setPodReady(set, i, true)
 		}
 		sort.Sort(ascendingOrdinal(pods))
 
@@ -3892,75 +3878,75 @@ func TestStatefulSetMetrics(t *testing.T) {
 
 	tests := []testcase{
 		{
-			name:       "ordered pods within limit",
-			totalPods:  5,
-			maxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
-			podManagementPolicy: apps.OrderedReadyPodManagement,
-			unavailablePodCount: 1,
-			expectedMaxUnavailableValue: 2,
+			name:                             "ordered pods within limit",
+			totalPods:                        5,
+			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+			podManagementPolicy:              apps.OrderedReadyPodManagement,
+			unavailablePodCount:              1,
+			expectedMaxUnavailableValue:      2,
 			expectedUnavailableReplicasValue: 1,
 		},
 		{
-			name:       "parallel pods exceeding limit",
-			totalPods:  10,
-			maxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "20%"},
-			podManagementPolicy: apps.ParallelPodManagement,
-			unavailablePodCount: 3, // (20% of 10), violation but gauge shows current values
-			expectedMaxUnavailableValue: 2,
+			name:                             "parallel pods exceeding limit",
+			totalPods:                        10,
+			maxUnavailable:                   &intstr.IntOrString{Type: intstr.String, StrVal: "20%"},
+			podManagementPolicy:              apps.ParallelPodManagement,
+			unavailablePodCount:              3, // (20% of 10), violation but gauge shows current values
+			expectedMaxUnavailableValue:      2,
 			expectedUnavailableReplicasValue: 3,
 		},
 		{
-			name:       "ordered pods exactly at limit",
-			totalPods:  6,
-			maxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
-			podManagementPolicy: apps.OrderedReadyPodManagement,
-			unavailablePodCount: 3, // exactly at limit
-			expectedMaxUnavailableValue: 3,
+			name:                             "ordered pods exactly at limit",
+			totalPods:                        6,
+			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
+			podManagementPolicy:              apps.OrderedReadyPodManagement,
+			unavailablePodCount:              3, // exactly at limit
+			expectedMaxUnavailableValue:      3,
 			expectedUnavailableReplicasValue: 3,
 		},
 		{
-			name:       "parallel pods all available",
-			totalPods:  4,
-			maxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
-			podManagementPolicy: apps.ParallelPodManagement,
-			unavailablePodCount: 0, // all pods available
-			expectedMaxUnavailableValue: 1,
+			name:                             "parallel pods all available",
+			totalPods:                        4,
+			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			podManagementPolicy:              apps.ParallelPodManagement,
+			unavailablePodCount:              0, // all pods available
+			expectedMaxUnavailableValue:      1,
 			expectedUnavailableReplicasValue: 0,
 		},
 		{
-			name:       "ordered pods with percentage maxUnavailable",
-			totalPods:  8,
-			maxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "25%"},
-			podManagementPolicy: apps.OrderedReadyPodManagement,
-			unavailablePodCount: 1, // (25% of 8), within limit
-			expectedMaxUnavailableValue: 2,
+			name:                             "ordered pods with percentage maxUnavailable",
+			totalPods:                        8,
+			maxUnavailable:                   &intstr.IntOrString{Type: intstr.String, StrVal: "25%"},
+			podManagementPolicy:              apps.OrderedReadyPodManagement,
+			unavailablePodCount:              1, // (25% of 8), within limit
+			expectedMaxUnavailableValue:      2,
 			expectedUnavailableReplicasValue: 1,
 		},
 		{
-			name:       "parallel pods with large percentage",
-			totalPods:  5,
-			maxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "80%"},
-			podManagementPolicy: apps.ParallelPodManagement,
-			unavailablePodCount: 4, // (80% of 5), exactly at limit
-			expectedMaxUnavailableValue: 4,
+			name:                             "parallel pods with large percentage",
+			totalPods:                        5,
+			maxUnavailable:                   &intstr.IntOrString{Type: intstr.String, StrVal: "80%"},
+			podManagementPolicy:              apps.ParallelPodManagement,
+			unavailablePodCount:              4, // (80% of 5), exactly at limit
+			expectedMaxUnavailableValue:      4,
 			expectedUnavailableReplicasValue: 4,
 		},
 		{
-			name:       "small statefulset with maxUnavailable 1",
-			totalPods:  2,
-			maxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
-			podManagementPolicy: apps.OrderedReadyPodManagement,
-			unavailablePodCount: 1, // exactly at limit
-			expectedMaxUnavailableValue: 1,
+			name:                             "small statefulset with maxUnavailable 1",
+			totalPods:                        2,
+			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			podManagementPolicy:              apps.OrderedReadyPodManagement,
+			unavailablePodCount:              1, // exactly at limit
+			expectedMaxUnavailableValue:      1,
 			expectedUnavailableReplicasValue: 1,
 		},
 		{
-			name:       "single pod statefulset",
-			totalPods:  1,
-			maxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
-			podManagementPolicy: apps.ParallelPodManagement,
-			unavailablePodCount: 1, // single pod unavailable
-			expectedMaxUnavailableValue: 1,
+			name:                             "single pod statefulset",
+			totalPods:                        1,
+			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			podManagementPolicy:              apps.ParallelPodManagement,
+			unavailablePodCount:              1, // single pod unavailable
+			expectedMaxUnavailableValue:      1,
 			expectedUnavailableReplicasValue: 1,
 		},
 	}
