@@ -551,6 +551,73 @@ func TestReattachMessage(t *testing.T) {
 			stdin:     true,
 			expected:  "Session ended, the ephemeral container will not be restarted",
 		},
+		{
+			name: "pod in default namespace - no namespace flag",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyAlways,
+					Containers:    []corev1.Container{{Name: "bar"}},
+				},
+				Status: corev1.PodStatus{Phase: corev1.PodRunning},
+			},
+			container: "bar",
+			rawTTY:    true,
+			stdin:     true,
+			expected:  "kubectl attach foo -c bar -i -t",
+		},
+		{
+			name: "pod in non-default namespace - includes namespace flag",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "custom-namespace"},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyAlways,
+					Containers:    []corev1.Container{{Name: "bar"}},
+				},
+				Status: corev1.PodStatus{Phase: corev1.PodRunning},
+			},
+			container: "bar",
+			rawTTY:    true,
+			stdin:     true,
+			expected:  "kubectl attach -n custom-namespace foo -c bar -i -t",
+		},
+		{
+			name: "ephemeral container in non-default namespace - includes namespace flag",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "custom-namespace"},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyAlways,
+					Containers:    []corev1.Container{{Name: "bar"}},
+					EphemeralContainers: []corev1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+								Name: "debugger",
+							},
+						},
+					},
+				},
+				Status: corev1.PodStatus{Phase: corev1.PodRunning},
+			},
+			container: "debugger",
+			rawTTY:    true,
+			stdin:     true,
+			expected:  "kubectl attach -n custom-namespace foo -c debugger -i -t",
+		},
+		{
+			name: "pod with empty namespace - no namespace flag",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ""},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyAlways,
+					Containers:    []corev1.Container{{Name: "bar"}},
+				},
+				Status: corev1.PodStatus{Phase: corev1.PodRunning},
+			},
+			container: "bar",
+			rawTTY:    true,
+			stdin:     true,
+			expected:  "kubectl attach foo -c bar -i -t",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -558,11 +625,14 @@ func TestReattachMessage(t *testing.T) {
 				StreamOptions: exec.StreamOptions{
 					Stdin: test.stdin,
 				},
-				Pod: test.pod,
+				Pod:         test.pod,
+				CommandName: "kubectl attach",
 			}
-			if msg := options.reattachMessage(test.container, test.rawTTY); test.expected == "" && msg != "" {
+			msg := options.reattachMessage(test.container, test.rawTTY)
+
+			if test.expected == "" && msg != "" {
 				t.Errorf("reattachMessage(%v, %v) = %q, want empty string", test.container, test.rawTTY, msg)
-			} else if !strings.Contains(msg, test.expected) {
+			} else if test.expected != "" && !strings.Contains(msg, test.expected) {
 				t.Errorf("reattachMessage(%v, %v) = %q, want string containing %q", test.container, test.rawTTY, msg, test.expected)
 			}
 		})
