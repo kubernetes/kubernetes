@@ -495,13 +495,14 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
 	if !cmdutil.KubeRC.IsDisabled() {
-
-		existingPreRunE := cmds.PersistentPreRunE
+		existingPreRunE := cmds.PersistentPostRunE
 		cmds.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-			klog.V(1).Info(fmt.Sprintf("kuberc command executed: kubectl %s", cmds.Annotations[kuberc.KubeRCTraceAnnotation]))
+			if originalCommandArgs, ok := cmd.Annotations[kuberc.KubeRCOriginalCommandAnnotation]; ok {
+				originalCommand := strings.TrimSpace(fmt.Sprintf("%s %s", cmd.Root().Name(), originalCommandArgs))
+				klog.V(1).Info(fmt.Sprintf("kuberc command executed: %q", originalCommand))
+			}
 			return existingPreRunE(cmd, args)
 		}
-
 		_, err := pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
 		if err != nil {
 			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)

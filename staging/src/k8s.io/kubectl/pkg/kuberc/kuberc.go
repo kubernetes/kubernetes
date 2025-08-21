@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	RecommendedKubeRCFileName = "kuberc"
-	KubeRCTraceAnnotation     = "KubercCommandTrace"
+	RecommendedKubeRCFileName       = "kuberc"
+	KubeRCOriginalCommandAnnotation = "kubectl.kubernetes.io/original-command"
 )
 
 var (
@@ -148,14 +148,13 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 				allShorthands[flag.Shorthand] = struct{}{}
 			}
 		})
-		overrideNameValueFlags := make([]string, 0, len(c.Options))
+		originalNameValueFlags := make([]string, 0, len(c.Options))
 
 		for _, fl := range c.Options {
 			existingFlag := cmd.Flag(fl.Name)
 			if existingFlag == nil {
 				return fmt.Errorf("invalid flag %s for command %s", fl.Name, c.Command)
 			}
-			overrideNameValueFlags = append(overrideNameValueFlags, fmt.Sprintf("--%s=%s", fl.Name, fl.Default))
 			if searchInArgs(existingFlag.Name, existingFlag.Shorthand, allShorthands, args) {
 				// Don't modify the value implicitly, if it is passed in args explicitly
 				continue
@@ -164,13 +163,14 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 			if err != nil {
 				return fmt.Errorf("could not apply override value %s to flag %s in command %s err: %w", fl.Default, fl.Name, c.Command, err)
 			}
+			originalNameValueFlags = append(originalNameValueFlags, fmt.Sprintf("--%s=%s", fl.Name, fl.Default))
 		}
 		// Add annotation to trace back command built with default values set within kuberc
-		if rootCmd.Annotations == nil {
-			rootCmd.Annotations = make(map[string]string, 1)
+		if cmd.Annotations == nil {
+			cmd.Annotations = make(map[string]string, 1)
 		}
-		rootCmd.Annotations[KubeRCTraceAnnotation] = strings.TrimSpace(
-			fmt.Sprintf("%s %s", strings.Join(args, " "), strings.Join(overrideNameValueFlags, " ")),
+		cmd.Annotations[KubeRCOriginalCommandAnnotation] = strings.TrimSpace(
+			fmt.Sprintf("%s %s", strings.Join(args, " "), strings.Join(originalNameValueFlags, " ")),
 		)
 	}
 
@@ -190,7 +190,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 	}
 
 	var aliasArgs *aliasing
-	var aliasCommandName string
+	var originalCommand string
 	var commandName string // first "non-flag" arguments
 	var commandIndex int
 	for index, arg := range args[1:] {
@@ -223,7 +223,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		newCmd.Use = alias.Name
 		newCmd.Aliases = []string{}
 		aliasCmd := &newCmd
-		aliasCommandName = alias.Command
+		originalCommand = alias.Command
 
 		aliasArgs = &aliasing{
 			prependArgs: alias.PrependArgs,
@@ -256,7 +256,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 			allShorthands[flag.Shorthand] = struct{}{}
 		}
 	})
-	aliasNameValueFlags := make([]string, 0, len(aliasArgs.flags))
+	originalNameValueFlags := make([]string, 0, len(aliasArgs.flags))
 	for _, fl := range aliasArgs.flags {
 		existingFlag := foundAliasCmd.Flag(fl.Name)
 		if existingFlag == nil {
@@ -270,7 +270,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		if err != nil {
 			return args, fmt.Errorf("could not apply value %s to flag %s in alias %s err: %w", fl.Default, fl.Name, args[0], err)
 		}
-		aliasNameValueFlags = append(aliasNameValueFlags, fmt.Sprintf("--%s=%s", fl.Name, fl.Default))
+		originalNameValueFlags = append(originalNameValueFlags, fmt.Sprintf("--%s=%s", fl.Name, fl.Default))
 	}
 
 	if len(aliasArgs.prependArgs) > 0 {
@@ -291,12 +291,10 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 	// expect that it will be passed along to the actual command.
 	rootCmd.SetArgs(args[1:])
 	// Add annotation to trace back command built without aliases applied
-	if rootCmd.Annotations == nil {
-		rootCmd.Annotations = make(map[string]string, 1)
+	if aliasArgs.command.Annotations == nil {
+		aliasArgs.command.Annotations = make(map[string]string, 1)
 	}
-	rootCmd.Annotations[KubeRCTraceAnnotation] = strings.TrimSpace(
-		fmt.Sprintf("%s %s %s %s", aliasCommandName, strings.Join(aliasArgs.prependArgs, " "), strings.Join(aliasNameValueFlags, " "), strings.Join(aliasArgs.appendArgs, " ")),
-	)
+	aliasArgs.command.Annotations[KubeRCOriginalCommandAnnotation] = fmt.Sprintf("%s %s %s %s", originalCommand, strings.Join(aliasArgs.prependArgs, " "), strings.Join(originalNameValueFlags, " "), strings.Join(aliasArgs.appendArgs, " "))
 	return args, nil
 }
 
