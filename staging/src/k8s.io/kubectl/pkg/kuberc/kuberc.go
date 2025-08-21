@@ -126,7 +126,9 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, cfg clientcmd.ClientConfig, 
 
 // applyAllowlist compares the configured credential plugin against all
 // criteria for each entry in the allowlist
-func (p *Preferences) applyAllowlist(cfg clientcmd.ClientConfig, kuberc *config.Preference) error {
+func (p *Preferences) applyAllowlist(pluginName string, kuberc *config.Preference) error {
+	// no allowlist provided. for backward compatibility, this must allow all
+	// plugins.
 	if kuberc.CredPluginAllowlist == nil {
 		return nil
 	}
@@ -156,12 +158,12 @@ func (p *Preferences) applyAllowlist(cfg clientcmd.ClientConfig, kuberc *config.
 	return fmt.Errorf("%q is not permitted by the credential plugin allowlist", pluginAbsPath)
 }
 
-// isGreenlit looks up the binary found at `absBin` and compares it against the
+// isGreenlit looks up the binary found at `pluginAbsPath` and compares it against the
 // criteria specified in `alEntry`. All checks against nonempty criteria must
 // succeed for the binary to be greenlit.
 func isGreenlit(pluginAbsPath string, alEntry config.AllowlistItem) bool {
-	// if no fields are specified, this is a user error, and the entry must not
-	// allow anything
+	// if no fields are specified, this is a user error. To avoid fail-open
+	// behavior, an empty entry must not allow anything.
 	if alEntry == emptyAllowlistItem {
 		return false
 	}
