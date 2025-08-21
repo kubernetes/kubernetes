@@ -26,6 +26,8 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	corev1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -498,6 +500,49 @@ func (o *ApplyOptions) SetObjects(infos []*resource.Info) {
 	o.objectsCached = true
 }
 
+// Deduplicates environment variables in the container.
+func deduplicateEnvVars(container *corev1.Container) {
+	seen := make(map[string]bool)
+	deduped := []corev1.EnvVar{}
+
+	for _, env := range container.Env {
+		if !seen[env.Name] {
+			seen[env.Name] = true
+			deduped = append(deduped, env)
+		} else {
+			fmt.Printf("Duplicate env var '%s' removed from container '%s'\n", env.Name, container.Name)
+		}
+	}
+
+	container.Env = deduped
+}
+
+// helper function to sanitize pod specs by removing duplicate environment variables
+func sanitizePodSpec(podSpec *corev1.PodSpec) {
+	for i := range podSpec.Containers {
+		deduplicateEnvVars(&podSpec.Containers[i])
+	}
+	for i := range podSpec.InitContainers {
+		deduplicateEnvVars(&podSpec.InitContainers[i])
+	}
+}
+
+// helper function to extract the PodSpec from a runtime.Object
+func extractPodSpec(obj runtime.Object) (*corev1.PodSpec, error) {
+	switch t := obj.(type) {
+	case *corev1.Pod:
+		return &t.Spec, nil
+	case *appsv1.Deployment:
+		return &t.Spec.Template.Spec, nil
+	case *batchv1.Job:
+		return &t.Spec.Template.Spec, nil
+	case *appsv1.StatefulSet:
+		return &t.Spec.Template.Spec, nil
+	default:
+		return nil, fmt.Errorf("unsupported type")
+	}
+}
+
 // Run executes the `apply` command.
 func (o *ApplyOptions) Run() error {
 	if o.PreProcessorFn != nil {
@@ -527,6 +572,16 @@ func (o *ApplyOptions) Run() error {
 		if err := o.ApplySet.BeforeApply(infos, o.DryRunStrategy, o.ValidationDirective); err != nil {
 			return err
 		}
+	}
+
+	for _, info := range infos {
+		obj := info.Object
+		podSpec, err := extractPodSpec(obj)
+		if err != nil {
+			fmt.Println(err.Error())
+			continue
+		}
+		sanitizePodSpec(podSpec)
 	}
 
 	// Iterate through all objects, applying each one.
