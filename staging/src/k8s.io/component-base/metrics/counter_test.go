@@ -19,6 +19,7 @@ package metrics
 import (
 	"bytes"
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/blang/semver/v4"
@@ -27,6 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/trace"
+	tracenoop "go.opentelemetry.io/otel/trace/noop"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
@@ -314,7 +316,6 @@ func TestCounterWithExemplar(t *testing.T) {
 		Name: "metric_exemplar_test",
 		Help: "helpless",
 	})
-	_ = counter.WithContext(ctxForSpanCtx)
 
 	// Register counter.
 	registry := newKubeRegistry(apimachineryversion.Info{
@@ -325,9 +326,9 @@ func TestCounterWithExemplar(t *testing.T) {
 	registry.MustRegister(counter)
 
 	// Call underlying exemplar methods.
-	counter.Add(toAdd)
-	counter.Inc()
-	counter.Inc()
+	counter.WithContext(ctxForSpanCtx).Add(toAdd)
+	counter.WithContext(ctxForSpanCtx).Inc()
+	counter.WithContext(ctxForSpanCtx).Inc()
 
 	// Gather.
 	mfs, err := registry.Gather()
@@ -381,4 +382,119 @@ func TestCounterWithExemplar(t *testing.T) {
 			t.Fatalf("Got unexpected label %s", *l.Name)
 		}
 	}
+}
+
+// TestCounterConcurrentWithContextRace reproduces the race condition in Counter.WithContext
+// where c.ctx is written concurrently with reads in withExemplar method.
+// This test simulates the real authentication flow that triggers the race:
+// x509.AuthenticateRequest -> union.AuthenticateRequest -> group.AuthenticateRequest
+func TestCounterConcurrentWithContextRace(t *testing.T) {
+	opts := &CounterOpts{
+		Namespace: "apiserver",
+		Subsystem: "authentication",
+		Name:      "requests_total",
+		Help:      "Authentication requests counter for race condition testing",
+	}
+
+	c := NewCounter(opts)
+
+	// Force initialization by calling initializeMetric directly
+	c.initializeMetric()
+
+	// Create contexts with trace spans to trigger exemplar code path
+	ctx1, span1 := createContextWithSpanCounter("x509-auth", "authenticate-request")
+	defer span1.End()
+	ctx2, span2 := createContextWithSpanCounter("union-auth", "union-authenticate")
+	defer span2.End()
+
+	var wg sync.WaitGroup
+	iterations := 10000 // Increase iterations to make race more likely
+
+	// Goroutine 1: Simulate x509 Authenticator calling WithContext
+	// This matches: x509.(*Authenticator).AuthenticateRequest() calling WithContext
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			// Simulate authentication request processing
+			simulateX509AuthenticateRequestCounter(c, ctx1, i)
+		}
+	}()
+
+	// Goroutine 2: Simulate concurrent Add/Inc calls (metrics collection)
+	// This matches the withExemplar/Add path that reads c.ctx
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			c.Add(float64(i % 10))
+			if i%2 == 0 {
+				c.Inc()
+			}
+		}
+	}()
+
+	// Goroutine 3: Simulate union AuthenticateRequest calling WithContext
+	// This matches: union.(*unionAuthRequestHandler).AuthenticateRequest()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			// Simulate union authentication processing
+			simulateUnionAuthenticateRequestCounter(c, ctx2, i)
+		}
+	}()
+
+	// Goroutine 4: Simulate group AuthenticateRequest calling WithContext
+	// This matches: group.(*AuthenticatedGroupAdder).AuthenticateRequest()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			// Simulate group authentication processing
+			simulateGroupAuthenticateRequestCounter(c, ctx1, ctx2, i)
+		}
+	}()
+
+	wg.Wait()
+}
+
+// simulateX509AuthenticateRequestCounter simulates the call path from x509 authenticator
+func simulateX509AuthenticateRequestCounter(c CounterMetric, ctx context.Context, iteration int) {
+	// Simulate the authentication request processing that calls WithContext
+	if cWithCtx, ok := c.(*Counter); ok {
+		cWithCtx.WithContext(ctx)
+	}
+}
+
+// simulateUnionAuthenticateRequestCounter simulates the call path from union authenticator
+func simulateUnionAuthenticateRequestCounter(c CounterMetric, ctx context.Context, iteration int) {
+	// Simulate union authentication processing
+	if cWithCtx, ok := c.(*Counter); ok {
+		cWithCtx.WithContext(ctx)
+	}
+}
+
+// simulateGroupAuthenticateRequestCounter simulates the call path from group authenticator
+func simulateGroupAuthenticateRequestCounter(c CounterMetric, ctx1, ctx2 context.Context, iteration int) {
+	// Alternate between contexts to simulate different authentication scenarios
+	ctx := ctx1
+	if iteration%3 == 0 {
+		ctx = ctx2
+	}
+
+	if cWithCtx, ok := c.(*Counter); ok {
+		cWithCtx.WithContext(ctx)
+	}
+}
+
+// Helper function to create a context with a valid trace span
+func createContextWithSpanCounter(traceID, spanID string) (context.Context, trace.Span) {
+	ctx := context.Background()
+
+	// Create a noop tracer and span for testing
+	tracer := tracenoop.NewTracerProvider().Tracer("test")
+	ctx, span := tracer.Start(ctx, "test-span")
+
+	return ctx, span
 }
