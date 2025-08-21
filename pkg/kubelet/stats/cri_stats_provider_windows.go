@@ -20,6 +20,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -84,7 +85,7 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 	return networkStats, nil
 }
 
-func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.PodSandboxStats,
+func (p *criStatsProvider) addCRIPodContainerStats(ctx context.Context, criSandboxStat *runtimeapi.PodSandboxStats,
 	ps *statsapi.PodStats, fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
 	containerMap map[string]*runtimeapi.Container,
 	podSandbox *runtimeapi.PodSandbox,
