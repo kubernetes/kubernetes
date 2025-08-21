@@ -386,6 +386,16 @@ func UpdatePodCondition(status *v1.PodStatus, condition *v1.PodCondition) bool {
 	return !isEqual
 }
 
+// IsInitContainer returns true if the container is an InitContainer.
+func IsInitContainer(spec *v1.PodSpec, container *v1.Container) bool {
+    for _, initContainer := range spec.InitContainers {
+        if container.Name == initContainer.Name {
+            return true
+        }
+    }
+    return false
+}
+
 // IsRestartableInitContainer returns true if the container has ContainerRestartPolicyAlways.
 // This function is not checking if the container passed to it is indeed an init container.
 // It is just checking if the container restart policy has been set to always.

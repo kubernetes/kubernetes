@@ -2713,6 +2713,26 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	}
 }
 
+func (kl *Kubelet) UpdatePodAllocation(pod *v1.Pod) *v1.Pod{
+	if pod == nil {
+		return pod
+	}
+
+	for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...)  {
+		if cAlloc, ok := kl.allocationManager.GetAllocatedResources(pod.UID, c.Name); ok {
+			// add feature exclusive
+			allocateCpus := kl.containerManager.GetCPUs(string(pod.UID), c.Name)
+			cpuRequests := cAlloc.Requests[v1.ResourceCPU]
+			klog.V(4).InfoS("UpdatePodAllocation", "c.Name", c.Name, "allocateCpus", allocateCpus, "len(allocateCpus)", len(allocateCpus), "int(cpuRequests.Value())", int(cpuRequests.Value()))
+			if len(allocateCpus) != int(cpuRequests.Value()) {
+				// Allocation differs from pod spec, update
+				kl.allocationManager.SetAllocatedResourcesFromAllocateCpus(pod.UID, c.Name, int64(len(allocateCpus)))
+			}
+		}
+	}
+	return pod
+}
+
 // HandlePodUpdates is the callback in the SyncHandler interface for pods
 // being updated from a config source.
 func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
@@ -2731,6 +2751,12 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			if recordContainerResizeOperations(oldPod, pod) {
+				/* // Option1, before resize, update m.allocated if InitContainer release exclusive CPUs. 
+				if podstatus, ok := kl.statusManager.GetPodStatus(pod.UID); ok{
+					if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) && podstatus.QOSClass == v1.PodQOSGuaranteed{
+						kl.UpdatePodAllocation(pod)
+					}
+				}*/
 				_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 				if updatedFromAllocation {
 					kl.allocationManager.PushPendingResize(pod.UID)
@@ -2933,6 +2959,14 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 	}
 }
 
+func (kl *Kubelet) IsRestartInitContainer(pod *v1.Pod) bool {
+	status, err := kl.podWorkers.GetNewStatus(pod.UID)
+	if err != nil  {
+		return false
+	}
+	return kl.containerRuntime.IsInitContainerRestart(pod, status)
+}
+
 // HandlePodSyncs is the callback in the syncHandler interface for pods
 // that should be dispatched to pod workers for sync.
 func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
@@ -2950,6 +2984,25 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 			klog.V(3).InfoS("Programmer error, HandlePodSyncs does not expect to receive mirror pods", "podUID", pod.UID, "mirrorPodUID", mirrorPod.UID)
 			continue
 		}
+
+		// Option 2, Add resource reallocate process if InitContianer should be restart
+		if podstatus, ok := kl.statusManager.GetPodStatus(pod.UID); ok{
+			if kl.IsRestartInitContainer(pod) && podstatus.QOSClass == v1.PodQOSGuaranteed{
+				kl.UpdatePodAllocation(pod)
+				_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+				if updatedFromAllocation {
+					kl.allocationManager.PushPendingResize(pod.UID)
+					// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
+					// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
+					kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonPodUpdated)
+				} else {
+					// We can hit this case if a pending resize has been reverted,
+					// so we need to clear the pending resize condition.
+					kl.statusManager.ClearPodResizePendingCondition(pod.UID)
+				}
+			}
+		}
+
 		kl.podWorkers.UpdatePod(UpdatePodOptions{
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
