@@ -38,6 +38,9 @@ graph TD
         `/apis/mycompany.com/v1/myresources`), it checks if an `APIService` has "claimed"
         that path. If so, it uses a `ServiceResolver` to find the IP of the backing
         `Service` and proxies the request.
+    *   **Use Case:** This pattern is for programmatic, high-control extensions that require
+        custom business logic (e.g., non-CRUD subresources like `/logs`) or alternative
+        storage backends.
     *   **Delegation:** If no `APIService` matches, it delegates the request to the next
         server in the chain.
 
@@ -50,11 +53,14 @@ graph TD
 
 3.  **API Extensions Server (`apiextensions-apiserver`):**
     *   **Purpose:** Handles the `apiextensions.k8s.io` API, which manages
-        `CustomResourceDefinition` objects. The evolution of CRDs from a simple extension
+        `CustomResourceDefinition` objects (CRDs). The evolution of CRDs from a simple extension
         mechanism to a feature-rich system with validation, versioning, and defaulting is
         documented in a series of KEPs, starting with the graduation to GA in Kubernetes v1.16.
     *   **Mechanism:** When a CRD is created, this server dynamically creates and installs a
         new REST storage handler for the new resource, making it immediately available.
+    *   **Use Case:** CRDs are the most common extension pattern, offering a declarative,
+        schema-based way to define new resource types that are stored in etcd and require no
+        custom API server code.
     *   **Delegation:** It is the end of the chain. If it cannot handle a request, a `404 Not
         Found` is returned.
 
@@ -213,11 +219,13 @@ apiserver uses a **watch cache**. The implementation can be found in
 
 *   **Optimistic Concurrency via `resourceVersion`:** Clients are expected to perform updates using a
     read-modify-write workflow. The apiserver uses the `resourceVersion` field of every
-    object to enforce optimistic concurrency. When a client submits an update (`PUT` or `PATCH`),
-    it must provide the `resourceVersion` of the object it based its modifications on. If the
-    `resourceVersion` on the server does not match, the server rejects the request with a
-    `409 Conflict` error. This forces the client to re-read the object, resolve the conflict,
-    and resubmit with the new `resourceVersion`.
+    object to enforce optimistic concurrency. This `resourceVersion` is not an arbitrary number;
+    it maps directly to etcd's globally consistent `mod_revision`. When a client submits an
+    update (`PUT` or `PATCH`), it must provide the `resourceVersion` of the object it based its
+    modifications on. If the `resourceVersion` on the server does not match the current
+    `mod_revision` in etcd, the server rejects the request with a `409 Conflict` error. This
+    forces the client to re-read the object, resolve the conflict, and resubmit with the new
+    `resourceVersion`.
 *   **Server-Side Apply:** A declarative, "intent-based" patch. The server maintains a
     `managedFields` section in the object's metadata to track which "manager" (e.g., a
     controller) owns each field. This allows multiple actors to manage different parts of the
