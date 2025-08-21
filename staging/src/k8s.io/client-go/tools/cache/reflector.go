@@ -49,11 +49,9 @@ import (
 
 const defaultExpectedTypeName = "<unspecified>"
 
-var (
-	// We try to spread the load on apiserver by setting timeouts for
-	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
-	defaultMinWatchTimeout = 5 * time.Minute
-)
+// We try to spread the load on apiserver by setting timeouts for
+// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
+var defaultMinWatchTimeout = 5 * time.Minute
 
 // ReflectorStore is the subset of cache.Store that the reflector uses
 type ReflectorStore interface {
@@ -365,9 +363,6 @@ func (r *Reflector) RunWithContext(ctx context.Context) {
 }
 
 var (
-	// nothing will ever be sent down this channel
-	neverExitWatch <-chan time.Time = make(chan time.Time)
-
 	// Used to indicate that watching stopped because of a signal from the stop
 	// channel passed in from a client of the reflector.
 	errorStopRequested = errors.New("stop requested")
@@ -377,7 +372,8 @@ var (
 // required, and a cleanup function.
 func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 	if r.resyncPeriod == 0 {
-		return neverExitWatch, func() bool { return false }
+		// nothing will ever be sent down this channel
+		return nil, func() bool { return false }
 	}
 	// The cleanup function is required: imagine the scenario where watches
 	// always fail so we end up listing frequently. Then, if we don't
