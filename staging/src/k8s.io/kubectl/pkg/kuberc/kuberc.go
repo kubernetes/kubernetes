@@ -52,7 +52,7 @@ var (
 // arguments based on user's kuberc configuration.
 type PreferencesHandler interface {
 	AddFlags(flags *pflag.FlagSet)
-	Apply(rootCmd *cobra.Command, cfg clientcmd.ClientConfig, args []string, errOut io.Writer) ([]string, error)
+	Apply(rootCmd *cobra.Command, args []string, pluginName *string, errOut io.Writer) ([]string, error)
 }
 
 // Preferences stores the kuberc file coming either from environment variable
@@ -85,7 +85,7 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 
 // Apply applies the aliases in the preferences file, overrides the default
 // values of flags, and checks configured credential plugins against the allowlist
-func (p *Preferences) Apply(rootCmd *cobra.Command, cfg clientcmd.ClientConfig, args []string, errOut io.Writer) ([]string, error) {
+func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, pluginName *string, errOut io.Writer) ([]string, error) {
 	if len(args) <= 1 {
 		return args, nil
 	}
@@ -116,9 +116,12 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, cfg clientcmd.ClientConfig, 
 	if err != nil {
 		return args, err
 	}
-	err = p.applyAllowlist(cfg, kuberc)
-	if err != nil {
-		return args, err
+
+	if pluginName != nil {
+		err = p.applyAllowlist(*pluginName, kuberc)
+		if err != nil {
+			return args, err
+		}
 	}
 
 	return args, nil
@@ -135,16 +138,7 @@ func (p *Preferences) applyAllowlist(pluginName string, kuberc *config.Preferenc
 
 	allowlist := *kuberc.CredPluginAllowlist
 
-	rcfg, err := cfg.ClientConfig()
-	if err != nil {
-		return err
-	}
-
-	if rcfg.ExecProvider == nil || len(rcfg.ExecProvider.Command) == 0 {
-		return nil
-	}
-
-	pluginAbsPath, err := exec.LookPath(rcfg.ExecProvider.Command)
+	pluginAbsPath, err := exec.LookPath(pluginName)
 	if err != nil {
 		return err
 	}
