@@ -592,13 +592,15 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
 	csiDriverLister := informerFactory.Storage().V1().CSIDrivers().Lister()
 	vaindexer := informerFactory.Storage().V1().VolumeAttachments().Informer().GetIndexer()
-	informerFactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{"nodename": func(obj interface{}) ([]string, error) {
+	if err := informerFactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{"nodename": func(obj interface{}) ([]string, error) {
 		va, ok := obj.(*storagev1.VolumeAttachment)
 		if !ok {
 			return []string{}, nil
 		}
 		return []string{va.Spec.NodeName}, nil
-	}})
+	}}); err != nil {
+		return nil, fmt.Errorf("failed to add index to VA informer: %w", err)
+	}
 	csiTranslator := csitrans.New()
 
 	return &CSILimits{
