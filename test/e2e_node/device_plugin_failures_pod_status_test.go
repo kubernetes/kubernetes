@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -40,7 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/testdeviceplugin"
 )
 
-var _ = SIGDescribe("Device Plugin Failures Pod Status", feature.ResourceHealthStatus, func() {
+var _ = SIGDescribe("Device Plugin Failures Pod Status", framework.WithFeatureGate(features.ResourceHealthStatus), func() {
 	f := framework.NewDefaultFramework("device-plugin-failures")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
