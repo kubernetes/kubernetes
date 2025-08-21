@@ -38,7 +38,6 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 
 	v1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -64,7 +63,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo/v2"
@@ -166,12 +164,6 @@ func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResour
 	return resp, nil
 }
 
-// Returns the current KubeletConfiguration
-func getCurrentKubeletConfig(ctx context.Context) (*kubeletconfig.KubeletConfiguration, error) {
-	// namespace only relevant if useProxy==true, so we don't bother
-	return e2enodekubelet.GetCurrentKubeletConfig(ctx, framework.TestContext.NodeName, "", false, framework.TestContext.StandaloneMode)
-}
-
 func addAfterEachForCleaningUpPods(f *framework.Framework) {
 	ginkgo.AfterEach(func(ctx context.Context) {
 		ginkgo.By("Deleting any Pods created by the test in namespace: " + f.Namespace.Name)
@@ -185,50 +177,6 @@ func addAfterEachForCleaningUpPods(f *framework.Framework) {
 			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		}
 	})
-}
-
-// Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
-// The change is reverted in the AfterEach of the context.
-func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration)) {
-	var oldCfg *kubeletconfig.KubeletConfiguration
-
-	ginkgo.BeforeEach(func(ctx context.Context) {
-		var err error
-		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
-
-		newCfg := oldCfg.DeepCopy()
-		updateFunction(ctx, newCfg)
-		if apiequality.Semantic.DeepEqual(*newCfg, *oldCfg) {
-			return
-		}
-
-		updateKubeletConfig(ctx, f, newCfg, true)
-	})
-
-	ginkgo.AfterEach(func(ctx context.Context) {
-		if oldCfg != nil {
-			// Update the Kubelet configuration.
-			updateKubeletConfig(ctx, f, oldCfg, true)
-		}
-	})
-}
-
-func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {
-	// Update the Kubelet configuration.
-	ginkgo.By("Stopping the kubelet")
-	restartKubelet := mustStopKubelet(ctx, f)
-
-	// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
-	if deleteStateFiles {
-		deleteStateFile(cpuManagerStateFile)
-		deleteStateFile(memoryManagerStateFile)
-	}
-
-	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
-
-	ginkgo.By("Restarting the kubelet")
-	restartKubelet(ctx)
 }
 
 func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
@@ -297,6 +245,20 @@ func getLocalTestNode(ctx context.Context, f *framework.Framework) (*v1.Node, bo
 	schedulable := e2enode.IsNodeSchedulable(node)
 	framework.Logf("node %q ready=%v schedulable=%v", node.Name, ready, schedulable)
 	return node, ready && schedulable
+}
+
+func getLocalNodeCPUDetails(ctx context.Context, f *framework.Framework) (cpuCapVal int64, cpuAllocVal int64, cpuResVal int64) {
+	localNodeCap := getLocalNode(ctx, f).Status.Capacity
+	cpuCap := localNodeCap[v1.ResourceCPU]
+	localNodeAlloc := getLocalNode(ctx, f).Status.Allocatable
+	cpuAlloc := localNodeAlloc[v1.ResourceCPU]
+	cpuRes := cpuCap.DeepCopy()
+	cpuRes.Sub(cpuAlloc)
+
+	// RoundUp reserved CPUs to get only integer cores.
+	cpuRes.RoundUp(0)
+
+	return cpuCap.Value(), cpuCap.Value() - cpuRes.Value(), cpuRes.Value()
 }
 
 // logKubeletLatencyMetrics logs KubeletLatencyMetrics computed from the Prometheus
@@ -630,4 +592,36 @@ func WaitForPodInitContainerToFail(ctx context.Context, c clientset.Interface, n
 
 func nodeNameOrIP() string {
 	return "localhost"
+}
+
+func deletePodSyncByName(ctx context.Context, f *framework.Framework, podName string) {
+	gp := int64(0)
+	delOpts := metav1.DeleteOptions{
+		GracePeriodSeconds: &gp,
+	}
+	e2epod.NewPodClient(f).DeleteSync(ctx, podName, delOpts, f.Timeouts.PodDelete)
+}
+
+func deletePods(ctx context.Context, f *framework.Framework, podNames []string) {
+	for _, podName := range podNames {
+		deletePodSyncByName(ctx, f, podName)
+	}
+}
+
+func waitForContainerRemoval(ctx context.Context, containerName, podName, podNS string) {
+	rs, _, err := getCRIClient()
+	framework.ExpectNoError(err)
+	gomega.Eventually(ctx, func(ctx context.Context) bool {
+		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{
+			LabelSelector: map[string]string{
+				types.KubernetesPodNameLabel:       podName,
+				types.KubernetesPodNamespaceLabel:  podNS,
+				types.KubernetesContainerNameLabel: containerName,
+			},
+		})
+		if err != nil {
+			return false
+		}
+		return len(containers) == 0
+	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrueBecause("Containers were expected to be removed"))
 }
