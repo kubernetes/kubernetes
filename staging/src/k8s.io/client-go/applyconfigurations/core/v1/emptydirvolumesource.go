@@ -28,6 +28,7 @@ import (
 type EmptyDirVolumeSourceApplyConfiguration struct {
 	Medium    *corev1.StorageMedium `json:"medium,omitempty"`
 	SizeLimit *resource.Quantity    `json:"sizeLimit,omitempty"`
+	StickyBit *bool                 `json:"stickyBit,omitempty"`
 }
 
 // EmptyDirVolumeSourceApplyConfiguration constructs a declarative configuration of the EmptyDirVolumeSource type for use with
@@ -49,5 +50,13 @@ func (b *EmptyDirVolumeSourceApplyConfiguration) WithMedium(value corev1.Storage
 // If called multiple times, the SizeLimit field is set to the value of the last call.
 func (b *EmptyDirVolumeSourceApplyConfiguration) WithSizeLimit(value resource.Quantity) *EmptyDirVolumeSourceApplyConfiguration {
 	b.SizeLimit = &value
+	return b
+}
+
+// WithStickyBit sets the StickyBit field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the StickyBit field is set to the value of the last call.
+func (b *EmptyDirVolumeSourceApplyConfiguration) WithStickyBit(value bool) *EmptyDirVolumeSourceApplyConfiguration {
+	b.StickyBit = &value
 	return b
 }
