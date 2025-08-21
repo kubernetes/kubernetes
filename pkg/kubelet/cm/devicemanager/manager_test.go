@@ -1087,14 +1087,22 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 	as.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
+	containerMap := containermap.NewContainerMap()
+	containerMap.Add("pod4", "con4", "con4")
+	containerMap.Add("pod4", "con4", "con5")
+	runningSet := sets.New[string]()
+	runningSet.Insert("con5")
+
 	testManager := &ManagerImpl{
-		endpoints:        make(map[string]endpointInfo),
-		healthyDevices:   make(map[string]sets.Set[string]),
-		unhealthyDevices: make(map[string]sets.Set[string]),
-		allocatedDevices: make(map[string]sets.Set[string]),
-		podDevices:       newPodDevices(),
-		activePods:       func() []*v1.Pod { return []*v1.Pod{} },
-		sourcesReady:     &sourcesReadyStub{},
+		endpoints:           make(map[string]endpointInfo),
+		healthyDevices:      make(map[string]sets.Set[string]),
+		unhealthyDevices:    make(map[string]sets.Set[string]),
+		allocatedDevices:    make(map[string]sets.Set[string]),
+		podDevices:          newPodDevices(),
+		activePods:          func() []*v1.Pod { return []*v1.Pod{} },
+		sourcesReady:        &sourcesReadyStub{},
+		containerMap:        containerMap,
+		containerRunningSet: runningSet,
 	}
 
 	testManager.podDevices.insert("pod1", "con1", resourceName1,
@@ -1168,6 +1176,16 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 			reusableDevices:          sets.New[string](),
 			expectedAllocatedDevices: nil,
 			expErr:                   fmt.Errorf("previously allocated devices are no longer healthy; cannot allocate unhealthy devices %s", resourceName3),
+		},
+		{
+			description:              "Admission allow in case previously allocated",
+			podUID:                   "pod4",
+			contName:                 "con4",
+			resource:                 resourceName2,
+			required:                 1,
+			reusableDevices:          sets.New[string](),
+			expectedAllocatedDevices: nil,
+			expErr:                   nil,
 		},
 	}
 
