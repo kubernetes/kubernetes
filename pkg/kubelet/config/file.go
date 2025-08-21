@@ -60,13 +60,13 @@ type sourceFile struct {
 }
 
 // NewSourceFile watches a config file for changes.
-func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
+func NewSourceFile(logger klog.Logger, path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	// "github.com/sigma/go-inotify" requires a path without trailing "/"
 	path = strings.TrimRight(path, string(os.PathSeparator))
 
 	config := newSourceFile(path, nodeName, period, updates)
-	klog.V(1).InfoS("Watching path", "path", path)
-	config.run()
+	logger.V(1).Info("Watching path", "path", path)
+	config.run(logger)
 }
 
 func newSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) *sourceFile {
@@ -89,36 +89,36 @@ func newSourceFile(path string, nodeName types.NodeName, period time.Duration, u
 	}
 }
 
-func (s *sourceFile) run() {
+func (s *sourceFile) run(logger klog.Logger) {
 	listTicker := time.NewTicker(s.period)
 
 	go func() {
 		// Read path immediately to speed up startup.
-		if err := s.listConfig(); err != nil {
-			klog.ErrorS(err, "Unable to read config path", "path", s.path)
+		if err := s.listConfig(logger); err != nil {
+			logger.Error(err, "Unable to read config path", "path", s.path)
 		}
 		for {
 			select {
 			case <-listTicker.C:
-				if err := s.listConfig(); err != nil {
-					klog.ErrorS(err, "Unable to read config path", "path", s.path)
+				if err := s.listConfig(logger); err != nil {
+					logger.Error(err, "Unable to read config path", "path", s.path)
 				}
 			case e := <-s.watchEvents:
-				if err := s.consumeWatchEvent(e); err != nil {
-					klog.ErrorS(err, "Unable to process watch event")
+				if err := s.consumeWatchEvent(logger, e); err != nil {
+					logger.Error(err, "Unable to process watch event")
 				}
 			}
 		}
 	}()
 
-	s.startWatch()
+	s.startWatch(logger)
 }
 
-func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
-	return applyDefaults(pod, source, true, s.nodeName)
+func (s *sourceFile) applyDefaults(logger klog.Logger, pod *api.Pod, source string) error {
+	return applyDefaults(logger, pod, source, true, s.nodeName)
 }
 
-func (s *sourceFile) listConfig() error {
+func (s *sourceFile) listConfig(logger klog.Logger) error {
 	path := s.path
 	statInfo, err := os.Stat(path)
 	if err != nil {
@@ -132,7 +132,7 @@ func (s *sourceFile) listConfig() error {
 
 	switch {
 	case statInfo.Mode().IsDir():
-		pods, err := s.extractFromDir(path)
+		pods, err := s.extractFromDir(logger, path)
 		if err != nil {
 			return err
 		}
@@ -144,7 +144,7 @@ func (s *sourceFile) listConfig() error {
 		return s.replaceStore(pods...)
 
 	case statInfo.Mode().IsRegular():
-		pod, err := s.extractFromFile(path)
+		pod, err := s.extractFromFile(logger, path)
 		if err != nil {
 			return err
 		}
@@ -158,7 +158,7 @@ func (s *sourceFile) listConfig() error {
 // Get as many pod manifests as we can from a directory. Return an error if and only if something
 // prevented us from reading anything at all. Do not return an error if only some files
 // were problematic.
-func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
+func (s *sourceFile) extractFromDir(logger klog.Logger, name string) ([]*v1.Pod, error) {
 	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
 		return nil, fmt.Errorf("glob failed: %v", err)
@@ -173,32 +173,32 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 	for _, path := range dirents {
 		statInfo, err := os.Stat(path)
 		if err != nil {
-			klog.ErrorS(err, "Could not get metadata", "path", path)
+			logger.Error(err, "Could not get metadata", "path", path)
 			continue
 		}
 
 		switch {
 		case statInfo.Mode().IsDir():
-			klog.ErrorS(nil, "Provided manifest path is a directory, not recursing into manifest path", "path", path)
+			logger.Error(nil, "Provided manifest path is a directory, not recursing into manifest path", "path", path)
 		case statInfo.Mode().IsRegular():
-			pod, err := s.extractFromFile(path)
+			pod, err := s.extractFromFile(logger, path)
 			if err != nil {
 				if !os.IsNotExist(err) {
-					klog.ErrorS(err, "Could not process manifest file", "path", path)
+					logger.Error(err, "Could not process manifest file", "path", path)
 				}
 			} else {
 				pods = append(pods, pod)
 			}
 		default:
-			klog.ErrorS(nil, "Manifest path is not a directory or file", "path", path, "mode", statInfo.Mode())
+			logger.Error(nil, "Manifest path is not a directory or file", "path", path, "mode", statInfo.Mode())
 		}
 	}
 	return pods, nil
 }
 
 // extractFromFile parses a file for Pod configuration information.
-func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
-	klog.V(3).InfoS("Reading config file", "path", filename)
+func (s *sourceFile) extractFromFile(logger klog.Logger, filename string) (pod *v1.Pod, err error) {
+	logger.V(3).Info("Reading config file", "path", filename)
 	defer func() {
 		if err == nil && pod != nil {
 			objKey, keyErr := cache.MetaNamespaceKeyFunc(pod)
@@ -221,11 +221,11 @@ func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 		return pod, err
 	}
 
-	defaultFn := func(pod *api.Pod) error {
-		return s.applyDefaults(pod, filename)
+	defaultFn := func(logger klog.Logger, pod *api.Pod) error {
+		return s.applyDefaults(logger, pod, filename)
 	}
 
-	parsed, pod, podErr := tryDecodeSinglePod(data, defaultFn)
+	parsed, pod, podErr := tryDecodeSinglePod(logger, data, defaultFn)
 	if parsed {
 		if podErr != nil {
 			return pod, podErr
