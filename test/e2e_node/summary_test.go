@@ -407,10 +407,11 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			podSpec := getStressTestPod(podName, "memory-stress", []string{})
 			podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
 			podSpec.Spec.Containers[0].Args = []string{
-				// This command runs an infinite loop that uses `dd` to write 50MB files,
-				// cycling through 5 files to target 250MB of reclaimable file cache usage.
-				// This exceeds the 200MB memory limit, forcing the kernel to reclaim memory and generate pressure stalls.
-				"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
+				// This command runs an infinite loop that uses five parallel `dd` processes to
+				// simultaneously write 50MB files, targeting 250MB of reclaimable file cache usage.
+				// This bursty, parallel workload is designed to exceed the 200MB memory limit
+				// aggressively, forcing the kernel to reclaim memory and reliably generate pressure stalls.
+				"while true; do for i in $(seq 0 4); do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null & done; wait; done",
 			}
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
