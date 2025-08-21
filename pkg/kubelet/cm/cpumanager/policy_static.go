@@ -474,21 +474,6 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 		return 0
 	}
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
-	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
-	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
-	// We should return this value because this is what kubelet agreed to allocate for the container
-	// and the value configured with runtime.
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		containerStatuses := pod.Status.ContainerStatuses
-		if podutil.IsRestartableInitContainer(container) {
-			if len(pod.Status.InitContainerStatuses) != 0 {
-				containerStatuses = append(containerStatuses, pod.Status.InitContainerStatuses...)
-			}
-		}
-		if cs, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
-			cpuQuantity = cs.AllocatedResources[v1.ResourceCPU]
-		}
-	}
 	cpuValue := cpuQuantity.Value()
 	if cpuValue*1000 != cpuQuantity.MilliValue() {
 		klog.V(5).InfoS("Exclusive CPU allocation skipped, pod requested non-integral CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "cpu", cpuValue)
