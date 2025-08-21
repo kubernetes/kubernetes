@@ -47,29 +47,15 @@ func PersistentVolumeClaim(name, namespace string) *PersistentVolumeClaimApplyCo
 	return b
 }
 
-// ExtractPersistentVolumeClaim extracts the applied configuration owned by fieldManager from
-// persistentVolumeClaim. If no managedFields are found in persistentVolumeClaim for fieldManager, a
-// PersistentVolumeClaimApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractPersistentVolumeClaimFrom extracts the applied configuration owned by fieldManager from
+// persistentVolumeClaim for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // persistentVolumeClaim must be a unmodified PersistentVolumeClaim API object that was retrieved from the Kubernetes API.
-// ExtractPersistentVolumeClaim provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractPersistentVolumeClaimFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPersistentVolumeClaim(persistentVolumeClaim *corev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
-	return extractPersistentVolumeClaim(persistentVolumeClaim, fieldManager, "")
-}
-
-// ExtractPersistentVolumeClaimStatus is the same as ExtractPersistentVolumeClaim except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractPersistentVolumeClaimStatus(persistentVolumeClaim *corev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
-	return extractPersistentVolumeClaim(persistentVolumeClaim, fieldManager, "status")
-}
-
-func extractPersistentVolumeClaim(persistentVolumeClaim *corev1.PersistentVolumeClaim, fieldManager string, subresource string) (*PersistentVolumeClaimApplyConfiguration, error) {
+func ExtractPersistentVolumeClaimFrom(persistentVolumeClaim *corev1.PersistentVolumeClaim, fieldManager string, subresource string) (*PersistentVolumeClaimApplyConfiguration, error) {
 	b := &PersistentVolumeClaimApplyConfiguration{}
 	err := managedfields.ExtractInto(persistentVolumeClaim, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolumeClaim"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +68,29 @@ func extractPersistentVolumeClaim(persistentVolumeClaim *corev1.PersistentVolume
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractPersistentVolumeClaim extracts the applied configuration owned by fieldManager from
+// persistentVolumeClaim. If no managedFields are found in persistentVolumeClaim for fieldManager, a
+// PersistentVolumeClaimApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// persistentVolumeClaim must be a unmodified PersistentVolumeClaim API object that was retrieved from the Kubernetes API.
+// ExtractPersistentVolumeClaim provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractPersistentVolumeClaim(persistentVolumeClaim *corev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
+	return ExtractPersistentVolumeClaimFrom(persistentVolumeClaim, fieldManager, "")
+}
+
+// ExtractPersistentVolumeClaimStatus extracts the applied configuration owned by fieldManager from
+// persistentVolumeClaim for the status subresource.
+// Experimental!
+func ExtractPersistentVolumeClaimStatus(persistentVolumeClaim *corev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
+	return ExtractPersistentVolumeClaimFrom(persistentVolumeClaim, fieldManager, "status")
+}
+
 func (b PersistentVolumeClaimApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

@@ -42,6 +42,7 @@ func DeleteOptions() *DeleteOptionsApplyConfiguration {
 	b.WithAPIVersion("meta.k8s.io/v1")
 	return b
 }
+
 func (b DeleteOptionsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
