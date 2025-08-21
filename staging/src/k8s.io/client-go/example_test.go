@@ -66,7 +66,7 @@ func Example_inClusterConfiguration() {
 
 	// Use the clientset to interact with the API.
 
-pods, err := clientset.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
+	pods, err := clientset.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		fmt.Printf("Error encountered: %v\n", err)
 		return
@@ -107,7 +107,7 @@ func Example_outOfClusterConfiguration() {
 
 	// Use the clientset to interact with the API.
 
-pods, err := clientset.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
+	pods, err := clientset.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		fmt.Printf("Error encountered: %v\n", err)
 		return
