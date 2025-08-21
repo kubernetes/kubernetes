@@ -162,7 +162,7 @@ type Fscacheinfo struct {
 	ReleaseRequestsAgainstPagesStoredByTimeLockGranted uint64
 	// Number of release reqs ignored due to in-progress store
 	ReleaseRequestsIgnoredDueToInProgressStore uint64
-	// Number of page stores cancelled due to release req
+	// Number of page stores canceled due to release req
 	PageStoresCancelledByReleaseRequests uint64
 	VmscanWaiting                        uint64
 	// Number of times async ops added to pending queues
@@ -171,11 +171,11 @@ type Fscacheinfo struct {
 	OpsRunning uint64
 	// Number of times async ops queued for processing
 	OpsEnqueued uint64
-	// Number of async ops cancelled
+	// Number of async ops canceled
 	OpsCancelled uint64
 	// Number of async ops rejected due to object lookup/create failure
 	OpsRejected uint64
-	// Number of async ops initialised
+	// Number of async ops initialized
 	OpsInitialised uint64
 	// Number of async ops queued for deferred release
 	OpsDeferred uint64
