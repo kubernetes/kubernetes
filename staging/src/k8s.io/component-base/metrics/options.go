@@ -283,15 +283,15 @@ func validateAllowListMappingManifest(allowListMappingManifestPath string) error
 	}
 	data, err := os.ReadFile(filepath.Clean(allowListMappingManifestPath))
 	if err != nil {
-		return fmt.Errorf("failed to read allow list manifest: %v", err)
+		return fmt.Errorf("failed to read allow list manifest: %w", err)
 	}
 	allowListMapping := make(map[string]string)
 	err = yaml.Unmarshal(data, &allowListMapping)
 	if err != nil {
-		return fmt.Errorf("failed to parse allow list manifest: %v", err)
+		return fmt.Errorf("failed to parse allow list manifest: %w", err)
 	}
 	if err = validateAllowListMapping(allowListMapping); err != nil {
-		return fmt.Errorf("invalid allow list mapping in manifest: %v", err)
+		return fmt.Errorf("invalid allow list mapping in manifest: %w", err)
 	}
 
 	return nil
