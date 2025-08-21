@@ -99,7 +99,7 @@ func TestEnableHiddenMetrics(t *testing.T) {
 
 			SetShowHidden()
 			defer func() {
-				showHiddenOnce = *new(sync.Once)
+				showHiddenOnce = sync.Once{}
 				showHidden.Store(false)
 			}()
 
@@ -181,7 +181,7 @@ func TestEnableHiddenStableCollector(t *testing.T) {
 
 			SetShowHidden()
 			defer func() {
-				showHiddenOnce = *new(sync.Once)
+				showHiddenOnce = sync.Once{}
 				showHidden.Store(false)
 			}()
 
@@ -189,7 +189,7 @@ func TestEnableHiddenStableCollector(t *testing.T) {
 				t.Fatalf("after enable test failed: %v", err)
 			}
 
-			// refresh descriptors so as to share with cases.
+			// refresh descriptors to share with cases.
 			for _, d := range tc.descriptors {
 				d.ClearState()
 			}
