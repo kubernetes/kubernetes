@@ -131,7 +131,7 @@ func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit
 	}
 	celRules := s.XValidations
 
-	oldSelfEnvSet, optionalOldSelfEnvSet, err := prepareEnvSet(baseEnvSet, declType)
+	envSets, err := prepareEnvSets(baseEnvSet, declType)
 	if err != nil {
 		return nil, err
 	}
@@ -140,66 +140,62 @@ func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit
 	compResults := make([]CompilationResult, len(celRules))
 	maxCardinality := maxCardinality(declType.MinSerializedSize)
 	for i, rule := range celRules {
-		ruleEnvSet := oldSelfEnvSet
-		if rule.OptionalOldSelf != nil && *rule.OptionalOldSelf {
-			ruleEnvSet = optionalOldSelfEnvSet
-		}
+		isOptionalSelf := rule.OptionalSelf != nil && *rule.OptionalSelf
+		isOptionalOldSelf := rule.OptionalOldSelf != nil && *rule.OptionalOldSelf
+		ruleEnvSet := envSets[isOptionalSelf][isOptionalOldSelf]
 		compResults[i] = compileRule(s, rule, ruleEnvSet, envLoader, estimator, maxCardinality, perCallLimit)
 	}
 
 	return compResults, nil
 }
 
-func prepareEnvSet(baseEnvSet *environment.EnvSet, declType *apiservercel.DeclType) (oldSelfEnvSet *environment.EnvSet, optionalOldSelfEnvSet *environment.EnvSet, err error) {
+func prepareEnvSets(baseEnvSet *environment.EnvSet, declType *apiservercel.DeclType) (map[bool]map[bool]*environment.EnvSet, error) {
 	scopedType := declType.MaybeAssignTypeName(generateUniqueSelfTypeName())
-
-	oldSelfEnvSet, err = baseEnvSet.Extend(
-		environment.VersionedOptions{
-			// Feature epoch was actually 1.23, but we artificially set it to 1.0 because these
-			// options should always be present.
-			IntroducedVersion: version.MajorMinor(1, 0),
-			EnvOptions: []cel.EnvOption{
-				cel.Variable(ScopedVarName, scopedType.CelType()),
-			},
-			DeclTypes: []*apiservercel.DeclType{
-				scopedType,
-			},
-		},
-		environment.VersionedOptions{
-			IntroducedVersion: version.MajorMinor(1, 24),
-			EnvOptions: []cel.EnvOption{
-				cel.Variable(OldScopedVarName, scopedType.CelType()),
-			},
-		},
-	)
-	if err != nil {
-		return nil, nil, err
+	envSets := map[bool]map[bool]*environment.EnvSet{
+		false: {false: nil, true: nil},
+		true:  {false: nil, true: nil},
 	}
 
-	optionalOldSelfEnvSet, err = baseEnvSet.Extend(
-		environment.VersionedOptions{
-			// Feature epoch was actually 1.23, but we artificially set it to 1.0 because these
-			// options should always be present.
-			IntroducedVersion: version.MajorMinor(1, 0),
-			EnvOptions: []cel.EnvOption{
-				cel.Variable(ScopedVarName, scopedType.CelType()),
-			},
-			DeclTypes: []*apiservercel.DeclType{
-				scopedType,
-			},
-		},
-		environment.VersionedOptions{
-			IntroducedVersion: version.MajorMinor(1, 24),
-			EnvOptions: []cel.EnvOption{
-				cel.Variable(OldScopedVarName, types.NewOptionalType(scopedType.CelType())),
-			},
-		},
-	)
-	if err != nil {
-		return nil, nil, err
-	}
+	for _, optionalSelf := range []bool{false, true} {
+		for _, optionalOldSelf := range []bool{false, true} {
+			var selfEnvOption cel.EnvOption
+			if optionalSelf {
+				selfEnvOption = cel.Variable(ScopedVarName, types.NewOptionalType(scopedType.CelType()))
+			} else {
+				selfEnvOption = cel.Variable(ScopedVarName, scopedType.CelType())
+			}
 
-	return oldSelfEnvSet, optionalOldSelfEnvSet, nil
+			var oldSelfEnvOption cel.EnvOption
+			if optionalOldSelf {
+				oldSelfEnvOption = cel.Variable(OldScopedVarName, types.NewOptionalType(scopedType.CelType()))
+			} else {
+				oldSelfEnvOption = cel.Variable(OldScopedVarName, scopedType.CelType())
+			}
+
+			envSet, err := baseEnvSet.Extend(
+				environment.VersionedOptions{
+					IntroducedVersion: version.MajorMinor(1, 0),
+					EnvOptions: []cel.EnvOption{
+						selfEnvOption,
+					},
+					DeclTypes: []*apiservercel.DeclType{
+						scopedType,
+					},
+				},
+				environment.VersionedOptions{
+					IntroducedVersion: version.MajorMinor(1, 24),
+					EnvOptions: []cel.EnvOption{
+						oldSelfEnvOption,
+					},
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+			envSets[optionalSelf][optionalOldSelf] = envSet
+		}
+	}
+	return envSets, nil
 }
 
 func compileRule(s *schema.Structural, rule apiextensions.ValidationRule, envSet *environment.EnvSet, envLoader EnvLoader, estimator *library.CostEstimator, maxCardinality uint64, perCallLimit uint64) (compilationResult CompilationResult) {
@@ -228,7 +224,6 @@ func compileRule(s *schema.Structural, rule apiextensions.ValidationRule, envSet
 	for _, ref := range checkedExpr.ReferenceMap {
 		if ref.Name == OldScopedVarName {
 			compilationResult.UsesOldSelf = true
-			break
 		}
 	}
 
