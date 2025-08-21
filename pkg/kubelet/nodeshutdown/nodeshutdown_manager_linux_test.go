@@ -335,7 +335,7 @@ func TestManager(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
 
 			fakeRecorder := &record.FakeRecorder{}
-			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil)
+			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 			manager := NewManager(&Config{
 				Logger:                          logger,
@@ -439,7 +439,7 @@ func TestFeatureEnabled(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)
 
 			fakeRecorder := &record.FakeRecorder{}
-			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil)
+			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			manager := NewManager(&Config{
@@ -496,7 +496,7 @@ func TestRestart(t *testing.T) {
 	}
 
 	fakeRecorder := &record.FakeRecorder{}
-	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil)
+	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager := NewManager(&Config{
 		Logger:                          logger,
@@ -534,7 +534,7 @@ func TestRestart(t *testing.T) {
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	var (
 		fakeRecorder      = &record.FakeRecorder{}
-		fakeVolumeManager = volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil)
+		fakeVolumeManager = volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 		syncNodeStatus    = func() {}
 		nodeRef           = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 		fakeclock         = testingclock.NewFakeClock(time.Now())
@@ -651,7 +651,7 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 		[]v1.UniqueVolumeName{},
 		3*time.Second, // This value is intentionally longer than the shutdownGracePeriodSeconds (2s) to test the behavior
 		// for volume unmount operations that take longer than the allowed grace period.
-		fmt.Errorf("unmount timeout"),
+		fmt.Errorf("unmount timeout"), false,
 	)
 	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
 	m := &managerImpl{
