@@ -24,8 +24,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 	"time"
+
+	"k8s.io/client-go/informers"
+	k8sclientset "k8s.io/client-go/kubernetes"
+	testing2 "k8s.io/component-base/featuregate/testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
@@ -46,6 +51,23 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
+
+func TestStatuszEndpoint(t *testing.T) {
+	testing2.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
+	client := k8sclientset.New(nil)
+	sharedK8sInformerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	handler := newEndpointsHandler(&config.KubeSchedulerConfiguration{}, sharedK8sInformerFactory, func() bool { return true }, nil, nil, nil)
+	req := httptest.NewRequest(http.MethodGet, "/statusz", nil)
+	req.Header.Set("Accept", "text/plain")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+
+	reg := regexp.MustCompile(`Paths([:=\s]+)/configz /healthz /livez /metrics /readyz\n$`)
+	if reg.FindStringSubmatch(res.Body.String()) == nil {
+		t.Errorf("statusz paths missing: %s\n\nExpected: %q", res.Body.String(), "Paths<delimiter> /configz /healthz /livez /metrics /readyz")
+	}
+}
 
 func TestSetup(t *testing.T) {
 	// temp dir
