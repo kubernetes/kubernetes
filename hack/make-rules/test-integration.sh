@@ -25,6 +25,8 @@ kube::golang::setup_env
 kube::golang::setup_gomaxprocs
 kube::util::require-jq
 
+set -x
+
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
@@ -46,6 +48,8 @@ LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
 # Default glog module settings.
 KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-""}
+
+set +x
 
 kube::test::find_integration_test_pkgs() {
   (
