@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -39,13 +40,13 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierrors "k8s.io/cri-api/pkg/errors"
-	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
+	"k8s.io/kubernetes/pkg/kubelet/testutil"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
@@ -56,7 +57,7 @@ type pullerExpects struct {
 	err                             error
 	shouldRecordStartedPullingTime  bool
 	shouldRecordFinishedPullingTime bool
-	events                          []v1.Event
+	events                          []eventsv1.Event
 	msg                             string
 }
 
@@ -104,7 +105,7 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:          0,
 			expected: []pullerExpects{
 				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
@@ -120,15 +121,15 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:          0,
 			expected: []pullerExpects{
 				{[]string{"GetImageRef"}, nil, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"GetImageRef"}, nil, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"GetImageRef"}, nil, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulled"},
 					}, ""},
 			}},
@@ -142,17 +143,17 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:      0,
 			expected: []pullerExpects{
 				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
@@ -167,15 +168,15 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:      0,
 			expected: []pullerExpects{
 				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "ErrImageNeverPull"},
 					}, ""},
 				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "ErrImageNeverPull"},
 					}, ""},
 				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "ErrImageNeverPull"},
 					}, ""},
 			}},
@@ -189,15 +190,15 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:      0,
 			expected: []pullerExpects{
 				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "InspectFailed"},
 					}, ""},
 				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "InspectFailed"},
 					}, ""},
 				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "InspectFailed"},
 					}, ""},
 			}},
@@ -211,30 +212,30 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:      0,
 			expected: []pullerExpects{
 				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
 					}, ""},
 				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
 					}, ""},
 				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "BackOff"},
 					}, ""},
 				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
 					}, ""},
 				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "BackOff"},
 					}, ""},
 				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "BackOff"},
 					}, ""},
 			}},
@@ -248,17 +249,17 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:      600,
 			expected: []pullerExpects{
 				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
@@ -273,17 +274,17 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:      0,
 			expected: []pullerExpects{
 				{[]string(nil), ErrImagePull, true, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
 					}, ""},
 				{[]string(nil), ErrImagePull, true, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
 					}, ""},
 				{[]string(nil), ErrImagePullBackOff, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "BackOff"},
 					}, ""},
 			}},
@@ -297,7 +298,7 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:      0,
 			expected: []pullerExpects{
 				{[]string(nil), ErrInvalidImageName, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "InspectFailed"},
 					}, ""},
 			}},
@@ -311,7 +312,7 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:      0,
 			expected: []pullerExpects{
 				{[]string(nil), ErrInvalidImageName, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "InspectFailed"},
 					}, ""},
 			}},
@@ -325,7 +326,7 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:      0,
 			expected: []pullerExpects{
 				{[]string(nil), ErrInvalidImageName, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "InspectFailed"},
 					}, ""},
 			}},
@@ -338,26 +339,26 @@ func noFGPullerTestCases() []pullerTestCase {
 			burst:      0,
 			expected: []pullerExpects{
 				{[]string{"GetImageRef", "PullImage"}, crierrors.ErrSignatureValidationFailed, true, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
 					}, "image pull failed for typo_image because the signature validation failed"},
 				{[]string{"GetImageRef", "PullImage"}, crierrors.ErrSignatureValidationFailed, true, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
 					}, "image pull failed for typo_image because the signature validation failed"},
 				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "BackOff"},
 					}, "Back-off pulling image \"typo_image\": SignatureValidationFailed: image pull failed for typo_image because the signature validation failed"},
 				{[]string{"GetImageRef", "PullImage"}, crierrors.ErrSignatureValidationFailed, true, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
 					}, "image pull failed for typo_image because the signature validation failed"},
 				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "BackOff"},
 					}, "Back-off pulling image \"typo_image\": SignatureValidationFailed: image pull failed for typo_image because the signature validation failed"},
 			}},
@@ -387,17 +388,17 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 			expected: []pullerExpects{
 				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
@@ -420,17 +421,17 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 			expected: []pullerExpects{
 				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
@@ -454,15 +455,15 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 			expected: []pullerExpects{
 				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "ErrImageNeverPull"},
 					}, ""},
 				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "ErrImageNeverPull"},
 					}, ""},
 				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "ErrImageNeverPull"},
 					}, ""},
 			},
@@ -488,15 +489,15 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 			expected: []pullerExpects{
 				{[]string{"GetImageRef"}, nil, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"GetImageRef"}, nil, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulled"},
 					}, ""},
 				{[]string{"GetImageRef"}, nil, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulled"},
 					}, ""},
 			},
@@ -531,7 +532,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 			expected: []pullerExpects{
 				{[]string{"GetImageRef"}, nil, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulled"},
 					}, ""},
 			},
@@ -576,7 +577,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 			expected: []pullerExpects{
 				{[]string{"GetImageRef"}, nil, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulled"},
 					}, ""},
 			},
@@ -618,7 +619,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 			expected: []pullerExpects{
 				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
@@ -647,7 +648,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 			expected: []pullerExpects{
 				{[]string{"GetImageRef"}, nil, false, false,
-					[]v1.Event{
+					[]eventsv1.Event{
 						{Reason: "Pulled"},
 					}, ""},
 			},
@@ -1228,14 +1229,14 @@ func TestImagePullPrecheck(t *testing.T) {
 
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
-				fakeRecorder.Events = []*v1.Event{}
+				fakeRecorder.Events = []*eventsv1.Event{}
 				fakeClock.Step(time.Second)
 
 				_, _, err := puller.EnsureImageExists(ctx, &v1.ObjectReference{}, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 				fakeRuntime.AssertCalls(expected.calls)
-				var recorderEvents []v1.Event
+				var recorderEvents []eventsv1.Event
 				for _, event := range fakeRecorder.Events {
-					recorderEvents = append(recorderEvents, v1.Event{Reason: event.Reason})
+					recorderEvents = append(recorderEvents, eventsv1.Event{Reason: event.Reason})
 				}
 				if diff := cmp.Diff(recorderEvents, expected.events); diff != "" {
 					t.Errorf("unexpected events diff (-want +got):\n%s", diff)
