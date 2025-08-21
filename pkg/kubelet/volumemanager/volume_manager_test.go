@@ -656,7 +656,6 @@ func delayClaimBecomesBound(
 }
 
 func TestWaitForAllPodsUnmount(t *testing.T) {
-	tCtx := ktesting.Init(t)
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	require.NoError(t, err, "Failed to create temp directory")
 	defer func() {
@@ -684,6 +683,7 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			var ctx context.Context = ktesting.Init(t)
 			podManager := kubepod.NewBasicPodManager()
 
 			node, pod, pv, claim := createObjects(test.podMode, test.podMode)
@@ -691,8 +691,6 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 
 			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
-			ctx, cancel := context.WithTimeout(tCtx, 1*time.Second)
-			defer cancel()
 			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 			go manager.Run(ctx, sourcesReady)
 
@@ -706,11 +704,12 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 			err := manager.WaitForAttachAndMount(ctx, pod)
 			require.NoError(t, err, "Failed to wait for attach and mount")
 
+			ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+			defer cancel()
 			err = manager.WaitForAllPodsUnmount(ctx, []*v1.Pod{pod})
 
 			if test.expectedError {
-				require.Error(t, err, "Expected error due to timeout")
-				require.Contains(t, err.Error(), "context deadline exceeded", "Expected deadline exceeded error")
+				require.ErrorIs(t, err, context.DeadlineExceeded, "Expected error due to timeout")
 			} else {
 				require.NoError(t, err, "Expected no error")
 			}
