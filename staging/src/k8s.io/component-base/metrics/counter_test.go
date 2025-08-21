@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/blang/semver/v4"
+	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/assert"
@@ -292,7 +293,7 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 }
 
 func TestCounterWithExemplar(t *testing.T) {
-	// Set exemplar.
+	// Create context.
 	fn := func(offset int) []byte {
 		arr := make([]byte, 16)
 		for i := 0; i < 16; i++ {
@@ -300,6 +301,13 @@ func TestCounterWithExemplar(t *testing.T) {
 		}
 		return arr
 	}
+	originalTraceID := trace.TraceID(fn(0))
+	originalSpanID := trace.SpanID(fn(1))
+	redundantCtxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
+		SpanID:     originalSpanID,
+		TraceID:    originalTraceID,
+		TraceFlags: trace.FlagsSampled,
+	}))
 	traceID := trace.TraceID(fn(1))
 	spanID := trace.SpanID(fn(2))
 	ctxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
@@ -313,8 +321,7 @@ func TestCounterWithExemplar(t *testing.T) {
 	counter := NewCounter(&CounterOpts{
 		Name: "metric_exemplar_test",
 		Help: "helpless",
-	})
-	_ = counter.WithContext(ctxForSpanCtx)
+	}).WithContext(ctxForSpanCtx)
 
 	// Register counter.
 	registry := newKubeRegistry(apimachineryversion.Info{
@@ -324,17 +331,93 @@ func TestCounterWithExemplar(t *testing.T) {
 	})
 	registry.MustRegister(counter)
 
-	// Call underlying exemplar methods.
-	counter.Add(toAdd)
-	counter.Inc()
-	counter.Inc()
+	// Call underlying exemplar methods, overriding the original span context.
+	counter.WithContext(redundantCtxForSpanCtx).Add(toAdd) // This should be counted, but it's context should be overridden.
+	counter.WithContext(redundantCtxForSpanCtx).Inc()      // This should be counted, but it's context should be overridden.
+	counter.Inc()                                          // This should be counted, and it's (parent's) context should be used.
+
+	// Verify exemplar with the overridden span context.
+	exemplarGatherAndVerify(t, registry, traceID, spanID, 1, toAdd+2)
+
+	// Modify span context.
+	altTraceID := trace.TraceID(fn(2))
+	altSpanID := trace.SpanID(fn(3))
+	altCtxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
+		SpanID:     altSpanID,
+		TraceID:    altTraceID,
+		TraceFlags: trace.FlagsSampled,
+	}))
+
+	// Call underlying exemplar methods with different span context.
+	counter.WithContext(ctxForSpanCtx).Add(toAdd) // This should be counted, but it's context should be overridden.
+	counter.WithContext(ctxForSpanCtx).Inc()      // This should be counted, but it's context should be overridden.
+	counter.WithContext(altCtxForSpanCtx).Inc()   // This should be counted, and it's context should be used.
+
+	// Verify exemplar with different span context.
+	exemplarGatherAndVerify(t, registry, altTraceID, altSpanID, 1, 2*toAdd+4)
+
+	// Verify that all contextual counter calls are exclusive.
+	contextualCounter := NewCounter(&CounterOpts{
+		Name: "contextual_counter",
+		Help: "helpless",
+	})
+	spanIDa := trace.SpanID(fn(3))
+	traceIDa := trace.TraceID(fn(4))
+	contextualCounterA := contextualCounter.WithContext(trace.ContextWithSpanContext(context.Background(),
+		trace.NewSpanContext(trace.SpanContextConfig{
+			SpanID:     spanIDa,
+			TraceID:    traceIDa,
+			TraceFlags: trace.FlagsSampled,
+		}),
+	))
+	spanIDb := trace.SpanID(fn(5))
+	traceIDb := trace.TraceID(fn(6))
+	contextualCounterB := contextualCounter.WithContext(trace.ContextWithSpanContext(context.Background(),
+		trace.NewSpanContext(trace.SpanContextConfig{
+			SpanID:     spanIDb,
+			TraceID:    traceIDb,
+			TraceFlags: trace.FlagsSampled,
+		}),
+	))
+
+	runs := []struct {
+		spanID            trace.SpanID
+		traceID           trace.TraceID
+		contextualCounter *CounterWithContext
+	}{
+		{
+			spanID:            spanIDa,
+			traceID:           traceIDa,
+			contextualCounter: contextualCounterA,
+		},
+		{
+			spanID:            spanIDb,
+			traceID:           traceIDb,
+			contextualCounter: contextualCounterB,
+		},
+	}
+	for i, run := range runs {
+		registry.MustRegister(run.contextualCounter)
+		run.contextualCounter.Inc()
+		exemplarGatherAndVerify(t, registry, run.traceID, run.spanID, 2, float64(i+1))
+		registry.Unregister(run.contextualCounter)
+	}
+}
+
+func exemplarGatherAndVerify(t *testing.T,
+	registry *kubeRegistry,
+	traceID trace.TraceID,
+	spanID trace.SpanID,
+	expectedMetricFamilies int,
+	expectedValue float64,
+) {
 
 	// Gather.
 	mfs, err := registry.Gather()
 	if err != nil {
 		t.Fatalf("Gather failed %v", err)
 	}
-	if len(mfs) != 1 {
+	if len(mfs) != expectedMetricFamilies {
 		t.Fatalf("Got %v metric families, Want: 1 metric family", len(mfs))
 	}
 
@@ -349,7 +432,7 @@ func TestCounterWithExemplar(t *testing.T) {
 	}
 
 	// Verify value.
-	want := toAdd + 2
+	want := expectedValue
 	got := m.GetCounter().GetValue()
 	if got != want {
 		t.Fatalf("Got %f, wanted %f as the count", got, want)
@@ -381,4 +464,69 @@ func TestCounterWithExemplar(t *testing.T) {
 			t.Fatalf("Got unexpected label %s", *l.Name)
 		}
 	}
+}
+
+// Prometheus does not support exemplars for metric vectors, but only the metric scalars themselves.
+// The following is the only way Prometheus supports exemplars for vectors.
+// We test this to make sure the same expectations are met.
+func TestCounterVecWithExemplar(t *testing.T) {
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	counterVec := NewCounterVec(&CounterOpts{
+		Name:      "metric_test_name",
+		Help:      "counter help",
+		Subsystem: "subsystem",
+		Namespace: "namespace",
+	}, []string{"label_a", "label_b"})
+	registry.MustRegister(counterVec)
+
+	// no-op, but this shouldn't panic.
+	c := counterVec.WithContext(nil)
+
+	c.WithLabelValues("1", "2").Inc()
+	c.WithLabelValues("1", "2").(prometheus.ExemplarAdder).AddWithExemplar(100, prometheus.Labels{
+		"exemplar_label": "42",
+	})
+
+	mfs, err := registry.Gather()
+	require.NoError(t, err, "Gather failed %v", err)
+
+	mf := mfs[0]
+
+	assert.Lenf(t, mfs, 1, "Got %v metric families, Want: 1 metric family", len(mfs))
+	assert.Equal(t, BuildFQName("namespace", "subsystem", "metric_test_name"), *mf.Name)
+	assert.Equal(t, "[ALPHA] counter help", mf.GetHelp())
+	assert.Lenf(t, mf.GetMetric(), 1, "Got %v metrics, wanted 1 as the count", len(mf.GetMetric()))
+
+	var m *dto.Metric
+	switch mf.GetType() {
+	case dto.MetricType_COUNTER:
+		m = mfs[0].GetMetric()[0]
+	default:
+		t.Fatalf("Got %v metric type, Want: %v metric type", mf.GetType(), dto.MetricType_COUNTER)
+	}
+
+	var aValue, bValue string
+	for _, l := range m.GetLabel() {
+		if *l.Name == "label_a" {
+			aValue = *l.Value
+		}
+		if *l.Name == "label_b" {
+			bValue = *l.Value
+		}
+	}
+	labelValuePair := aValue + " " + bValue
+	gotValue := int(m.GetCounter().GetValue())
+	gotExemplarValue := int(m.GetCounter().GetExemplar().GetValue())
+	gotExemplarLabelName := m.GetCounter().GetExemplar().GetLabel()[0].GetName()
+	gotExemplarLabelValue := m.GetCounter().GetExemplar().GetLabel()[0].GetValue()
+
+	assert.Equalf(t, "1 2", labelValuePair, "Got %v, wanted %v as the label values", labelValuePair, "1 2")
+	assert.Equalf(t, 101, gotValue, "Got %v, wanted %v as the count while setting label_a to %v and label b to %v", gotValue, 101, aValue, bValue)
+	assert.Equalf(t, 100, gotExemplarValue, "Got %v, wanted %v as the exemplar value while setting label_a to %v and label b to %v", gotExemplarValue, 100, aValue, bValue)
+	assert.Equalf(t, "exemplar_label", gotExemplarLabelName, "Got %v, wanted %v as the exemplar label name", gotExemplarLabelName, "exemplar_label")
+	assert.Equalf(t, "42", gotExemplarLabelValue, "Got %v, wanted %v as the exemplar label value", gotExemplarLabelValue, "42")
 }
