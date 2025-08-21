@@ -1908,3 +1908,63 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 		})
 	}
 }
+func TestWithDeviceClass(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	client := fake.NewSimpleClientset(deviceClassWithExtendResourceName)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	draManager := dynamicresources.NewDRAManager(ctx, assumecache.NewAssumeCache(logger, informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil), nil, informerFactory)
+	informerFactory.Start(ctx.Done())
+	t.Cleanup(func() {
+		// Now we can wait for all goroutines to stop.
+		informerFactory.Shutdown()
+	})
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	testCases := map[string]struct {
+		state                         *preFilterState
+		expectedResourceToDeviceClass map[v1.ResourceName]string
+	}{
+
+		"regular extended resource name": {
+			state: &preFilterState{
+				Resource: framework.Resource{
+					ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
+				},
+			},
+			expectedResourceToDeviceClass: map[v1.ResourceName]string{
+				v1.ResourceName("deviceclass.resource.kubernetes.io/device-class-name"): deviceClassName,
+				v1.ResourceName("extended.resource.dra.io/something"):                   deviceClassName,
+			},
+		},
+		"implicit extended resource name": {
+			state: &preFilterState{
+				Resource: framework.Resource{
+					ScalarResources: map[v1.ResourceName]int64{v1.ResourceName("deviceclass.resource.kubernetes.io/" + deviceClassName): 1},
+				},
+			},
+			expectedResourceToDeviceClass: map[v1.ResourceName]string{
+				v1.ResourceName("deviceclass.resource.kubernetes.io/device-class-name"): deviceClassName,
+				v1.ResourceName("extended.resource.dra.io/something"):                   deviceClassName,
+			},
+		},
+		"no extended resource name": {
+			state: &preFilterState{
+				Resource: framework.Resource{
+					MilliCPU: 1000,
+				},
+			},
+			expectedResourceToDeviceClass: nil,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			withDeviceClass(tc.state, draManager)
+			if diff := cmp.Diff(tc.state.resourceToDeviceClass, tc.expectedResourceToDeviceClass); diff != "" {
+				t.Error("resourceToDeviceClass doesn't match (-expected +actual):\n", diff)
+			}
+		})
+	}
+}
