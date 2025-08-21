@@ -209,6 +209,7 @@ type PodFailurePolicyOnPodConditionsPattern struct {
 	// Specifies the required Pod condition status. To match a pod condition
 	// it is required that the specified status equals the pod condition status.
 	// Defaults to True.
+	// +optional
 	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,req,name=status"`
 }
 

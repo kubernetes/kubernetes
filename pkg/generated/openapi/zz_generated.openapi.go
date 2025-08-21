@@ -18565,7 +18565,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyOnPodConditionsPattern(ref common
 						},
 					},
 				},
-				Required: []string{"type", "status"},
+				Required: []string{"type"},
 			},
 		},
 	}
