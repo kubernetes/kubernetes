@@ -52,7 +52,7 @@ type fsPullRecordsAccessor struct {
 
 // NewFSPullRecordsAccessor returns an accessor for the ImagePullIntent/ImagePulledRecord
 // records with a filesystem as the backing database.
-func NewFSPullRecordsAccessor(kubeletDir string) (*fsPullRecordsAccessor, error) {
+func NewFSPullRecordsAccessor(kubeletDir string) (PullRecordsAccessor, error) {
 	kubeletConfigEncoder, kubeletConfigDecoder, err := createKubeletConfigSchemeEncoderDecoder()
 	if err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func NewFSPullRecordsAccessor(kubeletDir string) (*fsPullRecordsAccessor, error)
 		return nil, err
 	}
 
-	return accessor, nil
+	return NewMeteringRecordsAccessor(accessor, fsPullIntentsSize, fsPulledRecordsSize), nil
 }
 
 func (f *fsPullRecordsAccessor) WriteImagePullIntent(image string) error {
@@ -181,8 +181,50 @@ func (f *fsPullRecordsAccessor) DeleteImagePulledRecord(imageRef string) error {
 	return err
 }
 
+func (f *fsPullRecordsAccessor) intentsSize() (uint, error) {
+	intentsCount, err := countCacheFiles(f.pullingDir)
+	if err != nil {
+		return 0, err
+	}
+	return intentsCount, nil
+}
+
+func (f *fsPullRecordsAccessor) pulledRecordsSize() (uint, error) {
+	pulledRecordsCount, err := countCacheFiles(f.pulledDir)
+	if err != nil {
+		return 0, err
+	}
+	return pulledRecordsCount, nil
+}
+
+func countCacheFiles(dir string) (uint, error) {
+	var cacheFilesCount uint
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list directory %q: %w", dir, err)
+	}
+	for _, entry := range entries {
+		if !isValidCacheFile(entry) {
+			continue
+		}
+		cacheFilesCount++
+	}
+	return cacheFilesCount, nil
+}
+
 func cacheFilename(image string) string {
 	return fmt.Sprintf("%s%x", cacheFilesSHA256Prefix, sha256.Sum256([]byte(image)))
+}
+
+// isValidCacheFile returns true if the info doesn't point to a directory and
+// the filename matches the expectation for a valid, non-temporary cache file.
+func isValidCacheFile(fileInfo os.DirEntry) bool {
+	if fileInfo.IsDir() {
+		return false
+	}
+
+	filename := fileInfo.Name()
+	return strings.HasPrefix(filename, cacheFilesSHA256Prefix) && !strings.HasSuffix(filename, tmpFilesSuffix)
 }
 
 // writeFile writes `content` to the file with name `filename` in directory `dir`.
