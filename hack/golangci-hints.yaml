@@ -317,5 +317,6 @@ linters:
     staticcheck:
       checks:
         - "all"
+        - "-QF1008"  # Omit embedded fields from selector expression
     testifylint:
       enable-all: true
