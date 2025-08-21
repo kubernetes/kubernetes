@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -714,7 +715,7 @@ func updateStatefulSetAfterInvariantEstablished(
 
 	logger := klog.FromContext(ctx)
 	replicaCount := int(*set.Spec.Replicas)
-
+	podManagementPolicy := string(set.Spec.PodManagementPolicy)
 	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
 	updateMin := 0
 	maxUnavailable := 1
@@ -729,6 +730,7 @@ func updateStatefulSetAfterInvariantEstablished(
 		if err != nil {
 			return &status, err
 		}
+		metrics.MaxUnavailable.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(maxUnavailable))
 	}
 
 	// Collect all targets in the range between getStartOrdinal(set) and getEndOrdinal(set). Count any targets in that range
@@ -736,17 +738,20 @@ func updateStatefulSetAfterInvariantEstablished(
 	// (MaxUnavailable - Unavailable) Pods, in order with respect to their ordinal for termination. Delete
 	// those pods and count the successful deletions. Update the status with the correct number of deletions.
 	unavailablePods := 0
+
 	for target := len(replicas) - 1; target >= 0; target-- {
 		if isUnavailable(replicas[target], set.Spec.MinReadySeconds) {
 			unavailablePods++
 		}
 	}
+	metrics.UnavailableReplicas.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(unavailablePods))
 
 	if unavailablePods >= maxUnavailable {
-		logger.V(2).Info("StatefulSet found unavailablePods, more than or equal to allowed maxUnavailable",
+		logger.V(4).Info("StatefulSet found unavailablePods, more than the allowed maxUnavailable",
 			"statefulSet", klog.KObj(set),
 			"unavailablePods", unavailablePods,
 			"maxUnavailable", maxUnavailable)
+
 		return &status, nil
 	}
 
@@ -757,9 +762,9 @@ func updateStatefulSetAfterInvariantEstablished(
 	deletedPods := 0
 	for target := len(replicas) - 1; target >= updateMin && deletedPods < podsToDelete; target-- {
 
-		// delete the Pod if it is healthy and the revision doesnt match the target
+		// delete the Pod if it is healthy and the revision does not match the target
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
-			// delete the Pod if it is healthy and the revision doesnt match the target
+			// delete the Pod if it is healthy and the revision does not match the target
 			logger.V(2).Info("StatefulSet terminating Pod for update",
 				"statefulSet", klog.KObj(set),
 				"pod", klog.KObj(replicas[target]))
