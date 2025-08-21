@@ -119,7 +119,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		logManager:             logManager,
 		memoryThrottlingFactor: 0.9,
 		podLogsDirectory:       fakePodLogsDirectory,
-		allocationManager:      allocation.NewInMemoryManager(nil, nil, nil, nil, nil, nil),
+		allocationManager:      allocation.NewInMemoryManager(cm.NodeConfig{}, nil, nil, nil, nil, nil, nil),
 	}
 
 	// Initialize swap controller availability check (always false for tests)
