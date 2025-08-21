@@ -356,7 +356,7 @@ func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	}
 
 	result := make([]int64, 0, supplementalGroups.Len())
-	for _, group := range supplementalGroups.UnsortedList() {
+	for group := range supplementalGroups {
 		iGroup, extra := getExtraSupplementalGID(group, pod)
 		if !extra {
 			continue
