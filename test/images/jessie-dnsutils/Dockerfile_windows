@@ -15,7 +15,7 @@
 ARG BASEIMAGE
 
 # We're using a Linux image to unpack the archive, then we're copying it over to Windows.
-FROM --platform=linux/amd64 alpine:3.6 as prep
+FROM --platform=linux/amd64 alpine:3.22 as prep
 
 ADD https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_windows_amd64.tgz /coredns.tgz
 RUN tar -xzvf /coredns.tgz
