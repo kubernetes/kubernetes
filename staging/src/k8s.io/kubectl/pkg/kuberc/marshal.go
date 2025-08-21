@@ -92,8 +92,8 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 		}
 
 		// if there was a strict decode error, check check whether the
-		// client-go credential plugin allowlist is the cause; if so, the
-		// allowlist is misconfigured and the operation should fail.
+		// client-go credential plugin allowlist is the cause. If so, the
+		// allowlist is a misconfigured security control and should therefore fail.
 		if pluginPathErr, ok := asAllowlistErr(strictDecodeErr); ok {
 			return nil, pluginPathErr
 		}
