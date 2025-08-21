@@ -28,8 +28,8 @@ import (
 	"fmt"
 	"strings"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -336,7 +336,7 @@ func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Con
 		return nil, false, nil
 	}
 
-	tok, err := jwt.ParseSigned(tokenData)
+	tok, err := jwt.ParseSigned(tokenData, []jose.SignatureAlgorithm{jose.EdDSA, jose.HS256, jose.HS384, jose.HS512, jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.ES256})
 	if err != nil {
 		return nil, false, nil
 	}
@@ -448,5 +448,5 @@ func GenerateToken(signer jose.Signer, iss string, claims *jwt.Claims, privateCl
 		Claims(&jwt.Claims{
 			Issuer: iss,
 		}).
-		CompactSerialize()
+		Serialize()
 }
