@@ -23,7 +23,6 @@ import (
 	pluginvalidatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus"
@@ -32,9 +31,8 @@ import (
 
 func newValidatingAdmissionPolicyStatusControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:                 names.ValidatingAdmissionPolicyStatusController,
-		initFunc:             startValidatingAdmissionPolicyStatusController,
-		requiredFeatureGates: []featuregate.Feature{},
+		name:     names.ValidatingAdmissionPolicyStatusController,
+		initFunc: startValidatingAdmissionPolicyStatusController,
 	}
 }
 
