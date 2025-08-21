@@ -378,3 +378,8 @@ func (cm *containerManagerImpl) PodHasExclusiveCPUs(pod *v1.Pod) bool {
 func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
 	return containerHasExclusiveCPUs(cm.cpuManager, pod, container)
 }
+
+func (cm *containerManagerImpl) CanAllocateExclusively(res v1.ResourceName) bool {
+	// run from the cheapest to the most expensive
+	return cm.cpuManager.CanAllocateExclusively(res) || cm.memoryManager.CanAllocateExclusively(res) || cm.deviceManager.CanAllocateExclusively(res)
+}

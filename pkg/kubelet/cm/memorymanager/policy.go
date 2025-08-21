@@ -45,4 +45,6 @@ type Policy interface {
 	GetPodTopologyHints(ctx context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 	// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 	GetAllocatableMemory(ctx context.Context, s state.State) []state.Block
+	// CanAllocateExclusively returns true if the policy can allocate exclusively CPUs
+	CanAllocateExclusively() bool
 }
