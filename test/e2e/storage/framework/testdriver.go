@@ -224,6 +224,9 @@ const (
 
 	// The driver supports ReadOnlyMany (ROX) access mode
 	CapReadOnlyMany Capability = "capReadOnlyMany"
+
+	// The driver supports SELinuxMount feature
+	CapSELinuxMount Capability = "seLinuxMount"
 )
 
 // DriverInfo represents static information about a TestDriver.
