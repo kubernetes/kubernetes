@@ -330,6 +330,10 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+	// PrevKV is the previous generation of the object in etcd.
+	// When WatchWithoutPrevKV is enabled, the prevKV field in etcd watch events will be excluded.
+	// The option is ignored for non-watch requests.
+	WatchWithoutPrevKV bool
 }
 
 // DeleteOptions provides the options that may be provided for storage delete operations.
@@ -391,3 +395,5 @@ type Stats struct {
 	// Value is an estimate, meaning it doesn't need to provide accurate nor consistent.
 	EstimatedAverageObjectSizeBytes int64
 }
+
+type ReverseKeyFunc func(key string) (name string, namespace string, err error)
