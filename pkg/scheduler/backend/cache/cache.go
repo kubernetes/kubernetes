@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -392,8 +392,8 @@ func (cache *cacheImpl) finishBinding(logger klog.Logger, pod *v1.Pod, now time.
 		return err
 	}
 
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
 
 	logger.V(5).Info("Finished binding for pod, can be expired", "podKey", key, "pod", klog.KObj(pod))
 	currState, ok := cache.podStates[key]

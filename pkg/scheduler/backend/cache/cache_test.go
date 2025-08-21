@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2122,4 +2123,31 @@ func (cache *cacheImpl) getNodeInfo(nodeName string) (*v1.Node, error) {
 	}
 
 	return n.info.Node(), nil
+}
+
+func TestConcurrentFinishBinding(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cache := newCache(ctx, 10*time.Second, time.Second, nil)
+	pod := makeBasePod(t, "node", "test-concurrent", "100m", "500Mi", "", nil)
+
+	// First assume the pod so that finishBinding can proceed
+	if err := cache.AssumePod(logger, pod); err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+
+	// Launch multiple goroutines to call finishBinding concurrently.
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = cache.finishBinding(logger, pod, time.Now())
+		}()
+	}
+
+	wg.Wait()
 }
