@@ -44,6 +44,8 @@ var (
 
 	aliasNameRegex = regexp.MustCompile("^[a-zA-Z]+$")
 	shortHandRegex = regexp.MustCompile("^-[a-zA-Z]+$")
+
+	emptyAllowlistItem = config.AllowlistItem{}
 )
 
 // PreferencesHandler is responsible for setting default flags
@@ -140,56 +142,40 @@ func (p *Preferences) applyAllowlist(cfg clientcmd.ClientConfig, kuberc *config.
 		return nil
 	}
 
-	absBin, err := exec.LookPath(rcfg.ExecProvider.Command)
+	pluginAbsPath, err := exec.LookPath(rcfg.ExecProvider.Command)
 	if err != nil {
 		return err
 	}
 
-	for _, e := range allowlist {
-		if isGreenlit(absBin, &e) {
+	for _, entry := range allowlist {
+		if isGreenlit(pluginAbsPath, entry) {
 			return nil
 		}
 	}
 
-	return fmt.Errorf("%q is not permitted by the credential plugin allowlist", absBin)
+	return fmt.Errorf("%q is not permitted by the credential plugin allowlist", pluginAbsPath)
 }
 
 // isGreenlit looks up the binary found at `absBin` and compares it against the
 // criteria specified in `alEntry`. All checks against nonempty criteria must
 // succeed for the binary to be greenlit.
-func isGreenlit(absBin string, alEntry *config.AllowlistItem) bool {
-	if entryIsEmpty(alEntry) {
+func isGreenlit(pluginAbsPath string, alEntry config.AllowlistItem) bool {
+	// if no fields are specified, this is a user error, and the entry must not
+	// allow anything
+	if alEntry == emptyAllowlistItem {
 		return false
 	}
 
-	if n := alEntry.Name; len(n) > 0 {
-		alAbsBin, err := exec.LookPath(alEntry.Name)
+	if entryName := alEntry.Name; len(entryName) > 0 {
+		entryAbsPath, err := exec.LookPath(entryName)
 		if err != nil {
-			klog.V(5).Infof("error looking up path for %q: %s", alEntry.Name, err)
+			klog.V(5).Infof("error looking up path for %q: %s", entryName, err)
 			return false
 		}
 
-		if absBin != alAbsBin {
+		if pluginAbsPath != entryAbsPath {
 			return false
 		}
-	}
-
-	return true
-}
-
-// entryIsEmpty determines whether all fields in an allowlist entry are empty.
-// This function should return `false` if *any* of the fields of the allowlist
-// are nonempty. This is not strictly needed while the only field in the
-// allowlist entry is `name`, but when other fields are added the empty check
-// will be more involved.
-func entryIsEmpty(entry *config.AllowlistItem) bool {
-	// This should never happen
-	if entry == nil {
-		return true
-	}
-
-	if len(entry.Name) > 0 {
-		return false
 	}
 
 	return true
