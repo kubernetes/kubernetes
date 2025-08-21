@@ -10,7 +10,6 @@ require (
 	github.com/golangci/misspell v0.6.0
 	github.com/jcchavezs/porto v0.6.0
 	github.com/vektra/mockery/v2 v2.53.3
-	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/mod v0.24.0
 	golang.org/x/tools v0.32.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1

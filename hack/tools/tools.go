@@ -32,9 +32,6 @@ import (
 	// mockery
 	_ "github.com/vektra/mockery/v2"
 
-	// tools like cpu
-	_ "go.uber.org/automaxprocs"
-
 	// for publishing bot
 	_ "golang.org/x/mod/modfile"
 	_ "k8s.io/publishing-bot/cmd/publishing-bot/config"
