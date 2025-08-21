@@ -134,6 +134,7 @@ func BuildGenericConfig(
 	if lastErr = s.SecureServing.ApplyTo(&genericConfig.SecureServing, &genericConfig.LoopbackClientConfig); lastErr != nil {
 		return
 	}
+	genericConfig.LoopbackClientConfig.Context = s.Context
 
 	// Use protobufs for self-communication.
 	// Since not every generic apiserver has to support protobufs, we
@@ -286,6 +287,7 @@ func CreateConfig(
 	[]admission.PluginInitializer,
 	error,
 ) {
+	fmt.Println("Create proxy transport...")
 	proxyTransport := CreateProxyTransport()
 
 	opts.Metrics.Apply()
@@ -316,12 +318,14 @@ func CreateConfig(
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		var err error
+		fmt.Println("Create Peer Endpoint reconciler...")
 		config.PeerEndpointLeaseReconciler, err = CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
 		if err != nil {
 			return nil, nil, err
 		}
 		if opts.PeerCAFile != "" {
 			leaseInformer := versionedInformers.Coordination().V1().Leases()
+			fmt.Println("Build peer proxy...")	
 			config.PeerProxy, err = BuildPeerProxy(
 				leaseInformer,
 				genericConfig.LoopbackClientConfig,
@@ -336,7 +340,7 @@ func CreateConfig(
 			}
 		}
 	}
-
+	fmt.Println("Create client CA content provider...")
 	clientCAProvider, err := opts.Authentication.ClientCert.GetClientCAContentProvider()
 	if err != nil {
 		return nil, nil, err
