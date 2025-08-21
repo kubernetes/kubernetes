@@ -717,7 +717,7 @@ type NamedRuleWithOperations struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.16
 
-// ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
+// ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects an object without changing it.
 type ValidatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
