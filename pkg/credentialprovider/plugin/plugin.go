@@ -210,6 +210,7 @@ func newPluginProvider(pluginBinDir string, provider kubeletconfig.CredentialPro
 
 	clock := clock.RealClock{}
 	return &pluginProvider{
+		name:                 provider.Name,
 		clock:                clock,
 		matchImages:          provider.MatchImages,
 		cache:                cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: clock}),
@@ -230,6 +231,7 @@ func newPluginProvider(pluginBinDir string, provider kubeletconfig.CredentialPro
 
 // pluginProvider is the plugin-based implementation of the DockerConfigProvider interface.
 type pluginProvider struct {
+	name  string
 	clock clock.Clock
 
 	sync.Mutex
@@ -390,8 +392,6 @@ func (c *cacheExpirationPolicy) IsExpired(entry *cache.TimestampedEntry) bool {
 // that the plugin can use this information to get the pod's service account and generate bound service account tokens
 // for plugins running in service account token mode.
 type perPodPluginProvider struct {
-	name string
-
 	provider *pluginProvider
 
 	podNamespace string
@@ -406,7 +406,19 @@ type perPodPluginProvider struct {
 // context was used (e.g., the plugin is not operating in service account token mode or no service
 // account was provided for the request).
 func (p *perPodPluginProvider) provideWithCoordinates(image string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates) {
-	return p.provider.provide(image, p.podNamespace, p.podName, p.podUID, p.serviceAccountName)
+	credentials, coordinates, err := p.provider.provide(image, p.podNamespace, p.podName, p.podUID, p.serviceAccountName)
+	if err == nil {
+		return credentials, coordinates
+	}
+
+	// If there was an error providing credentials, we log the error but do not return it.
+	if p.provider.serviceAccountProvider != nil {
+		klog.ErrorS(err, "Failed to provide credentials for image", "provider", p.provider.name, "image", image, "pod", klog.KRef(p.podNamespace, p.podName), "podUID", p.podUID, "serviceAccount", klog.KRef(p.podNamespace, p.serviceAccountName))
+	} else {
+		klog.ErrorS(err, "Failed to provide credentials for image", "provider", p.provider.name, "image", image)
+	}
+
+	return credentialprovider.DockerConfig{}, nil
 }
 
 // provide returns a credentialprovider.DockerConfig based on the credentials returned
@@ -414,9 +426,9 @@ func (p *perPodPluginProvider) provideWithCoordinates(image string) (credentialp
 // If ServiceAccountCoordinates is nil, it means no service account context was used
 // (e.g., the plugin is not operating in service account token mode or no service account
 // was provided for the request).
-func (p *pluginProvider) provide(image, podNamespace, podName string, podUID types.UID, serviceAccountName string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates) {
+func (p *pluginProvider) provide(image, podNamespace, podName string, podUID types.UID, serviceAccountName string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates, error) {
 	if !p.isImageAllowed(image) {
-		return credentialprovider.DockerConfig{}, nil
+		return credentialprovider.DockerConfig{}, nil, nil
 	}
 
 	var serviceAccountUID types.UID
@@ -429,8 +441,8 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 
 	if p.serviceAccountProvider != nil {
 		if len(serviceAccountName) == 0 && p.serviceAccountProvider.requireServiceAccount {
-			klog.V(5).Infof("Service account name is empty for pod %s/%s", podNamespace, podName)
-			return credentialprovider.DockerConfig{}, nil
+			klog.V(5).InfoS("Service account name is empty", "provider", p.name, "image", image, "pod", klog.KRef(podNamespace, podName), "podUID", podUID)
+			return credentialprovider.DockerConfig{}, nil, nil
 		}
 
 		// If the service account name is empty and the plugin has indicated that invoking the plugin
@@ -443,17 +455,15 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 					// The required annotation could be a mechanism for individual workloads to opt in to using service account tokens
 					// for image pull. If any of the required annotation is missing, we will not invoke the plugin. We will log the error
 					// at higher verbosity level as it could be noisy.
-					klog.V(5).Infof("Failed to get service account data %s/%s: %v", podNamespace, serviceAccountName, err)
-					return credentialprovider.DockerConfig{}, nil
+					klog.V(5).ErrorS(err, "Failed to get service account data", "provider", p.name, "image", image, "pod", klog.KRef(podNamespace, podName), "podUID", podUID, "serviceAccount", klog.KRef(podNamespace, serviceAccountName))
+					return credentialprovider.DockerConfig{}, nil, nil
 				}
 
-				klog.Errorf("Failed to get service account %s/%s: %v", podNamespace, serviceAccountName, err)
-				return credentialprovider.DockerConfig{}, nil
+				return credentialprovider.DockerConfig{}, nil, fmt.Errorf("failed to get service account: %w", err)
 			}
 
 			if serviceAccountToken, err = p.serviceAccountProvider.getServiceAccountToken(podNamespace, podName, serviceAccountName, serviceAccountUID, podUID); err != nil {
-				klog.Errorf("Error getting service account token %s/%s: %v", podNamespace, serviceAccountName, err)
-				return credentialprovider.DockerConfig{}, nil
+				return credentialprovider.DockerConfig{}, nil, fmt.Errorf("failed to get service account token: %w", err)
 			}
 			serviceAccountTokenHash = getHashIfNotEmpty(serviceAccountToken)
 
@@ -470,8 +480,7 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 
 			serviceAccountCacheKey, err = generateServiceAccountCacheKey(c)
 			if err != nil {
-				klog.Errorf("Error generating service account cache key: %v", err)
-				return credentialprovider.DockerConfig{}, nil
+				return credentialprovider.DockerConfig{}, nil, fmt.Errorf("error generating service account cache key: %w", err)
 			}
 
 			serviceAccountCoordinates = &credentialprovider.ServiceAccountCoordinates{
@@ -485,12 +494,11 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 	// Check if the credentials are cached and return them if found.
 	cachedConfig, found, errCache := p.getCachedCredentials(image, serviceAccountCacheKey)
 	if errCache != nil {
-		klog.Errorf("Failed to get cached docker config: %v", err)
-		return credentialprovider.DockerConfig{}, nil
+		return credentialprovider.DockerConfig{}, nil, fmt.Errorf("failed to get cached docker config: %w", errCache)
 	}
 
 	if found {
-		return cachedConfig, serviceAccountCoordinates
+		return cachedConfig, serviceAccountCoordinates, nil
 	}
 
 	// ExecPlugin is wrapped in single flight to exec plugin once for concurrent same image request.
@@ -508,8 +516,7 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 		// This does mean the singleflight key is different for each image pull request (even if the image is the same)
 		// and the workload is using the same service account.
 		if singleFlightKey, err = generateSingleFlightKey(image, serviceAccountTokenHash, saAnnotations); err != nil {
-			klog.Errorf("Error generating singleflight key: %v", err)
-			return credentialprovider.DockerConfig{}, nil
+			return credentialprovider.DockerConfig{}, nil, fmt.Errorf("error generating singleflight key: %w", err)
 		}
 	}
 	res, err, _ := p.group.Do(singleFlightKey, func() (interface{}, error) {
@@ -517,14 +524,12 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 	})
 
 	if err != nil {
-		klog.Errorf("Failed getting credential from external registry credential provider: %v", err)
-		return credentialprovider.DockerConfig{}, nil
+		return credentialprovider.DockerConfig{}, nil, fmt.Errorf("failed to get credential from external registry credential provider: %w", err)
 	}
 
 	response, ok := res.(*credentialproviderapi.CredentialProviderResponse)
 	if !ok {
-		klog.Errorf("Invalid response type returned by external credential provider")
-		return credentialprovider.DockerConfig{}, nil
+		return credentialprovider.DockerConfig{}, nil, fmt.Errorf("invalid response type returned by external credential provider: %T", res)
 	}
 	if len(serviceAccountToken) > 0 && p.serviceAccountProvider.cacheType != kubeletconfig.TokenServiceAccountTokenCacheType {
 		// validate that the response credentials are not the echoed token back verbatim when cache
@@ -532,8 +537,7 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 		// is returned as the registry credentials.
 		for _, authConfig := range response.Auth {
 			if authConfig.Password == serviceAccountToken {
-				klog.Errorf("Credential provider plugin returned the service account token as the password for image %q, which is not allowed when service account cache type is not set to 'Token'", image)
-				return credentialprovider.DockerConfig{}, nil
+				return credentialprovider.DockerConfig{}, nil, fmt.Errorf("credential provider plugin returned the service account token as the password which is not allowed when service account cache type is not set to 'Token'")
 			}
 		}
 	}
@@ -548,8 +552,7 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 	case credentialproviderapi.GlobalPluginCacheKeyType:
 		cacheKey = globalCacheKey
 	default:
-		klog.Errorf("credential provider plugin did not return a valid cacheKeyType: %q", cacheKeyType)
-		return credentialprovider.DockerConfig{}, nil
+		return credentialprovider.DockerConfig{}, nil, fmt.Errorf("credential provider plugin did not return a valid cacheKeyType: %s", cacheKeyType)
 	}
 
 	dockerConfig := make(credentialprovider.DockerConfig, len(response.Auth))
@@ -562,14 +565,14 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 
 	// cache duration was explicitly 0 so don't cache this response at all.
 	if response.CacheDuration != nil && response.CacheDuration.Duration == 0 {
-		return dockerConfig, serviceAccountCoordinates
+		return dockerConfig, serviceAccountCoordinates, nil
 	}
 
 	var expiresAt time.Time
 	// nil cache duration means use the default cache duration
 	if response.CacheDuration == nil {
 		if p.defaultCacheDuration == 0 {
-			return dockerConfig, serviceAccountCoordinates
+			return dockerConfig, serviceAccountCoordinates, nil
 		}
 		expiresAt = p.clock.Now().Add(p.defaultCacheDuration)
 	} else {
@@ -578,8 +581,7 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 
 	cacheKey, err = generateCacheKey(cacheKey, serviceAccountCacheKey)
 	if err != nil {
-		klog.Errorf("Error generating cache key: %v", err)
-		return credentialprovider.DockerConfig{}, nil
+		return credentialprovider.DockerConfig{}, nil, fmt.Errorf("error generating cache key: %w", err)
 	}
 
 	cachedEntry := &cacheEntry{
@@ -589,10 +591,12 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 	}
 
 	if err := p.cache.Add(cachedEntry); err != nil {
-		klog.Errorf("Error adding auth entry to cache: %v", err)
+		// If we fail to add the credentials to the cache, we still return the credentials
+		// to the caller, but we log an error.
+		return dockerConfig, serviceAccountCoordinates, fmt.Errorf("failed to add credentials to cache: %w", err)
 	}
 
-	return dockerConfig, serviceAccountCoordinates
+	return dockerConfig, serviceAccountCoordinates, nil
 }
 
 // isImageAllowed returns true if the image matches against the list of allowed matches by the plugin.
@@ -680,7 +684,7 @@ type execPlugin struct {
 // The plugin is expected to receive the CredentialProviderRequest API via stdin from the kubelet and
 // return CredentialProviderResponse via stdout.
 func (e *execPlugin) ExecPlugin(ctx context.Context, image, serviceAccountToken string, serviceAccountAnnotations map[string]string) (*credentialproviderapi.CredentialProviderResponse, error) {
-	klog.V(5).Infof("Getting image %s credentials from external exec plugin %s", image, e.name)
+	klog.V(5).InfoS("Getting image credentials from external exec plugin", "pluginName", e.name, "image", image)
 
 	authRequest := &credentialproviderapi.CredentialProviderRequest{Image: image, ServiceAccountToken: serviceAccountToken, ServiceAccountAnnotations: serviceAccountAnnotations}
 	data, err := e.encodeRequest(authRequest)
