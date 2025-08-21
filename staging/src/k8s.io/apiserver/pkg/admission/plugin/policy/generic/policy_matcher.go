@@ -66,6 +66,13 @@ func (c *matcher) DefinitionMatches(a admission.Attributes, o admission.ObjectIn
 	if constraints == nil {
 		return false, schema.GroupVersionResource{}, schema.GroupVersionKind{}, fmt.Errorf("policy contained no match constraints, a required field")
 	}
+	if constraints.NamespaceSelector == nil {
+		constraints.NamespaceSelector = &metav1.LabelSelector{}
+	}
+	if constraints.ObjectSelector == nil {
+		constraints.ObjectSelector = &metav1.LabelSelector{}
+	}
+
 	criteria := matchCriteria{constraints: constraints}
 	return c.Matcher.Matches(a, o, &criteria)
 }
@@ -75,6 +82,12 @@ func (c *matcher) BindingMatches(a admission.Attributes, o admission.ObjectInter
 	matchResources := binding.GetMatchResources()
 	if matchResources == nil {
 		return true, nil
+	}
+	if matchResources.NamespaceSelector == nil {
+		matchResources.NamespaceSelector = &metav1.LabelSelector{}
+	}
+	if matchResources.ObjectSelector == nil {
+		matchResources.ObjectSelector = &metav1.LabelSelector{}
 	}
 
 	criteria := matchCriteria{constraints: matchResources}
