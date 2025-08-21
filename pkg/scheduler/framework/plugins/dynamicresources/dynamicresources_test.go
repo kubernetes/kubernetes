@@ -634,6 +634,7 @@ func TestPlugin(t *testing.T) {
 		enableDRADeviceTaints            bool
 		disableDRASchedulerFilterTimeout bool
 		skipOnWindows                    string
+		failPatch                        bool
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
@@ -1305,6 +1306,26 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
+		"extended-resource-name-with-resources-fail-patch": {
+			enableDRAExtendedResource: true,
+			failPatch:                 true,
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaim: extendedResourceClaimNoName,
+				},
+				prebind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+					added:        []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
+					status:       fwk.NewStatus(fwk.Unschedulable, `patch error`),
+				},
+				postbind: result{
+					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
+				},
+			},
+		},
 		"extended-resource-name-with-resources-has-claim": {
 			enableDRAExtendedResource: true,
 			pod:                       podWithExtendedResourceName,
@@ -1728,7 +1749,7 @@ func TestPlugin(t *testing.T) {
 				EnableDRAPrioritizedList:           tc.enableDRAPrioritizedList,
 				EnableDRAExtendedResource:          tc.enableDRAExtendedResource,
 			}
-			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, features)
+			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, features, tc.failPatch)
 			initialObjects := testCtx.listAll(t)
 
 			status := testCtx.p.PreEnqueue(testCtx.ctx, tc.pod)
@@ -2042,7 +2063,7 @@ func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Obje
 	return updated
 }
 
-func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features) (result *testContext) {
+func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features, failPatch bool) (result *testContext) {
 	t.Helper()
 
 	tc := &testContext{}
@@ -2050,7 +2071,7 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	tc.ctx = tCtx
 
 	tc.client = fake.NewSimpleClientset(objs...)
-	reactor := createReactor(tc.client.Tracker())
+	reactor := createReactor(tc.client.Tracker(), failPatch)
 	tc.client.PrependReactor("*", "*", reactor)
 
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
@@ -2138,13 +2159,19 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 // fields to work when using the fake client. Add it with client.PrependReactor
 // to your fake client. ResourceVersion handling is required for conflict
 // detection during updates, which is covered by some scenarios.
-func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+func createReactor(tracker cgotesting.ObjectTracker, failPatch bool) func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
 	var nameCounter int
 	var uidCounter int
 	var resourceVersionCounter int
 	var mutex sync.Mutex
 
 	return func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+		if failPatch {
+			if _, ok := action.(cgotesting.PatchAction); ok {
+				return true, nil, errors.New("patch error")
+			}
+		}
+
 		createAction, ok := action.(cgotesting.CreateAction)
 		if !ok {
 			return false, nil, nil
@@ -2294,7 +2321,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, nil, tc.claims, nil, nil, features)
+			testCtx := setup(t, nil, nil, tc.claims, nil, nil, features, false)
 			oldObj := tc.oldObj
 			newObj := tc.newObj
 			if claim, ok := tc.newObj.(*resourceapi.ResourceClaim); ok {
@@ -2418,7 +2445,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, nil, tc.claims, nil, tc.objs, features)
+			testCtx := setup(t, nil, nil, tc.claims, nil, tc.objs, features, false)
 			gotHint, err := testCtx.p.isSchedulableAfterPodChange(logger, tc.pod, nil, tc.obj)
 			if tc.wantErr {
 				if err == nil {

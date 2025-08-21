@@ -1431,7 +1431,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod) []v1.C
 // bindClaim gets called by PreBind for claim which is not reserved for the pod yet.
 // It might not even be allocated. bindClaim then ensures that the allocation
 // and reservation are recorded. This finishes the work started in Reserve.
-func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (patchedClaim *resourceapi.ResourceClaim, finalErr error) {
+func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (*resourceapi.ResourceClaim, error) {
 	logger := klog.FromContext(ctx)
 	claim := state.claims.get(index)
 	allocation := state.informationsForClaim[index].allocation
@@ -1444,11 +1444,12 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		isExtendedResourceClaim = true
 	}
 	claimUIDs := []types.UID{claim.UID}
+	resourceClaimModified := false
 	defer func() {
 		if allocation != nil {
 			// The scheduler was handling allocation. Now that has
 			// completed, either successfully or with a failure.
-			if finalErr == nil {
+			if resourceClaimModified {
 				// This can fail, but only for reasons that are okay (concurrent delete or update).
 				// Shouldn't happen in this case.
 				if isExtendedResourceClaim {
@@ -1501,6 +1502,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		if err != nil {
 			return nil, fmt.Errorf("create claim for extended resources %v: %w", klog.KObj(claim), err)
 		}
+		resourceClaimModified = true
 		logger.V(5).Info("created claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
 
 		// Track the actual extended ResourceClaim from now.
@@ -1568,6 +1570,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			return fmt.Errorf("add reservation to claim %s: %w", klog.KObj(claim), err)
 		}
 		claim = updatedClaim
+		resourceClaimModified = true
 		return nil
 	})
 
