@@ -2030,15 +2030,20 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 
 		ginkgo.It("must run a pod with extended resource with one container three resources", func(ctx context.Context) {
+			var objects []klog.KMetadata
 			pod := b.Pod()
 			res := v1.ResourceList{}
 			for i := range 3 {
 				res[v1.ResourceName(drautils.ExtendedResourceName(i))] = resource.MustParse("1")
+				if i > 0 {
+					objects = append(objects, b.Class(i))
+				}
 			}
 			pod.Spec.Containers[0].Resources.Requests = res
 			pod.Spec.Containers[0].Resources.Limits = res
+			objects = append(objects, pod)
 
-			b.Create(ctx, pod)
+			b.Create(ctx, objects...)
 			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 			framework.ExpectNoError(err, "start pod")
 			containerEnv := []string{
@@ -2049,21 +2054,26 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
 		})
 		ginkgo.It("must run a pod with extended resource with three containers one resource each", func(ctx context.Context) {
+			var objects []klog.KMetadata
 			pod := b.Pod()
 			pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy())
 			pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy())
 			pod.Spec.Containers[0].Name = "container0"
 			pod.Spec.Containers[1].Name = "container1"
 			pod.Spec.Containers[2].Name = "container2"
+			objects = append(objects, pod)
 
 			for i := range 3 {
 				res := v1.ResourceList{}
 				res[v1.ResourceName(drautils.ExtendedResourceName(i))] = resource.MustParse("1")
 				pod.Spec.Containers[i].Resources.Requests = res
 				pod.Spec.Containers[i].Resources.Limits = res
+				if i > 0 {
+					objects = append(objects, b.Class(i))
+				}
 			}
 
-			b.Create(ctx, pod)
+			b.Create(ctx, objects...)
 			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 			framework.ExpectNoError(err, "start pod")
 			for i := range 3 {
@@ -2074,6 +2084,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}
 		})
 		ginkgo.It("must run a pod with extended resource with three containers multiple resources each", func(ctx context.Context) {
+			var objects []klog.KMetadata
 			pod := b.Pod()
 			pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy())
 			pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy())
@@ -2096,8 +2107,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			res[v1.ResourceName(drautils.ExtendedResourceName(5))] = resource.MustParse("1")
 			pod.Spec.Containers[2].Resources.Requests = res
 			pod.Spec.Containers[2].Resources.Limits = res
+			for i := 1; i < 6; i++ {
+				objects = append(objects, b.Class(i))
+			}
+			objects = append(objects, pod)
 
-			b.Create(ctx, pod)
+			b.Create(ctx, objects...)
 			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 			framework.ExpectNoError(err, "start pod")
 			containerEnv := []string{
@@ -2130,23 +2145,26 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		// The test runs two pods, one pod request extended resource backed by DRA,
 		// the other pod requests extended resource by device plugin.
 		f.It("must run pods with extended resource on dra nodes and device plugin nodes", f.WithSerial(), func(ctx context.Context) {
+			var objects []klog.KMetadata
 			extendedResourceName := deployDevicePlugin(ctx, f, nodes.ExtraNodeNames)
 			// drautils.ExtendedResourceName(-1) must be the same as the returned extendedResourceName
 			// drautils.ExtendedResourceName(-1) is used for DRA drivers
 			// extendedResourceName is used for device plugin.
-			gomega.Expect(string(extendedResourceName)).To(gomega.Equal(drautils.ExtendedResourceName(-1)))
+			gomega.Expect(string(extendedResourceName)).To(gomega.Equal(drautils.ExtendedResourceName(drautils.SingletonIndex)))
 
 			pod1 := b.Pod()
 			res := v1.ResourceList{}
-			res[v1.ResourceName(drautils.ExtendedResourceName(-1))] = resource.MustParse("2")
+			res[v1.ResourceName(drautils.ExtendedResourceName(drautils.SingletonIndex))] = resource.MustParse("2")
 			pod1.Spec.Containers[0].Resources.Requests = res
 			pod1.Spec.Containers[0].Resources.Limits = res
-			b.Create(ctx, pod1)
+			objects = append(objects, b.Class(drautils.SingletonIndex), pod1)
 
 			pod2 := b.Pod()
 			pod2.Spec.Containers[0].Resources.Requests = res
 			pod2.Spec.Containers[0].Resources.Limits = res
-			b.Create(ctx, pod2)
+			objects = append(objects, pod2)
+
+			b.Create(ctx, objects...)
 
 			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod1)
 			framework.ExpectNoError(err, "start pod1")
