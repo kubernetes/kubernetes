@@ -567,7 +567,7 @@ func initConfigz(ctx context.Context, kc *kubeletconfiginternal.KubeletConfigura
 }
 
 // makeEventRecorder sets up kubeDeps.Recorder if it's nil. It's a no-op otherwise.
-func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, nodeName types.NodeName) {
+func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, nodeName types.NodeName, eventsNamespace string) {
 	if kubeDeps.Recorder != nil {
 		return
 	}
@@ -577,7 +577,7 @@ func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, node
 	eventBroadcaster.StartStructuredLogging(3)
 	if kubeDeps.EventClient != nil {
 		logger.V(4).Info("Sending events to api server")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events(eventsNamespace)})
 	} else {
 		logger.Info("No api server defined - no events will be sent to API server")
 	}
@@ -774,7 +774,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// Setup event recorder if required.
-	makeEventRecorder(ctx, kubeDeps, nodeName)
+	makeEventRecorder(ctx, kubeDeps, nodeName, s.EventNamespace)
 
 	if kubeDeps.ContainerManager == nil {
 		if s.CgroupsPerQOS && s.CgroupRoot == "" {
