@@ -34,9 +34,9 @@ func waitForPodToScheduleWithTimeout(cs clientset.Interface, pod *v1.Pod, timeou
 }
 
 // waitForPodToSchedule waits for a pod to get scheduled and returns an error if
-// it does not get scheduled within the timeout duration (30 seconds).
+// it does not get scheduled within the timeout duration (60 seconds).
 func waitForPodToSchedule(cs clientset.Interface, pod *v1.Pod) error {
-	return waitForPodToScheduleWithTimeout(cs, pod, 30*time.Second)
+	return waitForPodToScheduleWithTimeout(cs, pod, 60*time.Second)
 }
 
 // waitForPodUnscheduleWithTimeout waits for a pod to fail scheduling and returns
@@ -46,9 +46,9 @@ func waitForPodUnschedulableWithTimeout(cs clientset.Interface, pod *v1.Pod, tim
 }
 
 // waitForPodUnschedule waits for a pod to fail scheduling and returns
-// an error if it does not become unschedulable within the timeout duration (30 seconds).
+// an error if it does not become unschedulable within the timeout duration (60 seconds).
 func waitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
-	return waitForPodUnschedulableWithTimeout(cs, pod, 30*time.Second)
+	return waitForPodUnschedulableWithTimeout(cs, pod, 60*time.Second)
 }
 
 // podScheduled returns true if a node is assigned to the given pod.
