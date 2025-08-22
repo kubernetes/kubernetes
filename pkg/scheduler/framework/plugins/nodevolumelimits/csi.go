@@ -62,7 +62,6 @@ type CSILimits struct {
 	pvLister      corelisters.PersistentVolumeLister
 	pvcLister     corelisters.PersistentVolumeClaimLister
 	scLister      storagelisters.StorageClassLister
-	vaLister      storagelisters.VolumeAttachmentLister
 	vaindexer     cache.Indexer
 
 	enableCSIMigrationPortworx bool
@@ -554,7 +553,6 @@ func NewCSI(_ context.Context, _ runtime.Object, handle framework.Handle, fts fe
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	csiNodesLister := informerFactory.Storage().V1().CSINodes().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
-	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
 	vaindexer := informerFactory.Storage().V1().VolumeAttachments().Informer().GetIndexer()
 	if err := informerFactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{"nodename": func(obj interface{}) ([]string, error) {
 		va, ok := obj.(*storagev1.VolumeAttachment)
@@ -572,7 +570,6 @@ func NewCSI(_ context.Context, _ runtime.Object, handle framework.Handle, fts fe
 		pvLister:                   pvLister,
 		pvcLister:                  pvcLister,
 		scLister:                   scLister,
-		vaLister:                   vaLister,
 		enableCSIMigrationPortworx: fts.EnableCSIMigrationPortworx,
 		randomVolumeIDPrefix:       rand.String(32),
 		translator:                 csiTranslator,
