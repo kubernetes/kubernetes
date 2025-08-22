@@ -461,6 +461,16 @@ func (jm *ControllerV2) syncCronJob(
 					cronJob.Status.LastSuccessfulTime = j.Status.CompletionTime
 					updateStatus = true
 				}
+			} else if jobutil.IsJobFailed(j) {
+				// a job does not have to be in active list, as long as it has completed successfully, we will process the timestamp
+				if cronJob.Status.LastFailureTime == nil {
+					cronJob.Status.LastFailureTime = j.Status.CompletionTime
+					updateStatus = true
+				}
+				if j.Status.CompletionTime != nil && j.Status.CompletionTime.After(cronJob.Status.LastFailureTime.Time) {
+					cronJob.Status.LastFailureTime = j.Status.CompletionTime
+					updateStatus = true
+				}
 			}
 
 		}
