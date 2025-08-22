@@ -147,6 +147,10 @@ func (in *CronJobStatus) DeepCopyInto(out *CronJobStatus) {
 		in, out := &in.LastSuccessfulTime, &out.LastSuccessfulTime
 		*out = (*in).DeepCopy()
 	}
+	if in.LastFailureTime != nil {
+		in, out := &in.LastFailureTime, &out.LastFailureTime
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 
