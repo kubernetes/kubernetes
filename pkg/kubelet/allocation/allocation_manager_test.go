@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -192,330 +191,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 	}
 }
 
-func getEventsFromFakeRecorder(t *testing.T, am Manager) string {
-	select {
-	case e := <-am.(*manager).recorder.(*record.FakeRecorder).Events:
-		return e
-	default:
-		return ""
-	}
-}
-
-func TestCheckPodResizeInProgress(t *testing.T) {
-	type testResources struct {
-		cpuReq, cpuLim, memReq, memLim int64
-	}
-	type testContainer struct {
-		allocated               testResources
-		actuated                *testResources
-		nonSidecarInit, sidecar bool
-		isRunning               bool
-		unstarted               bool // Whether the container is missing from the pod status
-	}
-
-	tests := []struct {
-		name                            string
-		containers                      []testContainer
-		oldPodResizeInProgressCondition bool
-		expectHasResize                 bool
-		expectPodResizeCompletedMsg     string
-	}{{
-		name: "simple running container",
-		containers: []testContainer{{
-			allocated: testResources{100, 100, 100, 100},
-			actuated:  &testResources{100, 100, 100, 100},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: true,
-		expectHasResize:                 false,
-		expectPodResizeCompletedMsg:     `Normal ResizeCompleted Pod resize completed: {"containers":[{"name":"c0","resources":{"limits":{"cpu":"100m","memory":"100"},"requests":{"cpu":"100m","memory":"100"}}}]}`,
-	}, {
-		name: "simple unstarted container",
-		containers: []testContainer{{
-			allocated: testResources{100, 100, 100, 100},
-			unstarted: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 false,
-	}, {
-		name: "simple resized container/cpu req",
-		containers: []testContainer{{
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{150, 200, 100, 200},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 true,
-	}, {
-		name: "simple resized container/cpu limit",
-		containers: []testContainer{{
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{100, 300, 100, 200},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 true,
-	}, {
-		name: "simple resized container/mem req",
-		containers: []testContainer{{
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{100, 200, 150, 200},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 true,
-	}, {
-		name: "simple resized container/cpu+mem req",
-		containers: []testContainer{{
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{150, 200, 150, 200},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 true,
-	}, {
-		name: "simple resized container/mem limit",
-		containers: []testContainer{{
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{100, 200, 100, 300},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 true,
-	}, {
-		name: "terminated resized container",
-		containers: []testContainer{{
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{200, 200, 100, 200},
-			isRunning: false,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 false,
-	}, {
-		name: "non-sidecar init container",
-		containers: []testContainer{{
-			allocated:      testResources{100, 200, 100, 200},
-			nonSidecarInit: true,
-			isRunning:      true,
-		}, {
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{100, 200, 100, 200},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 false,
-	}, {
-		name: "non-resized sidecar",
-		containers: []testContainer{{
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{100, 200, 100, 200},
-			sidecar:   true,
-			isRunning: true,
-		}, {
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{100, 200, 100, 200},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 false,
-	}, {
-		name: "resized sidecar",
-		containers: []testContainer{{
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{200, 200, 100, 200},
-			sidecar:   true,
-			isRunning: true,
-		}, {
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{100, 200, 100, 200},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 true,
-	}, {
-		name: "several containers and a resize",
-		containers: []testContainer{{
-			allocated:      testResources{100, 200, 100, 200},
-			nonSidecarInit: true,
-			isRunning:      true,
-		}, {
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{100, 200, 100, 200},
-			isRunning: true,
-		}, {
-			allocated: testResources{100, 200, 100, 200},
-			unstarted: true,
-		}, {
-			allocated: testResources{100, 200, 100, 200},
-			actuated:  &testResources{200, 200, 100, 200}, // Resized
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 true,
-	}, {
-		name: "several containers",
-		containers: []testContainer{{
-			allocated: testResources{cpuReq: 100, cpuLim: 200},
-			actuated:  &testResources{cpuReq: 100, cpuLim: 200},
-			sidecar:   true,
-			isRunning: true,
-		}, {
-			allocated: testResources{memReq: 100, memLim: 200},
-			actuated:  &testResources{memReq: 100, memLim: 200},
-			isRunning: true,
-		}, {
-			allocated: testResources{cpuReq: 200, memReq: 100},
-			actuated:  &testResources{cpuReq: 200, memReq: 100},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: true,
-		expectHasResize:                 false,
-		expectPodResizeCompletedMsg:     `Normal ResizeCompleted Pod resize completed: {"initContainers":[{"name":"c0","resources":{"limits":{"cpu":"200m"},"requests":{"cpu":"100m"}}}],"containers":[{"name":"c1","resources":{"limits":{"memory":"200"},"requests":{"memory":"100"}}},{"name":"c2","resources":{"requests":{"cpu":"200m","memory":"100"}}}]}`,
-	}, {
-		name: "best-effort pod",
-		containers: []testContainer{{
-			allocated: testResources{},
-			actuated:  &testResources{},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: true,
-		expectHasResize:                 false,
-		expectPodResizeCompletedMsg:     `Normal ResizeCompleted Pod resize completed: {"containers":[{"name":"c0","resources":{}}]}`,
-	}, {
-		name: "burstable pod/not resizing",
-		containers: []testContainer{{
-			allocated: testResources{cpuReq: 100},
-			actuated:  &testResources{cpuReq: 100},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 false,
-	}, {
-		name: "burstable pod/resized",
-		containers: []testContainer{{
-			allocated: testResources{cpuReq: 100},
-			actuated:  &testResources{cpuReq: 500},
-			isRunning: true,
-		}},
-		oldPodResizeInProgressCondition: false,
-		expectHasResize:                 true,
-	}}
-
-	mkRequirements := func(r testResources) v1.ResourceRequirements {
-		res := v1.ResourceRequirements{
-			Requests: v1.ResourceList{},
-			Limits:   v1.ResourceList{},
-		}
-		if r.cpuReq != 0 {
-			res.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(r.cpuReq, resource.DecimalSI)
-		}
-		if r.cpuLim != 0 {
-			res.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(r.cpuLim, resource.DecimalSI)
-		}
-		if r.memReq != 0 {
-			res.Requests[v1.ResourceMemory] = *resource.NewQuantity(r.memReq, resource.DecimalSI)
-		}
-		if r.memLim != 0 {
-			res.Limits[v1.ResourceMemory] = *resource.NewQuantity(r.memLim, resource.DecimalSI)
-		}
-		return res
-	}
-	mkContainer := func(index int, c testContainer) v1.Container {
-		container := v1.Container{
-			Name:      fmt.Sprintf("c%d", index),
-			Resources: mkRequirements(c.allocated),
-		}
-		if c.sidecar {
-			container.RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
-		}
-		return container
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-pod",
-					UID:  "12345",
-				},
-			}
-			podStatus := &kubecontainer.PodStatus{
-				ID:   pod.UID,
-				Name: pod.Name,
-			}
-
-			am := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{pod}, nil)
-			t.Cleanup(func() { am.RemovePod(pod.UID) })
-
-			for i, c := range test.containers {
-				// Add the container to the pod
-				container := mkContainer(i, c)
-				if c.nonSidecarInit || c.sidecar {
-					pod.Spec.InitContainers = append(pod.Spec.InitContainers, container)
-				} else {
-					pod.Spec.Containers = append(pod.Spec.Containers, container)
-				}
-
-				// Add the container to the pod status, if it's started.
-				if !test.containers[i].unstarted {
-					cs := kubecontainer.Status{
-						Name: container.Name,
-					}
-					if test.containers[i].isRunning {
-						cs.State = kubecontainer.ContainerStateRunning
-					} else {
-						cs.State = kubecontainer.ContainerStateExited
-					}
-					podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, &cs)
-				}
-
-				// Register the actuated container (if needed)
-				if c.actuated != nil {
-					actuatedContainer := container.DeepCopy()
-					actuatedContainer.Resources = mkRequirements(*c.actuated)
-					require.NoError(t, am.SetActuatedResources(pod, actuatedContainer))
-
-					fetched, found := am.GetActuatedResources(pod.UID, container.Name)
-					require.True(t, found)
-					assert.Equal(t, actuatedContainer.Resources, fetched)
-				} else {
-					_, found := am.GetActuatedResources(pod.UID, container.Name)
-					require.False(t, found)
-				}
-			}
-			require.NoError(t, am.SetAllocatedResources(pod))
-
-			am.(*manager).recorder = record.NewFakeRecorder(200)
-
-			// Set old Pod condition as Inprogress, so that ClearPodResizeInProgressCondition is true and emit resize completed event
-			if test.oldPodResizeInProgressCondition {
-				am.(*manager).statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", int64(1))
-			}
-
-			am.CheckPodResizeInProgress(pod, podStatus)
-
-			// Verify pod resize completed event is emitted
-			podResizeCompletionEvent := getEventsFromFakeRecorder(t, am)
-			assert.Equal(t, test.expectPodResizeCompletedMsg, podResizeCompletionEvent)
-
-			if test.expectHasResize {
-				// Verify the status manager has the InProgress condition set on it
-				gotResizeConditions := am.(*manager).statusManager.GetPodResizeConditions(pod.UID)
-				for _, c := range gotResizeConditions {
-					require.Equal(t, v1.PodResizeInProgress, c.Type, "ResizeConditions Type should be PodResizeInProgress")
-					require.Empty(t, c.Reason, "ResizeConditions Error")
-					require.Empty(t, c.Message, "ResizeConditions Message")
-				}
-			} else {
-				// Verify pod resize Inprogress condition is cleared
-				gotResizeConditions := am.(*manager).statusManager.GetPodResizeConditions(pod.UID)
-				require.Empty(t, gotResizeConditions, "ResizeConditions Error")
-			}
-		})
-	}
-}
-
-func TestHandlePodResourcesResize(t *testing.T) {
+func TestRetryPendingResizes(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
@@ -596,12 +272,19 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	testPod3.Name = "pod3"
 	testPod3.Namespace = "ns2"
 
+	const (
+		originalInProgressMsg = "original in-progress"
+		originalPendingMsg    = "original pending"
+	)
+
 	tests := []struct {
 		name                   string
 		originalRequests       v1.ResourceList
 		newRequests            v1.ResourceList
 		originalLimits         v1.ResourceList
 		newLimits              v1.ResourceList
+		originalInProgress     bool // Whether to prepopulate an in-progress condition.
+		originalPending        bool // Whether to prepopulate a pending condition.
 		newResourcesAllocated  bool // Whether the new requests have already been allocated (but not actuated)
 		expectedAllocatedReqs  v1.ResourceList
 		expectedAllocatedLims  v1.ResourceList
@@ -617,8 +300,9 @@ func TestHandlePodResourcesResize(t *testing.T) {
 
 			expectedResize: []*v1.PodCondition{
 				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
+					Type:    v1.PodResizeInProgress,
+					Status:  "True",
+					Message: "", // Expect the original InProgress condition to be cleared.
 				},
 			},
 			expectPodSyncTriggered: "true",
@@ -662,7 +346,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Type:    v1.PodResizePending,
 					Status:  "True",
 					Reason:  "Deferred",
-					Message: "",
+					Message: "Node didn't have enough resource: cpu",
 				},
 			},
 			expectPodSyncTriggered: "true",
@@ -716,18 +400,64 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                  "CPU increase in progress - expect InProgress",
+			name:                  "CPU increase in progress, resources unchanged - expect InProgress",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
 			newResourcesAllocated: true,
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
+			originalInProgress:    true,
+			originalPending:       true,
 
 			expectedResize: []*v1.PodCondition{
 				{
-					Type:   v1.PodResizeInProgress,
-					Status: "True",
+					Type:    v1.PodResizeInProgress,
+					Status:  "True",
+					Message: originalInProgressMsg, // Since the allocation didn't change, the condition isn't reset.
 				},
 			},
+			// Should trigger a sync since the conditions changed (to update status), even though
+			// the allocated resources are unchanged.
+			expectPodSyncTriggered: "true",
+		},
+		{
+			name:                  "CPU increase in progress, new allocation - expect InProgress reset",
+			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
+			originalInProgress:    true,
+			originalPending:       true,
+
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizeInProgress,
+					Status:  "True",
+					Message: "",
+				},
+			},
+			expectPodSyncTriggered: "true",
+		},
+		{
+			name:                  "Deferred resize doesn't clear in-progress status",
+			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2500M},
+			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			originalInProgress:    true,
+			originalPending:       true,
+
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  "Deferred",
+					Message: "Node didn't have enough resource: memory", // Deferred condition should be updated.
+				},
+				{
+					Type:    v1.PodResizeInProgress,
+					Status:  "True",
+					Message: originalInProgressMsg, // InProgress condition should be unchanged.
+				},
+			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "No resize",
@@ -862,16 +592,20 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				} else {
 					require.NoError(t, allocationManager.SetAllocatedResources(newPod))
 				}
-				require.NoError(t, allocationManager.SetActuatedResources(originalPod, nil))
 				t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
+
+				if tt.originalInProgress {
+					allocationManager.(*manager).statusManager.SetPodResizeInProgressCondition(originalPod.UID, "", originalInProgressMsg, 0)
+				}
+				if tt.originalPending {
+					allocationManager.(*manager).statusManager.SetPodResizePendingCondition(originalPod.UID, v1.PodReasonDeferred, originalPendingMsg, 0)
+				}
 
 				allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 					return newPod, true
 				}
 				allocationManager.PushPendingResize(originalPod.UID)
 				allocationManager.RetryPendingResizes(TriggerReasonPodUpdated)
-				allocatedPod, _ := allocationManager.UpdatePodFromAllocation(newPod)
-				allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
 
 				var updatedPod *v1.Pod
 				if allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID) || allocationManager.(*manager).statusManager.IsPodResizeDeferred(newPod.UID) {
@@ -895,16 +629,22 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				assert.Equal(t, tt.expectedAllocatedLims, alloc.Limits, "stored container limit allocation")
 
 				resizeStatus := allocationManager.(*manager).statusManager.GetPodResizeConditions(newPod.UID)
-				for i := range resizeStatus {
-					// Ignore probe time and last transition time during comparison.
-					resizeStatus[i].LastProbeTime = metav1.Time{}
-					resizeStatus[i].LastTransitionTime = metav1.Time{}
+				if assert.Len(t, resizeStatus, len(tt.expectedResize), "different number of resize conditions") {
+					for i := range resizeStatus {
+						// Ignore probe time and last transition time during comparison.
+						resizeStatus[i].LastProbeTime = metav1.Time{}
+						resizeStatus[i].LastTransitionTime = metav1.Time{}
 
-					// Message is a substring assertion, since it can change slightly.
-					assert.Contains(t, resizeStatus[i].Message, tt.expectedResize[i].Message)
-					resizeStatus[i].Message = tt.expectedResize[i].Message
+						// Message is a substring assertion, since it can change slightly.
+						if tt.expectedResize[i].Message != "" {
+							assert.Contains(t, resizeStatus[i].Message, tt.expectedResize[i].Message)
+						} else {
+							assert.Empty(t, resizeStatus[i].Message)
+						}
+						resizeStatus[i].Message = tt.expectedResize[i].Message
+					}
+					assert.Equal(t, tt.expectedResize, resizeStatus)
 				}
-				assert.Equal(t, tt.expectedResize, resizeStatus)
 				assert.Equal(t, tt.expectPodSyncTriggered, newPod.Annotations["pod-sync-triggered"], "pod sync annotation should be set")
 			})
 		}
@@ -912,9 +652,9 @@ func TestHandlePodResourcesResize(t *testing.T) {
 
 	expectedMetrics := `
 		# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
-        # TYPE kubelet_pod_infeasible_resizes_total counter
-        kubelet_pod_infeasible_resizes_total{reason_detail="insufficient_node_allocatable"} 4
-        kubelet_pod_infeasible_resizes_total{reason_detail="static_pod"} 2
+	    # TYPE kubelet_pod_infeasible_resizes_total counter
+	    kubelet_pod_infeasible_resizes_total{reason_detail="insufficient_node_allocatable"} 4
+	    kubelet_pod_infeasible_resizes_total{reason_detail="static_pod"} 2
 	`
 	assert.NoError(t, testutil.GatherAndCompare(
 		legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_pod_infeasible_resizes_total",
@@ -1122,8 +862,6 @@ func TestHandlePodResourcesResizeForGuanteedQOSPods(t *testing.T) {
 				allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{guaranteedQOSPod, guaranteedQOSPodWithSidecar, bestEffortPod}, &nodeConfig)
 
 				require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
-
-				require.NoError(t, allocationManager.SetActuatedResources(originalPod, nil))
 				t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
 
 				allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
@@ -1131,8 +869,6 @@ func TestHandlePodResourcesResizeForGuanteedQOSPods(t *testing.T) {
 				}
 				allocationManager.PushPendingResize(originalPod.UID)
 				allocationManager.RetryPendingResizes(TriggerReasonPodUpdated)
-				allocatedPod, _ := allocationManager.UpdatePodFromAllocation(newPod)
-				allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
 
 				var updatedPod *v1.Pod
 				if allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID) || allocationManager.(*manager).statusManager.IsPodResizeDeferred(newPod.UID) {
@@ -1303,7 +1039,6 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 			allocationManager := makeAllocationManager(t, runtime, []*v1.Pod{testPod}, nil)
 
 			require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
-			require.NoError(t, allocationManager.SetActuatedResources(originalPod, nil))
 			t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
 
 			allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
@@ -1311,8 +1046,6 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 			}
 			allocationManager.PushPendingResize(testPod.UID)
 			allocationManager.RetryPendingResizes(TriggerReasonPodUpdated)
-			allocatedPod, _ := allocationManager.UpdatePodFromAllocation(newPod)
-			allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
 
 			var updatedPod *v1.Pod
 			if allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID) {
@@ -1498,8 +1231,6 @@ func TestHandlePodResourcesResizeMultipleConditions(t *testing.T) {
 
 			allocationManager.PushPendingResize(testPod.UID)
 			allocationManager.RetryPendingResizes(TriggerReasonPodUpdated)
-			allocatedPod, _ := allocationManager.UpdatePodFromAllocation(testPod)
-			allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
 
 			conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(testPod.UID)
 			require.Len(t, conditions, len(tc.expectedConditions))
@@ -2041,7 +1772,6 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 
 			am := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{original}, nil)
 			require.NoError(t, am.SetAllocatedResources(original))
-			require.NoError(t, am.SetActuatedResources(original, nil))
 			if tc.hasPendingCondition {
 				am.(*manager).statusManager.SetPodResizePendingCondition(original.UID, v1.PodReasonDeferred, "message", 1)
 			}
