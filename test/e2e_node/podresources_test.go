@@ -1624,6 +1624,9 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				cpus := reservedSystemCPUs.String()
 				framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
 				initialConfig.ReservedSystemCPUs = cpus
+				if initialConfig.FeatureGates == nil {
+					initialConfig.FeatureGates = make(map[string]bool)
+				}
 				initialConfig.FeatureGates["KubeletPodResourcesListUseActivePods"] = false
 			})
 
