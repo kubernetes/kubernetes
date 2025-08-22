@@ -282,11 +282,13 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 			for {
 				switch d.DryRunStrategy {
 				case cmdutil.DryRunServer:
+					//nolint:errcheck
 					fmt.Fprintf(d.Out, "evicting pod %s/%s (server dry run)\n", activePod.Namespace, activePod.Name)
 				default:
 					if d.OnPodDeletionOrEvictionStarted != nil {
 						d.OnPodDeletionOrEvictionStarted(&activePod, true)
 					}
+					//nolint:errcheck
 					fmt.Fprintf(d.Out, "evicting pod %s/%s\n", activePod.Namespace, activePod.Name)
 				}
 				select {
@@ -304,6 +306,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 					returnCh <- nil
 					return
 				} else if apierrors.IsTooManyRequests(err) {
+					//nolint:errcheck
 					fmt.Fprintf(d.ErrOut, "error when evicting pods/%q -n %q (will retry after 5s): %v\n", activePod.Name, activePod.Namespace, err)
 					time.Sleep(5 * time.Second)
 				} else if !activePod.ObjectMeta.DeletionTimestamp.IsZero() && apierrors.IsForbidden(err) && apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
@@ -314,6 +317,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 				} else if apierrors.IsForbidden(err) && apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 					// an eviction request in a deleting namespace will throw a forbidden error,
 					// if the pod is not marked deleted, we retry until it is.
+					//nolint:errcheck
 					fmt.Fprintf(d.ErrOut, "error when evicting pod %q from terminating namespace %q (will retry after 5s): %v\n", activePod.Name, activePod.Namespace, err)
 					time.Sleep(5 * time.Second)
 				} else {
@@ -333,7 +337,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 			}
 			params := waitForDeleteParams{
 				ctx:                             ctx,
-				pods:                            []corev1.Pod{pod},
+				pods:                            []corev1.Pod{activePod},
 				interval:                        1 * time.Second,
 				timeout:                         time.Duration(math.MaxInt64),
 				usingEviction:                   true,
