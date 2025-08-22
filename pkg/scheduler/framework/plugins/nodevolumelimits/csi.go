@@ -19,6 +19,7 @@ package nodevolumelimits
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -592,14 +593,16 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
 	csiDriverLister := informerFactory.Storage().V1().CSIDrivers().Lister()
 	vaindexer := informerFactory.Storage().V1().VolumeAttachments().Informer().GetIndexer()
-	if err := informerFactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{"nodename": func(obj interface{}) ([]string, error) {
+	if err := informerFactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{vaIndexKey: func(obj interface{}) ([]string, error) {
 		va, ok := obj.(*storagev1.VolumeAttachment)
 		if !ok {
 			return []string{}, nil
 		}
 		return []string{va.Spec.NodeName}, nil
 	}}); err != nil {
-		return nil, fmt.Errorf("failed to add index to VA informer: %w", err)
+		if !strings.HasPrefix(err.Error(), "indexer conflict") {
+			return nil, fmt.Errorf("failed to add index to VA informer: %w", err)
+		}
 	}
 	csiTranslator := csitrans.New()
 
@@ -633,10 +636,12 @@ func getVolumeLimits(csiNode *storagev1.CSINode) map[string]int64 {
 	return nodeVolumeLimits
 }
 
+const vaIndexKey = "va.spec.nodename"
+
 // getNodeVolumeAttachmentInfo returns a map of volumeID to driver name for the given node.
 func (pl *CSILimits) getNodeVolumeAttachmentInfo(logger klog.Logger, nodeName string) (map[string]string, error) {
 	volumeAttachments := make(map[string]string)
-	vas, err := pl.vaindexer.ByIndex("nodename", nodeName)
+	vas, err := pl.vaindexer.ByIndex(vaIndexKey, nodeName)
 	if err != nil {
 		return nil, err
 	}
