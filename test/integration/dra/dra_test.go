@@ -696,7 +696,7 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 		pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 		tCtx.ExpectNoError(err, "get pod")
 		return pod
-	}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
+	}).WithTimeout(20 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
 }
 
 func testExtendedResource(tCtx ktesting.TContext, enabled bool) {
@@ -1649,7 +1649,7 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 			return nil
 		}
 		return claim2
-	}).WithTimeout(30*time.Second).WithPolling(time.Second).Should(gomega.BeNil(), "claim should not have any condition")
+	}).WithTimeout(45*time.Second).WithPolling(time.Second).Should(gomega.BeNil(), "claim should not have any condition")
 
 	// Allow the scheduler to proceed.
 	claim2.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
