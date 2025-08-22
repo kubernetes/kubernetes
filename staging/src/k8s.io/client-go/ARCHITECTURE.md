@@ -30,8 +30,8 @@ supporting different client models from a common base.
 
 *   **Content Negotiation:** The client uses HTTP `Accept` headers to negotiate the wire format
     (JSON or Protobuf). A key performance optimization using this mechanism is the ability to
-    request metadata-only lists via the `PartialObjectMetadataList` media type, which returns
-    objects containing only `TypeMeta` and `ObjectMeta`.
+    request metadata-only objects via the `as=PartialObjectMetadata;g=meta.k8s.io;v=v1` Accept custom parameter.
+    Also the `as=Table;g=meta.k8s.io;v=v1` Accept custom parameters may be used to request lists as tables. 
 *   **Subresources:** The client can target standard subresources like `/status` or `/scale` for
     object mutations, and it can also handle action-oriented subresources like `/logs` or
     `/exec`, which often involve streaming data.
@@ -83,7 +83,7 @@ several key components:
 *   **Apply Configurations:** The type-safe builders for Server-Side Apply.
 
 A contributor modifying a built-in API type **must** run the code generation scripts to update all
-of these dependent components.
+of these dependent components. For the Kubernetes project, `hack/update-codegen.sh` runs code generation.
 
 ## Controller Infrastructure
 
