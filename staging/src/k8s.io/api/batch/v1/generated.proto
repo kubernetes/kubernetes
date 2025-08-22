@@ -122,6 +122,10 @@ message CronJobStatus {
   // Information when was the last time the job successfully completed.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastSuccessfulTime = 5;
+
+  // Information when was the last time the job completed with failure.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastFailureTime = 6;
 }
 
 // Job represents the configuration of a single job.
