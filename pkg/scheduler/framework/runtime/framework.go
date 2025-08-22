@@ -1020,7 +1020,8 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 	// nominated pods are running because they are not running right now and in fact,
 	// they may end up getting scheduled to a different node.
 	logger := klog.FromContext(ctx)
-	if f.enableNamedLogging {
+	verboseLogs := logger.V(4).Enabled()
+	if verboseLogs && f.enableNamedLogging {
 		logger = klog.LoggerWithName(logger, "FilterWithNominatedPods")
 	}
 	ctx = klog.NewContext(ctx, logger)
