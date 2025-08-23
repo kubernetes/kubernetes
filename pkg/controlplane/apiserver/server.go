@@ -230,6 +230,18 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				err := c.Extra.PeerProxy.WaitForCacheSync(context.Done())
 				return err
 			})
+
+			// Register the new merged discovery endpoints.
+			s.GenericAPIServer.AddPostStartHookOrDie("register-merged-discovery-endpoints", func(context genericapiserver.PostStartHookContext) error {
+				mergedHandler := c.Generic.MergedDiscoveryHandler
+				if mergedHandler == nil {
+					return fmt.Errorf("MergedDiscoveryHandler not configured")
+				}
+
+				s.GenericAPIServer.Handler.NonGoRestfulMux.HandleFunc("/api/merged", mergedHandler.ServeHTTP)
+				s.GenericAPIServer.Handler.NonGoRestfulMux.HandleFunc("/apis/merged", mergedHandler.ServeHTTP)
+				return nil
+			})
 		}
 	}
 

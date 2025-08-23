@@ -23,11 +23,13 @@ import (
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/emicklei/go-restful/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 type WrappedHandler struct {
@@ -37,6 +39,15 @@ type WrappedHandler struct {
 }
 
 func (wrapped *WrappedHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	// Check if this is a specific merged discovery request.
+	if req.URL.Path == "/apis/merged" || req.URL.Path == "/api/merged" {
+		// Check if merged discovery feature is enabled
+		if !utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+			http.Error(resp, "Merged discovery not enabled", http.StatusNotImplemented)
+			return
+		}
+	}
+
 	mediaType, _ := negotiation.NegotiateMediaTypeOptions(req.Header.Get("Accept"), wrapped.s.SupportedMediaTypes(), DiscoveryEndpointRestrictions)
 	// mediaType.Convert looks at the request accept headers and is used to control whether the discovery document will be aggregated.
 	if IsAggregatedDiscoveryGVK(mediaType.Convert) {

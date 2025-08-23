@@ -117,6 +117,12 @@ type APIResourceDiscovery struct {
 	// +listType=map
 	// +listMapKey=subresource
 	Subresources []APISubresourceDiscovery `json:"subresources,omitempty" protobuf:"bytes,8,rep,name=subresources"`
+	// ServerIDs is a list of API server identifiers that serve this resource.
+	// This enables clients to understand which servers in a multi-server deployment
+	// are capable of handling requests for this resource type.
+	// +listType=set
+	// +optional
+	ServerIDs []string `json:"serverIds,omitempty" protobuf:"bytes,9,rep,name=serverIds"`
 }
 
 // ResourceScope is an enum defining the different scopes available to a resource.

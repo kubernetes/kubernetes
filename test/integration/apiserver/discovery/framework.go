@@ -717,3 +717,70 @@ func FindGroupVersionV2(discovery apidiscoveryv2.APIGroupDiscoveryList, gv metav
 
 	return nil
 }
+
+func FetchMergedDiscovery(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
+	result, err := client.
+		Discovery().
+		RESTClient().
+		Get().
+		AbsPath("/apis/merged").
+		SetHeader("Accept", acceptV2JSON).
+		Do(ctx).
+		Raw()
+
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch merged discovery: %w", err)
+	}
+
+	groupList := apidiscoveryv2.APIGroupDiscoveryList{}
+	err = json.Unmarshal(result, &groupList)
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse merged discovery: %w", err)
+	}
+
+	return groupList, nil
+}
+
+func FetchMergedDiscoveryWithServerIDs(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
+	result, err := client.
+		Discovery().
+		RESTClient().
+		Get().
+		AbsPath("/apis/merged").
+		Param("includeServerIds", "true").
+		SetHeader("Accept", acceptV2JSON).
+		Do(ctx).
+		Raw()
+
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch merged discovery with server IDs: %w", err)
+	}
+
+	groupList := apidiscoveryv2.APIGroupDiscoveryList{}
+	err = json.Unmarshal(result, &groupList)
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse merged discovery with server IDs: %w", err)
+	}
+
+	return groupList, nil
+}
+
+func WaitForMergedDiscoveryWithCondition(ctx context.Context, client testClient, condition func(result apidiscoveryv2.APIGroupDiscoveryList) bool) error {
+	return wait.PollUntilContextTimeout(
+		ctx,
+		5*time.Second,
+		30*time.Second,
+		true,
+		func(ctx context.Context) (done bool, err error) {
+			groupList, err := FetchMergedDiscovery(ctx, client)
+			if err != nil {
+				return false, err
+			}
+
+			if condition(groupList) {
+				return true, nil
+			}
+
+			return false, nil
+		})
+}

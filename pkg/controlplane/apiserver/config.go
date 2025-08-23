@@ -236,8 +236,13 @@ func BuildGenericConfig(
 		return
 	}
 
-	genericConfig.AggregatedDiscoveryGroupManager = aggregated.NewResourceManager("apis")
-
+	genericConfig.AggregatedDiscoveryGroupManager = aggregated.NewResourceManager("apis", genericConfig.APIServerID)
+	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+		genericConfig.MergedDiscoveryHandler = aggregated.NewMergedDiscoveryHandler(
+			genericConfig.AggregatedDiscoveryGroupManager,
+			genericConfig.APIServerID,
+		)
+	}
 	return
 }
 
@@ -323,6 +328,7 @@ func CreateConfig(
 		if opts.PeerCAFile != "" {
 			leaseInformer := versionedInformers.Coordination().V1().Leases()
 			config.PeerProxy, err = BuildPeerProxy(
+				config.Generic.MergedDiscoveryHandler,
 				leaseInformer,
 				genericConfig.LoopbackClientConfig,
 				opts.ProxyClientCertFile,
@@ -334,6 +340,10 @@ func CreateConfig(
 			if err != nil {
 				return nil, nil, err
 			}
+		}
+
+		if config.Generic.MergedDiscoveryHandler != nil {
+			config.Generic.MergedDiscoveryHandler.SetPeerDiscoveryProvider(config.PeerProxy)
 		}
 	}
 
