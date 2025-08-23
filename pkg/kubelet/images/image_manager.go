@@ -101,24 +101,63 @@ func NewImageManager(
 
 // imagePullPrecheck inspects the pull policy and checks for image presence accordingly,
 // returning (imageRef, error msg, err) and logging any errors.
-func (m *imageManager) imagePullPrecheck(ctx context.Context, objRef *v1.ObjectReference, logPrefix string, pullPolicy v1.PullPolicy, spec *kubecontainer.ImageSpec, requestedImage string) (imageRef string, msg string, err error) {
+func (m *imageManager) imagePullPrecheck(ctx context.Context, objRef *v1.ObjectReference, logPrefix string, pullPolicy v1.PullPolicy, pullSecrets []v1.Secret, spec *kubecontainer.ImageSpec, requestedImage string) (imageRef string, msg string, err error) {
+
 	switch pullPolicy {
+		
 	case v1.PullAlways:
+
+		// always pull image
 		return "", msg, nil
-	case v1.PullIfNotPresent, v1.PullNever:
+
+	case v1.PullIfNewerNotPresent:
+
+		// Get local image id (digest)
 		imageRef, err = m.imageService.GetImageRef(ctx, *spec)
 		if err != nil {
-			msg = fmt.Sprintf("Failed to inspect image %q: %v", imageRef, err)
+			msg = fmt.Sprintf("[PullIfNewerNotPresent] Failed to inspect image %q: %v", imageRef, err)
+			m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
+			return "", msg, ErrImageInspect
+		}
+
+		// Get remote image id (digest)
+		remoteImageRef, _ := GetRemoteImageDigestWithoutPull(ctx, requestedImage, pullSecrets)
+
+		// Compare digests if not match then pull image from remote
+		if remoteImageRef != imageRef {
+			msg = fmt.Sprintf("Remote image for %q changed (local=%s, remote=%s), will pull new one.", requestedImage, imageRef, remoteImageRef)
+			m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
+			return "", msg, err
+		}
+
+		msg = fmt.Sprintf("Remote image for %q is exactly the same (local=%s, remote=%s), using existing one.", requestedImage, imageRef, remoteImageRef)
+		m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
+
+	case v1.PullIfNotPresent:
+		// check if image exists and return image ID
+		imageRef, err = m.imageService.GetImageRef(ctx, *spec)
+		if err != nil {
+			msg = fmt.Sprintf("[PullIfNotPresent/PullNever] Failed to inspect image %q: %v", imageRef, err)
+			m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
+			return "", msg, ErrImageInspect
+		}
+	case v1.PullNever:
+		// check if image exists and return image ID
+		imageRef, err = m.imageService.GetImageRef(ctx, *spec)
+		if err != nil {
+			msg = fmt.Sprintf("[PullIfNotPresent/PullNever] Failed to inspect image %q: %v", imageRef, err)
 			m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
 			return "", msg, ErrImageInspect
 		}
 	}
 
+	// check if image doesn't exist and imagePullPolicy is set to "Never".
 	if len(imageRef) == 0 && pullPolicy == v1.PullNever {
 		msg, err = m.imageNotPresentOnNeverPolicyError(logPrefix, objRef, requestedImage)
 		return "", msg, err
 	}
 
+	// return image id (digest) if found or "" for pulling.
 	return imageRef, msg, nil
 }
 
@@ -173,7 +212,7 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		RuntimeHandler: podRuntimeHandler,
 	}
 
-	imageRef, message, err = m.imagePullPrecheck(ctx, objRef, logPrefix, pullPolicy, &spec, requestedImage)
+	imageRef, message, err = m.imagePullPrecheck(ctx, objRef, logPrefix, pullPolicy, pullSecrets, &spec, requestedImage)
 	if err != nil {
 		return "", message, err
 	}

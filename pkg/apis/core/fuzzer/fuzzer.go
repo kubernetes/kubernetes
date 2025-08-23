@@ -173,7 +173,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			q.MaxLimitRequestRatio[core.ResourceCPU] = resource.MustParse("10")
 		},
 		func(p *core.PullPolicy, c randfill.Continue) {
-			policies := []core.PullPolicy{core.PullAlways, core.PullNever, core.PullIfNotPresent}
+			policies := []core.PullPolicy{core.PullAlways, core.PullNever, core.PullIfNotPresent, core.PullIfNewerNotPresent}
 			*p = policies[c.Rand.Intn(len(policies))]
 		},
 		func(rp *core.RestartPolicy, c randfill.Continue) {

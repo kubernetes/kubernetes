@@ -47,13 +47,13 @@ const (
 	tableStart        = "\n.TS\nallbox;\n"
 	tableEnd          = ".TE\n"
 	tableCellStart    = "T{\n"
-	tableCellEnd      = "\nT}\n"
+	tableCellEnd      = "\nT}"
 	tablePreprocessor = `'\" t`
 )
 
 // NewRoffRenderer creates a new blackfriday Renderer for generating roff documents
 // from markdown
-func NewRoffRenderer() *roffRenderer { // nolint: golint
+func NewRoffRenderer() *roffRenderer {
 	return &roffRenderer{}
 }
 
@@ -316,9 +316,8 @@ func (r *roffRenderer) handleTableCell(w io.Writer, node *blackfriday.Node, ente
 		} else if nodeLiteralSize(node) > 30 {
 			end = tableCellEnd
 		}
-		if node.Next == nil && end != tableCellEnd {
-			// Last cell: need to carriage return if we are at the end of the
-			// header row and content isn't wrapped in a "tablecell"
+		if node.Next == nil {
+			// Last cell: need to carriage return if we are at the end of the header row.
 			end += crTag
 		}
 		out(w, end)
@@ -356,7 +355,7 @@ func countColumns(node *blackfriday.Node) int {
 }
 
 func out(w io.Writer, output string) {
-	io.WriteString(w, output) // nolint: errcheck
+	io.WriteString(w, output) //nolint:errcheck
 }
 
 func escapeSpecialChars(w io.Writer, text []byte) {
@@ -395,7 +394,7 @@ func escapeSpecialCharsLine(w io.Writer, text []byte) {
 			i++
 		}
 		if i > org {
-			w.Write(text[org:i]) // nolint: errcheck
+			w.Write(text[org:i]) //nolint:errcheck
 		}
 
 		// escape a character
@@ -403,7 +402,7 @@ func escapeSpecialCharsLine(w io.Writer, text []byte) {
 			break
 		}
 
-		w.Write([]byte{'\\', text[i]}) // nolint: errcheck
+		w.Write([]byte{'\\', text[i]}) //nolint:errcheck
 	}
 }
 

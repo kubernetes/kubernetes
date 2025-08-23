@@ -36,14 +36,19 @@ import (
 // ClientConfig.HostKeyAlgorithms, Signature.Format, or as AlgorithmSigner
 // arguments.
 const (
-	KeyAlgoRSA        = "ssh-rsa"
-	KeyAlgoDSA        = "ssh-dss"
-	KeyAlgoECDSA256   = "ecdsa-sha2-nistp256"
-	KeyAlgoSKECDSA256 = "sk-ecdsa-sha2-nistp256@openssh.com"
-	KeyAlgoECDSA384   = "ecdsa-sha2-nistp384"
-	KeyAlgoECDSA521   = "ecdsa-sha2-nistp521"
-	KeyAlgoED25519    = "ssh-ed25519"
-	KeyAlgoSKED25519  = "sk-ssh-ed25519@openssh.com"
+	KeyAlgoRSA = "ssh-rsa"
+	// Deprecated: DSA is only supported at insecure key sizes, and was removed
+	// from major implementations.
+	KeyAlgoDSA = InsecureKeyAlgoDSA
+	// Deprecated: DSA is only supported at insecure key sizes, and was removed
+	// from major implementations.
+	InsecureKeyAlgoDSA = "ssh-dss"
+	KeyAlgoECDSA256    = "ecdsa-sha2-nistp256"
+	KeyAlgoSKECDSA256  = "sk-ecdsa-sha2-nistp256@openssh.com"
+	KeyAlgoECDSA384    = "ecdsa-sha2-nistp384"
+	KeyAlgoECDSA521    = "ecdsa-sha2-nistp521"
+	KeyAlgoED25519     = "ssh-ed25519"
+	KeyAlgoSKED25519   = "sk-ssh-ed25519@openssh.com"
 
 	// KeyAlgoRSASHA256 and KeyAlgoRSASHA512 are only public key algorithms, not
 	// public key formats, so they can't appear as a PublicKey.Type. The
@@ -67,7 +72,7 @@ func parsePubKey(in []byte, algo string) (pubKey PublicKey, rest []byte, err err
 	switch algo {
 	case KeyAlgoRSA:
 		return parseRSA(in)
-	case KeyAlgoDSA:
+	case InsecureKeyAlgoDSA:
 		return parseDSA(in)
 	case KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521:
 		return parseECDSA(in)
@@ -77,7 +82,7 @@ func parsePubKey(in []byte, algo string) (pubKey PublicKey, rest []byte, err err
 		return parseED25519(in)
 	case KeyAlgoSKED25519:
 		return parseSKEd25519(in)
-	case CertAlgoRSAv01, CertAlgoDSAv01, CertAlgoECDSA256v01, CertAlgoECDSA384v01, CertAlgoECDSA521v01, CertAlgoSKECDSA256v01, CertAlgoED25519v01, CertAlgoSKED25519v01:
+	case CertAlgoRSAv01, InsecureCertAlgoDSAv01, CertAlgoECDSA256v01, CertAlgoECDSA384v01, CertAlgoECDSA521v01, CertAlgoSKECDSA256v01, CertAlgoED25519v01, CertAlgoSKED25519v01:
 		cert, err := parseCert(in, certKeyAlgoNames[algo])
 		if err != nil {
 			return nil, nil, err

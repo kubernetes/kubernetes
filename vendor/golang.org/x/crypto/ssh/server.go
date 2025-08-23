@@ -243,20 +243,13 @@ func NewServerConn(c net.Conn, config *ServerConfig) (*ServerConn, <-chan NewCha
 		fullConf.MaxAuthTries = 6
 	}
 	if len(fullConf.PublicKeyAuthAlgorithms) == 0 {
-		fullConf.PublicKeyAuthAlgorithms = supportedPubKeyAuthAlgos
+		fullConf.PublicKeyAuthAlgorithms = defaultPubKeyAuthAlgos
 	} else {
 		for _, algo := range fullConf.PublicKeyAuthAlgorithms {
-			if !contains(supportedPubKeyAuthAlgos, algo) {
+			if !contains(SupportedAlgorithms().PublicKeyAuths, algo) && !contains(InsecureAlgorithms().PublicKeyAuths, algo) {
 				c.Close()
 				return nil, nil, nil, fmt.Errorf("ssh: unsupported public key authentication algorithm %s", algo)
 			}
-		}
-	}
-	// Check if the config contains any unsupported key exchanges
-	for _, kex := range fullConf.KeyExchanges {
-		if _, ok := serverForbiddenKexAlgos[kex]; ok {
-			c.Close()
-			return nil, nil, nil, fmt.Errorf("ssh: unsupported key exchange %s for server", kex)
 		}
 	}
 
@@ -315,6 +308,7 @@ func (s *connection) serverHandshake(config *ServerConfig) (*Permissions, error)
 
 	// We just did the key change, so the session ID is established.
 	s.sessionID = s.transport.getSessionID()
+	s.algorithms = s.transport.getAlgorithms()
 
 	var packet []byte
 	if packet, err = s.transport.readPacket(); err != nil {

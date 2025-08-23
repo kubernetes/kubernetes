@@ -1178,7 +1178,7 @@
             "type": "string"
           },
           "imagePullPolicy": {
-            "description": "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images",
+            "description": "Image pull policy. One of Always, Never, IfNotPresent, IfNewerNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images",
             "type": "string"
           },
           "lifecycle": {
@@ -2199,7 +2199,7 @@
             "type": "string"
           },
           "imagePullPolicy": {
-            "description": "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images",
+            "description": "Image pull policy. One of Always, Never, IfNotPresent, IfNewerNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images",
             "type": "string"
           },
           "lifecycle": {

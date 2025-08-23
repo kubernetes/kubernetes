@@ -109,7 +109,6 @@ func noFGPullerTestCases() []pullerTestCase {
 						{Reason: "Pulled"},
 					}, ""},
 			}},
-
 		{ // image present, don't pull
 			testName:       "image present, allow all, don't pull ",
 			containerImage: "present_image",

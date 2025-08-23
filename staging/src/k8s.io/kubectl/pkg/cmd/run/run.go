@@ -534,7 +534,7 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (corev1.RestartPolic
 func verifyImagePullPolicy(cmd *cobra.Command) error {
 	pullPolicy := cmdutil.GetFlagString(cmd, "image-pull-policy")
 	switch corev1.PullPolicy(pullPolicy) {
-	case corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever:
+	case corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullIfNewerNotPresent, corev1.PullNever:
 		return nil
 	case "":
 		return nil
