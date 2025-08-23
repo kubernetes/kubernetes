@@ -19,6 +19,7 @@ package prober
 import (
 	"reflect"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +55,7 @@ func getTestRunningStatusWithStarted(started bool) v1.PodStatus {
 		Name:        testContainerName,
 		ContainerID: testContainerID.String(),
 	}
-	containerStatus.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.Now()}
+	containerStatus.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(time.Now().Add(time.Second))}
 	containerStatus.Started = &started
 	podStatus := v1.PodStatus{
 		Phase:             v1.PodRunning,

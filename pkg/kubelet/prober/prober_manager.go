@@ -276,6 +276,10 @@ func (m *manager) isContainerStarted(pod *v1.Pod, containerStatus *v1.ContainerS
 		return result == results.Success
 	}
 
+	if containerStatus.Started != nil && *containerStatus.Started {
+		return true
+	}
+
 	// if there is a startup probe which hasn't run yet, the container is not
 	// started.
 	if _, exists := m.getWorker(pod.UID, containerStatus.Name, startup); exists {
@@ -312,7 +316,35 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 					klog.InfoS("Failed to trigger a manual run", "probe", w.probeType.String())
 				}
 			}
+
+			var containerStartTime time.Time
+			if c.State.Running != nil {
+				containerStartTime = c.State.Running.StartedAt.Time
+			}
+
+			if !containerStartTime.IsZero() && containerStartTime.Before(m.start) {
+				hasReadinessProbe := false
+				for _, container := range pod.Spec.Containers {
+					if container.Name == c.Name {
+						hasReadinessProbe = container.ReadinessProbe != nil
+						break
+					}
+				}
+				if hasReadinessProbe {
+					podIsReady := false
+					for _, c := range pod.Status.Conditions {
+						if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+							podIsReady = true
+							break
+						}
+					}
+					if !podIsReady {
+						ready = false
+					}
+				}
+			}
 		}
+
 		podStatus.ContainerStatuses[i].Ready = ready
 	}
 
