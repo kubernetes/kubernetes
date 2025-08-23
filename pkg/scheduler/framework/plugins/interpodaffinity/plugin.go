@@ -125,6 +125,9 @@ func (pl *InterPodAffinity) mergeAffinityTermNamespacesIfNotEmpty(at fwk.Affinit
 	if at.NamespaceSelector.Empty() {
 		return nil
 	}
+	if _, selectable := at.NamespaceSelector.Requirements(); !selectable {
+		return nil
+	}
 	ns, err := pl.nsLister.List(at.NamespaceSelector)
 	if err != nil {
 		return err
