@@ -24,7 +24,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -185,6 +189,9 @@ func TestInitialDelay(t *testing.T) {
 			InitialDelaySeconds: 10,
 		})
 		m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(probeType != startup))
+
+		// Set initial result for test to pass.
+		resultsManager(m, probeType).Set(testContainerID, w.initialValue, w.pod)
 
 		expectContinue(t, w, w.doProbe(ctx), "during initial delay")
 		// Default value depends on probe, Success for liveness, Failure for readiness, Unknown for startup
@@ -621,6 +628,10 @@ func TestLivenessProbeDisabledByStarted(t *testing.T) {
 	m := newTestManager()
 	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(false))
+
+	// Set initial result for test to pass.
+	w.resultsManager.Set(testContainerID, w.initialValue, w.pod)
+
 	// livenessProbe fails, but is disabled
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg := "Not started, probe failure, result success"
@@ -658,4 +669,108 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	msg = "Started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
+}
+
+func TestDoProbeWithChangeContainerStatusOnKubeletRestart(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	baseStatus := getTestRunningStatus()
+	baseStatus.ContainerStatuses[0].ContainerID = "test://old_id"
+
+	restartedStatus := getTestRunningStatus()
+	restartedStatus.ContainerStatuses[0].ContainerID = "test://restarted_id"
+	restartedStatus.ContainerStatuses[0].Ready = false
+
+	notReadyStatus := getTestRunningStatus()
+	notReadyStatus.ContainerStatuses[0].ContainerID = "test://not_ready_id"
+	notReadyStatus.ContainerStatuses[0].Ready = false
+
+	readyStatus := getTestRunningStatus()
+	readyStatus.ContainerStatuses[0].ContainerID = "test://ready_id"
+	readyStatus.ContainerStatuses[0].Ready = true
+
+	enabledStatus := getTestRunningStatus()
+	enabledStatus.ContainerStatuses[0].ContainerID = "test://enabled_id"
+
+	tests := []struct {
+		name             string
+		featureEnabled   bool
+		isRestart        bool
+		probeType        probeType
+		updatedPodStatus v1.PodStatus
+		expectedResult   results.Result
+		expectSet        bool
+	}{
+		{
+			name:             "feature disabled, is a restart",
+			featureEnabled:   false,
+			isRestart:        true,
+			probeType:        readiness,
+			updatedPodStatus: restartedStatus,
+			expectedResult:   results.Failure,
+			expectSet:        true,
+		},
+		{
+			name:             "feature disabled, not a restart, not ready",
+			featureEnabled:   false,
+			isRestart:        false,
+			probeType:        readiness,
+			updatedPodStatus: notReadyStatus,
+			expectedResult:   results.Failure,
+			expectSet:        true,
+		},
+		{
+			name:             "feature disabled, not a restart, ready",
+			featureEnabled:   false,
+			isRestart:        false,
+			probeType:        readiness,
+			updatedPodStatus: readyStatus,
+			expectSet:        false,
+		},
+		{
+			name:             "feature enabled",
+			featureEnabled:   true,
+			isRestart:        false,
+			probeType:        readiness,
+			updatedPodStatus: enabledStatus,
+			expectedResult:   results.Failure,
+			expectSet:        true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, tc.featureEnabled)
+
+			m := newTestManager()
+			if tc.isRestart {
+				tc.updatedPodStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(-500 * time.Second)}
+			} else {
+				tc.updatedPodStatus.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(500 * time.Second)}
+			}
+
+			w := newTestWorker(m, tc.probeType, v1.Probe{InitialDelaySeconds: 1000})
+
+			m.statusManager.SetPodStatus(logger, w.pod, baseStatus)
+			w.doProbe(ctx)
+			if w.containerID.String() != baseStatus.ContainerStatuses[0].ContainerID {
+				t.Fatalf("worker containerID not set correctly, expected %s, got %s",
+					baseStatus.ContainerStatuses[0].ContainerID, w.containerID.String())
+			}
+
+			m.statusManager.SetPodStatus(logger, w.pod, tc.updatedPodStatus)
+			w.doProbe(ctx)
+
+			newContainerID := kubecontainer.ParseContainerID(tc.updatedPodStatus.ContainerStatuses[0].ContainerID)
+
+			result, ok := resultsManager(m, tc.probeType).Get(newContainerID)
+
+			if ok != tc.expectSet {
+				t.Errorf("Expected result to be set: %v, but got: %v", tc.expectSet, ok)
+			}
+			if tc.expectSet && result != tc.expectedResult {
+				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
+			}
+		})
+	}
 }
