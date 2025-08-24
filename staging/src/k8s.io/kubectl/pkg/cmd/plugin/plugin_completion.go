@@ -189,10 +189,23 @@ func pluginCompletion(cmd *cobra.Command, args []string, toComplete string) ([]s
 	// Recreate the plugin name from the commandPath
 	pluginName := strings.ReplaceAll(strings.ReplaceAll(cmd.CommandPath(), "-", "_"), " ", "-")
 
+	// First, try to find a matching completion executable
 	path, found := lookupCompletionExec(pluginName)
 	if !found {
-		cobra.CompDebugln(fmt.Sprintf("Plugin %s does not provide a matching completion executable", pluginName), true)
-		return nil, cobra.ShellCompDirectiveDefault
+		// If no matching completion executable is found, fallback to using the plugin executable
+		pluginExec := strings.ReplaceAll(pluginName, "_", "-")
+		cobra.CompDebugln(fmt.Sprintf("Plugin %s does not provide a matching completion executable. Fallback to using plugin executable: %[1]s with __complete", pluginExec), true)
+
+		// Check if the plugin executable exists in the PATH
+		pluginPath, err := exec.LookPath(pluginExec)
+		if err != nil || len(pluginPath) == 0 {
+			cobra.CompDebugln(fmt.Sprintf("Plugin executable %s not found", pluginExec), true)
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+
+		// Append the `__complete` argument to the plugin executable
+		args = append([]string{"__complete"}, args...)
+		path = pluginPath
 	}
 
 	args = append(args, toComplete)
