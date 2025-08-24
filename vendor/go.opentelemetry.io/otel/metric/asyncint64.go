@@ -105,7 +105,9 @@ type Int64ObservableUpDownCounterConfig struct {
 
 // NewInt64ObservableUpDownCounterConfig returns a new
 // [Int64ObservableUpDownCounterConfig] with all opts applied.
-func NewInt64ObservableUpDownCounterConfig(opts ...Int64ObservableUpDownCounterOption) Int64ObservableUpDownCounterConfig {
+func NewInt64ObservableUpDownCounterConfig(
+	opts ...Int64ObservableUpDownCounterOption,
+) Int64ObservableUpDownCounterConfig {
 	var config Int64ObservableUpDownCounterConfig
 	for _, o := range opts {
 		config = o.applyInt64ObservableUpDownCounter(config)
@@ -242,7 +244,9 @@ func (o int64CallbackOpt) applyInt64ObservableCounter(cfg Int64ObservableCounter
 	return cfg
 }
 
-func (o int64CallbackOpt) applyInt64ObservableUpDownCounter(cfg Int64ObservableUpDownCounterConfig) Int64ObservableUpDownCounterConfig {
+func (o int64CallbackOpt) applyInt64ObservableUpDownCounter(
+	cfg Int64ObservableUpDownCounterConfig,
+) Int64ObservableUpDownCounterConfig {
 	cfg.callbacks = append(cfg.callbacks, o.cback)
 	return cfg
 }
