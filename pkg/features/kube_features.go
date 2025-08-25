@@ -2069,7 +2069,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 }
 
-// defaultKuebrnetesFeatuerGateDependencies enumerates the dependencies of any feature gate that
+// defaultKubernetesFeatureGateDependencies enumerates the dependencies of any feature gate that
 // depends on another. Dependencies ensure that a dependent feature gate can only be enabled if all
 // of its dependencies are also enabled, and ensures a feature at a higher stability level cannot
 // depend on a less stable feature.
