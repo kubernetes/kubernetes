@@ -386,13 +386,11 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	}
 	// If we find a Pod that has not been created we create the Pod
 	if !isCreated(replicas[i]) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-			if isStale, err := ssc.podControl.PodClaimIsStale(set, replicas[i]); err != nil {
-				return true, err
-			} else if isStale {
-				// If a pod has a stale PVC, no more work can be done this round.
-				return true, err
-			}
+		if isStale, err := ssc.podControl.PodClaimIsStale(set, replicas[i]); err != nil {
+			return true, err
+		} else if isStale {
+			// If a pod has a stale PVC, no more work can be done this round.
+			return true, err
 		}
 		if err := ssc.podControl.CreateStatefulPod(ctx, set, replicas[i]); err != nil {
 			return true, err
@@ -440,14 +438,10 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	}
 
 	// Enforce the StatefulSet invariants
-	retentionMatch := true
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		var err error
-		retentionMatch, err = ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, replicas[i])
-		// An error is expected if the pod is not yet fully updated, and so return is treated as matching.
-		if err != nil {
-			retentionMatch = true
-		}
+	retentionMatch, err := ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, replicas[i])
+	// An error is expected if the pod is not yet fully updated, and so return is treated as matching.
+	if err != nil {
+		retentionMatch = true
 	}
 
 	if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) && retentionMatch {
@@ -623,21 +617,19 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	// Fix pod claims for condemned pods, if necessary.
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		fixPodClaim := func(i int) (bool, error) {
-			if matchPolicy, err := ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
+	fixPodClaim := func(i int) (bool, error) {
+		if matchPolicy, err := ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
+			return true, err
+		} else if !matchPolicy {
+			if err := ssc.podControl.UpdatePodClaimForRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
 				return true, err
-			} else if !matchPolicy {
-				if err := ssc.podControl.UpdatePodClaimForRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
-					return true, err
-				}
 			}
-			return false, nil
 		}
-		if shouldExit, err := runForAll(condemned, fixPodClaim, monotonic); shouldExit || err != nil {
-			updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, replicas, condemned)
-			return &status, err
-		}
+		return false, nil
+	}
+	if shouldExit, err := runForAll(condemned, fixPodClaim, monotonic); shouldExit || err != nil {
+		updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, replicas, condemned)
+		return &status, err
 	}
 
 	// At this point, in monotonic mode all of the current Replicas are Running, Ready and Available,
