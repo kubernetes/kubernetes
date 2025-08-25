@@ -23,13 +23,17 @@ import (
 	"net"
 	"testing"
 	"time"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"k8s.io/apiserver/pkg/util/compatibility"
+	"k8s.io/component-base/zpages/statusz"
 
 	v1 "k8s.io/api/core/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 )
-
 type fakeProxyServerLongRun struct{}
 
 // Run runs the specified ProxyServer.
@@ -563,5 +567,59 @@ func Test_checkBadIPConfig(t *testing.T) {
 				t.Errorf("expected fatal=%v, got %v", c.dsFatal, fatal)
 			}
 		})
+	}
+}
+
+// fakeMux matches the statusz mux interface used by statusz.Install:
+// it needs Handle(path, handler) and ListedPaths().
+type fakeMux struct {
+	handlers map[string]http.Handler
+	paths    []string
+}
+
+func newFakeMux(paths []string) *fakeMux {
+	return &fakeMux{
+		handlers: make(map[string]http.Handler),
+		paths:    paths,
+	}
+}
+
+func (m *fakeMux) Handle(path string, h http.Handler) { m.handlers[path] = h }
+func (m *fakeMux) ListedPaths() []string              { return m.paths }
+
+// Verifies that WithListedPaths(...) is plumbed into /statusz output.
+func TestStatuszRegistryReceivesListedPaths(t *testing.T) {
+	// These simulate what kube-proxy's mux would report.
+	wantPaths := []string{"/livez", "/readyz", "/healthz"}
+	m := newFakeMux(wantPaths)
+
+	// Mirror the production wiring in cmd/kube-proxy/app/server.go
+	reg := statusz.NewRegistry(
+		compatibility.DefaultBuildEffectiveVersion(),
+		statusz.WithListedPaths(m.ListedPaths()),
+	)
+	statusz.Install(m, "kube-proxy", reg)
+
+	// Grab the installed /statusz handler from our fake mux.
+	h, ok := m.handlers[statusz.DefaultStatuszPath]
+	if !ok {
+		t.Fatalf("statusz handler not installed at %q", statusz.DefaultStatuszPath)
+	}
+
+	// Serve a request to /statusz and validate the body includes the paths.
+	req := httptest.NewRequest(http.MethodGet, statusz.DefaultStatuszPath, nil)
+	req.Header.Add("Accept", "text/plain")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d; body:\n%s", rr.Code, rr.Body.String())
+	}
+
+	body := rr.Body.String()
+	for _, p := range wantPaths {
+		if !strings.Contains(body, p) {
+			t.Errorf("expected /statusz output to include %q; body was:\n%s", p, body)
+		}
 	}
 }
