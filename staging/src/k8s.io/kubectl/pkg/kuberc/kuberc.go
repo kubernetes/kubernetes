@@ -17,9 +17,11 @@ limitations under the License.
 package kuberc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/config"
 )
 
@@ -41,13 +44,15 @@ var (
 
 	aliasNameRegex = regexp.MustCompile("^[a-zA-Z]+$")
 	shortHandRegex = regexp.MustCompile("^-[a-zA-Z]+$")
+
+	emptyAllowlistItem = config.AllowlistItem{}
 )
 
 // PreferencesHandler is responsible for setting default flags
 // arguments based on user's kuberc configuration.
 type PreferencesHandler interface {
 	AddFlags(flags *pflag.FlagSet)
-	Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error)
+	Apply(rootCmd *cobra.Command, args []string, pluginName *string, errOut io.Writer) ([]string, error)
 }
 
 // Preferences stores the kuberc file coming either from environment variable
@@ -78,9 +83,9 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 	flags.String("kuberc", "", "Path to the kuberc file to use for preferences. This can be disabled by exporting KUBECTL_KUBERC=false feature gate or turning off the feature KUBERC=off.")
 }
 
-// Apply firstly applies the aliases in the preferences file and secondly overrides
-// the default values of flags.
-func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
+// Apply applies the aliases in the preferences file, overrides the default
+// values of flags, and checks configured credential plugins against the allowlist
+func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, pluginName *string, errOut io.Writer) ([]string, error) {
 	if len(args) <= 1 {
 		return args, nil
 	}
@@ -111,7 +116,65 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 	if err != nil {
 		return args, err
 	}
+
+	if pluginName != nil {
+		err = p.applyAllowlist(*pluginName, kuberc)
+		if err != nil {
+			return args, err
+		}
+	}
+
 	return args, nil
+}
+
+// applyAllowlist compares the configured credential plugin against all
+// criteria for each entry in the allowlist
+func (p *Preferences) applyAllowlist(pluginName string, kuberc *config.Preference) error {
+	// no allowlist provided. for backward compatibility, this must allow all
+	// plugins.
+	if kuberc.CredPluginAllowlist == nil {
+		return nil
+	}
+
+	allowlist := *kuberc.CredPluginAllowlist
+
+	pluginAbsPath, err := exec.LookPath(pluginName)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range allowlist {
+		if isGreenlit(pluginAbsPath, entry) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("%q is not permitted by the credential plugin allowlist", pluginAbsPath)
+}
+
+// isGreenlit looks up the binary found at `pluginAbsPath` and compares it against the
+// criteria specified in `alEntry`. All checks against nonempty criteria must
+// succeed for the binary to be greenlit.
+func isGreenlit(pluginAbsPath string, alEntry config.AllowlistItem) bool {
+	// if no fields are specified, this is a user error. To avoid fail-open
+	// behavior, an empty entry must not allow anything.
+	if alEntry == emptyAllowlistItem {
+		return false
+	}
+
+	if entryName := alEntry.Name; len(entryName) > 0 {
+		entryAbsPath, err := exec.LookPath(entryName)
+		if err != nil {
+			klog.V(5).Infof("error looking up path for %q: %s", entryName, err)
+			return false
+		}
+
+		if pluginAbsPath != entryAbsPath {
+			return false
+		}
+	}
+
+	return true
 }
 
 // applyOverrides finds the command and sets the defaulted flag values in kuberc.
@@ -320,11 +383,13 @@ func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference,
 		// if not explicitly requested, silently ignore missing kuberc
 		return nil, nil
 
+	case !explicitly && errors.Is(err, pluginAllowlistError):
+		return nil, err
+
 	case !explicitly && err != nil:
 		// if not explicitly requested, only warn on any other error
 		fmt.Fprintf(errOut, "kuberc: no preferences loaded from %s: %v", kubeRCFile, err) //nolint:errcheck
 		return nil, nil
-
 	default:
 		return preference, nil
 	}

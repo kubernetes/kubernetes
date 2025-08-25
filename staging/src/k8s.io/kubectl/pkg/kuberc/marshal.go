@@ -23,13 +23,18 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/config"
 	"k8s.io/kubectl/pkg/config/scheme"
+	"sigs.k8s.io/json"
 )
+
+var pluginAllowlistError = errors.New("plugin allowlist error")
 
 // decodePreference iterates over the yamls in kuberc file to find the supported kuberc version.
 // Once it finds, it returns the compatible kuberc object as well as accumulated errors during the iteration.
@@ -86,6 +91,13 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 			continue
 		}
 
+		// if there was a strict decode error, check check whether the
+		// client-go credential plugin allowlist is the cause. If so, the
+		// allowlist is a misconfigured security control and should therefore fail.
+		if pluginPathErr, ok := asAllowlistErr(strictDecodeErr); ok {
+			return nil, pluginPathErr
+		}
+
 		// we have a usable preferences to return
 		klog.V(5).Infof("kuberc: using entry %d (%s) in %s", attemptedItems, gvk.GroupVersion(), kubercFile)
 		return preferences, strictDecodeErr
@@ -98,4 +110,40 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 	// empty doc
 	klog.V(5).Infof("kuberc: no preferences found in %s", kubercFile)
 	return nil, nil
+}
+
+// asAllowlistErr returns a `pluginAllowlistError` and `true` when `err` is at
+// least partially the result of a misconfiguration of the credential plugin
+// allowlist. In all other cases, the boolean return value is `false` and the
+// input `err` is returned unaltered, including when it is `nil`.
+func asAllowlistErr(err error) (error, bool) {
+	const credPluginAllowlistKey = "credPluginAllowlist"
+
+	if err == nil {
+		return err, false
+	}
+
+	decodingErr, ok := runtime.AsStrictDecodingError(err)
+	if !ok {
+		return err, false
+	}
+
+	var fieldError json.FieldError
+	for _, subErr := range decodingErr.Errors() {
+		if errors.As(subErr, &fieldError) {
+			topLevel, subFields, hasSubfields := strings.Cut(fieldError.FieldPath(), ".")
+			if !strings.HasPrefix(topLevel, credPluginAllowlistKey) {
+				continue
+			}
+
+			retErr := pluginAllowlistError
+			if hasSubfields {
+				retErr = fmt.Errorf("%w: field %q is invalid", pluginAllowlistError, subFields)
+			}
+
+			return retErr, true
+		}
+	}
+
+	return err, false
 }
