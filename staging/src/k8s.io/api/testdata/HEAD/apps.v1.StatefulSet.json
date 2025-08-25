@@ -1982,7 +1982,8 @@
     },
     "ordinals": {
       "start": 1
-    }
+    },
+    "progressDeadlineSeconds": 12
   },
   "status": {
     "observedGeneration": 1,

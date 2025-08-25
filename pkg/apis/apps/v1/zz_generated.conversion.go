@@ -1217,6 +1217,7 @@ func autoConvert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1.StatefulS
 	out.MinReadySeconds = in.MinReadySeconds
 	out.PersistentVolumeClaimRetentionPolicy = (*apps.StatefulSetPersistentVolumeClaimRetentionPolicy)(unsafe.Pointer(in.PersistentVolumeClaimRetentionPolicy))
 	out.Ordinals = (*apps.StatefulSetOrdinals)(unsafe.Pointer(in.Ordinals))
+	// WARNING: in.ProgressDeadlineSeconds requires manual conversion: does not exist in peer-type
 	return nil
 }
 

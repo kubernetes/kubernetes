@@ -8750,6 +8750,13 @@ func schema_k8sio_api_apps_v1_StatefulSetSpec(ref common.ReferenceCallback) comm
 							Ref:         ref("k8s.io/api/apps/v1.StatefulSetOrdinals"),
 						},
 					},
+					"progressDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The StatefulSet controller will continue to process failed StatefulSets and a condition with a ProgressDeadlineExceeded reason will be surfaced in the StatefulSet status. Note that progress will not be estimated during the time a StatefulSet is paused. This field defaults to 600s.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 				Required: []string{"selector", "template"},
 			},

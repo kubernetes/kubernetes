@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"reflect"
 	"regexp"
@@ -1800,6 +1801,162 @@ func newStatefulSetWithLabels(replicas int32, name string, uid types.UID, labels
 			},
 			ServiceName: "governingsvc",
 		},
+	}
+}
+
+func TestStatefulSetConditions(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	set := newStatefulSet(3)
+	now := metav1.Now()
+
+	// Test NewStatefulSetCondition
+	condition := NewStatefulSetCondition(apps.StatefulSetProgressing, v1.ConditionTrue, "Creating", "Creating pods")
+	if condition.Type != apps.StatefulSetProgressing {
+		t.Errorf("Expected condition type %v, got %v", apps.StatefulSetProgressing, condition.Type)
+	}
+	if condition.Status != v1.ConditionTrue {
+		t.Errorf("Expected condition status %v, got %v", v1.ConditionTrue, condition.Status)
+	}
+	if condition.Reason != "Creating" {
+		t.Errorf("Expected condition reason %v, got %v", "Creating", condition.Reason)
+	}
+	if condition.Message != "Creating pods" {
+		t.Errorf("Expected condition message %v, got %v", "Creating pods", condition.Message)
+	}
+
+	// Test GetStatefulSetCondition
+	set.Status.Conditions = append(set.Status.Conditions, *condition)
+	gotCondition := GetStatefulSetCondition(set.Status, apps.StatefulSetProgressing)
+	if !reflect.DeepEqual(gotCondition, condition) {
+		t.Errorf("Expected condition %v, got %v", condition, gotCondition)
+	}
+	nonExistentCondition := GetStatefulSetCondition(set.Status, apps.StatefulSetAvailable)
+	if nonExistentCondition != nil {
+		t.Errorf("Expected nil condition, got %v", nonExistentCondition)
+	}
+
+	// Test SetStatefulSetCondition - Adding new condition
+	newCondition := NewStatefulSetCondition(apps.StatefulSetAvailable, v1.ConditionTrue, "MinimumReplicasAvailable", "Minimum replicas available")
+	SetStatefulSetCondition(&set.Status, *newCondition)
+	if len(set.Status.Conditions) != 2 {
+		t.Errorf("Expected 2 conditions, got %d", len(set.Status.Conditions))
+	}
+	gotNewCondition := GetStatefulSetCondition(set.Status, apps.StatefulSetAvailable)
+	if !reflect.DeepEqual(gotNewCondition, newCondition) {
+		t.Errorf("Expected condition %v, got %v", newCondition, gotNewCondition)
+	}
+
+	// Test SetStatefulSetCondition - Updating existing condition
+	updatedCondition := NewStatefulSetCondition(apps.StatefulSetProgressing, v1.ConditionFalse, "Completed", "StatefulSet rollout completed")
+	SetStatefulSetCondition(&set.Status, *updatedCondition)
+	if len(set.Status.Conditions) != 2 {
+		t.Errorf("Expected 2 conditions, got %d", len(set.Status.Conditions))
+	}
+	gotUpdatedCondition := GetStatefulSetCondition(set.Status, apps.StatefulSetProgressing)
+	if !reflect.DeepEqual(gotUpdatedCondition, updatedCondition) {
+		t.Errorf("Expected condition %v, got %v", updatedCondition, gotUpdatedCondition)
+	}
+
+	// Test StatefulSetProgressing
+	// Case 1: No status - create a new status with different values to show progress
+	emptySet := newStatefulSet(3)
+	newStatus1 := emptySet.Status.DeepCopy()
+	newStatus1.Replicas = 1 // Simulate progress from 0 to 1 replica
+	if !StatefulSetProgressing(emptySet, newStatus1) {
+		t.Error("Expected StatefulSetProgressing to return true for progress in replicas")
+	}
+
+	// Case 2: Different generation - create a new status with different values
+	set.Status.ObservedGeneration = set.Generation - 1
+	newStatus2 := set.Status.DeepCopy()
+	newStatus2.ReadyReplicas = 3 // Simulate progress from 2 to 3 ready replicas
+	if !StatefulSetProgressing(set, newStatus2) {
+		t.Error("Expected StatefulSetProgressing to return true when ready replicas increase")
+	}
+
+	// Case 3: Different replicas - create a new status with different values
+	set.Status.ObservedGeneration = set.Generation
+	set.Status.UpdateRevision = "test"
+	set.Status.CurrentRevision = "test"
+	set.Status.ReadyReplicas = 2
+	newStatus3 := set.Status.DeepCopy()
+	newStatus3.Replicas = 4 // Simulate scaling up from 3 to 4 replicas
+	if !StatefulSetProgressing(set, newStatus3) {
+		t.Error("Expected StatefulSetProgressing to return true when replicas increase")
+	}
+
+	// Test case where no progress is made
+	newStatusNoProgress := set.Status.DeepCopy()
+	if StatefulSetProgressing(set, newStatusNoProgress) {
+		t.Error("Expected StatefulSetProgressing to return false when no progress is made")
+	}
+
+	// Test StatefulSetTimedOut
+	timeout := int32(300)
+	set.Spec.ProgressDeadlineSeconds = &timeout
+	newStatus := set.Status.DeepCopy()
+	timeoutCondition := NewStatefulSetCondition(apps.StatefulSetProgressing, v1.ConditionTrue, "", "")
+	timeoutCondition.LastTransitionTime = metav1.NewTime(now.Add(-time.Second * time.Duration(timeout+1)))
+	SetStatefulSetCondition(newStatus, *timeoutCondition)
+	if !StatefulSetTimedOut(ctx, set, newStatus) {
+		t.Error("Expected StatefulSetTimedOut to return true when deadline exceeded")
+	}
+
+	// Test RemoveStatefulSetCondition
+	RemoveStatefulSetCondition(&set.Status, apps.StatefulSetProgressing)
+	if GetStatefulSetCondition(set.Status, apps.StatefulSetProgressing) != nil {
+		t.Error("RemoveStatefulSetCondition didn't remove the condition")
+	}
+
+	// Test filterOutStatefulSetCondition
+	conditions := []apps.StatefulSetCondition{
+		*NewStatefulSetCondition(apps.StatefulSetProgressing, v1.ConditionTrue, "Creating", "Creating pods"),
+		*NewStatefulSetCondition(apps.StatefulSetAvailable, v1.ConditionTrue, "MinimumReplicasAvailable", "Minimum replicas available"),
+	}
+	filtered := filterOutStatefulSetCondition(conditions, apps.StatefulSetProgressing)
+	if len(filtered) != 1 || filtered[0].Type != apps.StatefulSetAvailable {
+		t.Error("filterOutStatefulSetCondition didn't correctly filter the condition")
+	}
+
+	// Test HasProgressDeadline
+	setWithDeadline := newStatefulSet(3)
+	deadline := int32(300)
+	setWithDeadline.Spec.ProgressDeadlineSeconds = &deadline
+	if !HasProgressDeadline(setWithDeadline) {
+		t.Error("HasProgressDeadline returned false for set with deadline")
+	}
+
+	maxInt32 := int32(math.MaxInt32)
+	setWithMaxDeadline := newStatefulSet(3)
+	setWithMaxDeadline.Spec.ProgressDeadlineSeconds = &maxInt32
+	if HasProgressDeadline(setWithMaxDeadline) {
+		t.Error("HasProgressDeadline returned true for set with max deadline")
+	}
+
+	setWithNoDeadline := newStatefulSet(3)
+	if HasProgressDeadline(setWithNoDeadline) {
+		t.Error("HasProgressDeadline returned true for set without deadline")
+	}
+
+	// Test StatefulSetComplete
+	completeSet := newStatefulSet(3)
+	completeSet.Status.Replicas = 3
+	completeSet.Status.ReadyReplicas = 3
+	completeSet.Status.UpdatedReplicas = 3
+	completeSet.Status.AvailableReplicas = 3
+	completeSet.Status.ObservedGeneration = completeSet.Generation
+	if !StatefulSetComplete(completeSet, &completeSet.Status) {
+		t.Error("StatefulSetComplete returned false for complete set")
+	}
+
+	incompleteSet := newStatefulSet(3)
+	incompleteSet.Status.Replicas = 2
+	incompleteSet.Status.ReadyReplicas = 2
+	incompleteSet.Status.UpdatedReplicas = 2
+	incompleteSet.Status.AvailableReplicas = 2
+	incompleteSet.Status.ObservedGeneration = incompleteSet.Generation
+	if StatefulSetComplete(incompleteSet, &incompleteSet.Status) {
+		t.Error("StatefulSetComplete returned true for incomplete set")
 	}
 }
 

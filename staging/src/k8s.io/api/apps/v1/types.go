@@ -265,6 +265,14 @@ type StatefulSetSpec struct {
 	// increments the index by one for each additional replica requested.
 	// +optional
 	Ordinals *StatefulSetOrdinals `json:"ordinals,omitempty" protobuf:"bytes,11,opt,name=ordinals"`
+
+	// The maximum time in seconds for a deployment to make progress before it
+	// is considered to be failed. The StatefulSet controller will continue to
+	// process failed StatefulSets and a condition with a ProgressDeadlineExceeded
+	// reason will be surfaced in the StatefulSet status. Note that progress will
+	// not be estimated during the time a StatefulSet is paused. This field defaults to 600s.
+	// +optional
+	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,12,opt,name=progressDeadlineSeconds"`
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
@@ -316,6 +324,18 @@ type StatefulSetStatus struct {
 }
 
 type StatefulSetConditionType string
+
+const (
+	// Progressing means the statefulset is progressing. Progress for a statefulset is
+	// considered when new pods are created, old pods are updated (or terminated) in their
+	// ordinal order, or when both. Progress is not estimated for paused statefulsets or
+	// when progressDeadlineSeconds is not specified.
+	StatefulSetProgressing StatefulSetConditionType = "Progressing"
+
+	// Available means the statefulset is available, ie. at least the minimum available
+	// replicas required are up and running for at least minReadySeconds.
+	StatefulSetAvailable StatefulSetConditionType = "Available"
+)
 
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetCondition struct {

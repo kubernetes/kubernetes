@@ -358,6 +358,7 @@ var map_StatefulSetSpec = map[string]string{
 	"minReadySeconds":                      "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 	"persistentVolumeClaimRetentionPolicy": "persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent volume claims created from volumeClaimTemplates. By default, all persistent volume claims are created as needed and retained until manually deleted. This policy allows the lifecycle to be altered, for example by deleting persistent volume claims when their stateful set is deleted, or when their pod is scaled down.",
 	"ordinals":                             "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested.",
+	"progressDeadlineSeconds":              "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The StatefulSet controller will continue to process failed StatefulSets and a condition with a ProgressDeadlineExceeded reason will be surfaced in the StatefulSet status. Note that progress will not be estimated during the time a StatefulSet is paused. This field defaults to 600s.",
 }
 
 func (StatefulSetSpec) SwaggerDoc() map[string]string {
