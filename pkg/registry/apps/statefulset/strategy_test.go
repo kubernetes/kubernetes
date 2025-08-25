@@ -331,15 +331,6 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 	}
 }
 
-// generateStatefulSetWithMinReadySeconds generates a StatefulSet with min values
-func generateStatefulSetWithMinReadySeconds(minReadySeconds int32) *apps.StatefulSet {
-	return &apps.StatefulSet{
-		Spec: apps.StatefulSetSpec{
-			MinReadySeconds: minReadySeconds,
-		},
-	}
-}
-
 func makeStatefulSetWithMaxUnavailable(maxUnavailable *int) *apps.StatefulSet {
 	rollingUpdate := apps.RollingUpdateStatefulSetStrategy{}
 	if maxUnavailable != nil {
@@ -368,24 +359,6 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 		oldSS                *apps.StatefulSet
 		expectedSS           *apps.StatefulSet
 	}{
-		{
-			name:       "set minReadySeconds, no update",
-			ss:         generateStatefulSetWithMinReadySeconds(10),
-			oldSS:      generateStatefulSetWithMinReadySeconds(20),
-			expectedSS: generateStatefulSetWithMinReadySeconds(10),
-		},
-		{
-			name:       "set minReadySeconds, oldSS field set to nil",
-			ss:         generateStatefulSetWithMinReadySeconds(10),
-			oldSS:      nil,
-			expectedSS: generateStatefulSetWithMinReadySeconds(10),
-		},
-		{
-			name:       "set minReadySeconds, oldSS field is set to 0",
-			ss:         generateStatefulSetWithMinReadySeconds(10),
-			oldSS:      generateStatefulSetWithMinReadySeconds(0),
-			expectedSS: generateStatefulSetWithMinReadySeconds(10),
-		},
 		{
 			name:       "MaxUnavailable not enabled, field not used",
 			ss:         makeStatefulSetWithMaxUnavailable(nil),
