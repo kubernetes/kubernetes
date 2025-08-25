@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -169,6 +170,9 @@ type MutableVersionedFeatureGate interface {
 	GetAllVersioned() map[Feature]VersionedSpecs
 	// AddVersioned adds versioned feature specs to the featureGate.
 	AddVersioned(features map[Feature]VersionedSpecs) error
+	// AddDependencies marks features that depend on other features. Must be called after all
+	// referenced features have already been added (dependents & depnedencies). Cycles are forbidden.
+	AddDependencies(features map[Feature][]Feature) error
 	// OverrideDefaultAtVersion sets a local override for the registered default value of a named
 	// feature for the prerelease lifecycle the given version is at.
 	// If the feature has not been previously registered (e.g. by a call to Add),
@@ -203,7 +207,8 @@ type featureGate struct {
 	// known holds a map[Feature]FeatureSpec
 	known atomic.Value
 	// enabled holds a map[Feature]bool
-	enabled atomic.Value
+	enabled      atomic.Value
+	dependencies atomic.Pointer[map[Feature][]Feature]
 	// enabledRaw holds a raw map[string]bool of the parsed flag.
 	// It keeps the original values of "special" features like "all alpha gates",
 	// while enabled keeps the values of all resolved features.
@@ -264,6 +269,7 @@ func NewVersionedFeatureGate(emulationVersion *version.Version) *featureGate {
 		special:         specialFeatures,
 	}
 	f.known.Store(known)
+	f.dependencies.Store(new(map[Feature][]Feature))
 	f.enabled.Store(map[Feature]bool{})
 	f.enabledRaw.Store(map[string]bool{})
 	f.emulationVersion.Store(emulationVersion)
@@ -309,7 +315,27 @@ func (f *featureGate) Validate() []error {
 		return []error{fmt.Errorf("cannot cast enabledRaw to map[string]bool")}
 	}
 	enabled := map[Feature]bool{}
-	return f.unsafeSetFromMap(enabled, m, f.EmulationVersion())
+	errs := f.unsafeSetFromMap(enabled, m, f.EmulationVersion())
+
+	dependencies := *f.dependencies.Load()
+	known := f.known.Load().(map[Feature]VersionedSpecs)
+	for feature, deps := range dependencies {
+		if !featureEnabled(feature, enabled, known, f.EmulationVersion()) {
+			continue
+		}
+
+		var disabledDeps []Feature
+		for _, dep := range deps {
+			if !featureEnabled(dep, enabled, known, f.EmulationVersion()) {
+				disabledDeps = append(disabledDeps, dep)
+			}
+		}
+		if len(disabledDeps) > 0 {
+			errs = append(errs, fmt.Errorf("cannot enable %s since it depends on disabled features: %v", feature, disabledDeps))
+		}
+	}
+
+	return errs
 }
 
 // unsafeSetFromMap stores flag gates for known features from a map[string]bool into an enabled map.
@@ -471,6 +497,106 @@ func (f *featureGate) AddVersioned(features map[Feature]VersionedSpecs) error {
 
 	// Persist updated state
 	f.known.Store(known)
+
+	return nil
+}
+
+// AddDependencies adds feature gate dependencies.
+func (f *featureGate) AddDependencies(dependencies map[Feature][]Feature) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if f.closed {
+		return fmt.Errorf("cannot add a feature gate dependency after adding it to the flag set")
+	}
+	// Copy existing state
+	known := f.GetAllVersioned()
+
+	// Merge existing dependencies in.
+	existing := *f.dependencies.Load()
+	for k, v := range existing {
+		dependencies[k] = append(dependencies[k], v...)
+	}
+
+	// Sort and compact all dependency lists.
+	for k, v := range dependencies {
+		slices.Sort(v)
+		dependencies[k] = slices.Compact(v)
+	}
+
+	// Features cannot depend on features with a lower prerelease level.
+	// This function converts prereleases to a numerical value for comparison.
+	stabilityOrder := func(p prerelease) int {
+		switch p {
+		case Deprecated:
+			return 0 // Non-deprecated features cannot depend on deprecated features.
+		case PreAlpha:
+			return 1
+		case Alpha:
+			return 2
+		case Beta:
+			return 3
+		case GA:
+			return 4
+		default:
+			return -1 // Unknown prerelease
+		}
+	}
+
+	// Validate dependencies:
+	// 1. Features & dependencies must be known
+	// 2. Features cannot depend on features with a lower prerelease level.
+	for feature, deps := range dependencies {
+		var stability int
+		var pr prerelease
+		if versioned, ok := known[feature]; !ok {
+			return fmt.Errorf("cannot add dependency for unknown feature %s", feature)
+		} else {
+			latest := versioned[len(versioned)-1] // only check the stability of the latest release
+			pr = latest.PreRelease
+			stability = stabilityOrder(pr)
+		}
+
+		for _, dep := range deps {
+			if versioned, ok := known[dep]; !ok {
+				return fmt.Errorf("cannot add dependency from %s to unknown feature %s", feature, dep)
+			} else {
+				latest := versioned[len(versioned)-1] // only check the stability of the latest release
+				if stabilityOrder(latest.PreRelease) < stability {
+					return fmt.Errorf("%s feature %s cannot depend on %s feature %s", pr, feature, latest.PreRelease, dep)
+				}
+			}
+		}
+	}
+
+	// Check for cycles
+	visited := map[Feature]bool{}
+	finished := map[Feature]bool{}
+	var detectCycles func(Feature) error
+	detectCycles = func(feature Feature) error {
+		if finished[feature] {
+			return nil
+		}
+		if visited[feature] {
+			return fmt.Errorf("cycle detected with feature %s", feature)
+		}
+		visited[feature] = true
+		for _, dep := range dependencies[feature] {
+			if err := detectCycles(dep); err != nil {
+				return err
+			}
+		}
+		finished[feature] = true
+		return nil
+	}
+	for feature := range dependencies {
+		if err := detectCycles(feature); err != nil {
+			return err
+		}
+	}
+
+	// Persist updated state
+	f.dependencies.Store(&dependencies)
 
 	return nil
 }
@@ -714,6 +840,10 @@ func (f *featureGate) DeepCopy() MutableVersionedFeatureGate {
 	for k, v := range f.enabledRaw.Load().(map[string]bool) {
 		enabledRaw[k] = v
 	}
+	dependencies := map[Feature][]Feature{}
+	for k, v := range *f.dependencies.Load() {
+		dependencies[k] = append([]Feature{}, v...)
+	}
 
 	// Construct a new featureGate around the copied state.
 	// Note that specialFeatures is treated as immutable by convention,
@@ -725,6 +855,7 @@ func (f *featureGate) DeepCopy() MutableVersionedFeatureGate {
 	fg.emulationVersion.Store(f.EmulationVersion())
 	fg.known.Store(known)
 	fg.enabled.Store(enabled)
+	fg.dependencies.Store(&dependencies)
 	fg.enabledRaw.Store(enabledRaw)
 	fg.queriedFeatures.Store(sets.Set[Feature]{})
 	return fg

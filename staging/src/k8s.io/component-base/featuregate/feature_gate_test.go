@@ -1905,3 +1905,234 @@ func TestAddVersioned(t *testing.T) {
 		})
 	}
 }
+
+func TestAddDependencies(t *testing.T) {
+	const (
+		featureAlpha1      Feature = "FeatureAlpha1"
+		featureAlpha2      Feature = "FeatureAlpha2"
+		featureAlpha3      Feature = "FeatureAlpha3"
+		featureBeta1       Feature = "FeatureBeta1"
+		featureGA1         Feature = "FeatureGA1"
+		featureDeprecated1 Feature = "FeatureDeprecated1"
+		featureUnknown     Feature = "FeatureUnknown"
+	)
+
+	baseFeatures := map[Feature]FeatureSpec{
+		featureAlpha1:      {Default: false, PreRelease: Alpha},
+		featureAlpha2:      {Default: false, PreRelease: Alpha},
+		featureAlpha3:      {Default: false, PreRelease: Alpha},
+		featureBeta1:       {Default: false, PreRelease: Beta},
+		featureGA1:         {Default: true, PreRelease: GA},
+		featureDeprecated1: {Default: false, PreRelease: Deprecated},
+	}
+
+	testCases := []struct {
+		name        string
+		initialDeps map[Feature][]Feature
+		newDeps     map[Feature][]Feature
+		expectedErr string
+		finalDeps   map[Feature][]Feature
+		closeGate   bool
+	}{
+		{
+			name: "valid dependencies",
+			newDeps: map[Feature][]Feature{
+				featureBeta1:  {featureGA1},
+				featureAlpha1: {featureBeta1, featureAlpha2},
+			},
+			finalDeps: map[Feature][]Feature{
+				featureBeta1:  {featureGA1},
+				featureAlpha1: {featureAlpha2, featureBeta1},
+			},
+		},
+		{
+			name: "dependency on unknown feature",
+			newDeps: map[Feature][]Feature{
+				featureAlpha1: {featureUnknown},
+			},
+			expectedErr: "cannot add dependency from FeatureAlpha1 to unknown feature FeatureUnknown",
+		},
+		{
+			name: "unknown feature has dependency",
+			newDeps: map[Feature][]Feature{
+				featureUnknown: {featureAlpha1},
+			},
+			expectedErr: "cannot add dependency for unknown feature FeatureUnknown",
+		},
+		{
+			name: "GA depends on Beta",
+			newDeps: map[Feature][]Feature{
+				featureGA1: {featureBeta1},
+			},
+			expectedErr: " feature FeatureGA1 cannot depend on BETA feature FeatureBeta1",
+		},
+		{
+			name: "Beta depends on Alpha",
+			newDeps: map[Feature][]Feature{
+				featureBeta1: {featureAlpha1},
+			},
+			expectedErr: "BETA feature FeatureBeta1 cannot depend on ALPHA feature FeatureAlpha1",
+		},
+		{
+			name: "Alpha depends on Deprecated",
+			newDeps: map[Feature][]Feature{
+				featureAlpha1: {featureDeprecated1},
+			},
+			expectedErr: "ALPHA feature FeatureAlpha1 cannot depend on DEPRECATED feature FeatureDeprecated1",
+		},
+		{
+			name: "cycle",
+			newDeps: map[Feature][]Feature{
+				featureAlpha1: {featureAlpha2},
+				featureAlpha2: {featureAlpha3},
+				featureAlpha3: {featureAlpha1},
+			},
+			expectedErr: "cycle detected with feature",
+		},
+		{
+			name: "self cycle",
+			newDeps: map[Feature][]Feature{
+				featureAlpha1: {featureAlpha1},
+			},
+			expectedErr: "cycle detected with feature FeatureAlpha1",
+		},
+		{
+			name: "merge dependencies",
+			initialDeps: map[Feature][]Feature{
+				featureAlpha1: {featureAlpha2},
+			},
+			newDeps: map[Feature][]Feature{
+				featureAlpha1: {featureBeta1},
+			},
+			finalDeps: map[Feature][]Feature{
+				featureAlpha1: {featureAlpha2, featureBeta1},
+			},
+		},
+		{
+			name: "duplicate dependencies are compacted",
+			initialDeps: map[Feature][]Feature{
+				featureAlpha1: {featureAlpha2},
+			},
+			newDeps: map[Feature][]Feature{
+				featureAlpha1: {featureAlpha2, featureBeta1},
+			},
+			finalDeps: map[Feature][]Feature{
+				featureAlpha1: {featureAlpha2, featureBeta1},
+			},
+		},
+		{
+			name: "gate closed",
+			newDeps: map[Feature][]Feature{
+				featureAlpha1: {featureAlpha2},
+			},
+			closeGate:   true,
+			expectedErr: "cannot add a feature gate dependency after adding it to the flag set",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := NewFeatureGate()
+			require.NoError(t, f.Add(baseFeatures))
+
+			if tc.initialDeps != nil {
+				require.NoError(t, f.AddDependencies(tc.initialDeps))
+			}
+
+			if tc.closeGate {
+				f.Close()
+			}
+
+			err := f.AddDependencies(tc.newDeps)
+
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+				deps := *f.dependencies.Load()
+				if tc.finalDeps != nil {
+					assert.Equal(t, tc.finalDeps, deps)
+				}
+				clone := *f.DeepCopy().(*featureGate).dependencies.Load()
+				assert.Equal(t, deps, clone, "depnedencies should identical after DeepCopy")
+			}
+		})
+	}
+}
+
+func TestValidateDependencies(t *testing.T) {
+	const (
+		featureA Feature = "FeatureA"
+		featureB Feature = "FeatureB"
+		featureC Feature = "FeatureC"
+		featureD Feature = "FeatureD"
+	)
+
+	features := map[Feature]FeatureSpec{
+		featureA: {Default: false, PreRelease: Alpha},
+		featureB: {Default: false, PreRelease: Alpha},
+		featureC: {Default: false, PreRelease: Alpha},
+		featureD: {Default: false, PreRelease: Alpha},
+	}
+
+	dependencies := map[Feature][]Feature{
+		featureA: {featureB, featureC},
+		featureB: {featureD},
+	}
+
+	testCases := []struct {
+		name        string
+		set         string
+		expectedErr string
+	}{
+		{
+			name: "all enabled",
+			set:  "FeatureA=true,FeatureB=true,FeatureC=true,FeatureD=true",
+		},
+		{
+			name:        "one dependency disabled",
+			set:         "FeatureA=true,FeatureB=false,FeatureC=true,FeatureD=true",
+			expectedErr: "cannot enable FeatureA since it depends on disaled features: [FeatureB]",
+		},
+		{
+			name:        "another dependency disabled",
+			set:         "FeatureA=true,FeatureB=true,FeatureC=false,FeatureD=true",
+			expectedErr: "cannot enable FeatureA since it depends on disaled features: [FeatureC]",
+		},
+		{
+			name:        "multiple dependencies disabled",
+			set:         "FeatureA=true,FeatureB=false,FeatureC=false,FeatureD=true",
+			expectedErr: "cannot enable FeatureA since it depends on disaled features: [FeatureB FeatureC]",
+		},
+		{
+			name:        "transitive dependency disabled",
+			set:         "FeatureA=true,FeatureB=true,FeatureC=true,FeatureD=false",
+			expectedErr: "cannot enable FeatureB since it depends on disaled features: [FeatureD]",
+		},
+		{
+			name: "feature disabled",
+			set:  "FeatureA=false,FeatureB=false,FeatureC=true,FeatureD=true",
+		},
+		{
+			name: "all disabled",
+			set:  "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := NewFeatureGate()
+			require.NoError(t, f.Add(features))
+			require.NoError(t, f.AddDependencies(dependencies))
+			require.NoError(t, f.Set(tc.set))
+
+			errs := f.Validate()
+			if tc.expectedErr == "" {
+				assert.Empty(t, errs)
+			} else {
+				require.NotEmpty(t, errs)
+				assert.EqualError(t, errs[0], tc.expectedErr)
+			}
+		})
+	}
+}
