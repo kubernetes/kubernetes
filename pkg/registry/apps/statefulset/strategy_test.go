@@ -187,8 +187,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 		Status: apps.StatefulSetStatus{Replicas: 4},
 	}
 
-	t.Run("when StatefulSetAutoDeletePVC feature gate is enabled, PersistentVolumeClaimRetentionPolicy should be updated", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
+	t.Run("PersistentVolumeClaimRetentionPolicy should be updated", func(t *testing.T) {
 		// Test creation
 		ps := &apps.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -227,8 +226,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 			t.Errorf("expected PersistentVolumeClaimRetentionPolicy to be updated: %v", errs)
 		}
 	})
-	t.Run("when StatefulSetAutoDeletePVC feature gate is disabled, PersistentVolumeClaimRetentionPolicy should not be updated", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
+	t.Run("PersistentVolumeClaimRetentionPolicy should not be updated", func(t *testing.T) {
 		// Test creation
 		ps := &apps.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -261,7 +259,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 		Strategy.PrepareForUpdate(ctx, validPs, invalidPs)
 		errs = Strategy.ValidateUpdate(ctx, validPs, ps)
 		if len(errs) != 0 {
-			t.Errorf("should ignore updates to PersistentVolumeClaimRetentionPolicyType")
+			t.Errorf("unexpected failure with PersistentVolumeClaimRetentionPolicy: %v", errs)
 		}
 	})
 

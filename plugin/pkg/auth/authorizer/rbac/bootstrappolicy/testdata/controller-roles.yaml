@@ -1577,15 +1577,6 @@ items:
     - watch
   - apiGroups:
     - ""
-    - events.k8s.io
-    resources:
-    - events
-    verbs:
-    - create
-    - patch
-    - update
-  - apiGroups:
-    - ""
     resources:
     - persistentvolumeclaims
     verbs:
@@ -1596,6 +1587,15 @@ items:
     resources:
     - pods/finalizers
     verbs:
+    - update
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
     - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
