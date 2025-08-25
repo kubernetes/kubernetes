@@ -108,11 +108,11 @@ func (ccc *CSRCleanerController) worker(ctx context.Context) {
 func (ccc *CSRCleanerController) handle(ctx context.Context, csr *capi.CertificateSigningRequest) error {
 	logger := klog.FromContext(ctx)
 	if isIssuedPastDeadline(logger, csr) ||
-	   isDeniedPastDeadline(logger, csr) ||
-	   isFailedPastDeadline(logger, csr) ||
-	   isPendingPastDeadline(logger, csr) ||
-	   isIssuedExpired(logger, csr) ||
-	   isApprovedUnissuedPastDeadline(logger, csr) {
+		isDeniedPastDeadline(logger, csr) ||
+		isFailedPastDeadline(logger, csr) ||
+		isPendingPastDeadline(logger, csr) ||
+		isIssuedExpired(logger, csr) ||
+		isApprovedUnissuedPastDeadline(logger, csr) {
 		if err := ccc.csrClient.Delete(ctx, csr.Name, metav1.DeleteOptions{}); err != nil {
 			return fmt.Errorf("unable to delete CSR %q: %v", csr.Name, err)
 		}
