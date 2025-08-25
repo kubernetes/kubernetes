@@ -663,12 +663,6 @@ const (
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
-	// owner: @danielvegamyhre
-	// kep: https://kep.k8s.io/4017
-	//
-	// Set pod completion index as a pod label for Indexed Jobs.
-	PodIndexLabel featuregate.Feature = "PodIndexLabel"
-
 	// owner: @ndixita
 	// key: https://kep.k8s.io/2837
 	//
@@ -1515,11 +1509,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	PodDeletionCost: {
 		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	PodIndexLabel: {
-		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.35
 	},
 
 	PodLevelResources: {
