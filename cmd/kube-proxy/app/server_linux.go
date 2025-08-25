@@ -90,18 +90,17 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 
 	if isIPTablesBased(s.Config.Mode) {
 		// Check for the iptables and ip6tables binaries.
-		var ipts map[v1.IPFamily]utiliptables.Interface
-		ipts, err = utiliptables.NewDualStack()
+		ipts, errDS := utiliptables.NewDualStack()
 
 		ipv4Supported = ipts[v1.IPv4Protocol] != nil
 		ipv6Supported = ipts[v1.IPv6Protocol] != nil
 
 		if !ipv4Supported && !ipv6Supported {
-			err = fmt.Errorf("iptables is not available on this host : %w", err)
+			err = fmt.Errorf("iptables is not available on this host : %w", errDS)
 		} else if !ipv4Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol, "error", err)
+			logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol, "error", errDS)
 		} else if !ipv6Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol, "error", err)
+			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol, "error", errDS)
 		}
 	} else {
 		// The nft CLI always supports both families.
