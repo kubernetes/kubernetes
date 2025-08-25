@@ -61,11 +61,11 @@ func newPodNominator(podLister listersv1.PodLister) *nominator {
 	}
 }
 
-// AddNominatedPod adds a pod to the nominated pods of the given node.
-// This is called during the preemption process after a node is nominated to run
-// the pod. We update the structure before sending a request to update the pod
-// object to avoid races with the following scheduling cycles.
-func (npm *nominator) AddNominatedPod(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *framework.NominatingInfo) {
+// addNominatedPod adds a pod to the nominated pods of the given node.
+// This is called during the preemption process when a node is nominated to run
+// the pod. We update the nominator's structure before sending an API request to update the pod
+// object, to avoid races with the following scheduling cycles.
+func (npm *nominator) addNominatedPod(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *framework.NominatingInfo) {
 	npm.nLock.Lock()
 	npm.addNominatedPodUnlocked(logger, pi, nominatingInfo)
 	npm.nLock.Unlock()
