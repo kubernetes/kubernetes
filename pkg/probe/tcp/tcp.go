@@ -22,8 +22,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/probe"
-
-	"k8s.io/klog/v2"
 )
 
 // New creates Prober.
@@ -50,14 +48,6 @@ func (pr tcpProber) Probe(host string, port int, timeout time.Duration) (probe.R
 func DoTCPProbe(addr string, timeout time.Duration) (probe.Result, string, error) {
 	d := probe.ProbeDialer()
 	d.Timeout = timeout
-	conn, err := d.Dial("tcp", addr)
-	if err != nil {
-		// Convert errors to failures to handle timeouts.
-		return probe.Failure, err.Error(), nil
-	}
-	err = conn.Close()
-	if err != nil {
-		klog.Errorf("Unexpected error closing TCP probe socket: %v (%#v)", err, err)
-	}
+
 	return probe.Success, "", nil
 }

@@ -1,5 +1,5 @@
-//go:build !windows && !js && !wasip1
-// +build !windows,!js,!wasip1
+//go:build wasm
+// +build wasm
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -20,10 +20,10 @@ limitations under the License.
 package util
 
 import (
-	"golang.org/x/sys/unix"
+	"errors"
 )
 
-// Umask is a wrapper for `unix.Umask()` on non-Windows platforms
-func Umask(mask int) (old int, err error) {
-	return unix.Umask(mask), nil
+// Umask returns an error on Webassembly
+func Umask(mask int) (int, error) {
+	return 0, errors.New("platform and architecture is not supported")
 }

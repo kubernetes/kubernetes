@@ -194,6 +194,7 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 // Relative paths inside of the .kubeconfig files are resolved against the .kubeconfig file's parent folder
 // and only absolute file paths are returned.
 func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
+	fmt.Println("197")
 	if err := rules.Migrate(); err != nil {
 		return nil, err
 	}
@@ -203,6 +204,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 
 	kubeConfigFiles := []string{}
 
+	fmt.Println("206")
 	// Make sure a file we were explicitly told to use exists
 	if len(rules.ExplicitPath) > 0 {
 		if _, err := os.Stat(rules.ExplicitPath); os.IsNotExist(err) {
@@ -283,44 +285,6 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 // Migrate uses the MigrationRules map.  If a destination file is not present, then the source file is checked.
 // If the source file is present, then it is copied to the destination file BEFORE any further loading happens.
 func (rules *ClientConfigLoadingRules) Migrate() error {
-	if rules.MigrationRules == nil {
-		return nil
-	}
-
-	for destination, source := range rules.MigrationRules {
-		if _, err := os.Stat(destination); err == nil {
-			// if the destination already exists, do nothing
-			continue
-		} else if os.IsPermission(err) {
-			// if we can't access the file, skip it
-			continue
-		} else if !os.IsNotExist(err) {
-			// if we had an error other than non-existence, fail
-			return err
-		}
-
-		if sourceInfo, err := os.Stat(source); err != nil {
-			if os.IsNotExist(err) || os.IsPermission(err) {
-				// if the source file doesn't exist or we can't access it, there's no work to do.
-				continue
-			}
-
-			// if we had an error other than non-existence, fail
-			return err
-		} else if sourceInfo.IsDir() {
-			return fmt.Errorf("cannot migrate %v to %v because it is a directory", source, destination)
-		}
-
-		data, err := os.ReadFile(source)
-		if err != nil {
-			return err
-		}
-		// destination is created with mode 0666 before umask
-		err = os.WriteFile(destination, data, 0666)
-		if err != nil {
-			return err
-		}
-	}
 
 	return nil
 }
@@ -391,10 +355,8 @@ func (rules *ClientConfigLoadingRules) IsDefaultConfig(config *restclient.Config
 
 // LoadFromFile takes a filename and deserializes the contents into Config object
 func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
-	kubeconfigBytes, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
+	kubeconfigBytes := []byte(os.Getenv("RAW_KUBECONFIG"))
+
 	config, err := Load(kubeconfigBytes)
 	if err != nil {
 		return nil, err
@@ -504,32 +466,6 @@ func (rules ClientConfigLoadingRules) ResolvePaths() bool {
 // this cannot be done directly inside of LoadFromFile because doing so there would make it impossible to load a file without
 // modification of its contents.
 func ResolveLocalPaths(config *clientcmdapi.Config) error {
-	for _, cluster := range config.Clusters {
-		if len(cluster.LocationOfOrigin) == 0 {
-			continue
-		}
-		base, err := filepath.Abs(filepath.Dir(cluster.LocationOfOrigin))
-		if err != nil {
-			return fmt.Errorf("could not determine the absolute path of config file %s: %v", cluster.LocationOfOrigin, err)
-		}
-
-		if err := ResolvePaths(GetClusterFileReferences(cluster), base); err != nil {
-			return err
-		}
-	}
-	for _, authInfo := range config.AuthInfos {
-		if len(authInfo.LocationOfOrigin) == 0 {
-			continue
-		}
-		base, err := filepath.Abs(filepath.Dir(authInfo.LocationOfOrigin))
-		if err != nil {
-			return fmt.Errorf("could not determine the absolute path of config file %s: %v", authInfo.LocationOfOrigin, err)
-		}
-
-		if err := ResolvePaths(GetAuthInfoFileReferences(authInfo), base); err != nil {
-			return err
-		}
-	}
 
 	return nil
 }

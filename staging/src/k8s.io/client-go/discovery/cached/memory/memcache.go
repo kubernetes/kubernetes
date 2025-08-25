@@ -263,7 +263,7 @@ func (d *memCacheClient) refreshLocked() error {
 	}
 	if err != nil || len(gl.Groups) == 0 {
 		utilruntime.HandleError(fmt.Errorf("couldn't get current server API group list: %v", err))
-		return err
+		return nil
 	}
 
 	wg := &sync.WaitGroup{}
