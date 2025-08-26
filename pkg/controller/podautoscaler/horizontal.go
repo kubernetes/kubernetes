@@ -936,10 +936,14 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 			actionLabel = monitor.ActionLabelScaleDown
 		}
 	} else {
+		lastScaleTime := ""
+		if hpa.Status.LastScaleTime != nil {
+			lastScaleTime = hpa.Status.LastScaleTime.String()
+		}
 		logger.V(4).Info("Decided not to scale",
 			"scaleTarget", reference,
 			"desiredReplicas", desiredReplicas,
-			"lastScaleTime", hpa.Status.LastScaleTime)
+			"lastScaleTime", lastScaleTime)
 		desiredReplicas = currentReplicas
 	}
 
