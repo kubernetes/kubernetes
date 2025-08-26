@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-// unschedulablePodsQueuer is a wrapper for unschedulableQ related operations.
+// unschedulablePodsQueuer defines an interface for operations on the unschedulableQ.
 type unschedulablePodsQueuer interface {
 	// add adds a pod to the unschedulablePods queue.
 	// The event should show which event triggered the addition and is used for the metric recording.

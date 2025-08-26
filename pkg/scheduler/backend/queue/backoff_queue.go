@@ -37,7 +37,7 @@ import (
 // See the KEP-5142 (http://kep.k8s.io/5142) for rationale.
 const backoffQOrderingWindowDuration = time.Second
 
-// backoffQueuer is a wrapper for backoffQ related operations.
+// backoffQueuer defines an interface for operations on the backoffQ.
 // Its methods that relies on the queues, take the lock inside.
 type backoffQueuer interface {
 	// isPodBackingoff returns true if a pod is still waiting for its backoff timer.

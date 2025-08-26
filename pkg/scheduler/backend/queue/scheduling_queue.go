@@ -93,6 +93,8 @@ type PreEnqueueCheck func(pod *v1.Pod) bool
 // makes it easy to use those data structures as a SchedulingQueue.
 type SchedulingQueue interface {
 	fwk.PodNominator
+	// Add adds a pod to the active queue. It should be called only when a new pod
+	// is added so there is no chance the pod is already in active/unschedulable/backoff queues
 	Add(logger klog.Logger, pod *v1.Pod)
 	// Activate moves the given pods to activeQ.
 	// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
@@ -114,13 +116,32 @@ type SchedulingQueue interface {
 	// Done must be called for pod returned by Pop. This allows the queue to
 	// keep track of which pods are currently being processed.
 	Done(types.UID)
+	// Update updates pod in queues.
+	// If pod is present in active or backoff queue, it gets updated with the new value.
+	// If pod is in unschedulable queue, and it is updated in a way that it may become schedulable, it gets moved from unschedulable to active queue.
+	// If pod is not present in any of the queues, it gets added to active queue.
+	// To perform these operations correctly, both the previous and current states of the Pod are needed.
+	// The oldPod represents the previous state of the Pod before the update. It is mainly used to
+	// locate the Pod in existing queues, compare with newPod to detect scheduling-relevant changes,
+	// and update nominated Pods to keep scheduling nominations consistent. The newPod represents
+	// the current state of the Pod and replaces the oldPod in the queue if an update occurs.
 	Update(logger klog.Logger, oldPod, newPod *v1.Pod)
+	// Delete deletes the item from one of the three queues: active, backoff, or unschedulable.
+	// It assumes the pod is only in one queue.
 	Delete(pod *v1.Pod)
+	// MoveAllToActiveOrBackoffQueue moves all pods from unschedulablePods to activeQ or backoffQ.
+	// This function adds all pods and afterward signals the condition variable to ensure that
+	// if Pop() is waiting for an item, it receives the signal after all the pods are in the
+	// queue and the head is the highest priority pod.
 	// Important Note: preCheck shouldn't include anything that depends on the in-tree plugins' logic.
 	// (e.g., filter Pods based on added/updated Node's capacity, etc.)
 	// We know currently some do, but we'll eventually remove them in favor of the scheduling queue hint.
 	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
+	// AssignedPodAdded is called when a bound pod is added to the scheduler cache.
+	// Creation of this pod may make pending pods with matching affinity terms schedulable.
 	AssignedPodAdded(logger klog.Logger, pod *v1.Pod)
+	// AssignedPodUpdated is called when a bound pod in the scheduler cache is updated.
+	// Change of labels may make pending pods with matching affinity terms schedulable.
 	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event fwk.ClusterEvent)
 
 	// Close closes the SchedulingQueue so that the goroutine which is
@@ -134,12 +155,23 @@ type SchedulingQueue interface {
 	PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error)
 
 	// The following functions are supposed to be used only for testing or debugging.
+
+	// GetPod searches for a pod in the activeQ, backoffQ, and unschedulablePods.
+	// returning the pod info and true if found, or nil and false otherwise.
 	GetPod(name, namespace string) (*framework.QueuedPodInfo, bool)
+	// PendingPods returns all the pending pods in the queue; accompanied by a debugging string
+	// recording the number of pods in each queue respectively.
+	// This function is used for debugging purposes in the scheduler cache dumper and comparer.
 	PendingPods() ([]*v1.Pod, string)
+	// InFlightPods returns all pods that are currently being processed by the scheduler.
+	// These include pods that have been popped from the queue and are in their scheduling
+	// or binding cycle. Pods are removed from inFlightPods once their scheduling succeeds or fails.
 	InFlightPods() []*v1.Pod
+	// PodsInActiveQ returns all the Pods in the activeQ.
 	PodsInActiveQ() []*v1.Pod
 	// PodsInBackoffQ returns all the Pods in the backoffQ.
 	PodsInBackoffQ() []*v1.Pod
+	// UnschedulablePods returns all the pods in unschedulable queue.
 	UnschedulablePods() []*v1.Pod
 }
 
@@ -972,6 +1004,9 @@ func (p *PriorityQueue) Done(pod types.UID) {
 	p.activeQ.done(pod)
 }
 
+// InFlightPods returns all pods that are currently being processed by the scheduler.
+// These include pods that have been popped from the queue and are in their scheduling
+// or binding cycle. Pods are removed from inFlightPods once their scheduling succeeds or fails.
 func (p *PriorityQueue) InFlightPods() []*v1.Pod {
 	if !p.isSchedulingQueueHintEnabled {
 		// do nothing if schedulingQueueHint is disabled.
@@ -1002,10 +1037,15 @@ func isPodUpdated(oldPod, newPod *v1.Pod) bool {
 	return !reflect.DeepEqual(strip(oldPod), strip(newPod))
 }
 
-// Update updates a pod in the active or backoff queue if present. Otherwise, it removes
-// the item from the unschedulable queue if pod is updated in a way that it may
-// become schedulable and adds the updated one to the active queue.
-// If pod is not present in any of the queues, it is added to the active queue.
+// Update updates pod in queues.
+// If pod is present in active or backoff queue, it gets updated with the new value.
+// If pod is in unschedulable queue, and it is updated in a way that it may become schedulable, it gets moved from unschedulable to active queue.
+// If pod is not present in any of the queues, it gets added to active queue.
+// To perform these operations correctly, both the previous and current states of the Pod are needed.
+// The oldPod represents the previous state of the Pod before the update. It is mainly used to
+// locate the Pod in existing queues, compare with newPod to detect scheduling-relevant changes,
+// and update nominated Pods to keep scheduling nominations consistent. The newPod represents
+// the current state of the Pod and replaces the oldPod in the queue if an update occurs.
 func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -1105,8 +1145,8 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	}
 }
 
-// Delete deletes the item from either of the two queues. It assumes the pod is
-// only in one queue.
+// Delete deletes the item from one of the three queues: active, backoff, or unschedulable.
+// It assumes the pod is only in one queue.
 func (p *PriorityQueue) Delete(pod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -1123,8 +1163,8 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) {
 	}
 }
 
-// AssignedPodAdded is called when a bound pod is added. Creation of this pod
-// may make pending pods with matching affinity terms schedulable.
+// AssignedPodAdded is called when a bound pod is added to the scheduler cache.
+// Creation of this pod may make pending pods with matching affinity terms schedulable.
 func (p *PriorityQueue) AssignedPodAdded(logger klog.Logger, pod *v1.Pod) {
 	p.lock.Lock()
 
@@ -1134,8 +1174,8 @@ func (p *PriorityQueue) AssignedPodAdded(logger klog.Logger, pod *v1.Pod) {
 	p.lock.Unlock()
 }
 
-// AssignedPodUpdated is called when a bound pod is updated. Change of labels
-// may make pending pods with matching affinity terms schedulable.
+// AssignedPodUpdated is called when a bound pod in the scheduler cache is updated.
+// Change of labels may make pending pods with matching affinity terms schedulable.
 func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event fwk.ClusterEvent) {
 	p.lock.Lock()
 	if (framework.MatchClusterEvents(fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodScaleDown}, event)) {
@@ -1172,9 +1212,12 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 }
 
 // MoveAllToActiveOrBackoffQueue moves all pods from unschedulablePods to activeQ or backoffQ.
-// This function adds all pods and then signals the condition variable to ensure that
+// This function adds all pods and afterward signals the condition variable to ensure that
 // if Pop() is waiting for an item, it receives the signal after all the pods are in the
 // queue and the head is the highest priority pod.
+// Important Note: preCheck shouldn't include anything that depends on the in-tree plugins' logic.
+// (e.g., filter Pods based on added/updated Node's capacity, etc.)
+// We know currently some do, but we'll eventually remove them in favor of the scheduling queue hint.
 func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -1290,7 +1333,7 @@ func (p *PriorityQueue) PodsInBackoffQ() []*v1.Pod {
 	return p.backoffQ.list()
 }
 
-// UnschedulablePods returns all the pods in unschedulable state.
+// UnschedulablePods returns all the pods in unschedulable queue.
 func (p *PriorityQueue) UnschedulablePods() []*v1.Pod {
 	return p.unschedulablePods.list()
 }
@@ -1298,6 +1341,7 @@ func (p *PriorityQueue) UnschedulablePods() []*v1.Pod {
 var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"
 
 // GetPod searches for a pod in the activeQ, backoffQ, and unschedulablePods.
+// returning the pod info and true if found, or nil and false otherwise.
 func (p *PriorityQueue) GetPod(name, namespace string) (pInfo *framework.QueuedPodInfo, ok bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -1326,7 +1370,7 @@ func (p *PriorityQueue) GetPod(name, namespace string) (pInfo *framework.QueuedP
 }
 
 // PendingPods returns all the pending pods in the queue; accompanied by a debugging string
-// recording showing the number of pods in each queue respectively.
+// recording the number of pods in each queue respectively.
 // This function is used for debugging purposes in the scheduler cache dumper and comparer.
 func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 	p.lock.RLock()
