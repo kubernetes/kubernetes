@@ -26,7 +26,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -670,20 +669,20 @@ func (pi *PodInfo) Update(pod *v1.Pod) error {
 
 	// Attempt to parse the affinity terms
 	var parseErrs []error
-	requiredAffinityTerms, err := GetAffinityTerms(pod, GetPodAffinityTerms(pod.Spec.Affinity))
+	requiredAffinityTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("requiredAffinityTerms: %w", err))
 	}
-	requiredAntiAffinityTerms, err := GetAffinityTerms(pod,
-		GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	requiredAntiAffinityTerms, err := fwk.GetAffinityTerms(pod,
+		fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("requiredAntiAffinityTerms: %w", err))
 	}
-	weightedAffinityTerms, err := getWeightedAffinityTerms(pod, preferredAffinityTerms)
+	weightedAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAffinityTerms)
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("preferredAffinityTerms: %w", err))
 	}
-	weightedAntiAffinityTerms, err := getWeightedAffinityTerms(pod, preferredAntiAffinityTerms)
+	weightedAntiAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAntiAffinityTerms)
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("preferredAntiAffinityTerms: %w", err))
 	}
@@ -837,101 +836,11 @@ func (f *FitError) Error() string {
 	return reasonMsg
 }
 
-func newAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm) (*fwk.AffinityTerm, error) {
-	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	namespaces := getNamespacesFromPodAffinityTerm(pod, term)
-	nsSelector, err := metav1.LabelSelectorAsSelector(term.NamespaceSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	return &fwk.AffinityTerm{Namespaces: namespaces, Selector: selector, TopologyKey: term.TopologyKey, NamespaceSelector: nsSelector}, nil
-}
-
-// GetAffinityTerms receives a Pod and affinity terms and returns the namespaces and
-// selectors of the terms.
-func GetAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]fwk.AffinityTerm, error) {
-	if v1Terms == nil {
-		return nil, nil
-	}
-
-	var terms []fwk.AffinityTerm
-	for i := range v1Terms {
-		t, err := newAffinityTerm(pod, &v1Terms[i])
-		if err != nil {
-			// We get here if the label selector failed to process
-			return nil, err
-		}
-		terms = append(terms, *t)
-	}
-	return terms, nil
-}
-
-// getWeightedAffinityTerms returns the list of processed affinity terms.
-func getWeightedAffinityTerms(pod *v1.Pod, v1Terms []v1.WeightedPodAffinityTerm) ([]fwk.WeightedAffinityTerm, error) {
-	if v1Terms == nil {
-		return nil, nil
-	}
-
-	var terms []fwk.WeightedAffinityTerm
-	for i := range v1Terms {
-		t, err := newAffinityTerm(pod, &v1Terms[i].PodAffinityTerm)
-		if err != nil {
-			// We get here if the label selector failed to process
-			return nil, err
-		}
-		terms = append(terms, fwk.WeightedAffinityTerm{AffinityTerm: *t, Weight: v1Terms[i].Weight})
-	}
-	return terms, nil
-}
-
 // NewPodInfo returns a new PodInfo.
 func NewPodInfo(pod *v1.Pod) (*PodInfo, error) {
 	pInfo := &PodInfo{}
 	err := pInfo.Update(pod)
 	return pInfo, err
-}
-
-func GetPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
-	if affinity != nil && affinity.PodAffinity != nil {
-		if len(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
-			terms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
-		}
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		// if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-		//	terms = append(terms, affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		// }
-	}
-	return terms
-}
-
-func GetPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
-	if affinity != nil && affinity.PodAntiAffinity != nil {
-		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
-			terms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
-		}
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		// if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-		//	terms = append(terms, affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		// }
-	}
-	return terms
-}
-
-// returns a set of names according to the namespaces indicated in podAffinityTerm.
-// If namespaces is empty it considers the given pod's namespace.
-func getNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.Set[string] {
-	names := sets.Set[string]{}
-	if len(podAffinityTerm.Namespaces) == 0 && podAffinityTerm.NamespaceSelector == nil {
-		names.Insert(pod.Namespace)
-	} else {
-		names.Insert(podAffinityTerm.Namespaces...)
-	}
-	return names
 }
 
 // Resource is a collection of compute resource.
