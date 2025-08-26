@@ -176,6 +176,62 @@ func waitForRollingUpdate(ctx context.Context, c clientset.Interface, set *appsv
 	return set, pods
 }
 
+// waitForMaxUnavailableRollingUpdate waits for all Pods in set to exist and have the correct revision and for the
+// RollingUpdate to complete while enforcing maxUnavailable constraints. set must have a RollingUpdateStatefulSetStrategyType
+// with MaxUnavailable configured.
+func waitForMaxUnavailableRollingUpdate(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, maxUnavailable int) (*appsv1.StatefulSet, *v1.PodList) {
+	var pods *v1.PodList
+	if set.Spec.UpdateStrategy.Type != appsv1.RollingUpdateStatefulSetStrategyType {
+		framework.Failf("StatefulSet %s/%s attempt to wait for maxUnavailable rolling update with updateStrategy %s",
+			set.Namespace,
+			set.Name,
+			set.Spec.UpdateStrategy.Type)
+	}
+	e2estatefulset.WaitForState(ctx, c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+		set = set2
+		pods = pods2
+		if len(pods.Items) < int(*set.Spec.Replicas) {
+			return false, nil
+		}
+
+		// Count unavailable pods
+		unavailablePods := 0
+		e2estatefulset.SortStatefulPods(pods)
+		for i := range pods.Items {
+			if !podutil.IsPodReady(&pods.Items[i]) {
+				unavailablePods++
+			}
+		}
+
+		// Validate maxUnavailable constraint is never violated
+		if unavailablePods > maxUnavailable {
+			framework.Failf("StatefulSet %s/%s rolling update violated maxUnavailable constraint: %d unavailable pods > %d maxUnavailable",
+				set.Namespace, set.Name, unavailablePods, maxUnavailable)
+		}
+
+		if set.Status.UpdateRevision != set.Status.CurrentRevision {
+			framework.Logf("Waiting for StatefulSet %s/%s to complete update, %d unavailable (max %d)",
+				set.Namespace,
+				set.Name,
+				unavailablePods,
+				maxUnavailable,
+			)
+			for i := range pods.Items {
+				if pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
+					framework.Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						set.Status.UpdateRevision,
+						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel])
+				}
+			}
+			return false, nil
+		}
+		return true, nil
+	})
+	return set, pods
+}
+
 // waitForRunningAndNotReady waits for numStatefulPods in ss to be Running and not Ready.
 func waitForRunningAndNotReady(ctx context.Context, c clientset.Interface, numStatefulPods int32, ss *appsv1.StatefulSet) {
 	e2estatefulset.WaitForRunning(ctx, c, numStatefulPods, 0, ss)

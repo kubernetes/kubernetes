@@ -49,6 +49,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/features"
+
+	"k8s.io/utils/ptr"
+
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -60,7 +64,6 @@ import (
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -97,7 +100,7 @@ var httpProbe = &v1.Probe{
 
 // GCE Quota requirements: 3 pds, one per stateful pod manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
-var _ = SIGDescribe("StatefulSet", func() {
+var _ = SIGDescribe("StatefulSet", framework.WithFeatureGate(features.MaxUnavailableStatefulSet), func() {
 	f := framework.NewDefaultFramework("statefulset")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var ns string
@@ -566,6 +569,77 @@ var _ = SIGDescribe("StatefulSet", func() {
 				},
 			})
 			deletingPodForRollingUpdatePartitionTest(ctx, f, c, ns, ss)
+		})
+
+		ginkgo.It("should perform rolling updates with maxUnavailable", func(ctx context.Context) {
+			ginkgo.By("Creating a new StatefulSet")
+			ss := e2estatefulset.NewStatefulSet("ss-maxunavailable", ns, headlessSvcName, 5, nil, nil, labels)
+			setHTTPProbe(ss)
+			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+					MaxUnavailable: ptr.To(intstr.IntOrString{IntVal: 2}),
+				},
+			}
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
+			ss = waitForStatus(ctx, c, ss)
+			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
+				ss.Namespace, ss.Name, updateRevision, currentRevision)
+			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
+			framework.ExpectNoError(err)
+
+			for i := range pods.Items {
+				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to currentRevision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					currentRevision)
+			}
+			newImage := NewWebserverImage
+			oldImage := ss.Spec.Template.Spec.Containers[0].Image
+
+			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
+			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+				update.Spec.Template.Spec.Containers[0].Image = newImage
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Creating a new revision")
+			ss = waitForStatus(ctx, c, ss)
+			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update")
+
+			ginkgo.By("Performing rolling update with maxUnavailable=2")
+			ss, pods = waitForMaxUnavailableRollingUpdate(ctx, c, ss, 2)
+			for i := range pods.Items {
+				gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(newImage), "Pod %s/%s has image %s not equal to the new image %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Spec.Containers[0].Image,
+					oldImage)
+				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s has revision %s not equal to current revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					currentRevision)
+			}
+
+			ginkgo.By("Verifying StatefulSet status reflects completed update")
+			ss = waitForStatus(ctx, c, ss)
+			gomega.Expect(ss.Status.CurrentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
+				ss.Namespace,
+				ss.Name,
+				ss.Status.CurrentRevision,
+				updateRevision)
+			gomega.Expect(ss.Status.UpdatedReplicas).To(gomega.Equal(*ss.Spec.Replicas), "StatefulSet %s/%s updated replicas %d does not equal desired replicas %d",
+				ss.Namespace,
+				ss.Name,
+				ss.Status.UpdatedReplicas,
+				*ss.Spec.Replicas)
 		})
 
 		// Do not mark this as Conformance.
