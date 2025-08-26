@@ -67,17 +67,17 @@ func GetRemoteImageDigestWithoutPull(ctx context.Context, imageName string, pull
 	// Parse the image reference
 	imageRef, err := name.ParseReference(imageName)
 	if err != nil {
-		klog.Errorf("GetRemoteImageDigestWithoutPull failed to parse image reference %q: %v", imageName, err)
+		klog.Errorf("Failed to parse image reference %q: %v", imageName, err)
 		return "", err
 	}
 
 	// Create keychain from pull secrets
 	keychain := createKeychainFromSecrets(pullSecrets)
-
     
 	// Fetch the remote image with authentication
     remoteImage, err := remote.Image(imageRef, remote.WithContext(ctx), remote.WithAuthFromKeychain(keychain))
-	for i := 0; i < 30; i++ {
+	// Retries for 15 sec
+	for i := 0; i < 5; i++ {
 		if err == nil {
 			break
 		}
@@ -87,17 +87,17 @@ func GetRemoteImageDigestWithoutPull(ctx context.Context, imageName string, pull
 	}
     
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch image after retries: %w", err)
+		return imageRef.String(), fmt.Errorf("Failed to fetch image after retries: %w.", err)
 	}
     
 	// Get the image ID (config digest)
 	remoteImageRef, err := remoteImage.ConfigName()
 	if err != nil {
-		klog.Errorf("GetRemoteImageDigestWithoutPull failed to get remote image id (digest) for %q: %v", imageName, err)
-		return "", err
+		klog.Errorf("Failed to get remote image id (digest) for %q: %v.", imageName, err)
+		return imageRef.String(), err
 	}
 
-	klog.V(4).Infof("Successfully fetched remote digest: %s", remoteImageRef.String())
+	klog.V(4).Infof("Successfully fetched remote digest: %s.", remoteImageRef.String())
 	return remoteImageRef.String(), nil
 }
 
@@ -121,7 +121,7 @@ func getAuthenticatorFromSecret(secret *v1.Secret) (authn.Authenticator, error) 
 	}
 
 	if err := json.Unmarshal(configData, &dockerConfig); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal docker config in secret %s: %w", secret.Name, err)
+		return nil, fmt.Errorf("Failed to unmarshal docker config in secret %s: %w", secret.Name, err)
 	}
 
 	// Loop through auth entries and return the first valid one
