@@ -450,6 +450,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 			}
 			delete(m.endpoints, resourceName)
 			delete(m.healthyDevices, resourceName)
+			delete(m.unhealthyDevices, resourceName)
 			deletedResources.Insert(resourceName)
 			needsUpdateCheckpoint = true
 		} else {
