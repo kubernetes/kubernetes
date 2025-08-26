@@ -658,8 +658,7 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 			if p.unschedulablePods.has(pInfo.Pod) {
 				return
 			}
-			p.unschedulablePods.add(pInfo, event)
-			logger.V(5).Info("Pod moved to an internal scheduling queue, because the pod is gated", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
+			p.unschedulablePods.add(logger, pInfo, event, "reason", "because the pod is gated")
 			return
 		}
 		if pInfo.InitialAttemptTimestamp == nil {
@@ -690,8 +689,7 @@ func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, pInfo *framework.Queu
 		p.runPreEnqueuePlugins(context.Background(), pInfo)
 		if pInfo.Gated() {
 			if !p.unschedulablePods.has(pInfo.Pod) {
-				p.unschedulablePods.add(pInfo, event)
-				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
+				p.unschedulablePods.add(logger, pInfo, event)
 			}
 			return false
 		}
@@ -826,8 +824,6 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 // TODO: This function is called only when p.isSchedulingQueueHintEnabled is false,
 // and this will be removed after SchedulingQueueHint goes to stable and the feature gate is removed.
 func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
-	pod := pInfo.Pod
-
 	// When the queueing hint is enabled, they are used differently.
 	// But, we use all of them as UnschedulablePlugins when the queueing hint isn't enabled so that we don't break the old behaviour.
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
@@ -850,8 +846,7 @@ func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, 
 			}
 		}
 	} else {
-		p.unschedulablePods.add(pInfo, framework.ScheduleAttemptFailure)
-		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", framework.ScheduleAttemptFailure, "queue", unschedulableQ)
+		p.unschedulablePods.add(logger, pInfo, framework.ScheduleAttemptFailure)
 	}
 
 	return nil
@@ -912,7 +907,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 
 	// In this case, we try to requeue this Pod to activeQ/backoffQ.
 	queue := p.requeuePodWithQueueingStrategy(logger, pInfo, schedulingHint, framework.ScheduleAttemptFailure)
-	logger.V(3).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", framework.ScheduleAttemptFailure, "queue", queue, "schedulingCycle", podSchedulingCycle, "hint", schedulingHint, "unschedulable plugins", rejectorPlugins)
+	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", framework.ScheduleAttemptFailure, "queue", queue, "schedulingCycle", podSchedulingCycle, "hint", schedulingHint, "unschedulable plugins", rejectorPlugins)
 	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 		// When the Pod is moved to activeQ, need to let p.cond know so that the Pod will be pop()ed out.
 		p.activeQ.broadcast()
@@ -1192,7 +1187,7 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) requeuePodWithQueueingStrategy(logger klog.Logger, pInfo *framework.QueuedPodInfo, strategy queueingStrategy, event string) string {
 	if strategy == queueSkip {
-		p.unschedulablePods.add(pInfo, event)
+		p.unschedulablePods.add(logger, pInfo, event)
 		return unschedulableQ
 	}
 
@@ -1237,6 +1232,7 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 
 		p.unschedulablePods.delete(pInfo.Pod, pInfo.Gated())
 		queue := p.requeuePodWithQueueingStrategy(logger, pInfo, schedulingHint, event.Label())
+		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event.Label(), "queue", queue, "hint", schedulingHint)
 		if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 			activated = true
 		}

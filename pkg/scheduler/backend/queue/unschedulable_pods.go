@@ -18,6 +18,7 @@ package queue
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -27,7 +28,8 @@ import (
 type unschedulablePodsQueuer interface {
 	// add adds a pod to the unschedulablePods queue.
 	// The event should show which event triggered the addition and is used for the metric recording.
-	add(pInfo *framework.QueuedPodInfo, event string)
+	// extraFields allows passing optional key/value pairs for additional logging context.
+	add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string, extraFields ...any)
 	// update updates the information of a pod in the unschedulablePods queue.
 	update(pInfo *framework.QueuedPodInfo)
 	// delete deletes a pod from the unschedulablePods queue.
@@ -69,7 +71,8 @@ func newUnschedulablePods(unschedulableRecorder, gatedRecorder metrics.MetricRec
 
 // add adds a pod to the unschedulablePods queue.
 // The event should show which event triggered the addition and is used for the metric recording.
-func (u *unschedulablePods) add(pInfo *framework.QueuedPodInfo, event string) {
+// extraFields allows passing optional key/value pairs for additional logging context.
+func (u *unschedulablePods) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string, extraFields ...any) {
 	podID := u.keyFunc(pInfo.Pod)
 	if pInfo.Gated() && u.gatedRecorder != nil {
 		u.gatedRecorder.Inc()
@@ -77,6 +80,7 @@ func (u *unschedulablePods) add(pInfo *framework.QueuedPodInfo, event string) {
 		u.unschedulableRecorder.Inc()
 	}
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", event).Inc()
+	logger.V(5).Info("Pod moved to unschedulableQ", append([]any{"pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ}, extraFields...)...)
 	u.podInfoMap[podID] = pInfo
 }
 

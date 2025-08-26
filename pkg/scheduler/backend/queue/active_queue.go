@@ -107,7 +107,7 @@ func newUnlockedActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], inFlight
 func (uaq *unlockedActiveQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) {
 	uaq.queue.AddOrUpdate(pInfo)
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
-	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
+	logger.V(5).Info("Pod moved to activeQ", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
 }
 
 // update updates the pod in activeQ if oldPodInfo is already in the queue.

@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -107,9 +108,10 @@ func TestUnschedulablePods(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			upm := newUnschedulablePods(nil, nil)
 			for _, p := range test.podsToAdd {
-				upm.add(newQueuedPodInfoForLookup(p), framework.EventUnscheduledPodAdd.Label())
+				upm.add(logger, newQueuedPodInfoForLookup(p), framework.EventUnscheduledPodAdd.Label())
 			}
 			if diff := cmp.Diff(test.expectedMapAfterAdd, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected map after adding pods(-want, +got):\n%s", diff)

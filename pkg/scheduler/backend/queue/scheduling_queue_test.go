@@ -1103,7 +1103,7 @@ func TestPriorityQueue_Pop(t *testing.T) {
 			q.backoffQ.add(logger, errorBackoffPodInfo, framework.EventUnscheduledPodAdd.Label())
 			// Add pod to the unschedulablePods
 			unschedulablePodInfo := q.newQueuedPodInfo(unschedulablePodInfo.Pod, "plugin")
-			q.unschedulablePods.add(unschedulablePodInfo, framework.EventUnscheduledPodAdd.Label())
+			q.unschedulablePods.add(logger, unschedulablePodInfo, framework.EventUnscheduledPodAdd.Label())
 
 			var gotPods []string
 			for i := 0; i < len(tt.wantPods)+1; i++ {
@@ -1198,7 +1198,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 				pInfo := q.newQueuedPodInfo(medPriorityPodInfo.Pod, queuePlugin)
 				// needs to increment to make the pod backing off
 				pInfo.UnschedulableCount++
-				q.unschedulablePods.add(pInfo, framework.EventUnscheduledPodAdd.Label())
+				q.unschedulablePods.add(logger, pInfo, framework.EventUnscheduledPodAdd.Label())
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
 				updatedPod.Annotations["foo"] = "test"
 				return medPriorityPodInfo.Pod, updatedPod
@@ -1212,7 +1212,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 				pInfo := q.newQueuedPodInfo(medPriorityPodInfo.Pod, queuePlugin)
 				// needs to increment to make the pod backing off
 				pInfo.UnschedulableCount++
-				q.unschedulablePods.add(pInfo, framework.EventUnscheduledPodAdd.Label())
+				q.unschedulablePods.add(logger, pInfo, framework.EventUnscheduledPodAdd.Label())
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
 				updatedPod.Annotations["foo"] = "test1"
 				// Move clock by podMaxBackoffDuration, so that pods in the unschedulablePods would pass the backing off,
@@ -1226,7 +1226,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 			name:  "when updating a pod which is in unschedulable pods but the plugin returns skip, it will remain in unschedulablePods",
 			wantQ: unschedulableQ,
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
-				q.unschedulablePods.add(q.newQueuedPodInfo(medPriorityPodInfo.Pod, skipPlugin), framework.EventUnscheduledPodAdd.Label())
+				q.unschedulablePods.add(logger, q.newQueuedPodInfo(medPriorityPodInfo.Pod, skipPlugin), framework.EventUnscheduledPodAdd.Label())
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
 				updatedPod.Annotations["foo"] = "test1"
 				return medPriorityPodInfo.Pod, updatedPod
@@ -1478,7 +1478,7 @@ func TestPriorityQueue_Activate(t *testing.T) {
 			}
 
 			for _, qPodInfo := range tt.qPodInfoInUnschedulablePods {
-				q.unschedulablePods.add(qPodInfo, framework.EventUnscheduledPodAdd.Label())
+				q.unschedulablePods.add(logger, qPodInfo, framework.EventUnscheduledPodAdd.Label())
 			}
 
 			for _, qPodInfo := range tt.qPodInfoInBackoffQ {
@@ -3171,7 +3171,7 @@ var (
 			// needs to increment it to make it backoff
 			pInfo.UnschedulableCount++
 		}
-		queue.unschedulablePods.add(pInfo, framework.EventUnscheduledPodAdd.Label())
+		queue.unschedulablePods.add(logger, pInfo, framework.EventUnscheduledPodAdd.Label())
 	}
 	deletePod = func(t *testing.T, _ klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.Delete(pInfo.Pod)
@@ -4355,7 +4355,7 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 		unlockedActiveQ.add(logger, newQueuedPodInfoForLookup(activeQPod), framework.EventUnscheduledPodAdd.Label())
 	})
 	q.backoffQ.add(logger, newQueuedPodInfoForLookup(backoffQPod), framework.EventUnscheduledPodAdd.Label())
-	q.unschedulablePods.add(newQueuedPodInfoForLookup(unschedPod), framework.EventUnscheduledPodAdd.Label())
+	q.unschedulablePods.add(logger, newQueuedPodInfoForLookup(unschedPod), framework.EventUnscheduledPodAdd.Label())
 
 	tests := []struct {
 		name        string
