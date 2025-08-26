@@ -46,6 +46,10 @@ func TestBuildGenericConfig(t *testing.T) {
 	s.BindPort = ln.Addr().(*net.TCPAddr).Port
 	opts.SecureServing = s
 
+	// Configure an etcd endpoint to avoid immediate errors.
+	// In this case it doesn't matter the endpoint actually doesn't exist.
+	opts.Etcd.StorageConfig.Transport.ServerList = []string{"http://example.com:2379"}
+
 	completedOptions, err := opts.Complete(context.TODO(), nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to complete apiserver options: %v", err)
