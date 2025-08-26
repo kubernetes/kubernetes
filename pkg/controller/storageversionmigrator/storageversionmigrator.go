@@ -56,7 +56,7 @@ type SVMController struct {
 	controllerName         string
 	kubeClient             kubernetes.Interface
 	dynamicClient          *dynamic.DynamicClient
-	discoveryClient        *discovery.DiscoveryClient
+	discoveryClient        discovery.DiscoveryInterface
 	svmListers             svmlisters.StorageVersionMigrationLister
 	svmSynced              cache.InformerSynced
 	queue                  workqueue.TypedRateLimitingInterface[string]
@@ -68,7 +68,7 @@ func NewSVMController(
 	ctx context.Context,
 	kubeClient kubernetes.Interface,
 	dynamicClient *dynamic.DynamicClient,
-	discoveryClient *discovery.DiscoveryClient,
+	discoveryClient discovery.DiscoveryInterface,
 	svmInformer svminformers.StorageVersionMigrationInformer,
 	controllerName string,
 	mapper meta.ResettableRESTMapper,
@@ -368,7 +368,7 @@ func (sv *SVMController) isResourceUpdatable(gvr schema.GroupVersionResource) (b
 			if resource.Verbs != nil && sets.NewString(resource.Verbs...).Has("update") {
 				return true, nil
 			}
-			return false, fmt.Errorf("resource %q does not support update verb", gvr.String())
+			return false, nil
 		}
 	}
 

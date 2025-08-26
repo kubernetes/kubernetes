@@ -50,7 +50,7 @@ const (
 // to the SVM status before the migration is initiated. This resource version is utilized for checking
 // freshness of GC cache before the migration is initiated.
 type ResourceVersionController struct {
-	discoveryClient *discovery.DiscoveryClient
+	discoveryClient discovery.DiscoveryInterface
 	metadataClient  metadata.Interface
 	svmListers      svmlisters.StorageVersionMigrationLister
 	svmSynced       cache.InformerSynced
@@ -62,7 +62,7 @@ type ResourceVersionController struct {
 func NewResourceVersionController(
 	ctx context.Context,
 	kubeClient clientset.Interface,
-	discoveryClient *discovery.DiscoveryClient,
+	discoveryClient discovery.DiscoveryInterface,
 	metadataClient metadata.Interface,
 	svmInformer svminformers.StorageVersionMigrationInformer,
 	mapper meta.ResettableRESTMapper,
