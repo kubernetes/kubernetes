@@ -4457,7 +4457,7 @@ func TestAllocator(t *testing.T,
 
 			expectResults: []any{}, // default max requestPolicy is 4, should not allocate even though 6 < 10
 		},
-		"consumable-capacity-multi-allocatable-device-with-some-remaining-consumable-capacity": {
+		"consumable-capacity-multi-allocatable-device-with-allocated-capacity-use-remaining": {
 			features: Features{
 				ConsumableCapacity: true,
 			},
@@ -4481,6 +4481,34 @@ func TestAllocator(t *testing.T,
 				allocationResult(
 					localNodeSelector(node1),
 					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+				),
+			},
+		},
+		"consumable-capacity-multi-allocatable-device-with-allocated-capacity-next-device": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0, "", classA).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(ptr.To(two))),
+			),
+			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
+				MakeDeviceID(driverA, pool1, device1): {
+					capacity0: ptr.To(two),
+				},
+			},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+					device(device2, nil, nil).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceRequestAllocationResult(req0, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 				),
 			},
 		},
@@ -4710,8 +4738,13 @@ func TestAllocator(t *testing.T,
 					device(device2, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}, nil).withAllowMultipleAllocations(),
 				),
 			),
-			node:          node(node1, region1),
-			expectResults: []any{},
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceRequestAllocationResult(req0, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+				),
+			},
 		},
 		"consumable-capacity-dedicated-device-with-consumable-capacity-request": {
 			features: Features{
