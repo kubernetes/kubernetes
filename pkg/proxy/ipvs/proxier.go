@@ -1895,7 +1895,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	}
 
 	// Delete old endpoints
-	for ep := range curEndpoints.DifferenceSeq(newEndpoints) {
+	for _, ep := range curEndpoints.Difference(newEndpoints).UnsortedList() {
 		// if curEndpoint is in gracefulDelete, skip
 		uniqueRS := vs.String() + "/" + ep
 		if proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {

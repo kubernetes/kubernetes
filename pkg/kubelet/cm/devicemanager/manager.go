@@ -642,7 +642,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		if m.allocatedDevices[resource] == nil {
 			m.allocatedDevices[resource] = sets.New[string]()
 		}
-		for device := range devices.DifferenceSeq(allocated) {
+		for device := range devices.Difference(allocated) {
 			m.allocatedDevices[resource].Insert(device)
 			allocated.Insert(device)
 			needed--
