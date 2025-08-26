@@ -201,8 +201,20 @@ linters:
             contextual k8s.io/kubernetes/cmd/kube-proxy/.*
             contextual k8s.io/kubernetes/cmd/kube-scheduler/.*
             contextual k8s.io/kubernetes/cmd/kubelet/.*
+            contextual k8s.io/kubernetes/pkg/api/.*
+            contextual k8s.io/kubernetes/pkg/apis/.*
+            contextual k8s.io/kubernetes/pkg/capabilities/.*
+            contextual k8s.io/kubernetes/pkg/client/.*
+            contextual k8s.io/kubernetes/pkg/cluster/.*
             contextual k8s.io/kubernetes/pkg/controller/.*
+            contextual k8s.io/kubernetes/pkg/features/.*
+            contextual k8s.io/kubernetes/pkg/fieldpath/.*
+            contextual k8s.io/kubernetes/pkg/generated/.*
+            contextual k8s.io/kubernetes/pkg/printers/.*
+            contextual k8s.io/kubernetes/pkg/quota/.*
             contextual k8s.io/kubernetes/pkg/scheduler/.*
+            contextual k8s.io/kubernetes/pkg/security/.*
+            contextual k8s.io/kubernetes/pkg/securitycontext/.*
             contextual k8s.io/kubernetes/test/e2e/dra/.*
             contextual k8s.io/kubernetes/pkg/kubelet/cm/dra/.*
             contextual k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/.*
