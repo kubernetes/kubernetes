@@ -27,6 +27,7 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/kubernetes"
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
@@ -77,6 +78,7 @@ type watcher struct {
 	versioner           storage.Versioner
 	transformer         value.Transformer
 	getCurrentStorageRV func(context.Context) (uint64, error)
+	getList             func(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (kubernetes.ListResponse, error)
 	stats               *statsCache
 }
 
@@ -268,59 +270,46 @@ func (wc *watchChan) RequestWatchProgress() error {
 // The revision to watch will be set to the revision in response.
 // All events sent will have isCreated=true
 func (wc *watchChan) sync() error {
-	opts := []clientv3.OpOption{}
-	if wc.recursive {
-		opts = append(opts, clientv3.WithLimit(defaultWatcherMaxLimit))
-		rangeEnd := clientv3.GetPrefixRangeEnd(wc.key)
-		opts = append(opts, clientv3.WithRange(rangeEnd))
-	}
-
 	var err error
 	var lastKey []byte
-	var withRev int64
-	var getResp *clientv3.GetResponse
+	var resp kubernetes.ListResponse
 
 	metricsOp := "get"
 	if wc.recursive {
 		metricsOp = "list"
 	}
-
-	preparedKey := wc.key
+	opts := kubernetes.ListOptions{
+		Limit: defaultWatcherMaxLimit,
+	}
 
 	for {
 		startTime := time.Now()
-		getResp, err = wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
+		resp, err = wc.watcher.getList(wc.ctx, wc.key, wc.recursive, opts)
 		metrics.RecordEtcdRequest(metricsOp, wc.watcher.groupResource, err, startTime)
 		if err != nil {
-			return interpretListError(err, true, preparedKey, wc.key)
-		}
-
-		if len(getResp.Kvs) == 0 && getResp.More {
-			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+			return interpretListError(err, true, opts.Continue, wc.key)
 		}
 
 		// send items from the response until no more results
-		for i, kv := range getResp.Kvs {
+		for i, kv := range resp.Kvs {
 			lastKey = kv.Key
 			wc.queueEvent(parseKV(kv))
 			// free kv early. Long lists can take O(seconds) to decode.
-			getResp.Kvs[i] = nil
+			resp.Kvs[i] = nil
 		}
 
-		if withRev == 0 {
-			wc.initialRev = getResp.Header.Revision
-		}
-
-		// no more results remain
-		if !getResp.More {
+		wc.initialRev = resp.Revision
+		hasMore := resp.Count > int64(len(resp.Kvs))
+		if !hasMore {
 			return nil
 		}
 
-		preparedKey = string(lastKey) + "\x00"
-		if withRev == 0 {
-			withRev = getResp.Header.Revision
-			opts = append(opts, clientv3.WithRev(withRev))
+		if len(resp.Kvs) == 0 {
+			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
+
+		opts.Continue = string(lastKey) + "\x00"
+		opts.Revision = resp.Revision
 	}
 }
 
