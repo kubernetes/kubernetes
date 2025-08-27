@@ -137,6 +137,10 @@ func (p *Preferences) applyAllowlist(pluginName string, kuberc *config.Preferenc
 	}
 
 	allowlist := *kuberc.CredPluginAllowlist
+	if len(allowlist) == 0 {
+		// empty allowlist permits no binaries
+		return fmt.Errorf("%q is not permitted by the credential plugin allowlist: allowlist is empty")
+	}
 
 	pluginAbsPath, err := exec.LookPath(pluginName)
 	if err != nil {
