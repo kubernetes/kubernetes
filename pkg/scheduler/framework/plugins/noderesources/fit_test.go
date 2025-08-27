@@ -724,7 +724,12 @@ func TestEnoughRequests(t *testing.T) {
 			opts := ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled}
 			state := computePodResourceRequest(test.pod, opts)
 			if test.draExtendedResourceEnabled && !test.nilResourceToDeviceClass {
-				state.resourceToDeviceClass = map[v1.ResourceName]string{extendedResourceDRA: deviceClassName}
+				state.resourceToDeviceClass = map[v1.ResourceName]*resourceapi.DeviceClass{extendedResourceDRA: {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: deviceClassName,
+					},
+				},
+				}
 			}
 			gotInsufficientResources := fitsRequest(state, test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, opts)
 			if diff := cmp.Diff(test.wantInsufficientResources, gotInsufficientResources); diff != "" {
@@ -1922,10 +1927,20 @@ func TestWithDeviceClass(t *testing.T) {
 		informerFactory.Shutdown()
 	})
 	informerFactory.WaitForCacheSync(ctx.Done())
+	extendedResourceName := "extended.resource.dra.io/something"
+
+	deviceClass := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: deviceClassName,
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &extendedResourceName,
+		},
+	}
 
 	testCases := map[string]struct {
 		state                         *preFilterState
-		expectedResourceToDeviceClass map[v1.ResourceName]string
+		expectedResourceToDeviceClass map[v1.ResourceName]*resourceapi.DeviceClass
 	}{
 
 		"regular extended resource name": {
@@ -1934,9 +1949,9 @@ func TestWithDeviceClass(t *testing.T) {
 					ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
 				},
 			},
-			expectedResourceToDeviceClass: map[v1.ResourceName]string{
-				v1.ResourceName("deviceclass.resource.kubernetes.io/device-class-name"): deviceClassName,
-				v1.ResourceName("extended.resource.dra.io/something"):                   deviceClassName,
+			expectedResourceToDeviceClass: map[v1.ResourceName]*resourceapi.DeviceClass{
+				v1.ResourceName("deviceclass.resource.kubernetes.io/device-class-name"): deviceClass,
+				v1.ResourceName("extended.resource.dra.io/something"):                   deviceClass,
 			},
 		},
 		"implicit extended resource name": {
@@ -1945,9 +1960,9 @@ func TestWithDeviceClass(t *testing.T) {
 					ScalarResources: map[v1.ResourceName]int64{v1.ResourceName("deviceclass.resource.kubernetes.io/" + deviceClassName): 1},
 				},
 			},
-			expectedResourceToDeviceClass: map[v1.ResourceName]string{
-				v1.ResourceName("deviceclass.resource.kubernetes.io/device-class-name"): deviceClassName,
-				v1.ResourceName("extended.resource.dra.io/something"):                   deviceClassName,
+			expectedResourceToDeviceClass: map[v1.ResourceName]*resourceapi.DeviceClass{
+				v1.ResourceName("deviceclass.resource.kubernetes.io/device-class-name"): deviceClass,
+				v1.ResourceName("extended.resource.dra.io/something"):                   deviceClass,
 			},
 		},
 		"no extended resource name": {

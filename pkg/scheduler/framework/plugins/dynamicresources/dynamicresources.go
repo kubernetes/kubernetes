@@ -141,7 +141,7 @@ type draExtendedResource struct {
 	// May have extended resource backed by DRA.
 	podScalarResources map[v1.ResourceName]int64
 	// The mapping of extended resource to device class name
-	resourceToDeviceClass map[v1.ResourceName]string
+	resourceToDeviceClass map[v1.ResourceName]*resourceapi.DeviceClass
 }
 
 type informationForClaim struct {
@@ -410,7 +410,7 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 
 // hasDeviceClassMappedExtendedResource returns true when the given resource list has an extended resource, that has
 // a mapping to a device class.
-func hasDeviceClassMappedExtendedResource(reqs v1.ResourceList, deviceClassMapping map[v1.ResourceName]string) bool {
+func hasDeviceClassMappedExtendedResource(reqs v1.ResourceList, deviceClassMapping map[v1.ResourceName]*resourceapi.DeviceClass) bool {
 	for rName, rValue := range reqs {
 		if rValue.IsZero() {
 			// We only care about the resources requested by the pod we are trying to schedule.
@@ -808,7 +808,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 // the device request name has the format: container-%d-request-%d,
 // the first %d is the container's index in the pod's initContainer and containers
 // the second %d is the extended resource's index in that container's sorted resource requests.
-func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, deviceClassMapping map[v1.ResourceName]string) []resourceapi.DeviceRequest {
+func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int64, deviceClassMapping map[v1.ResourceName]*resourceapi.DeviceClass) []resourceapi.DeviceRequest {
 	var deviceRequests []resourceapi.DeviceRequest
 	// Creating the extended resource claim's Requests by
 	// iterating over the containers, and the resources in the containers,
@@ -834,9 +834,9 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 			if !ok || crq == 0 {
 				continue
 			}
-			className, ok := deviceClassMapping[r]
+			class, ok := deviceClassMapping[r]
 			// skip if the request does not map to a device class
-			if !ok || className == "" {
+			if !ok || class.Name == "" {
 				continue
 			}
 			keys := make([]string, 0, len(creqs))
@@ -860,7 +860,7 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 				resourceapi.DeviceRequest{
 					Name: fmt.Sprintf("container-%d-request-%d", i, ridx), // need to be container name index - extended resource name index
 					Exactly: &resourceapi.ExactDeviceRequest{
-						DeviceClassName: className, // map external resource name -> device class name
+						DeviceClassName: class.Name, // map external resource name -> device class name
 						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
 						Count:           crq,
 					},

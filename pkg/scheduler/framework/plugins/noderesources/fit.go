@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -106,7 +107,7 @@ func (f *Fit) ScoreExtensions() fwk.ScoreExtensions {
 type preFilterState struct {
 	framework.Resource
 	// resourceToDeviceClass holds the mapping of extended resource to device class name.
-	resourceToDeviceClass map[v1.ResourceName]string
+	resourceToDeviceClass map[v1.ResourceName]*resourceapi.DeviceClass
 }
 
 // Clone the prefilter state.
@@ -254,7 +255,7 @@ func withDeviceClass(result *preFilterState, draManager fwk.SharedDRAManager) *f
 		result.resourceToDeviceClass = resourceToDeviceClass
 		if len(resourceToDeviceClass) == 0 {
 			// ensure it is empty map, not nil.
-			result.resourceToDeviceClass = make(map[v1.ResourceName]string, 0)
+			result.resourceToDeviceClass = make(map[v1.ResourceName]*resourceapi.DeviceClass, 0)
 		}
 	}
 	return nil
