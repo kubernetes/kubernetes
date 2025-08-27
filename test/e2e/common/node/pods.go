@@ -19,6 +19,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -608,6 +609,172 @@ var _ = SIGDescribe("Pods", func() {
 			}
 			return nil
 		}, time.Minute, 10*time.Second).Should(gomega.BeNil())
+	})
+
+	/*
+		Testname: Pods, remote command execution via POST
+		Description: A Pod is created. POST request is made to the exec endpoint to execute a command.
+		The POST request MUST successfully execute the command and return expected output.
+	*/
+	f.It("should support remote command execution via POST to exec endpoint", f.WithNodeConformance(), func(ctx context.Context) {
+		config, err := framework.LoadConfig()
+		framework.ExpectNoError(err, "unable to get base config")
+
+		ginkgo.By("creating the pod")
+		name := "pod-exec-post-" + string(uuid.NewUUID())
+		pod := e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "main",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
+					},
+				},
+			},
+		})
+
+		ginkgo.By("submitting the pod to kubernetes")
+		pod = podClient.CreateSync(ctx, pod)
+
+		ginkgo.By("executing command via POST request to exec endpoint")
+		req := f.ClientSet.CoreV1().RESTClient().Post().
+			Namespace(f.Namespace.Name).
+			Resource("pods").
+			Name(pod.Name).
+			Suffix("exec").
+			Param("stderr", "1").
+			Param("stdout", "1").
+			Param("container", pod.Spec.Containers[0].Name).
+			Param("command", "echo").
+			Param("command", "POST exec test output")
+
+		url := req.URL()
+		ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"channel.k8s.io"})
+		if err != nil {
+			framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
+		}
+		defer ws.Close()
+
+		buf := &bytes.Buffer{}
+		gomega.Eventually(ctx, func() error {
+			for {
+				var msg []byte
+				if err := websocket.Message.Receive(ws, &msg); err != nil {
+					if err == io.EOF {
+						break
+					}
+					framework.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
+				}
+				if len(msg) == 0 {
+					continue
+				}
+				if msg[0] != 1 {
+					if len(msg) == 1 {
+						continue
+					} else {
+						framework.Failf("Got message from server that didn't start with channel 1 (STDOUT): %v", msg)
+					}
+				}
+				buf.Write(msg[1:])
+			}
+			if buf.Len() == 0 {
+				return fmt.Errorf("unexpected output from server")
+			}
+			if !strings.Contains(buf.String(), "POST exec test output") {
+				return fmt.Errorf("expected to find 'POST exec test output' in %q", buf.String())
+			}
+			return nil
+		}, time.Minute, 10*time.Second).Should(gomega.BeNil())
+	})
+
+	/*
+		Testname: Pods, port forwarding via POST
+		Description: A Pod is created with a web server listening on port 80. POST request is made to the portforward endpoint to establish port forwarding.
+		The POST request MUST successfully establish port forwarding and allow communication to the pod.
+	*/
+	f.It("should support port forwarding via POST to portforward endpoint", f.WithNodeConformance(), func(ctx context.Context) {
+		config, err := framework.LoadConfig()
+		framework.ExpectNoError(err, "unable to get base config")
+
+		ginkgo.By("creating the pod")
+		name := "pod-portforward-post-" + string(uuid.NewUUID())
+		pod := e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "testserver",
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:    []string{"test-webserver"},
+						Command: nil,
+						Ports:   []v1.ContainerPort{{ContainerPort: 80}},
+						ReadinessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								HTTPGet: &v1.HTTPGetAction{
+									Path: "/",
+									Port: intstr.FromInt32(80),
+								},
+							},
+							InitialDelaySeconds: 5,
+							TimeoutSeconds:      3,
+						},
+					},
+				},
+			},
+		})
+
+		ginkgo.By("submitting the pod to kubernetes")
+		pod = podClient.CreateSync(ctx, pod)
+
+		ginkgo.By("establishing port forwarding via POST request")
+		req := f.ClientSet.CoreV1().RESTClient().Post().
+			Namespace(f.Namespace.Name).
+			Resource("pods").
+			Name(pod.Name).
+			Suffix("portforward").
+			Param("ports", "80")
+
+		url := req.URL()
+		ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"v4.channel.k8s.io"})
+		if err != nil {
+			framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
+		}
+		defer ws.Close()
+
+		ginkgo.By("verifying port forwarding handshake")
+		gomega.Eventually(ctx, func() error {
+			for {
+				var msg []byte
+				if err := websocket.Message.Receive(ws, &msg); err != nil {
+					if err == io.EOF {
+						break
+					}
+					return fmt.Errorf("failed to read from websocket: %w", err)
+				}
+				if len(msg) == 0 {
+					continue
+				}
+				channel := msg[0]
+				data := msg[1:]
+				if channel == 0 || channel == 1 {
+					if len(data) >= 2 {
+						port := binary.LittleEndian.Uint16(data)
+						if port == 80 {
+							return nil
+						}
+					}
+				}
+			}
+			return fmt.Errorf("did not receive expected port forwarding handshake")
+		}, time.Minute, time.Second).Should(gomega.BeNil())
+
+		framework.Logf("POST portforward connection established successfully")
 	})
 
 	/*
