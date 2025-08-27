@@ -85,9 +85,17 @@ func TestDeviceClassMapping(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "class3",
 		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &ern2,
+		},
+	}
+	class4 := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "class4",
+		},
 	}
 
-	client := fake.NewSimpleClientset(class1, class2, class3)
+	client := fake.NewSimpleClientset(class1, class2, class3, class4)
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	draManager := &fakeDRAManager{
@@ -121,6 +129,14 @@ func TestDeviceClassMapping(t *testing.T) {
 	}
 	if c != "class2" {
 		t.Errorf("result does not match device class name %s", "class2")
+	}
+	imp := v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + class4.Name)
+	c, ok = rm[v1.ResourceName(imp)]
+	if !ok {
+		t.Errorf("result does not contain implicit extended resource %s", imp)
+	}
+	if c != "class4" {
+		t.Errorf("result does not match device class name %s", "class4")
 	}
 }
 

@@ -17,23 +17,44 @@ limitations under the License.
 package extended
 
 import (
+	"context"
+	"sort"
+
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 func DeviceClassMapping(draManager framework.SharedDRAManager) (map[v1.ResourceName]string, error) {
 	classes, err := draManager.DeviceClasses().List()
-	extendedResources := make(map[v1.ResourceName]string, len(classes))
 	if err != nil {
 		return nil, err
 	}
+	resClasses := make(map[v1.ResourceName][]*resourceapi.DeviceClass, len(classes))
 	for _, c := range classes {
-		if c.Spec.ExtendedResourceName == nil {
-			extendedResources[v1.ResourceName(v1beta1.ResourceDeviceClassPrefix+c.Name)] = c.Name
-		} else {
-			extendedResources[v1.ResourceName(*c.Spec.ExtendedResourceName)] = c.Name
+		name := v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + c.Name)
+		if c.Spec.ExtendedResourceName != nil {
+			name = v1.ResourceName(*c.Spec.ExtendedResourceName)
 		}
+		cls := resClasses[name]
+		cls = append(cls, c)
+		resClasses[v1.ResourceName(name)] = cls
+	}
+	extendedResources := make(map[v1.ResourceName]string, len(resClasses))
+	for name, cls := range resClasses {
+		// Primary sort by creation timestamp, newest first
+		// Secondary sort by class name, ascending order
+		sort.Slice(cls, func(i, j int) bool {
+			if cls[i].CreationTimestamp.UnixNano() == cls[j].CreationTimestamp.UnixNano() {
+				return cls[i].Name < cls[j].Name
+			}
+			return cls[i].CreationTimestamp.UnixNano() > cls[j].CreationTimestamp.UnixNano()
+		})
+		if len(cls) > 1 {
+			klog.FromContext(context.Background()).V(5).Info("Device classes found", "total", len(cls), "name", cls[0].Name)
+		}
+		extendedResources[name] = cls[0].Name
 	}
 	return extendedResources, nil
 }
