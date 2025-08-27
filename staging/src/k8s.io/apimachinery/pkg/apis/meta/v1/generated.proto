@@ -1038,7 +1038,6 @@ message Status {
   // is not guaranteed to conform to any schema except that defined by
   // the reason type.
   // +optional
-  // +listType=atomic
   optional StatusDetails details = 5;
 
   // Suggested HTTP return code for this status, 0 if not set.
