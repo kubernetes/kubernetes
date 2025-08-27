@@ -30,6 +30,7 @@ const (
 type ValidationMetrics interface {
 	IncDeclarativeValidationMismatchMetric()
 	IncDeclarativeValidationPanicMetric()
+	IncDuplicateValidationErrorMetric()
 	Reset()
 }
 
@@ -52,6 +53,15 @@ var validationMetricsInstance = &validationMetrics{
 			StabilityLevel: metrics.BETA,
 		},
 	),
+	DuplicateValidationErrorCounter: metrics.NewCounter(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "duplicate_validation_error_total",
+			Help:           "Number of duplicate validation errors during validation.",
+			StabilityLevel: metrics.INTERNAL,
+		},
+	),
 }
 
 // Metrics provides access to validation metrics.
@@ -60,17 +70,20 @@ var Metrics ValidationMetrics = validationMetricsInstance
 func init() {
 	legacyregistry.MustRegister(validationMetricsInstance.DeclarativeValidationMismatchCounter)
 	legacyregistry.MustRegister(validationMetricsInstance.DeclarativeValidationPanicCounter)
+	legacyregistry.MustRegister(validationMetricsInstance.DuplicateValidationErrorCounter)
 }
 
 type validationMetrics struct {
 	DeclarativeValidationMismatchCounter *metrics.Counter
 	DeclarativeValidationPanicCounter    *metrics.Counter
+	DuplicateValidationErrorCounter      *metrics.Counter
 }
 
 // Reset resets the validation metrics.
 func (m *validationMetrics) Reset() {
 	m.DeclarativeValidationMismatchCounter.Reset()
 	m.DeclarativeValidationPanicCounter.Reset()
+	m.DuplicateValidationErrorCounter.Reset()
 }
 
 // IncDeclarativeValidationMismatchMetric increments the counter for the declarative_validation_mismatch_total metric.
@@ -81,6 +94,11 @@ func (m *validationMetrics) IncDeclarativeValidationMismatchMetric() {
 // IncDeclarativeValidationPanicMetric increments the counter for the declarative_validation_panic_total metric.
 func (m *validationMetrics) IncDeclarativeValidationPanicMetric() {
 	m.DeclarativeValidationPanicCounter.Inc()
+}
+
+// IncDuplicateValidationErrorMetric increments the counter for the duplicate_validation_error_total metric.
+func (m *validationMetrics) IncDuplicateValidationErrorMetric() {
+	m.DuplicateValidationErrorCounter.Inc()
 }
 
 func ResetValidationMetricsInstance() {
