@@ -251,6 +251,7 @@ linters:
     staticcheck:
       checks:
         - "all"
+        - "-QF1008"  # Omit embedded fields from selector expression
         {{- if .Base }}
         - "-QF1001"  # Apply De Morgan’s law
         - "-QF1002"  # Convert untagged switch to tagged switch
