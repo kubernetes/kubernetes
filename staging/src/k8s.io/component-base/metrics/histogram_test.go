@@ -318,7 +318,7 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 }
 
 func TestHistogramWithExemplar(t *testing.T) {
-	// Arrange.
+	// Create context.
 	traceID := trace.TraceID([]byte("trace-0000-xxxxx"))
 	spanID := trace.SpanID([]byte("span-0000-xxxxx"))
 	ctxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
@@ -328,13 +328,14 @@ func TestHistogramWithExemplar(t *testing.T) {
 	}))
 	value := float64(10)
 
+	// Create contextual histogram.
 	histogram := NewHistogram(&HistogramOpts{
 		Name:    "histogram_exemplar_test",
 		Help:    "helpless",
 		Buckets: []float64{100},
-	})
-	_ = histogram.WithContext(ctxForSpanCtx)
+	}).WithContext(ctxForSpanCtx)
 
+	// Register histogram.
 	registry := newKubeRegistry(apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "15",
@@ -342,53 +343,51 @@ func TestHistogramWithExemplar(t *testing.T) {
 	})
 	registry.MustRegister(histogram)
 
-	// Act.
+	// Call underlying exemplar methods.
 	histogram.Observe(value)
 
-	// Assert.
+	// Gather.
 	mfs, err := registry.Gather()
 	if err != nil {
 		t.Fatalf("Gather failed %v", err)
 	}
-
 	if len(mfs) != 1 {
 		t.Fatalf("Got %v metric families, Want: 1 metric family", len(mfs))
 	}
 
+	// Verify metric type.
 	mf := mfs[0]
 	var m *dto.Metric
 	switch mf.GetType() {
 	case dto.MetricType_HISTOGRAM:
 		m = mfs[0].GetMetric()[0]
 	default:
-		t.Fatalf("Got %v metric type, Want: %v metric type", mf.GetType(), dto.MetricType_COUNTER)
+		t.Fatalf("Got %v metric type, Want: %v metric type", mf.GetType(), dto.MetricType_HISTOGRAM)
 	}
 
+	// Verify value.
 	want := value
 	got := m.GetHistogram().GetSampleSum()
 	if got != want {
 		t.Fatalf("Got %f, wanted %f as the count", got, want)
 	}
 
+	// Verify exemplars.
 	buckets := m.GetHistogram().GetBucket()
 	if len(buckets) == 0 {
 		t.Fatalf("Got 0 buckets, wanted 1")
 	}
-
 	e := buckets[0].GetExemplar()
 	if e == nil {
 		t.Fatalf("Got nil exemplar, wanted an exemplar")
 	}
-
 	eLabels := e.GetLabel()
 	if eLabels == nil {
 		t.Fatalf("Got nil exemplar label, wanted an exemplar label")
 	}
-
 	if len(eLabels) != 2 {
 		t.Fatalf("Got %v exemplar labels, wanted 2 exemplar labels", len(eLabels))
 	}
-
 	for _, l := range eLabels {
 		switch *l.Name {
 		case "trace_id":
@@ -403,92 +402,150 @@ func TestHistogramWithExemplar(t *testing.T) {
 			t.Fatalf("Got unexpected label %s", *l.Name)
 		}
 	}
+
+	// Verify that all contextual histogram calls are exclusive.
+	contextualHistogram := NewHistogram(&HistogramOpts{
+		Name:    "contextual_histogram",
+		Help:    "helpless",
+		Buckets: []float64{100},
+	})
+	traceIDa := trace.TraceID([]byte("trace-0000-aaaaa"))
+	spanIDa := trace.SpanID([]byte("span-0000-aaaaa"))
+	contextualHistogramA := contextualHistogram.WithContext(trace.ContextWithSpanContext(context.Background(),
+		trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID:    traceIDa,
+			SpanID:     spanIDa,
+			TraceFlags: trace.FlagsSampled,
+		}),
+	))
+	traceIDb := trace.TraceID([]byte("trace-0000-bbbbb"))
+	spanIDb := trace.SpanID([]byte("span-0000-bbbbb"))
+	contextualHistogramB := contextualHistogram.WithContext(trace.ContextWithSpanContext(context.Background(),
+		trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID:    traceIDb,
+			SpanID:     spanIDb,
+			TraceFlags: trace.FlagsSampled,
+		}),
+	))
+
+	runs := []struct {
+		spanID              trace.SpanID
+		traceID             trace.TraceID
+		contextualHistogram *HistogramWithContext
+	}{
+		{
+			spanID:              spanIDa,
+			traceID:             traceIDa,
+			contextualHistogram: contextualHistogramA,
+		},
+		{
+			spanID:              spanIDb,
+			traceID:             traceIDb,
+			contextualHistogram: contextualHistogramB,
+		},
+	}
+	for _, run := range runs {
+		registry.MustRegister(run.contextualHistogram)
+		run.contextualHistogram.Observe(value)
+
+		mfs, err = registry.Gather()
+		if err != nil {
+			t.Fatalf("Gather failed %v", err)
+		}
+		if len(mfs) != 2 {
+			t.Fatalf("Got %v metric families, Want: 2 metric families", len(mfs))
+		}
+
+		dtoMetric := mfs[0].GetMetric()[0]
+		dtoMetricBuckets := dtoMetric.GetHistogram().GetBucket()
+		if len(dtoMetricBuckets) == 0 {
+			t.Fatalf("Got nil buckets")
+		}
+		dtoMetricBucketsExemplar := dtoMetricBuckets[0].GetExemplar()
+		if dtoMetricBucketsExemplar == nil {
+			t.Fatalf("Got nil exemplar")
+		}
+
+		dtoMetricLabels := dtoMetricBucketsExemplar.GetLabel()
+		if len(dtoMetricLabels) != 2 {
+			t.Fatalf("Got %v exemplar labels, wanted 2 exemplar labels", len(dtoMetricLabels))
+		}
+		for _, l := range dtoMetricLabels {
+			switch *l.Name {
+			case "trace_id":
+				if *l.Value != run.traceID.String() {
+					t.Fatalf("Got %s as traceID, wanted %s", *l.Value, run.traceID.String())
+				}
+			case "span_id":
+				if *l.Value != run.spanID.String() {
+					t.Fatalf("Got %s as spanID, wanted %s", *l.Value, run.spanID.String())
+				}
+			default:
+				t.Fatalf("Got unexpected label %s", *l.Name)
+			}
+		}
+
+		registry.Unregister(run.contextualHistogram)
+	}
 }
 
 func TestHistogramVecWithExemplar(t *testing.T) {
-	// Arrange.
-	traceID := trace.TraceID([]byte("trace-0000-xxxxx"))
-	spanID := trace.SpanID([]byte("span-0000-xxxxx"))
-	ctxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
-		TraceID:    traceID,
-		SpanID:     spanID,
-		TraceFlags: trace.FlagsSampled,
-	}))
-	value := float64(10)
-
-	histogramVec := NewHistogramVec(&HistogramOpts{
-		Name:    "histogram_exemplar_test",
-		Help:    "helpless",
-		Buckets: []float64{100},
-	}, []string{"group"})
-	h := histogramVec.WithContext(ctxForSpanCtx)
-
 	registry := newKubeRegistry(apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "15",
 		GitVersion: "v1.15.0-alpha-1.12345",
 	})
+	histogramVec := NewHistogramVec(&HistogramOpts{
+		Name:      "histogram_exemplar_test",
+		Help:      "histogram help",
+		Namespace: "namespace",
+		Subsystem: "subsystem",
+		Buckets:   []float64{100},
+	}, []string{"group"})
 	registry.MustRegister(histogramVec)
 
-	// Act.
+	// no-op, but this shouldn't panic.
+	h := histogramVec.WithContext(nil)
+
+	value := float64(1)
 	h.WithLabelValues("foo").Observe(value)
+	h.WithLabelValues("foo").(prometheus.ExemplarObserver).ObserveWithExemplar(100, prometheus.Labels{
+		"exemplar_label": "42",
+	})
 
-	// Assert.
 	mfs, err := registry.Gather()
-	if err != nil {
-		t.Fatalf("Gather failed %v", err)
-	}
-
-	if len(mfs) != 1 {
-		t.Fatalf("Got %v metric families, Want: 1 metric family", len(mfs))
-	}
+	require.NoError(t, err, "Gather failed %v", err)
 
 	mf := mfs[0]
+
+	assert.Lenf(t, mfs, 1, "Got %v metric families, Want: 1 metric family", len(mfs))
+	assert.Equal(t, BuildFQName("namespace", "subsystem", "histogram_exemplar_test"), *mf.Name)
+	assert.Equal(t, "[ALPHA] histogram help", mf.GetHelp())
+	assert.Lenf(t, mf.GetMetric(), 1, "Got %v metrics, wanted 1 as the count", len(mf.GetMetric()))
+
 	var m *dto.Metric
 	switch mf.GetType() {
 	case dto.MetricType_HISTOGRAM:
 		m = mfs[0].GetMetric()[0]
 	default:
-		t.Fatalf("Got %v metric type, Want: %v metric type", mf.GetType(), dto.MetricType_COUNTER)
+		t.Fatalf("Got %v metric type, Want: %v metric type", mf.GetType(), dto.MetricType_HISTOGRAM)
 	}
 
-	want := value
-	got := m.GetHistogram().GetSampleSum()
-	if got != want {
-		t.Fatalf("Got %f, wanted %f as the count", got, want)
-	}
-
-	buckets := m.GetHistogram().GetBucket()
-	if len(buckets) == 0 {
-		t.Fatalf("Got 0 buckets, wanted 1")
-	}
-
-	e := buckets[0].GetExemplar()
-	if e == nil {
-		t.Fatalf("Got nil exemplar, wanted an exemplar")
-	}
-
-	eLabels := e.GetLabel()
-	if eLabels == nil {
-		t.Fatalf("Got nil exemplar label, wanted an exemplar label")
-	}
-
-	if len(eLabels) != 2 {
-		t.Fatalf("Got %v exemplar labels, wanted 2 exemplar labels", len(eLabels))
-	}
-
-	for _, l := range eLabels {
-		switch *l.Name {
-		case "trace_id":
-			if *l.Value != traceID.String() {
-				t.Fatalf("Got %s as traceID, wanted %s", *l.Value, traceID.String())
-			}
-		case "span_id":
-			if *l.Value != spanID.String() {
-				t.Fatalf("Got %s as spanID, wanted %s", *l.Value, spanID.String())
-			}
-		default:
-			t.Fatalf("Got unexpected label %s", *l.Name)
+	var labelValue string
+	for _, l := range m.GetLabel() {
+		if *l.Name == "group" {
+			labelValue = *l.Value
 		}
 	}
+
+	gotValue := m.GetHistogram().GetSampleSum()
+	gotExemplarValue := m.GetHistogram().GetBucket()[0].GetExemplar().GetValue()
+	gotExemplarLabelName := m.GetHistogram().GetBucket()[0].GetExemplar().GetLabel()[0].GetName()
+	gotExemplarLabelValue := m.GetHistogram().GetBucket()[0].GetExemplar().GetLabel()[0].GetValue()
+
+	assert.Equalf(t, "foo", labelValue, "Got %v, wanted %v as the label values", labelValue, "foo")
+	assert.Equalf(t, 101, int(gotValue), "Got %v, wanted %v as the count while setting group to %v", gotValue, 101, labelValue)
+	assert.Equalf(t, 100, int(gotExemplarValue), "Got %v, wanted %v as the exemplar value while setting group to %v", gotExemplarValue, 100, labelValue)
+	assert.Equalf(t, "exemplar_label", gotExemplarLabelName, "Got %v, wanted %v as the exemplar label name", gotExemplarLabelName, "exemplar_label")
+	assert.Equalf(t, "42", gotExemplarLabelValue, "Got %v, wanted %v as the exemplar label value", gotExemplarLabelValue, "42")
 }
