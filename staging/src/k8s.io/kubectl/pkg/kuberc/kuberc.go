@@ -383,7 +383,10 @@ func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference,
 		// if not explicitly requested, silently ignore missing kuberc
 		return nil, nil
 
-	case !explicitly && errors.Is(err, pluginAllowlistError):
+	case !explicitly && errors.Is(err, malformedAllowlistError):
+		// misconfigured security controls must cause a failure. otherwise the
+		// user may be operating under the assumption of a security guarantee
+		// which does not exist.
 		return nil, err
 
 	case !explicitly && err != nil:

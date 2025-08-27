@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/json"
 )
 
-var pluginAllowlistError = errors.New("plugin allowlist error")
+var malformedAllowlistError = errors.New("credential plugin allowlist is malformed")
 
 // decodePreference iterates over the yamls in kuberc file to find the supported kuberc version.
 // Once it finds, it returns the compatible kuberc object as well as accumulated errors during the iteration.
@@ -92,8 +92,11 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 		}
 
 		// if there was a strict decode error, check check whether the
-		// client-go credential plugin allowlist is the cause. If so, the
-		// allowlist is a misconfigured security control and should therefore fail.
+		// client-go credential plugin allowlist is the cause. The credential
+		// plugin allowlist is a security control and must cause failure if it
+		// is misconfigured: the user is working under the assumption of a
+		// security guarantee. If the command were to succeed with some long
+		// output, the warning will likely be missed by the user.
 		if pluginPathErr, ok := asAllowlistErr(strictDecodeErr); ok {
 			return nil, pluginPathErr
 		}
@@ -136,9 +139,9 @@ func asAllowlistErr(err error) (error, bool) {
 				continue
 			}
 
-			retErr := pluginAllowlistError
+			retErr := malformedAllowlistError
 			if hasSubfields {
-				retErr = fmt.Errorf("%w: field %q is invalid", pluginAllowlistError, subFields)
+				retErr = fmt.Errorf("%w: field %q is invalid", malformedAllowlistError, subFields)
 			}
 
 			return retErr, true
