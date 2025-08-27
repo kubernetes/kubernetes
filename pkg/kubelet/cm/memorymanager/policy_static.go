@@ -471,23 +471,7 @@ func (p *staticPolicy) GetTopologyHints(ctx context.Context, s state.State, pod 
 
 func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.ResourceName]uint64, error) {
 	requestedResources := map[v1.ResourceName]uint64{}
-	resources := container.Resources.Requests
-	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
-	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
-	// We should return this value because this is what kubelet agreed to allocate for the container
-	// and the value configured with runtime.
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		containerStatuses := pod.Status.ContainerStatuses
-		if podutil.IsRestartableInitContainer(container) {
-			if len(pod.Status.InitContainerStatuses) != 0 {
-				containerStatuses = append(containerStatuses, pod.Status.InitContainerStatuses...)
-			}
-		}
-		if cs, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
-			resources = cs.AllocatedResources
-		}
-	}
-	for resourceName, quantity := range resources {
+	for resourceName, quantity := range container.Resources.Requests {
 		if resourceName != v1.ResourceMemory && !corehelper.IsHugePageResourceName(resourceName) {
 			continue
 		}
