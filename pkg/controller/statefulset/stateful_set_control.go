@@ -722,8 +722,9 @@ func updateStatefulSetAfterInvariantEstablished(
 		if err != nil {
 			return &status, err
 		}
-		metrics.MaxUnavailable.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(maxUnavailable))
 	}
+	// Always set the MaxUnavailable metric, defaulting to 1 for all update strategies
+	metrics.MaxUnavailable.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(maxUnavailable))
 
 	// Collect all targets in the range between getStartOrdinal(set) and getEndOrdinal(set). Count any targets in that range
 	// that are unavailable. Select the
