@@ -616,7 +616,7 @@ var _ = SIGDescribe("Pods", func() {
 		Description: A Pod is created. POST request is made to the exec endpoint to execute a command.
 		The POST request MUST successfully execute the command and return expected output.
 	*/
-	f.It("should support remote command execution via POST to exec endpoint", f.WithNodeConformance(), func(ctx context.Context) {
+	framework.ConformanceIt("should support remote command execution via POST to exec endpoint", f.WithNodeConformance(), func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err, "unable to get base config")
 
@@ -696,7 +696,7 @@ var _ = SIGDescribe("Pods", func() {
 		Description: A Pod is created with a web server listening on port 80. POST request is made to the portforward endpoint to establish port forwarding.
 		The POST request MUST successfully establish port forwarding and allow communication to the pod.
 	*/
-	f.It("should support port forwarding via POST to portforward endpoint", f.WithNodeConformance(), func(ctx context.Context) {
+	framework.ConformanceIt("should support port forwarding via POST to portforward endpoint", f.WithNodeConformance(), func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err, "unable to get base config")
 
