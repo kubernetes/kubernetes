@@ -94,6 +94,60 @@ func TestValidateMinAvailablePodAndMaxUnavailableDisruptionBudgetSpec(t *testing
 	}
 }
 
+func TestValidatePodDisruptionBudget(t *testing.T) {
+	tests := []struct {
+		name      string
+		pdb       *policy.PodDisruptionBudget
+		expectErr bool
+	}{
+		{
+			name: "valid PodDisruptionBudget with valid metadata",
+			pdb: &policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "valid-pdb",
+					Namespace: "default",
+				},
+				Spec: policy.PodDisruptionBudgetSpec{},
+			},
+			expectErr: false,
+		},
+		{
+			name: "invalid PodDisruptionBudget with invalid name",
+			pdb: &policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "valid-pdb",
+					Namespace: "==invalid_Namespace==",
+				},
+				Spec: policy.PodDisruptionBudgetSpec{},
+			},
+			expectErr: true,
+		},
+		{
+			name: "invalid PodDisruptionBudget with invalid namespace",
+			pdb: &policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "invalidPdb++",
+					Namespace: "valid-ns",
+				},
+				Spec: policy.PodDisruptionBudgetSpec{},
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidatePodDisruptionBudget(tc.pdb, PodDisruptionBudgetValidationOptions{false})
+			if len(errs) == 0 && tc.expectErr {
+				t.Errorf("unexpected success for %v", tc.pdb)
+			}
+			if len(errs) != 0 && !tc.expectErr {
+				t.Errorf("unexpected failure: %v for %v", errs, tc.pdb)
+			}
+		})
+	}
+}
+
 func TestValidateUnhealthyPodEvictionPolicyDisruptionBudgetSpec(t *testing.T) {
 	c1 := intstr.FromString("10%")
 	alwaysAllowPolicy := policy.AlwaysAllow

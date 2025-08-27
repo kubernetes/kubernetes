@@ -20,6 +20,7 @@ import (
 	"regexp"
 
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
+	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,7 +42,8 @@ type PodDisruptionBudgetValidationOptions struct {
 // ValidatePodDisruptionBudget validates a PodDisruptionBudget and returns an ErrorList
 // with any errors.
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget, opts PodDisruptionBudgetValidationOptions) field.ErrorList {
-	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, opts, field.NewPath("spec"))
+	allErrs := genericvalidation.ValidateObjectMeta(&pdb.ObjectMeta, true, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidatePodDisruptionBudgetSpec(pdb.Spec, opts, field.NewPath("spec"))...)
 	return allErrs
 }
 
