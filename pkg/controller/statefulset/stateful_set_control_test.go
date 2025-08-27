@@ -3750,6 +3750,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		name                             string
 		totalPods                        int32
 		maxUnavailable                   *intstr.IntOrString
+		updateStrategy                   apps.StatefulSetUpdateStrategyType
 		podManagementPolicy              apps.PodManagementPolicyType
 		unavailablePodCount              int
 		expectedMaxUnavailableValue      int
@@ -3760,13 +3761,19 @@ func TestStatefulSetMetrics(t *testing.T) {
 
 		// Create StatefulSet
 		set := newStatefulSet(test.totalPods)
-		var partition int32 = 0
-		set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
-			Type: apps.RollingUpdateStatefulSetStrategyType,
-			RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
-				Partition:      &partition,
-				MaxUnavailable: test.maxUnavailable,
-			},
+		if test.updateStrategy == apps.RollingUpdateStatefulSetStrategyType {
+			var partition int32 = 0
+			set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+				Type: apps.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+					Partition:      &partition,
+					MaxUnavailable: test.maxUnavailable,
+				},
+			}
+		} else {
+			set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+				Type: test.updateStrategy,
+			}
 		}
 		set = setupPodManagementPolicy(test.podManagementPolicy, set)
 		set.Status.CollisionCount = new(int32)
@@ -3851,6 +3858,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 			name:                             "ordered pods within limit",
 			totalPods:                        5,
 			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
 			podManagementPolicy:              apps.OrderedReadyPodManagement,
 			unavailablePodCount:              1,
 			expectedMaxUnavailableValue:      2,
@@ -3860,6 +3868,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 			name:                             "parallel pods exceeding limit",
 			totalPods:                        10,
 			maxUnavailable:                   &intstr.IntOrString{Type: intstr.String, StrVal: "20%"},
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
 			podManagementPolicy:              apps.ParallelPodManagement,
 			unavailablePodCount:              3, // (20% of 10), violation but gauge shows current values
 			expectedMaxUnavailableValue:      2,
@@ -3869,6 +3878,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 			name:                             "ordered pods exactly at limit",
 			totalPods:                        6,
 			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
 			podManagementPolicy:              apps.OrderedReadyPodManagement,
 			unavailablePodCount:              3, // exactly at limit
 			expectedMaxUnavailableValue:      3,
@@ -3878,6 +3888,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 			name:                             "parallel pods all available",
 			totalPods:                        4,
 			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
 			podManagementPolicy:              apps.ParallelPodManagement,
 			unavailablePodCount:              0, // all pods available
 			expectedMaxUnavailableValue:      1,
@@ -3887,6 +3898,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 			name:                             "ordered pods with percentage maxUnavailable",
 			totalPods:                        8,
 			maxUnavailable:                   &intstr.IntOrString{Type: intstr.String, StrVal: "25%"},
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
 			podManagementPolicy:              apps.OrderedReadyPodManagement,
 			unavailablePodCount:              1, // (25% of 8), within limit
 			expectedMaxUnavailableValue:      2,
@@ -3896,6 +3908,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 			name:                             "parallel pods with large percentage",
 			totalPods:                        5,
 			maxUnavailable:                   &intstr.IntOrString{Type: intstr.String, StrVal: "80%"},
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
 			podManagementPolicy:              apps.ParallelPodManagement,
 			unavailablePodCount:              4, // (80% of 5), exactly at limit
 			expectedMaxUnavailableValue:      4,
@@ -3905,6 +3918,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 			name:                             "small statefulset with maxUnavailable 1",
 			totalPods:                        2,
 			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
 			podManagementPolicy:              apps.OrderedReadyPodManagement,
 			unavailablePodCount:              1, // exactly at limit
 			expectedMaxUnavailableValue:      1,
@@ -3914,10 +3928,51 @@ func TestStatefulSetMetrics(t *testing.T) {
 			name:                             "single pod statefulset",
 			totalPods:                        1,
 			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
 			podManagementPolicy:              apps.ParallelPodManagement,
 			unavailablePodCount:              1, // single pod unavailable
 			expectedMaxUnavailableValue:      1,
 			expectedUnavailableReplicasValue: 1,
+		},
+		{
+			name:                             "OnDelete strategy defaults to maxUnavailable 1",
+			totalPods:                        3,
+			maxUnavailable:                   nil, // OnDelete doesn't use maxUnavailable
+			updateStrategy:                   apps.OnDeleteStatefulSetStrategyType,
+			podManagementPolicy:              apps.OrderedReadyPodManagement,
+			unavailablePodCount:              2,
+			expectedMaxUnavailableValue:      1, // default value
+			expectedUnavailableReplicasValue: 2,
+		},
+		{
+			name:                             "OnDelete strategy with parallel management",
+			totalPods:                        4,
+			maxUnavailable:                   nil, // OnDelete doesn't use maxUnavailable
+			updateStrategy:                   apps.OnDeleteStatefulSetStrategyType,
+			podManagementPolicy:              apps.ParallelPodManagement,
+			unavailablePodCount:              1,
+			expectedMaxUnavailableValue:      1,
+			expectedUnavailableReplicasValue: 1,
+		},
+		{
+			name:                             "RollingUpdate with nil maxUnavailable defaults to 1",
+			totalPods:                        5,
+			maxUnavailable:                   nil, // nil should default to 1
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
+			podManagementPolicy:              apps.OrderedReadyPodManagement,
+			unavailablePodCount:              2,
+			expectedMaxUnavailableValue:      1,
+			expectedUnavailableReplicasValue: 2,
+		},
+		{
+			name:                             "RollingUpdate with nil maxUnavailable and parallel pods",
+			totalPods:                        6,
+			maxUnavailable:                   nil, // nil should default to 1
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
+			podManagementPolicy:              apps.ParallelPodManagement,
+			unavailablePodCount:              0,
+			expectedMaxUnavailableValue:      1,
+			expectedUnavailableReplicasValue: 0,
 		},
 	}
 

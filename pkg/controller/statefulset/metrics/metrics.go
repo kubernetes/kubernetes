@@ -26,9 +26,10 @@ import (
 const StatefulSetControllerSubsystem = "statefulset_controller"
 
 var (
-	// MaxUnavailable tracks the current maxUnavailable configuration value for StatefulSets with the
+	// MaxUnavailable tracks the current .spec.updateStrategy.rollingUpdate.maxUnavailable value with the
 	// MaxUnavailableStatefulSet feature enabled. This gauge reflects the configured maximum number of pods
 	// that can be unavailable during rolling updates, providing visibility into the availability constraints.
+	// The metric is set to 1 by default.
 	//
 	// Sample monitoring queries:
 	// - Current maxUnavailable setting: statefulset_max_unavailable
@@ -45,8 +46,8 @@ var (
 	)
 
 	// UnavailableReplicas tracks the current number of unavailable pods in a StatefulSet.
-	// This gauge reflects the real-time count of pods that are not running and available,
-	// providing immediate visibility into StatefulSet health and availability status.
+	// This gauge reflects the real-time count of pods that are either missing or unavailable
+	// (i.e., not ready for .spec.minReadySeconds).
 	//
 	// Sample monitoring queries:
 	// - Current unavailable pods: statefulset_unavailable_replicas
