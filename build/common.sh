@@ -709,7 +709,6 @@ function kube::build::copy_output() {
     --prune-empty-dirs \
     --filter='- /_temp/' \
     --filter='+ /vendor/' \
-    --filter='+ /staging/***/Godeps/**' \
     --filter='+ /_output/dockerized/bin/**' \
     --filter='+ zz_generated.*' \
     --filter='+ generated.proto' \
