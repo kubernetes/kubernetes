@@ -22,17 +22,55 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
+// DeviceClassMapping creates the mapping of extended resource name to device class name.
+// It always includes the implicit extended resource name for each device class.
 func DeviceClassMapping(draManager fwk.SharedDRAManager) (map[v1.ResourceName]string, error) {
-	classes, err := draManager.DeviceClasses().List()
-	extendedResources := make(map[v1.ResourceName]string, len(classes))
+	deviceClassMap := make(map[v1.ResourceName]string)
+	mapping, err := extendedResourceToDeviceClassMapping(draManager)
 	if err != nil {
 		return nil, err
 	}
-	for _, c := range classes {
-		if c.Spec.ExtendedResourceName != nil {
-			extendedResources[v1.ResourceName(*c.Spec.ExtendedResourceName)] = c.Name
-		}
-		extendedResources[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+c.Name)] = c.Name
+	for k, v := range mapping {
+		deviceClassMap[k] = v.Name
 	}
-	return extendedResources, nil
+
+	return deviceClassMap, nil
+}
+
+// deviceClassCmp returns true when classi is created later than classj, or
+// when they are created at the same time, classi's Name is lexicographically sorted before classj's Name.
+// This helps the transition of extended resource name from one device class to another.
+func deviceClassCmp(classi, classj *resourceapi.DeviceClass) bool {
+	if classi.CreationTimestamp.Equal(&classj.CreationTimestamp) {
+		return classi.Name < classj.Name
+	}
+	return classj.CreationTimestamp.Before(&classi.CreationTimestamp)
+}
+
+// extendedResourceToDeviceClassMapping returns the mapping of extended resource (including implicit extended resource name)
+// to device class. The device class MUST NOT BE modified.
+func extendedResourceToDeviceClassMapping(draManager fwk.SharedDRAManager) (map[v1.ResourceName]*resourceapi.DeviceClass, error) {
+	classes, err := draManager.DeviceClasses().List()
+	if err != nil {
+		return nil, err
+	}
+	mapping := make(map[v1.ResourceName]*resourceapi.DeviceClass, len(classes))
+	for _, c := range classes {
+		// implicit extended resource name
+		name := v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + c.Name)
+		mapping[name] = c
+
+		// explicit extended resource name, if any
+		if c.Spec.ExtendedResourceName != nil {
+			name = v1.ResourceName(*c.Spec.ExtendedResourceName)
+			if class, ok := mapping[name]; ok {
+				if deviceClassCmp(c, class) {
+					mapping[name] = c
+				}
+			} else {
+				mapping[name] = c
+			}
+		}
+	}
+	return mapping, nil
 }
