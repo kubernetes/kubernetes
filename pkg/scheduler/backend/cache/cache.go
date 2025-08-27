@@ -739,21 +739,23 @@ func (cache *cacheImpl) cleanupAssumedPods(logger klog.Logger, now time.Time) {
 	defer cache.mu.Unlock()
 	defer cache.updateMetrics()
 
-	// The size of assumedPods should be small
-	for key := range cache.assumedPods {
-		ps, ok := cache.podStates[key]
-		if !ok {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Key found in assumed set but not in podStates, potentially a logical error")
-			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-		}
-		if !ps.bindingFinished {
-			logger.V(5).Info("Could not expire cache for pod as binding is still in progress", "podKey", key, "pod", klog.KObj(ps.pod))
-			continue
-		}
-		if cache.ttl != 0 && now.After(*ps.deadline) {
-			logger.Info("Pod expired", "podKey", key, "pod", klog.KObj(ps.pod))
-			if err := cache.removePod(logger, ps.pod); err != nil {
-				utilruntime.HandleErrorWithLogger(logger, err, "ExpirePod failed", "podKey", key, "pod", klog.KObj(ps.pod))
+	if cache.ttl != 0 {
+		// The size of assumedPods should be small
+		for key := range cache.assumedPods {
+			ps, ok := cache.podStates[key]
+			if !ok {
+				utilruntime.HandleErrorWithLogger(logger, nil, "Key found in assumed set but not in podStates, potentially a logical error")
+				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+			}
+			if !ps.bindingFinished {
+				logger.V(5).Info("Could not expire cache for pod as binding is still in progress", "podKey", key, "pod", klog.KObj(ps.pod))
+				continue
+			}
+			if now.After(*ps.deadline) {
+				logger.Info("Pod expired", "podKey", key, "pod", klog.KObj(ps.pod))
+				if err := cache.removePod(logger, ps.pod); err != nil {
+					utilruntime.HandleErrorWithLogger(logger, err, "ExpirePod failed", "podKey", key, "pod", klog.KObj(ps.pod))
+				}
 			}
 		}
 	}
