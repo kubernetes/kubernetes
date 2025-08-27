@@ -74,6 +74,9 @@ type Helper struct {
 	// won't drain otherwise
 	SkipWaitForDeleteTimeoutSeconds int
 
+	// EvictErrorRetryDelay is used to control the retry delay after a pod eviction error
+	EvictErrorRetryDelay time.Duration
+
 	// AdditionalFilters are applied sequentially after base drain filters to
 	// exclude pods using custom logic.  Any filter that returns PodDeleteStatus
 	// with Delete == false will immediately stop execution of further filters.
@@ -307,8 +310,8 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 					return
 				} else if apierrors.IsTooManyRequests(err) {
 					//nolint:errcheck
-					fmt.Fprintf(d.ErrOut, "error when evicting pods/%q -n %q (will retry after 5s): %v\n", activePod.Name, activePod.Namespace, err)
-					time.Sleep(5 * time.Second)
+					fmt.Fprintf(d.ErrOut, "error when evicting pods/%q -n %q (will retry after %v): %v\n", activePod.Name, activePod.Namespace, d.EvictErrorRetryDelay, err)
+					time.Sleep(d.EvictErrorRetryDelay)
 				} else if !activePod.ObjectMeta.DeletionTimestamp.IsZero() && apierrors.IsForbidden(err) && apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 					// an eviction request in a deleting namespace will throw a forbidden error,
 					// if the pod is already marked deleted, we can ignore this error, an eviction
@@ -318,8 +321,8 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 					// an eviction request in a deleting namespace will throw a forbidden error,
 					// if the pod is not marked deleted, we retry until it is.
 					//nolint:errcheck
-					fmt.Fprintf(d.ErrOut, "error when evicting pod %q from terminating namespace %q (will retry after 5s): %v\n", activePod.Name, activePod.Namespace, err)
-					time.Sleep(5 * time.Second)
+					fmt.Fprintf(d.ErrOut, "error when evicting pod %q from terminating namespace %q (will retry after %v): %v\n", activePod.Name, activePod.Namespace, d.EvictErrorRetryDelay, err)
+					time.Sleep(d.EvictErrorRetryDelay)
 				} else {
 					returnCh <- fmt.Errorf("error when evicting pods/%q -n %q: %v", activePod.Name, activePod.Namespace, err)
 					return

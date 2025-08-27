@@ -534,7 +534,9 @@ func TestEvictDuringNamespaceTerminating(t *testing.T) {
 	testPodUID := types.UID("test-uid")
 	testPodName := "test-pod"
 	testNamespace := "default"
-	globalTimeout := time.Duration(10) * time.Second
+
+	retryDelay := 5 * time.Millisecond
+	globalTimeout := 2 * retryDelay
 
 	tests := []struct {
 		description string
@@ -617,11 +619,12 @@ func TestEvictDuringNamespaceTerminating(t *testing.T) {
 			})
 
 			h := &Helper{
-				Client:          k,
-				DisableEviction: false,
-				Out:             os.Stdout,
-				ErrOut:          os.Stderr,
-				Timeout:         globalTimeout,
+				Client:               k,
+				DisableEviction:      false,
+				Out:                  os.Stdout,
+				ErrOut:               os.Stderr,
+				Timeout:              globalTimeout,
+				EvictErrorRetryDelay: retryDelay,
 			}
 
 			err := h.DeleteOrEvictPods(evictPods)
