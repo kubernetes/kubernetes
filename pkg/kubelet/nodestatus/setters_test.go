@@ -47,6 +47,7 @@ import (
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -279,7 +280,7 @@ func TestNodeAddress(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			// testCase setup
 			existingNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -385,7 +386,7 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			// testCase setup
 			existingNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
@@ -914,7 +915,7 @@ func TestMachineInfo(t *testing.T) {
 		}
 
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			machineInfoFunc := func() (*cadvisorapiv1.MachineInfo, error) {
 				return tc.machineInfo, tc.machineInfoError
 			}
@@ -1081,7 +1082,7 @@ func TestVersionInfo(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableNodeKubeProxyVersion, !tc.kubeProxyVersion)
 
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			versionInfoFunc := func() (*cadvisorapiv1.VersionInfo, error) {
 				return tc.versionInfo, tc.versionInfoError
 			}
@@ -1158,7 +1159,7 @@ func TestImages(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			imageListFunc := func() ([]kubecontainer.Image, error) {
 				// today, imageListFunc is expected to return a sorted list,
 				// but we may choose to sort in the setter at some future point
@@ -1324,7 +1325,7 @@ func TestReadyCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			runtimeErrorsFunc := func() error {
 				return tc.runtimeErrors
 			}
@@ -1458,7 +1459,7 @@ func TestMemoryPressureCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event string) {
 				events = append(events, testEvent{
@@ -1580,7 +1581,7 @@ func TestPIDPressureCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event string) {
 				events = append(events, testEvent{
@@ -1702,7 +1703,7 @@ func TestDiskPressureCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event string) {
 				events = append(events, testEvent{
@@ -1763,7 +1764,7 @@ func TestVolumesInUse(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			syncedFunc := func() bool {
 				return tc.synced
 			}
@@ -1801,7 +1802,7 @@ func TestDaemonEndpoints(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			existingNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: testKubeletHostname,
