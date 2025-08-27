@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -91,6 +92,7 @@ var upgradeableMethods = []string{"GET", "POST"}
 type AttachREST struct {
 	Store       *genericregistry.Store
 	KubeletConn client.ConnectionInfoGetter
+	Authorizer  authorizer.Authorizer
 }
 
 // Implement Connecter
@@ -109,6 +111,10 @@ func (r *AttachREST) Destroy() {
 
 // Connect returns a handler for the pod exec proxy
 func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+	if err := ensureAuthorizedForVerb(ctx, r.Authorizer, "create"); err != nil {
+		return nil, err
+	}
+
 	attachOpts, ok := opts.(*api.PodAttachOptions)
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
@@ -148,6 +154,7 @@ func (r *AttachREST) ConnectMethods() []string {
 type ExecREST struct {
 	Store       *genericregistry.Store
 	KubeletConn client.ConnectionInfoGetter
+	Authorizer  authorizer.Authorizer
 }
 
 // Implement Connecter
@@ -166,6 +173,10 @@ func (r *ExecREST) Destroy() {
 
 // Connect returns a handler for the pod exec proxy
 func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+	if err := ensureAuthorizedForVerb(ctx, r.Authorizer, "create"); err != nil {
+		return nil, err
+	}
+
 	execOpts, ok := opts.(*api.PodExecOptions)
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
@@ -205,6 +216,7 @@ func (r *ExecREST) ConnectMethods() []string {
 type PortForwardREST struct {
 	Store       *genericregistry.Store
 	KubeletConn client.ConnectionInfoGetter
+	Authorizer  authorizer.Authorizer
 }
 
 // Implement Connecter
@@ -234,6 +246,10 @@ func (r *PortForwardREST) ConnectMethods() []string {
 
 // Connect returns a handler for the pod portforward proxy
 func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+	if err := ensureAuthorizedForVerb(ctx, r.Authorizer, "create"); err != nil {
+		return nil, err
+	}
+
 	portForwardOpts, ok := opts.(*api.PodPortForwardOptions)
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
