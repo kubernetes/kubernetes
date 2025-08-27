@@ -543,27 +543,36 @@ func (f *featureGate) AddDependencies(dependencies map[Feature][]Feature) error 
 		}
 	}
 
-	// Validate dependencies:
+	// Validate dependencies for each emulated version:
 	// 1. Features & dependencies must be known
-	// 2. Features cannot depend on features with a lower prerelease level.
+	// 2. Features cannot depend on features with a lower prerelease level
+	// 3. Enabled features cannot depend on disabled features
+	// 4. Locked-to-default featurs cannot depend on unlocked features
 	for feature, deps := range dependencies {
-		var stability int
-		var pr prerelease
-		if versioned, ok := known[feature]; !ok {
+		versionedFeature, ok := known[feature]
+		if !ok {
 			return fmt.Errorf("cannot add dependency for unknown feature %s", feature)
-		} else {
-			latest := versioned[len(versioned)-1] // only check the stability of the latest release
-			pr = latest.PreRelease
-			stability = stabilityOrder(pr)
 		}
 
 		for _, dep := range deps {
-			if versioned, ok := known[dep]; !ok {
+			versionedDep, ok := known[dep]
+			if !ok {
 				return fmt.Errorf("cannot add dependency from %s to unknown feature %s", feature, dep)
-			} else {
-				latest := versioned[len(versioned)-1] // only check the stability of the latest release
-				if stabilityOrder(latest.PreRelease) < stability {
-					return fmt.Errorf("%s feature %s cannot depend on %s feature %s", pr, feature, latest.PreRelease, dep)
+			}
+
+			// Check versions starting with the most recent for more intuitive error messages.
+			for _, spec := range slices.Backward(versionedFeature) {
+				// depSpec is the effective FeatureSpec for the dependency at the version declared by the dependent FeatureSpec.
+				depSpec := featureSpecAtEmulationVersion(versionedDep, spec.Version)
+
+				if stabilityOrder(spec.PreRelease) > stabilityOrder(depSpec.PreRelease) {
+					return fmt.Errorf("%s feature %s cannot depend on %s feature %s at version %s", spec.PreRelease, feature, depSpec.PreRelease, dep, spec.Version.String())
+				}
+				if spec.Default && !depSpec.Default {
+					return fmt.Errorf("default-enabled feature %s cannot depend on default-disabled feature %s at version %s", feature, dep, spec.Version.String())
+				}
+				if spec.LockToDefault && !depSpec.LockToDefault {
+					return fmt.Errorf("locked-to-default feature %s cannot depend on unlocked feature %s at version %s", feature, dep, spec.Version.String())
 				}
 			}
 		}

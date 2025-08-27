@@ -1908,26 +1908,23 @@ func TestAddVersioned(t *testing.T) {
 
 func TestAddDependencies(t *testing.T) {
 	const (
-		featureAlpha1      Feature = "FeatureAlpha1"
-		featureAlpha2      Feature = "FeatureAlpha2"
-		featureAlpha3      Feature = "FeatureAlpha3"
-		featureBeta1       Feature = "FeatureBeta1"
-		featureGA1         Feature = "FeatureGA1"
-		featureDeprecated1 Feature = "FeatureDeprecated1"
-		featureUnknown     Feature = "FeatureUnknown"
+		// Test features
+		fA       Feature = "FeatureA"
+		fB       Feature = "FeatureB"
+		fC       Feature = "FeatureC"
+		fUnknown Feature = "FeatureUnknown"
 	)
 
-	baseFeatures := map[Feature]FeatureSpec{
-		featureAlpha1:      {Default: false, PreRelease: Alpha},
-		featureAlpha2:      {Default: false, PreRelease: Alpha},
-		featureAlpha3:      {Default: false, PreRelease: Alpha},
-		featureBeta1:       {Default: false, PreRelease: Beta},
-		featureGA1:         {Default: true, PreRelease: GA},
-		featureDeprecated1: {Default: false, PreRelease: Deprecated},
-	}
+	var (
+		v129 = version.MustParse("1.29")
+		v130 = version.MustParse("1.30")
+		v131 = version.MustParse("1.31")
+		v132 = version.MustParse("1.32")
+	)
 
 	testCases := []struct {
 		name        string
+		features    map[Feature]VersionedSpecs
 		initialDeps map[Feature][]Feature
 		newDeps     map[Feature][]Feature
 		expectedErr string
@@ -1935,110 +1932,189 @@ func TestAddDependencies(t *testing.T) {
 		closeGate   bool
 	}{
 		{
-			name: "valid dependencies",
-			newDeps: map[Feature][]Feature{
-				featureBeta1:  {featureGA1},
-				featureAlpha1: {featureBeta1, featureAlpha2},
-			},
-			finalDeps: map[Feature][]Feature{
-				featureBeta1:  {featureGA1},
-				featureAlpha1: {featureAlpha2, featureBeta1},
-			},
-		},
-		{
 			name: "dependency on unknown feature",
-			newDeps: map[Feature][]Feature{
-				featureAlpha1: {featureUnknown},
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
 			},
-			expectedErr: "cannot add dependency from FeatureAlpha1 to unknown feature FeatureUnknown",
+			newDeps:     map[Feature][]Feature{fA: {fUnknown}},
+			expectedErr: "cannot add dependency from FeatureA to unknown feature FeatureUnknown",
 		},
 		{
 			name: "unknown feature has dependency",
-			newDeps: map[Feature][]Feature{
-				featureUnknown: {featureAlpha1},
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
 			},
+			newDeps:     map[Feature][]Feature{fUnknown: {fA}},
 			expectedErr: "cannot add dependency for unknown feature FeatureUnknown",
 		},
 		{
-			name: "GA depends on Beta",
-			newDeps: map[Feature][]Feature{
-				featureGA1: {featureBeta1},
-			},
-			expectedErr: " feature FeatureGA1 cannot depend on BETA feature FeatureBeta1",
-		},
-		{
-			name: "Beta depends on Alpha",
-			newDeps: map[Feature][]Feature{
-				featureBeta1: {featureAlpha1},
-			},
-			expectedErr: "BETA feature FeatureBeta1 cannot depend on ALPHA feature FeatureAlpha1",
-		},
-		{
-			name: "Alpha depends on Deprecated",
-			newDeps: map[Feature][]Feature{
-				featureAlpha1: {featureDeprecated1},
-			},
-			expectedErr: "ALPHA feature FeatureAlpha1 cannot depend on DEPRECATED feature FeatureDeprecated1",
-		},
-		{
 			name: "cycle",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+				fB: {{Version: v129}},
+				fC: {{Version: v129}},
+			},
 			newDeps: map[Feature][]Feature{
-				featureAlpha1: {featureAlpha2},
-				featureAlpha2: {featureAlpha3},
-				featureAlpha3: {featureAlpha1},
+				fA: {fB},
+				fB: {fC},
+				fC: {fA},
 			},
 			expectedErr: "cycle detected with feature",
 		},
 		{
-			name: "self cycle",
-			newDeps: map[Feature][]Feature{
-				featureAlpha1: {featureAlpha1},
+			name: "valid: no cycle with overlapping dependencies",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+				fB: {{Version: v129}},
+				fC: {{Version: v129}},
 			},
-			expectedErr: "cycle detected with feature FeatureAlpha1",
+			newDeps: map[Feature][]Feature{
+				fA: {fB, fC},
+				fB: {fC},
+			},
+		},
+		{
+			name: "self cycle",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fA}},
+			expectedErr: "cycle detected with feature FeatureA",
 		},
 		{
 			name: "merge dependencies",
-			initialDeps: map[Feature][]Feature{
-				featureAlpha1: {featureAlpha2},
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+				fB: {{Version: v129}},
+				fC: {{Version: v129}},
 			},
-			newDeps: map[Feature][]Feature{
-				featureAlpha1: {featureBeta1},
-			},
-			finalDeps: map[Feature][]Feature{
-				featureAlpha1: {featureAlpha2, featureBeta1},
-			},
+			initialDeps: map[Feature][]Feature{fA: {fB}},
+			newDeps:     map[Feature][]Feature{fA: {fC}},
+			finalDeps:   map[Feature][]Feature{fA: {fB, fC}},
 		},
 		{
-			name: "duplicate dependencies are compacted",
-			initialDeps: map[Feature][]Feature{
-				featureAlpha1: {featureAlpha2},
+			name: "add after close",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+				fB: {{Version: v129}},
 			},
-			newDeps: map[Feature][]Feature{
-				featureAlpha1: {featureAlpha2, featureBeta1},
-			},
-			finalDeps: map[Feature][]Feature{
-				featureAlpha1: {featureAlpha2, featureBeta1},
-			},
-		},
-		{
-			name: "gate closed",
-			newDeps: map[Feature][]Feature{
-				featureAlpha1: {featureAlpha2},
-			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
 			closeGate:   true,
 			expectedErr: "cannot add a feature gate dependency after adding it to the flag set",
+		},
+		{
+			name: "valid: dependency is valid across all versions",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta}, {Version: v130, PreRelease: GA}},
+				fB: {{Version: v129, PreRelease: Beta}, {Version: v130, PreRelease: GA}},
+			},
+			newDeps: map[Feature][]Feature{fA: {fB}},
+		},
+		{
+			name: "invalid: stability inversion",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta}},
+				fB: {{Version: v129, PreRelease: Alpha}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "BETA feature FeatureA cannot depend on ALPHA feature FeatureB at version 1.29",
+		},
+		{
+			name: "invalid: stability inversion at later version",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Alpha}, {Version: v130, PreRelease: Beta}},
+				fB: {{Version: v129, PreRelease: Alpha}, {Version: v130, PreRelease: Alpha}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "BETA feature FeatureA cannot depend on ALPHA feature FeatureB at version 1.30",
+		},
+		{
+			name: "invalid: stability inversion at earlier version",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Alpha}, {Version: v130, PreRelease: Beta}, {Version: v132, PreRelease: GA}},
+				fB: {{Version: v129, PreRelease: Alpha}, {Version: v131, PreRelease: Beta}, {Version: v132, PreRelease: GA}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "BETA feature FeatureA cannot depend on ALPHA feature FeatureB at version 1.30",
+		},
+		{
+			name: "valid: default-enabled depends on default-enabled",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta, Default: true}},
+				fB: {{Version: v129, PreRelease: Beta, Default: true}},
+			},
+			newDeps: map[Feature][]Feature{fA: {fB}},
+		},
+		{
+			name: "valid: default-disabled depends on default-enabled",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta, Default: false}},
+				fB: {{Version: v129, PreRelease: Beta, Default: true}},
+			},
+			newDeps: map[Feature][]Feature{fA: {fB}},
+		},
+		{
+			name: "invalid: default-enabled depends on default-disabled",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta, Default: true}},
+				fB: {{Version: v129, PreRelease: Beta, Default: false}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "default-enabled feature FeatureA cannot depend on default-disabled feature FeatureB at version 1.29",
+		},
+		{
+			name: "invalid: default-enabled depends on default-disabled at a later version",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Alpha, Default: false}, {Version: v130, PreRelease: Beta, Default: true}},
+				fB: {{Version: v129, PreRelease: Alpha, Default: false}, {Version: v130, PreRelease: Beta, Default: false}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "default-enabled feature FeatureA cannot depend on default-disabled feature FeatureB at version 1.30",
+		},
+		{
+			name: "invalid: default-enabled depends on default-disabled at an earlier version",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta, Default: true}},
+				fB: {{Version: v129, PreRelease: Beta, Default: false}, {Version: v130, PreRelease: Beta, Default: true}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "default-enabled feature FeatureA cannot depend on default-disabled feature FeatureB at version 1.29",
+		},
+		{
+			name: "valid: locked depends on locked",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: true}},
+				fB: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: true}},
+			},
+			newDeps: map[Feature][]Feature{fA: {fB}},
+		},
+		{
+			name: "invalid: locked depends on unlocked",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: true}},
+				fB: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: false}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "locked-to-default feature FeatureA cannot depend on unlocked feature FeatureB at version 1.29",
+		},
+		{
+			name: "invalid: locked depends on unlocked at a later version",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: false}, {Version: v130, PreRelease: GA, Default: true, LockToDefault: true}},
+				fB: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: false}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "locked-to-default feature FeatureA cannot depend on unlocked feature FeatureB at version 1.30",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := NewFeatureGate()
-			require.NoError(t, f.Add(baseFeatures))
-
+			require.NoError(t, f.AddVersioned(tc.features))
 			if tc.initialDeps != nil {
 				require.NoError(t, f.AddDependencies(tc.initialDeps))
 			}
-
 			if tc.closeGate {
 				f.Close()
 			}
@@ -2049,12 +2125,16 @@ func TestAddDependencies(t *testing.T) {
 				assert.ErrorContains(t, err, tc.expectedErr)
 			} else {
 				require.NoError(t, err)
+
 				deps := *f.dependencies.Load()
-				if tc.finalDeps != nil {
-					assert.Equal(t, tc.finalDeps, deps)
+				finalDeps := tc.finalDeps
+				if finalDeps == nil {
+					finalDeps = tc.newDeps
 				}
+				assert.Equal(t, finalDeps, deps)
+
 				clone := *f.DeepCopy().(*featureGate).dependencies.Load()
-				assert.Equal(t, deps, clone, "depnedencies should identical after DeepCopy")
+				assert.Equal(t, deps, clone, "dependencies should identical after DeepCopy")
 			}
 		})
 	}
@@ -2092,22 +2172,22 @@ func TestValidateDependencies(t *testing.T) {
 		{
 			name:        "one dependency disabled",
 			set:         "FeatureA=true,FeatureB=false,FeatureC=true,FeatureD=true",
-			expectedErr: "cannot enable FeatureA since it depends on disaled features: [FeatureB]",
+			expectedErr: "cannot enable FeatureA since it depends on disabled features: [FeatureB]",
 		},
 		{
 			name:        "another dependency disabled",
 			set:         "FeatureA=true,FeatureB=true,FeatureC=false,FeatureD=true",
-			expectedErr: "cannot enable FeatureA since it depends on disaled features: [FeatureC]",
+			expectedErr: "cannot enable FeatureA since it depends on disabled features: [FeatureC]",
 		},
 		{
 			name:        "multiple dependencies disabled",
 			set:         "FeatureA=true,FeatureB=false,FeatureC=false,FeatureD=true",
-			expectedErr: "cannot enable FeatureA since it depends on disaled features: [FeatureB FeatureC]",
+			expectedErr: "cannot enable FeatureA since it depends on disabled features: [FeatureB FeatureC]",
 		},
 		{
 			name:        "transitive dependency disabled",
 			set:         "FeatureA=true,FeatureB=true,FeatureC=true,FeatureD=false",
-			expectedErr: "cannot enable FeatureB since it depends on disaled features: [FeatureD]",
+			expectedErr: "cannot enable FeatureB since it depends on disabled features: [FeatureD]",
 		},
 		{
 			name: "feature disabled",
