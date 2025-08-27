@@ -91,7 +91,7 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
-	}, nil, nil, nil)
+	}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
