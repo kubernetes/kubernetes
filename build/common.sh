@@ -425,6 +425,8 @@ function kube::build::clean() {
 
 # Set up the context directory for the kube-build image and build it.
 function kube::build::build_image() {
+  # TODO: eliminate this entirely in favor of just docker run kube-cross
+  return
   mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
   # Make sure the context directory owned by the right user for syncing sources to container.
   chown -R "${USER_ID}":"${GROUP_ID}" "${LOCAL_OUTPUT_BUILD_CONTEXT}"
@@ -483,6 +485,8 @@ EOF
 }
 
 function kube::build::ensure_data_container() {
+  # TODO: eliminate this, we mount to the build container instead now
+  return
   # If the data container exists AND exited successfully, we can use it.
   # Otherwise nuke it and start over.
   local ret=0
@@ -510,7 +514,8 @@ function kube::build::ensure_data_container() {
     # libraries for true static building.
     local -ra docker_cmd=(
       "${DOCKER[@]}" run
-      --volume "${REMOTE_ROOT}"   # white-out the whole output dir
+      --volume "${KUBE_ROOT}/:/k8s/"
+      #--volume "${REMOTE_ROOT}"   # white-out the whole output dir
       --volume /usr/local/go/pkg/linux_386_cgo
       --volume /usr/local/go/pkg/linux_amd64_cgo
       --volume /usr/local/go/pkg/linux_arm_cgo
@@ -553,7 +558,7 @@ function kube::build::run_build_command_ex() {
     "--user=$(id -u):$(id -g)"
     "--hostname=${HOSTNAME}"
     "-e=GOPROXY=${GOPROXY}"
-    "${DOCKER_MOUNT_ARGS[@]}"
+    #"${DOCKER_MOUNT_ARGS[@]}"
   )
 
   local detach=false
@@ -595,7 +600,21 @@ function kube::build::run_build_command_ex() {
     --env "GOFLAGS=${GOFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
     --env "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-}"
+    # mount source code / output dir
+    --volume "${KUBE_ROOT}:/go/src/k8s.io/kubernetes"
+    # env migrated from build-image, we could consider setting this in kube-cross
+    --env 'KUBE_OUTPUT_SUBPATH=_output/dockerized'
+    --workdir /go/src/k8s.io/kubernetes
+    --env 'GIT_AUTHOR_EMAIL=nobody@k8s.io'
+    --env 'GIT_AUTHOR_NAME=kube-build-image'
   )
+
+  # if host has localtime, mount it so we log in local time
+  if [ -f /etc/localtime ]; then
+    docker_run_opts+=(
+      --mount 'type=bind,source=/etc/localtime,target=/etc/localtime'
+    )
+  fi
 
   # use GOLDFLAGS only if it is set explicitly.
   if [[ -v GOLDFLAGS ]]; then
@@ -620,7 +639,7 @@ function kube::build::run_build_command_ex() {
   fi
 
   local -ra docker_cmd=(
-    "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}")
+    "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_CROSS_IMAGE}:${KUBE_CROSS_VERSION}")
 
   # Clean up container from any previous run
   kube::build::destroy_container "${container_name}"
@@ -713,6 +732,9 @@ function kube::build::rsync {
 # This will launch rsyncd in a container and then sync the source tree to the
 # container over the local network.
 function kube::build::sync_to_container() {
+  # TODO: eliminate calls to this
+  # for now making sure it doesn't run, so we can just use the volume mount
+  return
   kube::log::status "Syncing sources to container"
 
   kube::build::start_rsyncd_container
@@ -740,6 +762,9 @@ function kube::build::sync_to_container() {
 
 # Copy all build results back out.
 function kube::build::copy_output() {
+  # TODO eliminate calls to this
+  # For now just returning early
+  return
   kube::log::status "Syncing out of container"
 
   kube::build::start_rsyncd_container
