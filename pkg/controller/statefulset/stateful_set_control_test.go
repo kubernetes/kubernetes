@@ -375,7 +375,7 @@ func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc)
 		if err != nil {
 			t.Fatalf("Error getting updated StatefulSet: %v", err)
 		}
-		if _, err = om.setPodReady(set, i, true); err != nil {
+		if _, err = om.setPodReadyCondition(set, i, true); err != nil {
 			t.Error(err)
 		}
 	}
@@ -992,7 +992,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		// if pod 4 ready, start to update pod 3, even though 5 is not ready
 		spc.setPodRunning(set, 4)
 		spc.setPodRunning(set, 5)
-		originalPods, _ := spc.setPodReady(set, 4, true)
+		originalPods, _ := spc.setPodReadyCondition(set, 4, true)
 		sort.Sort(ascendingOrdinal(originalPods))
 		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 			t.Fatal(err)
@@ -1034,7 +1034,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatalf("Expected create pods 5, got pods %v", len(pods))
 		}
 		spc.setPodRunning(set, 4)
-		pods, _ = spc.setPodReady(set, 4, true)
+		pods, _ = spc.setPodReadyCondition(set, 4, true)
 
 		// create new pods 4(only one pod gets created at a time due to OrderedReady)
 		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
@@ -1050,7 +1050,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		}
 		// if pod 4 ready, start to update pod 3
 		spc.setPodRunning(set, 5)
-		originalPods, _ := spc.setPodReady(set, 5, true)
+		originalPods, _ := spc.setPodReadyCondition(set, 5, true)
 		sort.Sort(ascendingOrdinal(originalPods))
 		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 			t.Fatal(err)
@@ -1163,8 +1163,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		// pods 3/4/5 ready, should not update other pods
 		spc.setPodRunning(set, 3)
 		spc.setPodRunning(set, 5)
-		spc.setPodReady(set, 5, true)
-		originalPods, _ = spc.setPodReady(set, 3, true)
+		spc.setPodReadyCondition(set, 5, true)
+		originalPods, _ = spc.setPodReadyCondition(set, 3, true)
 		sort.Sort(ascendingOrdinal(originalPods))
 		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 			t.Fatal(err)
@@ -2662,7 +2662,7 @@ func (om *fakeObjectManager) setPodRunning(set *apps.StatefulSet, ordinal int) (
 	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
-func (om *fakeObjectManager) setPodReady(set *apps.StatefulSet, ordinal int, ready bool) ([]*v1.Pod, error) {
+func (om *fakeObjectManager) setPodReadyCondition(set *apps.StatefulSet, ordinal int, ready bool) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -2673,7 +2673,7 @@ func (om *fakeObjectManager) setPodReady(set *apps.StatefulSet, ordinal int, rea
 	}
 	pod := findPodByOrdinal(pods, ordinal)
 	if pod == nil {
-		return nil, fmt.Errorf("setPodReady: pod ordinal %d not found", ordinal)
+		return nil, fmt.Errorf("setPodReadyCondition: pod ordinal %d not found", ordinal)
 	}
 	var condition v1.PodCondition
 	if ready {
@@ -3199,7 +3199,7 @@ func scaleUpStatefulSetControl(set *apps.StatefulSet,
 					return err
 				}
 			case v1.PodRunning:
-				if pods, err = om.setPodReady(set, getOrdinal(pod), true); err != nil {
+				if pods, err = om.setPodReadyCondition(set, getOrdinal(pod), true); err != nil {
 					return err
 				}
 			default:
@@ -3395,7 +3395,7 @@ func updateStatefulSetControl(set *apps.StatefulSet,
 					return err
 				}
 			case v1.PodRunning:
-				if pods, err = om.setPodReady(set, getOrdinal(pod), true); err != nil {
+				if pods, err = om.setPodReadyCondition(set, getOrdinal(pod), true); err != nil {
 					return err
 				}
 			default:
@@ -3805,7 +3805,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		for i := 0; i < test.unavailablePodCount; i++ {
 			if test.podManagementPolicy == apps.OrderedReadyPodManagement {
 				spc.setPodRunning(set, i)
-				pods, _ = spc.setPodReady(set, i, false)
+				pods, _ = spc.setPodReadyCondition(set, i, false)
 			} else {
 				pods, _ = spc.addTerminatingPod(set, i)
 			}
@@ -3814,7 +3814,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		// Make remaining pods ready
 		for i := test.unavailablePodCount; i < int(test.totalPods); i++ {
 			spc.setPodRunning(set, i)
-			pods, _ = spc.setPodReady(set, i, true)
+			pods, _ = spc.setPodReadyCondition(set, i, true)
 		}
 		sort.Sort(ascendingOrdinal(pods))
 
