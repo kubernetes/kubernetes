@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // ProxyREST implements the proxy subresource for a Pod
@@ -234,10 +235,15 @@ func (r *PortForwardREST) ConnectMethods() []string {
 
 // Connect returns a handler for the pod portforward proxy
 func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+	opTrace := utiltrace.New("PortForwardREST.Connect", Field{Key: "name", Value: name})
+	ctx = utiltrace.ContextWithTrace(ctx, opTrace)
+	defer opTrace.Log()
+
 	portForwardOpts, ok := opts.(*api.PodPortForwardOptions)
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
+	opTrace.Step("PortForwardLocation")
 	location, transport, err := pod.PortForwardLocation(ctx, r.Store, r.KubeletConn, name, portForwardOpts)
 	if err != nil {
 		return nil, err
