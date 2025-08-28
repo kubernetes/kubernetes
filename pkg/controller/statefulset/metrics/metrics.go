@@ -41,7 +41,7 @@ var (
 			Subsystem:      StatefulSetControllerSubsystem,
 			Name:           "statefulset_max_unavailable",
 			Help:           "Maximum number of unavailable pods allowed during StatefulSet rolling updates",
-			StabilityLevel: metrics.BETA,
+			StabilityLevel: metrics.ALPHA,
 		}, []string{"statefulset_namespace", "statefulset_name", "pod_management_policy"},
 	)
 
@@ -59,7 +59,7 @@ var (
 			Subsystem:      StatefulSetControllerSubsystem,
 			Name:           "statefulset_unavailable_replicas",
 			Help:           "Current number of unavailable pods in StatefulSet",
-			StabilityLevel: metrics.BETA,
+			StabilityLevel: metrics.ALPHA,
 		}, []string{"statefulset_namespace", "statefulset_name", "pod_management_policy"},
 	)
 )
