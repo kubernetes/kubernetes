@@ -324,8 +324,6 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 }
 
 func TestAPIServerTracing(t *testing.T) {
-	// TODO: remove after updating otelhttp to v0.61.0
-	t.Setenv("OTEL_SEMCONV_STABILITY_OPT_IN", "http/dup")
 	// Listen for traces from the API Server before starting it, so the
 	// API Server will successfully connect right away during the test.
 	listener, err := net.Listen("tcp", "localhost:")
