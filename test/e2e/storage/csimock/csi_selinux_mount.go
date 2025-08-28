@@ -298,7 +298,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				// Act
 				ginkgo.By("Starting the initial pod")
 				accessModes := []v1.PersistentVolumeAccessMode{t.volumeMode}
-				_, claim, pod := m.createPodWithSELinux(ctx, accessModes, t.mountOptions, t.firstPodSELinuxOpts, t.firstPodChangePolicy)
+				_, claim, pod := m.createPodWithSELinux(ctx, accessModes, t.mountOptions, t.firstPodSELinuxOpts, t.firstPodChangePolicy, false /* privileged */)
 				err := e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "starting the initial pod")
 
@@ -331,7 +331,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				pod, err = m.cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "getting the initial pod")
 				nodeSelection := e2epod.NodeSelection{Name: pod.Spec.NodeName}
-				pod2, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, t.secondPodSELinuxOpts, t.secondPodChangePolicy)
+				pod2, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, t.secondPodSELinuxOpts, t.secondPodChangePolicy, false /* privileged */)
 				framework.ExpectNoError(err, "creating second pod with SELinux context %s", t.secondPodSELinuxOpts)
 				m.pods = append(m.pods, pod2)
 
@@ -453,8 +453,10 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 			csiDriverSELinuxEnabled          bool
 			firstPodSELinuxOpts              *v1.SELinuxOptions
 			firstPodChangePolicy             *v1.PodSELinuxChangePolicy
+			firstPodPrivileged               bool
 			secondPodSELinuxOpts             *v1.SELinuxOptions
 			secondPodChangePolicy            *v1.PodSELinuxChangePolicy
+			secondPodPrivileged              bool
 			volumeMode                       v1.PersistentVolumeAccessMode
 			waitForSecondPodStart            bool
 			secondPodFailureEvent            string
@@ -599,7 +601,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 				testTags:                         []interface{}{framework.WithFeatureGate(features.SELinuxMount)},
 			},
 			{
-				name:                    "error is not bumped on two Pods with a different policy RWX volume (nil + MountOption)",
+				name:                    "error is not bumped on two Pods with the same policy RWX volume (nil + MountOption)",
 				csiDriverSELinuxEnabled: true,
 				firstPodSELinuxOpts:     &seLinuxOpts1,
 				firstPodChangePolicy:    &mount,
@@ -611,7 +613,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 				testTags:                []interface{}{framework.WithFeatureGate(features.SELinuxMount)},
 			},
 			{
-				name:                    "error is not bumped on two Pods with a different policy RWX volume (MountOption + MountOption)",
+				name:                    "error is not bumped on two Pods with the same policy RWX volume (MountOption + MountOption)",
 				csiDriverSELinuxEnabled: true,
 				firstPodSELinuxOpts:     &seLinuxOpts1,
 				firstPodChangePolicy:    &mount,
@@ -648,6 +650,75 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 				expectControllerConflictProperty: "SELinuxLabel",
 				testTags:                         []interface{}{framework.WithFeatureGate(features.SELinuxMount)},
 			},
+			{
+				name:                    "error is not bumped on two privileged Pods with mount policy RWO volume",
+				csiDriverSELinuxEnabled: true,
+				firstPodSELinuxOpts:     nil, /* privileged Pods are typically without SELinux context */
+				firstPodPrivileged:      true,
+				firstPodChangePolicy:    &recursive,
+				secondPodSELinuxOpts:    nil, /* privileged Pods are typically without SELinux context */
+				secondPodPrivileged:     true,
+				secondPodChangePolicy:   &recursive,
+				volumeMode:              v1.ReadWriteOnce,
+				waitForSecondPodStart:   true,
+				expectNodeIncreases:     sets.New[string]( /* no metric is increased, admitted_total was already increased when the first pod started */ ),
+				testTags:                []interface{}{framework.WithFeatureGate(features.SELinuxMount)},
+			},
+			{
+				name:                    "error is not bumped on two privileged Pods with recursive policy RWO volume",
+				csiDriverSELinuxEnabled: true,
+				firstPodSELinuxOpts:     nil, /* privileged Pods are typically without SELinux context */
+				firstPodPrivileged:      true,
+				firstPodChangePolicy:    &mount,
+				secondPodSELinuxOpts:    nil, /* privileged Pods are typically without SELinux context */
+				secondPodPrivileged:     true,
+				secondPodChangePolicy:   &mount,
+				volumeMode:              v1.ReadWriteOnce,
+				waitForSecondPodStart:   true,
+				expectNodeIncreases:     sets.New[string]( /* no metric is increased, admitted_total was already increased when the first pod started */ ),
+				testTags:                []interface{}{framework.WithFeatureGate(features.SELinuxMount)},
+			},
+			{
+				name:                    "error is not bumped on a privileged and unprivileged Pod with given SELinux context and recursive policy",
+				csiDriverSELinuxEnabled: true,
+				firstPodSELinuxOpts:     nil, /* privileged Pods are typically without SELinux context */
+				firstPodPrivileged:      true,
+				secondPodSELinuxOpts:    &seLinuxOpts1,
+				secondPodChangePolicy:   &recursive,
+				secondPodPrivileged:     false,
+				volumeMode:              v1.ReadWriteMany,
+				waitForSecondPodStart:   true,
+				expectNodeIncreases:     sets.New[string]( /* no metric is increased, admitted_total was already increased when the first pod started */ ),
+				testTags:                []interface{}{framework.WithFeatureGate(features.SELinuxMount)},
+			},
+			{
+				name:                             "error is bumped on a privileged and unprivileged Pod with given SELinux with MountOption policy",
+				csiDriverSELinuxEnabled:          true,
+				firstPodSELinuxOpts:              nil, /* privileged Pods are typically without SELinux context */
+				firstPodPrivileged:               true,
+				secondPodSELinuxOpts:             &seLinuxOpts1,
+				secondPodChangePolicy:            &mount,
+				secondPodFailureEvent:            "conflicting SELinux labels of volume",
+				volumeMode:                       v1.ReadWriteOncePod,
+				waitForSecondPodStart:            false,
+				expectNodeIncreases:              sets.New[string]("volume_manager_selinux_volume_context_mismatch_errors_total"),
+				expectControllerConflictProperty: "SELinuxLabel",
+				testTags:                         []interface{}{framework.WithFeatureGate(features.SELinuxMount)},
+			},
+			{
+				name:                             "error is bumped on an unprivileged and privileged Pod with given SELinux with MountOption policy",
+				csiDriverSELinuxEnabled:          true,
+				firstPodSELinuxOpts:              &seLinuxOpts1,
+				firstPodChangePolicy:             &mount,
+				secondPodSELinuxOpts:             nil, /* privileged Pods are typically without SELinux context */
+				secondPodPrivileged:              true,
+				secondPodFailureEvent:            "conflicting SELinux labels of volume",
+				volumeMode:                       v1.ReadWriteOncePod,
+				waitForSecondPodStart:            false,
+				expectNodeIncreases:              sets.New[string]("volume_manager_selinux_volume_context_mismatch_errors_total"),
+				expectControllerConflictProperty: "SELinuxLabel",
+				testTags:                         []interface{}{framework.WithFeatureGate(features.SELinuxMount)},
+			},
 		}
 		for _, t := range tests {
 			t := t
@@ -673,7 +744,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 
 				ginkgo.By("Starting the first pod")
 				accessModes := []v1.PersistentVolumeAccessMode{t.volumeMode}
-				_, claim, pod := m.createPodWithSELinux(ctx, accessModes, []string{}, t.firstPodSELinuxOpts, t.firstPodChangePolicy)
+				_, claim, pod := m.createPodWithSELinux(ctx, accessModes, []string{}, t.firstPodSELinuxOpts, t.firstPodChangePolicy, t.firstPodPrivileged)
 				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "starting the initial pod")
 
@@ -688,7 +759,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 				ginkgo.By("Starting the second pod")
 				// Skip scheduler, it would block scheduling the second pod with ReadWriteOncePod PV.
 				nodeSelection := e2epod.NodeSelection{Name: pod.Spec.NodeName}
-				pod2, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, t.secondPodSELinuxOpts, t.secondPodChangePolicy)
+				pod2, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, t.secondPodSELinuxOpts, t.secondPodChangePolicy, t.secondPodPrivileged)
 				framework.ExpectNoError(err, "creating second pod with SELinux context %s", t.secondPodSELinuxOpts)
 				m.pods = append(m.pods, pod2)
 
