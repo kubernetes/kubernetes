@@ -29,7 +29,6 @@ import (
 	authv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -265,14 +264,11 @@ func getAPIEndpoint(client clientset.Interface, nodeName string, apiEndpoint *ku
 
 func getAPIEndpointWithRetry(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint,
 	interval, timeout time.Duration) error {
-	var err error
-	var errs []error
-
-	if err = getAPIEndpointFromPodAnnotation(client, nodeName, apiEndpoint, interval, timeout); err == nil {
-		return nil
+	err := getAPIEndpointFromPodAnnotation(client, nodeName, apiEndpoint, interval, timeout)
+	if err != nil {
+		return errors.WithMessagef(err, "could not retrieve API endpoints for node %q using pod annotations", nodeName)
 	}
-	errs = append(errs, errors.WithMessagef(err, "could not retrieve API endpoints for node %q using pod annotations", nodeName))
-	return errorsutil.NewAggregate(errs)
+	return nil
 }
 
 func getAPIEndpointFromPodAnnotation(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint,
