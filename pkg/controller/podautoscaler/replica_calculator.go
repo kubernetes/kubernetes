@@ -185,7 +185,7 @@ func (c *ReplicaCalculator) GetMetricReplicas(currentReplicas int32, targetUsage
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v", metricName, err)
 	}
 
-	replicaCount, usage, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUsage, tolerances, namespace, selector, v1.ResourceName(""))
+	replicaCount, usage, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUsage, tolerances, namespace, selector, "")
 	return replicaCount, usage, timestamp, err
 }
 
