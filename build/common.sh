@@ -677,6 +677,8 @@ function kube::build::sync_to_container() {
   # are hidden from rsync so they will be deleted in the target container if
   # they exist. This will allow them to be re-created in the container if
   # necessary.
+  # PLEASE DO NOT ADD TO THIS
+  # https://github.com/kubernetes/kubernetes/issues/112862
   kube::build::rsync \
     --delete \
     --filter='- /_tmp/' \
@@ -701,13 +703,13 @@ function kube::build::copy_output() {
   #
   # We are looking to copy out all of the built binaries along with various
   # generated files.
+  # PLEASE DO NOT ADD TO THIS
+  # https://github.com/kubernetes/kubernetes/issues/112862
   kube::build::rsync \
     --prune-empty-dirs \
     --filter='- /_temp/' \
     --filter='+ /vendor/' \
-    --filter='+ /staging/***/Godeps/**' \
     --filter='+ /_output/dockerized/bin/**' \
-    --filter='- /_output/dockerized/go/**' \
     --filter='+ zz_generated.*' \
     --filter='+ generated.proto' \
     --filter='+ *.pb.go' \
