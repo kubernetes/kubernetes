@@ -21,6 +21,7 @@ package oom
 import (
 	"context"
 	"fmt"
+	"path"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -39,13 +40,14 @@ var _ streamer = &oomparser.OomParser{}
 type realWatcher struct {
 	recorder    record.EventRecorder
 	oomStreamer streamer
+	state       *state
 }
 
 var _ Watcher = &realWatcher{}
 
 // NewWatcher creates and initializes a OOMWatcher backed by Cadvisor as
 // the oom streamer.
-func NewWatcher(recorder record.EventRecorder) (Watcher, error) {
+func NewWatcher(recorder record.EventRecorder, rootDir string) (Watcher, error) {
 	// for test purpose
 	_, ok := recorder.(*record.FakeRecorder)
 	if ok {
@@ -56,10 +58,14 @@ func NewWatcher(recorder record.EventRecorder) (Watcher, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	watcher := &realWatcher{
 		recorder:    recorder,
 		oomStreamer: oomStreamer,
+		state: &state{
+			storer: &FileStorer{
+				filePath: path.Join(rootDir, "oom_watcher_state"),
+			},
+		},
 	}
 
 	return watcher, nil
@@ -72,6 +78,10 @@ const (
 
 // Start watches for system oom's and records an event for every system oom encountered.
 func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error {
+	if err := ow.state.load(); err != nil {
+		return fmt.Errorf("unable to load oom watcher state: %w", err)
+	}
+
 	outStream := make(chan *oomparser.OomInstance, 10)
 	go ow.oomStreamer.StreamOoms(outStream)
 
@@ -82,11 +92,20 @@ func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error
 		for event := range outStream {
 			if event.VictimContainerName == recordEventContainerName {
 				logger.V(1).Info("Got sys oom event", "event", event)
+				if !ow.state.isNewEvent(event.TimeOfDeath) {
+					logger.V(1).Info("ignore out of the order event", "event", event, "LastProcessedTimestamp", ow.state.LastProcessedTimestamp)
+					continue
+				}
+
 				eventMsg := "System OOM encountered"
 				if event.ProcessName != "" && event.Pid != 0 {
 					eventMsg = fmt.Sprintf("%s, victim process: %s, pid: %d", eventMsg, event.ProcessName, event.Pid)
 				}
 				ow.recorder.Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
+				ow.state.LastProcessedTimestamp = event.TimeOfDeath
+				if err := ow.state.store(); err != nil {
+					logger.Error(err, "Unable to store watcher state")
+				}
 			}
 		}
 		logger.Error(nil, "Unexpectedly stopped receiving OOM notifications")
