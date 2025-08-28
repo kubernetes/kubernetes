@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -201,7 +200,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 		original                   *appsv1.StatefulSet
 		expected                   *appsv1.StatefulSet
 		enableMaxUnavailablePolicy bool
-		disablePVCDeletionPolicy   bool
 	}{
 		{
 			name: "labels and default update strategy",
@@ -594,76 +592,11 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 			},
 			enableMaxUnavailablePolicy: true,
 		},
-		{
-			name: "PVCDeletionPolicy disabled",
-			original: &appsv1.StatefulSet{
-				Spec: appsv1.StatefulSetSpec{
-					Template: defaultTemplate,
-				},
-			},
-			expected: &appsv1.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: defaultLabels,
-				},
-				Spec: appsv1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					MinReadySeconds:     int32(0),
-					Template:            defaultTemplate,
-					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
-					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-						Type: appsv1.RollingUpdateStatefulSetStrategyType,
-						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-							Partition: &defaultPartition,
-						},
-					},
-					RevisionHistoryLimit: ptr.To[int32](10),
-				},
-			},
-			disablePVCDeletionPolicy: true,
-		},
-		{
-			name: "PVCDeletionPolicy disabled, scaledown set",
-			original: &appsv1.StatefulSet{
-				Spec: appsv1.StatefulSetSpec{
-					Template: defaultTemplate,
-					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
-						WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
-					},
-				},
-			},
-			expected: &appsv1.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: defaultLabels,
-				},
-				Spec: appsv1.StatefulSetSpec{
-					Replicas:        &defaultReplicas,
-					MinReadySeconds: int32(0),
-					Template:        defaultTemplate,
-					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
-						WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
-					},
-					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
-					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-						Type: appsv1.RollingUpdateStatefulSetStrategyType,
-						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-							Partition: &defaultPartition,
-						},
-					},
-					RevisionHistoryLimit: ptr.To[int32](10),
-				},
-			},
-			disablePVCDeletionPolicy: true,
-		},
 	}
 
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			if test.disablePVCDeletionPolicy {
-				// TODO: this will be removed in 1.35
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)
-			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)
 
 			obj2 := roundTrip(t, runtime.Object(test.original))

@@ -124,16 +124,14 @@ func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		if obj.Spec.PersistentVolumeClaimRetentionPolicy == nil {
-			obj.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{}
-		}
-		if len(obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted) == 0 {
-			obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
-		}
-		if len(obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled) == 0 {
-			obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
-		}
+	if obj.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+		obj.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{}
+	}
+	if len(obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted) == 0 {
+		obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	}
+	if len(obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled) == 0 {
+		obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
 	}
 
 	if obj.Spec.Replicas == nil {
