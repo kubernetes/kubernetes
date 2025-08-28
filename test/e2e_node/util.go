@@ -214,21 +214,59 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ctx
 	})
 }
 
-func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {
+type updateKubeletOptions struct {
+	deleteStateFiles          bool
+	ensureConsistentReadyNode bool
+	// TODO: add option to use systemctl stop, now we only use systemctl kill for historical reasons
+}
+
+func updateKubeletConfigWithOptions(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, opts updateKubeletOptions) {
+	ginkgo.GinkgoHelper()
+
+	nodeIdent := identifyNode(getLocalNode(ctx, f))
+
 	// Update the Kubelet configuration.
-	ginkgo.By("Stopping the kubelet")
+	ginkgo.By("Stopping the kubelet on " + nodeIdent)
 	restartKubelet := mustStopKubelet(ctx, f)
 
 	// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
-	if deleteStateFiles {
+	if opts.deleteStateFiles {
+		ginkgo.By("Deleting the kubelet state files on " + nodeIdent)
 		deleteStateFile(cpuManagerStateFile)
 		deleteStateFile(memoryManagerStateFile)
 	}
 
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
 
-	ginkgo.By("Restarting the kubelet")
+	ginkgo.By("Restarting the kubelet on " + nodeIdent)
 	restartKubelet(ctx)
+
+	if opts.ensureConsistentReadyNode {
+		gomega.Consistently(ctx, func(ctx context.Context) bool {
+			return getNodeReadyStatus(ctx, f) && kubeletHealthCheck(kubeletHealthCheckURL)
+		}).WithTimeout(2 * time.Minute).WithPolling(2 * time.Second).Should(gomega.BeTrueBecause("node keeps reporting ready status"))
+	}
+}
+
+func identifyNode(node *v1.Node) string {
+	if node == nil {
+		return "localhost"
+	}
+	var addrs string
+	if len(node.Status.Addresses) > 0 {
+		var sb strings.Builder
+		for _, addr := range node.Status.Addresses {
+			fmt.Fprintf(&sb, " %v=%v", addr.Type, addr.Address)
+		}
+		addrs = " <" + sb.String()[2:] + ">"
+	}
+	return node.Name + addrs
+}
+
+func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {
+	updateKubeletConfigWithOptions(ctx, f, kubeletConfig, updateKubeletOptions{
+		deleteStateFiles: deleteStateFiles,
+	})
 }
 
 func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
@@ -251,8 +289,19 @@ func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 }
 
 func deleteStateFile(stateFileName string) {
-	err := exec.Command("/bin/sh", "-c", fmt.Sprintf("rm -f %s", stateFileName)).Run()
+	cmdLet := fmt.Sprintf("rm -f %s", stateFileName)
+	framework.Logf("About to run: %q", cmdLet)
+	err := exec.Command("/bin/sh", "-c", cmdLet).Run()
 	framework.ExpectNoError(err, "failed to delete the state file")
+}
+
+func getNodeReadyStatus(ctx context.Context, f *framework.Framework) bool {
+	ginkgo.GinkgoHelper()
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	framework.ExpectNoError(err)
+	// Assuming that there is only one node, because this is a node e2e test.
+	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1), "the number of nodes is not as expected")
+	return isNodeReady(&nodeList.Items[0])
 }
 
 // listNamespaceEvents lists the events in the given namespace.
@@ -343,6 +392,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 // otherwise, also stopped, failed, exited (non-running in general) services are also considered.
 // TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
 func findKubeletServiceName(running bool) string {
+	ginkgo.GinkgoHelper()
 	cmdLine := []string{
 		"systemctl", "list-units", "*kubelet*",
 	}
@@ -350,12 +400,16 @@ func findKubeletServiceName(running bool) string {
 		cmdLine = append(cmdLine, "--state=running")
 	}
 	stdout, err := exec.Command("sudo", cmdLine...).CombinedOutput()
+	framework.Logf("run '%s' output: %v", strings.Join(cmdLine, " "), string(stdout))
 	framework.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
-	gomega.Expect(matches).ToNot(gomega.BeEmpty(), "Found more than one kubelet service running: %q", stdout)
+	gomega.Expect(matches).ToNot(gomega.BeEmpty(), "Found no kubelet service running: %q", stdout)
+	if len(matches) > 1 {
+		framework.Logf("CAUTION! found %d kubelet services running, using first: %v", len(matches), matches)
+	}
 	kubeletServiceName := matches[0]
-	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kubeletServiceName)
+	framework.Logf("Get running kubelet with systemctl: %v", kubeletServiceName)
 	return kubeletServiceName
 }
 
@@ -443,6 +497,16 @@ func restartKubelet(ctx context.Context, running bool) {
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %s", err, string(stdout))
 }
 
+func dumpKubeletStatus() {
+	ginkgo.GinkgoHelper()
+	cmdLine := []string{
+		"systemctl", "--quiet", "list-units", "*kubelet*",
+	}
+	stdout, err := exec.Command("sudo", cmdLine...).CombinedOutput()
+	framework.ExpectNoError(err)
+	framework.Logf("%s", string(stdout))
+}
+
 // mustStopKubelet will kill the running kubelet, and returns a func that will restart the process again
 func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx context.Context) {
 	kubeletServiceName := findKubeletServiceName(true)
@@ -459,11 +523,14 @@ func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx conte
 		return kubeletHealthCheck(kubeletHealthCheckURL)
 	}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet was expected to be stopped but it is still running"))
 
+	dumpKubeletStatus()
+
 	return func(ctx context.Context) {
 		// we should restart service, otherwise the transient service start will fail
 		stdout, err := exec.CommandContext(ctx, "sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
 		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 		waitForKubeletToStart(ctx, f)
+		dumpKubeletStatus()
 	}
 }
 
@@ -630,4 +697,14 @@ func WaitForPodInitContainerToFail(ctx context.Context, c clientset.Interface, n
 
 func nodeNameOrIP() string {
 	return "localhost"
+}
+
+// isNodeReady returns true if a node is ready; false otherwise.
+func isNodeReady(node *v1.Node) bool {
+	for _, c := range node.Status.Conditions {
+		if c.Type == v1.NodeReady {
+			return c.Status == v1.ConditionTrue
+		}
+	}
+	return false
 }
