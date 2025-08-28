@@ -284,7 +284,7 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 			})
 			c := NewHistogramVec(opts, labels)
 			registry.MustRegister(c)
-			SetLabelAllowListFromCLI(labelAllowValues)
+			SetLabelAllowList(labelAllowValues)
 
 			for _, lv := range test.labelValues {
 				c.WithLabelValues(lv...).Observe(1.0)

@@ -259,7 +259,7 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 			})
 			c := NewCounterVec(opts, labels)
 			registry.MustRegister(c)
-			SetLabelAllowListFromCLI(labelAllowValues)
+			SetLabelAllowList(labelAllowValues)
 			for _, lv := range test.labelValues {
 				c.WithLabelValues(lv...).Inc()
 			}
