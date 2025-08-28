@@ -54,6 +54,11 @@ func startSVMController(
 		return nil, true, fmt.Errorf("storage version migrator requires garbage collector")
 	}
 
+	if !clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
+		err := fmt.Errorf("storage version migrator requires the InOrderInformers feature gate to be enabled")
+		return nil, true, err
+	}
+
 	// svm controller can make a lot of requests during migration, keep it fast
 	config := controllerContext.ClientBuilder.ConfigOrDie(controllerName)
 	config.QPS *= 20

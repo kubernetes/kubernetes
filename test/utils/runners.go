@@ -54,13 +54,6 @@ const (
 	nonExist = "NonExist"
 )
 
-func removePtr(replicas *int32) int32 {
-	if replicas == nil {
-		return 0
-	}
-	return *replicas
-}
-
 func waitUntilPodIsScheduled(ctx context.Context, c clientset.Interface, name, namespace string, timeout time.Duration) (*v1.Pod, error) {
 	// Wait until it's scheduled
 	p, err := c.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{ResourceVersion: "0"})
@@ -356,7 +349,7 @@ func (config *DeploymentConfig) create() error {
 	if err := CreateDeploymentWithRetries(config.Client, config.Namespace, deployment); err != nil {
 		return fmt.Errorf("error creating deployment: %v", err)
 	}
-	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, removePtr(deployment.Spec.Replicas))
+	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, ptr.Deref(deployment.Spec.Replicas, 0))
 	return nil
 }
 
@@ -427,7 +420,7 @@ func (config *ReplicaSetConfig) create() error {
 	if err := CreateReplicaSetWithRetries(config.Client, config.Namespace, rs); err != nil {
 		return fmt.Errorf("error creating replica set: %v", err)
 	}
-	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, removePtr(rs.Spec.Replicas))
+	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, ptr.Deref(rs.Spec.Replicas, 0))
 	return nil
 }
 
@@ -507,7 +500,7 @@ func (config *RCConfig) create() error {
 	if err := CreateRCWithRetries(config.Client, config.Namespace, rc); err != nil {
 		return fmt.Errorf("error creating replication controller: %v", err)
 	}
-	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, removePtr(rc.Spec.Replicas))
+	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, ptr.Deref(rc.Spec.Replicas, 0))
 	return nil
 }
 

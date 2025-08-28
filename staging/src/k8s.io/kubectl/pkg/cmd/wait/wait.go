@@ -46,7 +46,7 @@ import (
 
 var (
 	waitLong = templates.LongDesc(i18n.T(`
-		Experimental: Wait for a specific condition on one or many resources.
+		Wait for a specific condition on one or many resources.
 
 		The command takes multiple resources and waits until the specified condition
 		is seen in the Status field of every given resource.

@@ -331,15 +331,6 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 	}
 }
 
-// generateStatefulSetWithMinReadySeconds generates a StatefulSet with min values
-func generateStatefulSetWithMinReadySeconds(minReadySeconds int32) *apps.StatefulSet {
-	return &apps.StatefulSet{
-		Spec: apps.StatefulSetSpec{
-			MinReadySeconds: minReadySeconds,
-		},
-	}
-}
-
 func makeStatefulSetWithMaxUnavailable(maxUnavailable *int) *apps.StatefulSet {
 	rollingUpdate := apps.RollingUpdateStatefulSetStrategy{}
 	if maxUnavailable != nil {
@@ -359,38 +350,6 @@ func makeStatefulSetWithMaxUnavailable(maxUnavailable *int) *apps.StatefulSet {
 	}
 }
 
-func createOrdinalsWithStart(start int) *apps.StatefulSetOrdinals {
-	return &apps.StatefulSetOrdinals{
-		Start: int32(start),
-	}
-}
-
-func makeStatefulSetWithStatefulSetOrdinals(ordinals *apps.StatefulSetOrdinals) *apps.StatefulSet {
-	validSelector := map[string]string{"a": "b"}
-	validPodTemplate := api.PodTemplate{
-		Template: api.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			},
-		},
-	}
-	return &apps.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "ss", Namespace: metav1.NamespaceDefault},
-		Spec: apps.StatefulSetSpec{
-			Ordinals:            ordinals,
-			Selector:            &metav1.LabelSelector{MatchLabels: validSelector},
-			Template:            validPodTemplate.Template,
-			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-			PodManagementPolicy: apps.OrderedReadyPodManagement,
-		},
-	}
-}
-
 // TestDropStatefulSetDisabledFields tests if the drop functionality is working fine or not
 func TestDropStatefulSetDisabledFields(t *testing.T) {
 	testCases := []struct {
@@ -400,24 +359,6 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 		oldSS                *apps.StatefulSet
 		expectedSS           *apps.StatefulSet
 	}{
-		{
-			name:       "set minReadySeconds, no update",
-			ss:         generateStatefulSetWithMinReadySeconds(10),
-			oldSS:      generateStatefulSetWithMinReadySeconds(20),
-			expectedSS: generateStatefulSetWithMinReadySeconds(10),
-		},
-		{
-			name:       "set minReadySeconds, oldSS field set to nil",
-			ss:         generateStatefulSetWithMinReadySeconds(10),
-			oldSS:      nil,
-			expectedSS: generateStatefulSetWithMinReadySeconds(10),
-		},
-		{
-			name:       "set minReadySeconds, oldSS field is set to 0",
-			ss:         generateStatefulSetWithMinReadySeconds(10),
-			oldSS:      generateStatefulSetWithMinReadySeconds(0),
-			expectedSS: generateStatefulSetWithMinReadySeconds(10),
-		},
 		{
 			name:       "MaxUnavailable not enabled, field not used",
 			ss:         makeStatefulSetWithMaxUnavailable(nil),
@@ -451,18 +392,6 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 			ss:                   makeStatefulSetWithMaxUnavailable(ptr.To(1)),
 			oldSS:                makeStatefulSetWithMaxUnavailable(ptr.To(3)),
 			expectedSS:           makeStatefulSetWithMaxUnavailable(ptr.To(1)),
-		},
-		{
-			name:       "set ordinals, ordinals in use in new only",
-			ss:         makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
-			oldSS:      nil,
-			expectedSS: makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
-		},
-		{
-			name:       "set ordinals, ordinals in use in both old and new",
-			ss:         makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
-			oldSS:      makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(1)),
-			expectedSS: makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
 		},
 	}
 	for _, tc := range testCases {

@@ -21,10 +21,21 @@ import (
 // Resources should be passed and stored as pointers
 // (`*resource.Resource`).  The `nil` value is equivalent to an empty
 // Resource.
+//
+// Note that the Go == operator compares not just the resource attributes but
+// also all other internals of the Resource type. Therefore, Resource values
+// should not be used as map or database keys. In general, the [Resource.Equal]
+// method should be used instead of direct comparison with ==, since that
+// method ensures the correct comparison of resource attributes, and the
+// [attribute.Distinct] returned from [Resource.Equivalent] should be used for
+// map and database keys instead.
 type Resource struct {
 	attrs     attribute.Set
 	schemaURL string
 }
+
+// Compile-time check that the Resource remains comparable.
+var _ map[Resource]struct{} = nil
 
 var (
 	defaultResource     *Resource
@@ -137,15 +148,19 @@ func (r *Resource) Iter() attribute.Iterator {
 	return r.attrs.Iter()
 }
 
-// Equal returns true when a Resource is equivalent to this Resource.
-func (r *Resource) Equal(eq *Resource) bool {
+// Equal returns whether r and o represent the same resource. Two resources can
+// be equal even if they have different schema URLs.
+//
+// See the documentation on the [Resource] type for the pitfalls of using ==
+// with Resource values; most code should use Equal instead.
+func (r *Resource) Equal(o *Resource) bool {
 	if r == nil {
 		r = Empty()
 	}
-	if eq == nil {
-		eq = Empty()
+	if o == nil {
+		o = Empty()
 	}
-	return r.Equivalent() == eq.Equivalent()
+	return r.Equivalent() == o.Equivalent()
 }
 
 // Merge creates a new [Resource] by merging a and b.

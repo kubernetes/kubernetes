@@ -9,6 +9,14 @@ type ThrottlingData struct {
 	ThrottledTime uint64 `json:"throttled_time,omitempty"`
 }
 
+type BurstData struct {
+	// Number of periods bandwidth burst occurs
+	BurstsPeriods uint64 `json:"bursts_periods,omitempty"`
+	// Cumulative wall-time that any cpus has used above quota in respective periods
+	// Units: nanoseconds.
+	BurstTime uint64 `json:"burst_time,omitempty"`
+}
+
 // CpuUsage denotes the usage of a CPU.
 // All CPU stats are aggregate since container inception.
 type CpuUsage struct {
@@ -48,6 +56,7 @@ type CpuStats struct {
 	CpuUsage       CpuUsage       `json:"cpu_usage,omitempty"`
 	ThrottlingData ThrottlingData `json:"throttling_data,omitempty"`
 	PSI            *PSIStats      `json:"psi,omitempty"`
+	BurstData      BurstData      `json:"burst_data,omitempty"`
 }
 
 type CPUSetStats struct {

@@ -509,6 +509,26 @@ func TestReplicaCalcScaleUpUnreadyLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcScaleUpOverflow(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: math.MaxInt32,
+		metric: &metricInfo{
+			name:          "qps",
+			levels:        []int64{math.MaxInt64}, // Use MaxInt64 to ensure a very large value
+			targetUsage:   1,                      // Set a very low target to force high scaling
+			metricType:    objectMetric,
+			expectedUsage: math.MaxInt64,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+				Name:       "some-deployment",
+			},
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcScaleUpContainerHotCpuLessScale(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
@@ -2429,4 +2449,31 @@ func TestCalculateRequests(t *testing.T) {
 			assert.Equal(t, tc.expectedError, err, "error should be as expected")
 		})
 	}
+}
+func TestCalculatePodRequestsFromContainers_NonExistentContainer(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: testNamespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	request, err := calculatePodRequestsFromContainers(pod, "non-existent-container", v1.ResourceCPU)
+
+	require.Error(t, err, "expected error for non-existent container")
+	expectedErr := "container non-existent-container not found in Pod test-pod"
+	assert.Equal(t, expectedErr, err.Error(), "error message should match expected format")
+	assert.Equal(t, int64(0), request, "request should be 0 when container does not exist")
 }

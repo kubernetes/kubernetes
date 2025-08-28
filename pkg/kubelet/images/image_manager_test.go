@@ -694,7 +694,7 @@ type mockImagePullManager struct {
 	config *mockImagePullManagerConfig
 }
 
-func (m *mockImagePullManager) MustAttemptImagePull(image, _ string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
+func (m *mockImagePullManager) MustAttemptImagePull(ctx context.Context, image, _ string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
 	if m.config == nil || m.config.allowAll {
 		return false
 	}
@@ -736,7 +736,7 @@ type mockImagePullManagerWithTracking struct {
 	recordedCredentials *kubeletconfiginternal.ImagePullCredentials
 }
 
-func (m *mockImagePullManagerWithTracking) MustAttemptImagePull(image, imageRef string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
+func (m *mockImagePullManagerWithTracking) MustAttemptImagePull(ctx context.Context, image, imageRef string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
 	m.mustAttemptCalled = true
 	m.lastImage = image
 	m.lastImageRef = imageRef
@@ -751,7 +751,7 @@ func (m *mockImagePullManagerWithTracking) MustAttemptImagePull(image, imageRef 
 	return m.mustAttemptReturn
 }
 
-func (m *mockImagePullManagerWithTracking) RecordImagePulled(image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) {
+func (m *mockImagePullManagerWithTracking) RecordImagePulled(ctx context.Context, image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) {
 	m.recordedCredentials = credentials
 }
 
@@ -834,7 +834,7 @@ func TestParallelPuller(t *testing.T) {
 	useSerializedEnv := false
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			pod := &v1.Pod{
@@ -880,7 +880,7 @@ func TestSerializedPuller(t *testing.T) {
 	useSerializedEnv := true
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			pod := &v1.Pod{
@@ -975,7 +975,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 
 	useSerializedEnv := true
 	t.Run(c.testName, func(t *testing.T) {
-		ctx := context.Background()
+		ctx := ktesting.Init(t)
 		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
 		fakeRuntime.ImageList = []Image{}
@@ -1039,7 +1039,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 	useSerializedEnv := true
 	t.Run(c.testName, func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
-		ctx := context.Background()
+		ctx := ktesting.Init(t)
 		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
 		fakeRuntime.ImageList = []Image{}
@@ -1071,7 +1071,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 }
 
 func TestMaxParallelImagePullsLimit(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",

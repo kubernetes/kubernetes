@@ -173,6 +173,7 @@ linters:
             structured k8s.io/kms/.*
             structured k8s.io/apiserver/pkg/storage/value/.*
             structured k8s.io/apiserver/pkg/server/options/encryptionconfig/.*
+            structured k8s.io/kubernetes/pkg/credentialprovider/plugin/.*
             
             # The following packages have been migrated to contextual logging.
             # Packages matched here do not have to be listed above because
@@ -317,5 +318,6 @@ linters:
     staticcheck:
       checks:
         - "all"
+        - "-QF1008"  # Omit embedded fields from selector expression
     testifylint:
       enable-all: true

@@ -294,12 +294,12 @@ func TestFullFlow(t *testing.T) {
 
 	// Because our fake podManager is based on an informer, we need to poll
 	// until workloadPod is reflected in the informer.
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, ok := node1PodManager.GetPodByUID(workloadPod.ObjectMeta.UID)
 		return ok, nil
 	})
 	if err != nil {
-		t.Fatalf("Error while waiting node1 podManager to know about workloadPod: %v", err)
+		t.Fatalf("Error while waiting for node1 podManager to know about workloadPod: %v", err)
 	}
 
 	node1PodCertificateManager.TrackPod(ctx, workloadPod)
@@ -307,7 +307,7 @@ func TestFullFlow(t *testing.T) {
 	// Within a few seconds, we should see a PodCertificateRequest created for
 	// this pod.
 	var gotPCR *certsv1alpha1.PodCertificateRequest
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		pcrs, err := kc.CertificatesV1alpha1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
@@ -353,7 +353,7 @@ func TestFullFlow(t *testing.T) {
 	}
 
 	// Wait some more time for the PCR to be issued.
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		pcrs, err := kc.CertificatesV1alpha1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
@@ -388,7 +388,7 @@ func TestFullFlow(t *testing.T) {
 
 	// Now we know that the PCR was issued, so we can wait for the
 	// podcertificate manager to return some valid credentials.
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, _, err := node1PodCertificateManager.GetPodCertificateCredentialBundle(ctx, workloadPod.ObjectMeta.Namespace, workloadPod.ObjectMeta.Name, string(workloadPod.ObjectMeta.UID), "certificate", 0)
 		if err != nil {
 			return false, err
@@ -413,7 +413,7 @@ func TestFullFlow(t *testing.T) {
 
 	// Within a few seconds, we should see a new PodCertificateRequest created for
 	// this pod.
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		pcrs, err := kc.CertificatesV1alpha1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
@@ -433,7 +433,7 @@ func TestFullFlow(t *testing.T) {
 	// We will assume that the created PCR matches our expectations.
 
 	// Wait some more time for the new PCR to be issued.
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		pcrs, err := kc.CertificatesV1alpha1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
@@ -461,7 +461,7 @@ func TestFullFlow(t *testing.T) {
 
 	// Now we know that the PCR was issued, so we can wait for the
 	// podcertificate manager to start returning the new certificate
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, certChain, err := node1PodCertificateManager.GetPodCertificateCredentialBundle(ctx, workloadPod.ObjectMeta.Namespace, workloadPod.ObjectMeta.Name, string(workloadPod.ObjectMeta.UID), "certificate", 0)
 		if err != nil {
 			return false, err

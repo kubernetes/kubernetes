@@ -625,13 +625,15 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Log
 
 // moveToActiveQ tries to add the pod to the active queue.
 // If the pod doesn't pass PreEnqueue plugins, it gets added to unschedulablePods instead.
+// movesFromBackoffQ should be set to true, if the pod directly moves from the backoffQ, so the PreEnqueue call can be skipped.
 // It returns a boolean flag to indicate whether the pod is added successfully.
-func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) bool {
+func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string, movesFromBackoffQ bool) bool {
 	gatedBefore := pInfo.Gated()
 	// If SchedulerPopFromBackoffQ feature gate is enabled,
 	// PreEnqueue plugins were called when the pod was added to the backoffQ.
 	// Don't need to repeat it here when the pod is directly moved from the backoffQ.
-	if !p.isPopFromBackoffQEnabled || event != framework.BackoffComplete {
+	skipPreEnqueue := p.isPopFromBackoffQEnabled && movesFromBackoffQ
+	if !skipPreEnqueue {
 		p.runPreEnqueuePlugins(context.Background(), pInfo)
 	}
 
@@ -699,7 +701,7 @@ func (p *PriorityQueue) Add(logger klog.Logger, pod *v1.Pod) {
 	defer p.lock.Unlock()
 
 	pInfo := p.newQueuedPodInfo(pod)
-	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodAdd.Label()); added {
+	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodAdd.Label(), false); added {
 		p.activeQ.broadcast()
 	}
 }
@@ -735,6 +737,7 @@ func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 
 func (p *PriorityQueue) activate(logger klog.Logger, pod *v1.Pod) bool {
 	var pInfo *framework.QueuedPodInfo
+	var movesFromBackoffQ bool
 	// Verify if the pod is present in unschedulablePods or backoffQ.
 	if pInfo = p.unschedulablePods.get(pod); pInfo == nil {
 		// If the pod doesn't belong to unschedulablePods or backoffQ, don't activate it.
@@ -750,6 +753,7 @@ func (p *PriorityQueue) activate(logger klog.Logger, pod *v1.Pod) bool {
 			// Pod was popped from the backoffQ in the meantime. Don't activate it.
 			return false
 		}
+		movesFromBackoffQ = true
 	}
 
 	if pInfo == nil {
@@ -758,7 +762,7 @@ func (p *PriorityQueue) activate(logger klog.Logger, pod *v1.Pod) bool {
 		return false
 	}
 
-	return p.moveToActiveQ(logger, pInfo, framework.ForceActivate)
+	return p.moveToActiveQ(logger, pInfo, framework.ForceActivate, movesFromBackoffQ)
 }
 
 // SchedulingCycle returns current scheduling cycle.
@@ -916,7 +920,7 @@ func (p *PriorityQueue) flushBackoffQCompleted(logger klog.Logger) {
 	activated := false
 	podsCompletedBackoff := p.backoffQ.popAllBackoffCompleted(logger)
 	for _, pInfo := range podsCompletedBackoff {
-		if added := p.moveToActiveQ(logger, pInfo, framework.BackoffComplete); added {
+		if added := p.moveToActiveQ(logger, pInfo, framework.BackoffComplete, true); added {
 			activated = true
 		}
 	}
@@ -1069,7 +1073,7 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 				return
 			}
 
-			if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodUpdate.Label()); added {
+			if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodUpdate.Label(), false); added {
 				p.activeQ.broadcast()
 			}
 			return
@@ -1081,7 +1085,7 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	}
 	// If pod is not in any of the queues, we put it in the active queue.
 	pInfo := p.newQueuedPodInfo(newPod)
-	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodUpdate.Label()); added {
+	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodUpdate.Label(), false); added {
 		p.activeQ.broadcast()
 	}
 }
@@ -1182,7 +1186,7 @@ func (p *PriorityQueue) requeuePodWithQueueingStrategy(logger klog.Logger, pInfo
 	}
 
 	// Reach here if schedulingHint is QueueImmediately, or schedulingHint is Queue but the pod is not backing off.
-	if added := p.moveToActiveQ(logger, pInfo, event); added {
+	if added := p.moveToActiveQ(logger, pInfo, event, false); added {
 		return activeQ
 	}
 	// Pod is gated. We don't have to push it back to unschedulable queue, because moveToActiveQ should already have done that.

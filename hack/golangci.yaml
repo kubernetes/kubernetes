@@ -187,6 +187,7 @@ linters:
             structured k8s.io/kms/.*
             structured k8s.io/apiserver/pkg/storage/value/.*
             structured k8s.io/apiserver/pkg/server/options/encryptionconfig/.*
+            structured k8s.io/kubernetes/pkg/credentialprovider/plugin/.*
             
             # The following packages have been migrated to contextual logging.
             # Packages matched here do not have to be listed above because
@@ -316,10 +317,11 @@ linters:
         - pattern: \.Add$
           pkg: ^k8s\.io/component-base/featuregate$         
           msg: should not use Add, use AddVersioned instead
-    gocritic:	
-      enabled-checks:	
-        - equalFold	
+    gocritic:
+      enabled-checks:
+        - equalFold
         - boolExprSimplify
+        - deprecatedComment
     revive:
       # Only these rules are enabled.
       rules:
@@ -329,6 +331,7 @@ linters:
     staticcheck:
       checks:
         - "all"
+        - "-QF1008"  # Omit embedded fields from selector expression
         - "-QF1001"  # Apply De Morgan’s law
         - "-QF1002"  # Convert untagged switch to tagged switch
         - "-QF1003"  # Convert if/else-if chain to tagged switch

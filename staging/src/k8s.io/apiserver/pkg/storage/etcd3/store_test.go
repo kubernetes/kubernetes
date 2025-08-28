@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/kubernetes"
@@ -588,6 +589,12 @@ func withPrefix(prefix string) setupOption {
 	}
 }
 
+func withResourcePrefix(prefix string) setupOption {
+	return func(options *setupOptions) {
+		options.resourcePrefix = prefix
+	}
+}
+
 func withLeaseConfig(leaseConfig LeaseManagerConfig) setupOption {
 	return func(options *setupOptions) {
 		options.leaseConfig = leaseConfig
@@ -994,5 +1001,96 @@ func BenchmarkStatsCacheCleanKeys(b *testing.B) {
 	}
 	if len(store.stats.keys) < namespaceCount*podPerNamespaceCount {
 		b.Fatalf("Unexpected number of keys in stats, want: %d, got: %d", namespaceCount*podPerNamespaceCount, len(store.stats.keys))
+	}
+}
+
+func TestPrefixGetKeys(t *testing.T) {
+	ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("pods"))
+	_, err := c.KV.Put(ctx, "key", "a")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = c.KV.Put(ctx, "/registry/key", "b")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = c.KV.Put(ctx, "/registry/pods/key", "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = c.KV.Put(ctx, "/registry/podskey", "d")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gotKeys, err := store.getKeys(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantKeys := []string{"/registry/pods/key"}
+	if diff := cmp.Diff(wantKeys, gotKeys); diff != "" {
+		t.Errorf("getKeys diff:\n%s", diff)
+	}
+}
+
+func TestPrefixStats(t *testing.T) {
+	tcs := []struct {
+		name        string
+		estimate    bool
+		expectStats storage.Stats
+	}{
+		{
+			name:        "SizeBasedListCostEstimate=false",
+			estimate:    false,
+			expectStats: storage.Stats{ObjectCount: 1},
+		},
+		{
+			name:        "SizeBasedListCostEstimate=true",
+			estimate:    true,
+			expectStats: storage.Stats{ObjectCount: 1, EstimatedAverageObjectSizeBytes: 3},
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, tc.estimate)
+			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("pods"))
+			_, err := c.KV.Put(ctx, "key", "a")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = c.KV.Put(ctx, "/registry/key", "ab")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = c.KV.Put(ctx, "/registry/pods/key", "abc")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = c.KV.Put(ctx, "/registry/podskey", "abcd")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			listOut := &example.PodList{}
+			// Ignore error as decode is expected to fail
+			_ = store.GetList(ctx, "pods", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, listOut)
+
+			gotStats, err := store.Stats(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(tc.expectStats, gotStats); diff != "" {
+				t.Errorf("Stats diff:\n%s", diff)
+			}
+
+		})
 	}
 }
