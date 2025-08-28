@@ -6238,9 +6238,7 @@ func TestDescribeServiceAccount(t *testing.T) {
 Namespace:           foo
 Labels:              <none>
 Annotations:         <none>
-Image pull secrets:  test-local-ref (not found)
-Mountable secrets:   test-objectref (not found)
-Tokens:              <none>
+Image pull secrets:  test-local-ref
 Events:              <none>` + "\n"
 	if out != expectedOut {
 		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
