@@ -43,274 +43,303 @@ import (
 )
 
 func doPodResizeResourceQuotaTests(f *framework.Framework) {
-	testcases := []struct {
-		name                  string
-		enableAdmissionPlugin func(ctx context.Context, f *framework.Framework)
-		wantMemoryError       string
-		wantCPUError          string
-	}{
-		{
-			name: "pod-resize-resource-quota-test",
-			enableAdmissionPlugin: func(ctx context.Context, f *framework.Framework) {
-				resourceQuota := v1.ResourceQuota{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "resize-resource-quota",
-						Namespace: f.Namespace.Name,
-					},
-					Spec: v1.ResourceQuotaSpec{
-						Hard: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("800m"),
-							v1.ResourceMemory: resource.MustParse("800Mi"),
-						},
-					},
-				}
-
-				ginkgo.By("Creating a ResourceQuota")
-				_, rqErr := f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, &resourceQuota, metav1.CreateOptions{})
-				framework.ExpectNoError(rqErr, "failed to create resource quota")
-				// pod creation using this quota will fail until the quota status is populated, so we need to wait to
-				// prevent races with the resourcequota controller
-				ginkgo.By("Waiting for ResourceQuota status to populate")
-				quotaStatusErr := waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuota.Name)
-				framework.ExpectNoError(quotaStatusErr, "resource quota status failed to populate")
-
+	ginkgo.It("pod-resize-resource-quota-test", func(ctx context.Context) {
+		resourceQuota := v1.ResourceQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "resize-resource-quota",
+				Namespace: f.Namespace.Name,
 			},
-			wantMemoryError: "exceeded quota: resize-resource-quota, requested: memory=350Mi, used: memory=700Mi, limited: memory=800Mi",
-			wantCPUError:    "exceeded quota: resize-resource-quota, requested: cpu=200m, used: cpu=700m, limited: cpu=800m",
-		},
-	}
+			Spec: v1.ResourceQuotaSpec{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("800m"),
+					v1.ResourceMemory: resource.MustParse("800Mi"),
+				},
+			},
+		}
 
-	for _, tc := range testcases {
-		ginkgo.It(tc.name, func(ctx context.Context) {
-			containers := []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
-				},
-			}
-			patchString := `{"spec":{"containers":[
-				{"name":"c1", "resources":{"requests":{"cpu":"400m","memory":"400Mi"},"limits":{"cpu":"400m","memory":"400Mi"}}}
-			]}}`
-			expected := []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
-				},
-			}
-			patchStringExceedCPU := `{"spec":{"containers":[
+		ginkgo.By("Creating a ResourceQuota")
+		_, rqErr := f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, &resourceQuota, metav1.CreateOptions{})
+		framework.ExpectNoError(rqErr, "failed to create resource quota")
+		// pod creation using this quota will fail until the quota status is populated, so we need to wait to
+		// prevent races with the resourcequota controller
+		ginkgo.By("Waiting for ResourceQuota status to populate")
+		quotaStatusErr := waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuota.Name)
+		framework.ExpectNoError(quotaStatusErr, "resource quota status failed to populate")
+
+		containers := []podresize.ResizableContainerInfo{
+			{
+				Name:      "c1",
+				Resources: &cgroups.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
+			},
+		}
+		tStamp := strconv.Itoa(time.Now().Nanosecond())
+		testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, containers)
+		testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
+		testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, containers)
+		testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
+
+		ginkgo.By("creating pods")
+		podClient := e2epod.NewPodClient(f)
+		newPods := podClient.CreateBatch(ctx, []*v1.Pod{testPod1, testPod2})
+
+		ginkgo.By("verifying initial pod resources, and policy are as expected")
+		podresize.VerifyPodResources(newPods[0], containers)
+
+		testcases := []struct {
+			name        string
+			patchString string
+			expected    []podresize.ResizableContainerInfo
+			wantError   string
+		}{
+			{
+				name: "pod-resize-resource-quota-test-exceed-cpu",
+				patchString: `{"spec":{"containers":[
 				{"name":"c1", "resources":{"requests":{"cpu":"600m"},"limits":{"cpu":"600m"}}}
-			]}}`
-			patchStringExceedMemory := `{"spec":{"containers":[
+			]}}`,
+				expected:  containers,
+				wantError: "exceeded quota: resize-resource-quota, requested: cpu=300m, used: cpu=600m, limited: cpu=800m",
+			},
+			{
+				name: "pod-resize-resource-quota-test-exceed-memory",
+				patchString: `{"spec":{"containers":[
 				{"name":"c1", "resources":{"requests":{"cpu":"250m","memory":"750Mi"},"limits":{"cpu":"250m","memory":"750Mi"}}}
-			]}}`
+			]}}`,
+				expected:  containers,
+				wantError: "exceeded quota: resize-resource-quota, requested: memory=450Mi, used: memory=600Mi, limited: memory=800Mi",
+			},
+			{
+				name: "pod-resize-resource-quota-test-exceed-cpu-and-memory",
+				patchString: `{"spec":{"containers":[
+				{"name":"c1", "resources":{"requests":{"cpu":"600m","memory":"750Mi"},"limits":{"cpu":"600m","memory":"750Mi"}}}
+			]}}`,
+				expected:  containers,
+				wantError: "exceeded quota: resize-resource-quota",
+			},
+			{
+				name: "pod-resize-resource-quota-test-valid-increase",
+				patchString: `{"spec":{"containers":[
+				{"name":"c1", "resources":{"requests":{"cpu":"400m","memory":"400Mi"},"limits":{"cpu":"400m","memory":"400Mi"}}}
+			]}}`,
+				expected: []podresize.ResizableContainerInfo{
+					{
+						Name:      "c1",
+						Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
+					},
+				},
+			},
+		}
 
-			tc.enableAdmissionPlugin(ctx, f)
+		for _, tc := range testcases {
+			ginkgo.By(fmt.Sprintf("patching pod for resize with resource-quota: %s", tc.name))
 
-			tStamp := strconv.Itoa(time.Now().Nanosecond())
-			testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, containers)
-			testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
-			testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, containers)
-			testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
+			if tc.wantError == "" {
+				patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx,
+					newPods[0].Name, types.StrategicMergePatchType, []byte(tc.patchString), metav1.PatchOptions{}, "resize")
+				framework.ExpectNoError(pErr, "failed to patch pod for resize")
 
-			ginkgo.By("creating pods")
-			podClient := e2epod.NewPodClient(f)
-			newPods := podClient.CreateBatch(ctx, []*v1.Pod{testPod1, testPod2})
+				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, tc.expected)
+				ginkgo.By("verifying pod resources are as expected post patch, pre-actuation")
+				podresize.VerifyPodResources(patchedPod, expected)
 
-			ginkgo.By("verifying initial pod resources, and policy are as expected")
-			podresize.VerifyPodResources(newPods[0], containers)
+				ginkgo.By("waiting for resize to be actuated")
+				resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPods[0], expected)
+				podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 
-			ginkgo.By("patching pod for resize within resource quota")
-			patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx, newPods[0].Name,
-				types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
-			framework.ExpectNoError(pErr, "failed to patch pod for resize")
-			expected = podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expected)
+				ginkgo.By("verifying pod resources after resize")
+				podresize.VerifyPodResources(resizedPod, expected)
 
-			ginkgo.By("verifying pod patched for resize within resource quota")
-			podresize.VerifyPodResources(patchedPod, expected)
+			} else {
+				var patchedPod *v1.Pod
+				framework.ExpectNoError(framework.Gomega().
+					// Use Eventually because we need to wait for the resource-quota controller to sync.
+					Eventually(ctx, func(ctx context.Context) error {
+						var pErr error
+						patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx,
+							newPods[0].Name, types.StrategicMergePatchType, []byte(tc.patchString), metav1.PatchOptions{}, "resize")
+						return pErr
+					}).
+					WithTimeout(f.Timeouts.PodStart).
+					Should(gomega.MatchError(gomega.ContainSubstring(tc.wantError))))
 
-			ginkgo.By("waiting for resize to be actuated")
-			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPods[0], expected)
-			podresize.ExpectPodResized(ctx, f, resizedPod, expected)
-
-			ginkgo.By("verifying pod resources after resize")
-			podresize.VerifyPodResources(resizedPod, expected)
-
-			ginkgo.By("patching pod for resize with memory exceeding resource quota")
-			framework.ExpectNoError(framework.Gomega().
-				// Use Eventually because we need to wait for the quota controller to sync.
-				Eventually(ctx, func(ctx context.Context) error {
-					_, pErrExceedMemory := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(ctx,
-						resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedMemory), metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}}, "resize")
-					return pErrExceedMemory
-				}).
-				WithTimeout(f.Timeouts.PodStart).
-				Should(gomega.MatchError(gomega.ContainSubstring(tc.wantMemoryError))))
-
-			ginkgo.By("verifying pod patched for resize exceeding memory resource quota remains unchanged")
-			patchedPodExceedMemory, pErrEx2 := podClient.Get(ctx, resizedPod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(pErrEx2, "failed to get pod post exceed memory resize")
-			podresize.VerifyPodResources(patchedPodExceedMemory, expected)
-			framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPodExceedMemory, expected))
-
-			ginkgo.By(fmt.Sprintf("patching pod %s for resize with CPU exceeding resource quota", resizedPod.Name))
-			framework.ExpectNoError(framework.Gomega().
-				// Use Eventually because we need to wait for the quota controller to sync.
-				Eventually(ctx, func(ctx context.Context) error {
-					_, pErrExceedCPU := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(ctx,
-						resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedCPU), metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}}, "resize")
-					return pErrExceedCPU
-				}).
-				WithTimeout(f.Timeouts.PodStart).
-				Should(gomega.MatchError(gomega.ContainSubstring(tc.wantCPUError))))
-
-			ginkgo.By("verifying pod patched for resize exceeding CPU resource quota remains unchanged")
-			patchedPodExceedCPU, pErrEx1 := podClient.Get(ctx, resizedPod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(pErrEx1, "failed to get pod post exceed CPU resize")
-			podresize.VerifyPodResources(patchedPodExceedCPU, expected)
-			framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPodExceedMemory, expected))
-		})
-	}
+				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, tc.expected)
+				ginkgo.By("verifying pod patched for resize with error remains unchanged")
+				patchedPod, pErrEx2 := podClient.Get(ctx, newPods[0].Name, metav1.GetOptions{})
+				framework.ExpectNoError(pErrEx2, "failed to get pod post failed resize")
+				podresize.VerifyPodResources(patchedPod, expected)
+				framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, expected))
+			}
+		}
+	})
 }
 
 func doPodResizeLimitRangerTests(f *framework.Framework) {
-	testcases := []struct {
-		name                  string
-		enableAdmissionPlugin func(ctx context.Context, f *framework.Framework)
-		wantMemoryError       string
-		wantCPUError          string
-	}{
-		{
-			name: "pod-resize-limit-ranger-test",
-			enableAdmissionPlugin: func(ctx context.Context, f *framework.Framework) {
-				lr := v1.LimitRange{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "resize-limit-ranger",
-						Namespace: f.Namespace.Name,
-					},
-					Spec: v1.LimitRangeSpec{
-						Limits: []v1.LimitRangeItem{
-							{
-								Type: v1.LimitTypeContainer,
-								Max: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("500m"),
-									v1.ResourceMemory: resource.MustParse("500Mi"),
-								},
-								Min: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("50m"),
-									v1.ResourceMemory: resource.MustParse("50Mi"),
-								},
-								Default: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("100m"),
-									v1.ResourceMemory: resource.MustParse("100Mi"),
-								},
-								DefaultRequest: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("50m"),
-									v1.ResourceMemory: resource.MustParse("50Mi"),
-								},
-							},
+	ginkgo.It("pod-resize-limit-ranger-test", func(ctx context.Context) {
+		ginkgo.By("Creating a LimitRanger")
+		lr := v1.LimitRange{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "resize-limit-ranger",
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.LimitRangeSpec{
+				Limits: []v1.LimitRangeItem{
+					{
+						Type: v1.LimitTypeContainer,
+						Max: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("500Mi"),
+						},
+						Min: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("50m"),
+							v1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+						Default: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						DefaultRequest: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("50m"),
+							v1.ResourceMemory: resource.MustParse("50Mi"),
 						},
 					},
-				}
-
-				ginkgo.By("Creating a LimitRanger")
-				_, lrErr := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Create(ctx, &lr, metav1.CreateOptions{})
-				framework.ExpectNoError(lrErr, "failed to create limit ranger")
+				},
 			},
-			wantMemoryError: "forbidden: maximum memory usage per Container is 500Mi, but limit is 750Mi",
-			wantCPUError:    "forbidden: maximum cpu usage per Container is 500m, but limit is 600m",
-		},
-	}
+		}
+		_, lrErr := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Create(context.Background(), &lr, metav1.CreateOptions{})
+		framework.ExpectNoError(lrErr, "failed to create limit ranger")
 
-	for _, tc := range testcases {
-		ginkgo.It(tc.name, func(ctx context.Context) {
-			containers := []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
+		containers := []podresize.ResizableContainerInfo{
+			{
+				Name:      "c1",
+				Resources: &cgroups.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
+			},
+		}
+
+		tStamp := strconv.Itoa(time.Now().Nanosecond())
+		testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, containers)
+		testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
+		testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, containers)
+		testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
+
+		ginkgo.By("creating pods")
+		podClient := e2epod.NewPodClient(f)
+		newPods := podClient.CreateBatch(context.Background(), []*v1.Pod{testPod1, testPod2})
+
+		ginkgo.By("verifying initial pod resources, and policy are as expected")
+		podresize.VerifyPodResources(newPods[0], containers)
+
+		testcases := []struct {
+			name        string
+			patchString string
+			expected    []podresize.ResizableContainerInfo
+			wantError   string
+		}{
+			{
+				name: "pod-resize-limit-ranger-test-exceed-max-cpu",
+				patchString: `{"spec":{"containers":[
+					{"name":"c1", "resources":{"requests":{"cpu":"600m"},"limits":{"cpu":"600m"}}}
+				]}}`,
+				expected:  containers,
+				wantError: "forbidden: maximum cpu usage per Container is 500m, but limit is 600m",
+			},
+			{
+				name: "pod-resize-limit-ranger-test-exceed-max-memory",
+				patchString: `{"spec":{"containers":[
+					{"name":"c1", "resources":{"requests":{"cpu":"250m","memory":"750Mi"},"limits":{"cpu":"250m","memory":"750Mi"}}}
+				]}}`,
+				expected:  containers,
+				wantError: "forbidden: maximum memory usage per Container is 500Mi, but limit is 750Mi",
+			},
+			{
+				name: "pod-resize-limit-ranger-test-exceed-max-memory-and-cpu",
+				patchString: `{"spec":{"containers":[
+					{"name":"c1", "resources":{"requests":{"cpu":"600m","memory":"600Mi"},"limits":{"cpu":"600m","memory":"600Mi"}}}
+				]}}`,
+				expected:  containers,
+				wantError: "maximum memory usage per Container is 500Mi, but limit is 600Mi",
+			},
+			{
+				name: "pod-resize-limit-ranger-test-below-min-cpu",
+				patchString: `{"spec":{"containers":[
+					{"name":"c1", "resources":{"requests":{"cpu":"10m"},"limits":{"cpu":"10m"}}}
+				]}}`,
+				expected:  containers,
+				wantError: "forbidden: minimum cpu usage per Container is 50m, but request is 10m",
+			},
+			{
+				name: "pod-resize-limit-ranger-test-below-min-memory",
+				patchString: `{"spec":{"containers":[
+					{"name":"c1", "resources":{"requests":{"cpu":"250m","memory":"10Mi"},"limits":{"cpu":"250m","memory":"10Mi"}}}
+				]}}`,
+				expected:  containers,
+				wantError: "forbidden: minimum memory usage per Container is 50Mi, but request is 10Mi",
+			},
+			{
+				name: "pod-resize-limit-ranger-test-valid-increase",
+				patchString: `{"spec":{"containers":[
+					{"name":"c1", "resources":{"requests":{"cpu":"400m","memory":"400Mi"},"limits":{"cpu":"400m","memory":"400Mi"}}}
+				]}}`,
+				expected: []podresize.ResizableContainerInfo{
+					{
+						Name:      "c1",
+						Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
+					},
 				},
-			}
-			patchString := `{"spec":{"containers":[
-				{"name":"c1", "resources":{"requests":{"cpu":"400m","memory":"400Mi"},"limits":{"cpu":"400m","memory":"400Mi"}}}
-			]}}`
-			expected := []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
+			},
+			{
+				name: "pod-resize-limit-ranger-test-valid-decrease",
+				patchString: `{"spec":{"containers":[
+					{"name":"c1", "resources":{"requests":{"cpu":"200m","memory":"200Mi"},"limits":{"cpu":"200m","memory":"200Mi"}}}
+				]}}`,
+				expected: []podresize.ResizableContainerInfo{
+					{
+						Name:      "c1",
+						Resources: &cgroups.ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "200Mi", MemLim: "200Mi"},
+					},
 				},
+			},
+		}
+
+		for _, tc := range testcases {
+			ginkgo.By(fmt.Sprintf("patching pod for resize with limit-ranger: %s", tc.name))
+
+			if tc.wantError == "" {
+				patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx,
+					newPods[0].Name, types.StrategicMergePatchType, []byte(tc.patchString), metav1.PatchOptions{}, "resize")
+				framework.ExpectNoError(pErr, "failed to patch pod for resize")
+
+				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, tc.expected)
+				ginkgo.By("verifying pod resources are as expected post patch, pre-actuation")
+				podresize.VerifyPodResources(patchedPod, expected)
+
+				ginkgo.By("waiting for resize to be actuated")
+				resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPods[0], expected)
+				podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+
+				ginkgo.By("verifying pod resources after resize")
+				podresize.VerifyPodResources(resizedPod, expected)
+
+			} else {
+				var patchedPod *v1.Pod
+				framework.ExpectNoError(framework.Gomega().
+					// Use Eventually because we need to wait for the limit-ranger controller to sync.
+					Eventually(ctx, func(ctx context.Context) error {
+						var pErr error
+						patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx,
+							newPods[0].Name, types.StrategicMergePatchType, []byte(tc.patchString), metav1.PatchOptions{}, "resize")
+						return pErr
+					}).
+					WithTimeout(f.Timeouts.PodStart).
+					Should(gomega.MatchError(gomega.ContainSubstring(tc.wantError))))
+
+				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, tc.expected)
+				ginkgo.By("verifying pod patched for resize with error remains unchanged")
+				patchedPod, pErrEx2 := podClient.Get(ctx, newPods[0].Name, metav1.GetOptions{})
+				framework.ExpectNoError(pErrEx2, "failed to get pod post failed resize")
+				podresize.VerifyPodResources(patchedPod, expected)
+				framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, expected))
 			}
-			patchStringExceedCPU := `{"spec":{"containers":[
-				{"name":"c1", "resources":{"requests":{"cpu":"600m"},"limits":{"cpu":"600m"}}}
-			]}}`
-			patchStringExceedMemory := `{"spec":{"containers":[
-				{"name":"c1", "resources":{"requests":{"cpu":"250m","memory":"750Mi"},"limits":{"cpu":"250m","memory":"750Mi"}}}
-			]}}`
-
-			tc.enableAdmissionPlugin(ctx, f)
-
-			tStamp := strconv.Itoa(time.Now().Nanosecond())
-			testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, containers)
-			testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
-			testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, containers)
-			testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
-
-			ginkgo.By("creating pods")
-			podClient := e2epod.NewPodClient(f)
-			newPods := podClient.CreateBatch(ctx, []*v1.Pod{testPod1, testPod2})
-
-			ginkgo.By("verifying initial pod resources, and policy are as expected")
-			podresize.VerifyPodResources(newPods[0], containers)
-
-			ginkgo.By("patching pod for resize within limit-ranger range")
-			patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx, newPods[0].Name,
-				types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
-			framework.ExpectNoError(pErr, "failed to patch pod for resize")
-			expected = podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expected)
-
-			ginkgo.By("verifying pod patched for resize within limit-ranger range")
-			podresize.VerifyPodResources(patchedPod, expected)
-
-			ginkgo.By("waiting for resize to be actuated")
-			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPods[0], expected)
-			podresize.ExpectPodResized(ctx, f, resizedPod, expected)
-
-			ginkgo.By("verifying pod resources after resize")
-			podresize.VerifyPodResources(resizedPod, expected)
-
-			ginkgo.By("patching pod for resize with memory exceeding limit-ranger range")
-			framework.ExpectNoError(framework.Gomega().
-				// Use Eventually because we need to wait for the limit-ranger controller to sync.
-				Eventually(ctx, func(ctx context.Context) error {
-					_, pErrExceedMemory := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(ctx,
-						resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedMemory), metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}}, "resize")
-					return pErrExceedMemory
-				}).
-				WithTimeout(f.Timeouts.PodStart).
-				Should(gomega.MatchError(gomega.ContainSubstring(tc.wantMemoryError))))
-
-			ginkgo.By("verifying pod patched for resize exceeding memory limit-ranger range remains unchanged")
-			patchedPodExceedMemory, pErrEx2 := podClient.Get(ctx, resizedPod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(pErrEx2, "failed to get pod post exceed memory resize")
-			podresize.VerifyPodResources(patchedPodExceedMemory, expected)
-			framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPodExceedMemory, expected))
-
-			ginkgo.By(fmt.Sprintf("patching pod %s for resize with CPU exceeding limit-ranger range", resizedPod.Name))
-			framework.ExpectNoError(framework.Gomega().
-				// Use Eventually because we need to wait for the quota controller to sync.
-				Eventually(ctx, func(ctx context.Context) error {
-					_, pErrExceedCPU := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(ctx,
-						resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedCPU), metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}}, "resize")
-					return pErrExceedCPU
-				}).
-				WithTimeout(f.Timeouts.PodStart).
-				Should(gomega.MatchError(gomega.ContainSubstring(tc.wantCPUError))))
-
-			ginkgo.By("verifying pod patched for resize exceeding CPU limit-ranger range remains unchanged")
-			patchedPodExceedCPU, pErrEx1 := podClient.Get(ctx, resizedPod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(pErrEx1, "failed to get pod post exceed CPU resize")
-			podresize.VerifyPodResources(patchedPodExceedCPU, expected)
-			framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPodExceedMemory, expected))
-		})
-	}
+		}
+	})
 }
 
 func doPodResizeSchedulerTests(f *framework.Framework) {
@@ -1012,7 +1041,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (sched
 	doPodResizeSchedulerTests(f)
 })
 
-var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (deferred resizes)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
+var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (deferred-resizes)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-resize-deferred-resize-tests")
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -1024,7 +1053,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (defer
 	doPodResizeRetryDeferredTests(f)
 })
 
-var _ = SIGDescribe("Pod InPlace Resize Container (resource quota)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
+var _ = SIGDescribe("Pod InPlace Resize Container (resource-quota)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-resize-resource-quota-tests")
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
@@ -1037,7 +1066,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container (resource quota)", framework.W
 	doPodResizeResourceQuotaTests(f)
 })
 
-var _ = SIGDescribe("Pod InPlace Resize Container (limit ranger)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
+var _ = SIGDescribe("Pod InPlace Resize Container (limit-ranger)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-resize-limit-ranger-tests")
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
