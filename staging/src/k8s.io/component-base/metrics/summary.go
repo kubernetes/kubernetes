@@ -33,7 +33,7 @@ const (
 // Summary is our internal representation for our wrapping struct around prometheus
 // summaries. Summary implements both kubeCollector and ObserverMetric
 //
-// DEPRECATED: as per the metrics overhaul KEP
+// Deprecated: as per the metrics overhaul KEP
 type Summary struct {
 	ObserverMetric
 	*SummaryOpts
@@ -44,7 +44,7 @@ type Summary struct {
 // NewSummary returns an object which is Summary-like. However, nothing
 // will be measured until the summary is registered somewhere.
 //
-// DEPRECATED: as per the metrics overhaul KEP
+// Deprecated: as per the metrics overhaul KEP
 func NewSummary(opts *SummaryOpts) *Summary {
 	opts.StabilityLevel.setDefaults()
 
@@ -91,7 +91,7 @@ func (s *Summary) WithContext(ctx context.Context) ObserverMetric {
 // SummaryVec is the internal representation of our wrapping struct around prometheus
 // summaryVecs.
 //
-// DEPRECATED: as per the metrics overhaul KEP
+// Deprecated: as per the metrics overhaul KEP
 type SummaryVec struct {
 	*prometheus.SummaryVec
 	*SummaryOpts
@@ -105,7 +105,7 @@ type SummaryVec struct {
 // and only members extracted after
 // registration will actually measure anything.
 //
-// DEPRECATED: as per the metrics overhaul KEP
+// Deprecated: as per the metrics overhaul KEP
 func NewSummaryVec(opts *SummaryOpts, labels []string) *SummaryVec {
 	opts.StabilityLevel.setDefaults()
 
