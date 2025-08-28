@@ -1034,7 +1034,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatalf("Expected create pods 5, got pods %v", len(pods))
 		}
 		spc.setPodRunning(set, 4)
-		pods, _ = spc.setPodReadyCondition(set, 4, true)
+		spc.setPodReadyCondition(set, 4, true)
 
 		// create new pods 4(only one pod gets created at a time due to OrderedReady)
 		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
@@ -1163,7 +1163,6 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		// pods 3/4/5 ready, should not update other pods
 		spc.setPodRunning(set, 3)
 		spc.setPodRunning(set, 5)
-		spc.setPodReadyCondition(set, 5, true)
 		originalPods, _ = spc.setPodReadyCondition(set, 3, true)
 		sort.Sort(ascendingOrdinal(originalPods))
 		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
@@ -3779,7 +3778,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		set.Status.CollisionCount = new(int32)
 
 		// Setup controller
-		client := fake.NewSimpleClientset(set)
+		client := fake.NewClientset(set)
 		spc, _, ssc := setupController(client)
 
 		// Scale up StatefulSet
