@@ -289,7 +289,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 	*/
 	framework.It("should type check a CRD", func(ctx context.Context) {
 		crd := crontabExampleCRD()
-		crd.Spec.Group = "stable." + f.UniqueName
+		crd.Spec.Group = "stable." + f.UniqueName + ".example.com"
 		crd.Name = crd.Spec.Names.Plural + "." + crd.Spec.Group
 		var policy *admissionregistrationv1.ValidatingAdmissionPolicy
 		ginkgo.By("creating the CRD", func() {
