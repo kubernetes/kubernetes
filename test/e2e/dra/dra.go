@@ -52,6 +52,7 @@ import (
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econformance "k8s.io/kubernetes/test/e2e/framework/conformance"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -76,6 +77,156 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	// The driver containers have to run with sufficient privileges to
 	// modify /var/lib/kubelet/plugins.
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	f.Context("CRUD Tests", func() {
+		/*
+		   Release: v1.?
+		   Testname: CRUD operations for deviceclasses
+		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 DeviceClass.
+		*/
+		framework.It("resource.k8s.io/v1 DeviceClass", func(ctx context.Context) {
+			e2econformance.TestResource(ctx, f,
+				&e2econformance.ResourceTestcase[*resourceapi.DeviceClass]{
+					GVR:        resourceapi.SchemeGroupVersion.WithResource("deviceclasses"),
+					Namespaced: ptr.To(false),
+					InitialSpec: &resourceapi.DeviceClass{
+						Spec: resourceapi.DeviceClassSpec{
+							Selectors: []resourceapi.DeviceSelector{{
+								CEL: &resourceapi.CELDeviceSelector{
+									Expression: "false", // Matches no devices
+								},
+							}},
+						},
+					},
+					UpdateSpec: func(obj *resourceapi.DeviceClass) *resourceapi.DeviceClass {
+						obj.Spec.Selectors[0].CEL.Expression = "1 == 0" // Still matches no devices.
+						return obj
+					},
+					StrategicMergePatchSpec: `{"spec": {"selectors": [{"cel": {"expression": "1 == 0"}}]}}`,
+				},
+			)
+		})
+
+		/*
+		   Release: v1.?
+		   Testname: CRUD operations for resourceclaims
+		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 ResourceClaim.
+		*/
+		framework.It("resource.k8s.io/v1 ResourceClaim", func(ctx context.Context) {
+			e2econformance.TestResource(ctx, f,
+				&e2econformance.ResourceTestcase[*resourceapi.ResourceClaim]{
+					GVR:        resourceapi.SchemeGroupVersion.WithResource("resourceclaims"),
+					Namespaced: ptr.To(true),
+					InitialSpec: &resourceapi.ResourceClaim{
+						Spec: resourceapi.ResourceClaimSpec{
+							Devices: resourceapi.DeviceClaim{
+								Requests: []resourceapi.DeviceRequest{{
+									Name: "req-0",
+									Exactly: &resourceapi.ExactDeviceRequest{
+										DeviceClassName: "dra.example.com",
+									},
+								}},
+							},
+						},
+					},
+					UpdateSpec: func(obj *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+						// The spec is immutable, so let's add a label instead.
+						if obj.Labels == nil {
+							obj.Labels = make(map[string]string)
+						}
+						obj.Labels["test.dra.example.com"] = "test"
+						return obj
+					},
+					UpdateStatus: func(obj *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+						// Nothing allocated" is a valid allocation result.
+						obj.Status.Allocation = &resourceapi.AllocationResult{}
+						return obj
+					},
+
+					// This test case uses all available patch types to demonstrate what this looks like
+					// and that TestResource supports them. Strategic merge patch, apply patch, and JSON
+					// merge patch are identical for these simple modifications.
+					//
+					// Testing with only one patch type would be sufficient for conformance.
+					ApplyPatchSpec:            `{"metadata": {"labels": {"test.dra.example.com": "test"}}}`,
+					StrategicMergePatchSpec:   `{"metadata": {"labels": {"test.dra.example.com": "test"}}}`,
+					JSONMergePatchSpec:        `{"metadata": {"labels": {"test.dra.example.com": "test"}}}`,
+					JSONPatchSpec:             `[{"op": "add", "path": "/metadata/labels/test.dra.example.com", "value": "test"}]`,
+					ApplyPatchStatus:          `{"status": {"allocation": {}}}`,
+					StrategicMergePatchStatus: `{"status": {"allocation": {}}}`,
+					JSONMergePatchStatus:      `{"status": {"allocation": {}}}`,
+					JSONPatchStatus:           `[{"op": "add", "path": "/status/allocation", "value": {}}]`,
+				})
+		})
+
+		/*
+		   Release: v1.?
+		   Testname: CRUD operations for resourceclaimtemplates
+		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 ResourceClaimTemplate.
+		*/
+		framework.It("resource.k8s.io/v1 ResourceClaimTemplate", func(ctx context.Context) {
+			e2econformance.TestResource(ctx, f,
+				&e2econformance.ResourceTestcase[*resourceapi.ResourceClaimTemplate]{
+					GVR:        resourceapi.SchemeGroupVersion.WithResource("resourceclaimtemplates"),
+					Namespaced: ptr.To(true),
+					InitialSpec: &resourceapi.ResourceClaimTemplate{
+						Spec: resourceapi.ResourceClaimTemplateSpec{
+							Spec: resourceapi.ResourceClaimSpec{
+								Devices: resourceapi.DeviceClaim{
+									Requests: []resourceapi.DeviceRequest{{
+										Name: "req-0",
+										Exactly: &resourceapi.ExactDeviceRequest{
+											DeviceClassName: "dra.example.com",
+										},
+									}},
+								},
+							},
+						},
+					},
+					UpdateSpec: func(obj *resourceapi.ResourceClaimTemplate) *resourceapi.ResourceClaimTemplate {
+						// The spec is immutable, so let's add a label instead.
+						if obj.Labels == nil {
+							obj.Labels = make(map[string]string)
+						}
+						obj.Labels["test.dra.example.com"] = "test"
+						return obj
+					},
+					StrategicMergePatchSpec: `{"metadata": {"labels": {"test.dra.example.com": "test"}}}`,
+				},
+			)
+		})
+
+		/*
+		   Release: v1.?
+		   Testname: CRUD operations for resoureslices
+		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 ResourceSlice.
+		*/
+		framework.It("resource.k8s.io/v1 ResourceSlice", func(ctx context.Context) {
+			e2econformance.TestResource(ctx, f,
+				&e2econformance.ResourceTestcase[*resourceapi.ResourceSlice]{
+					GVR:        resourceapi.SchemeGroupVersion.WithResource("resourceslices"),
+					Namespaced: ptr.To(false),
+					InitialSpec: &resourceapi.ResourceSlice{
+						Spec: resourceapi.ResourceSliceSpec{
+							Driver: "dra.example.com",
+							Pool: resourceapi.ResourcePool{
+								Name:               "cluster",
+								Generation:         1,
+								ResourceSliceCount: 1,
+							},
+							NodeName: ptr.To("no-such-node"),
+							// The pool is empty -> no devices.
+						},
+					},
+					UpdateSpec: func(obj *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+						obj.Spec.Devices = []resourceapi.Device{{Name: "device-0"}}
+						return obj
+					},
+					StrategicMergePatchSpec: `{"spec": {"devices": [{"name": "device-0"}]}}`,
+				},
+			)
+		})
+	})
 
 	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
 		nodes := drautils.NewNodes(f, 1, 1)
