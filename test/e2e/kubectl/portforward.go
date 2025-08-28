@@ -649,6 +649,10 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 			framework.ExpectNoError(err, "couldn't get http response from port-forward")
 			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK), "unexpected status code")
 
+			ginkgo.By("Close response body")
+			err = resp.Body.Close()
+			framework.ExpectNoError(err, "couldn't close response body")
+
 			ginkgo.By("Dialing the local port")
 			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", cmd.port))
 			framework.ExpectNoError(err, "couldn't connect to port %d", cmd.port)
@@ -673,6 +677,10 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 			resp, err = client.Get(fmt.Sprintf("http://127.0.0.1:%d/", cmd.port))
 			framework.ExpectNoError(err, "couldn't get http response from port-forward")
 			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK), "unexpected status code")
+
+			ginkgo.By("Close response body")
+			err = resp.Body.Close()
+			framework.ExpectNoError(err, "couldn't close response body")
 		})
 	})
 })
