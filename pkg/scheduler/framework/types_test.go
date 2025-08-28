@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
@@ -1225,48 +1224,6 @@ func fakeNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		},
 	})
 	return ni
-}
-
-func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
-	tests := []struct {
-		name string
-		term *v1.PodAffinityTerm
-		want sets.Set[string]
-	}{
-		{
-			name: "podAffinityTerm_namespace_empty",
-			term: &v1.PodAffinityTerm{},
-			want: sets.Set[string]{metav1.NamespaceDefault: sets.Empty{}},
-		},
-		{
-			name: "podAffinityTerm_namespace_not_empty",
-			term: &v1.PodAffinityTerm{
-				Namespaces: []string{metav1.NamespacePublic, metav1.NamespaceSystem},
-			},
-			want: sets.New(metav1.NamespacePublic, metav1.NamespaceSystem),
-		},
-		{
-			name: "podAffinityTerm_namespace_selector_not_nil",
-			term: &v1.PodAffinityTerm{
-				NamespaceSelector: &metav1.LabelSelector{},
-			},
-			want: sets.Set[string]{},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			got := getNamespacesFromPodAffinityTerm(&v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "topologies_pod",
-					Namespace: metav1.NamespaceDefault,
-				},
-			}, test.term)
-			if diff := cmp.Diff(test.want, got); diff != "" {
-				t.Errorf("Unexpected namespaces (-want, +got):\n%s", diff)
-			}
-		})
-	}
 }
 
 func TestFitError_Error(t *testing.T) {
