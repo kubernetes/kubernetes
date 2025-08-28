@@ -88,13 +88,7 @@ func runServer(ctx context.Context, opts *options.Options) error {
 		return err
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go func() {
-		stopCh := apiserver.SetupSignalHandler()
-		<-stopCh
-		cancel()
-	}()
+	ctx = apiserver.SetupSignalContextFrom(ctx)
 
 	return server.Start(ctx)
 }

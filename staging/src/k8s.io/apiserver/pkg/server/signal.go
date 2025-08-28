@@ -38,11 +38,15 @@ func SetupSignalHandler() <-chan struct{} {
 // Only one of SetupSignalContext and SetupSignalHandler should be called, and only can
 // be called once.
 func SetupSignalContext() context.Context {
+	return SetupSignalContextFrom(context.Background())
+}
+
+func SetupSignalContextFrom(ctx context.Context) context.Context {
 	close(onlyOneSignalHandler) // panics when called twice
 
 	shutdownHandler = make(chan os.Signal, 2)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	signal.Notify(shutdownHandler, shutdownSignals...)
 	go func() {
 		<-shutdownHandler
