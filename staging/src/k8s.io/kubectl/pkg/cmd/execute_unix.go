@@ -2,7 +2,7 @@
 // +build !windows,!js,!wasip1
 
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package cmd
 
-import (
-	"golang.org/x/sys/unix"
-)
+import "syscall"
 
-// Umask is a wrapper for `unix.Umask()` on non-Windows platforms
-func Umask(mask int) (old int, err error) {
-	return unix.Umask(mask), nil
+func execute(executablePath string, cmdArgs, environment []string) error {
+	// invoke cmd binary relaying the environment and args given
+	// append executablePath to cmdArgs, as execve will make first argument the "binary name".
+	return syscall.Exec(executablePath, append([]string{executablePath}, cmdArgs...), environment)
 }

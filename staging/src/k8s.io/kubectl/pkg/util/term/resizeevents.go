@@ -20,12 +20,10 @@ limitations under the License.
 package term
 
 import (
-	"os"
-	"os/signal"
-
-	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
+	"os"
+	"os/signal"
 )
 
 // monitorResizeEvents spawns a goroutine that waits for SIGWINCH signals (these indicate the
@@ -36,7 +34,7 @@ func monitorResizeEvents(fd uintptr, resizeEvents chan<- remotecommand.TerminalS
 		defer runtime.HandleCrash()
 
 		winch := make(chan os.Signal, 1)
-		signal.Notify(winch, unix.SIGWINCH)
+		signal.Notify(winch, nil)
 		defer signal.Stop(winch)
 
 		for {

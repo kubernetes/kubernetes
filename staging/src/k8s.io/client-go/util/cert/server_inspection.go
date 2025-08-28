@@ -40,13 +40,7 @@ func GetClientCANames(apiHost string) ([]string, error) {
 		},
 	}
 
-	conn, err := tls.Dial("tcp", apiHost, tlsConfig)
-	if err != nil {
-		return nil, err
-	}
-	if err := conn.Close(); err != nil {
-		return nil, err
-	}
+	fmt.Println("tls config: ", tlsConfig)
 
 	return acceptableCAs, nil
 }
@@ -71,6 +65,7 @@ func GetServingCertificates(apiHost, serverName string) ([]*x509.Certificate, []
 		tlsConfig.ServerName = serverName
 	}
 
+	fmt.Println("Ligne 68")
 	conn, err := tls.Dial("tcp", apiHost, tlsConfig)
 	if err != nil {
 		return nil, nil, err
@@ -78,6 +73,7 @@ func GetServingCertificates(apiHost, serverName string) ([]*x509.Certificate, []
 	if err = conn.Close(); err != nil {
 		return nil, nil, fmt.Errorf("failed to close connection : %v", err)
 	}
+	fmt.Println("Ligne 76")
 
 	peerCerts := conn.ConnectionState().PeerCertificates
 	peerCertBytes := [][]byte{}
