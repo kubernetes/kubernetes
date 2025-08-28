@@ -187,8 +187,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 		Status: apps.StatefulSetStatus{Replicas: 4},
 	}
 
-	t.Run("when StatefulSetAutoDeletePVC feature gate is enabled, PersistentVolumeClaimRetentionPolicy should be updated", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
+	t.Run("PersistentVolumeClaimRetentionPolicy should be updated", func(t *testing.T) {
 		// Test creation
 		ps := &apps.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -225,43 +224,6 @@ func TestStatefulSetStrategy(t *testing.T) {
 		}
 		if validPs.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted != apps.RetainPersistentVolumeClaimRetentionPolicyType || validPs.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled != apps.DeletePersistentVolumeClaimRetentionPolicyType {
 			t.Errorf("expected PersistentVolumeClaimRetentionPolicy to be updated: %v", errs)
-		}
-	})
-	t.Run("when StatefulSetAutoDeletePVC feature gate is disabled, PersistentVolumeClaimRetentionPolicy should not be updated", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
-		// Test creation
-		ps := &apps.StatefulSet{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: apps.StatefulSetSpec{
-				PodManagementPolicy: apps.OrderedReadyPodManagement,
-				Selector:            ps.Spec.Selector,
-				Template:            validPodTemplate.Template,
-				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
-					WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
-					WhenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
-				},
-			},
-		}
-		Strategy.PrepareForCreate(ctx, ps)
-		errs := Strategy.Validate(ctx, ps)
-		if len(errs) != 0 {
-			t.Errorf("unexpected failure with PersistentVolumeClaimRetentionPolicy: %v", errs)
-		}
-		if ps.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted != apps.RetainPersistentVolumeClaimRetentionPolicyType || ps.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled != apps.DeletePersistentVolumeClaimRetentionPolicyType {
-			t.Errorf("expected invalid PersistentVolumeClaimRetentionPolicy to be defaulted to Retain, but got %v", ps.Spec.PersistentVolumeClaimRetentionPolicy)
-		}
-		Strategy.PrepareForUpdate(ctx, validPs, ps)
-		errs = Strategy.ValidateUpdate(ctx, validPs, ps)
-		if len(errs) != 0 {
-			t.Errorf("updates to PersistentVolumeClaimRetentionPolicy should be allowed: %v", errs)
-		}
-		invalidPs := ps
-		invalidPs.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = apps.PersistentVolumeClaimRetentionPolicyType("invalid type")
-		Strategy.PrepareForUpdate(ctx, validPs, invalidPs)
-		errs = Strategy.ValidateUpdate(ctx, validPs, ps)
-		if len(errs) != 0 {
-			t.Errorf("should ignore updates to PersistentVolumeClaimRetentionPolicyType")
 		}
 	})
 
