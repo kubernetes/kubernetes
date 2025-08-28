@@ -41,6 +41,12 @@ func (fs *fakeStreamer) StreamOoms(_ context.Context, outStream chan<- *oomparse
 	}
 }
 
+type noopStorer struct{}
+
+func (n noopStorer) store(data state) error { return nil }
+
+func (n noopStorer) load(data *state) error { return nil }
+
 // TestWatcherRecordsEventsForOomEvents ensures that our OomInstances coming
 // from `StreamOoms` are translated into events in our recorder.
 func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
@@ -66,11 +72,79 @@ func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
 	oomWatcher := &realWatcher{
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
+		state: &state{
+			LastProcessedTimestamp: time.Now().Add(-1 * time.Hour),
+			storer:                 &noopStorer{},
+		},
 	}
 	require.NoError(t, oomWatcher.Start(tCtx, node))
 
 	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 	assert.Len(t, eventsRecorded, numExpectedOomEvents)
+}
+
+type MemoryStorer struct {
+	LastProcessedTimestamp time.Time
+	storeCompletedCh       chan bool
+}
+
+func (ms *MemoryStorer) store(data state) error {
+	ms.LastProcessedTimestamp = data.LastProcessedTimestamp
+	ms.storeCompletedCh <- true
+	return nil
+}
+
+func (ms *MemoryStorer) load(data *state) error {
+	data.LastProcessedTimestamp = ms.LastProcessedTimestamp
+	return nil
+}
+
+func TestWatcherIgnoreOutOfOrderEvents(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	expectedStateTime := time.Now().Add(2 * time.Hour)
+	oomInstancesToStream := []*oomparser.OomInstance{
+		{
+			Pid:                 1000,
+			ProcessName:         "fakeProcess",
+			TimeOfDeath:         time.Now(),
+			ContainerName:       recordEventContainerName + "some-container",
+			VictimContainerName: recordEventContainerName,
+		},
+		{
+			Pid:                 1001,
+			ProcessName:         "fakeProcess",
+			TimeOfDeath:         expectedStateTime,
+			ContainerName:       recordEventContainerName + "some-container",
+			VictimContainerName: recordEventContainerName,
+		},
+	}
+	numExpectedOomEvents := len(oomInstancesToStream)
+
+	fakeStreamer := &fakeStreamer{
+		oomInstancesToStream: oomInstancesToStream,
+	}
+
+	fakeRecorder := record.NewFakeRecorder(numExpectedOomEvents)
+	node := &v1.ObjectReference{}
+
+	syncCh := make(chan bool)
+	defer close(syncCh)
+	oomWatcher := &realWatcher{
+		recorder:    fakeRecorder,
+		oomStreamer: fakeStreamer,
+		state: &state{
+			storer: &MemoryStorer{
+				LastProcessedTimestamp: time.Now().Add(1 * time.Hour),
+				storeCompletedCh:       syncCh,
+			},
+		},
+	}
+	require.NoError(t, oomWatcher.Start(tCtx, node))
+	<-syncCh
+
+	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
+	assert.Len(t, eventsRecorded, 1)
+	assert.Equal(t, expectedStateTime, oomWatcher.state.LastProcessedTimestamp)
 }
 
 func getRecordedEvents(fakeRecorder *record.FakeRecorder, numExpectedOomEvents int) []string {
@@ -126,6 +200,10 @@ func TestWatcherRecordsEventsForOomEventsCorrectContainerName(t *testing.T) {
 	oomWatcher := &realWatcher{
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
+		state: &state{
+			LastProcessedTimestamp: time.Now().Add(-1 * time.Hour),
+			storer:                 &noopStorer{},
+		},
 	}
 	require.NoError(t, oomWatcher.Start(tCtx, node))
 
@@ -163,6 +241,10 @@ func TestWatcherRecordsEventsForOomEventsWithAdditionalInfo(t *testing.T) {
 	oomWatcher := &realWatcher{
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
+		state: &state{
+			LastProcessedTimestamp: time.Now().Add(-1 * time.Hour),
+			storer:                 &noopStorer{},
+		},
 	}
 	require.NoError(t, oomWatcher.Start(tCtx, node))
 
