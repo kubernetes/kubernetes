@@ -38,10 +38,6 @@ func isMultiNUMA() bool {
 	return false
 }
 
-func getSMTLevel() int {
-	return 1
-}
-
 func getUncoreCPUGroupSize() int {
 	return 1
 }
