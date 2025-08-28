@@ -1445,7 +1445,15 @@ func (dsc *DaemonSetsController) syncNodeUpdate(ctx context.Context, nodeName st
 		daemonPods := podsByDS[dsKey]
 		scheduled := len(daemonPods) > 0
 
-		if (shouldRun && !scheduled) || (!shouldContinueRunning && scheduled) {
+		// Enqueue DaemonSet for sync in the following scenarios:
+		// 1. (shouldRun && !scheduled): Node now meets scheduling requirements but no pod exists
+		//    - Need to create a new pod on this node
+		// 2. (!shouldContinueRunning && scheduled): Node no longer meets requirements but pod exists
+		//    - Need to delete the existing pod from this node
+		// 3. (scheduled && ds.Status.NumberMisscheduled > 0): DaemonSet pod exists and misscheduled count is nonzero.
+		//    - For example: a pod was scheduled before the node became unready and tainted; after the node becomes ready and taints are removed, the pod may now be valid again.
+		//    - Need to recalculate NumberMisscheduled to ensure the DaemonSet status accurately reflects the current scheduling state.
+		if (shouldRun && !scheduled) || (!shouldContinueRunning && scheduled) || (scheduled && ds.Status.NumberMisscheduled > 0) {
 			dsc.enqueueDaemonSet(ds)
 		}
 	}
