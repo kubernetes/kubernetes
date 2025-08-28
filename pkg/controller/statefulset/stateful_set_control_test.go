@@ -3819,9 +3819,20 @@ func TestStatefulSetMetrics(t *testing.T) {
 		sort.Sort(ascendingOrdinal(pods))
 
 		// Update StatefulSet
-		status := apps.StatefulSetStatus{Replicas: test.totalPods}
+		// Calculate ready replicas based on the test setup
+		readyReplicas := test.totalPods - int32(test.unavailablePodCount)
+		status := apps.StatefulSetStatus{
+			Replicas:      test.totalPods,
+			ReadyReplicas: readyReplicas,
+		}
 		updateRevision := &apps.ControllerRevision{}
 		_, err = updateStatefulSetAfterInvariantEstablished(context.TODO(), ssc.(*defaultStatefulSetControl), set, pods, updateRevision, status)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Also call updateStatefulSetStatus to ensure metrics are updated
+		err = ssc.(*defaultStatefulSetControl).updateStatefulSetStatus(context.TODO(), set, &status)
 		if err != nil {
 			t.Fatal(err)
 		}
