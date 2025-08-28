@@ -295,3 +295,9 @@
 - endpoint: replaceNetworkingV1ServiceCIDRStatus
   reason: Kubernetes distribution would reasonably not allow this action via the API
   link: https://github.com/kubernetes/enhancements/pull/4983#issuecomment-2541699445
+- endpoint: connectCoreV1PostNamespacedPodExec
+  reason: Deprecated and uses a sometime unreliable SPDY protocol
+  link: https://github.com/kubernetes/kubernetes/issues/133689#issuecomment-3233952615
+- endpoint: connectCoreV1PostNamespacedPodPortforward
+  reason: Deprecated and uses a sometime unreliable SPDY protocol
+  link: https://github.com/kubernetes/kubernetes/issues/133689#issuecomment-3233952615
