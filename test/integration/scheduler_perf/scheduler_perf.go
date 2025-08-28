@@ -627,6 +627,9 @@ func (cmo *createNamespacesOp) isValid(allowParameterization bool) error {
 	if !isValidCount(allowParameterization, cmo.Count, cmo.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cmo.Count, cmo.CountParam)
 	}
+	if cmo.Prefix == "" {
+		return fmt.Errorf("prefix must be set")
+	}
 	return nil
 }
 
@@ -804,6 +807,9 @@ func (dpo *deletePodsOp) isValid(allowParameterization bool) error {
 	if dpo.DeletePodsPerSecond < 0 {
 		return fmt.Errorf("invalid DeletePodsPerSecond=%d; should be non-negative", dpo.DeletePodsPerSecond)
 	}
+	if dpo.Namespace == "" {
+		return fmt.Errorf("namespace must be set")
+	}
 	return nil
 }
 
@@ -918,6 +924,9 @@ type sleepOp struct {
 }
 
 func (so *sleepOp) isValid(_ bool) error {
+	if so.Duration.Duration < 0 {
+		return fmt.Errorf("duration must be non-negative")
+	}
 	return nil
 }
 
