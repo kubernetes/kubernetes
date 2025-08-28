@@ -471,7 +471,7 @@ func (m *mockDriverSetup) createPodWithFSGroup(ctx context.Context, fsGroup *int
 	return class, claim, pod
 }
 
-func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes []v1.PersistentVolumeAccessMode, mountOptions []string, seLinuxOpts *v1.SELinuxOptions, policy *v1.PodSELinuxChangePolicy) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes []v1.PersistentVolumeAccessMode, mountOptions []string, seLinuxOpts *v1.SELinuxOptions, policy *v1.PodSELinuxChangePolicy, privileged bool) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	ginkgo.By("Creating pod with SELinux context")
 	f := m.f
 	nodeSelection := m.config.ClientNodeSelection
@@ -488,7 +488,7 @@ func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes 
 		ReclaimPolicy:        m.tp.reclaimPolicy,
 	}
 	class, claim := createClaim(ctx, f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, accessModes)
-	pod, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, seLinuxOpts, policy)
+	pod, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, seLinuxOpts, policy, privileged)
 	framework.ExpectNoError(err, "Failed to create pause pod with SELinux context %s: %v", seLinuxOpts, err)
 
 	if class != nil {
@@ -826,7 +826,7 @@ func startBusyBoxPodWithVolumeSource(cs clientset.Interface, volumeSource v1.Vol
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
-func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection, ns string, seLinuxOpts *v1.SELinuxOptions, policy *v1.PodSELinuxChangePolicy) (*v1.Pod, error) {
+func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection, ns string, seLinuxOpts *v1.SELinuxOptions, policy *v1.PodSELinuxChangePolicy, privileged bool) (*v1.Pod, error) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-volume-tester-",
@@ -840,6 +840,9 @@ func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentV
 				{
 					Name:  "volume-tester",
 					Image: imageutils.GetE2EImage(imageutils.Pause),
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &privileged,
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",
