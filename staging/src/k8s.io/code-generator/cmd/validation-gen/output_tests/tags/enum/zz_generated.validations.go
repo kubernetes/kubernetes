@@ -55,15 +55,24 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-var exclusionsForConditionalEnum = validate.NewExclusions[ConditionalEnum](validate.EnumExclusion[ConditionalEnum]{
-	Value: ConditionalA, Option: "FeatureA", ExcludeWhenEnabled: true}, validate.EnumExclusion[ConditionalEnum]{
-	Value: ConditionalB, Option: "FeatureB", ExcludeWhenEnabled: false}, validate.EnumExclusion[ConditionalEnum]{
-	Value: ConditionalD, Option: "FeatureA", ExcludeWhenEnabled: true}, validate.EnumExclusion[ConditionalEnum]{
-	Value: ConditionalD, Option: "FeatureB", ExcludeWhenEnabled: true}, validate.EnumExclusion[ConditionalEnum]{
-	Value: ConditionalE, Option: "FeatureC", ExcludeWhenEnabled: false}, validate.EnumExclusion[ConditionalEnum]{
-	Value: ConditionalE, Option: "FeatureD", ExcludeWhenEnabled: false}, validate.EnumExclusion[ConditionalEnum]{
-	Value: ConditionalF, Option: "FeatureC", ExcludeWhenEnabled: false}, validate.EnumExclusion[ConditionalEnum]{
-	Value: ConditionalF, Option: "FeatureD", ExcludeWhenEnabled: true})
+var exclusionsForConditionalEnum = []validate.EnumExclusion[ConditionalEnum]{
+	{
+		Value: ConditionalA, Option: "FeatureA", ExcludeWhen: true},
+	{
+		Value: ConditionalB, Option: "FeatureB", ExcludeWhen: false},
+	{
+		Value: ConditionalD, Option: "FeatureA", ExcludeWhen: true},
+	{
+		Value: ConditionalD, Option: "FeatureB", ExcludeWhen: true},
+	{
+		Value: ConditionalE, Option: "FeatureC", ExcludeWhen: false},
+	{
+		Value: ConditionalE, Option: "FeatureD", ExcludeWhen: false},
+	{
+		Value: ConditionalF, Option: "FeatureC", ExcludeWhen: false},
+	{
+		Value: ConditionalF, Option: "FeatureD", ExcludeWhen: true},
+}
 var symbolsForConditionalEnum = sets.New[ConditionalEnum](ConditionalA, ConditionalB, ConditionalC, ConditionalD, ConditionalE, ConditionalF)
 
 func Validate_ConditionalEnum(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ConditionalEnum) (errs field.ErrorList) {
