@@ -20,6 +20,8 @@ package util
 import (
 	"bytes"
 	"os"
+	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -47,4 +49,22 @@ func SysReadFile(file string) (string, error) {
 	}
 
 	return string(bytes.TrimSpace(b[:n])), nil
+}
+
+// SysReadUintFromFile reads a file using SysReadFile and attempts to parse a uint64 from it.
+func SysReadUintFromFile(path string) (uint64, error) {
+	data, err := SysReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseUint(strings.TrimSpace(string(data)), 10, 64)
+}
+
+// SysReadIntFromFile reads a file using SysReadFile and attempts to parse a int64 from it.
+func SysReadIntFromFile(path string) (int64, error) {
+	data, err := SysReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
 }

@@ -164,7 +164,12 @@ loopItems:
 func CreateKey(k Key, path string, access uint32) (newk Key, openedExisting bool, err error) {
 	var h syscall.Handle
 	var d uint32
-	err = regCreateKeyEx(syscall.Handle(k), syscall.StringToUTF16Ptr(path),
+	var pathPointer *uint16
+	pathPointer, err = syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return 0, false, err
+	}
+	err = regCreateKeyEx(syscall.Handle(k), pathPointer,
 		0, nil, _REG_OPTION_NON_VOLATILE, access, nil, &h, &d)
 	if err != nil {
 		return 0, false, err
@@ -174,7 +179,11 @@ func CreateKey(k Key, path string, access uint32) (newk Key, openedExisting bool
 
 // DeleteKey deletes the subkey path of key k and its values.
 func DeleteKey(k Key, path string) error {
-	return regDeleteKey(syscall.Handle(k), syscall.StringToUTF16Ptr(path))
+	pathPointer, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return err
+	}
+	return regDeleteKey(syscall.Handle(k), pathPointer)
 }
 
 // A KeyInfo describes the statistics of a key. It is returned by Stat.
