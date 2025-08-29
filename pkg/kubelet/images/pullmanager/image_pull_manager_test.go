@@ -425,17 +425,18 @@ func Test_pulledRecordMergeNewCreds(t *testing.T) {
 
 func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 	tests := []struct {
-		name               string
-		imagePullPolicy    ImagePullPolicyEnforcer
-		podSecrets         []kubeletconfiginternal.ImagePullSecret
-		podServiceAccount  *kubeletconfiginternal.ImagePullServiceAccount
-		image              string
-		imageRef           string
-		pulledFiles        []string
-		pullingFiles       []string
-		expectedPullRecord *kubeletconfiginternal.ImagePulledRecord
-		want               bool
-		expectedCacheWrite bool
+		name                  string
+		imagePullPolicy       ImagePullPolicyEnforcer
+		podSecrets            []kubeletconfiginternal.ImagePullSecret
+		podServiceAccount     *kubeletconfiginternal.ImagePullServiceAccount
+		image                 string
+		imageRef              string
+		pulledFiles           []string
+		pullingFiles          []string
+		expectedPullRecord    *kubeletconfiginternal.ImagePulledRecord
+		want                  bool
+		wantPodCredsRequested bool
+		expectedCacheWrite    bool
 	}{
 		{
 			name:            "image exists and is recorded with pod's exact secret",
@@ -445,18 +446,20 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash",
 				},
 			},
-			image:       "docker.io/testing/test:latest",
-			imageRef:    "testimageref",
-			pulledFiles: []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
-			want:        false,
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testimageref",
+			pulledFiles:           []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			want:                  false,
+			wantPodCredsRequested: true,
 		},
 		{
-			name:            "image exists and is recorded, no pod secrets",
-			imagePullPolicy: NeverVerifyPreloadedPullPolicy(),
-			image:           "docker.io/testing/test:latest",
-			imageRef:        "testimageref",
-			pulledFiles:     []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
-			want:            true,
+			name:                  "image exists and is recorded, no pod secrets",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testimageref",
+			pulledFiles:           []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			want:                  true,
+			wantPodCredsRequested: true,
 		},
 		{
 			name:            "image exists and is recorded with the same secret but different credential hash",
@@ -479,8 +482,9 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					},
 				},
 			},
-			want:               false,
-			expectedCacheWrite: true,
+			want:                  false,
+			wantPodCredsRequested: true,
+			expectedCacheWrite:    true,
 		},
 		{
 			name:            "image exists and is recorded with a different secret with a different UID",
@@ -490,10 +494,11 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					UID: "different uid", Namespace: "default", Name: "pull-secret", CredentialHash: "differenthash",
 				},
 			},
-			image:       "docker.io/testing/test:latest",
-			imageRef:    "testimageref",
-			pulledFiles: []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
-			want:        true,
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testimageref",
+			pulledFiles:           []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			want:                  true,
+			wantPodCredsRequested: true,
 		},
 		{
 			name:            "image exists and is recorded with a different secret",
@@ -503,10 +508,11 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					UID: "testsecretuid", Namespace: "differentns", Name: "pull-secret", CredentialHash: "differenthash",
 				},
 			},
-			image:       "docker.io/testing/test:latest",
-			imageRef:    "testimageref",
-			pulledFiles: []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
-			want:        true,
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testimageref",
+			pulledFiles:           []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			want:                  true,
+			wantPodCredsRequested: true,
 		},
 		{
 			name:            "image exists and is recorded with a different secret with the same credential hash",
@@ -530,8 +536,9 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					},
 				},
 			},
-			want:               false,
-			expectedCacheWrite: true,
+			want:                  false,
+			wantPodCredsRequested: true,
+			expectedCacheWrite:    true,
 		},
 		{
 			name:            "image exists but the pull is recorded with a different image name but with the exact same secret",
@@ -541,39 +548,44 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash",
 				},
 			},
-			image:       "docker.io/testing/different:latest",
-			imageRef:    "testimageref",
-			pulledFiles: []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
-			want:        true,
+			image:                 "docker.io/testing/different:latest",
+			imageRef:              "testimageref",
+			pulledFiles:           []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			want:                  true,
+			wantPodCredsRequested: false,
 		},
 		{
-			name:            "image exists and is recorded with empty credential mapping",
-			imagePullPolicy: NeverVerifyPreloadedPullPolicy(),
-			image:           "docker.io/testing/test:latest",
-			imageRef:        "testemptycredmapping",
-			pulledFiles:     []string{"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991"},
-			want:            true,
+			name:                  "image exists and is recorded with empty credential mapping",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testemptycredmapping",
+			pulledFiles:           []string{"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991"},
+			want:                  true,
+			wantPodCredsRequested: false,
 		},
 		{
-			name:            "image does not exist and there are no records of it",
-			imagePullPolicy: NeverVerifyPreloadedPullPolicy(),
-			image:           "docker.io/testing/test:latest",
-			imageRef:        "",
-			want:            true,
+			name:                  "image does not exist and there are no records of it",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "",
+			want:                  true,
+			wantPodCredsRequested: false,
 		},
 		{
-			name:            "image exists and there are no records of it with NeverVerifyPreloadedImages pull policy",
-			imagePullPolicy: NeverVerifyPreloadedPullPolicy(),
-			image:           "docker.io/testing/test:latest",
-			imageRef:        "testexistingref",
-			want:            false,
+			name:                  "image exists and there are no records of it with NeverVerifyPreloadedImages pull policy",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testexistingref",
+			want:                  false,
+			wantPodCredsRequested: false,
 		},
 		{
-			name:            "image exists and there are no records of it with AlwaysVerify pull policy",
-			imagePullPolicy: AlwaysVerifyImagePullPolicy(),
-			image:           "docker.io/testing/test:latest",
-			imageRef:        "testexistingref",
-			want:            true,
+			name:                  "image exists and there are no records of it with AlwaysVerify pull policy",
+			imagePullPolicy:       AlwaysVerifyImagePullPolicy(),
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testexistingref",
+			want:                  true,
+			wantPodCredsRequested: false,
 		},
 		{
 			name:            "image exists but is only recorded via pulling intent",
@@ -583,10 +595,11 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash",
 				},
 			},
-			image:        "docker.io/testing/test:latest",
-			imageRef:     "testexistingref",
-			pullingFiles: []string{"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56"},
-			want:         true,
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testexistingref",
+			pullingFiles:          []string{"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56"},
+			want:                  true,
+			wantPodCredsRequested: false,
 		},
 		{
 			name:            "image exists but is only recorded via pulling intent - NeverVerify policy",
@@ -596,18 +609,20 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash",
 				},
 			},
-			image:        "docker.io/testing/test:latest",
-			imageRef:     "testexistingref",
-			pullingFiles: []string{"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56"},
-			want:         false,
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testexistingref",
+			pullingFiles:          []string{"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56"},
+			want:                  false,
+			wantPodCredsRequested: false,
 		},
 		{
-			name:            "image exists and is recorded as node-accessible, no pod secrets",
-			imagePullPolicy: NeverVerifyPreloadedPullPolicy(),
-			image:           "docker.io/testing/test:latest",
-			imageRef:        "testimage-anonpull",
-			pulledFiles:     []string{"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"},
-			want:            false,
+			name:                  "image exists and is recorded as node-accessible, no pod secrets",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testimage-anonpull",
+			pulledFiles:           []string{"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"},
+			want:                  false,
+			wantPodCredsRequested: false,
 		},
 		{
 			name:            "image exists and is recorded as node-accessible, request with pod secrets",
@@ -617,10 +632,11 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash",
 				},
 			},
-			image:       "docker.io/testing/test:latest",
-			imageRef:    "testimage-anonpull",
-			pulledFiles: []string{"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"},
-			want:        false,
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testimage-anonpull",
+			pulledFiles:           []string{"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"},
+			want:                  false,
+			wantPodCredsRequested: false,
 		},
 		{
 			name:            "image exists and is recorded with empty hash as its hashing originally failed, the same fail for a different pod secret",
@@ -630,10 +646,11 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					UID: "testsecretuid", Namespace: "differentns", Name: "pull-secret", CredentialHash: "",
 				},
 			},
-			image:       "docker.io/testing/test:latest",
-			imageRef:    "test-brokenhash",
-			pulledFiles: []string{"sha256-38a8906435c4dd5f4258899d46621bfd8eea3ad6ff494ee3c2f17ef0321625bd"},
-			want:        true,
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "test-brokenhash",
+			pulledFiles:           []string{"sha256-38a8906435c4dd5f4258899d46621bfd8eea3ad6ff494ee3c2f17ef0321625bd"},
+			want:                  true,
+			wantPodCredsRequested: true,
 		},
 		{
 			name:            "image exists and is recorded with empty hash as its hashing originally failed, the same fail for the same pod secret",
@@ -643,82 +660,91 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "",
 				},
 			},
-			image:       "docker.io/testing/test:latest",
-			imageRef:    "test-brokenhash",
-			pulledFiles: []string{"sha256-38a8906435c4dd5f4258899d46621bfd8eea3ad6ff494ee3c2f17ef0321625bd"},
-			want:        false,
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "test-brokenhash",
+			pulledFiles:           []string{"sha256-38a8906435c4dd5f4258899d46621bfd8eea3ad6ff494ee3c2f17ef0321625bd"},
+			want:                  false,
+			wantPodCredsRequested: true,
 		},
 
 		{
-			name:              "image exists and is recorded with pod's exact service account",
-			imagePullPolicy:   NeverVerifyPreloadedPullPolicy(),
-			podServiceAccount: &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
-			image:             "docker.io/testing/test:latest",
-			imageRef:          "testimageref-sa",
-			pulledFiles:       []string{"sha256-917e8b3439bf8a7a6f37ffd2d2ddfdfafac8a251bf214a0be39675742b420b1a"},
-			want:              false,
+			name:                  "image exists and is recorded with pod's exact service account",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			podServiceAccount:     &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testimageref-sa",
+			pulledFiles:           []string{"sha256-917e8b3439bf8a7a6f37ffd2d2ddfdfafac8a251bf214a0be39675742b420b1a"},
+			want:                  false,
+			wantPodCredsRequested: true,
 		},
 		{
-			name:            "image exists and is recorded, no pod service accounts",
-			imagePullPolicy: NeverVerifyPreloadedPullPolicy(),
-			image:           "docker.io/testing/test:latest",
-			imageRef:        "testimageref",
-			pulledFiles:     []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
-			want:            true,
+			name:                  "image exists and is recorded, no pod service accounts",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testimageref",
+			pulledFiles:           []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			want:                  true,
+			wantPodCredsRequested: true,
 		},
 		{
-			name:              "image exists and is recorded with a different service account with different UID",
-			imagePullPolicy:   NeverVerifyPreloadedPullPolicy(),
-			podServiceAccount: &kubeletconfiginternal.ImagePullServiceAccount{UID: "different-sa-uid", Namespace: "default", Name: "test-sa"},
-			image:             "docker.io/testing/test:latest",
-			imageRef:          "testimageref-sa",
-			pulledFiles:       []string{"sha256-917e8b3439bf8a7a6f37ffd2d2ddfdfafac8a251bf214a0be39675742b420b1a"},
-			want:              true,
+			name:                  "image exists and is recorded with a different service account with different UID",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			podServiceAccount:     &kubeletconfiginternal.ImagePullServiceAccount{UID: "different-sa-uid", Namespace: "default", Name: "test-sa"},
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testimageref-sa",
+			pulledFiles:           []string{"sha256-917e8b3439bf8a7a6f37ffd2d2ddfdfafac8a251bf214a0be39675742b420b1a"},
+			want:                  true,
+			wantPodCredsRequested: true,
 		},
 		{
-			name:              "image exists and is recorded with a different service account with different namespace",
-			imagePullPolicy:   NeverVerifyPreloadedPullPolicy(),
-			podServiceAccount: &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "different-ns", Name: "test-sa"},
-			image:             "docker.io/testing/test:latest",
-			imageRef:          "testimageref-sa",
-			pulledFiles:       []string{"sha256-917e8b3439bf8a7a6f37ffd2d2ddfdfafac8a251bf214a0be39675742b420b1a"},
-			want:              true,
+			name:                  "image exists and is recorded with a different service account with different namespace",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			podServiceAccount:     &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "different-ns", Name: "test-sa"},
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testimageref-sa",
+			pulledFiles:           []string{"sha256-917e8b3439bf8a7a6f37ffd2d2ddfdfafac8a251bf214a0be39675742b420b1a"},
+			want:                  true,
+			wantPodCredsRequested: true,
 		},
 		{
-			name:              "image exists but the pull is recorded with a different image name but with the exact same service account",
-			imagePullPolicy:   NeverVerifyPreloadedPullPolicy(),
-			podServiceAccount: &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
-			image:             "docker.io/testing/different:latest",
-			imageRef:          "testimageref-sa",
-			pulledFiles:       []string{"sha256-917e8b3439bf8a7a6f37ffd2d2ddfdfafac8a251bf214a0be39675742b420b1a"},
-			want:              true,
+			name:                  "image exists but the pull is recorded with a different image name but with the exact same service account",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			podServiceAccount:     &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+			image:                 "docker.io/testing/different:latest",
+			imageRef:              "testimageref-sa",
+			pulledFiles:           []string{"sha256-917e8b3439bf8a7a6f37ffd2d2ddfdfafac8a251bf214a0be39675742b420b1a"},
+			want:                  true,
+			wantPodCredsRequested: false,
 		},
 		{
-			name:              "image exists but is only recorded via pulling intent with service account",
-			imagePullPolicy:   NeverVerifyPreloadedPullPolicy(),
-			podServiceAccount: &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
-			image:             "docker.io/testing/test:latest",
-			imageRef:          "testexistingref",
-			pullingFiles:      []string{"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56"},
-			want:              true,
+			name:                  "image exists but is only recorded via pulling intent with service account",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			podServiceAccount:     &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testexistingref",
+			pullingFiles:          []string{"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56"},
+			want:                  true,
+			wantPodCredsRequested: false,
 		},
 		{
-			name:              "image exists but is only recorded via pulling intent with service account - NeverVerify policy",
-			imagePullPolicy:   NeverVerifyImagePullPolicy(),
-			podServiceAccount: &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
-			image:             "docker.io/testing/test:latest",
-			imageRef:          "testexistingref",
-			pullingFiles:      []string{"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56"},
-			want:              false,
+			name:                  "image exists but is only recorded via pulling intent with service account - NeverVerify policy",
+			imagePullPolicy:       NeverVerifyImagePullPolicy(),
+			podServiceAccount:     &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testexistingref",
+			pullingFiles:          []string{"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56"},
+			want:                  false,
+			wantPodCredsRequested: false,
 		},
 		{
-			name:              "image exists and is recorded as node-accessible, request with pod service accounts",
-			imagePullPolicy:   NeverVerifyPreloadedPullPolicy(),
-			podServiceAccount: &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
-			image:             "docker.io/testing/test:latest",
-			imageRef:          "testimage-anonpull",
-			pulledFiles:       []string{"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"},
-			want:              false,
+			name:                  "image exists and is recorded as node-accessible, request with pod service accounts",
+			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
+			podServiceAccount:     &kubeletconfiginternal.ImagePullServiceAccount{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testimage-anonpull",
+			pulledFiles:           []string{"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a"},
+			want:                  false,
+			wantPodCredsRequested: false,
 		},
 	}
 
@@ -744,6 +770,11 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 				},
 			}
 
+			var podCredsRequested bool
+			s := func() ([]kubeletconfiginternal.ImagePullSecret, *kubeletconfiginternal.ImagePullServiceAccount, error) {
+				podCredsRequested = true
+				return tt.podSecrets, tt.podServiceAccount, nil
+			}
 			f := &PullManager{
 				recordsAccessor:     fsRecordAccessor,
 				imagePolicyEnforcer: tt.imagePullPolicy,
@@ -752,8 +783,14 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 				pulledAccessors:     NewStripedLockSet(10),
 			}
 
-			if got := f.MustAttemptImagePull(tCtx, tt.image, tt.imageRef, tt.podSecrets, tt.podServiceAccount); got != tt.want {
+			if got, err := f.MustAttemptImagePull(tCtx, tt.image, tt.imageRef, s); err != nil {
+				t.Errorf("FileBasedImagePullManager.MustAttemptImagePull() unexpected error %v", err)
+			} else if got != tt.want {
 				t.Errorf("FileBasedImagePullManager.MustAttemptImagePull() = %v, want %v", got, tt.want)
+			} else if podCredsRequested && !tt.wantPodCredsRequested {
+				t.Error("expected FileBasedImagePullManager.MustAttemptImagePull() to not look up pod credentials, but it did")
+			} else if !podCredsRequested && tt.wantPodCredsRequested {
+				t.Error("expected FileBasedImagePullManager.MustAttemptImagePull() to look up pod credentials, but it did not")
 			}
 
 			if tt.expectedCacheWrite != (fsRecordAccessor.imagePulledRecordsWrites != 0) {
