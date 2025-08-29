@@ -49,29 +49,15 @@ func Secret(name, namespace string) *SecretApplyConfiguration {
 	return b
 }
 
-// ExtractSecret extracts the applied configuration owned by fieldManager from
-// secret. If no managedFields are found in secret for fieldManager, a
-// SecretApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractSecretFrom extracts the applied configuration owned by fieldManager from
+// secret for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // secret must be a unmodified Secret API object that was retrieved from the Kubernetes API.
-// ExtractSecret provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractSecretFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractSecret(secret *corev1.Secret, fieldManager string) (*SecretApplyConfiguration, error) {
-	return extractSecret(secret, fieldManager, "")
-}
-
-// ExtractSecretStatus is the same as ExtractSecret except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractSecretStatus(secret *corev1.Secret, fieldManager string) (*SecretApplyConfiguration, error) {
-	return extractSecret(secret, fieldManager, "status")
-}
-
-func extractSecret(secret *corev1.Secret, fieldManager string, subresource string) (*SecretApplyConfiguration, error) {
+func ExtractSecretFrom(secret *corev1.Secret, fieldManager string, subresource string) (*SecretApplyConfiguration, error) {
 	b := &SecretApplyConfiguration{}
 	err := managedfields.ExtractInto(secret, internal.Parser().Type("io.k8s.api.core.v1.Secret"), fieldManager, b, subresource)
 	if err != nil {
@@ -84,6 +70,22 @@ func extractSecret(secret *corev1.Secret, fieldManager string, subresource strin
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractSecret extracts the applied configuration owned by fieldManager from
+// secret. If no managedFields are found in secret for fieldManager, a
+// SecretApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// secret must be a unmodified Secret API object that was retrieved from the Kubernetes API.
+// ExtractSecret provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractSecret(secret *corev1.Secret, fieldManager string) (*SecretApplyConfiguration, error) {
+	return ExtractSecretFrom(secret, fieldManager, "")
+}
+
 func (b SecretApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

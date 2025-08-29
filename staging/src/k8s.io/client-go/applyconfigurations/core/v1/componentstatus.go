@@ -45,6 +45,27 @@ func ComponentStatus(name string) *ComponentStatusApplyConfiguration {
 	return b
 }
 
+// ExtractComponentStatusFrom extracts the applied configuration owned by fieldManager from
+// componentStatus for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// componentStatus must be a unmodified ComponentStatus API object that was retrieved from the Kubernetes API.
+// ExtractComponentStatusFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractComponentStatusFrom(componentStatus *corev1.ComponentStatus, fieldManager string, subresource string) (*ComponentStatusApplyConfiguration, error) {
+	b := &ComponentStatusApplyConfiguration{}
+	err := managedfields.ExtractInto(componentStatus, internal.Parser().Type("io.k8s.api.core.v1.ComponentStatus"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(componentStatus.Name)
+
+	b.WithKind("ComponentStatus")
+	b.WithAPIVersion("v1")
+	return b, nil
+}
+
 // ExtractComponentStatus extracts the applied configuration owned by fieldManager from
 // componentStatus. If no managedFields are found in componentStatus for fieldManager, a
 // ComponentStatusApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func ComponentStatus(name string) *ComponentStatusApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractComponentStatus(componentStatus *corev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
-	return extractComponentStatus(componentStatus, fieldManager, "")
+	return ExtractComponentStatusFrom(componentStatus, fieldManager, "")
 }
 
-// ExtractComponentStatusStatus is the same as ExtractComponentStatus except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractComponentStatusStatus(componentStatus *corev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
-	return extractComponentStatus(componentStatus, fieldManager, "status")
-}
-
-func extractComponentStatus(componentStatus *corev1.ComponentStatus, fieldManager string, subresource string) (*ComponentStatusApplyConfiguration, error) {
-	b := &ComponentStatusApplyConfiguration{}
-	err := managedfields.ExtractInto(componentStatus, internal.Parser().Type("io.k8s.api.core.v1.ComponentStatus"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(componentStatus.Name)
-
-	b.WithKind("ComponentStatus")
-	b.WithAPIVersion("v1")
-	return b, nil
-}
 func (b ComponentStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

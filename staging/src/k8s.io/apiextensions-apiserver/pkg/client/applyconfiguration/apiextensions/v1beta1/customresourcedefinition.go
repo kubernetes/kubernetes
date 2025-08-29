@@ -42,6 +42,7 @@ func CustomResourceDefinition(name string) *CustomResourceDefinitionApplyConfigu
 	b.WithAPIVersion("apiextensions.k8s.io/v1beta1")
 	return b
 }
+
 func (b CustomResourceDefinitionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

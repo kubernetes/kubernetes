@@ -46,6 +46,27 @@ func ClusterRole(name string) *ClusterRoleApplyConfiguration {
 	return b
 }
 
+// ExtractClusterRoleFrom extracts the applied configuration owned by fieldManager from
+// clusterRole for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// clusterRole must be a unmodified ClusterRole API object that was retrieved from the Kubernetes API.
+// ExtractClusterRoleFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractClusterRoleFrom(clusterRole *rbacv1.ClusterRole, fieldManager string, subresource string) (*ClusterRoleApplyConfiguration, error) {
+	b := &ClusterRoleApplyConfiguration{}
+	err := managedfields.ExtractInto(clusterRole, internal.Parser().Type("io.k8s.api.rbac.v1.ClusterRole"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(clusterRole.Name)
+
+	b.WithKind("ClusterRole")
+	b.WithAPIVersion("rbac.authorization.k8s.io/v1")
+	return b, nil
+}
+
 // ExtractClusterRole extracts the applied configuration owned by fieldManager from
 // clusterRole. If no managedFields are found in clusterRole for fieldManager, a
 // ClusterRoleApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -58,28 +79,9 @@ func ClusterRole(name string) *ClusterRoleApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractClusterRole(clusterRole *rbacv1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
-	return extractClusterRole(clusterRole, fieldManager, "")
+	return ExtractClusterRoleFrom(clusterRole, fieldManager, "")
 }
 
-// ExtractClusterRoleStatus is the same as ExtractClusterRole except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractClusterRoleStatus(clusterRole *rbacv1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
-	return extractClusterRole(clusterRole, fieldManager, "status")
-}
-
-func extractClusterRole(clusterRole *rbacv1.ClusterRole, fieldManager string, subresource string) (*ClusterRoleApplyConfiguration, error) {
-	b := &ClusterRoleApplyConfiguration{}
-	err := managedfields.ExtractInto(clusterRole, internal.Parser().Type("io.k8s.api.rbac.v1.ClusterRole"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(clusterRole.Name)
-
-	b.WithKind("ClusterRole")
-	b.WithAPIVersion("rbac.authorization.k8s.io/v1")
-	return b, nil
-}
 func (b ClusterRoleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

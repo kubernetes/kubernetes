@@ -42,6 +42,7 @@ func Scale() *ScaleApplyConfiguration {
 	b.WithAPIVersion("apps/v1beta2")
 	return b
 }
+
 func (b ScaleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

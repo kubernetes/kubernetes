@@ -20,13 +20,17 @@ import (
 	"io"
 	"path"
 	"slices"
+	"sort"
 	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 )
@@ -106,7 +110,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 			sw.Do(clientgenTypeConstructorNamespaced, typeParams)
 		}
 		if typeParams.OpenAPIType != nil {
-			g.generateClientgenExtract(sw, typeParams, !typeParams.Tags.NoStatus)
+			g.generateClientgenExtract(sw, typeParams)
 		}
 	} else {
 		if hasTypeMetaField(t) {
@@ -276,7 +280,9 @@ func (g *applyConfigurationGenerator) generateStruct(sw *generator.SnippetWriter
 }
 
 func (g *applyConfigurationGenerator) generateIsApplyConfiguration(t *types.Type, sw *generator.SnippetWriter) {
-	sw.Do("func (b $.|public$) IsApplyConfiguration() {}\n", t)
+	sw.Do(`
+func (b $.|public$) IsApplyConfiguration() {}
+`, t)
 }
 
 func deref(t *types.Type) *types.Type {
@@ -433,6 +439,8 @@ func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
 }
 `
 
+var titler = cases.Title(language.Und)
+
 var constructor = `
 // $.ApplyConfig.ApplyConfiguration|public$ constructs a declarative configuration of the $.ApplyConfig.Type|public$ type for use with
 // apply.
@@ -441,7 +449,36 @@ func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
 }
 `
 
-func (g *applyConfigurationGenerator) generateClientgenExtract(sw *generator.SnippetWriter, typeParams TypeParams, includeStatus bool) {
+func (g *applyConfigurationGenerator) generateClientgenExtract(sw *generator.SnippetWriter, typeParams TypeParams) {
+	subresources := g.collectSubresources(typeParams)
+
+	sw.Do(`
+// Extract$.ApplyConfig.Type|public$From extracts the applied configuration owned by fieldManager from
+// $.Struct|private$ for the specified subresource. Pass an empty string for subresource to extract 
+// the main resource. Common subresources include "status", "scale", etc.
+// $.Struct|private$ must be a unmodified $.Struct|public$ API object that was retrieved from the Kubernetes API.
+// Extract$.ApplyConfig.Type|public$From provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func Extract$.ApplyConfig.Type|public$From($.Struct|private$ *$.Struct|raw$, fieldManager string, subresource string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
+	b := &$.ApplyConfig.ApplyConfiguration|public${}
+	err := $.ExtractInto|raw$($.Struct|private$, $.ParserFunc|raw$().Type("$.OpenAPIType$"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName($.Struct|private$.Name)
+`, typeParams)
+	if !typeParams.Tags.NonNamespaced {
+		sw.Do("	b.WithNamespace($.Struct|private$.Namespace)\n", typeParams)
+	}
+	sw.Do(`
+	b.WithKind("$.ApplyConfig.Type|singularKind$")
+	b.WithAPIVersion("$.APIVersion$")
+	return b, nil
+}
+`, typeParams)
+
 	sw.Do(`
 // Extract$.ApplyConfig.Type|public$ extracts the applied configuration owned by fieldManager from
 // $.Struct|private$. If no managedFields are found in $.Struct|private$ for fieldManager, a
@@ -455,34 +492,46 @@ func (g *applyConfigurationGenerator) generateClientgenExtract(sw *generator.Sni
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func Extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldManager string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
-	return extract$.ApplyConfig.Type|public$($.Struct|private$, fieldManager, "")
-}`, typeParams)
-	if includeStatus {
+	return Extract$.ApplyConfig.Type|public$From($.Struct|private$, fieldManager, "")
+}
+`, typeParams)
+
+	for _, subresource := range subresources {
 		sw.Do(`
-// Extract$.ApplyConfig.Type|public$Status is the same as Extract$.ApplyConfig.Type|public$ except
-// that it extracts the status subresource applied configuration.
+// Extract$.ApplyConfig.Type|public$$.SubresourceName$ extracts the applied configuration owned by fieldManager from
+// $.Struct|private$ for the $.Subresource$ subresource.
 // Experimental!
-func Extract$.ApplyConfig.Type|public$Status($.Struct|private$ *$.Struct|raw$, fieldManager string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
-	return extract$.ApplyConfig.Type|public$($.Struct|private$, fieldManager, "status")
+func Extract$.ApplyConfig.Type|public$$.SubresourceName$($.Struct|private$ *$.Struct|raw$, fieldManager string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
+	return Extract$.ApplyConfig.Type|public$From($.Struct|private$, fieldManager, "$.Subresource$")
 }
-`, typeParams)
+`, map[string]interface{}{
+			"ApplyConfig":     typeParams.ApplyConfig,
+			"Struct":          typeParams.Struct,
+			"SubresourceName": titler.String(subresource),
+			"Subresource":     subresource,
+		})
 	}
-	sw.Do(`
-func extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldManager string, subresource string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
-	b := &$.ApplyConfig.ApplyConfiguration|public${}
-	err := $.ExtractInto|raw$($.Struct|private$, $.ParserFunc|raw$().Type("$.OpenAPIType$"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName($.Struct|private$.Name)
-`, typeParams)
-	if !typeParams.Tags.NonNamespaced {
-		sw.Do("b.WithNamespace($.Struct|private$.Namespace)\n", typeParams)
-	}
-	sw.Do(`
-	b.WithKind("$.ApplyConfig.Type|singularKind$")
-	b.WithAPIVersion("$.APIVersion$")
-	return b, nil
 }
-`, typeParams)
+
+func (g *applyConfigurationGenerator) collectSubresources(typeParams TypeParams) []string {
+	subresources := sets.New[string]()
+	if !typeParams.Tags.NoStatus {
+		// Do we even have a status?
+		for _, member := range typeParams.Struct.Members {
+			if member.Name == "Status" {
+				subresources.Insert("status")
+				break
+			}
+		}
+	}
+
+	for _, ext := range typeParams.Tags.Extensions {
+		if ext.SubResourcePath != "" {
+			subresources.Insert(ext.SubResourcePath)
+		}
+	}
+
+	sorted := subresources.UnsortedList()
+	sort.Strings(sorted)
+	return sorted
 }

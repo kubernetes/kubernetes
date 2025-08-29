@@ -46,6 +46,27 @@ func ServiceCIDR(name string) *ServiceCIDRApplyConfiguration {
 	return b
 }
 
+// ExtractServiceCIDRFrom extracts the applied configuration owned by fieldManager from
+// serviceCIDR for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// serviceCIDR must be a unmodified ServiceCIDR API object that was retrieved from the Kubernetes API.
+// ExtractServiceCIDRFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractServiceCIDRFrom(serviceCIDR *networkingv1beta1.ServiceCIDR, fieldManager string, subresource string) (*ServiceCIDRApplyConfiguration, error) {
+	b := &ServiceCIDRApplyConfiguration{}
+	err := managedfields.ExtractInto(serviceCIDR, internal.Parser().Type("io.k8s.api.networking.v1beta1.ServiceCIDR"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(serviceCIDR.Name)
+
+	b.WithKind("ServiceCIDR")
+	b.WithAPIVersion("networking.k8s.io/v1beta1")
+	return b, nil
+}
+
 // ExtractServiceCIDR extracts the applied configuration owned by fieldManager from
 // serviceCIDR. If no managedFields are found in serviceCIDR for fieldManager, a
 // ServiceCIDRApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -58,28 +79,16 @@ func ServiceCIDR(name string) *ServiceCIDRApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractServiceCIDR(serviceCIDR *networkingv1beta1.ServiceCIDR, fieldManager string) (*ServiceCIDRApplyConfiguration, error) {
-	return extractServiceCIDR(serviceCIDR, fieldManager, "")
+	return ExtractServiceCIDRFrom(serviceCIDR, fieldManager, "")
 }
 
-// ExtractServiceCIDRStatus is the same as ExtractServiceCIDR except
-// that it extracts the status subresource applied configuration.
+// ExtractServiceCIDRStatus extracts the applied configuration owned by fieldManager from
+// serviceCIDR for the status subresource.
 // Experimental!
 func ExtractServiceCIDRStatus(serviceCIDR *networkingv1beta1.ServiceCIDR, fieldManager string) (*ServiceCIDRApplyConfiguration, error) {
-	return extractServiceCIDR(serviceCIDR, fieldManager, "status")
+	return ExtractServiceCIDRFrom(serviceCIDR, fieldManager, "status")
 }
 
-func extractServiceCIDR(serviceCIDR *networkingv1beta1.ServiceCIDR, fieldManager string, subresource string) (*ServiceCIDRApplyConfiguration, error) {
-	b := &ServiceCIDRApplyConfiguration{}
-	err := managedfields.ExtractInto(serviceCIDR, internal.Parser().Type("io.k8s.api.networking.v1beta1.ServiceCIDR"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(serviceCIDR.Name)
-
-	b.WithKind("ServiceCIDR")
-	b.WithAPIVersion("networking.k8s.io/v1beta1")
-	return b, nil
-}
 func (b ServiceCIDRApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

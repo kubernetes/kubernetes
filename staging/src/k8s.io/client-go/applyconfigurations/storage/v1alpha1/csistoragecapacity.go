@@ -50,29 +50,15 @@ func CSIStorageCapacity(name, namespace string) *CSIStorageCapacityApplyConfigur
 	return b
 }
 
-// ExtractCSIStorageCapacity extracts the applied configuration owned by fieldManager from
-// cSIStorageCapacity. If no managedFields are found in cSIStorageCapacity for fieldManager, a
-// CSIStorageCapacityApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractCSIStorageCapacityFrom extracts the applied configuration owned by fieldManager from
+// cSIStorageCapacity for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // cSIStorageCapacity must be a unmodified CSIStorageCapacity API object that was retrieved from the Kubernetes API.
-// ExtractCSIStorageCapacity provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractCSIStorageCapacityFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCSIStorageCapacity(cSIStorageCapacity *storagev1alpha1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
-	return extractCSIStorageCapacity(cSIStorageCapacity, fieldManager, "")
-}
-
-// ExtractCSIStorageCapacityStatus is the same as ExtractCSIStorageCapacity except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractCSIStorageCapacityStatus(cSIStorageCapacity *storagev1alpha1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
-	return extractCSIStorageCapacity(cSIStorageCapacity, fieldManager, "status")
-}
-
-func extractCSIStorageCapacity(cSIStorageCapacity *storagev1alpha1.CSIStorageCapacity, fieldManager string, subresource string) (*CSIStorageCapacityApplyConfiguration, error) {
+func ExtractCSIStorageCapacityFrom(cSIStorageCapacity *storagev1alpha1.CSIStorageCapacity, fieldManager string, subresource string) (*CSIStorageCapacityApplyConfiguration, error) {
 	b := &CSIStorageCapacityApplyConfiguration{}
 	err := managedfields.ExtractInto(cSIStorageCapacity, internal.Parser().Type("io.k8s.api.storage.v1alpha1.CSIStorageCapacity"), fieldManager, b, subresource)
 	if err != nil {
@@ -85,6 +71,22 @@ func extractCSIStorageCapacity(cSIStorageCapacity *storagev1alpha1.CSIStorageCap
 	b.WithAPIVersion("storage.k8s.io/v1alpha1")
 	return b, nil
 }
+
+// ExtractCSIStorageCapacity extracts the applied configuration owned by fieldManager from
+// cSIStorageCapacity. If no managedFields are found in cSIStorageCapacity for fieldManager, a
+// CSIStorageCapacityApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// cSIStorageCapacity must be a unmodified CSIStorageCapacity API object that was retrieved from the Kubernetes API.
+// ExtractCSIStorageCapacity provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractCSIStorageCapacity(cSIStorageCapacity *storagev1alpha1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
+	return ExtractCSIStorageCapacityFrom(cSIStorageCapacity, fieldManager, "")
+}
+
 func (b CSIStorageCapacityApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

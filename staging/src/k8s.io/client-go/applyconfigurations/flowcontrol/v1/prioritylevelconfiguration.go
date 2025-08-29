@@ -46,6 +46,27 @@ func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyCon
 	return b
 }
 
+// ExtractPriorityLevelConfigurationFrom extracts the applied configuration owned by fieldManager from
+// priorityLevelConfiguration for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// priorityLevelConfiguration must be a unmodified PriorityLevelConfiguration API object that was retrieved from the Kubernetes API.
+// ExtractPriorityLevelConfigurationFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractPriorityLevelConfigurationFrom(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string, subresource string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+	b := &PriorityLevelConfigurationApplyConfiguration{}
+	err := managedfields.ExtractInto(priorityLevelConfiguration, internal.Parser().Type("io.k8s.api.flowcontrol.v1.PriorityLevelConfiguration"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(priorityLevelConfiguration.Name)
+
+	b.WithKind("PriorityLevelConfiguration")
+	b.WithAPIVersion("flowcontrol.apiserver.k8s.io/v1")
+	return b, nil
+}
+
 // ExtractPriorityLevelConfiguration extracts the applied configuration owned by fieldManager from
 // priorityLevelConfiguration. If no managedFields are found in priorityLevelConfiguration for fieldManager, a
 // PriorityLevelConfigurationApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -58,28 +79,16 @@ func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyCon
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
-	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "")
+	return ExtractPriorityLevelConfigurationFrom(priorityLevelConfiguration, fieldManager, "")
 }
 
-// ExtractPriorityLevelConfigurationStatus is the same as ExtractPriorityLevelConfiguration except
-// that it extracts the status subresource applied configuration.
+// ExtractPriorityLevelConfigurationStatus extracts the applied configuration owned by fieldManager from
+// priorityLevelConfiguration for the status subresource.
 // Experimental!
 func ExtractPriorityLevelConfigurationStatus(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
-	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "status")
+	return ExtractPriorityLevelConfigurationFrom(priorityLevelConfiguration, fieldManager, "status")
 }
 
-func extractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, fieldManager string, subresource string) (*PriorityLevelConfigurationApplyConfiguration, error) {
-	b := &PriorityLevelConfigurationApplyConfiguration{}
-	err := managedfields.ExtractInto(priorityLevelConfiguration, internal.Parser().Type("io.k8s.api.flowcontrol.v1.PriorityLevelConfiguration"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(priorityLevelConfiguration.Name)
-
-	b.WithKind("PriorityLevelConfiguration")
-	b.WithAPIVersion("flowcontrol.apiserver.k8s.io/v1")
-	return b, nil
-}
 func (b PriorityLevelConfigurationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
