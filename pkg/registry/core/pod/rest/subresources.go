@@ -235,7 +235,7 @@ func (r *PortForwardREST) ConnectMethods() []string {
 
 // Connect returns a handler for the pod portforward proxy
 func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	opTrace := utiltrace.New("PortForwardREST.Connect", Field{Key: "name", Value: name})
+	opTrace := utiltrace.New("PortForwardREST.Connect", utiltrace.Field{Key: "name", Value: name})
 	ctx = utiltrace.ContextWithTrace(ctx, opTrace)
 	defer opTrace.Log()
 
