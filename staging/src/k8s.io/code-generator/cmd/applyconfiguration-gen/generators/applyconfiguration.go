@@ -491,7 +491,6 @@ func (g *applyConfigurationGenerator) generateClientgenExtract(sw *generator.Sni
 // Extract$.ApplyConfig.Type|public$From provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func Extract$.ApplyConfig.Type|public$From($.Struct|private$ *$.Struct|raw$, fieldManager string, subresource string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
 	b := &$.ApplyConfig.ApplyConfiguration|public${}
 	err := $.ExtractInto|raw$($.Struct|private$, $.ParserFunc|raw$().Type("$.OpenAPIType$"), fieldManager, b, subresource)
@@ -521,7 +520,6 @@ func Extract$.ApplyConfig.Type|public$From($.Struct|private$ *$.Struct|raw$, fie
 // Extract$.ApplyConfig.Type|public$ provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func Extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldManager string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
 	return Extract$.ApplyConfig.Type|public$From($.Struct|private$, fieldManager, "")
 }
@@ -531,7 +529,6 @@ func Extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldMa
 		sw.Do(`
 // Extract$.ApplyConfig.Type|public$$.SubresourceName$ extracts the applied configuration owned by fieldManager from
 // $.Struct|private$ for the $.Subresource$ subresource.
-// Experimental!
 func Extract$.ApplyConfig.Type|public$$.SubresourceName$($.Struct|private$ *$.Struct|raw$, fieldManager string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
 	return Extract$.ApplyConfig.Type|public$From($.Struct|private$, fieldManager, "$.Subresource$")
 }
