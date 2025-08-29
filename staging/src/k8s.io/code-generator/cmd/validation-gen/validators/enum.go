@@ -107,7 +107,6 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 			switch tag.Name {
 			case enumExcludeTagName:
 				isExcluded = true
-				break
 			case ifEnabledTag, ifDisabledTag:
 				if tag.ValueTag != nil && tag.ValueTag.Name == enumExcludeTagName {
 					if option, ok := tag.PositionalArg(); ok {
