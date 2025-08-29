@@ -67,3 +67,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/code-generator => ../code-generator
 )
+
+tool k8s.io/code-generator
