@@ -82,6 +82,10 @@ github.com/containerd/errdefs/pkg/internal/types
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
+# github.com/containerd/stargz-snapshotter/estargz v0.16.3
+## go 1.22.0
+github.com/containerd/stargz-snapshotter/estargz
+github.com/containerd/stargz-snapshotter/estargz/errorutil
 # github.com/containerd/ttrpc v1.2.7
 ## explicit; go 1.19
 github.com/containerd/ttrpc
@@ -163,8 +167,6 @@ github.com/fxamacker/cbor/v2
 # github.com/go-errors/errors v1.4.2
 ## explicit; go 1.14
 github.com/go-errors/errors
-# github.com/go-logr/logr v1.4.3
-## explicit; go 1.18
 # github.com/go-logr/logr v1.4.3
 ## explicit; go 1.18
 github.com/go-logr/logr
@@ -833,7 +835,7 @@ go.yaml.in/yaml/v3
 # golang.org/x/crypto v0.38.0
 ## explicit; go 1.23.0
 # golang.org/x/crypto v0.39.0
-## explicit; go 1.23.0
+## go 1.23.0
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
@@ -856,14 +858,14 @@ golang.org/x/exp/slices
 # golang.org/x/mod v0.21.0
 ## explicit; go 1.23.0
 # golang.org/x/mod v0.25.0
-## explicit; go 1.23.0
+## go 1.23.0
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
 # golang.org/x/net v0.40.0
 ## explicit; go 1.23.0
 # golang.org/x/net v0.41.0
-## explicit; go 1.23.0
+## go 1.23.0
 golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
@@ -880,18 +882,14 @@ golang.org/x/net/trace
 golang.org/x/net/websocket
 # golang.org/x/oauth2 v0.30.0
 ## explicit; go 1.23.0
-# golang.org/x/oauth2 v0.30.0
-## explicit; go 1.23.0
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
 # golang.org/x/sync v0.14.0
 ## explicit; go 1.23.0
 # golang.org/x/sync v0.15.0
-## explicit; go 1.23.0
+## go 1.23.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.33.0
-## explicit; go 1.23.0
 # golang.org/x/sys v0.33.0
 ## explicit; go 1.23.0
 golang.org/x/sys/cpu
@@ -903,13 +901,11 @@ golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/mgr
 # golang.org/x/term v0.32.0
 ## explicit; go 1.23.0
-# golang.org/x/term v0.32.0
-## explicit; go 1.23.0
 golang.org/x/term
 # golang.org/x/text v0.25.0
 ## explicit; go 1.23.0
 # golang.org/x/text v0.26.0
-## explicit; go 1.23.0
+## go 1.23.0
 golang.org/x/text/cases
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -945,7 +941,7 @@ golang.org/x/time/rate
 # golang.org/x/tools v0.26.0
 ## explicit; go 1.23.0
 # golang.org/x/tools v0.34.0
-## explicit; go 1.23.0
+## go 1.23.0
 golang.org/x/tools/benchmark/parse
 golang.org/x/tools/container/intsets
 golang.org/x/tools/cover

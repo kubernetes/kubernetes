@@ -76,10 +76,8 @@ func (g *Group) Wait() error {
 }
 
 // Go calls the given function in a new goroutine.
-// The first call to Go must happen before a Wait.
-// It blocks until the new goroutine can be added without the number of
-// active goroutines in the group exceeding the configured limit.
 //
+// The first call to Go must happen before a Wait.
 // It blocks until the new goroutine can be added without the number of
 // goroutines in the group exceeding the configured limit.
 //
@@ -185,8 +183,9 @@ type PanicError struct {
 }
 
 func (p PanicError) Error() string {
-	// A Go Error method conventionally does not include a stack dump, so omit it
-	// here. (Callers who care can extract it from the Stack field.)
+	if len(p.Stack) > 0 {
+		return fmt.Sprintf("recovered from errgroup.Group: %v\n%s", p.Recovered, p.Stack)
+	}
 	return fmt.Sprintf("recovered from errgroup.Group: %v", p.Recovered)
 }
 
