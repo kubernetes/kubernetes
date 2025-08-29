@@ -192,6 +192,75 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 	return nil
 }
 
+// RewriteKubeletArgsToFile removes unwanted kubelet flags from the existing KubeletEnvFile file,
+// but first creates a backup of the existing file.
+func RewriteKubeletArgsToFile(kubeletEnvDir string, dryRun bool, out io.Writer) error {
+	var (
+		err        error
+		kubeletDir = kubeadmconstants.KubeletRunDirectory
+	)
+	// If dry-running, this will return a directory under /etc/kubernetes/tmp or kubeletEnvDir.
+	if dryRun {
+		kubeletDir, err = kubeadmconstants.CreateTempDir(kubeletEnvDir, "kubeadm-upgrade-dryrun")
+	}
+	if err != nil {
+		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
+		return err
+	}
+	// Create a copy of the KubeletEnvFile in the /etc/kubernetes/tmp or kubeletEnvDir.
+	backupDir, err := kubeadmconstants.CreateTempDir(kubeletEnvDir, "kubeadm-kubelet-env")
+	if err != nil {
+		return err
+	}
+	klog.Warningf("Using temporary directory %s for kubelet env file. To override it set the environment variable %s",
+		backupDir, kubeadmconstants.EnvVarUpgradeDryRunDir)
+
+	src := filepath.Join(kubeletDir, kubeadmconstants.KubeletEnvFileName)
+	dest := filepath.Join(backupDir, kubeadmconstants.KubeletEnvFileName)
+
+	if !dryRun {
+		fmt.Printf("[upgrade] Backing up kubelet env file to %s\n", dest)
+		err := kubeadmutil.CopyFile(src, dest)
+		if err != nil {
+			return errors.Wrap(err, "error backing up the kubelet env file")
+		}
+	} else {
+		fmt.Printf("[dryrun] Would back up kubelet env file to %s\n", dest)
+	}
+
+	unwantedFlags := sets.New(
+		// The flag has been deprecated and no longer served a purpose in the kubelet as the logic was migrated to CRI.
+		// TODO: Remove it from this list in 1.36.
+		"pod-infra-container-image",
+	)
+	var kubeletFlags []kubeadmapi.Arg
+	command, err := kubeletphase.ReadKubeletDynamicEnvFile(src)
+	if err != nil {
+		return errors.Wrap(err, "error reading kubelet env file")
+	}
+	args := kubeadmutil.ArgumentsFromCommand(command)
+	for _, arg := range args {
+		if unwantedFlags.Has(arg.Name) {
+			continue
+		}
+		kubeletFlags = append(kubeletFlags, arg)
+	}
+	// Rewrite env file if needed
+	if len(args) != len(kubeletFlags) {
+		if err := kubeletphase.WriteKubeletArgsToFile(kubeletFlags, nil, kubeletDir); err != nil {
+			return errors.Wrap(err, "error writing kubelet env file")
+		}
+	}
+
+	if dryRun { // Print what contents would be written
+		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletEnvFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		if err != nil {
+			return errors.Wrap(err, "error printing kubelet configuration file on dryrun")
+		}
+	}
+	return nil
+}
+
 // UpdateKubeletKubeconfigServer changes the Server URL in the kubelets kubeconfig if necessary depending on the
 // ControlPlaneKubeletLocalMode feature gate.
 // TODO: remove this function once ControlPlaneKubeletLocalMode goes GA and is hardcoded to be enabled by default:
