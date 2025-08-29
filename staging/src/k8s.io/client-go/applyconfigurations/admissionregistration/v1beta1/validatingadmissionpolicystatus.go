@@ -24,10 +24,16 @@ import (
 
 // ValidatingAdmissionPolicyStatusApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicyStatus type for use
 // with apply.
+//
+// ValidatingAdmissionPolicyStatus represents the status of an admission validation policy.
 type ValidatingAdmissionPolicyStatusApplyConfiguration struct {
-	ObservedGeneration *int64                           `json:"observedGeneration,omitempty"`
-	TypeChecking       *TypeCheckingApplyConfiguration  `json:"typeChecking,omitempty"`
-	Conditions         []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	// The generation observed by the controller.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// The results of type checking for each expression.
+	// Presence of this field indicates the completion of the type checking.
+	TypeChecking *TypeCheckingApplyConfiguration `json:"typeChecking,omitempty"`
+	// The conditions represent the latest available observations of a policy's current state.
+	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // ValidatingAdmissionPolicyStatusApplyConfiguration constructs a declarative configuration of the ValidatingAdmissionPolicyStatus type for use with

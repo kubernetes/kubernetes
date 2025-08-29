@@ -29,13 +29,32 @@ import (
 
 // SecretApplyConfiguration represents a declarative configuration of the Secret type for use
 // with apply.
+//
+// Secret holds secret data of a certain type. The total bytes of the values in
+// the Data field must be less than MaxSecretSize bytes.
 type SecretApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Immutable                            *bool              `json:"immutable,omitempty"`
-	Data                                 map[string][]byte  `json:"data,omitempty"`
-	StringData                           map[string]string  `json:"stringData,omitempty"`
-	Type                                 *corev1.SecretType `json:"type,omitempty"`
+	// Immutable, if set to true, ensures that data stored in the Secret cannot
+	// be updated (only object metadata can be modified).
+	// If not set to true, the field can be modified at any time.
+	// Defaulted to nil.
+	Immutable *bool `json:"immutable,omitempty"`
+	// Data contains the secret data. Each key must consist of alphanumeric
+	// characters, '-', '_' or '.'. The serialized form of the secret data is a
+	// base64 encoded string, representing the arbitrary (possibly non-string)
+	// data value here. Described in https://tools.ietf.org/html/rfc4648#section-4
+	Data map[string][]byte `json:"data,omitempty"`
+	// stringData allows specifying non-binary secret data in string form.
+	// It is provided as a write-only input field for convenience.
+	// All keys and values are merged into the data field on write, overwriting any existing values.
+	// The stringData field is never output when reading from the API.
+	StringData map[string]string `json:"stringData,omitempty"`
+	// Used to facilitate programmatic handling of secret data.
+	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
+	Type *corev1.SecretType `json:"type,omitempty"`
 }
 
 // Secret constructs a declarative configuration of the Secret type for use with
@@ -56,7 +75,6 @@ func Secret(name, namespace string) *SecretApplyConfiguration {
 // ExtractSecretFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractSecretFrom(secret *corev1.Secret, fieldManager string, subresource string) (*SecretApplyConfiguration, error) {
 	b := &SecretApplyConfiguration{}
 	err := managedfields.ExtractInto(secret, internal.Parser().Type("io.k8s.api.core.v1.Secret"), fieldManager, b, subresource)
@@ -81,7 +99,6 @@ func ExtractSecretFrom(secret *corev1.Secret, fieldManager string, subresource s
 // ExtractSecret provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractSecret(secret *corev1.Secret, fieldManager string) (*SecretApplyConfiguration, error) {
 	return ExtractSecretFrom(secret, fieldManager, "")
 }

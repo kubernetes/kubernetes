@@ -29,11 +29,17 @@ import (
 
 // CertificateSigningRequestApplyConfiguration represents a declarative configuration of the CertificateSigningRequest type for use
 // with apply.
+//
+// Describes a certificate signing request
 type CertificateSigningRequestApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *CertificateSigningRequestSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *CertificateSigningRequestStatusApplyConfiguration `json:"status,omitempty"`
+	// spec contains the certificate request, and is immutable after creation.
+	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
+	// Other fields are derived by Kubernetes and cannot be modified by users.
+	Spec *CertificateSigningRequestSpecApplyConfiguration `json:"spec,omitempty"`
+	// Derived information about the request.
+	Status *CertificateSigningRequestStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // CertificateSigningRequest constructs a declarative configuration of the CertificateSigningRequest type for use with
@@ -53,7 +59,6 @@ func CertificateSigningRequest(name string) *CertificateSigningRequestApplyConfi
 // ExtractCertificateSigningRequestFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractCertificateSigningRequestFrom(certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, fieldManager string, subresource string) (*CertificateSigningRequestApplyConfiguration, error) {
 	b := &CertificateSigningRequestApplyConfiguration{}
 	err := managedfields.ExtractInto(certificateSigningRequest, internal.Parser().Type("io.k8s.api.certificates.v1beta1.CertificateSigningRequest"), fieldManager, b, subresource)
@@ -77,14 +82,12 @@ func ExtractCertificateSigningRequestFrom(certificateSigningRequest *certificate
 // ExtractCertificateSigningRequest provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractCertificateSigningRequest(certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
 	return ExtractCertificateSigningRequestFrom(certificateSigningRequest, fieldManager, "")
 }
 
 // ExtractCertificateSigningRequestStatus extracts the applied configuration owned by fieldManager from
 // certificateSigningRequest for the status subresource.
-// Experimental!
 func ExtractCertificateSigningRequestStatus(certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
 	return ExtractCertificateSigningRequestFrom(certificateSigningRequest, fieldManager, "status")
 }

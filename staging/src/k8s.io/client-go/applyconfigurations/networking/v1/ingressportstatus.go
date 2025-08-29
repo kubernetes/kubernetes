@@ -24,10 +24,23 @@ import (
 
 // IngressPortStatusApplyConfiguration represents a declarative configuration of the IngressPortStatus type for use
 // with apply.
+//
+// IngressPortStatus represents the error condition of a service port
 type IngressPortStatusApplyConfiguration struct {
-	Port     *int32           `json:"port,omitempty"`
+	// port is the port number of the ingress port.
+	Port *int32 `json:"port,omitempty"`
+	// protocol is the protocol of the ingress port.
+	// The supported values are: "TCP", "UDP", "SCTP"
 	Protocol *corev1.Protocol `json:"protocol,omitempty"`
-	Error    *string          `json:"error,omitempty"`
+	// error is to record the problem with the service port
+	// The format of the error shall comply with the following rules:
+	// - built-in error values shall be specified in this file and those shall use
+	// CamelCase names
+	// - cloud provider specific error values must have names that comply with the
+	// format foo.example.com/CamelCase.
+	// ---
+	// The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+	Error *string `json:"error,omitempty"`
 }
 
 // IngressPortStatusApplyConfiguration constructs a declarative configuration of the IngressPortStatus type for use with

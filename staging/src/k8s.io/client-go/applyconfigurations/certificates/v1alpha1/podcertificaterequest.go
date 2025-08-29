@@ -29,11 +29,19 @@ import (
 
 // PodCertificateRequestApplyConfiguration represents a declarative configuration of the PodCertificateRequest type for use
 // with apply.
+//
+// PodCertificateRequest encodes a pod requesting a certificate from a given
+// signer.
+//
+// Kubelets use this API to implement podCertificate projected volumes
 type PodCertificateRequestApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata contains the object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PodCertificateRequestSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *PodCertificateRequestStatusApplyConfiguration `json:"status,omitempty"`
+	// spec contains the details about the certificate being requested.
+	Spec *PodCertificateRequestSpecApplyConfiguration `json:"spec,omitempty"`
+	// status contains the issued certificate, and a standard set of conditions.
+	Status *PodCertificateRequestStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PodCertificateRequest constructs a declarative configuration of the PodCertificateRequest type for use with
@@ -54,7 +62,6 @@ func PodCertificateRequest(name, namespace string) *PodCertificateRequestApplyCo
 // ExtractPodCertificateRequestFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPodCertificateRequestFrom(podCertificateRequest *certificatesv1alpha1.PodCertificateRequest, fieldManager string, subresource string) (*PodCertificateRequestApplyConfiguration, error) {
 	b := &PodCertificateRequestApplyConfiguration{}
 	err := managedfields.ExtractInto(podCertificateRequest, internal.Parser().Type("io.k8s.api.certificates.v1alpha1.PodCertificateRequest"), fieldManager, b, subresource)
@@ -79,14 +86,12 @@ func ExtractPodCertificateRequestFrom(podCertificateRequest *certificatesv1alpha
 // ExtractPodCertificateRequest provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPodCertificateRequest(podCertificateRequest *certificatesv1alpha1.PodCertificateRequest, fieldManager string) (*PodCertificateRequestApplyConfiguration, error) {
 	return ExtractPodCertificateRequestFrom(podCertificateRequest, fieldManager, "")
 }
 
 // ExtractPodCertificateRequestStatus extracts the applied configuration owned by fieldManager from
 // podCertificateRequest for the status subresource.
-// Experimental!
 func ExtractPodCertificateRequestStatus(podCertificateRequest *certificatesv1alpha1.PodCertificateRequest, fieldManager string) (*PodCertificateRequestApplyConfiguration, error) {
 	return ExtractPodCertificateRequestFrom(podCertificateRequest, fieldManager, "status")
 }

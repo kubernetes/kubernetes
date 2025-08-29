@@ -29,10 +29,16 @@ import (
 
 // ComponentStatusApplyConfiguration represents a declarative configuration of the ComponentStatus type for use
 // with apply.
+//
+// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
+// Deprecated: This API is deprecated in v1.19+
 type ComponentStatusApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Conditions                           []ComponentConditionApplyConfiguration `json:"conditions,omitempty"`
+	// List of component conditions observed
+	Conditions []ComponentConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // ComponentStatus constructs a declarative configuration of the ComponentStatus type for use with
@@ -52,7 +58,6 @@ func ComponentStatus(name string) *ComponentStatusApplyConfiguration {
 // ExtractComponentStatusFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractComponentStatusFrom(componentStatus *corev1.ComponentStatus, fieldManager string, subresource string) (*ComponentStatusApplyConfiguration, error) {
 	b := &ComponentStatusApplyConfiguration{}
 	err := managedfields.ExtractInto(componentStatus, internal.Parser().Type("io.k8s.api.core.v1.ComponentStatus"), fieldManager, b, subresource)
@@ -76,7 +81,6 @@ func ExtractComponentStatusFrom(componentStatus *corev1.ComponentStatus, fieldMa
 // ExtractComponentStatus provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractComponentStatus(componentStatus *corev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
 	return ExtractComponentStatusFrom(componentStatus, fieldManager, "")
 }

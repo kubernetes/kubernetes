@@ -29,11 +29,18 @@ import (
 
 // DeploymentApplyConfiguration represents a declarative configuration of the Deployment type for use
 // with apply.
+//
+// DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
+// more information.
+// Deployment enables declarative updates for Pods and ReplicaSets.
 type DeploymentApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *DeploymentSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the Deployment.
+	Spec *DeploymentSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the Deployment.
+	Status *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Deployment constructs a declarative configuration of the Deployment type for use with
@@ -54,7 +61,6 @@ func Deployment(name, namespace string) *DeploymentApplyConfiguration {
 // ExtractDeploymentFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractDeploymentFrom(deployment *appsv1beta1.Deployment, fieldManager string, subresource string) (*DeploymentApplyConfiguration, error) {
 	b := &DeploymentApplyConfiguration{}
 	err := managedfields.ExtractInto(deployment, internal.Parser().Type("io.k8s.api.apps.v1beta1.Deployment"), fieldManager, b, subresource)
@@ -79,14 +85,12 @@ func ExtractDeploymentFrom(deployment *appsv1beta1.Deployment, fieldManager stri
 // ExtractDeployment provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractDeployment(deployment *appsv1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
 	return ExtractDeploymentFrom(deployment, fieldManager, "")
 }
 
 // ExtractDeploymentStatus extracts the applied configuration owned by fieldManager from
 // deployment for the status subresource.
-// Experimental!
 func ExtractDeploymentStatus(deployment *appsv1beta1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
 	return ExtractDeploymentFrom(deployment, fieldManager, "status")
 }

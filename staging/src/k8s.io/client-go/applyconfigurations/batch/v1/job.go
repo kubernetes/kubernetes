@@ -29,11 +29,19 @@ import (
 
 // JobApplyConfiguration represents a declarative configuration of the Job type for use
 // with apply.
+//
+// Job represents the configuration of a single job.
 type JobApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *JobSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *JobStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of a job.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *JobSpecApplyConfiguration `json:"spec,omitempty"`
+	// Current status of a job.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *JobStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Job constructs a declarative configuration of the Job type for use with
@@ -54,7 +62,6 @@ func Job(name, namespace string) *JobApplyConfiguration {
 // ExtractJobFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractJobFrom(job *batchv1.Job, fieldManager string, subresource string) (*JobApplyConfiguration, error) {
 	b := &JobApplyConfiguration{}
 	err := managedfields.ExtractInto(job, internal.Parser().Type("io.k8s.api.batch.v1.Job"), fieldManager, b, subresource)
@@ -79,14 +86,12 @@ func ExtractJobFrom(job *batchv1.Job, fieldManager string, subresource string) (
 // ExtractJob provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractJob(job *batchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
 	return ExtractJobFrom(job, fieldManager, "")
 }
 
 // ExtractJobStatus extracts the applied configuration owned by fieldManager from
 // job for the status subresource.
-// Experimental!
 func ExtractJobStatus(job *batchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
 	return ExtractJobFrom(job, fieldManager, "status")
 }

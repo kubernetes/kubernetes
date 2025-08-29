@@ -25,10 +25,20 @@ import (
 
 // AllocationResultApplyConfiguration represents a declarative configuration of the AllocationResult type for use
 // with apply.
+//
+// AllocationResult contains attributes of an allocated resource.
 type AllocationResultApplyConfiguration struct {
-	Devices             *DeviceAllocationResultApplyConfiguration `json:"devices,omitempty"`
-	NodeSelector        *corev1.NodeSelectorApplyConfiguration    `json:"nodeSelector,omitempty"`
-	AllocationTimestamp *metav1.Time                              `json:"allocationTimestamp,omitempty"`
+	// Devices is the result of allocating devices.
+	Devices *DeviceAllocationResultApplyConfiguration `json:"devices,omitempty"`
+	// NodeSelector defines where the allocated resources are available. If
+	// unset, they are available everywhere.
+	NodeSelector *corev1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
+	// AllocationTimestamp stores the time when the resources were allocated.
+	// This field is not guaranteed to be set, in which case that time is unknown.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gate.
+	AllocationTimestamp *metav1.Time `json:"allocationTimestamp,omitempty"`
 }
 
 // AllocationResultApplyConfiguration constructs a declarative configuration of the AllocationResult type for use with
