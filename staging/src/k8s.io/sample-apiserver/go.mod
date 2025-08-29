@@ -119,3 +119,5 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/kms => ../kms
 )
+
+tool k8s.io/code-generator
