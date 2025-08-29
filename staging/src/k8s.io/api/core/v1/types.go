@@ -5681,6 +5681,8 @@ const (
 // ServiceInternalTrafficPolicy describes how nodes distribute service traffic they
 // receive on the ClusterIP.
 // +enum
+//
+// Deprecated: use ServiceInternalTrafficPolicy instead.
 type ServiceInternalTrafficPolicyType = ServiceInternalTrafficPolicy
 
 // ServiceExternalTrafficPolicy describes how nodes distribute service traffic they
@@ -5703,6 +5705,8 @@ const (
 // receive on one of the Service's "externally-facing" addresses (NodePorts, ExternalIPs,
 // and LoadBalancer IPs.
 // +enum
+//
+// Deprecated: use ServiceExternalTrafficPolicy instead.
 type ServiceExternalTrafficPolicyType = ServiceExternalTrafficPolicy
 
 const (
@@ -5838,6 +5842,8 @@ const (
 
 // IPFamilyPolicy represents the dual-stack-ness requested or required by a Service
 // +enum
+//
+// Deprecated: use IPFamilyPolicy instead.
 type IPFamilyPolicyType = IPFamilyPolicy
 
 // ServiceSpec describes the attributes that a user creates on a service.
