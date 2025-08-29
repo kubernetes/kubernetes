@@ -73,7 +73,7 @@ var exclusionsForConditionalEnum = []validate.EnumExclusion[ConditionalEnum]{
 	{
 		Value: ConditionalF, Option: "FeatureD", ExcludeWhen: true},
 }
-var symbolsForConditionalEnum = sets.New[ConditionalEnum](ConditionalA, ConditionalB, ConditionalC, ConditionalD, ConditionalE, ConditionalF)
+var symbolsForConditionalEnum = sets.New(ConditionalA, ConditionalB, ConditionalC, ConditionalD, ConditionalE, ConditionalF)
 
 func Validate_ConditionalEnum(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ConditionalEnum) (errs field.ErrorList) {
 	// type ConditionalEnum
@@ -117,7 +117,7 @@ func Validate_Enum0(ctx context.Context, op operation.Operation, fldPath *field.
 	return errs
 }
 
-var symbolsForEnum1 = sets.New[Enum1](E1V1)
+var symbolsForEnum1 = sets.New(E1V1)
 
 func Validate_Enum1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Enum1) (errs field.ErrorList) {
 	// type Enum1
@@ -129,7 +129,7 @@ func Validate_Enum1(ctx context.Context, op operation.Operation, fldPath *field.
 	return errs
 }
 
-var symbolsForEnum2 = sets.New[Enum2](E2V1, E2V2)
+var symbolsForEnum2 = sets.New(E2V1, E2V2)
 
 func Validate_Enum2(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Enum2) (errs field.ErrorList) {
 	// type Enum2
@@ -141,7 +141,7 @@ func Validate_Enum2(ctx context.Context, op operation.Operation, fldPath *field.
 	return errs
 }
 
-var symbolsForEnumWithExclude = sets.New[EnumWithExclude](EnumWithExclude1)
+var symbolsForEnumWithExclude = sets.New(EnumWithExclude1)
 
 func Validate_EnumWithExclude(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *EnumWithExclude) (errs field.ErrorList) {
 	// type EnumWithExclude

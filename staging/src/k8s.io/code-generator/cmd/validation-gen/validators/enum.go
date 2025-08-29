@@ -169,7 +169,11 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 			})
 		}
 	}
-	result.AddVariable(Variable(symbolsVarName, Function("setsNew", DefaultFlags, setsNew, allValues...).WithTypeArgs(enum.Name)))
+	initFn := Function("setsNew", DefaultFlags, setsNew, allValues...)
+	if len(allValues) == 0 {
+		initFn = initFn.WithTypeArgs(enum.Name)
+	}
+	result.AddVariable(Variable(symbolsVarName, initFn))
 	var exclusions any = Literal("nil")
 	if len(exclusionRules) > 0 {
 		exclusionsVar := PrivateVar{Name: "ExclusionsFor" + context.Type.Name.Name, Package: "local"}
