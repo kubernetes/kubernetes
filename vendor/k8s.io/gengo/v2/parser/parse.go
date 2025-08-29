@@ -23,7 +23,10 @@ import (
 	"go/constant"
 	"go/token"
 	gotypes "go/types"
+	"maps"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -385,8 +388,63 @@ func (p *Parser) NewUniverse() (types.Universe, error) {
 // addCommentsToType takes any accumulated comment lines prior to obj and
 // attaches them to the type t.
 func (p *Parser) addCommentsToType(obj gotypes.Object, t *types.Type) {
-	t.CommentLines = p.docComment(obj.Pos())
-	t.SecondClosestCommentLines = p.priorDetachedComment(obj.Pos())
+	if newLines, oldLines := p.docComment(obj.Pos()), t.CommentLines; len(newLines) > 0 {
+		switch {
+		case len(oldLines) == 0, reflect.DeepEqual(oldLines, newLines):
+			// no comments associated, or comments match exactly
+			t.CommentLines = newLines
+
+		case isTypeAlias(obj.Type()):
+			// ignore mismatched comments from obj because it's an alias
+			klog.Warningf(
+				"Mismatched comments seen for type %v. Using comments:\n%s\nIgnoring comments from type alias:\n%s\n",
+				t.GoType,
+				formatCommentBlock(oldLines),
+				formatCommentBlock(newLines),
+			)
+
+		case !isTypeAlias(obj.Type()):
+			// overwrite existing comments with ones from obj because obj is not an alias
+			t.CommentLines = newLines
+			klog.Warningf(
+				"Mismatched comments seen for type %v. Using comments:\n%s\nIgnoring comments from type alias:\n%s\n",
+				t.GoType,
+				formatCommentBlock(newLines),
+				formatCommentBlock(oldLines),
+			)
+		}
+	}
+
+	if newLines, oldLines := p.priorDetachedComment(obj.Pos()), t.SecondClosestCommentLines; len(newLines) > 0 {
+		switch {
+		case len(oldLines) == 0, reflect.DeepEqual(oldLines, newLines):
+			// no comments associated, or comments match exactly
+			t.SecondClosestCommentLines = newLines
+
+		case isTypeAlias(obj.Type()):
+			// ignore mismatched comments from obj because it's an alias
+			klog.Warningf(
+				"Mismatched secondClosestCommentLines seen for type %v. Using comments:\n%s\nIgnoring comments from type alias:\n%s\n",
+				t.GoType,
+				formatCommentBlock(oldLines),
+				formatCommentBlock(newLines),
+			)
+
+		case !isTypeAlias(obj.Type()):
+			// overwrite existing comments with ones from obj because obj is not an alias
+			t.SecondClosestCommentLines = newLines
+			klog.Warningf(
+				"Mismatched secondClosestCommentLines seen for type %v. Using comments:\n%s\nIgnoring comments from type alias:\n%s\n",
+				t.GoType,
+				formatCommentBlock(newLines),
+				formatCommentBlock(oldLines),
+			)
+		}
+	}
+}
+
+func formatCommentBlock(lines []string) string {
+	return "```\n" + strings.Join(lines, "\n") + "\n```"
 }
 
 // packageDir tries to figure out the directory of the specified package.
@@ -510,7 +568,9 @@ func (p *Parser) addPkgToUniverse(pkg *packages.Package, u *types.Universe) erro
 
 	// Add all of this package's imports.
 	importedPkgs := []string{}
-	for _, imp := range pkg.Imports {
+	// Iterate imports in a predictable order
+	for _, key := range slices.Sorted(maps.Keys(pkg.Imports)) {
+		imp := pkg.Imports[key]
 		if err := p.addPkgToUniverse(imp, u); err != nil {
 			return err
 		}
@@ -557,7 +617,11 @@ func (p *Parser) priorCommentLines(pos token.Pos, lines int) *ast.CommentGroup {
 }
 
 func splitLines(str string) []string {
-	return strings.Split(strings.TrimRight(str, "\n"), "\n")
+	lines := strings.Split(strings.TrimRight(str, "\n"), "\n")
+	if len(lines) == 1 && lines[0] == "" {
+		return nil
+	}
+	return lines
 }
 
 func goFuncNameToName(in string) types.Name {
