@@ -319,13 +319,13 @@ func compGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cm
 	streams := genericiooptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
 	o := apiresources.NewAPIResourceOptions(streams)
 
-	o.Complete(restClientGetter, cmd, nil)
-
 	// Get the list of resources
 	o.PrintFlags.OutputFormat = ptr.To("name")
 	o.Cached = true
 	o.Verbs = []string{"get"}
 	// TODO:Should set --request-timeout=5s
+
+	o.Complete(restClientGetter, cmd, nil)
 
 	// Ignore errors as the output may still be valid
 	o.RunAPIResources()
