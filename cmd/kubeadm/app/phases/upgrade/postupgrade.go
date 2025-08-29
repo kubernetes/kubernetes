@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -175,6 +176,63 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletDir strin
 		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
 		if err != nil {
 			return errors.Wrap(err, "error printing kubelet configuration file on dryrun")
+		}
+	}
+	return nil
+}
+
+// RemoveKubeletArgsFromFile removes unwanted kubelet flags from the existing KubeletEnvFile file,
+// but first creates a backup of the existing file.
+func RemoveKubeletArgsFromFile(kubeletDir string, kubeConfigDir string, unwantedFlags []string, dryRun bool, out io.Writer) error {
+	// If there are no unwanted flags, do nothing.
+	if len(unwantedFlags) == 0 {
+		return nil
+	}
+
+	// Create a copy of the KubeletEnvFile in the /etc/kubernetes/tmp or kubeConfigDir.
+	backupDir, err := kubeadmconstants.CreateTempDir(kubeConfigDir, "kubeadm-kubelet-env")
+	if err != nil {
+		return err
+	}
+	klog.Warningf("Using temporary directory %s for kubelet env file. To override it set the environment variable %s",
+		backupDir, kubeadmconstants.EnvVarUpgradeDryRunDir)
+
+	src := filepath.Join(kubeletDir, kubeadmconstants.KubeletEnvFileName)
+	dest := filepath.Join(backupDir, kubeadmconstants.KubeletEnvFileName)
+
+	if !dryRun {
+		_, _ = fmt.Fprintf(out, "[upgrade] Backing up kubelet env file to %s\n", dest)
+		err := kubeadmutil.CopyFile(src, dest)
+		if err != nil {
+			return errors.Wrap(err, "error backing up the kubelet env file")
+		}
+	} else {
+		_, _ = fmt.Fprintf(out, "[dryrun] Would back up kubelet env file to %s\n", dest)
+	}
+
+	var kubeletFlags []kubeadmapi.Arg
+	command, err := kubeletphase.ReadKubeletDynamicEnvFile(src)
+	if err != nil {
+		return errors.Wrap(err, "error reading kubelet env file")
+	}
+	args := kubeadmutil.ArgumentsFromCommand(command)
+	for _, arg := range args {
+		if slices.Contains(unwantedFlags, arg.Name) {
+			continue
+		}
+		kubeletFlags = append(kubeletFlags, arg)
+	}
+	// Rewrite env file if needed
+	if len(args) != len(kubeletFlags) {
+		if err := kubeletphase.WriteKubeletArgsToFile(kubeletFlags, nil, kubeletDir); err != nil {
+			return errors.Wrap(err, "error writing kubelet env file")
+		}
+	}
+
+	if dryRun { // Print what contents would be written
+		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletEnvFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
+		if err != nil {
+			return errors.Wrap(err, "error printing kubelet env file on dryrun")
 		}
 	}
 	return nil
