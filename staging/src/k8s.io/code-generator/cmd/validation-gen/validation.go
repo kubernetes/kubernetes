@@ -391,7 +391,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		if fldPath.String() != t.String() {
 			panic(fmt.Sprintf("path for type != the type name: %s, %s", t.String(), fldPath.String()))
 		}
-		consts, _ := td.constantsByType[t]
+		consts := td.constantsByType[t]
 		context := validators.Context{
 			Scope:      validators.ScopeType,
 			Type:       t,
@@ -1240,25 +1240,25 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 			"field":    mkSymbolArgs(c, fieldPkgSymbols),
 		}
 
-			emitCall := func() {
-				sw.Do("$.funcName|raw$", targs)
-				if typeArgs := v.TypeArgs; len(typeArgs) > 0 {
-					sw.Do("[", nil)
-					for i, typeArg := range typeArgs {
-						sw.Do("$.|raw$", c.Universe.Type(typeArg))
-						if i < len(typeArgs)-1 {
-							sw.Do(",", nil)
-						}
+		emitCall := func() {
+			sw.Do("$.funcName|raw$", targs)
+			if typeArgs := v.TypeArgs; len(typeArgs) > 0 {
+				sw.Do("[", nil)
+				for i, typeArg := range typeArgs {
+					sw.Do("$.|raw$", c.Universe.Type(typeArg))
+					if i < len(typeArgs)-1 {
+						sw.Do(",", nil)
 					}
-					sw.Do("]", nil)
 				}
-				sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
-				for _, arg := range v.Args {
-					sw.Do(", ", nil)
-					toGolangSourceDataLiteral(sw, emitterContext{Context: c}, arg)
-				}
-				sw.Do(")", targs)
+				sw.Do("]", nil)
 			}
+			sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
+			for _, arg := range v.Args {
+				sw.Do(", ", nil)
+				toGolangSourceDataLiteral(sw, emitterContext{Context: c}, arg)
+			}
+			sw.Do(")", targs)
+		}
 
 		// If validation is conditional, wrap the validation function with a conditions check.
 		if !v.Conditions.Empty() {
