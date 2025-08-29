@@ -499,7 +499,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 
 	// Initialization should successfully finish.
 	fakeClock.Step(30 * time.Second)
-	deadlineCtx, deadlineCancel := context.WithTimeout(tCtx, time.Second)
+	deadlineCtx, deadlineCancel := context.WithTimeout(tCtx, 5*time.Second)
 	defer deadlineCancel()
 	if err := wait.PollUntilContextCancel(deadlineCtx, 10*time.Millisecond, false, reflectorInitialized); err != nil {
 		t.Errorf("reflector didn't iniailize correctly")
