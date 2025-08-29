@@ -937,7 +937,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		ginkgo.It("should not add health status to Pod when feature gate is disabled", func(ctx context.Context) {
 
 			ginkgo.By("Starting a test driver")
-			newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName, withHealthService(false))
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName, withHealthService(false))
 
 			className := "gate-disabled-class"
 			claimName := "gate-disabled-claim"
@@ -966,6 +966,10 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 				}
 				return fmt.Errorf("could not find container 'testcontainer' in pod status")
 			}).WithContext(ctx).WithTimeout(30*time.Second).WithPolling(2*time.Second).Should(gomega.Succeed(), "The allocatedResourcesStatus field should be absent when the feature gate is disabled")
+			// Clean up and wait for the system to settle before the test ends
+			ginkgo.By("Cleaning up pod and waiting for resources to be unprepared")
+			e2epod.DeletePodOrFail(ctx, f.ClientSet, pod.Namespace, pod.Name)
+			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesSucceeded)
 		})
 	})
 })
@@ -1374,9 +1378,9 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 	_, err := f.ClientSet.ResourceV1().DeviceClasses().Create(ctx, dc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create DeviceClass "+className)
 	ginkgo.DeferCleanup(func() {
-		err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Delete(context.Background(), claimName, metav1.DeleteOptions{})
+		err := f.ClientSet.ResourceV1beta1().DeviceClasses().Delete(context.Background(), className, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			framework.Failf("Failed to delete ResourceClaim %s: %v", claimName, err)
+			framework.Failf("Failed to delete DeviceClass %s: %v", className, err)
 		}
 	})
 	ginkgo.By(fmt.Sprintf("Creating ResourceClaim %q", claimName))
