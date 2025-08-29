@@ -82,15 +82,7 @@ github.com/containerd/errdefs/pkg/internal/types
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
-<<<<<<< HEAD
 # github.com/containerd/ttrpc v1.2.7
-=======
-# github.com/containerd/stargz-snapshotter/estargz v0.16.3
-## go 1.22.0
-github.com/containerd/stargz-snapshotter/estargz
-github.com/containerd/stargz-snapshotter/estargz/errorutil
-# github.com/containerd/ttrpc v1.2.6
->>>>>>> b18fc174d2a (feat: Add new imagePullPolicy: IfNotNewerPresent)
 ## explicit; go 1.19
 github.com/containerd/ttrpc
 # github.com/containerd/typeurl/v2 v2.2.3
@@ -751,22 +743,12 @@ go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelr
 ## explicit; go 1.22.0
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc/internal
-<<<<<<< HEAD
-=======
-# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0
-## explicit; go 1.23.0
->>>>>>> b18fc174d2a (feat: Add new imagePullPolicy: IfNotNewerPresent)
 # go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0
 ## explicit; go 1.23.0
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconvutil
-<<<<<<< HEAD
-=======
-# go.opentelemetry.io/otel v1.35.0
-## explicit; go 1.23.0
->>>>>>> b18fc174d2a (feat: Add new imagePullPolicy: IfNotNewerPresent)
 # go.opentelemetry.io/otel v1.36.0
 ## explicit; go 1.23.0
 go.opentelemetry.io/otel
@@ -793,21 +775,11 @@ go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/envconfig
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/otlpconfig
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/retry
-<<<<<<< HEAD
-=======
-# go.opentelemetry.io/otel/metric v1.35.0
-## explicit; go 1.23.0
->>>>>>> b18fc174d2a (feat: Add new imagePullPolicy: IfNotNewerPresent)
 # go.opentelemetry.io/otel/metric v1.36.0
 ## explicit; go 1.23.0
 go.opentelemetry.io/otel/metric
 go.opentelemetry.io/otel/metric/embedded
 go.opentelemetry.io/otel/metric/noop
-<<<<<<< HEAD
-=======
-# go.opentelemetry.io/otel/sdk v1.34.0
-## explicit; go 1.23.0
->>>>>>> b18fc174d2a (feat: Add new imagePullPolicy: IfNotNewerPresent)
 # go.opentelemetry.io/otel/sdk v1.36.0
 ## explicit; go 1.23.0
 go.opentelemetry.io/otel/sdk
@@ -817,11 +789,7 @@ go.opentelemetry.io/otel/sdk/internal/x
 go.opentelemetry.io/otel/sdk/resource
 go.opentelemetry.io/otel/sdk/trace
 go.opentelemetry.io/otel/sdk/trace/tracetest
-<<<<<<< HEAD
 # go.opentelemetry.io/otel/sdk/metric v1.36.0
-=======
-# go.opentelemetry.io/otel/trace v1.35.0
->>>>>>> b18fc174d2a (feat: Add new imagePullPolicy: IfNotNewerPresent)
 ## explicit; go 1.23.0
 # go.opentelemetry.io/otel/trace v1.36.0
 ## explicit; go 1.23.0
