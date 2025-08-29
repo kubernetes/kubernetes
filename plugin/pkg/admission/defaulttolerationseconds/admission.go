@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
@@ -38,11 +39,38 @@ var (
 	defaultUnreachableTolerationSeconds = int64(300)
 )
 
+// int64Value is an implementation of pflag.Value for an int64.
+// It was copied from pflag/int64.go.
+type int64Value int64
+
+// newInt64value, in contrast to the pflag implementation, does not set the default value.
+func newInt64Value(p *int64) *int64Value {
+	return (*int64Value)(p)
+}
+
+func (i *int64Value) Set(s string) error {
+	v, err := strconv.ParseInt(s, 0, 64)
+	*i = int64Value(v)
+	return err
+}
+
+func (i *int64Value) Type() string {
+	return "int64"
+}
+
+func (i *int64Value) String() string { return strconv.FormatInt(int64(*i), 10) }
+
 func RegisterFlags(fs *pflag.FlagSet) {
-	fs.Int64Var(&defaultNotReadyTolerationSeconds, "default-not-ready-toleration-seconds", defaultNotReadyTolerationSeconds,
+	// Creating a flag with Int64Var writes the value, leading to data races
+	// when setting up apiservers in parallel during integration testing.
+	// This write is unnecessary (variables already have the default value) and
+	// can be skipped, which avoids the data race as long as argument parsing
+	// doesn't set the values.
+	fs.Var(newInt64Value(&defaultNotReadyTolerationSeconds),
+		"default-not-ready-toleration-seconds",
 		"Indicates the tolerationSeconds of the toleration for notReady:NoExecute"+
 			" that is added by default to every pod that does not already have such a toleration.")
-	fs.Int64Var(&defaultUnreachableTolerationSeconds, "default-unreachable-toleration-seconds", defaultUnreachableTolerationSeconds,
+	fs.Var(newInt64Value(&defaultUnreachableTolerationSeconds), "default-unreachable-toleration-seconds",
 		"Indicates the tolerationSeconds of the toleration for unreachable:NoExecute"+
 			" that is added by default to every pod that does not already have such a toleration.")
 }
