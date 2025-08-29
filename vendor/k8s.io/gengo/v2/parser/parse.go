@@ -385,66 +385,118 @@ func (p *Parser) NewUniverse() (types.Universe, error) {
 	return u, nil
 }
 
+// minimize returns a copy of lines with "irrelevant" lines removed.  This
+// includes blank lines and lines starting with "Deprecated:".
+func minimize(lines []string) []string {
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if len(strings.TrimSpace(line)) == 0 {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimSpace(line), "Deprecated:") {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
+}
+
 // addCommentsToType takes any accumulated comment lines prior to obj and
 // attaches them to the type t.
 func (p *Parser) addCommentsToType(obj gotypes.Object, t *types.Type) {
 	if newLines, oldLines := p.docComment(obj.Pos()), t.CommentLines; len(newLines) > 0 {
 		switch {
-		case len(oldLines) == 0, reflect.DeepEqual(oldLines, newLines):
-			// no comments associated, or comments match exactly
+		case len(oldLines) == 0:
+			// no previous comments, use the new ones
 			t.CommentLines = newLines
 
+		case reflect.DeepEqual(minimize(oldLines), minimize(newLines)):
+			// comments match exactly, modulo things we don't want to compare;
+			// keep the shorter of the two, assuming the difference is things
+			// like "Deprecated".
+			if len(newLines) < len(oldLines) {
+				t.CommentLines = newLines
+			}
+
 		case isTypeAlias(obj.Type()):
-			// ignore mismatched comments from obj because it's an alias
+			// ignore mismatched comments from obj because it's an alias, but
+			// complain about it
 			klog.Warningf(
-				"Mismatched comments seen for type %v. Using comments:\n%s\nIgnoring comments from type alias:\n%s\n",
+				"Mismatched comments on type %v.\n  Using comments:\n%s\n  Ignoring comments from type alias:\n%s\n",
 				t.GoType,
 				formatCommentBlock(oldLines),
 				formatCommentBlock(newLines),
 			)
 
-		case !isTypeAlias(obj.Type()):
-			// overwrite existing comments with ones from obj because obj is not an alias
-			t.CommentLines = newLines
+		default: // !isTypeAlias(obj.Type())
+			// if we have 2 comment blocks, take the longer one, after removing
+			// irrelevant lines like "Deprecated", but still complain
+			if len(minimize(newLines)) > len(minimize(oldLines)) {
+				klog.Warningf(
+					"Mismatched comments on type %v.\n  Using comments:\n%s\n  Ignoring comments:\n%s\n",
+					t.GoType,
+					formatCommentBlock(newLines),
+					formatCommentBlock(oldLines),
+				)
+				t.CommentLines = newLines
+			}
 			klog.Warningf(
-				"Mismatched comments seen for type %v. Using comments:\n%s\nIgnoring comments from type alias:\n%s\n",
+				"Mismatched comments on type %v.\n  Using comments:\n%s\n  Ignoring comments:\n%s\n",
 				t.GoType,
-				formatCommentBlock(newLines),
 				formatCommentBlock(oldLines),
+				formatCommentBlock(newLines),
 			)
 		}
 	}
 
 	if newLines, oldLines := p.priorDetachedComment(obj.Pos()), t.SecondClosestCommentLines; len(newLines) > 0 {
 		switch {
-		case len(oldLines) == 0, reflect.DeepEqual(oldLines, newLines):
-			// no comments associated, or comments match exactly
+		case len(oldLines) == 0:
+			// no previous comments, use the new ones
 			t.SecondClosestCommentLines = newLines
 
+		case reflect.DeepEqual(minimize(oldLines), minimize(newLines)):
+			// comments match exactly, modulo things we don't want to compare;
+			// keep the shorter of the two, assuming the difference is things
+			// like "Deprecated".
+			if len(newLines) < len(oldLines) {
+				t.SecondClosestCommentLines = newLines
+			}
+
 		case isTypeAlias(obj.Type()):
-			// ignore mismatched comments from obj because it's an alias
+			// ignore mismatched comments from obj because it's an alias, but
+			// complain about it
 			klog.Warningf(
-				"Mismatched secondClosestCommentLines seen for type %v. Using comments:\n%s\nIgnoring comments from type alias:\n%s\n",
+				"Mismatched secondClosestCommentLines near type %v.\n  Using comments:\n%s\n  Ignoring comments from type alias:\n%s\n",
 				t.GoType,
 				formatCommentBlock(oldLines),
 				formatCommentBlock(newLines),
 			)
 
-		case !isTypeAlias(obj.Type()):
-			// overwrite existing comments with ones from obj because obj is not an alias
-			t.SecondClosestCommentLines = newLines
+		default: // !isTypeAlias(obj.Type())
+			// if we have 2 comment blocks, take the longer one, after removing
+			// irrelevant lines like "Deprecated", but still complain
+			if len(minimize(newLines)) > len(minimize(oldLines)) {
+				klog.Warningf(
+					"Mismatched comments near type %v.\n  Using comments:\n%s\n  Ignoring comments:\n%s\n",
+					t.GoType,
+					formatCommentBlock(newLines),
+					formatCommentBlock(oldLines),
+				)
+				t.SecondClosestCommentLines = newLines
+			}
 			klog.Warningf(
-				"Mismatched secondClosestCommentLines seen for type %v. Using comments:\n%s\nIgnoring comments from type alias:\n%s\n",
+				"Mismatched comments near type %v.\n  Using comments:\n%s\n  Ignoring comments:\n%s\n",
 				t.GoType,
-				formatCommentBlock(newLines),
 				formatCommentBlock(oldLines),
+				formatCommentBlock(newLines),
 			)
 		}
 	}
 }
 
 func formatCommentBlock(lines []string) string {
-	return "```\n" + strings.Join(lines, "\n") + "\n```"
+	return "    ```\n    " + strings.Join(lines, "\n    ") + "\n    ```"
 }
 
 // packageDir tries to figure out the directory of the specified package.
