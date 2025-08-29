@@ -50,3 +50,16 @@ require (
 )
 
 replace k8s.io/apimachinery => ../apimachinery
+
+tool (
+	k8s.io/code-generator/cmd/applyconfiguration-gen
+	k8s.io/code-generator/cmd/client-gen
+	k8s.io/code-generator/cmd/conversion-gen
+	k8s.io/code-generator/cmd/deepcopy-gen
+	k8s.io/code-generator/cmd/defaulter-gen
+	k8s.io/code-generator/cmd/go-to-protobuf
+	k8s.io/code-generator/cmd/informer-gen
+	k8s.io/code-generator/cmd/lister-gen
+	k8s.io/code-generator/cmd/register-gen
+	k8s.io/kube-openapi/cmd/openapi-gen
+)
