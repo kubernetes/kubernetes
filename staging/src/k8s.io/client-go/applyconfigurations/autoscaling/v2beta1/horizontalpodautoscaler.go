@@ -47,29 +47,15 @@ func HorizontalPodAutoscaler(name, namespace string) *HorizontalPodAutoscalerApp
 	return b
 }
 
-// ExtractHorizontalPodAutoscaler extracts the applied configuration owned by fieldManager from
-// horizontalPodAutoscaler. If no managedFields are found in horizontalPodAutoscaler for fieldManager, a
-// HorizontalPodAutoscalerApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractHorizontalPodAutoscalerFrom extracts the applied configuration owned by fieldManager from
+// horizontalPodAutoscaler for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // horizontalPodAutoscaler must be a unmodified HorizontalPodAutoscaler API object that was retrieved from the Kubernetes API.
-// ExtractHorizontalPodAutoscaler provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractHorizontalPodAutoscalerFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractHorizontalPodAutoscaler(horizontalPodAutoscaler *autoscalingv2beta1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
-	return extractHorizontalPodAutoscaler(horizontalPodAutoscaler, fieldManager, "")
-}
-
-// ExtractHorizontalPodAutoscalerStatus is the same as ExtractHorizontalPodAutoscaler except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractHorizontalPodAutoscalerStatus(horizontalPodAutoscaler *autoscalingv2beta1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
-	return extractHorizontalPodAutoscaler(horizontalPodAutoscaler, fieldManager, "status")
-}
-
-func extractHorizontalPodAutoscaler(horizontalPodAutoscaler *autoscalingv2beta1.HorizontalPodAutoscaler, fieldManager string, subresource string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+func ExtractHorizontalPodAutoscalerFrom(horizontalPodAutoscaler *autoscalingv2beta1.HorizontalPodAutoscaler, fieldManager string, subresource string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
 	b := &HorizontalPodAutoscalerApplyConfiguration{}
 	err := managedfields.ExtractInto(horizontalPodAutoscaler, internal.Parser().Type("io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +68,29 @@ func extractHorizontalPodAutoscaler(horizontalPodAutoscaler *autoscalingv2beta1.
 	b.WithAPIVersion("autoscaling/v2beta1")
 	return b, nil
 }
+
+// ExtractHorizontalPodAutoscaler extracts the applied configuration owned by fieldManager from
+// horizontalPodAutoscaler. If no managedFields are found in horizontalPodAutoscaler for fieldManager, a
+// HorizontalPodAutoscalerApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// horizontalPodAutoscaler must be a unmodified HorizontalPodAutoscaler API object that was retrieved from the Kubernetes API.
+// ExtractHorizontalPodAutoscaler provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractHorizontalPodAutoscaler(horizontalPodAutoscaler *autoscalingv2beta1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+	return ExtractHorizontalPodAutoscalerFrom(horizontalPodAutoscaler, fieldManager, "")
+}
+
+// ExtractHorizontalPodAutoscalerStatus extracts the applied configuration owned by fieldManager from
+// horizontalPodAutoscaler for the status subresource.
+// Experimental!
+func ExtractHorizontalPodAutoscalerStatus(horizontalPodAutoscaler *autoscalingv2beta1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+	return ExtractHorizontalPodAutoscalerFrom(horizontalPodAutoscaler, fieldManager, "status")
+}
+
 func (b HorizontalPodAutoscalerApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

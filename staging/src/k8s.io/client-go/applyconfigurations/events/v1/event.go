@@ -60,29 +60,15 @@ func Event(name, namespace string) *EventApplyConfiguration {
 	return b
 }
 
-// ExtractEvent extracts the applied configuration owned by fieldManager from
-// event. If no managedFields are found in event for fieldManager, a
-// EventApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractEventFrom extracts the applied configuration owned by fieldManager from
+// event for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // event must be a unmodified Event API object that was retrieved from the Kubernetes API.
-// ExtractEvent provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractEventFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractEvent(event *eventsv1.Event, fieldManager string) (*EventApplyConfiguration, error) {
-	return extractEvent(event, fieldManager, "")
-}
-
-// ExtractEventStatus is the same as ExtractEvent except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractEventStatus(event *eventsv1.Event, fieldManager string) (*EventApplyConfiguration, error) {
-	return extractEvent(event, fieldManager, "status")
-}
-
-func extractEvent(event *eventsv1.Event, fieldManager string, subresource string) (*EventApplyConfiguration, error) {
+func ExtractEventFrom(event *eventsv1.Event, fieldManager string, subresource string) (*EventApplyConfiguration, error) {
 	b := &EventApplyConfiguration{}
 	err := managedfields.ExtractInto(event, internal.Parser().Type("io.k8s.api.events.v1.Event"), fieldManager, b, subresource)
 	if err != nil {
@@ -95,6 +81,22 @@ func extractEvent(event *eventsv1.Event, fieldManager string, subresource string
 	b.WithAPIVersion("events.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractEvent extracts the applied configuration owned by fieldManager from
+// event. If no managedFields are found in event for fieldManager, a
+// EventApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// event must be a unmodified Event API object that was retrieved from the Kubernetes API.
+// ExtractEvent provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractEvent(event *eventsv1.Event, fieldManager string) (*EventApplyConfiguration, error) {
+	return ExtractEventFrom(event, fieldManager, "")
+}
+
 func (b EventApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

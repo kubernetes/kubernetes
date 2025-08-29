@@ -45,6 +45,27 @@ func DeviceClass(name string) *DeviceClassApplyConfiguration {
 	return b
 }
 
+// ExtractDeviceClassFrom extracts the applied configuration owned by fieldManager from
+// deviceClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// deviceClass must be a unmodified DeviceClass API object that was retrieved from the Kubernetes API.
+// ExtractDeviceClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractDeviceClassFrom(deviceClass *resourcev1.DeviceClass, fieldManager string, subresource string) (*DeviceClassApplyConfiguration, error) {
+	b := &DeviceClassApplyConfiguration{}
+	err := managedfields.ExtractInto(deviceClass, internal.Parser().Type("io.k8s.api.resource.v1.DeviceClass"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(deviceClass.Name)
+
+	b.WithKind("DeviceClass")
+	b.WithAPIVersion("resource.k8s.io/v1")
+	return b, nil
+}
+
 // ExtractDeviceClass extracts the applied configuration owned by fieldManager from
 // deviceClass. If no managedFields are found in deviceClass for fieldManager, a
 // DeviceClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func DeviceClass(name string) *DeviceClassApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractDeviceClass(deviceClass *resourcev1.DeviceClass, fieldManager string) (*DeviceClassApplyConfiguration, error) {
-	return extractDeviceClass(deviceClass, fieldManager, "")
+	return ExtractDeviceClassFrom(deviceClass, fieldManager, "")
 }
 
-// ExtractDeviceClassStatus is the same as ExtractDeviceClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractDeviceClassStatus(deviceClass *resourcev1.DeviceClass, fieldManager string) (*DeviceClassApplyConfiguration, error) {
-	return extractDeviceClass(deviceClass, fieldManager, "status")
-}
-
-func extractDeviceClass(deviceClass *resourcev1.DeviceClass, fieldManager string, subresource string) (*DeviceClassApplyConfiguration, error) {
-	b := &DeviceClassApplyConfiguration{}
-	err := managedfields.ExtractInto(deviceClass, internal.Parser().Type("io.k8s.api.resource.v1.DeviceClass"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(deviceClass.Name)
-
-	b.WithKind("DeviceClass")
-	b.WithAPIVersion("resource.k8s.io/v1")
-	return b, nil
-}
 func (b DeviceClassApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

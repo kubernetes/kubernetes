@@ -44,6 +44,7 @@ func Flunder(name, namespace string) *FlunderApplyConfiguration {
 	b.WithAPIVersion("wardle.example.com/v1alpha1")
 	return b
 }
+
 func (b FlunderApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

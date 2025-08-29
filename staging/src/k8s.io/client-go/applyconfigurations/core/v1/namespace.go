@@ -46,6 +46,27 @@ func Namespace(name string) *NamespaceApplyConfiguration {
 	return b
 }
 
+// ExtractNamespaceFrom extracts the applied configuration owned by fieldManager from
+// namespace for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// namespace must be a unmodified Namespace API object that was retrieved from the Kubernetes API.
+// ExtractNamespaceFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractNamespaceFrom(namespace *corev1.Namespace, fieldManager string, subresource string) (*NamespaceApplyConfiguration, error) {
+	b := &NamespaceApplyConfiguration{}
+	err := managedfields.ExtractInto(namespace, internal.Parser().Type("io.k8s.api.core.v1.Namespace"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(namespace.Name)
+
+	b.WithKind("Namespace")
+	b.WithAPIVersion("v1")
+	return b, nil
+}
+
 // ExtractNamespace extracts the applied configuration owned by fieldManager from
 // namespace. If no managedFields are found in namespace for fieldManager, a
 // NamespaceApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -58,28 +79,16 @@ func Namespace(name string) *NamespaceApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractNamespace(namespace *corev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
-	return extractNamespace(namespace, fieldManager, "")
+	return ExtractNamespaceFrom(namespace, fieldManager, "")
 }
 
-// ExtractNamespaceStatus is the same as ExtractNamespace except
-// that it extracts the status subresource applied configuration.
+// ExtractNamespaceStatus extracts the applied configuration owned by fieldManager from
+// namespace for the status subresource.
 // Experimental!
 func ExtractNamespaceStatus(namespace *corev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
-	return extractNamespace(namespace, fieldManager, "status")
+	return ExtractNamespaceFrom(namespace, fieldManager, "status")
 }
 
-func extractNamespace(namespace *corev1.Namespace, fieldManager string, subresource string) (*NamespaceApplyConfiguration, error) {
-	b := &NamespaceApplyConfiguration{}
-	err := managedfields.ExtractInto(namespace, internal.Parser().Type("io.k8s.api.core.v1.Namespace"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(namespace.Name)
-
-	b.WithKind("Namespace")
-	b.WithAPIVersion("v1")
-	return b, nil
-}
 func (b NamespaceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
