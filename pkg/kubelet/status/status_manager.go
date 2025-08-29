@@ -275,6 +275,11 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 
 	alreadyPending := m.podResizeConditions[podUID].PodResizePending != nil
 
+	if reason != v1.PodReasonInfeasible {
+		// For all other "pending" reasons, we set the reason to "Deferred".
+		reason = v1.PodReasonDeferred
+	}
+
 	m.podResizeConditions[podUID] = podResizeConditions{
 		PodResizePending:    updatedPodResizeCondition(v1.PodResizePending, m.podResizeConditions[podUID].PodResizePending, reason, message, observedGeneration),
 		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
