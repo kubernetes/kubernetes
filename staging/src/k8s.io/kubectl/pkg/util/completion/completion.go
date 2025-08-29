@@ -325,10 +325,12 @@ func compGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cm
 	o.Verbs = []string{"get"}
 	// TODO:Should set --request-timeout=5s
 
-	o.Complete(restClientGetter, cmd, nil)
+	if err := o.Complete(restClientGetter, cmd, nil); err != nil {
+		return []string{}
+	}
 
 	// Ignore errors as the output may still be valid
-	o.RunAPIResources()
+	_ = o.RunAPIResources()
 
 	// Resources can be a comma-separated list.  The last element is then
 	// the one we should complete.  For example if toComplete=="pods,secre"
