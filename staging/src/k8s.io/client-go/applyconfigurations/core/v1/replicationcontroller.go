@@ -47,29 +47,15 @@ func ReplicationController(name, namespace string) *ReplicationControllerApplyCo
 	return b
 }
 
-// ExtractReplicationController extracts the applied configuration owned by fieldManager from
-// replicationController. If no managedFields are found in replicationController for fieldManager, a
-// ReplicationControllerApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractReplicationControllerFrom extracts the applied configuration owned by fieldManager from
+// replicationController for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // replicationController must be a unmodified ReplicationController API object that was retrieved from the Kubernetes API.
-// ExtractReplicationController provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractReplicationControllerFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractReplicationController(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
-	return extractReplicationController(replicationController, fieldManager, "")
-}
-
-// ExtractReplicationControllerStatus is the same as ExtractReplicationController except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractReplicationControllerStatus(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
-	return extractReplicationController(replicationController, fieldManager, "status")
-}
-
-func extractReplicationController(replicationController *corev1.ReplicationController, fieldManager string, subresource string) (*ReplicationControllerApplyConfiguration, error) {
+func ExtractReplicationControllerFrom(replicationController *corev1.ReplicationController, fieldManager string, subresource string) (*ReplicationControllerApplyConfiguration, error) {
 	b := &ReplicationControllerApplyConfiguration{}
 	err := managedfields.ExtractInto(replicationController, internal.Parser().Type("io.k8s.api.core.v1.ReplicationController"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +68,36 @@ func extractReplicationController(replicationController *corev1.ReplicationContr
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractReplicationController extracts the applied configuration owned by fieldManager from
+// replicationController. If no managedFields are found in replicationController for fieldManager, a
+// ReplicationControllerApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// replicationController must be a unmodified ReplicationController API object that was retrieved from the Kubernetes API.
+// ExtractReplicationController provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractReplicationController(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+	return ExtractReplicationControllerFrom(replicationController, fieldManager, "")
+}
+
+// ExtractReplicationControllerScale extracts the applied configuration owned by fieldManager from
+// replicationController for the scale subresource.
+// Experimental!
+func ExtractReplicationControllerScale(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+	return ExtractReplicationControllerFrom(replicationController, fieldManager, "scale")
+}
+
+// ExtractReplicationControllerStatus extracts the applied configuration owned by fieldManager from
+// replicationController for the status subresource.
+// Experimental!
+func ExtractReplicationControllerStatus(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+	return ExtractReplicationControllerFrom(replicationController, fieldManager, "status")
+}
+
 func (b ReplicationControllerApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

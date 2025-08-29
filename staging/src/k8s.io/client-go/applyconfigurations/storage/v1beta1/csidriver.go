@@ -45,6 +45,27 @@ func CSIDriver(name string) *CSIDriverApplyConfiguration {
 	return b
 }
 
+// ExtractCSIDriverFrom extracts the applied configuration owned by fieldManager from
+// cSIDriver for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// cSIDriver must be a unmodified CSIDriver API object that was retrieved from the Kubernetes API.
+// ExtractCSIDriverFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractCSIDriverFrom(cSIDriver *storagev1beta1.CSIDriver, fieldManager string, subresource string) (*CSIDriverApplyConfiguration, error) {
+	b := &CSIDriverApplyConfiguration{}
+	err := managedfields.ExtractInto(cSIDriver, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSIDriver"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(cSIDriver.Name)
+
+	b.WithKind("CSIDriver")
+	b.WithAPIVersion("storage.k8s.io/v1beta1")
+	return b, nil
+}
+
 // ExtractCSIDriver extracts the applied configuration owned by fieldManager from
 // cSIDriver. If no managedFields are found in cSIDriver for fieldManager, a
 // CSIDriverApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func CSIDriver(name string) *CSIDriverApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractCSIDriver(cSIDriver *storagev1beta1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
-	return extractCSIDriver(cSIDriver, fieldManager, "")
+	return ExtractCSIDriverFrom(cSIDriver, fieldManager, "")
 }
 
-// ExtractCSIDriverStatus is the same as ExtractCSIDriver except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractCSIDriverStatus(cSIDriver *storagev1beta1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
-	return extractCSIDriver(cSIDriver, fieldManager, "status")
-}
-
-func extractCSIDriver(cSIDriver *storagev1beta1.CSIDriver, fieldManager string, subresource string) (*CSIDriverApplyConfiguration, error) {
-	b := &CSIDriverApplyConfiguration{}
-	err := managedfields.ExtractInto(cSIDriver, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSIDriver"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(cSIDriver.Name)
-
-	b.WithKind("CSIDriver")
-	b.WithAPIVersion("storage.k8s.io/v1beta1")
-	return b, nil
-}
 func (b CSIDriverApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

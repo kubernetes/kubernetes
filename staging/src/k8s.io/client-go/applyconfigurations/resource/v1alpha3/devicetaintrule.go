@@ -45,6 +45,27 @@ func DeviceTaintRule(name string) *DeviceTaintRuleApplyConfiguration {
 	return b
 }
 
+// ExtractDeviceTaintRuleFrom extracts the applied configuration owned by fieldManager from
+// deviceTaintRule for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// deviceTaintRule must be a unmodified DeviceTaintRule API object that was retrieved from the Kubernetes API.
+// ExtractDeviceTaintRuleFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractDeviceTaintRuleFrom(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string, subresource string) (*DeviceTaintRuleApplyConfiguration, error) {
+	b := &DeviceTaintRuleApplyConfiguration{}
+	err := managedfields.ExtractInto(deviceTaintRule, internal.Parser().Type("io.k8s.api.resource.v1alpha3.DeviceTaintRule"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(deviceTaintRule.Name)
+
+	b.WithKind("DeviceTaintRule")
+	b.WithAPIVersion("resource.k8s.io/v1alpha3")
+	return b, nil
+}
+
 // ExtractDeviceTaintRule extracts the applied configuration owned by fieldManager from
 // deviceTaintRule. If no managedFields are found in deviceTaintRule for fieldManager, a
 // DeviceTaintRuleApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func DeviceTaintRule(name string) *DeviceTaintRuleApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractDeviceTaintRule(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string) (*DeviceTaintRuleApplyConfiguration, error) {
-	return extractDeviceTaintRule(deviceTaintRule, fieldManager, "")
+	return ExtractDeviceTaintRuleFrom(deviceTaintRule, fieldManager, "")
 }
 
-// ExtractDeviceTaintRuleStatus is the same as ExtractDeviceTaintRule except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractDeviceTaintRuleStatus(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string) (*DeviceTaintRuleApplyConfiguration, error) {
-	return extractDeviceTaintRule(deviceTaintRule, fieldManager, "status")
-}
-
-func extractDeviceTaintRule(deviceTaintRule *resourcev1alpha3.DeviceTaintRule, fieldManager string, subresource string) (*DeviceTaintRuleApplyConfiguration, error) {
-	b := &DeviceTaintRuleApplyConfiguration{}
-	err := managedfields.ExtractInto(deviceTaintRule, internal.Parser().Type("io.k8s.api.resource.v1alpha3.DeviceTaintRule"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(deviceTaintRule.Name)
-
-	b.WithKind("DeviceTaintRule")
-	b.WithAPIVersion("resource.k8s.io/v1alpha3")
-	return b, nil
-}
 func (b DeviceTaintRuleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

@@ -48,29 +48,15 @@ func EndpointSlice(name, namespace string) *EndpointSliceApplyConfiguration {
 	return b
 }
 
-// ExtractEndpointSlice extracts the applied configuration owned by fieldManager from
-// endpointSlice. If no managedFields are found in endpointSlice for fieldManager, a
-// EndpointSliceApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractEndpointSliceFrom extracts the applied configuration owned by fieldManager from
+// endpointSlice for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // endpointSlice must be a unmodified EndpointSlice API object that was retrieved from the Kubernetes API.
-// ExtractEndpointSlice provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractEndpointSliceFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractEndpointSlice(endpointSlice *discoveryv1.EndpointSlice, fieldManager string) (*EndpointSliceApplyConfiguration, error) {
-	return extractEndpointSlice(endpointSlice, fieldManager, "")
-}
-
-// ExtractEndpointSliceStatus is the same as ExtractEndpointSlice except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractEndpointSliceStatus(endpointSlice *discoveryv1.EndpointSlice, fieldManager string) (*EndpointSliceApplyConfiguration, error) {
-	return extractEndpointSlice(endpointSlice, fieldManager, "status")
-}
-
-func extractEndpointSlice(endpointSlice *discoveryv1.EndpointSlice, fieldManager string, subresource string) (*EndpointSliceApplyConfiguration, error) {
+func ExtractEndpointSliceFrom(endpointSlice *discoveryv1.EndpointSlice, fieldManager string, subresource string) (*EndpointSliceApplyConfiguration, error) {
 	b := &EndpointSliceApplyConfiguration{}
 	err := managedfields.ExtractInto(endpointSlice, internal.Parser().Type("io.k8s.api.discovery.v1.EndpointSlice"), fieldManager, b, subresource)
 	if err != nil {
@@ -83,6 +69,22 @@ func extractEndpointSlice(endpointSlice *discoveryv1.EndpointSlice, fieldManager
 	b.WithAPIVersion("discovery.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractEndpointSlice extracts the applied configuration owned by fieldManager from
+// endpointSlice. If no managedFields are found in endpointSlice for fieldManager, a
+// EndpointSliceApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// endpointSlice must be a unmodified EndpointSlice API object that was retrieved from the Kubernetes API.
+// ExtractEndpointSlice provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractEndpointSlice(endpointSlice *discoveryv1.EndpointSlice, fieldManager string) (*EndpointSliceApplyConfiguration, error) {
+	return ExtractEndpointSliceFrom(endpointSlice, fieldManager, "")
+}
+
 func (b EndpointSliceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

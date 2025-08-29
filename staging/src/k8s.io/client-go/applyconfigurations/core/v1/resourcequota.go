@@ -47,29 +47,15 @@ func ResourceQuota(name, namespace string) *ResourceQuotaApplyConfiguration {
 	return b
 }
 
-// ExtractResourceQuota extracts the applied configuration owned by fieldManager from
-// resourceQuota. If no managedFields are found in resourceQuota for fieldManager, a
-// ResourceQuotaApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractResourceQuotaFrom extracts the applied configuration owned by fieldManager from
+// resourceQuota for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // resourceQuota must be a unmodified ResourceQuota API object that was retrieved from the Kubernetes API.
-// ExtractResourceQuota provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractResourceQuotaFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractResourceQuota(resourceQuota *corev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
-	return extractResourceQuota(resourceQuota, fieldManager, "")
-}
-
-// ExtractResourceQuotaStatus is the same as ExtractResourceQuota except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractResourceQuotaStatus(resourceQuota *corev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
-	return extractResourceQuota(resourceQuota, fieldManager, "status")
-}
-
-func extractResourceQuota(resourceQuota *corev1.ResourceQuota, fieldManager string, subresource string) (*ResourceQuotaApplyConfiguration, error) {
+func ExtractResourceQuotaFrom(resourceQuota *corev1.ResourceQuota, fieldManager string, subresource string) (*ResourceQuotaApplyConfiguration, error) {
 	b := &ResourceQuotaApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceQuota, internal.Parser().Type("io.k8s.api.core.v1.ResourceQuota"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +68,29 @@ func extractResourceQuota(resourceQuota *corev1.ResourceQuota, fieldManager stri
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractResourceQuota extracts the applied configuration owned by fieldManager from
+// resourceQuota. If no managedFields are found in resourceQuota for fieldManager, a
+// ResourceQuotaApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// resourceQuota must be a unmodified ResourceQuota API object that was retrieved from the Kubernetes API.
+// ExtractResourceQuota provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractResourceQuota(resourceQuota *corev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
+	return ExtractResourceQuotaFrom(resourceQuota, fieldManager, "")
+}
+
+// ExtractResourceQuotaStatus extracts the applied configuration owned by fieldManager from
+// resourceQuota for the status subresource.
+// Experimental!
+func ExtractResourceQuotaStatus(resourceQuota *corev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
+	return ExtractResourceQuotaFrom(resourceQuota, fieldManager, "status")
+}
+
 func (b ResourceQuotaApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

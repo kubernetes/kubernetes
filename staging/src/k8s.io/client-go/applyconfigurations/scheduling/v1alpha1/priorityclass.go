@@ -49,6 +49,27 @@ func PriorityClass(name string) *PriorityClassApplyConfiguration {
 	return b
 }
 
+// ExtractPriorityClassFrom extracts the applied configuration owned by fieldManager from
+// priorityClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// priorityClass must be a unmodified PriorityClass API object that was retrieved from the Kubernetes API.
+// ExtractPriorityClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractPriorityClassFrom(priorityClass *schedulingv1alpha1.PriorityClass, fieldManager string, subresource string) (*PriorityClassApplyConfiguration, error) {
+	b := &PriorityClassApplyConfiguration{}
+	err := managedfields.ExtractInto(priorityClass, internal.Parser().Type("io.k8s.api.scheduling.v1alpha1.PriorityClass"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(priorityClass.Name)
+
+	b.WithKind("PriorityClass")
+	b.WithAPIVersion("scheduling.k8s.io/v1alpha1")
+	return b, nil
+}
+
 // ExtractPriorityClass extracts the applied configuration owned by fieldManager from
 // priorityClass. If no managedFields are found in priorityClass for fieldManager, a
 // PriorityClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -61,28 +82,9 @@ func PriorityClass(name string) *PriorityClassApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPriorityClass(priorityClass *schedulingv1alpha1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
-	return extractPriorityClass(priorityClass, fieldManager, "")
+	return ExtractPriorityClassFrom(priorityClass, fieldManager, "")
 }
 
-// ExtractPriorityClassStatus is the same as ExtractPriorityClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractPriorityClassStatus(priorityClass *schedulingv1alpha1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
-	return extractPriorityClass(priorityClass, fieldManager, "status")
-}
-
-func extractPriorityClass(priorityClass *schedulingv1alpha1.PriorityClass, fieldManager string, subresource string) (*PriorityClassApplyConfiguration, error) {
-	b := &PriorityClassApplyConfiguration{}
-	err := managedfields.ExtractInto(priorityClass, internal.Parser().Type("io.k8s.api.scheduling.v1alpha1.PriorityClass"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(priorityClass.Name)
-
-	b.WithKind("PriorityClass")
-	b.WithAPIVersion("scheduling.k8s.io/v1alpha1")
-	return b, nil
-}
 func (b PriorityClassApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
