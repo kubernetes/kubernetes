@@ -1013,7 +1013,6 @@ function Start-WorkerServices {
   # otherwise kubelet and kube-proxy will not be able to run properly.
   $instance_name = "$(Get-InstanceMetadata 'name' | Out-String)"
   $default_kubelet_args = @(`
-      "--pod-infra-container-image=${env:INFRA_CONTAINER}",
       "--hostname-override=${instance_name}"
   )
 
