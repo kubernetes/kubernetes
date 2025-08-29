@@ -98,8 +98,7 @@ func setupTestRegistry(t *testing.T) (string, func() error) {
 func TestRegistryServer(t *testing.T) {
 	tempDir, cleanup := setupTestRegistry(t)
 	defer func() {
-		err := cleanup()
-		if err != nil {
+		if err := cleanup(); err != nil {
 			t.Fatalf("Failed to cleanup temp dir: %v", err)
 		}
 	}()
@@ -108,12 +107,11 @@ func TestRegistryServer(t *testing.T) {
 	registryDir = tempDir
 	defer func() { registryDir = originalRegistryDir }()
 
-	server := httptest.NewServer(NewRegistryServerMux())
-	defer server.Close()
+	t.Run("Public Mode", func(t *testing.T) {
+		server := httptest.NewServer(NewRegistryServerMux(false))
+		defer server.Close()
+		client := server.Client()
 
-	client := server.Client()
-
-	t.Run("Public Endpoints", func(t *testing.T) {
 		t.Run("GET /v2/", func(t *testing.T) {
 			resp, err := client.Get(server.URL + "/v2/")
 			if err != nil {
@@ -250,9 +248,13 @@ func TestRegistryServer(t *testing.T) {
 		})
 	})
 
-	t.Run("Private Endpoints", func(t *testing.T) {
-		t.Run("GET without auth", func(t *testing.T) {
-			url := fmt.Sprintf("%s/private/v2/%s/blobs/%s", server.URL, testImageName, testBlobDigest)
+	t.Run("Private Mode", func(t *testing.T) {
+		server := httptest.NewServer(NewRegistryServerMux(true))
+		defer server.Close()
+		client := server.Client()
+
+		t.Run("GET blob without auth", func(t *testing.T) {
+			url := fmt.Sprintf("%s/v2/%s/blobs/%s", server.URL, testImageName, testBlobDigest)
 			resp, err := client.Get(url)
 			if err != nil {
 				t.Fatalf("Request failed: %v", err)
@@ -263,8 +265,35 @@ func TestRegistryServer(t *testing.T) {
 			}
 		})
 
-		t.Run("GET with correct auth", func(t *testing.T) {
-			url := fmt.Sprintf("%s/private/v2/%s/blobs/%s", server.URL, testImageName, testBlobDigest)
+		t.Run("GET blob with correct auth", func(t *testing.T) {
+			url := fmt.Sprintf("%s/v2/%s/blobs/%s", server.URL, testImageName, testBlobDigest)
+			req, _ := http.NewRequest(http.MethodGet, url, nil)
+			req.SetBasicAuth(privateRegistryUser, privateRegistryPass)
+			resp, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("Request failed: %v", err)
+			}
+			defer closeBody(t, resp)
+
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected status OK; got %v", resp.Status)
+			}
+		})
+
+		t.Run("GET manifest without auth", func(t *testing.T) {
+			url := fmt.Sprintf("%s/v2/%s/manifests/%s", server.URL, testImageName, testManifestDigest)
+			resp, err := client.Get(url)
+			if err != nil {
+				t.Fatalf("Request failed: %v", err)
+			}
+			defer closeBody(t, resp)
+			if resp.StatusCode != http.StatusUnauthorized {
+				t.Errorf("Expected status Unauthorized; got %v", resp.Status)
+			}
+		})
+
+		t.Run("GET manifest with correct auth", func(t *testing.T) {
+			url := fmt.Sprintf("%s/v2/%s/manifests/%s", server.URL, testImageName, testManifestDigest)
 			req, _ := http.NewRequest(http.MethodGet, url, nil)
 			req.SetBasicAuth(privateRegistryUser, privateRegistryPass)
 			resp, err := client.Do(req)

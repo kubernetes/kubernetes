@@ -29,6 +29,7 @@ import (
 
 var (
 	port        int
+	private     bool
 	registryDir = "/var/registry"
 )
 
@@ -39,6 +40,7 @@ const (
 
 func init() {
 	CmdFakeRegistryServer.Flags().IntVar(&port, "port", 5000, "Port number.")
+	CmdFakeRegistryServer.Flags().BoolVar(&private, "private", false, "Enable authentication for the registry.")
 }
 
 // CmdFakeRegistryServer is the cobra command for the fake registry server
@@ -50,7 +52,7 @@ var CmdFakeRegistryServer = &cobra.Command{
 }
 
 func main(cmd *cobra.Command, args []string) {
-	registryMux := NewRegistryServerMux()
+	registryMux := NewRegistryServerMux(private)
 
 	addr := fmt.Sprintf(":%d", port)
 	log.Printf("HTTP server starting to listen on %s", addr)
@@ -59,12 +61,14 @@ func main(cmd *cobra.Command, args []string) {
 	}
 }
 
-func NewRegistryServerMux() *http.ServeMux {
+func NewRegistryServerMux(isPrivate bool) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// setup private and public routes
-	mux.HandleFunc("/v2/", handleV2)
-	mux.Handle("/private/v2/", auth(http.HandlerFunc(handleV2)))
+	var v2Handler http.Handler = http.HandlerFunc(handleV2)
+	if isPrivate {
+		v2Handler = auth(v2Handler)
+	}
+	mux.Handle("/v2/", v2Handler)
 
 	return mux
 }
@@ -130,19 +134,12 @@ func handleManifests(w http.ResponseWriter, r *http.Request, imageName, identifi
 func handleV2(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Docker-Distribution-Api-Version", "registry/2.0")
 
-	// root discovery endpoint for both public and private paths
-	if r.URL.Path == "/v2/" || r.URL.Path == "/private/v2/" {
+	if r.URL.Path == "/v2/" {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	var path string
-	if strings.HasPrefix(r.URL.Path, "/private/v2/") {
-		path = strings.TrimPrefix(r.URL.Path, "/private/v2/")
-	} else {
-		path = strings.TrimPrefix(r.URL.Path, "/v2/")
-	}
-
+	path := strings.TrimPrefix(r.URL.Path, "/v2/")
 	parts := strings.Split(path, "/")
 	if len(parts) < 3 {
 		http.NotFound(w, r)
