@@ -103,7 +103,9 @@ func newWorker(
 	case readiness:
 		w.spec = container.ReadinessProbe
 		w.resultsManager = m.readinessManager
-		w.initialValue = results.Failure
+		// If the ready state already exists in the status, it may be that the kubelet has been restarted.
+		// Temporarily use the old state as the initial value
+		w.initialValue = getReadinessInitValue(pod, container)
 	case liveness:
 		w.spec = container.LivenessProbe
 		w.resultsManager = m.livenessManager
@@ -347,4 +349,19 @@ func deepCopyPrometheusLabels(m metrics.Labels) metrics.Labels {
 		ret[k] = v
 	}
 	return ret
+}
+
+func getReadinessInitValue(pod *v1.Pod, container v1.Container) results.Result {
+	if container.ReadinessProbe == nil {
+		return results.Success
+	}
+	for _, c := range pod.Status.ContainerStatuses {
+		if c.Name == container.Name {
+			if c.Ready && c.State.Running != nil {
+				return results.Success
+			}
+			return results.Failure
+		}
+	}
+	return results.Failure
 }

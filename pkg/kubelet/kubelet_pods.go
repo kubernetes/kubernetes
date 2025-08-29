@@ -2122,6 +2122,10 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		switch {
 		case cs.State == kubecontainer.ContainerStateRunning:
 			status.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(cs.StartedAt)}
+			// Preserve previous readiness while kubelet restarts until fresh probe results arrive.
+			if oldStatus != nil {
+				status.Ready = oldStatus.Ready
+			}
 		case cs.State == kubecontainer.ContainerStateCreated:
 			// containers that are created but not running are "waiting to be running"
 			status.State.Waiting = &v1.ContainerStateWaiting{}
@@ -2306,6 +2310,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 				// Apply some values from the old statuses as the default values.
 				status.RestartCount = oldStatus.RestartCount
 				status.LastTerminationState = oldStatus.LastTerminationState
+				// Preserve previous readiness to avoid transient flips on kubelet restart.
+				status.Ready = oldStatus.Ready
 			}
 		}
 		statuses[container.Name] = status

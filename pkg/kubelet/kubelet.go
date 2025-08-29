@@ -1944,6 +1944,11 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		// PodResizeInProgressCondition before we set the status below.
 	}
 
+	// Ensure the pod is being probed
+	// UpdatePodStatus is called in generateAPIPodStatus, and UpdatePodStatus uses getWorker
+	// to determine whether a container has readiness thereby setting the initial ready status.
+	// However, readiness worker is added in AddPod, so AddPod needs to be called before generateAPIPodStatus.
+	kl.probeManager.AddPod(pod)
 	// Generate final API pod status with pod and status manager status
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, false)
 	// The pod IP may be changed in generateAPIPodStatus if the pod is using host network. (See #24576)
@@ -2079,9 +2084,6 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	// Fetch the pull secrets for the pod
 	pullSecrets := kl.getPullSecretsForPod(pod)
-
-	// Ensure the pod is being probed
-	kl.probeManager.AddPod(pod)
 
 	// TODO(#113606): use cancellation from the incoming context parameter, which comes from the pod worker.
 	// Currently, using cancellation from that context causes test failures. To remove this WithoutCancel,
