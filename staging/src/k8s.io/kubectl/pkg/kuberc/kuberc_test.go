@@ -947,7 +947,7 @@ func TestApplyOverride(t *testing.T) {
 	}
 }
 
-func TestApplOverrideBool(t *testing.T) {
+func TestApplyOverrideBool(t *testing.T) {
 	tests := []testApplyOverride[bool]{
 		{
 			name: "command override",
@@ -1160,12 +1160,13 @@ func TestApplOverrideBool(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unable to find the command %v\n", err)
 			}
-
 			err = actualCmd.ParseFlags(test.args[1:])
 			if err != nil {
 				t.Fatalf("unexpected error %v\n", err)
 			}
-
+			if _, ok := actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok {
+				t.Fatalf("unable to find the KubeRCOriginalCommandAnnotation")
+			}
 			if errWriter.String() != "" {
 				t.Fatalf("unexpected error message %s\n", errWriter.String())
 			}
@@ -1466,6 +1467,9 @@ func TestApplyAliasBool(t *testing.T) {
 				t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
 			}
 
+			if _, ok := actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok {
+				t.Fatalf("unable to find the KubeRCOriginalCommandAnnotation")
+			}
 			for _, expectedFlag := range test.expectedFlags {
 				actualFlag := actualCmd.Flag(expectedFlag.name)
 				actualValue, err := strconv.ParseBool(actualFlag.Value.String())
@@ -2609,6 +2613,10 @@ func TestApplyAlias(t *testing.T) {
 				t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
 			}
 
+			if _, ok := actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok {
+				t.Fatalf("unable to find the KubeRCOriginalCommandAnnotation")
+			}
+
 			for _, expectedFlag := range test.expectedFlags {
 				actualFlag := actualCmd.Flag(expectedFlag.name)
 				if actualFlag.Value.String() != expectedFlag.value {
@@ -2709,7 +2717,6 @@ func addCommands[T supportedTypes](rootCmd *cobra.Command, commands []fakeCmds[T
 				subCmd.Flags().Bool(flg.name, v, "")
 			}
 		}
-
 	}
 	rootCmd.AddCommand(subCmd)
 

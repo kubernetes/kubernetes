@@ -499,7 +499,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 		cmds.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			if originalCommandArgs, ok := cmd.Annotations[kuberc.KubeRCOriginalCommandAnnotation]; ok {
 				originalCommand := strings.TrimSpace(fmt.Sprintf("%s %s", cmd.Root().Name(), originalCommandArgs))
-				klog.V(1).Info(fmt.Sprintf("kuberc command executed: %q", originalCommand))
+				klog.V(1).Info(fmt.Sprintf("original command: %q", originalCommand))
 			}
 			return existingPreRunE(cmd, args)
 		}
