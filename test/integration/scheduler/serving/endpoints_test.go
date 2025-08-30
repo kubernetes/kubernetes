@@ -141,6 +141,13 @@ func TestEndpointHandlers(t *testing.T) {
 				`Warning: This endpoint is not meant to be machine parseable, ` +
 				`has no formatting compatibility guarantees and is for debugging purposes only.`,
 		},
+		{
+			name:                 "/statusz - paths",
+			path:                 "/statusz",
+			requestHeader:        map[string]string{"Accept": "text/plain"},
+			wantResponseCode:     http.StatusOK,
+			wantResponseBodyRegx: `Paths([:=\s]+)/configz /flagz /healthz /livez /metrics /readyz\n$`,
+		},
 	}
 
 	for _, tt := range tests {
