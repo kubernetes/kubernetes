@@ -25746,7 +25746,6 @@ func schema_k8sio_api_core_v1_LimitRangeSpec(ref common.ReferenceCallback) commo
 						},
 					},
 				},
-				Required: []string{"limits"},
 			},
 		},
 		Dependencies: []string{
