@@ -162,6 +162,11 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+	
+	// Context is the context for the created client and its transport.
+	// It can be used to cancel background processes associated with the client.
+	// If nil, context.Background() will be used.
+	Context context.Context
 }
 
 var _ fmt.Stringer = new(Config)
@@ -653,6 +658,7 @@ func AnonymousClientConfig(config *Config) *Config {
 		Timeout:                   config.Timeout,
 		Dial:                      config.Dial,
 		Proxy:                     config.Proxy,
+		Context: 									 config.Context,
 	}
 }
 
@@ -698,6 +704,7 @@ func CopyConfig(config *Config) *Config {
 		Timeout:                   config.Timeout,
 		Dial:                      config.Dial,
 		Proxy:                     config.Proxy,
+		Context: 									 config.Context,
 	}
 	if config.ExecProvider != nil && config.ExecProvider.Config != nil {
 		c.ExecProvider.Config = config.ExecProvider.Config.DeepCopyObject()

@@ -18,6 +18,7 @@ package peerproxy
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -83,10 +84,13 @@ func TestPeerProxiedRequest(t *testing.T) {
 		ProxyCA:        &proxyCA},
 		[]string{"--runtime-config=api/all=true,batch/v1=false"}, etcd)
 	t.Cleanup(serverB.TearDownFn)
-
+	fmt.Printf("first clientconfig: %#v", serverA.ClientConfig)
+	fmt.Printf("first clientconfig: %#v", serverA.ClientConfig)
 	kubeClientSetA, err := kubernetes.NewForConfig(serverA.ClientConfig)
 	require.NoError(t, err)
 
+	fmt.Printf("first clientconfig: %#v", serverB.ClientConfig)
+	fmt.Printf("first clientconfig: %#v", serverB.ClientConfig)
 	kubeClientSetB, err := kubernetes.NewForConfig(serverB.ClientConfig)
 	require.NoError(t, err)
 

@@ -105,7 +105,8 @@ func NewPeerProxyHandler(
 	h.discoveryClient = discoveryClient
 	h.localDiscoveryInfoCache.Store(map[schema.GroupVersionResource]bool{})
 	h.peerDiscoveryInfoCache.Store(map[string]map[schema.GroupVersionResource]bool{})
-
+ 
+	fmt.Println("Create proxy client config...")
 	proxyTransport, err := transport.New(proxyClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create proxy transport: %w", err)
