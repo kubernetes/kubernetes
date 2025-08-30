@@ -240,7 +240,7 @@ func recordEvent(ctx context.Context, sink EventSink, event *eventsv1.Event) (*e
 		newEvent, err = sink.Patch(ctx, event, patch)
 	}
 	// Update can fail because the event may have been removed and it no longer exists.
-	if !isEventSeries || (isEventSeries && util.IsKeyNotFoundError(err)) {
+	if !isEventSeries || util.IsKeyNotFoundError(err) {
 		// Making sure that ResourceVersion is empty on creation
 		event.ResourceVersion = ""
 		newEvent, err = sink.Create(ctx, event)
