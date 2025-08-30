@@ -90,6 +90,7 @@ func startSVMController(
 		ctx,
 		client,
 		dynamicClient,
+		discoveryClient,
 		informer,
 		controllerName,
 		controllerContext.RESTMapper,
