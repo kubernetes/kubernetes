@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utiltrace "k8s.io/utils/trace"
 
 	"github.com/mxk/go-flowrate/flowrate"
 
@@ -211,6 +212,9 @@ func proxyRedirectsforRootPath(path string, w http.ResponseWriter, req *http.Req
 
 // ServeHTTP handles the proxy request
 func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	opTrace := utiltrace.New("UpgradeAwareHandler.ServeHTTP")
+	defer opTrace.Log()
+
 	if h.tryUpgrade(w, req) {
 		return
 	}
