@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
@@ -254,7 +255,7 @@ func TestMetrics(t *testing.T) {
 			ms := testMetrics.Reset()
 			testRegistry.MustRegister(ms...)
 
-			schemaValidator, _, err := validation.NewSchemaValidator(&tt.schema)
+			schemaValidator, _, err := validation.NewSchemaValidatorForVersion(&tt.schema, version.MustParse("1.27.0"))
 			if err != nil {
 				t.Fatal(err)
 				return
