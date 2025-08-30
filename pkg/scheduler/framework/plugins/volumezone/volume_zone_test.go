@@ -837,7 +837,7 @@ func BenchmarkVolumeZone(b *testing.B) {
 	}
 }
 
-func newPluginWithListers(ctx context.Context, tb testing.TB, pods []*v1.Pod, nodes []*v1.Node, pvcs []*v1.PersistentVolumeClaim, pvs []*v1.PersistentVolume) framework.Plugin {
+func newPluginWithListers(ctx context.Context, tb testing.TB, pods []*v1.Pod, nodes []*v1.Node, pvcs []*v1.PersistentVolumeClaim, pvs []*v1.PersistentVolume) fwk.Plugin {
 	snapshot := cache.NewSnapshot(pods, nodes)
 
 	objects := make([]runtime.Object, 0, len(pvcs))

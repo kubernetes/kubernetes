@@ -18,14 +18,13 @@ package helper
 
 import (
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // DefaultNormalizeScore generates a Normalize Score function that can normalize the
 // scores from [0, max(scores)] to [0, maxPriority]. If reverse is set to true, it
 // reverses the scores by subtracting it from maxPriority.
 // Note: The input scores are always assumed to be non-negative integers.
-func DefaultNormalizeScore(maxPriority int64, reverse bool, scores framework.NodeScoreList) *fwk.Status {
+func DefaultNormalizeScore(maxPriority int64, reverse bool, scores fwk.NodeScoreList) *fwk.Status {
 	var maxCount int64
 	for i := range scores {
 		if scores[i].Score > maxCount {

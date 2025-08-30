@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -34,17 +34,17 @@ type fakeDRAManager struct {
 	deviceClassLister *deviceClassLister
 }
 
-var _ framework.DeviceClassLister = &deviceClassLister{}
+var _ fwk.DeviceClassLister = &deviceClassLister{}
 
-func (f *fakeDRAManager) ResourceClaims() framework.ResourceClaimTracker {
+func (f *fakeDRAManager) ResourceClaims() fwk.ResourceClaimTracker {
 	return nil
 }
 
-func (f *fakeDRAManager) ResourceSlices() framework.ResourceSliceLister {
+func (f *fakeDRAManager) ResourceSlices() fwk.ResourceSliceLister {
 	return nil
 }
 
-func (f *fakeDRAManager) DeviceClasses() framework.DeviceClassLister {
+func (f *fakeDRAManager) DeviceClasses() fwk.DeviceClassLister {
 	return f.deviceClassLister
 }
 
