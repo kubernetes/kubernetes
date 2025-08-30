@@ -27,38 +27,43 @@ import (
 
 func TestEnum(t *testing.T) {
 	cases := []struct {
-		value string
-		valid sets.Set[string]
-		err   bool
+		name      string
+		value     string
+		valid     sets.Set[string]
+		expectErr string
 	}{{
-		value: "a",
-		valid: sets.New("a", "b", "c"),
-		err:   false,
+		name:      "valid value",
+		value:     "a",
+		valid:     sets.New("a", "b", "c"),
+		expectErr: "",
 	}, {
-		value: "x",
-		valid: sets.New("c", "a", "b"),
-		err:   true,
+		name:      "invalid value",
+		value:     "x",
+		valid:     sets.New("a", "b", "c"),
+		expectErr: `fldpath: Unsupported value: "x": supported values: "a", "b", "c"`,
 	}}
 
-	for i, tc := range cases {
-		result := Enum(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &tc.value, nil, tc.valid)
-		if len(result) > 0 && !tc.err {
-			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
-			continue
-		}
-		if len(result) == 0 && tc.err {
-			t.Errorf("case %d: unexpected success", i)
-			continue
-		}
-		if len(result) > 0 {
-			if len(result) > 1 {
-				t.Errorf("case %d: unexepected multi-error: %v", i, fmtErrs(result))
-				continue
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := operation.Operation{Type: operation.Create}
+			errs := Enum(context.Background(), op, field.NewPath("fldpath"), &tc.value, nil, tc.valid, nil)
+
+			if tc.expectErr == "" {
+				if len(errs) > 0 {
+					t.Fatalf("expected no error, but got: %v", errs)
+				}
+			} else {
+				if len(errs) == 0 {
+					t.Fatal("expected an error, but got none")
+				}
+				if len(errs) > 1 {
+					t.Fatalf("expected a single error, but got: %v", errs)
+				}
+				if errs[0].Error() != tc.expectErr {
+					t.Errorf("expected error %q, but got %q", tc.expectErr, errs[0].Error())
+				}
 			}
-			if want, got := `supported values: "a", "b", "c"`, result[0].Detail; got != want {
-				t.Errorf("case %d: wrong error, expected: %q, got: %q", i, want, got)
-			}
-		}
+		})
 	}
 }
 
@@ -71,37 +76,149 @@ func TestEnumTypedef(t *testing.T) {
 	)
 
 	cases := []struct {
-		value StringType
-		valid sets.Set[StringType]
-		err   bool
+		name      string
+		value     StringType
+		valid     sets.Set[StringType]
+		expectErr string
 	}{{
-		value: "foo",
-		valid: sets.New(NotStringFoo, NotStringBar, NotStringQux),
-		err:   false,
+		name:      "valid value",
+		value:     "foo",
+		valid:     sets.New(NotStringFoo, NotStringBar, NotStringQux),
+		expectErr: "",
 	}, {
-		value: "x",
-		valid: sets.New(NotStringFoo, NotStringBar, NotStringQux),
-		err:   true,
+		name:      "invalid value",
+		value:     "x",
+		valid:     sets.New(NotStringFoo, NotStringBar, NotStringQux),
+		expectErr: `fldpath: Unsupported value: "x": supported values: "bar", "foo", "qux"`,
 	}}
 
-	for i, tc := range cases {
-		result := Enum(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &tc.value, nil, tc.valid)
-		if len(result) > 0 && !tc.err {
-			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
-			continue
-		}
-		if len(result) == 0 && tc.err {
-			t.Errorf("case %d: unexpected success", i)
-			continue
-		}
-		if len(result) > 0 {
-			if len(result) > 1 {
-				t.Errorf("case %d: unexepected multi-error: %v", i, fmtErrs(result))
-				continue
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := operation.Operation{Type: operation.Create}
+			errs := Enum(context.Background(), op, field.NewPath("fldpath"), &tc.value, nil, tc.valid, nil)
+
+			if tc.expectErr == "" {
+				if len(errs) > 0 {
+					t.Fatalf("expected no error, but got: %v", errs)
+				}
+			} else {
+				if len(errs) == 0 {
+					t.Fatal("expected an error, but got none")
+				}
+				if len(errs) > 1 {
+					t.Fatalf("expected a single error, but got: %v", errs)
+				}
+				if errs[0].Error() != tc.expectErr {
+					t.Errorf("expected error %q, but got %q", tc.expectErr, errs[0].Error())
+				}
 			}
-			if want, got := `supported values: "bar", "foo", "qux"`, result[0].Detail; got != want {
-				t.Errorf("case %d: wrong error, expected: %q, got: %q", i, want, got)
+		})
+	}
+}
+
+func TestEnumExclude(t *testing.T) {
+	type TestEnum string
+	const (
+		ValueA TestEnum = "A"
+		ValueB TestEnum = "B"
+		ValueC TestEnum = "C"
+		ValueD TestEnum = "D"
+	)
+
+	const (
+		FeatureA = "FeatureA"
+		FeatureB = "FeatureB"
+	)
+
+	testEnumValues := sets.New(ValueA, ValueB, ValueC, ValueD)
+	testEnumExclusions := []EnumExclusion[TestEnum]{
+		{Value: ValueA, Option: FeatureA, ExcludeWhen: true},
+		{Value: ValueB, Option: FeatureB, ExcludeWhen: false},
+		{Value: ValueD, Option: FeatureA, ExcludeWhen: true},
+		{Value: ValueD, Option: FeatureB, ExcludeWhen: false},
+	}
+
+	testCases := []struct {
+		name      string
+		value     TestEnum
+		opts      []string
+		expectErr string
+	}{
+		{
+			name:  "no options, A is valid",
+			value: ValueA,
+		},
+		{
+			name:      "no options, B is invalid",
+			value:     ValueB,
+			expectErr: `fld: Unsupported value: "B": supported values: "A", "C"`,
+		},
+		{
+			name:      "no options, D is invalid",
+			value:     ValueD,
+			expectErr: `fld: Unsupported value: "D": supported values: "A", "C"`,
+		},
+		{
+			name:      "FeatureA enabled, A is invalid",
+			value:     ValueA,
+			opts:      []string{FeatureA},
+			expectErr: `fld: Unsupported value: "A": supported values: "C"`,
+		},
+		{
+			name:      "FeatureA enabled, B is invalid",
+			value:     ValueB,
+			opts:      []string{FeatureA},
+			expectErr: `fld: Unsupported value: "B": supported values: "C"`,
+		},
+		{
+			name:  "FeatureB enabled, A is valid",
+			value: ValueA,
+			opts:  []string{FeatureB},
+		},
+		{
+			name:  "FeatureB enabled, B is valid",
+			value: ValueB,
+			opts:  []string{FeatureB},
+		},
+		{
+			name:      "FeatureA and FeatureB enabled, A is invalid",
+			value:     ValueA,
+			opts:      []string{FeatureA, FeatureB},
+			expectErr: `fld: Unsupported value: "A": supported values: "B", "C"`,
+		},
+		{
+			name:  "FeatureA and FeatureB enabled, B is valid",
+			value: ValueB,
+			opts:  []string{FeatureA, FeatureB},
+		},
+		{
+			name:      "FeatureA and FeatureB enabled, D is invalid",
+			value:     ValueD,
+			opts:      []string{FeatureA, FeatureB},
+			expectErr: `fld: Unsupported value: "D": supported values: "B", "C"`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			op := operation.Operation{Type: operation.Create, Options: tc.opts}
+			errs := Enum(context.Background(), op, field.NewPath("fld"), &tc.value, nil, testEnumValues, testEnumExclusions)
+
+			if tc.expectErr == "" {
+				if len(errs) > 0 {
+					t.Fatalf("expected no error, but got: %v", errs)
+				}
+			} else {
+				if len(errs) == 0 {
+					t.Fatal("expected an error, but got none")
+				}
+				if len(errs) > 1 {
+					t.Fatalf("expected a single error, but got: %v", errs)
+				}
+				if errs[0].Error() != tc.expectErr {
+					t.Errorf("expected error %q, but got %q", tc.expectErr, errs[0].Error())
+				}
 			}
-		}
+		})
 	}
 }

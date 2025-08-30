@@ -42,7 +42,7 @@ func (neqTagValidator) TagName() string {
 	return neqTagName
 }
 
-var neqTagValidScopes = sets.New(ScopeAny)
+var neqTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 
 func (neqTagValidator) ValidScopes() sets.Set[Scope] {
 	return neqTagValidScopes
