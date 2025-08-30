@@ -1694,12 +1694,12 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 			jobs: []runtime.Object{
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"}},
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
-					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef, Kind: controllerKind.Kind}}}},
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"}},
 			},
 			expected: []*batchv1.Job{
 				{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
-					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef, Kind: controllerKind.Kind}}}},
 			},
 		},
 		{
@@ -1725,7 +1725,7 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 					Namespace:       "foo-ns",
 					Name:            "foo-fooer-owner-ref",
 					Labels:          map[string]string{"key": "different-value"},
-					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}},
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef, Kind: controllerKind.Kind}}},
 				},
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{
 					Namespace:       "foo-ns",
@@ -1739,7 +1739,7 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 					Namespace:       "foo-ns",
 					Name:            "foo-fooer-owner-ref",
 					Labels:          map[string]string{"key": "different-value"},
-					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}},
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef, Kind: controllerKind.Kind}}},
 			}},
 		},
 	}
@@ -1750,6 +1750,7 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 			defer cancel()
 			kubeClient := fake.NewSimpleClientset()
 			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+			sharedInformers.Batch().V1().CronJobs().Informer().GetIndexer().Add(tt.cronJob)
 			for _, job := range tt.jobs {
 				sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			}
@@ -1799,7 +1800,7 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "foo-ns",
 						Name:            "finished-job-started-hour-ago",
-						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: ptr.To(true)}},
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: ptr.To(true), Kind: controllerKind.Kind}},
 					},
 					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeThePriorHour()}},
 				},
@@ -1807,7 +1808,7 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "foo-ns",
 						Name:            "finished-job-started-minute-ago",
-						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: ptr.To(true)}},
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: ptr.To(true), Kind: controllerKind.Kind}},
 					},
 					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeTheHour()}},
 				},
