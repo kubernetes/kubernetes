@@ -79,7 +79,7 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 
 	controller := &PersistentVolumeController{
 		volumes:                       newPersistentVolumeOrderedIndex(),
-		claims:                        cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
+		claims:                        cache.NewTypedStore[*v1.PersistentVolumeClaim](cache.DeletionHandlingMetaNamespaceKeyFunc),
 		kubeClient:                    p.KubeClient,
 		eventBroadcaster:              eventBroadcaster,
 		eventRecorder:                 eventRecorder,
@@ -188,7 +188,7 @@ func (ctrl *PersistentVolumeController) storeVolumeUpdate(logger klog.Logger, vo
 	return storeObjectUpdate(logger, ctrl.volumes.store, volume, "volume")
 }
 
-func (ctrl *PersistentVolumeController) storeClaimUpdate(logger klog.Logger, claim interface{}) (bool, error) {
+func (ctrl *PersistentVolumeController) storeClaimUpdate(logger klog.Logger, claim *v1.PersistentVolumeClaim) (bool, error) {
 	return storeObjectUpdate(logger, ctrl.claims, claim, "claim")
 }
 
@@ -570,7 +570,7 @@ func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 		}
 
 		// The claim is not in informer cache, the event must have been "delete"
-		claimObj, found, err := ctrl.claims.GetByKey(key)
+		claim, found, err := ctrl.claims.GetByKey(key)
 		if err != nil {
 			logger.V(2).Info("Error getting claim from cache", "claimKey", key, "err", err)
 			return false
@@ -579,11 +579,6 @@ func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 			// The controller has already processed the delete event and
 			// deleted the claim from its cache
 			logger.V(2).Info("Deletion of claim was already processed", "claimKey", key)
-			return false
-		}
-		claim, ok := claimObj.(*v1.PersistentVolumeClaim)
-		if !ok {
-			logger.Error(nil, "Expected claim, got", "obj", claimObj)
 			return false
 		}
 		ctrl.deleteClaim(ctx, claim)
@@ -672,7 +667,7 @@ func getVolumeStatusForLogging(volume *v1.PersistentVolume) string {
 // callback (i.e. with events from etcd) or with an object modified by the
 // controller itself. Returns "true", if the cache was updated, false if the
 // object is an old version and should be ignored.
-func storeObjectUpdate(logger klog.Logger, store cache.Store, obj interface{}, className string) (bool, error) {
+func storeObjectUpdate[T any](logger klog.Logger, store cache.TypedStore[T], obj T, className string) (bool, error) {
 	objName, err := controller.KeyFunc(obj)
 	if err != nil {
 		return false, fmt.Errorf("couldn't get key for object %+v: %w", obj, err)
