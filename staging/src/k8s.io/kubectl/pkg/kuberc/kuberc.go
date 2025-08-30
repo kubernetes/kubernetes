@@ -81,10 +81,6 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 // Apply firstly applies the aliases in the preferences file and secondly overrides
 // the default values of flags.
 func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
-	if len(args) <= 1 {
-		return args, nil
-	}
-
 	kubercPath, err := getExplicitKuberc(args)
 	if err != nil {
 		return args, err
@@ -103,13 +99,18 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 		return args, err
 	}
 
+	// Always register aliases for help display
 	args, err = p.applyAliases(rootCmd, kuberc, args, errOut)
 	if err != nil {
 		return args, err
 	}
-	err = p.applyOverrides(rootCmd, kuberc, args, errOut)
-	if err != nil {
-		return args, err
+
+	// Only apply overrides if we have a command to execute
+	if len(args) > 1 {
+		err = p.applyOverrides(rootCmd, kuberc, args, errOut)
+		if err != nil {
+			return args, err
+		}
 	}
 	return args, nil
 }
@@ -126,7 +127,7 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 		parsedCmds := strings.Fields(c.Command)
 		overrideCmd, _, err := rootCmd.Find(parsedCmds)
 		if err != nil {
-			fmt.Fprintf(errOut, "Warning: command %q not found to set kuberc override\n", c.Command)
+			fmt.Fprintf(errOut, "Warning: command %q not found to set kuberc override\n", c.Command) //nolint:errcheck
 			continue
 		}
 		if overrideCmd.Name() != cmd.Name() {
@@ -172,14 +173,45 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 // of the command. Lastly, others parameters (e.g. resources, etc.) that are passed as arguments in kuberc
 // is appended into the command args.
 func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Preference, args []string, errOut io.Writer) ([]string, error) {
-	_, _, err := rootCmd.Find(args[1:])
+	// First, always register all aliases as commands for help display
+	for _, alias := range kuberc.Aliases {
+		p.aliases[alias.Name] = struct{}{}
+
+		// Check if alias already exists or conflicts with built-in command
+		if _, _, err := rootCmd.Find([]string{alias.Name}); err == nil {
+			continue
+		}
+
+		// Find the target command to ensure it exists
+		commands := strings.Fields(alias.Command)
+		existingCmd, _, err := rootCmd.Find(commands)
+		if err != nil {
+			continue
+		}
+
+		aliasCmd := &cobra.Command{
+			Use:    alias.Name,
+			Short:  buildFullAliasDescription(alias),
+			Run:    existingCmd.Run,
+			RunE:   existingCmd.RunE,
+			Hidden: false,
+		}
+
+		aliasCmd.Flags().AddFlagSet(existingCmd.Flags())
+		aliasCmd.PersistentFlags().AddFlagSet(existingCmd.PersistentFlags())
+		rootCmd.AddCommand(aliasCmd)
+	}
+
+	// Now handle the original aliasing logic for command execution
+	foundCmd, _, err := rootCmd.Find(args[1:])
 	if err == nil {
-		// Command is found, no need to continue for aliasing
-		return args, nil
+		// If found command is not an alias we created, no need to continue for aliasing
+		if _, isAlias := p.aliases[foundCmd.Use]; !isAlias {
+			return args, nil
+		}
 	}
 
 	var aliasArgs *aliasing
-
 	var commandName string // first "non-flag" arguments
 	var commandIndex int
 	for index, arg := range args[1:] {
@@ -192,34 +224,50 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 
 	for _, alias := range kuberc.Aliases {
 		p.aliases[alias.Name] = struct{}{}
-		if alias.Name != commandName {
-			continue
+		// Check for conflicts with existing commands
+		foundCmd, _, err := rootCmd.Find([]string{alias.Name})
+		if err == nil {
+			if alias.Name != commandName {
+				continue
+			}
+			if foundCmd.Use != alias.Name {
+				fmt.Fprintf(errOut, "Warning: Setting alias %q to a built-in command is not supported\n", alias.Name) //nolint:errcheck
+				continue
+			}
 		}
 
-		// do not allow shadowing built-ins
-		if _, _, err := rootCmd.Find([]string{alias.Name}); err == nil {
-			fmt.Fprintf(errOut, "Warning: Setting alias %q to a built-in command is not supported\n", alias.Name)
-			break
-		}
-
+		// Find the target command to ensure it exists
 		commands := strings.Fields(alias.Command)
 		existingCmd, flags, err := rootCmd.Find(commands)
 		if err != nil {
-			return args, fmt.Errorf("command %q not found to set alias %q: %v", alias.Command, alias.Name, flags)
+			if alias.Name == commandName {
+				return args, fmt.Errorf("command %q not found to set alias %q: %v", alias.Command, alias.Name, flags)
+			}
+			continue
 		}
 
-		newCmd := *existingCmd
-		newCmd.Use = alias.Name
-		newCmd.Aliases = []string{}
-		aliasCmd := &newCmd
-
-		aliasArgs = &aliasing{
-			prependArgs: alias.PrependArgs,
-			appendArgs:  alias.AppendArgs,
-			flags:       alias.Options,
-			command:     aliasCmd,
+		// Create alias command for help display and potential execution
+		aliasCmd := &cobra.Command{
+			Use:    alias.Name,
+			Short:  buildFullAliasDescription(alias),
+			Run:    existingCmd.Run,
+			RunE:   existingCmd.RunE,
+			Hidden: false,
 		}
-		break
+		aliasCmd.Flags().AddFlagSet(existingCmd.Flags())
+		aliasCmd.PersistentFlags().AddFlagSet(existingCmd.PersistentFlags())
+		if _, _, err := rootCmd.Find([]string{alias.Name}); err != nil {
+			rootCmd.AddCommand(aliasCmd)
+		}
+
+		if alias.Name == commandName {
+			aliasArgs = &aliasing{
+				prependArgs: alias.PrependArgs,
+				appendArgs:  alias.AppendArgs,
+				flags:       alias.Options,
+				command:     aliasCmd,
+			}
+		}
 	}
 
 	if aliasArgs == nil {
@@ -227,8 +275,6 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		// This might be a built-in command, external plugin, etc.
 		return args, nil
 	}
-
-	rootCmd.AddCommand(aliasArgs.command)
 
 	foundAliasCmd, _, err := rootCmd.Find([]string{commandName})
 	if err != nil {
@@ -410,6 +456,25 @@ func searchInArgs(flagName string, shorthand string, allShorthands map[string]st
 		}
 	}
 	return false
+}
+
+// buildFullAliasDescription creates a description showing the full expanded command
+// including prependArgs, appendArgs, and default flag values
+func buildFullAliasDescription(alias config.AliasOverride) string {
+	parts := []string{alias.Command}
+
+	if len(alias.PrependArgs) > 0 {
+		parts = append(parts, alias.PrependArgs...)
+	}
+	for _, option := range alias.Options {
+		parts = append(parts, fmt.Sprintf("--%s=%s", option.Name, option.Default))
+	}
+	if len(alias.AppendArgs) > 0 {
+		parts = append(parts, alias.AppendArgs...)
+	}
+	fullCommand := strings.Join(parts, " ")
+	description := fmt.Sprintf("Alias for '%s'", fullCommand)
+	return description
 }
 
 func validate(plugin *config.Preference) error {
