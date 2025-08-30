@@ -56,8 +56,7 @@ const tmpPrivateKeyFile = "kubelet-client.key.tmp"
 // kubeconfigPath on disk is populated based on bootstrapPath but pointing to the location of the client cert
 // in certDir. This preserves the historical behavior of bootstrapping where on subsequent restarts the
 // most recent client cert is used to request new client certs instead of the initial token.
-func LoadClientConfig(ctx context.Context, kubeconfigPath, bootstrapPath, certDir string) (certConfig, userConfig *restclient.Config, err error) {
-	logger := klog.FromContext(ctx)  
+func LoadClientConfig(logger klog.Logger, kubeconfigPath, bootstrapPath, certDir string) (certConfig, userConfig *restclient.Config, err error) {  
 	if len(bootstrapPath) == 0 {
 		clientConfig, err := loadRESTClientConfig(kubeconfigPath)
 		if err != nil {

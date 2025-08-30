@@ -275,7 +275,8 @@ users:
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			certConfig, clientConfig, err := LoadClientConfig(context.TODO(), test.kubeconfigPath, test.bootstrapPath, test.certDir)
+			logger := klog.Background()
+			certConfig, clientConfig, err := LoadClientConfig(logger, test.kubeconfigPath, test.bootstrapPath, test.certDir)
 			if err != nil {
 				t.Fatal(err)
 			}
