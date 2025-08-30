@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -105,7 +106,13 @@ func ShouldRetry(err error) (retry bool, retryAfter time.Duration) {
 		apierrors.IsTooManyRequests(err) ||
 		apierrors.IsServiceUnavailable(err) ||
 		errors.Is(err, io.EOF) ||
-		errors.As(err, &transientError{}) {
+		errors.As(err, &transientError{}) ||
+		// if the apiserver times out a request after the handler has
+		// written to the associated ResponseWriter object, then the
+		// client will receive an "unexpected EOF" error for
+		// http/1x, or a stream reset error for http/2.0.
+		errors.Is(err, io.ErrUnexpectedEOF) ||
+		(strings.Contains(err.Error(), "stream error") && strings.Contains(err.Error(), "INTERNAL_ERROR; received from peer")) {
 		return true, 0
 	}
 
