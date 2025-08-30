@@ -204,6 +204,29 @@ func nextScheduleTimeDuration(cj *batchv1.CronJob, now time.Time, schedule cron.
 	return &t
 }
 
+// calculateNextScheduleTime returns the actual next schedule time for storing in status
+func calculateNextScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Schedule) *time.Time {
+	earliestTime, mostRecentTime, missedSchedules, err := mostRecentScheduleTime(cj, now, schedule, false)
+	if err != nil {
+		// if there's an error, calculate next from now
+		nextTime := schedule.Next(now)
+		return &nextTime
+	}
+
+	if mostRecentTime == nil {
+		if missedSchedules == noneMissed {
+			// no missed schedules since earliestTime
+			mostRecentTime = &earliestTime
+		} else {
+			// if there are missed schedules since earliestTime, always use now
+			mostRecentTime = &now
+		}
+	}
+
+	nextTime := schedule.Next(*mostRecentTime)
+	return &nextTime
+}
+
 // nextScheduleTime returns the time.Time of the next schedule after the last scheduled
 // and before now, or nil if no unmet schedule times, and an error.
 // If there are too many (>100) unstarted times, it will also record a warning.
