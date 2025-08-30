@@ -125,12 +125,12 @@ func (m *imageManager) imagePullPrecheck(ctx context.Context, objRef *v1.ObjectR
 
 		// Compare digests if not match then pull image from remote
 		if remoteImageRef != imageRef && remoteImageRef != "" {
-			msg = fmt.Sprintf("Remote image for %q changed (local=%s, remote=%s), will pull new one.", requestedImage, imageRef, remoteImageRef)
+			msg = fmt.Sprintf("[PullIfNewerNotPresent] Remote image %s changed (local=%s, remote=%s), will pull new one.", requestedImage, imageRef, remoteImageRef)
 			m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
 			return "", msg, err
 		}
 
-		msg = fmt.Sprintf("Remote image for %q is exactly the same (local=%s, remote=%s), using existing one.", requestedImage, imageRef, remoteImageRef)
+		msg = fmt.Sprintf("[PullIfNewerNotPresent] Remote image %s is exactly the same (local=%s, remote=%s), using existing one.", requestedImage, imageRef, remoteImageRef)
 		m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
 
 	case v1.PullIfNotPresent:
