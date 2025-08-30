@@ -24,6 +24,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	goruntime "runtime"
 	"strings"
@@ -58,6 +59,8 @@ import (
 func TestAuthenticationValidate(t *testing.T) {
 	testCases := []struct {
 		name                              string
+		clientCert                        *apiserveroptions.ClientCertAuthenticationOptions
+		requestHeader                     *apiserveroptions.RequestHeaderAuthenticationOptions
 		testAnonymous                     *AnonymousAuthenticationOptions
 		testOIDC                          *OIDCAuthenticationOptions
 		testSA                            *ServiceAccountAuthenticationOptions
@@ -256,11 +259,43 @@ func TestAuthenticationValidate(t *testing.T) {
 			// feature-gate, otherwise this feature-gate cannot be disabled.
 			emulationVersion: version.MustParse("1.33"),
 		},
+		{
+			name:       "overlapping CA without allowed-names",
+			clientCert: &apiserveroptions.ClientCertAuthenticationOptions{ClientCA: filepath.Join("testdata", "client-ca.pem")},
+			requestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
+				ClientCAFile:    filepath.Join("testdata", "client-ca.pem"),
+				AllowedNames:    []string{},
+				UsernameHeaders: []string{"X-Remote-User"},
+			},
+			expectErr: "--requestheader-client-ca-file and --client-ca-file contain overlapping certificates; --requestheader-allowed-names must be specified to ensure regular client certificates cannot set authenticating proxy headers for arbitrary users",
+		},
+		{
+			name:       "overlapping CA with allowed-names",
+			clientCert: &apiserveroptions.ClientCertAuthenticationOptions{ClientCA: filepath.Join("testdata", "client-ca.pem")},
+			requestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
+				ClientCAFile:    filepath.Join("testdata", "client-ca.pem"),
+				AllowedNames:    []string{"Client-CA"},
+				UsernameHeaders: []string{"X-Remote-User"},
+			},
+			expectErr: "",
+		},
+		{
+			name:       "different CAs without allowed-names",
+			clientCert: &apiserveroptions.ClientCertAuthenticationOptions{ClientCA: filepath.Join("testdata", "client-ca.pem")},
+			requestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
+				ClientCAFile:    filepath.Join("testdata", "server-ca.pem"),
+				AllowedNames:    []string{},
+				UsernameHeaders: []string{"X-Remote-User"},
+			},
+			expectErr: "",
+		},
 	}
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
 			options := NewBuiltInAuthenticationOptions()
+			options.ClientCert = testcase.clientCert
+			options.RequestHeader = testcase.requestHeader
 			options.Anonymous = testcase.testAnonymous
 			options.OIDC = testcase.testOIDC
 			options.ServiceAccounts = testcase.testSA
