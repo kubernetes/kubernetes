@@ -3528,13 +3528,14 @@ func validateLifecycle(lifecycle *core.Lifecycle, gracePeriod *int64, fldPath *f
 var supportedPullPolicies = sets.New(
 	core.PullAlways,
 	core.PullIfNotPresent,
+	core.PullIfNewerNotPresent,
 	core.PullNever)
 
 func validatePullPolicy(policy core.PullPolicy, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 
 	switch policy {
-	case core.PullAlways, core.PullIfNotPresent, core.PullNever:
+	case core.PullAlways, core.PullIfNotPresent, core.PullIfNewerNotPresent, core.PullNever:
 		break
 	case "":
 		allErrors = append(allErrors, field.Required(fldPath, ""))

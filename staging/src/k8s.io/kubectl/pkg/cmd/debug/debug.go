@@ -360,7 +360,7 @@ func (o *DebugOptions) Validate() error {
 
 	// Pull Policy
 	switch o.PullPolicy {
-	case corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever, "":
+	case corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullIfNewerNotPresent, corev1.PullNever, "":
 		// continue
 	default:
 		return fmt.Errorf("invalid image pull policy: %s", o.PullPolicy)

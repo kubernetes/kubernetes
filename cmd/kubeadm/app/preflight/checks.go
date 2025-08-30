@@ -812,7 +812,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	// Handle unsupported image pull policy and policy Never.
 	policy := ipc.imagePullPolicy
 	switch policy {
-	case v1.PullAlways, v1.PullIfNotPresent:
+	case v1.PullAlways, v1.PullIfNotPresent, v1.PullIfNewerNotPresent:
 		klog.V(1).Infof("using image pull policy: %s", policy)
 	case v1.PullNever:
 		klog.V(1).Infof("skipping the pull of all images due to policy: %s", policy)
@@ -842,6 +842,12 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	// Perform serial pulls.
 	for _, image := range ipc.imageList {
 		switch policy {
+		case v1.PullIfNewerNotPresent:
+			if ipc.runtime.ImageExists(image) {
+				klog.V(1).Infof("image exists: %s", image)
+				continue
+			}
+			fallthrough // Proceed with pulling the image if it does not exist
 		case v1.PullIfNotPresent:
 			if ipc.runtime.ImageExists(image) {
 				klog.V(1).Infof("image exists: %s", image)

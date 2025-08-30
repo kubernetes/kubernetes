@@ -869,7 +869,7 @@ message Container {
   optional string terminationMessagePolicy = 20;
 
   // Image pull policy.
-  // One of Always, Never, IfNotPresent.
+  // One of Always, Never, IfNotPresent, IfNewerNotPresent.
   // Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
   // Cannot be updated.
   // More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
@@ -1648,7 +1648,7 @@ message EphemeralContainerCommon {
   optional string terminationMessagePolicy = 20;
 
   // Image pull policy.
-  // One of Always, Never, IfNotPresent.
+  // One of Always, Never, IfNotPresent, IfNewerNotPresent.
   // Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
   // Cannot be updated.
   // More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
@@ -7211,4 +7211,3 @@ message WindowsSecurityContextOptions {
   // +optional
   optional bool hostProcess = 4;
 }
-
