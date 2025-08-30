@@ -758,10 +758,10 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 			continue
 		}
 
-		_, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
+		allocatable := nodeInfo.GetAllocatable().GetScalarResources()[rName]
 		_, okDynamic := state.draExtendedResource.resourceToDeviceClass[rName]
 		if okDynamic {
-			if okScalar {
+			if allocatable > 0 {
 				// node provides the resource via device plugin
 				extendedResources[rName] = 0
 			} else {
@@ -769,7 +769,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 				extendedResources[rName] = rQuant
 				hasExtendedResource = true
 			}
-		} else if !okScalar {
+		} else if allocatable == 0 {
 			// has request neither provided by device plugin, nor backed by DRA,
 			// hence the pod does not fit the node.
 			return nil, statusUnschedulable(logger, "cannot fit resource", "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "resource", rName)
