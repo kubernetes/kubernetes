@@ -702,11 +702,19 @@ func (m *manager) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, strin
 
 	// If any handler rejects, the pod is rejected.
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods}
+	var allWarnings []lifecycle.PodAdmitWarning
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
 			klog.InfoS("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message)
 			return false, result.Reason, result.Message
+		} else if len(result.Warnings) > 0 {
+			allWarnings = append(allWarnings, result.Warnings...)
 		}
+	}
+
+	// The warnings are produced when it is certain that the pod is going to be admitted.
+	for _, warning := range allWarnings {
+		m.recorder.Event(attrs.Pod, v1.EventTypeWarning, warning.Reason, warning.Message)
 	}
 
 	return true, "", ""

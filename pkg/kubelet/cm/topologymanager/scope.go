@@ -156,3 +156,15 @@ func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) e
 	}
 	return nil
 }
+
+func (s *scope) getWarnings(pod *v1.Pod) []lifecycle.PodAdmitWarning {
+	var warnings []lifecycle.PodAdmitWarning
+	for _, provider := range s.hintProviders {
+		warningProvider, ok := provider.(lifecycle.PodWarningProvider)
+		if !ok {
+			continue
+		}
+		warnings = append(warnings, warningProvider.GetWarnings(pod)...)
+	}
+	return warnings
+}
