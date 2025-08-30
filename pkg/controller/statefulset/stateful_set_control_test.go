@@ -161,8 +161,7 @@ func TestStatefulSetControl(t *testing.T) {
 		fn  func(*testing.T, *apps.StatefulSet, invariantFunc)
 		obj func() *apps.StatefulSet
 	}{
-		{CreatesPodsWithPodIndexLabelFeature, simpleSetFn},
-		{CreatesPodsWithoutPodIndexLabelFeature, simpleSetFn},
+		{CreatePods, simpleSetFn},
 		{ScalesUp, simpleSetFn},
 		{ScalesDown, simpleSetFn},
 		{ReplacesPods, largeSetFn},
@@ -205,20 +204,7 @@ func TestStatefulSetControl(t *testing.T) {
 	}
 }
 
-func CreatesPodsWithPodIndexLabelFeature(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
-	createPods(t, set, invariants, true)
-}
-
-func CreatesPodsWithoutPodIndexLabelFeature(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
-	createPods(t, set, invariants, false)
-}
-
-func createPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, isPodIndexLabelEnabled bool) {
-	if !isPodIndexLabelEnabled {
-		// TODO: this will be removed in 1.35
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.31"))
-	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodIndexLabel, isPodIndexLabelEnabled)
+func CreatePods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
@@ -253,22 +239,14 @@ func createPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, i
 		t.Errorf("Expected 3 pods, got %d", len(pods))
 	}
 	for _, pod := range pods {
-		if isPodIndexLabelEnabled {
-			podIndexFromLabel, exists := pod.Labels[apps.PodIndexLabel]
-			if !exists {
-				t.Errorf("Missing pod index label: %s", apps.PodIndexLabel)
-				continue
-			}
-			podIndexFromName := strconv.Itoa(getOrdinal(pod))
-			if podIndexFromLabel != podIndexFromName {
-				t.Errorf("Pod index label value (%s) does not match pod index in pod name (%s)", podIndexFromLabel, podIndexFromName)
-			}
-		} else {
-			_, exists := pod.Labels[apps.PodIndexLabel]
-			if exists {
-				t.Errorf("Pod index label should not exist when feature gate is disabled: %s", apps.PodIndexLabel)
-				continue
-			}
+		podIndexFromLabel, exists := pod.Labels[apps.PodIndexLabel]
+		if !exists {
+			t.Errorf("Missing pod index label: %s", apps.PodIndexLabel)
+			continue
+		}
+		podIndexFromName := strconv.Itoa(getOrdinal(pod))
+		if podIndexFromLabel != podIndexFromName {
+			t.Errorf("Pod index label value (%s) does not match pod index in pod name (%s)", podIndexFromLabel, podIndexFromName)
 		}
 	}
 }
