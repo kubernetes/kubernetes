@@ -5680,7 +5680,8 @@ const (
 	ServiceInternalTrafficPolicyLocal ServiceInternalTrafficPolicy = "Local"
 )
 
-// for backwards compat
+// ServiceInternalTrafficPolicy describes how nodes distribute service traffic they
+// receive on the ClusterIP.
 // +enum
 type ServiceInternalTrafficPolicyType = ServiceInternalTrafficPolicy
 
@@ -5700,7 +5701,9 @@ const (
 	ServiceExternalTrafficPolicyLocal ServiceExternalTrafficPolicy = "Local"
 )
 
-// for backwards compat
+// ServiceExternalTrafficPolicy describes how nodes distribute service traffic they
+// receive on one of the Service's "externally-facing" addresses (NodePorts, ExternalIPs,
+// and LoadBalancer IPs.
 // +enum
 type ServiceExternalTrafficPolicyType = ServiceExternalTrafficPolicy
 
@@ -5835,7 +5838,7 @@ const (
 	IPFamilyPolicyRequireDualStack IPFamilyPolicy = "RequireDualStack"
 )
 
-// for backwards compat
+// IPFamilyPolicy represents the dual-stack-ness requested or required by a Service
 // +enum
 type IPFamilyPolicyType = IPFamilyPolicy
 

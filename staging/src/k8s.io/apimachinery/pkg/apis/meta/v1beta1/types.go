@@ -46,6 +46,7 @@ type ConditionStatus = v1.ConditionStatus
 type IncludeObjectPolicy = v1.IncludeObjectPolicy
 
 // TableOptions are used when a Table is requested by the caller.
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TableOptions = v1.TableOptions
 

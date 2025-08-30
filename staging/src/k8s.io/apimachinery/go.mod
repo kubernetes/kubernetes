@@ -21,7 +21,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/net v0.40.0
 	golang.org/x/time v0.9.0
-	gopkg.in/evanphx/json-patch.v4 v4.12.0
+	gopkg.in/evanphx/json-patch.v4 v4.13.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b
@@ -44,7 +44,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/onsi/ginkgo/v2 v2.21.0 // indirect
 	github.com/onsi/gomega v1.35.1 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
