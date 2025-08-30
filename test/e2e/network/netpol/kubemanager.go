@@ -19,18 +19,22 @@ package netpol
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	netutils "k8s.io/utils/net"
-	"net"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // defaultPollIntervalSeconds [seconds] is the default value for which the Prober will wait before attempting next attempt.
@@ -285,9 +289,20 @@ func (k *kubeManager) cleanNetworkPolicies(ctx context.Context) error {
 		for _, np := range l.Items {
 			framework.Logf("deleting network policy %s/%s", ns, np.Name)
 			err = k.clientSet.NetworkingV1().NetworkPolicies(ns).Delete(ctx, np.Name, metav1.DeleteOptions{})
-			if err != nil {
+			if err != nil && !apierrors.IsNotFound(err) {
 				return fmt.Errorf("unable to delete network policy %s/%s: %w", ns, np.Name, err)
 			}
+			err = framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*networkingv1.NetworkPolicy, error) {
+				np, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).Get(ctx, np.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return nil, nil
+				}
+				return np, err
+			})).WithTimeout(waitTimeout).Should(gomega.BeNil())
+			if err != nil {
+				return fmt.Errorf("expected network policy to not be found: %w", err)
+			}
+			return nil
 		}
 	}
 	return nil
