@@ -476,6 +476,11 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	as.Equal(int64(0), val.Value())
 	as.Empty(removed)
 	as.True(testManager.isDevicePluginResource(resourceName2))
+	// When DRAExtendedResource feature is enabled, resource
+	// with 0 healthy devices (disconnected or unregistered)
+	// is not considered a DevicePlugin resource.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+	as.False(testManager.isDevicePluginResource(resourceName2))
 }
 
 func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
