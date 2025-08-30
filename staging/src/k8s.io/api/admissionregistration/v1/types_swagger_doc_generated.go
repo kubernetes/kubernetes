@@ -282,7 +282,7 @@ func (ValidatingWebhook) SwaggerDoc() map[string]string {
 }
 
 var map_ValidatingWebhookConfiguration = map[string]string{
-	"":         "ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.",
+	"":         "ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects an object without changing it.",
 	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
 	"webhooks": "Webhooks is a list of webhooks and the affected resources and operations.",
 }
