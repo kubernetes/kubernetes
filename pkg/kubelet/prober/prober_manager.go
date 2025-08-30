@@ -305,6 +305,7 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 			w, exists := m.getWorker(pod.UID, c.Name, readiness)
 			ready = !exists // no readinessProbe -> always ready
 			if exists {
+				ready = c.Ready
 				// Trigger an immediate run of the readinessProbe to update ready state
 				select {
 				case w.manualTriggerCh <- struct{}{}:
