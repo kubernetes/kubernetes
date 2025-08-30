@@ -23,6 +23,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.36.0
 	go.yaml.in/yaml/v2 v2.4.2
 	golang.org/x/sync v0.14.0
+	golang.org/x/text v0.25.0
 	google.golang.org/grpc v1.72.2
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/evanphx/json-patch.v4 v4.13.0
@@ -113,7 +114,6 @@ require (
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb // indirect
