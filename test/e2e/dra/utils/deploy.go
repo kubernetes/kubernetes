@@ -149,7 +149,7 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 	claimInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
-				slices, err := resourceClient.ResourceClaims("").List(ctx, options)
+				slices, err := resourceClient.ResourceClaims(f.Namespace.Name).List(ctx, options)
 				if err == nil {
 					resourceClaimLogger.Info("Listed ResourceClaims", "resourceAPI", resourceClient.CurrentAPI(), "numClaims", len(slices.Items), "listMeta", slices.ListMeta)
 				} else {
@@ -158,7 +158,7 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 				return slices, err
 			},
 			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
-				w, err := resourceClient.ResourceClaims("").Watch(ctx, options)
+				w, err := resourceClient.ResourceClaims(f.Namespace.Name).Watch(ctx, options)
 				if err == nil {
 					resourceClaimLogger.Info("Started watching ResourceClaims", "resourceAPI", resourceClient.CurrentAPI())
 					wrapper := newWatchWrapper(klog.LoggerWithName(resourceClaimLogger, fmt.Sprintf("%d", resourceClaimWatchCounter.Load())), w)
