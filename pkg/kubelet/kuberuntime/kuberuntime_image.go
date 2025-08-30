@@ -83,7 +83,7 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 // createKeychainFromSecrets creates an authn.Keychain from Kubernetes pull secrets
 func createKeychainFromSecrets(pullSecrets []v1.Secret) authn.Keychain {
 	if len(pullSecrets) == 0 {
-		klog.V(4).Info("No pull secrets provided, using default keychain")
+		klog.V(4).Info("No pull secrets provided for fetching remote image digest, using default keychain")
 		return authn.DefaultKeychain
 	}
 	return &secretKeychain{secrets: pullSecrets}
@@ -115,7 +115,7 @@ func (m *kubeGenericRuntimeManager) GetRemoteImageRef(
 		if err == nil {
 			break
 		}
-		logger.V(4).Error(err, "Failed to fetch remote image.","imageRef",imageRef)
+		logger.V(4).Error(err, "Failed to fetch remote image digest.","imageRef",imageRef,"retry",i+1)
 		time.Sleep(time.Second * time.Duration(i+1))
 		remoteImage, err = remote.Image(imageRef, remote.WithContext(ctx), remote.WithAuthFromKeychain(keychain))
 	}
@@ -126,14 +126,14 @@ func (m *kubeGenericRuntimeManager) GetRemoteImageRef(
 	}
 
 	// Get the image digest
-	digest, err := remoteImage.ConfigName()
+	remoteImageRef, err := remoteImage.ConfigName()
 	if err != nil {
 		logger.V(3).Error(err, "Failed to get remote image digest, fallback to local image", "imageRef", imageRef)
 		return imageRef.String(), nil
 	}
 
-	logger.V(3).Info("Successfully fetched remote digest: %s", digest.String())
-	return digest.String(), nil
+	logger.V(3).Info("Successfully fetched remote image digest: %s", remoteImageRef.String())
+	return remoteImageRef.String(), nil
 }
 
 
