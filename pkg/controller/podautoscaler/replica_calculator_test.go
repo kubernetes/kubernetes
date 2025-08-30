@@ -287,7 +287,7 @@ func (tc *replicaCalcTestCase) prepareTestCMClient(t *testing.T) *cmfake.FakeCus
 				Metric: cmapi.MetricIdentifier{
 					Name: tc.metric.name,
 				},
-				Value: *resource.NewMilliQuantity(int64(tc.metric.levels[0]), resource.DecimalSI),
+				Value: *resource.NewMilliQuantity(tc.metric.levels[0], resource.DecimalSI),
 			},
 		}
 
