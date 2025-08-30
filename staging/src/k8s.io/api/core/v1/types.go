@@ -6695,6 +6695,11 @@ type NodeStatus struct {
 	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	Features *NodeFeatures `json:"features,omitempty" protobuf:"bytes,13,rep,name=features"`
+	// Capabilities provides a structured way to report various capabilities of the node.
+	// Keys are DNS-style and values are strings.
+	// +optional
+	// +featureGate=NodeCapabilities
+	Capabilities map[string]string `json:"capabilities,omitempty" protobuf:"bytes,14,rep,name=capabilities"`
 }
 
 type UniqueVolumeName string

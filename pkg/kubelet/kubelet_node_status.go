@@ -677,6 +677,11 @@ func (kl *Kubelet) setNodeStatus(ctx context.Context, node *v1.Node) {
 			klog.ErrorS(err, "Failed to set some node status fields", "node", klog.KObj(node))
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeCapabilities) {
+		if kl.nodeCapabilities != nil {
+			node.Status.Capabilities = kl.nodeCapabilities
+		}
+	}
 }
 
 // defaultNodeStatusFuncs is a factory that generates the default set of
