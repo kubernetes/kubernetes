@@ -43,7 +43,7 @@ type singleKeyStrategy struct {
 // CompositeKeyFor directly returns the value of the single key  to
 // use as a composite key.
 func (ks *singleKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interface{}, bool) {
-	v, ok := obj[ks.key]
+	v, ok := getNestedValue(obj, ks.key)
 	if !ok {
 		return nil, false
 	}
@@ -68,7 +68,7 @@ func (ks *multiKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interfa
 
 	var delimited strings.Builder
 	for _, key := range ks.sts.XListMapKeys() {
-		v, ok := obj[key]
+		v, ok := getNestedValue(obj, key)
 		if !ok {
 			return nil, false
 		}
@@ -174,4 +174,30 @@ func MakeMapList(sts Schema, items []interface{}) (rv MapList) {
 		keyedItems:   map[interface{}]interface{}{},
 		unkeyedItems: items,
 	}
+}
+
+// getNestedValue retrieves a value from a nested map using dot notation.
+// For example, "metadata.name" would access obj["metadata"]["name"]
+func getNestedValue(obj map[string]interface{}, key string) (interface{}, bool) {
+	parts := strings.Split(key, ".")
+	current := obj
+
+	for i, part := range parts {
+		value, exists := current[part]
+		if !exists {
+			return nil, false
+		}
+
+		if i == len(parts)-1 {
+			return value, true
+		}
+
+		nextMap, ok := value.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		current = nextMap
+	}
+
+	return nil, false
 }
