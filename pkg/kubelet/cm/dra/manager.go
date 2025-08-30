@@ -956,7 +956,7 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 					if driverState, ok := cInfo.DriverState[pluginName]; ok {
 						for _, allocatedDevice := range driverState.Devices {
 							if allocatedDevice.PoolName == dev.PoolName && allocatedDevice.DeviceName == dev.DeviceName {
-								podsToUpdate.Insert(cInfo.PodUIDs.UnsortedList()...)
+								podsToUpdate.InsertSet(cInfo.PodUIDs)
 								break
 							}
 						}

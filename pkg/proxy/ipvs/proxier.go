@@ -1843,7 +1843,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	}
 
 	// Create new endpoints
-	for _, ep := range newEndpoints.UnsortedList() {
+	for ep := range newEndpoints {
 		ip, port, err := net.SplitHostPort(ep)
 		if err != nil {
 			proxier.logger.Error(err, "Failed to parse endpoint", "endpoint", ep)
@@ -1895,7 +1895,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	}
 
 	// Delete old endpoints
-	for _, ep := range curEndpoints.Difference(newEndpoints).UnsortedList() {
+	for ep := range curEndpoints.DifferenceSeq(newEndpoints) {
 		// if curEndpoint is in gracefulDelete, skip
 		uniqueRS := vs.String() + "/" + ep
 		if proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
