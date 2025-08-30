@@ -69,6 +69,7 @@ type JSONSchemaPropsApplyConfiguration struct {
 	XListType              *string                                      `json:"x-kubernetes-list-type,omitempty"`
 	XMapType               *string                                      `json:"x-kubernetes-map-type,omitempty"`
 	XValidations           *apiextensionsv1.ValidationRules             `json:"x-kubernetes-validations,omitempty"`
+	XUnions                *apiextensionsv1.Unions                      `json:"x-kubernetes-unions,omitempty"`
 }
 
 // JSONSchemaPropsApplyConfiguration constructs a declarative configuration of the JSONSchemaProps type for use with
@@ -459,5 +460,13 @@ func (b *JSONSchemaPropsApplyConfiguration) WithXMapType(value string) *JSONSche
 // If called multiple times, the XValidations field is set to the value of the last call.
 func (b *JSONSchemaPropsApplyConfiguration) WithXValidations(value apiextensionsv1.ValidationRules) *JSONSchemaPropsApplyConfiguration {
 	b.XValidations = &value
+	return b
+}
+
+// WithXUnions sets the XUnions field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the XUnions field is set to the value of the last call.
+func (b *JSONSchemaPropsApplyConfiguration) WithXUnions(value apiextensionsv1.Unions) *JSONSchemaPropsApplyConfiguration {
+	b.XUnions = &value
 	return b
 }

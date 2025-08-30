@@ -145,6 +145,17 @@
                 "fieldPath": "fieldPathValue",
                 "optionalOldSelf": true
               }
+            ],
+            "x-kubernetes-unions": [
+              {
+                "discriminator": "discriminatorValue",
+                "members": [
+                  {
+                    "fieldName": "fieldNameValue",
+                    "discriminatorValue": "discriminatorValueValue"
+                  }
+                ]
+              }
             ]
           }
         },
