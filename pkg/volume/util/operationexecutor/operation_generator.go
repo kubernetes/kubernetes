@@ -578,15 +578,6 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			resizeOptions.DeviceStagePath = deviceStagePath
 		}
 
-		// Execute mount
-		mountErr := volumeMounter.SetUp(volume.MounterArgs{
-			FsUser:              util.FsUserFrom(volumeToMount.Pod),
-			FsGroup:             fsGroup,
-			DesiredSize:         volumeToMount.DesiredSizeLimit,
-			FSGroupChangePolicy: fsGroupChangePolicy,
-			Recorder:            og.recorder,
-			SELinuxLabel:        volumeToMount.SELinuxLabel,
-		})
 		// Update actual state of world
 		markOpts := MarkVolumeOpts{
 			PodName:             volumeToMount.PodName,
@@ -598,6 +589,21 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			VolumeMountState:    VolumeMounted,
 			SELinuxMountContext: volumeToMount.SELinuxLabel,
 		}
+		// MarkVolumeMountAsUncertain before setup if it takes too long
+		if err := actualStateOfWorld.MarkVolumeMountAsUncertain(markOpts); err != nil {
+				klog.Error(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", err).Error())
+		}
+
+		// Execute mount
+		mountErr := volumeMounter.SetUp(volume.MounterArgs{
+			FsUser:              util.FsUserFrom(volumeToMount.Pod),
+			FsGroup:             fsGroup,
+			DesiredSize:         volumeToMount.DesiredSizeLimit,
+			FSGroupChangePolicy: fsGroupChangePolicy,
+			Recorder:            og.recorder,
+			SELinuxLabel:        volumeToMount.SELinuxLabel,
+		})
+
 		if mountErr != nil {
 			og.checkForFailedMount(volumeToMount, mountErr)
 			og.markVolumeErrorState(volumeToMount, markOpts, mountErr, actualStateOfWorld)
@@ -1088,6 +1094,11 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 				eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.MarkDeviceAsMounted failed", markDeviceMappedErr)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
+		}
+
+		// MarkVolumeMountAsUncertain before map if it takes too long
+		if err := actualStateOfWorld.MarkVolumeMountAsUncertain(markVolumeOpts); err != nil {
+				klog.Error(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", err).Error())
 		}
 
 		// Execute common map
