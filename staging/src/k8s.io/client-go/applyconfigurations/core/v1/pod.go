@@ -29,11 +29,23 @@ import (
 
 // PodApplyConfiguration represents a declarative configuration of the Pod type for use
 // with apply.
+//
+// Pod is a collection of containers that can run on a host. This resource is created
+// by clients and scheduled onto hosts.
 type PodApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *PodSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *PodStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the pod.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *PodSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the pod.
+	// This data may not be up to date.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *PodStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Pod constructs a declarative configuration of the Pod type for use with
@@ -54,7 +66,6 @@ func Pod(name, namespace string) *PodApplyConfiguration {
 // ExtractPodFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPodFrom(pod *corev1.Pod, fieldManager string, subresource string) (*PodApplyConfiguration, error) {
 	b := &PodApplyConfiguration{}
 	err := managedfields.ExtractInto(pod, internal.Parser().Type("io.k8s.api.core.v1.Pod"), fieldManager, b, subresource)
@@ -79,28 +90,24 @@ func ExtractPodFrom(pod *corev1.Pod, fieldManager string, subresource string) (*
 // ExtractPod provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPod(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
 	return ExtractPodFrom(pod, fieldManager, "")
 }
 
 // ExtractPodEphemeralcontainers extracts the applied configuration owned by fieldManager from
 // pod for the ephemeralcontainers subresource.
-// Experimental!
 func ExtractPodEphemeralcontainers(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
 	return ExtractPodFrom(pod, fieldManager, "ephemeralcontainers")
 }
 
 // ExtractPodResize extracts the applied configuration owned by fieldManager from
 // pod for the resize subresource.
-// Experimental!
 func ExtractPodResize(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
 	return ExtractPodFrom(pod, fieldManager, "resize")
 }
 
 // ExtractPodStatus extracts the applied configuration owned by fieldManager from
 // pod for the status subresource.
-// Experimental!
 func ExtractPodStatus(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
 	return ExtractPodFrom(pod, fieldManager, "status")
 }

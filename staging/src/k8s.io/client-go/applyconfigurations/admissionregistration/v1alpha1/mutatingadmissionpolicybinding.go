@@ -29,10 +29,24 @@ import (
 
 // MutatingAdmissionPolicyBindingApplyConfiguration represents a declarative configuration of the MutatingAdmissionPolicyBinding type for use
 // with apply.
+//
+// MutatingAdmissionPolicyBinding binds the MutatingAdmissionPolicy with parametrized resources.
+// MutatingAdmissionPolicyBinding and the optional parameter resource together define how cluster administrators
+// configure policies for clusters.
+//
+// For a given admission request, each binding will cause its policy to be
+// evaluated N times, where N is 1 for policies/bindings that don't use
+// params, otherwise N is the number of parameters selected by the binding.
+// Each evaluation is constrained by a [runtime cost budget](https://kubernetes.io/docs/reference/using-api/cel/#runtime-cost-budget).
+//
+// Adding/removing policies, bindings, or params can not affect whether a
+// given (policy, binding, param) combination is within its own CEL budget.
 type MutatingAdmissionPolicyBindingApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *MutatingAdmissionPolicyBindingSpecApplyConfiguration `json:"spec,omitempty"`
+	// Specification of the desired behavior of the MutatingAdmissionPolicyBinding.
+	Spec *MutatingAdmissionPolicyBindingSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // MutatingAdmissionPolicyBinding constructs a declarative configuration of the MutatingAdmissionPolicyBinding type for use with
@@ -52,7 +66,6 @@ func MutatingAdmissionPolicyBinding(name string) *MutatingAdmissionPolicyBinding
 // ExtractMutatingAdmissionPolicyBindingFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractMutatingAdmissionPolicyBindingFrom(mutatingAdmissionPolicyBinding *admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, fieldManager string, subresource string) (*MutatingAdmissionPolicyBindingApplyConfiguration, error) {
 	b := &MutatingAdmissionPolicyBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(mutatingAdmissionPolicyBinding, internal.Parser().Type("io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"), fieldManager, b, subresource)
@@ -76,7 +89,6 @@ func ExtractMutatingAdmissionPolicyBindingFrom(mutatingAdmissionPolicyBinding *a
 // ExtractMutatingAdmissionPolicyBinding provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractMutatingAdmissionPolicyBinding(mutatingAdmissionPolicyBinding *admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, fieldManager string) (*MutatingAdmissionPolicyBindingApplyConfiguration, error) {
 	return ExtractMutatingAdmissionPolicyBindingFrom(mutatingAdmissionPolicyBinding, fieldManager, "")
 }

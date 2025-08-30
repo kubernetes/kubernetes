@@ -20,6 +20,9 @@ package v1
 
 // TestEmbeddedTypeApplyConfiguration represents a declarative configuration of the TestEmbeddedType type for use
 // with apply.
+//
+// TestEmbeddedType is a type intended to create conflicts with other embedded structs:
+// Kind conflicts with TypeMeta (inlined), and Namespace conflicts with ObjectMeta (embedded).
 type TestEmbeddedTypeApplyConfiguration struct {
 	Kind      *string `json:"kind,omitempty"`
 	Namespace *string `json:"namespace,omitempty"`

@@ -29,11 +29,19 @@ import (
 
 // ResourceQuotaApplyConfiguration represents a declarative configuration of the ResourceQuota type for use
 // with apply.
+//
+// ResourceQuota sets aggregate quota restrictions enforced per namespace
 type ResourceQuotaApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ResourceQuotaSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *ResourceQuotaStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the desired quota.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *ResourceQuotaSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status defines the actual enforced quota and its current usage.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *ResourceQuotaStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ResourceQuota constructs a declarative configuration of the ResourceQuota type for use with
@@ -54,7 +62,6 @@ func ResourceQuota(name, namespace string) *ResourceQuotaApplyConfiguration {
 // ExtractResourceQuotaFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractResourceQuotaFrom(resourceQuota *corev1.ResourceQuota, fieldManager string, subresource string) (*ResourceQuotaApplyConfiguration, error) {
 	b := &ResourceQuotaApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceQuota, internal.Parser().Type("io.k8s.api.core.v1.ResourceQuota"), fieldManager, b, subresource)
@@ -79,14 +86,12 @@ func ExtractResourceQuotaFrom(resourceQuota *corev1.ResourceQuota, fieldManager 
 // ExtractResourceQuota provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractResourceQuota(resourceQuota *corev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
 	return ExtractResourceQuotaFrom(resourceQuota, fieldManager, "")
 }
 
 // ExtractResourceQuotaStatus extracts the applied configuration owned by fieldManager from
 // resourceQuota for the status subresource.
-// Experimental!
 func ExtractResourceQuotaStatus(resourceQuota *corev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
 	return ExtractResourceQuotaFrom(resourceQuota, fieldManager, "status")
 }

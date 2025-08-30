@@ -20,7 +20,10 @@ package v1
 
 // ForNodeApplyConfiguration represents a declarative configuration of the ForNode type for use
 // with apply.
+//
+// ForNode provides information about which nodes should consume this endpoint.
 type ForNodeApplyConfiguration struct {
+	// name represents the name of the node.
 	Name *string `json:"name,omitempty"`
 }
 

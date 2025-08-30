@@ -20,13 +20,28 @@ package v1
 
 // CephFSPersistentVolumeSourceApplyConfiguration represents a declarative configuration of the CephFSPersistentVolumeSource type for use
 // with apply.
+//
+// Represents a Ceph Filesystem mount that lasts the lifetime of a pod
+// Cephfs volumes do not support ownership management or SELinux relabeling.
 type CephFSPersistentVolumeSourceApplyConfiguration struct {
-	Monitors   []string                           `json:"monitors,omitempty"`
-	Path       *string                            `json:"path,omitempty"`
-	User       *string                            `json:"user,omitempty"`
-	SecretFile *string                            `json:"secretFile,omitempty"`
-	SecretRef  *SecretReferenceApplyConfiguration `json:"secretRef,omitempty"`
-	ReadOnly   *bool                              `json:"readOnly,omitempty"`
+	// monitors is Required: Monitors is a collection of Ceph monitors
+	// More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
+	Monitors []string `json:"monitors,omitempty"`
+	// path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
+	Path *string `json:"path,omitempty"`
+	// user is Optional: User is the rados user name, default is admin
+	// More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
+	User *string `json:"user,omitempty"`
+	// secretFile is Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
+	// More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
+	SecretFile *string `json:"secretFile,omitempty"`
+	// secretRef is Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	// More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
+	SecretRef *SecretReferenceApplyConfiguration `json:"secretRef,omitempty"`
+	// readOnly is Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // CephFSPersistentVolumeSourceApplyConfiguration constructs a declarative configuration of the CephFSPersistentVolumeSource type for use with

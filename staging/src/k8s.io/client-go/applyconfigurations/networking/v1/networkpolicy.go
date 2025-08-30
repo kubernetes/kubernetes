@@ -29,10 +29,15 @@ import (
 
 // NetworkPolicyApplyConfiguration represents a declarative configuration of the NetworkPolicy type for use
 // with apply.
+//
+// NetworkPolicy describes what network traffic is allowed for a set of Pods
 type NetworkPolicyApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *NetworkPolicySpecApplyConfiguration `json:"spec,omitempty"`
+	// spec represents the specification of the desired behavior for this NetworkPolicy.
+	Spec *NetworkPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // NetworkPolicy constructs a declarative configuration of the NetworkPolicy type for use with
@@ -53,7 +58,6 @@ func NetworkPolicy(name, namespace string) *NetworkPolicyApplyConfiguration {
 // ExtractNetworkPolicyFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractNetworkPolicyFrom(networkPolicy *networkingv1.NetworkPolicy, fieldManager string, subresource string) (*NetworkPolicyApplyConfiguration, error) {
 	b := &NetworkPolicyApplyConfiguration{}
 	err := managedfields.ExtractInto(networkPolicy, internal.Parser().Type("io.k8s.api.networking.v1.NetworkPolicy"), fieldManager, b, subresource)
@@ -78,7 +82,6 @@ func ExtractNetworkPolicyFrom(networkPolicy *networkingv1.NetworkPolicy, fieldMa
 // ExtractNetworkPolicy provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractNetworkPolicy(networkPolicy *networkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
 	return ExtractNetworkPolicyFrom(networkPolicy, fieldManager, "")
 }
