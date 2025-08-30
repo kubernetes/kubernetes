@@ -1061,8 +1061,19 @@ func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulerframework.NodeInfo)
 func (m *ManagerImpl) isDevicePluginResource(resource string) bool {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	_, registeredResource := m.healthyDevices[resource]
+	var registeredResource bool
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		// Healthy devices are zeroed when device plugin is disconnected
+		// from Kubelet or uninstalled. In this case workload can be
+		// scheduled to the node and processed by a DRA driver.
+		// This makes resources without healthy devices (NodeStatus.Allocatable = 0)
+		// not considered as Device Plugin resources and allows DRA to process them.
+		registeredResource = len(m.healthyDevices[resource]) > 0
+	} else {
+		_, registeredResource = m.healthyDevices[resource]
+	}
 	_, allocatedResource := m.allocatedDevices[resource]
+
 	// Return true if this is either an active device plugin resource or
 	// a resource we have previously allocated.
 	if registeredResource || allocatedResource {
