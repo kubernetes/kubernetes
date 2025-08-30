@@ -532,18 +532,28 @@ func TestLoadingRulesPrecedences(t *testing.T) {
 	}
 
 	oldConfigDir, _ := os.MkdirTemp("", "")
-	defer os.RemoveAll(oldConfigDir)
+	defer func() {
+		if err := os.RemoveAll(oldConfigDir); err != nil {
+			t.Errorf("Unexpected error: Failed to remove oldConfigDir: %v", err)
+		}
+	}()
 	oldConfigFile := filepath.Join(oldConfigDir, ".kubeconfig")
-	oldConfigDir, _ = filepath.Abs(oldConfigDir)
 
 	newConfigDir, _ := os.MkdirTemp("", "")
-	defer os.RemoveAll(newConfigDir)
+	defer func() {
+		if err := os.RemoveAll(newConfigDir); err != nil {
+			t.Errorf("Unexpected error: Failed to remove newConfigDir: %v", err)
+		}
+	}()
 	newConfigDir, _ = os.MkdirTemp(newConfigDir, "")
 	newConfigFile := filepath.Join(newConfigDir, ".kubeconfig")
-	newConfigDir, _ = filepath.Abs(newConfigDir)
 
-	WriteToFile(oldConfig, oldConfigFile)
-	WriteToFile(newConfig, newConfigFile)
+	if err := WriteToFile(oldConfig, oldConfigFile); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if err := WriteToFile(newConfig, newConfigFile); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 
 	loadingRules := ClientConfigLoadingRules{
 		Precedence: []string{newConfigFile, oldConfigFile},
