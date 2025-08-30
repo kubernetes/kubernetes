@@ -212,6 +212,28 @@ func (g *Grabber) grabFromKubeletInternal(ctx context.Context, nodeName string, 
 	return parseKubeletMetrics(output)
 }
 
+// GrabSummaryFromNode returns stats summary metrics from kubelet
+func (g *Grabber) GrabSummaryFromNode(ctx context.Context, nodeName string) (string, error) {
+	nodes, err := g.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{"metadata.name": nodeName}.AsSelector().String()})
+	if err != nil {
+		return "", err
+	}
+	if len(nodes.Items) != 1 {
+		return "", fmt.Errorf("error listing nodes with name %v, got %v", nodeName, nodes.Items)
+	}
+	kubeletPort := nodes.Items[0].Status.DaemonEndpoints.KubeletEndpoint.Port
+
+	if kubeletPort <= 0 || kubeletPort > 65535 {
+		return "", fmt.Errorf("invalid Kubelet port %v. Skipping Kubelet's metrics gathering", kubeletPort)
+	}
+	output, err := g.getMetricsFromNode(ctx, nodeName, int(kubeletPort), "stats/summary")
+
+	if err != nil {
+		return "", err
+	}
+	return output, nil
+}
+
 func (g *Grabber) getMetricsFromNode(ctx context.Context, nodeName string, kubeletPort int, pathSuffix string) (string, error) {
 	// There's a problem with timing out during proxy. Wrapping this in a goroutine to prevent deadlock.
 	finished := make(chan struct{}, 1)
