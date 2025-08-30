@@ -62,6 +62,34 @@ type Preference struct {
 	// "kubectl getn control-plane-1 --output=json" expands to "kubectl get node --output=json control-plane-1"
 	// +listType=atomic
 	Aliases []AliasOverride `json:"aliases"`
+
+	// credPluginAllowlist (the credential plugin allowlist) specifies the
+	// conditions under which client-go credential plugins may be executed. If
+	// this field is explicitly given the empty list value (`[]`), the user can
+	// disallow all plugins. If this field is left unspecified by the user, it
+	// will default to `nil`. When the allowlist is `nil`, all binaries will be
+	// permited. In order for a credential plugin binary to be allowed, it must
+	// match all criteria specified by at least one entry in the allowlist.
+	// Curently, the only criteria available is the name of the plugin. Name
+	// matching is performed by first resolving the absolute path of both the
+	// plugin and the name in the allowlist entry using `exec.LookPath`. It
+	// will be called on both, and the resulting strings must be equal.
+	//
+	// e.g.
+	// credPluginAllowlist:
+	// - name: cloud-provider-plugin
+	// - name: /usr/local/bin/my-plugin
+	// In the above example, the user allows the credential plugins
+	// `cloud-provider-plugin` (found somewhere in PATH), and the plugin found
+	// at the explicit path `/usr/local/bin/my-plugin`.
+	CredPluginAllowlist *[]AllowlistItem `json:"credPluginAllowlist,omitempty"`
+}
+
+// AllowlistItem stores the criteria specified by an entry in the credential
+// plugin allowlist. In order for a binary plugin to be permitted, it must meet
+// all criteria specified within an AllowlistItem.
+type AllowlistItem struct {
+	Name string `json:"name"`
 }
 
 // AliasOverride stores the alias definitions.

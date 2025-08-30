@@ -496,7 +496,18 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
 	if !cmdutil.KubeRC.IsDisabled() {
-		_, err := pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
+		restconfig, err := f.ToRawKubeConfigLoader().ClientConfig()
+		if err != nil {
+			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
+			os.Exit(1)
+		}
+
+		var cmd *string
+		if restconfig.ExecProvider != nil {
+			cmd = &restconfig.ExecProvider.Command
+		}
+
+		_, err = pref.Apply(cmds, o.Arguments, cmd, o.IOStreams.ErrOut)
 		if err != nil {
 			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
 			os.Exit(1)
