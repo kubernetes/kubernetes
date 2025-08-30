@@ -38,6 +38,7 @@ import (
 
 	"github.com/emicklei/go-restful/v3"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
@@ -304,31 +305,19 @@ func testRequestInfoResolver() *request.RequestInfoFactory {
 func TestSimpleSetupRight(t *testing.T) {
 	s := &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "aName"}}
 	wire, err := runtime.Encode(codec, s)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	s2, err := runtime.Decode(codec, wire)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(s, s2) {
-		t.Fatalf("encode/decode broken:\n%#v\n%#v\n", s, s2)
-	}
+	require.NoError(t, err)
+	require.Equal(t, s, s2)
 }
 
 func TestSimpleOptionsSetupRight(t *testing.T) {
 	s := &genericapitesting.SimpleGetOptions{}
 	wire, err := runtime.Encode(codec, s)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	s2, err := runtime.Decode(codec, wire)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(s, s2) {
-		t.Fatalf("encode/decode broken:\n%#v\n%#v\n", s, s2)
-	}
+	require.NoError(t, err)
+	require.Equal(t, s, s2)
 }
 
 type SimpleRESTStorage struct {
@@ -702,15 +691,6 @@ func (storage *SimpleTypedStorage) GetSingularName() string {
 	return "simple"
 }
 
-func bodyOrDie(response *http.Response) string {
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		panic(err)
-	}
-	return string(body)
-}
-
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
 	return extractBodyDecoder(response, object, codec)
 }
@@ -811,19 +791,13 @@ func TestNotFound(t *testing.T) {
 	for testName, test := range cases {
 		t.Run(testName, func(t *testing.T) {
 			ctx := t.Context()
-			request, err := http.NewRequestWithContext(ctx, test.Method, server.URL+test.Path, nil)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			req, err := http.NewRequestWithContext(ctx, test.Method, server.URL+test.Path, nil)
+			require.NoError(t, err)
 
-			response, err := client.Do(request)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			defer apitesting.Close(t, response.Body)
-			if response.StatusCode != test.Status {
-				t.Errorf("Expected %d for %s, Got %#v", test.Status, test.Method, response)
-			}
+			resp, err := client.Do(req)
+			require.NoError(t, err)
+			defer apitesting.Close(t, resp.Body)
+			require.Equal(t, test.Status, resp.StatusCode)
 		})
 	}
 }
@@ -885,22 +859,14 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			ctx := t.Context()
 			request, err := http.NewRequestWithContext(ctx, test.Method, server.URL+test.Path, bytes.NewReader([]byte(`{"kind":"Simple","apiVersion":"version"}`)))
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			response, err := client.Do(request)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, response.Body)
 			data, err := io.ReadAll(response.Body)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if response.StatusCode != test.ErrCode {
-				t.Fatalf("expected %d for %s, Got %s", test.ErrCode, test.Method, string(data))
-			}
+			require.NoError(t, err)
+			require.Equal(t, test.ErrCode, response.StatusCode, string(data))
 		})
 	}
 }
@@ -956,22 +922,14 @@ func TestSomeUnimplementedRESTStorage(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			ctx := t.Context()
 			request, err := http.NewRequestWithContext(ctx, test.Method, server.URL+test.Path, bytes.NewReader([]byte(`{"kind":"Simple","apiVersion":"version"}`)))
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			response, err := client.Do(request)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, response.Body)
 			data, err := io.ReadAll(response.Body)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if response.StatusCode != test.ErrCode {
-				t.Fatalf("expected %d for %s, Got %s", test.ErrCode, test.Method, string(data))
-			}
+			require.NoError(t, err)
+			require.Equal(t, test.ErrCode, response.StatusCode, string(data))
 		})
 	}
 }
@@ -1129,16 +1087,12 @@ func TestList(t *testing.T) {
 			req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 			require.NoError(t, err)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, resp.Body)
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, test.url, http.StatusOK, resp)
 				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
+				require.NoError(t, err)
 				t.Logf("body: %s", string(body))
 				return
 			}
@@ -1184,20 +1138,14 @@ func TestRequestsWithInvalidQuery(t *testing.T) {
 			baseURL := server.URL + "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default"
 			url := baseURL + test.postfix
 			r, err := http.NewRequestWithContext(ctx, test.method, url, nil)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 			resp, err := http.DefaultClient.Do(r)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, resp.Body)
 			if resp.StatusCode != http.StatusBadRequest {
 				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, url, http.StatusBadRequest, resp)
 				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
+				require.NoError(t, err)
 				t.Logf("body: %s", string(body))
 			}
 		})
@@ -1225,7 +1173,7 @@ func TestListCompression(t *testing.T) {
 			acceptEncoding: "gzip",
 		},
 	}
-	for testIndex, test := range cases {
+	for _, test := range cases {
 		t.Run(test.acceptEncoding, func(t *testing.T) {
 			ctx := t.Context()
 			storage := map[string]rest.Storage{}
@@ -1245,24 +1193,18 @@ func TestListCompression(t *testing.T) {
 			defer server.Close()
 
 			req, err := http.NewRequestWithContext(ctx, request.MethodGet, server.URL+test.url, nil)
-			if err != nil {
-				t.Fatalf("%d: unexpected error: %v", testIndex, err)
-			}
+			require.NoError(t, err)
 			// It's necessary to manually set Accept-Encoding here
 			// to prevent http.DefaultClient from automatically
 			// decoding responses
 			req.Header.Set("Accept-Encoding", test.acceptEncoding)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatalf("%d: unexpected error: %v", testIndex, err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, resp.Body)
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, test.url, http.StatusOK, resp)
 				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
+				require.NoError(t, err)
 				t.Logf("body: %s", string(body))
 				return
 			}
@@ -1281,18 +1223,14 @@ func TestListCompression(t *testing.T) {
 			var decoder *json.Decoder
 			if test.acceptEncoding == "gzip" {
 				gzipReader, err := gzip.NewReader(resp.Body)
-				if err != nil {
-					t.Fatalf("unexpected error creating gzip reader: %v", err)
-				}
+				require.NoError(t, err)
 				decoder = json.NewDecoder(gzipReader)
 			} else {
 				decoder = json.NewDecoder(resp.Body)
 			}
 			var itemOut genericapitesting.SimpleList
 			err = decoder.Decode(&itemOut)
-			if err != nil {
-				t.Errorf("failed to read response body as SimpleList: %v", err)
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -1305,20 +1243,14 @@ func TestLogs(t *testing.T) {
 	client := http.Client{}
 
 	request, err := http.NewRequestWithContext(ctx, request.MethodGet, server.URL+"/logs", nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
 
 	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	t.Logf("Data: %s", string(body))
 }
 
@@ -1337,14 +1269,10 @@ func TestErrorList(t *testing.T) {
 	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
 
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusInternalServerError, resp)
-	}
+	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
 func TestNonEmptyList(t *testing.T) {
@@ -1367,43 +1295,30 @@ func TestNonEmptyList(t *testing.T) {
 	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
 		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 		t.Logf("Data: %s", string(body))
 	}
 
 	var listOut genericapitesting.SimpleList
 	body, err := extractBody(resp, &listOut)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	t.Log(body)
 
-	if len(listOut.Items) != 1 {
-		t.Errorf("Unexpected response: %#v", listOut)
-		return
-	}
-	if listOut.Items[0].Other != simpleStorage.list[0].Other {
-		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
-	}
+	require.Len(t, listOut.Items, 1, listOut)
+	require.Equal(t, simpleStorage.list[0].Other, listOut.Items[0].Other, listOut.Items[0])
 }
 
 func TestMetadata(t *testing.T) {
 	simpleStorage := &MetadataRESTStorage{&SimpleRESTStorage{}, []string{"text/plain"}}
 	h := handle(map[string]rest.Storage{"simple": simpleStorage})
 	ws := h.(*defaultAPIServer).container.RegisteredWebServices()
-	if len(ws) == 0 {
-		t.Fatal("no web services registered")
-	}
+	require.NotEmpty(t, ws, "no web services registered")
 	matches := map[string]int{}
 	for _, w := range ws {
 		for _, r := range w.Routes() {
@@ -1451,18 +1366,12 @@ func TestGet(t *testing.T) {
 	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	if itemOut.Name != simpleStorage.item.Name {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
@@ -1491,16 +1400,11 @@ func BenchmarkGet(b *testing.B) {
 			req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 			require.NoError(b, err)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				b.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(b, err)
 			defer apitesting.Close(b, resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				b.Fatalf("unexpected response: %#v", resp)
-			}
-			if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-				b.Fatalf("unable to read body")
-			}
+			require.Equal(b, http.StatusOK, resp.StatusCode)
+			_, err = io.Copy(io.Discard, resp.Body)
+			require.NoError(b, err)
 		}()
 	}
 	b.StopTimer()
@@ -1534,20 +1438,13 @@ func BenchmarkGetNoCompression(b *testing.B) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
-			if err != nil {
-				b.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(b, err)
 			resp, err := client.Do(req)
-			if err != nil {
-				b.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(b, err)
 			defer apitesting.Close(b, resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				b.Fatalf("unexpected response: %#v", resp)
-			}
-			if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-				b.Fatalf("unable to read body")
-			}
+			require.Equal(b, http.StatusOK, resp.StatusCode)
+			_, err = io.Copy(io.Discard, resp.Body)
+			require.NoError(b, err)
 		}()
 	}
 	b.StopTimer()
@@ -1578,41 +1475,30 @@ func TestGetCompression(t *testing.T) {
 		testName := fmt.Sprintf("Accept-Encoding:%s", test.acceptEncoding)
 		t.Run(testName, func(t *testing.T) {
 			ctx := t.Context()
-			req, err := http.NewRequestWithContext(ctx, request.MethodGet, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/id", nil)
-			if err != nil {
-				t.Fatalf("unexpected error creating request: %v", err)
-			}
+			url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
+			req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
+			require.NoError(t, err)
 			// It's necessary to manually set Accept-Encoding here
 			// to prevent http.DefaultClient from automatically
 			// decoding responses
 			req.Header.Set("Accept-Encoding", test.acceptEncoding)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("unexpected response: %#v", resp)
-			}
+			require.Equal(t, http.StatusOK, resp.StatusCode)
 			var decoder *json.Decoder
 			if test.acceptEncoding == "gzip" {
 				gzipReader, err := gzip.NewReader(resp.Body)
-				if err != nil {
-					t.Fatalf("unexpected error creating gzip reader: %v", err)
-				}
+				require.NoError(t, err)
 				decoder = json.NewDecoder(gzipReader)
 			} else {
 				decoder = json.NewDecoder(resp.Body)
 			}
 			var itemOut genericapitesting.Simple
 			err = decoder.Decode(&itemOut)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				t.Errorf("unexpected error reading body: %v", err)
-			}
+			require.NoError(t, err)
 
 			if itemOut.Name != simpleStorage.item.Name {
 				t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
@@ -1661,43 +1547,30 @@ func TestGetPretty(t *testing.T) {
 		}
 		t.Run(testName, func(t *testing.T) {
 			u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			u.RawQuery = test.params.Encode()
 			req := &http.Request{Method: request.MethodGet, URL: u}
 			req.Header = http.Header{}
 			req.Header.Set("Accept", test.accept)
 			req.Header.Set("User-Agent", test.userAgent)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if resp.StatusCode != http.StatusOK {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, resp.StatusCode)
 			var itemOut genericapitesting.Simple
 			body, err := extractBody(resp, &itemOut)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			// to get stable ordering we need to use a go type
 			unstructured := genericapitesting.Simple{}
-			if err := json.Unmarshal([]byte(body), &unstructured); err != nil {
-				t.Fatal(err)
-			}
+			err = json.Unmarshal([]byte(body), &unstructured)
+			require.NoError(t, err)
 			var expect string
 			if test.pretty {
 				out, err := json.MarshalIndent(unstructured, "", "  ")
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				expect = string(out)
 			} else {
 				out, err := json.Marshal(unstructured)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				expect = string(out) + "\n"
 			}
 			if expect != body {
@@ -1715,17 +1588,13 @@ func TestGetTable(t *testing.T) {
 	}
 
 	m, err := meta.Accessor(&obj)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var encodedV1Beta1Body []byte
 	{
 		partial := meta.AsPartialObjectMetadata(m)
 		partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
 		encodedBody, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		// the codec includes a trailing newline that is not present during decode
 		encodedV1Beta1Body = bytes.TrimSpace(encodedBody)
 	}
@@ -1734,9 +1603,7 @@ func TestGetTable(t *testing.T) {
 		partial := meta.AsPartialObjectMetadata(m)
 		partial.GetObjectKind().SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
 		encodedBody, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1.SchemeGroupVersion), partial)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		// the codec includes a trailing newline that is not present during decode
 		encodedV1Body = bytes.TrimSpace(encodedBody)
 	}
@@ -1862,39 +1729,25 @@ func TestGetTable(t *testing.T) {
 				id = "/id"
 			}
 			u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple" + id)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			u.RawQuery = test.params.Encode()
 			req := &http.Request{Method: request.MethodGet, URL: u}
 			req.Header = http.Header{}
 			req.Header.Set("Accept", test.accept)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			if test.statusCode != 0 {
-				if resp.StatusCode != test.statusCode {
-					t.Errorf("unexpected response: %#v", resp)
-				}
+				assert.Equal(t, test.statusCode, resp.StatusCode)
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
-				if err != nil {
-					t.Fatalf("unexpected body read error: %v", err)
-				}
-				gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
-				if obj.GetObjectKind().GroupVersionKind() != gvk {
-					t.Fatalf("unexpected error body: %#v", obj)
-				}
+				require.NoError(t, err)
+				expectedGVK := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+				require.Equal(t, expectedGVK, obj.GetObjectKind().GroupVersionKind())
 				return
 			}
-			if resp.StatusCode != http.StatusOK {
-				t.Errorf("unexpected response: %#v", resp)
-			}
+			require.Equal(t, http.StatusOK, resp.StatusCode)
 			var itemOut metav1.Table
 			body, err := extractBody(resp, &itemOut)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			if !reflect.DeepEqual(test.expected, &itemOut) {
 				t.Log(body)
 				t.Errorf("did not match: %s", cmp.Diff(test.expected, &itemOut))
@@ -1910,22 +1763,16 @@ func TestWatchTable(t *testing.T) {
 	}
 
 	m, err := meta.Accessor(&obj)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	partial := meta.AsPartialObjectMetadata(m)
 	partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
 	encodedBody, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	// the codec includes a trailing newline that is not present during decode
 	encodedBody = bytes.TrimSpace(encodedBody)
 
 	encodedBodyV1, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1.SchemeGroupVersion), partial)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	// the codec includes a trailing newline that is not present during decode
 	encodedBodyV1 = bytes.TrimSpace(encodedBodyV1)
 
@@ -2065,9 +1912,7 @@ func TestWatchTable(t *testing.T) {
 				id = "/id"
 			}
 			u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple")
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			if test.params == nil {
 				test.params = url.Values{}
 			}
@@ -2081,27 +1926,17 @@ func TestWatchTable(t *testing.T) {
 			req.Header = http.Header{}
 			req.Header.Set("Accept", test.accept)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, resp.Body)
 			if test.statusCode != 0 {
-				if resp.StatusCode != test.statusCode {
-					t.Fatalf("unexpected response: %#v", resp)
-				}
+				assert.Equal(t, test.statusCode, resp.StatusCode)
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
-				if err != nil {
-					t.Fatalf("unexpected body read error: %v", err)
-				}
-				gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
-				if obj.GetObjectKind().GroupVersionKind() != gvk {
-					t.Fatalf("unexpected error body: %#v", obj)
-				}
+				require.NoError(t, err)
+				expectedGVK := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+				require.Equal(t, expectedGVK, obj.GetObjectKind().GroupVersionKind())
 				return
 			}
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("unexpected response: %#v", resp)
-			}
+			require.Equal(t, http.StatusOK, resp.StatusCode)
 
 			go func() {
 				defer simpleStorage.fakeWatch.Stop()
@@ -2109,9 +1944,7 @@ func TestWatchTable(t *testing.T) {
 			}()
 
 			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			t.Logf("Body:\n%s", string(body))
 			d := watcher(resp.Header.Get("Content-Type"), io.NopCloser(bytes.NewReader(body)))
 			var actual []*metav1.WatchEvent
@@ -2121,14 +1954,10 @@ func TestWatchTable(t *testing.T) {
 				if err == io.EOF {
 					break
 				}
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				actual = append(actual, &event)
 			}
-			if !reflect.DeepEqual(test.expected, actual) {
-				t.Fatalf("unexpected: %s", cmp.Diff(test.expected, actual))
-			}
+			require.Equal(t, test.expected, actual)
 		})
 	}
 }
@@ -2270,59 +2099,38 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 				suffix = "/namespaces/default/simple"
 			}
 			u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + suffix)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			u.RawQuery = test.params.Encode()
 			req := &http.Request{Method: request.MethodGet, URL: u}
 			req.Header = http.Header{}
 			req.Header.Set("Accept", test.accept)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, resp.Body)
 			if test.statusCode != 0 {
-				if resp.StatusCode != test.statusCode {
-					t.Errorf("unexpected response: %#v", resp)
-				}
+				assert.Equal(t, test.statusCode, resp.StatusCode)
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
-				if err != nil {
-					t.Fatalf("unexpected body read error: %v", err)
-				}
-				gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
-				if obj.GetObjectKind().GroupVersionKind() != gvk {
-					t.Errorf("unexpected error body: %#v", obj)
-				}
+				require.NoError(t, err)
+				expectedGVK := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+				require.Equal(t, expectedGVK, obj.GetObjectKind().GroupVersionKind())
 				return
 			}
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("invalid status: %#v\n%s", resp, bodyOrDie(resp))
-			}
+			require.Equal(t, http.StatusOK, resp.StatusCode)
 			body := ""
 			if test.expected != nil {
 				itemOut, d, err := extractBodyObject(resp, metainternalversionscheme.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion))
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !reflect.DeepEqual(test.expected, itemOut) {
-					t.Errorf("did not match: %s", cmp.Diff(test.expected, itemOut))
-				}
+				require.NoError(t, err)
+				require.Equal(t, test.expected, itemOut)
 				body = d
 			} else {
 				d, err := io.ReadAll(resp.Body)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				body = string(d)
 			}
 			obj := &unstructured.Unstructured{}
-			if err := json.Unmarshal([]byte(body), obj); err != nil {
-				t.Fatal(err)
-			}
-			if obj.GetObjectKind().GroupVersionKind() != test.expectKind {
-				t.Errorf("unexpected kind: %#v", obj.GetObjectKind().GroupVersionKind())
-			}
+			err = json.Unmarshal([]byte(body), obj)
+			require.NoError(t, err)
+			require.Equal(t, test.expectKind, obj.GetObjectKind().GroupVersionKind())
 		})
 	}
 }
@@ -2339,23 +2147,16 @@ func TestGetBinary(t *testing.T) {
 	server := httptest.NewServer(handle(map[string]rest.Storage{"simple": &simpleStorage}))
 	defer server.Close()
 
-	req, err := http.NewRequestWithContext(ctx, request.MethodGet, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/binary", nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/binary"
+	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
+	require.NoError(t, err)
 	req.Header.Add("Accept", "text/other, */*")
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	if !stream.closed || stream.version != testGroupVersion.String() || stream.accept != "text/other, */*" ||
 		resp.Header.Get("Content-Type") != stream.contentType || string(body) != "response data" {
 		t.Errorf("unexpected stream: %#v", stream)
@@ -2391,9 +2192,7 @@ func TestGetWithOptionsRouteParams(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	ws := handler.(*defaultAPIServer).container.RegisteredWebServices()
-	if len(ws) == 0 {
-		t.Fatal("no web services registered")
-	}
+	require.NotEmpty(t, ws, "no web services registered")
 	routes := ws[0].Routes()
 	for i := range routes {
 		if routes[i].Method == request.MethodGet && routes[i].Operation == "readNamespacedSimple" {
@@ -2493,13 +2292,9 @@ func TestGetWithOptions(t *testing.T) {
 			req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 			require.NoError(t, err)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatalf("%s: %v", test.name, err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("%s: unexpected response: %#v", test.name, resp)
-			}
+			require.Equal(t, http.StatusOK, resp.StatusCode)
 
 			var itemOut runtime.Object
 			if test.rootScoped {
@@ -2508,34 +2303,22 @@ func TestGetWithOptions(t *testing.T) {
 				itemOut = &genericapitesting.Simple{}
 			}
 			body, err := extractBody(resp, itemOut)
-			if err != nil {
-				t.Fatalf("%s: %v", test.name, err)
-			}
-			if metadata, err := meta.Accessor(itemOut); err == nil {
-				if metadata.GetName() != simpleStorage.item.Name {
-					t.Fatalf("%s: Unexpected data: %#v, expected %#v (%s)", test.name, itemOut, simpleStorage.item, string(body))
-				}
-			} else {
-				t.Errorf("Couldn't get name from %#v: %v", itemOut, err)
-			}
+			require.NoError(t, err)
+			metadata, err := meta.Accessor(itemOut)
+			require.NoError(t, err)
+			require.Equal(t, simpleStorage.item.Name, metadata.GetName(), string(body))
 
 			var opts *genericapitesting.SimpleGetOptions
-			var ok bool
 			if test.rootScoped {
-				opts, ok = simpleRootStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
+				require.IsType(t, &genericapitesting.SimpleGetOptions{}, simpleRootStorage.optionsReceived)
+				opts = simpleRootStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
 			} else {
-				opts, ok = simpleStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
-
+				require.IsType(t, &genericapitesting.SimpleGetOptions{}, simpleStorage.optionsReceived)
+				opts = simpleStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
 			}
-			if !ok {
-				t.Fatalf("Unexpected options object received: %#v", simpleStorage.optionsReceived)
-			}
-			if opts.Param1 != "test1" || opts.Param2 != "test2" {
-				t.Fatalf("Did not receive expected options: %#v", opts)
-			}
-			if opts.Path != test.expectedPath {
-				t.Fatalf("Unexpected path value. Expected: %s. Actual: %s.", test.expectedPath, opts.Path)
-			}
+			assert.Equal(t, "test1", opts.Param1)
+			assert.Equal(t, "test2", opts.Param2)
+			assert.Equal(t, test.expectedPath, opts.Path)
 		})
 	}
 }
@@ -2555,13 +2338,9 @@ func TestGetMissing(t *testing.T) {
 	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", resp)
-	}
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 func TestGetRetryAfter(t *testing.T) {
@@ -2579,13 +2358,9 @@ func TestGetRetryAfter(t *testing.T) {
 	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("Unexpected response %#v", resp)
-	}
+	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 	if resp.Header.Get("Retry-After") != "2" {
 		t.Errorf("Unexpected Retry-After header: %v", resp.Header)
 	}
@@ -2612,17 +2387,11 @@ func TestConnect(t *testing.T) {
 	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", resp)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
@@ -2653,24 +2422,16 @@ func TestConnectResponderObject(t *testing.T) {
 	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("unexpected response: %#v", resp)
-	}
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
 	obj, err := runtime.Decode(codec, body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if !apiequality.Semantic.DeepEqual(obj, simple) {
 		t.Errorf("Unexpected response: %#v", obj)
 	}
@@ -2697,24 +2458,16 @@ func TestConnectResponderError(t *testing.T) {
 	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusForbidden {
-		t.Errorf("unexpected response: %#v", resp)
-	}
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
 	obj, err := runtime.Decode(codec, body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if obj.(*metav1.Status).Code != http.StatusForbidden {
 		t.Errorf("Unexpected response: %#v", obj)
 	}
@@ -2731,9 +2484,7 @@ func TestConnectWithOptionsRouteParams(t *testing.T) {
 	}
 	handler := handle(storage)
 	ws := handler.(*defaultAPIServer).container.RegisteredWebServices()
-	if len(ws) == 0 {
-		t.Fatal("no web services registered")
-	}
+	require.NotEmpty(t, ws, "no web services registered")
 	routes := ws[0].Routes()
 	for i := range routes {
 		switch routes[i].Operation {
@@ -2742,7 +2493,6 @@ func TestConnectWithOptionsRouteParams(t *testing.T) {
 		case "connectPutNamespacedSimpleConnect":
 		case "connectDeleteNamespacedSimpleConnect":
 			validateSimpleGetOptionsParams(t, &routes[i])
-
 		}
 	}
 }
@@ -2769,17 +2519,11 @@ func TestConnectWithOptions(t *testing.T) {
 	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", resp)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
@@ -2789,13 +2533,10 @@ func TestConnectWithOptions(t *testing.T) {
 	if connectStorage.receivedResponder == nil {
 		t.Errorf("Unexpected responder")
 	}
-	opts, ok := connectStorage.receivedConnectOptions.(*genericapitesting.SimpleGetOptions)
-	if !ok {
-		t.Fatalf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
-	}
-	if opts.Param1 != "value1" && opts.Param2 != "value2" {
-		t.Errorf("Unexpected options value: %#v", opts)
-	}
+	require.IsType(t, &genericapitesting.SimpleGetOptions{}, connectStorage.receivedConnectOptions)
+	opts := connectStorage.receivedConnectOptions.(*genericapitesting.SimpleGetOptions)
+	assert.Equal(t, "value1", opts.Param1)
+	assert.Equal(t, "value2", opts.Param2)
 }
 
 func TestConnectWithOptionsAndPath(t *testing.T) {
@@ -2822,33 +2563,18 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", resp)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if connectStorage.receivedID != itemID {
-		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
-	}
-	if string(body) != responseText {
-		t.Errorf("Unexpected response. Expected: %s. Actual: %s.", responseText, string(body))
-	}
-	opts, ok := connectStorage.receivedConnectOptions.(*genericapitesting.SimpleGetOptions)
-	if !ok {
-		t.Fatalf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
-	}
-	if opts.Param1 != "value1" && opts.Param2 != "value2" {
-		t.Errorf("Unexpected options value: %#v", opts)
-	}
-	if opts.Path != testPath {
-		t.Errorf("Unexpected path value. Expected: %s. Actual: %s.", testPath, opts.Path)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, itemID, connectStorage.receivedID)
+	assert.Equal(t, responseText, string(body))
+	require.IsType(t, &genericapitesting.SimpleGetOptions{}, connectStorage.receivedConnectOptions)
+	opts := connectStorage.receivedConnectOptions.(*genericapitesting.SimpleGetOptions)
+	assert.Equal(t, "value1", opts.Param1)
+	assert.Equal(t, "value2", opts.Param2)
+	assert.Equal(t, testPath, opts.Path)
 }
 
 func TestDelete(t *testing.T) {
@@ -2861,22 +2587,15 @@ func TestDelete(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequestWithContext(ctx, request.MethodDelete, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, request.MethodDelete, url, nil)
+	require.NoError(t, err)
 	res, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, res.Body)
-	if res.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", res)
-	}
-	if simpleStorage.deleted != ID {
-		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
-	}
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, ID, simpleStorage.deleted)
 }
 
 func TestDeleteWithOptions(t *testing.T) {
@@ -2894,35 +2613,24 @@ func TestDeleteWithOptions(t *testing.T) {
 		GracePeriodSeconds: &grace,
 	}
 	body, err := runtime.Encode(codec, item)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequestWithContext(ctx, request.MethodDelete, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, request.MethodDelete, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	res, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, res.Body)
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
 		s, err := io.ReadAll(res.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 		t.Log(string(s))
 	}
-	if simpleStorage.deleted != ID {
-		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
-	}
+	assert.Equal(t, ID, simpleStorage.deleted)
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
-	}
+	assert.Equal(t, item, simpleStorage.deleteOptions)
 }
 
 func TestDeleteWithOptionsQuery(t *testing.T) {
@@ -2940,31 +2648,22 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 		GracePeriodSeconds: &grace,
 	}
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID + "?gracePeriodSeconds=" + strconv.FormatInt(grace, 10)
 	client := http.Client{}
-	request, err := http.NewRequestWithContext(ctx, request.MethodDelete, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?gracePeriodSeconds="+strconv.FormatInt(grace, 10), nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, request.MethodDelete, url, nil)
+	require.NoError(t, err)
 	res, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, res.Body)
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
 		s, err := io.ReadAll(res.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 		t.Log(string(s))
 	}
-	if simpleStorage.deleted != ID {
-		t.Fatalf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
-	}
+	require.Equal(t, ID, simpleStorage.deleted)
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
-	}
+	require.Equal(t, item, simpleStorage.deleteOptions)
 }
 
 func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
@@ -2982,34 +2681,23 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 		GracePeriodSeconds: &grace,
 	}
 	body, err := runtime.Encode(codec, item)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID + "?gracePeriodSeconds=" + strconv.FormatInt(grace+10, 10)
 	client := http.Client{}
-	request, err := http.NewRequestWithContext(ctx, request.MethodDelete, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?gracePeriodSeconds="+strconv.FormatInt(grace+10, 10), bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, request.MethodDelete, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	res, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, res.Body)
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
 		s, err := io.ReadAll(res.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 		t.Log(string(s))
 	}
-	if simpleStorage.deleted != ID {
-		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
-	}
+	require.Equal(t, ID, simpleStorage.deleted)
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
-	}
+	require.Equal(t, item, simpleStorage.deleteOptions)
 }
 
 func TestDeleteInvokesAdmissionControl(t *testing.T) {
@@ -3026,19 +2714,14 @@ func TestDeleteInvokesAdmissionControl(t *testing.T) {
 			server := httptest.NewServer(handler)
 			defer server.Close()
 
+			url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 			client := http.Client{}
-			request, err := http.NewRequestWithContext(ctx, request.MethodDelete, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			request, err := http.NewRequestWithContext(ctx, request.MethodDelete, url, nil)
+			require.NoError(t, err)
 			response, err := client.Do(request)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, response.Body)
-			if response.StatusCode != http.StatusForbidden {
-				t.Errorf("Unexpected response %#v", response)
-			}
+			require.Equal(t, http.StatusForbidden, response.StatusCode)
 		})
 	}
 }
@@ -3055,19 +2738,14 @@ func TestDeleteMissing(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequestWithContext(ctx, request.MethodDelete, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, request.MethodDelete, url, nil)
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.Equal(t, http.StatusNotFound, response.StatusCode)
 }
 
 func TestUpdate(t *testing.T) {
@@ -3088,27 +2766,21 @@ func TestUpdate(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		// The following cases will fail, so die now
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPut, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, request.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	dump, _ := httputil.DumpResponse(response, true)
+	dump, err := httputil.DumpResponse(response, true)
+	require.NoError(t, err)
 	t.Log(string(dump))
 
-	if simpleStorage.updated == nil || simpleStorage.updated.Name != item.Name {
-		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
-	}
+	require.NotNil(t, simpleStorage.updated)
+	require.Equal(t, item.Name, simpleStorage.updated.Name)
 }
 
 func TestUpdateInvokesAdmissionControl(t *testing.T) {
@@ -3133,27 +2805,19 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 				Other: "bar",
 			}
 			body, err := runtime.Encode(testCodec, item)
-			if err != nil {
-				// The following cases will fail, so die now
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
+			url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 			client := http.Client{}
-			request, err := http.NewRequestWithContext(ctx, request.MethodPut, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			request, err := http.NewRequestWithContext(ctx, request.MethodPut, url, bytes.NewReader(body))
+			require.NoError(t, err)
 			response, err := client.Do(request)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, response.Body)
-			dump, _ := httputil.DumpResponse(response, true)
+			dump, err := httputil.DumpResponse(response, true)
+			require.NoError(t, err)
 			t.Log(string(dump))
-
-			if response.StatusCode != http.StatusForbidden {
-				t.Errorf("Unexpected response %#v", response)
-			}
+			require.Equal(t, http.StatusForbidden, response.StatusCode)
 		})
 	}
 }
@@ -3172,23 +2836,18 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		// The following cases will fail, so die now
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPut, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, request.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
 	if response.StatusCode != http.StatusBadRequest {
-		dump, _ := httputil.DumpResponse(response, true)
+		dump, err := httputil.DumpResponse(response, true)
+		require.NoError(t, err)
 		t.Log(string(dump))
 		t.Errorf("Unexpected response %#v", response)
 	}
@@ -3211,27 +2870,19 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		// The following cases will fail, so die now
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPut, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, request.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	dump, _ := httputil.DumpResponse(response, true)
+	dump, err := httputil.DumpResponse(response, true)
+	require.NoError(t, err)
 	t.Log(string(dump))
-
-	if response.StatusCode != http.StatusOK {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.Equal(t, http.StatusOK, response.StatusCode)
 }
 
 // when the object name and namespace can't be retrieved, don't update.  It isn't safe.
@@ -3253,27 +2904,20 @@ func TestUpdateDisallowsMismatchedNamespaceOnError(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		// The following cases will fail, so die now
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPut, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, request.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	dump, _ := httputil.DumpResponse(response, true)
+	dump, err := httputil.DumpResponse(response, true)
+	require.NoError(t, err)
 	t.Log(string(dump))
 
-	if simpleStorage.updated != nil {
-		t.Errorf("Unexpected update value %#v.", simpleStorage.updated)
-	}
+	require.Nil(t, simpleStorage.updated)
 }
 
 func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
@@ -3294,24 +2938,16 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		// The following cases will fail, so die now
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPut, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, request.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 }
 
 func TestUpdateMissing(t *testing.T) {
@@ -3334,23 +2970,16 @@ func TestUpdateMissing(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPut, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, request.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.Equal(t, http.StatusNotFound, response.StatusCode)
 }
 
 func TestCreateNotFound(t *testing.T) {
@@ -3368,22 +2997,15 @@ func TestCreateNotFound(t *testing.T) {
 
 	simple := &genericapitesting.Simple{Other: "foo"}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.Equal(t, http.StatusNotFound, response.StatusCode)
 }
 
 func TestCreateChecksDecode(t *testing.T) {
@@ -3395,27 +3017,17 @@ func TestCreateChecksDecode(t *testing.T) {
 
 	simple := &example.Pod{}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
 	b, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
-		t.Errorf("unexpected response: %s", string(b))
-	}
+	require.NoError(t, err)
+	require.Contains(t, string(b), "cannot be handled as a Simple")
 }
 
 func TestParentResourceIsRequired(t *testing.T) {
@@ -3446,9 +3058,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container := restful.NewContainer()
-	if _, _, err := group.InstallREST(container); err == nil {
-		t.Fatal("expected error")
-	}
+	_, _, err := group.InstallREST(container)
+	require.Error(t, err)
 
 	storage = &SimpleTypedStorage{
 		baseType: &genericapitesting.SimpleRoot{}, // a root scoped type
@@ -3479,28 +3090,21 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container = restful.NewContainer()
-	if _, _, err := group.InstallREST(container); err != nil {
-		t.Fatal(err)
-	}
+	_, _, err = group.InstallREST(container)
+	require.NoError(t, err)
 
 	handler := genericapifilters.WithRequestInfo(container, newTestRequestInfoResolver())
 
 	// resource is NOT registered in the root scope
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, &http.Request{Method: request.MethodGet, URL: &url.URL{Path: "/" + prefix + "/simple/test/sub"}})
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected not found: %#v", w)
-	}
+	assert.Equal(t, http.StatusNotFound, w.Code)
 
 	// resource is registered in the namespace scope
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, &http.Request{Method: request.MethodGet, URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/simple/test/sub"}})
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected OK: %#v", w)
-	}
-	if storage.actualNamespace != "test" {
-		t.Errorf("namespace should be set %#v", storage)
-	}
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "test", storage.actualNamespace)
 }
 
 func TestNamedCreaterWithName(t *testing.T) {
@@ -3517,24 +3121,15 @@ func TestNamedCreaterWithName(t *testing.T) {
 
 	simple := &genericapitesting.Simple{Other: "foo"}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+pathName+"/sub", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + pathName + "/sub"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected response %#v", response)
-	}
-	if storage.createdName != pathName {
-		t.Errorf("Did not get expected name in create context. Got: %s, Expected: %s", storage.createdName, pathName)
-	}
+	assert.Equal(t, http.StatusCreated, response.StatusCode)
+	assert.Equal(t, pathName, storage.createdName)
 }
 
 func TestNamedCreaterWithoutName(t *testing.T) {
@@ -3557,30 +3152,16 @@ func TestNamedCreaterWithoutName(t *testing.T) {
 		Other: "bar",
 	}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	response, err := client.Do(request)
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
 	// empty name is not allowed for NamedCreater
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 }
 
 type namePopulatorAdmissionControl struct {
@@ -3633,44 +3214,26 @@ func TestNamedCreaterWithGenerateName(t *testing.T) {
 		Other: "bar",
 	}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	response, err := client.Do(request)
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	require.Equal(t, http.StatusCreated, response.StatusCode)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(response, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v %#v", err, response)
-	}
+	require.NoError(t, err)
 
 	// Avoid comparing managed fields in expected result
 	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Name = populateName
 	simple.Namespace = "default" // populated by create handler to match request URL
-	if !reflect.DeepEqual(&itemOut, simple) {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
-	}
+	require.Equal(t, simple, &itemOut, body)
 }
 
 func TestUpdateChecksDecode(t *testing.T) {
@@ -3682,27 +3245,17 @@ func TestUpdateChecksDecode(t *testing.T) {
 
 	simple := &example.Pod{}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPut, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/bar", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/bar"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPut, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v\n%s", response, readBodyOrDie(response.Body))
-	}
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 	b, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
-		t.Errorf("unexpected response: %s", string(b))
-	}
+	require.NoError(t, err)
+	require.Contains(t, string(b), "cannot be handled as a Simple")
 }
 
 func TestCreate(t *testing.T) {
@@ -3722,32 +3275,18 @@ func TestCreate(t *testing.T) {
 		Other: "bar",
 	}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	response, err := client.Do(request)
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(response, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v %#v", err, response)
-	}
+	require.NoError(t, err)
 
 	// Avoid comparing managed fields in expected result
 	itemOut.ManagedFields = nil
@@ -3756,9 +3295,7 @@ func TestCreate(t *testing.T) {
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	require.Equal(t, http.StatusCreated, response.StatusCode)
 }
 
 func TestCreateYAML(t *testing.T) {
@@ -3786,34 +3323,20 @@ func TestCreateYAML(t *testing.T) {
 	decoder := codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
 
 	data, err := runtime.Encode(encoder, simple)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	request.Header.Set("Accept", "application/yaml, application/json")
 	request.Header.Set("Content-Type", "application/yaml")
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	response, err := client.Do(request)
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBodyDecoder(response, &itemOut, decoder)
-	if err != nil {
-		t.Fatalf("unexpected error: %v %#v", err, response)
-	}
+	require.NoError(t, err)
 
 	// Avoid comparing managed fields in expected result
 	itemOut.ManagedFields = nil
@@ -3822,9 +3345,7 @@ func TestCreateYAML(t *testing.T) {
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	require.Equal(t, http.StatusCreated, response.StatusCode)
 }
 
 func TestCreateInNamespace(t *testing.T) {
@@ -3844,32 +3365,18 @@ func TestCreateInNamespace(t *testing.T) {
 		Other: "bar",
 	}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	response, err := client.Do(request)
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(response, &itemOut)
-	if err != nil {
-		t.Fatalf("unexpected error: %v\n%s", err, data)
-	}
+	require.NoError(t, err)
 
 	// Avoid comparing managed fields in expected result
 	itemOut.ManagedFields = nil
@@ -3878,9 +3385,7 @@ func TestCreateInNamespace(t *testing.T) {
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	require.Equal(t, http.StatusCreated, response.StatusCode)
 }
 
 func TestCreateInvokeAdmissionControl(t *testing.T) {
@@ -3903,51 +3408,33 @@ func TestCreateInvokeAdmissionControl(t *testing.T) {
 				Other: "bar",
 			}
 			data, err := runtime.Encode(testCodec, simple)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			request, err := http.NewRequestWithContext(ctx, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/foo", bytes.NewBuffer(data))
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
+			url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo"
+			request, err := http.NewRequestWithContext(ctx, request.MethodPost, url, bytes.NewBuffer(data))
+			require.NoError(t, err)
 
-			var response *http.Response
-			response, err = client.Do(request)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			response, err := client.Do(request)
+			require.NoError(t, err)
 			defer apitesting.Close(t, response.Body)
-			if response.StatusCode != http.StatusForbidden {
-				t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusForbidden, response)
-			}
+			require.Equal(t, http.StatusForbidden, response.StatusCode)
 		})
 	}
 }
 
 func expectAPIStatus(t *testing.T, method, url string, data []byte, code int) *metav1.Status {
 	t.Helper()
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 	client := http.Client{}
 	request, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(data))
-	if err != nil {
-		t.Fatalf("unexpected error %#v", err)
-		return nil
-	}
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error on %s %s: %v", method, url, err)
-		return nil
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
 	var status metav1.Status
 	body, err := extractBody(response, &status)
-	if err != nil {
-		t.Fatalf("unexpected error on %s %s: %v\nbody:\n%s", method, url, err, body)
-		return nil
-	}
-	if code != response.StatusCode {
-		t.Fatalf("Expected %s %s to return %d, Got %d: %v", method, url, code, response.StatusCode, body)
-	}
+	require.NoError(t, err)
+	require.Equalf(t, code, response.StatusCode, "method: %s, url: %s, body: %s", method, url, body)
 	return &status
 }
 
@@ -3961,7 +3448,8 @@ func TestDelayReturnsError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	status := expectAPIStatus(t, request.MethodDelete, fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
+	url := fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL)
+	status := expectAPIStatus(t, request.MethodDelete, url, nil, http.StatusConflict)
 	if status.Status != metav1.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != metav1.StatusReasonAlreadyExists {
 		t.Errorf("Unexpected status %#v", status)
 	}
@@ -4016,13 +3504,8 @@ func TestWriteRAWJSONMarshalError(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 	resp, err := client.Get(server.URL)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("unexpected status code %d", resp.StatusCode)
-	}
+	require.NoError(t, err)
+	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
 func TestCreateTimeout(t *testing.T) {
@@ -4043,9 +3526,7 @@ func TestCreateTimeout(t *testing.T) {
 
 	simple := &genericapitesting.Simple{Other: "foo"}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	itemOut := expectAPIStatus(t, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
 	if itemOut.Status != metav1.StatusFailure || itemOut.Reason != metav1.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
@@ -4062,27 +3543,17 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 	simple := &genericapitesting.Simple{}
 	//using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
 	data, err := runtime.Encode(newCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 	b, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if !strings.Contains(string(b), "does not match the expected API version") {
-		t.Errorf("unexpected response: %s", string(b))
-	}
+	require.NoError(t, err)
+	require.Contains(t, string(b), "does not match the expected API version")
 }
 
 func TestCreateDefaultsAPIVersion(t *testing.T) {
@@ -4094,32 +3565,22 @@ func TestCreateDefaultsAPIVersion(t *testing.T) {
 
 	simple := &genericapitesting.Simple{}
 	data, err := runtime.Encode(codec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	m := make(map[string]interface{})
-	if err := json.Unmarshal(data, &m); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	err = json.Unmarshal(data, &m)
+	require.NoError(t, err)
 	delete(m, "apiVersion")
 	data, err = json.Marshal(m)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	request, err := http.NewRequestWithContext(ctx, request.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusCreated, response)
-	}
+	require.Equal(t, http.StatusCreated, response.StatusCode)
 }
 
 func TestUpdateChecksAPIVersion(t *testing.T) {
@@ -4131,27 +3592,17 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 
 	simple := &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 	data, err := runtime.Encode(newCodec, simple)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequestWithContext(ctx, request.MethodPut, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/bar", bytes.NewBuffer(data))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/bar"
+	request, err := http.NewRequestWithContext(ctx, request.MethodPut, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
 	b, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if !strings.Contains(string(b), "does not match the expected API version") {
-		t.Errorf("unexpected response: %s", string(b))
-	}
+	require.NoError(t, err)
+	require.Contains(t, string(b), "does not match the expected API version")
 }
 
 // runRequest is used by TestDryRun since it runs the test twice in a
@@ -4159,16 +3610,12 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 func runRequest(t testing.TB, path, verb string, data []byte, contentType string) *http.Response {
 	ctx := t.Context()
 	request, err := http.NewRequestWithContext(ctx, verb, path, bytes.NewBuffer(data))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	if contentType != "" {
 		request.Header.Set("Content-Type", contentType)
 	}
 	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	return response
 }
 
@@ -4307,20 +3754,19 @@ unknown: baz`)
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(response.Body)
 
-			if response.StatusCode != test.expectedStatusCode || !strings.Contains(buf.String(), test.expectedErr) {
-				t.Fatalf("unexpected response: %#v, expected err: %#v", response, test.expectedErr)
-			}
+			require.Equal(t, test.expectedStatusCode, response.StatusCode)
+			require.Contains(t, buf.String(), test.expectedErr)
 
-			warnings, _ := net.ParseWarningHeaders(response.Header["Warning"])
-			if len(warnings) != len(test.expectedWarns) {
-				t.Fatalf("unexpected number of warnings. Got count %d, expected %d. Got warnings %#v, expected %#v", len(warnings), len(test.expectedWarns), warnings, test.expectedWarns)
-
-			}
-			for i, warn := range warnings {
-				if warn.Text != test.expectedWarns[i] {
-					t.Fatalf("unexpected warning: %#v, expected warning: %#v", warn.Text, test.expectedWarns[i])
+			warnings, errs := net.ParseWarningHeaders(response.Header["Warning"])
+			require.Nil(t, errs)
+			var warningTexts []string
+			if len(warnings) > 0 {
+				warningTexts = make([]string, len(warnings))
+				for i, warn := range warnings {
+					warningTexts[i] = warn.Text
 				}
 			}
+			require.Equal(t, test.expectedWarns, warningTexts)
 		})
 	}
 }
@@ -4421,9 +3867,7 @@ other: bar`)
 				baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
 				response := runRequest(b, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
 				defer apitesting.Close(b, response.Body)
-				if response.StatusCode != test.expectedStatusCode {
-					b.Fatalf("unexpected status code: %d, expected: %d", response.StatusCode, test.expectedStatusCode)
-				}
+				require.Equal(b, test.expectedStatusCode, response.StatusCode)
 			}
 		})
 	}
@@ -4500,9 +3944,8 @@ func TestXGSubresource(t *testing.T) {
 		Serializer:             codecs,
 	}
 
-	if _, _, err := (&group).InstallREST(container); err != nil {
-		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
-	}
+	_, _, err := (&group).InstallREST(container)
+	require.NoError(t, err)
 
 	server := newTestServer(defaultAPIServer{mux, container})
 	defer server.Close()
@@ -4511,18 +3954,12 @@ func TestXGSubresource(t *testing.T) {
 	req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var itemOut genericapitesting.SimpleXGSubresource
 	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Test if the returned object has the expected group, version and kind
 	// We are directly unmarshaling JSON here because TypeMeta cannot be decoded through the
@@ -4532,9 +3969,7 @@ func TestXGSubresource(t *testing.T) {
 	decoder := json.NewDecoder(strings.NewReader(body))
 	var itemFromBody genericapitesting.SimpleXGSubresource
 	err = decoder.Decode(&itemFromBody)
-	if err != nil {
-		t.Errorf("unexpected JSON decoding error: %v", err)
-	}
+	require.NoError(t, err)
 	if want := fmt.Sprintf("%s/%s", testGroup2Version.Group, testGroup2Version.Version); itemFromBody.APIVersion != want {
 		t.Errorf("unexpected APIVersion got: %+v want: %+v", itemFromBody.APIVersion, want)
 	}
@@ -4545,14 +3980,6 @@ func TestXGSubresource(t *testing.T) {
 	if itemOut.Name != subresourceStorage.item.Name {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, subresourceStorage.item, string(body))
 	}
-}
-
-func readBodyOrDie(r io.Reader) []byte {
-	body, err := io.ReadAll(r)
-	if err != nil {
-		panic(err)
-	}
-	return body
 }
 
 // BenchmarkUpdateProtobuf measures the cost of processing an update on the server in proto
@@ -4566,37 +3993,34 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 	defer server.Close()
 	client := http.Client{}
 
-	dest, _ := url.Parse(server.URL)
+	dest, err := url.Parse(server.URL)
+	require.NoError(b, err)
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simples/bar"
 	dest.RawQuery = ""
 
 	info, _ := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), "application/vnd.kubernetes.protobuf")
 	e := codecs.EncoderForVersion(info.Serializer, newGroupVersion)
 	data, err := runtime.Encode(e, &items[0])
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(b, err)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Use a closure to execute defers before continuing
 		func() {
 			request, err := http.NewRequestWithContext(ctx, request.MethodPut, dest.String(), bytes.NewReader(data))
-			if err != nil {
-				b.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(b, err)
 			request.Header.Set("Accept", "application/vnd.kubernetes.protobuf")
 			request.Header.Set("Content-Type", "application/vnd.kubernetes.protobuf")
 			response, err := client.Do(request)
-			if err != nil {
-				b.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(b, err)
 			defer apitesting.Close(b, response.Body)
 			if response.StatusCode != http.StatusBadRequest {
-				body, _ := io.ReadAll(response.Body)
+				body, err := io.ReadAll(response.Body)
+				require.NoError(b, err)
 				b.Fatalf("Unexpected response %#v\n%s", response, body)
 			}
-			_, _ = io.ReadAll(response.Body)
+			_, err = io.ReadAll(response.Body)
+			require.NoError(b, err)
 		}()
 	}
 	b.StopTimer()
