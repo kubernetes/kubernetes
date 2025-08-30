@@ -241,7 +241,7 @@ func withDeviceClass(result *preFilterState, draManager framework.SharedDRAManag
 			continue
 		}
 
-		if v1helper.IsExtendedResourceName(rName) {
+		if schedutil.IsDRAExtendedResourceName(rName) {
 			hasExtendedResource = true
 			break
 		}
