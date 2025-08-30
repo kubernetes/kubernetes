@@ -48,6 +48,10 @@ func newPod(host string, hostPortInfos ...string) *v1.Pod {
 	return st.MakePod().Node(host).ContainerPort(networkPorts).Obj()
 }
 
+func newNodeInfo(hostPortInfos ...string) fwk.NodeInfo {
+	return framework.NewNodeInfo(newPod("p1", hostPortInfos...))
+}
+
 func TestNodePorts(t *testing.T) {
 	tests := []struct {
 		pod                 *v1.Pod
@@ -267,6 +271,70 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedHint, actualHint)
+		})
+	}
+}
+
+// This test is similar to TestHostPortInfo_Check in k8s.io/kube-scheduler/framework/types_test.go,
+// but it tests a smaller set of cases. We could consider using a fake HostPortInfo to verify the logic
+// of Fits, instead of the logic of CheckConflict.
+func TestFits(t *testing.T) {
+	tests := []struct {
+		desc     string
+		pod      *v1.Pod
+		existing fwk.NodeInfo
+		expect   bool
+	}{
+		{
+			desc:     "non-conflicting ports",
+			pod:      newPod("p", "TCP/127.0.0.1/80"),
+			existing: newNodeInfo("TCP/127.0.0.1/9090"),
+			expect:   true,
+		},
+		{
+			desc: "multiple non-conflicting ports",
+			pod: newPod("p",
+				"TCP/127.0.0.1/80",
+				"TCP/127.0.1.1/80",
+				"TCP/127.0.1.1/90",
+				"TCP/127.0.1.1/100"),
+			existing: newNodeInfo(
+				"TCP/127.0.0.1/9090",
+				"TCP/127.0.0.1/9191",
+				"TCP/127.0.1.1/8080"),
+			expect: true,
+		},
+		{
+			desc:     "same ports on different protocols",
+			pod:      newPod("m1", "TCP/127.0.0.1/80"),
+			existing: newNodeInfo("UDP/127.0.0.1/80"),
+			expect:   true,
+		},
+		{
+			desc:     "conflicting ports",
+			pod:      newPod("m1", "TCP/127.0.0.1/80"),
+			existing: newNodeInfo("TCP/127.0.0.1/80"),
+			expect:   false,
+		},
+		{
+			desc: "multiple ports, some conflicting",
+			pod: newPod("p",
+				"TCP/127.0.0.1/80",
+				"TCP/127.0.1.1/80",
+				"TCP/127.0.1.1/90",
+				"TCP/127.0.1.1/100"),
+			existing: newNodeInfo(
+				"TCP/127.0.0.1/9090",
+				"TCP/127.0.1.1/90",
+				"TCP/127.0.1.1/8080"),
+			expect: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			if Fits(test.pod, test.existing) != test.expect {
+				t.Errorf("expected %t; got %t", test.expect, !test.expect)
+			}
 		})
 	}
 }
