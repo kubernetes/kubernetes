@@ -199,6 +199,7 @@ func (s *Serializer) encode(obj runtime.Object, w io.Writer, memAlloc runtime.Me
 
 func (s *Serializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.MemoryAllocator) error {
 	if memAlloc == nil {
+		//nolint:logcheck // Hopefully not reached.
 		klog.Error("a mandatory memory allocator wasn't provided, this might have a negative impact on performance, check invocations of EncodeWithAllocator method, falling back on runtime.SimpleAllocator")
 		memAlloc = &runtime.SimpleAllocator{}
 	}
@@ -485,6 +486,7 @@ func doEncodeWithHeader(obj any, w io.Writer, field byte, precomputedSize int, m
 // precomputedObjSize should not include header bytes (field identifier, size).
 func doEncode(obj any, w io.Writer, precomputedObjSize *int, memAlloc runtime.MemoryAllocator) (int, error) {
 	if memAlloc == nil {
+		//nolint:logcheck // Hopefully not reached.
 		klog.Error("a mandatory memory allocator wasn't provided, this might have a negative impact on performance, check invocations of EncodeWithAllocator method, falling back on runtime.SimpleAllocator")
 		memAlloc = &runtime.SimpleAllocator{}
 	}
