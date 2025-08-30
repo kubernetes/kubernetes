@@ -677,6 +677,23 @@ func TestEnoughRequests(t *testing.T) {
 				},
 			},
 		},
+		{
+			draExtendedResourceEnabled: true,
+			pod: newResourcePod(
+				framework.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceDRA: 1}}),
+			nodeInfo:                  framework.NewNodeInfo(newResourcePod(framework.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceDRA: 0}})),
+			name:                      "extended resource was backed by Device Plugin (Allocatable: 0)",
+			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
+			draExtendedResourceEnabled: true,
+			pod: newResourcePod(
+				framework.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo:                  framework.NewNodeInfo(newResourcePod(framework.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 0}})),
+			name:                      "extended resource was backed by Device Plugin (Allocatable: 0), nil resourceToDeviceClass",
+			nilResourceToDeviceClass:  true,
+			wantInsufficientResources: []InsufficientResource{},
+		},
 	}
 
 	for _, test := range enoughPodsTests {
@@ -1795,6 +1812,19 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 				v1.ResourceCPU:              "1",
 				v1.ResourceMemory:           "2",
 				v1.ResourceEphemeralStorage: "1",
+			}).Obj(),
+			draExtendedResourceEnabled: true,
+			expected:                   true,
+		},
+		"requested-resources-dra-zero-capacity": {
+			pod: newResourcePod(framework.Resource{
+				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
+			}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				extendedResourceA: "0",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				extendedResourceA: "0",
 			}).Obj(),
 			draExtendedResourceEnabled: true,
 			expected:                   true,

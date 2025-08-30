@@ -477,14 +477,15 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 		}
 
 		if opts.EnableDRAExtendedResource {
-			_, okScalar := modifiedNodeInfo.GetAllocatable().GetScalarResources()[rName]
+			allocatable := modifiedNodeInfo.GetAllocatable().GetScalarResources()[rName]
 			_, okDynamic := podRequest.resourceToDeviceClass[rName]
 
-			if (okDynamic || podRequest.resourceToDeviceClass == nil) && !okScalar {
+			if (okDynamic || podRequest.resourceToDeviceClass == nil) && allocatable == 0 {
 				// The extended resource request matches a device class or no device class mapping
-				// provided and it is not in the node's Allocatable (i.e. it is not provided
-				// by the node's device plugin), then leave it to the dynamicresources
-				// plugin to evaluate whether it can be satisfy by DRA resources.
+				// provided and node's Allocatable is 0 (i.e. it was never provided by the node's
+				// device plugin or it's not provided by the node's device plugin anymore),
+				// then leave it to the dynamicresources plugin to evaluate whether it can be
+				// satisfied by DRA resources.
 				return true
 			}
 		}
@@ -633,14 +634,15 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 		}
 
 		if opts.EnableDRAExtendedResource {
-			_, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
+			allocatable := nodeInfo.GetAllocatable().GetScalarResources()[rName]
 			_, okDynamic := podRequest.resourceToDeviceClass[rName]
 
-			if (okDynamic || podRequest.resourceToDeviceClass == nil) && !okScalar {
+			if (okDynamic || podRequest.resourceToDeviceClass == nil) && allocatable == 0 {
 				// The extended resource request matches a device class or no device class mapping
-				// provided and it is not in the node's Allocatable (i.e. it is not provided
-				// by the node's device plugin), then leave it to the dynamicresources
-				// plugin to evaluate whether it can be satisfy by DRA resources.
+				// provided and node's Allocatable is 0 (i.e. it was never provided by the node's
+				// device plugin or it's not provided by the node's device plugin anymore),
+				// then leave it to the dynamicresources plugin to evaluate whether it can be
+				// satisfied by DRA resources.
 				continue
 			}
 		}
