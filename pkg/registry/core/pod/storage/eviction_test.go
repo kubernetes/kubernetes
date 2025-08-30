@@ -45,7 +45,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func TestEviction(t *testing.T) {
+func TestEvictionWithETCD(t *testing.T) {
 	testcases := []struct {
 		name     string
 		pdbs     []runtime.Object
@@ -248,7 +248,7 @@ func TestEviction(t *testing.T) {
 	}
 }
 
-func TestEvictionIgnorePDB(t *testing.T) {
+func TestEviction(t *testing.T) {
 	testcases := []struct {
 		name     string
 		pdbs     []runtime.Object
