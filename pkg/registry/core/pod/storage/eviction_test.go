@@ -521,6 +521,62 @@ func TestEviction(t *testing.T) {
 				Status: api.ConditionTrue,
 			},
 		},
+		{
+			name: "the error is about sync failure when the condition reason is SyncFailedReason",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{}},
+				Status: policyv1.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: 0,
+					Conditions: []metav1.Condition{
+						{
+							Type:    policyv1.DisruptionAllowedCondition,
+							Status:  metav1.ConditionFalse,
+							Reason:  policyv1.SyncFailedReason,
+							Message: "hoge",
+						},
+					},
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t12", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         "Cannot evict pod as it would violate the pod's disruption budget.: TooManyRequests: The disruption budget foo does not allow evicting pods currently because it failed sync: hoge",
+			podName:             "t12",
+			expectedDeleteCount: 0,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionTrue,
+			},
+		},
+		{
+			name: "the error includes the reason when the condition.Status is False",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{}},
+				Status: policyv1.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: 0,
+					Conditions: []metav1.Condition{
+						{
+							Type:    policyv1.DisruptionAllowedCondition,
+							Status:  metav1.ConditionFalse,
+							Reason:  policyv1.InsufficientPodsReason,
+							Message: "hoge",
+						},
+					},
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t12", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         "Cannot evict pod as it would violate the pod's disruption budget.: TooManyRequests: The disruption budget foo does not allow evicting pods currently. The reason is InsufficientPods: hoge",
+			podName:             "t12",
+			expectedDeleteCount: 0,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionTrue,
+			},
+		},
 	}
 
 	for _, unhealthyPodEvictionPolicy := range []*policyv1.UnhealthyPodEvictionPolicyType{unhealthyPolicyPtr(policyv1.AlwaysAllow), nil, unhealthyPolicyPtr(policyv1.IfHealthyBudget)} {
