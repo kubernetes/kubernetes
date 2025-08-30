@@ -30,7 +30,6 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/admission"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -205,7 +204,6 @@ func CreateKubeAPIServerConfig(
 ) (
 	*controlplane.Config,
 	aggregatorapiserver.ServiceResolver,
-	[]admission.PluginInitializer,
 	error,
 ) {
 	// global stuff
@@ -215,16 +213,16 @@ func CreateKubeAPIServerConfig(
 	kubeAdmissionConfig := &kubeapiserveradmission.Config{}
 	kubeInitializers, err := kubeAdmissionConfig.New()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
+		return nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
 	}
 
 	serviceResolver, err := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error building service resolver: %w", err)
+		return nil, nil, fmt.Errorf("error building service resolver: %w", err)
 	}
-	controlplaneConfig, admissionInitializers, err := controlplaneapiserver.CreateConfig(opts.CompletedOptions, genericConfig, versionedInformers, storageFactory, serviceResolver, kubeInitializers)
+	controlplaneConfig, err := controlplaneapiserver.CreateConfig(opts.CompletedOptions, genericConfig, versionedInformers, storageFactory, serviceResolver, kubeInitializers)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	config := &controlplane.Config{
@@ -254,14 +252,14 @@ func CreateKubeAPIServerConfig(
 		networkContext := egressselector.Cluster.AsNetworkContext()
 		dialer, err := config.ControlPlane.Generic.EgressSelector.Lookup(networkContext)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		c := config.ControlPlane.Extra.ProxyTransport.Clone()
 		c.DialContext = dialer
 		config.ControlPlane.ProxyTransport = c
 	}
 
-	return config, serviceResolver, admissionInitializers, nil
+	return config, serviceResolver, nil
 }
 
 var testServiceResolver webhook.ServiceResolver
