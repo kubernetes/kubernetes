@@ -1452,7 +1452,7 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
     case "$(uname -s)" in
       Darwin)
         print_color "kubelet is not currently supported in darwin, kubelet aborted."
-        KUBELET_LOG=""
+        exit 1
         ;;
       Linux)
         install_cni_if_needed
@@ -1460,6 +1460,7 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
         ;;
       *)
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
+        exit 1
         ;;
     esac
 fi
@@ -1471,6 +1472,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
     case "$(uname -s)" in
       Darwin)
         print_color "kubelet is not currently supported in darwin, kube-proxy aborted."
+        exit 1
         ;;
       Linux)
         start_kubeproxy
@@ -1480,6 +1482,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
         ;;
       *)
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kube-proxy aborted."
+        exit 1
         ;;
     esac
   fi
