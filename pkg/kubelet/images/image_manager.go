@@ -121,7 +121,7 @@ func (m *imageManager) imagePullPrecheck(ctx context.Context, objRef *v1.ObjectR
 		}
 
 		// Get remote image id (digest)
-		remoteImageRef, _ := m.imageService.GetRemoteImageRef(ctx, imageRef, pullSecrets)
+		remoteImageRef, _ := m.imageService.GetRemoteImageRef(ctx, requestedImage, pullSecrets)
 
 		// Compare digests if not match then pull image from remote
 		if remoteImageRef != imageRef && remoteImageRef != "" {

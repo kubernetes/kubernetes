@@ -27,7 +27,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -86,56 +85,59 @@ func createKeychainFromSecrets(pullSecrets []v1.Secret) authn.Keychain {
 		klog.V(4).Info("No pull secrets provided for fetching remote image digest, using default keychain")
 		return authn.DefaultKeychain
 	}
+	klog.V(4).Info("Using pull secrets for keychain", "count", len(pullSecrets))
 	return &secretKeychain{secrets: pullSecrets}
 }
 
-// GetRemoteImageRef gets the reference (digest or ID) of the image from the registry.
-// It supports private registries via pull secrets and falls back to the original imageRef on error.
+// GetRemoteImageRef fetches the remote image reference (digest) from the registry.
+// Falls back to the original imageRef string if fetching fails.
 func (m *kubeGenericRuntimeManager) GetRemoteImageRef(
 	ctx context.Context,
 	imageName string,
 	pullSecrets []v1.Secret,
 ) (string, error) {
 	logger := klog.FromContext(ctx)
-	logger.V(3).Info("Fetching remote imageName", "imageName", imageName)
+	logger.V(3).Info("Fetching remote image", "imageName", imageName)
 
 	// Parse the image reference
 	imageRef, err := name.ParseReference(imageName)
 	if err != nil {
-		klog.Errorf("GetRemoteImageDigestWithoutPull failed to parse image reference %q: %v", imageName, err)
-		return "", nil
+		logger.Error(err, "Failed to parse image reference", "imageName", imageName)
+		return "", fmt.Errorf("invalid image reference %q: %w", imageName, err)
 	}
 
 	// Create keychain from pull secrets
 	keychain := createKeychainFromSecrets(pullSecrets)
-	
-	// Try fetching the remote image digest with retries (15 sec total)
+
+	// Retry fetching remote image digest
 	remoteImage, err := remote.Image(imageRef, remote.WithContext(ctx), remote.WithAuthFromKeychain(keychain))
+
 	for i := 0; i < 5; i++ {
+
+		//Checking if fetched and then retries if not.
 		if err == nil {
 			break
 		}
-		logger.V(4).Error(err, "Failed to fetch remote image digest.","imageRef",imageRef,"retry",i+1)
+		logger.V(4).Error(err, "Retry fetching remote image digest", "imageRef", imageRef, "attempt", i+1)
 		time.Sleep(time.Second * time.Duration(i+1))
 		remoteImage, err = remote.Image(imageRef, remote.WithContext(ctx), remote.WithAuthFromKeychain(keychain))
 	}
 
 	if err != nil {
-		logger.V(3).Error(err, "Failed to fetch remote image digest, fallback to local image", "imageRef",imageRef)
+		logger.V(3).Error(err, "Failed to fetch remote image digest, fallback to original imageRef", "imageRef", imageRef)
 		return imageRef.String(), nil
 	}
 
-	// Get the image digest
+	// Get the digest reference
 	remoteImageRef, err := remoteImage.ConfigName()
 	if err != nil {
-		logger.V(3).Error(err, "Failed to get remote image digest, fallback to local image", "imageRef", imageRef)
+		logger.V(3).Error(err, "Failed to get remote image digest, fallback to original imageRef", "imageRef", imageRef)
 		return imageRef.String(), nil
 	}
 
-	logger.V(3).Info("Successfully fetched remote image digest: %s", remoteImageRef.String())
+	logger.V(3).Info("Successfully fetched remote image digest", "digest", remoteImageRef.String())
 	return remoteImageRef.String(), nil
 }
-
 
 // secretKeychain implements authn.Keychain for Kubernetes secrets
 type secretKeychain struct {
@@ -208,7 +210,6 @@ func (k *secretKeychain) Resolve(target authn.Resource) (authn.Authenticator, er
 	klog.V(4).Infof("No credentials found in secrets for registry %s, falling back to default keychain", registry)
 	return authn.DefaultKeychain.Resolve(target)
 }
-
 
 // GetImageRef gets the ID of the image which has already been in
 // the local storage. It returns ("", nil) if the image isn't in the local storage.
