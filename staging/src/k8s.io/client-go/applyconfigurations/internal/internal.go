@@ -4021,6 +4021,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.ObjectReference
           elementRelationship: atomic
+    - name: lastFailureTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: lastScheduleTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time

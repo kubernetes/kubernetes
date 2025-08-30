@@ -203,6 +203,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		jobCreationTime     time.Time
 		lastScheduleTime    time.Time
 		now                 time.Time
+		jobFailure          bool
 		jobCreateError      error
 		jobGetErr           error
 
@@ -1222,7 +1223,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectErr:                  true,
 			jobPresentInCJActiveStatus: false,
 		},
-		"set lastsuccessfultime if successfulJobHistoryLimit is zero": {
+		"set lastSuccessfulTime if successfulJobHistoryLimit is zero": {
 			successfulJobsHistoryLimit: ptr.To[int32](0),
 			ranPreviously:              true,
 			schedule:                   onTheHour,
@@ -1230,7 +1231,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCompleted:            true,
 			jobPresentInCJActiveStatus: true,
 		},
-		"set lastsuccessfultime if successfulJobHistoryLimit is ten": {
+		"set lastSuccessfulTime if successfulJobHistoryLimit is ten": {
 			successfulJobsHistoryLimit: ptr.To[int32](10),
 			ranPreviously:              true,
 			schedule:                   onTheHour,
@@ -1238,12 +1239,28 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCompleted:            true,
 			jobPresentInCJActiveStatus: true,
 		},
-		"set lastsuccessfultime if successfulJobHistoryLimit is nil": {
+		"set lastSuccessfulTime if successfulJobHistoryLimit is nil": {
 			ranPreviously:              true,
 			schedule:                   onTheHour,
 			expectUpdateStatus:         true,
 			expectCompleted:            true,
 			jobPresentInCJActiveStatus: true,
+		},
+		"set lastFailureTime if job failed": {
+			ranPreviously:              true,
+			schedule:                   onTheHour,
+			jobFailure:                 true,
+			expectUpdateStatus:         true,
+			expectCompleted:            true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"set lastFailureTime if job failed and not active": {
+			ranPreviously:              true,
+			schedule:                   onTheHour,
+			jobFailure:                 true,
+			expectUpdateStatus:         true,
+			expectCompleted:            false,
+			jobPresentInCJActiveStatus: false,
 		},
 	}
 	for name, tc := range testCases {
@@ -1296,10 +1313,17 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 					if !tc.jobStillNotFoundInLister {
 						js = append(js, job)
 					}
+					if tc.jobFailure {
+						t.Errorf("%s: test setup error: an active job cannot be in a failure", name)
+					}
 				} else {
+					jobConditionType := batchv1.JobComplete
+					if tc.jobFailure {
+						jobConditionType = batchv1.JobFailed
+					}
 					job.Status.CompletionTime = &metav1.Time{Time: job.ObjectMeta.CreationTimestamp.Add(time.Second * 10)}
 					job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{
-						Type:   batchv1.JobComplete,
+						Type:   jobConditionType,
 						Status: v1.ConditionTrue,
 					})
 					if !tc.jobStillNotFoundInLister {
@@ -1347,8 +1371,20 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			}
 			if tc.ranPreviously && !tc.stillActive {
 				completionTime := tc.jobCreationTime.Add(10 * time.Second)
-				if cjCopy.Status.LastSuccessfulTime == nil || !cjCopy.Status.LastSuccessfulTime.Time.Equal(completionTime) {
-					t.Errorf("cj.status.lastSuccessfulTime: %s expected, got %#v", completionTime, cj.Status.LastSuccessfulTime)
+				if tc.jobFailure {
+					if cjCopy.Status.LastFailureTime == nil || !cjCopy.Status.LastFailureTime.Time.Equal(completionTime) {
+						t.Errorf("cj.status.lastFailureTime: %s expected, got %#v", completionTime, cj.Status.LastFailureTime)
+					}
+					if cjCopy.Status.LastSuccessfulTime != nil {
+						t.Errorf("cj.status.lastSuccessfulTime: expected nil, got %#v", cj.Status.LastSuccessfulTime)
+					}
+				} else {
+					if cjCopy.Status.LastSuccessfulTime == nil || !cjCopy.Status.LastSuccessfulTime.Time.Equal(completionTime) {
+						t.Errorf("cj.status.lastSuccessfulTime: %s expected, got %#v", completionTime, cj.Status.LastSuccessfulTime)
+					}
+					if cjCopy.Status.LastFailureTime != nil {
+						t.Errorf("cj.status.lastFailureTime: expected nil, got %#v", cj.Status.LastFailureTime)
+					}
 				}
 			}
 			if len(jc.Jobs) != expectedCreates {
