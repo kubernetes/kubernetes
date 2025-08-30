@@ -80,46 +80,72 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 	return "", nil, utilerrors.NewAggregate(pullErrs)
 }
 
-// createKeychainFromSecrets creates an authn.Keychain from Kubernetes pull secrets.
-// It falls back to authn.DefaultKeychain if no valid secrets are found.
+// createKeychainFromSecrets creates an authn.Keychain from Kubernetes pull secrets
 func createKeychainFromSecrets(pullSecrets []v1.Secret) authn.Keychain {
 	if len(pullSecrets) == 0 {
 		klog.V(4).Info("No pull secrets provided, using default keychain")
 		return authn.DefaultKeychain
 	}
-
 	return &secretKeychain{secrets: pullSecrets}
 }
+
+// GetRemoteImageRef gets the reference (digest or ID) of the image from the registry.
+// It supports private registries via pull secrets and falls back to the original imageRef on error.
+func (m *kubeGenericRuntimeManager) GetRemoteImageRef(
+	ctx context.Context,
+	imageName string,
+	pullSecrets []v1.Secret,
+) (string, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(3).Info("Fetching remote imageName", "imageName", imageName)
+
+	// Parse the image reference
+	imageRef, err := name.ParseReference(imageName)
+	if err != nil {
+		klog.Errorf("GetRemoteImageDigestWithoutPull failed to parse image reference %q: %v", imageName, err)
+		return "", nil
+	}
+
+	// Create keychain from pull secrets
+	keychain := createKeychainFromSecrets(pullSecrets)
+	
+	// Try fetching the remote image digest with retries (15 sec total)
+	remoteImage, err := remote.Image(imageRef, remote.WithContext(ctx), remote.WithAuthFromKeychain(keychain))
+	for i := 0; i < 5; i++ {
+		if err == nil {
+			break
+		}
+		logger.V(4).Error(err, "Failed to fetch remote image.","imageRef",imageRef)
+		time.Sleep(time.Second * time.Duration(i+1))
+		remoteImage, err = remote.Image(imageRef, remote.WithContext(ctx), remote.WithAuthFromKeychain(keychain))
+	}
+
+	if err != nil {
+		logger.V(3).Error(err, "Failed to fetch remote image digest, fallback to local image", "imageRef",imageRef)
+		return imageRef.String(), nil
+	}
+
+	// Get the image digest
+	digest, err := remoteImage.ConfigName()
+	if err != nil {
+		logger.V(3).Error(err, "Failed to get remote image digest, fallback to local image", "imageRef", imageRef)
+		return imageRef.String(), nil
+	}
+
+	logger.V(3).Info("Successfully fetched remote digest: %s", digest.String())
+	return digest.String(), nil
+}
+
 
 // secretKeychain implements authn.Keychain for Kubernetes secrets
 type secretKeychain struct {
 	secrets []v1.Secret
 }
 
-// Resolve returns the appropriate authenticator for the given registry.
-func (k *secretKeychain) Resolve(target authn.Resource) (authn.Authenticator, error) {
-	registry := target.RegistryStr()
-	klog.V(4).Infof("Resolving auth for registry: %s", registry)
-
-	for _, secret := range k.secrets {
-		authConfig, err := getAuthenticatorFromSecret(&secret)
-		if err != nil {
-			klog.V(4).Infof("Failed to get auth from secret: %v", err)
-			continue
-		}
-		if authConfig != nil {
-			klog.V(4).Infof("Found credentials in secret for registry %s", registry)
-			return authConfig, nil
-		}
-	}
-
-	klog.V(4).Infof("No credentials found in secrets for registry %s, falling back to default keychain", registry)
-	return authn.DefaultKeychain.Resolve(target)
-}
-
 // getAuthenticatorFromSecret extracts an authn.Authenticator from a Kubernetes pull secret
 func getAuthenticatorFromSecret(secret *v1.Secret) (authn.Authenticator, error) {
 	configData, ok := secret.Data[".dockerconfigjson"]
+
 	if !ok {
 		return nil, fmt.Errorf("no .dockerconfigjson in secret %s", secret.Name)
 	}
@@ -134,78 +160,55 @@ func getAuthenticatorFromSecret(secret *v1.Secret) (authn.Authenticator, error) 
 		return nil, fmt.Errorf("failed to unmarshal docker config in secret %s: %w", secret.Name, err)
 	}
 
-	for _, authData := range dockerConfig.Auths {
+	// Loop through auth entries and return the first valid one
+	for registry, authData := range dockerConfig.Auths {
 		if authData.Auth == "" {
 			continue
 		}
 
 		decoded, err := base64.StdEncoding.DecodeString(authData.Auth)
 		if err != nil {
+			klog.V(4).Infof("Failed to decode auth token for registry %s in secret %s: %v", registry, secret.Name, err)
 			continue
 		}
 
 		parts := strings.SplitN(string(decoded), ":", 2)
 		if len(parts) != 2 {
+			klog.V(4).Infof("Invalid auth token format for registry %s in secret %s", registry, secret.Name)
 			continue
 		}
 
+		klog.V(4).Infof("Using credentials from secret %s for registry %s", secret.Name, registry)
 		return &authn.Basic{
 			Username: parts[0],
 			Password: parts[1],
 		}, nil
 	}
 
+	klog.V(5).Infof("No valid auth entries found in secret %s", secret.Name)
 	return nil, nil
 }
 
-// GetRemoteImageRef gets the reference (digest or ID) of the image from the registry.
-// It supports private registries via pull secrets and falls back to the original imageRef on error.
-func (m *kubeGenericRuntimeManager) GetRemoteImageRef(
-	ctx context.Context,
-	imageRef string,
-	pullSecrets []v1.Secret,
-) (string, error) {
-	logger := klog.FromContext(ctx)
-	logger.V(3).Info("Fetching remote image ref", "imageRef", imageRef)
+func (k *secretKeychain) Resolve(target authn.Resource) (authn.Authenticator, error) {
+	registry := target.RegistryStr()
+	klog.V(4).Infof("Resolving auth for registry: %s", registry)
 
-	// Parse the image reference
-	ref, err := name.ParseReference(imageRef)
-	if err != nil {
-		logger.Error(err, "Failed to parse image reference", "imageRef", imageRef)
-		return imageRef, err
-	}
-
-	// Create keychain from pull secrets
-	keychain := createKeychainFromSecrets(pullSecrets)
-
-	// Try fetching the remote image digest with retries (15 sec total)
-	remoteImage, err := remote.Image(ref, remote.WithContext(ctx), remote.WithAuthFromKeychain(keychain))
-	if err != nil {
-		for i := 0; i < 5; i++ {
-			remoteImage, err = remote.Image(ref, remote.WithContext(ctx), remote.WithAuthFromKeychain(keychain))
-			if err == nil {
-				break
-			}
-			logger.V(4).Info("Failed x%d to fetch remote image: %s, retrying after %d seconds", i+1, imageRef, i+1)
-			time.Sleep(time.Second * time.Duration(i+1))
+	for _, secret := range k.secrets {
+		authConfig, err := getAuthenticatorFromSecret(&secret)
+		if err != nil {
+			klog.V(4).Infof("Failed to get auth from secret %s: %v", secret.Name, err)
+			continue
+		}
+		if authConfig != nil {
+			klog.V(4).Infof("Found credentials in secret %s for registry %s", secret.Name, registry)
+			return authConfig, nil
 		}
 	}
 
-	if err != nil {
-		logger.V(3).Info("Failed to fetch remote image digest, fallback to imageRef: %s, err: %v", imageRef, err)
-		return imageRef, err
-	}
-
-	// Get the image digest
-	digest, err := remoteImage.ConfigName()
-	if err != nil {
-		logger.Error(err, "Failed to get remote image digest, fallback to imageRef", "imageRef", imageRef)
-		return imageRef, err
-	}
-
-	logger.V(4).Info("Successfully fetched remote digest: %s", digest.String())
-	return digest.String(), nil
+	klog.V(4).Infof("No credentials found in secrets for registry %s, falling back to default keychain", registry)
+	return authn.DefaultKeychain.Resolve(target)
 }
+
 
 // GetImageRef gets the ID of the image which has already been in
 // the local storage. It returns ("", nil) if the image isn't in the local storage.
