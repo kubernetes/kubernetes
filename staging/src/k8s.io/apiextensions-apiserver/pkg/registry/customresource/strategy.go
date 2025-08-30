@@ -401,6 +401,25 @@ func (a customResourceStrategy) MatchCustomResourceDefinitionStorage(label label
 	}
 }
 
+// CheckGracefulDelete updates the delete option with the desired grace value
+func (a customResourceStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
+	if options == nil || options.GracePeriodSeconds == nil {
+		return false
+	}
+
+	metaObj, err := meta.Accessor(obj)
+	if err != nil {
+		return false
+	}
+
+	// Only support graceful deletion if the object has finalizers
+	if len(metaObj.GetFinalizers()) == 0 {
+		return false
+	}
+
+	return true
+}
+
 // OpenAPIv3 type/maxLength/maxItems/MaxProperties/required/enum violation/wrong type field validation failures are viewed as blocking err for CEL validation
 func hasBlockingErr(errs field.ErrorList) (bool, *field.Error) {
 	for _, err := range errs {
