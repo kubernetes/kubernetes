@@ -164,6 +164,9 @@ type ImageService interface {
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(ctx context.Context, image ImageSpec) (string, error)
+	// GetRemoteImageRef gets the reference (digest or ID) of the image from the registry. 
+	// It returns ("", nil) if image is not found or any error appears.
+	GetRemoteImageRef(ctx context.Context, imageRef string, pullSecrets []v1.Secret) (string, error)
 	// ListImages gets all images currently on the machine.
 	ListImages(ctx context.Context) ([]Image, error)
 	// RemoveImage removes the specified image.

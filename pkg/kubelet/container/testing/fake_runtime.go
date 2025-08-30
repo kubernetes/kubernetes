@@ -363,6 +363,47 @@ func (f *FakeRuntime) UnblockImagePulls(count int) {
 	}
 }
 
+func (f *FakeRuntime) GetRemoteImageRef(ctx context.Context, imageRef string , creds []credentialprovider.TrackedAuthConfig) (string, error) {
+
+	f.Lock()
+	f.CalledFunctions = append(f.CalledFunctions, "GetRemoteImageRef")
+	if f.Err == nil {
+		i := kubecontainer.Image{
+			ID:   imageRef,
+		}
+		f.ImageList = append(f.ImageList, i)
+	}
+
+	if !f.BlockImagePulls {
+		f.Unlock()
+		return imageRef, f.Err
+	}
+
+	retErr := f.Err
+	if f.imagePullTokenBucket == nil {
+		f.imagePullTokenBucket = make(chan bool, 1)
+	}
+
+	// Unlock before waiting for UnblockImagePulls calls, to avoid deadlock.
+	f.Unlock()
+	select {
+	case <-ctx.Done():
+	case <-f.imagePullTokenBucket:
+	}
+
+	return imageRef, retErr
+}
+
+
+func (f *FakeRuntime) FetchRemoteImageDigest(_ context.Context) ([]kubecontainer.Image, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "FetchRemoteImageDigest")
+	return snapshot(f.ImageList), f.Err
+}
+
+
 func (f *FakeRuntime) GetImageRef(_ context.Context, image kubecontainer.ImageSpec) (string, error) {
 	f.Lock()
 	defer f.Unlock()
