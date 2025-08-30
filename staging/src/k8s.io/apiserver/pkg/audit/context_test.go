@@ -175,6 +175,55 @@ func TestAuditAnnotationsWithAuditLoggingSetup(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestAuditEventCopyFrom(t *testing.T) {
+	t.Run("no audit context data in the request context", func(t *testing.T) {
+		ctx := context.Background()
+		assert.Nil(t, AuditEventCopyFrom(ctx))
+	})
+
+	t.Run("with level other than none", func(t *testing.T) {
+		ctx := context.Background()
+		ctx = WithAuditContext(ctx)
+		assert.Equal(t, &auditinternal.Event{Stage: auditinternal.StageResponseStarted}, AuditEventCopyFrom(ctx))
+
+		if err := AuditContextFrom(ctx).Init(RequestAuditConfig{Level: auditinternal.LevelMetadata}, nil); err != nil {
+			t.Fatal(err)
+		}
+
+		actual := AuditEventCopyFrom(ctx)
+		want := &auditinternal.Event{Level: auditinternal.LevelMetadata, Stage: auditinternal.StageResponseStarted}
+		assert.Equal(t, want, actual)
+	})
+
+	t.Run("with level none", func(t *testing.T) {
+		ctx := context.Background()
+		ctx = WithAuditContext(ctx)
+		assert.Equal(t, &auditinternal.Event{Stage: auditinternal.StageResponseStarted}, AuditEventCopyFrom(ctx))
+
+		if err := AuditContextFrom(ctx).Init(RequestAuditConfig{Level: auditinternal.LevelNone}, nil); err != nil {
+			t.Fatal(err)
+		}
+		assert.Nil(t, AuditEventCopyFrom(ctx))
+	})
+
+	t.Run("returned audit event is a deep copy to keep the context's audit event effectively immutable", func(t *testing.T) {
+		ctx := context.Background()
+		ctx = WithAuditContext(ctx)
+		assert.Equal(t, &auditinternal.Event{Stage: auditinternal.StageResponseStarted}, AuditEventCopyFrom(ctx))
+
+		actual := AuditEventCopyFrom(ctx)
+		want := &auditinternal.Event{Stage: auditinternal.StageResponseStarted}
+		assert.Equal(t, want, actual)
+
+		// Mutate fields within the previously returned event to show that the mutation does not affect the context's event
+		actual.SourceIPs = append(actual.SourceIPs, "127.0.0.1")
+		actual.RequestURI = "foo"
+
+		updatedActual := AuditEventCopyFrom(ctx)
+		assert.Equal(t, want, updatedActual) // has not changed, thus does not contain the above mutations
+	})
+}
+
 func withAuditContextAndLevel(ctx context.Context, t *testing.T, l auditinternal.Level) context.Context {
 	ctx = WithAuditContext(ctx)
 	if err := AuditContextFrom(ctx).Init(RequestAuditConfig{Level: l}, nil); err != nil {
