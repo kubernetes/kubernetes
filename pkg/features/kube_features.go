@@ -56,12 +56,6 @@ const (
 	// Allow spec.terminationGracePeriodSeconds to be overridden by MaxPodGracePeriodSeconds in soft evictions.
 	AllowOverwriteTerminationGracePeriodSeconds featuregate.Feature = "AllowOverwriteTerminationGracePeriodSeconds"
 
-	// owner: @thockin
-	//
-	// Enables Service.status.ingress.loadBanace to be set on
-	// services of types other than LoadBalancer.
-	AllowServiceLBStatusOnNonLB featuregate.Feature = "AllowServiceLBStatusOnNonLB"
-
 	// owner: @bswartz
 	//
 	// Enables usage of any object for volume data source in PVCs
@@ -1097,12 +1091,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	AllowOverwriteTerminationGracePeriodSeconds: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Deprecated},
-	},
-
-	AllowServiceLBStatusOnNonLB: {
-		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Deprecated},
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.35
 	},
 
 	AnyVolumeDataSource: {
