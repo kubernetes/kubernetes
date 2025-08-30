@@ -41,6 +41,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -2023,4 +2024,57 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 			PodUIDs: []string{fmt.Sprintf("pod%d", i)},
 		}, u)
 	}
+}
+
+// TestEndpointSyncOnDisconnect verifies that when a device plugin disconnects,
+// the device manager correctly updates its internal state by marking all
+// devices from that endpoint as unhealthy. It ensures that the healthyDevices
+// and unhealthyDevices maps are in sync with the plugin endpoint info.
+func TestEndpointSyncOnDisconnect(t *testing.T) {
+	socketDir, socketName, _, err := tmpSocketDir()
+	require.NoError(t, err)
+	defer func() {
+		if err := os.RemoveAll(socketDir); err != nil {
+			klog.ErrorS(err, "unable to remove socket directory", "dir", socketDir)
+		}
+	}()
+
+	manager, err := newManagerImpl(socketName, nil, nil)
+	require.NoError(t, err)
+
+	resourceName := "domain1.com/resource1"
+	ep := &endpointImpl{
+		resourceName: resourceName,
+		client:       plugin.NewPluginClient(resourceName, socketName, manager),
+		stopTime:     time.Now().Add(-endpointStopGracePeriod * 2), // make the grace period expired
+	}
+
+	manager.endpoints[resourceName] = endpointInfo{e: ep, opts: nil}
+	devs := []*pluginapi.Device{
+		{ID: "Device1", Health: pluginapi.Healthy},
+		{ID: "Device2", Health: pluginapi.Healthy},
+		{ID: "Device3", Health: pluginapi.Unhealthy},
+	}
+	manager.genericDeviceUpdateCallback(resourceName, devs)
+
+	// Disconnect should result in all devices for this resource
+	// moved to the unhealthy set.
+	err = ep.client.Disconnect()
+	require.NoError(t, err)
+
+	require.Contains(t, manager.endpoints, resourceName)
+	require.Contains(t, manager.healthyDevices, resourceName)
+	require.Contains(t, manager.unhealthyDevices, resourceName)
+	require.Len(t, manager.endpoints, 1)
+	require.Empty(t, manager.healthyDevices[resourceName])
+	require.Equal(t, len(devs), manager.unhealthyDevices[resourceName].Len())
+
+	// Expire endpoint to shorten the test
+	ep.stopTime = time.Now().Add(-endpointStopGracePeriod * 2)
+	// Call GetCapacity to trigger https://github.com/kubernetes/kubernetes/issues/133702
+	manager.GetCapacity()
+
+	require.Empty(t, manager.endpoints)
+	require.Empty(t, manager.healthyDevices)
+	require.Empty(t, manager.unhealthyDevices)
 }
