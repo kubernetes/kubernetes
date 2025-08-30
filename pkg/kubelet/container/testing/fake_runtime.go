@@ -363,44 +363,43 @@ func (f *FakeRuntime) UnblockImagePulls(count int) {
 	}
 }
 
-func (f *FakeRuntime) GetRemoteImageRef(ctx context.Context, imageRef string , creds []credentialprovider.TrackedAuthConfig) (string, error) {
+func (f *FakeRuntime) GetRemoteImageRef(ctx context.Context, imageRef string, pullSecrets []v1.Secret) (string, error) {
+    f.Lock()
+    defer f.Unlock()
 
-	f.Lock()
-	f.CalledFunctions = append(f.CalledFunctions, "GetRemoteImageRef")
-	if f.Err == nil {
-		i := kubecontainer.Image{
-			ID:   imageRef,
-		}
-		f.ImageList = append(f.ImageList, i)
-	}
+    f.CalledFunctions = append(f.CalledFunctions, "GetRemoteImageRef")
 
-	if !f.BlockImagePulls {
-		f.Unlock()
-		return imageRef, f.Err
-	}
+    // Record image if no error
+    if f.Err == nil {
+        if f.ImageList == nil {
+            f.ImageList = []kubecontainer.Image{}
+        }
+        f.ImageList = append(f.ImageList, kubecontainer.Image{
+            ID: imageRef,
+        })
+    }
 
-	retErr := f.Err
-	if f.imagePullTokenBucket == nil {
-		f.imagePullTokenBucket = make(chan bool, 1)
-	}
+    // Return immediately if not blocking
+    if !f.BlockImagePulls {
+        return imageRef, f.Err
+    }
 
-	// Unlock before waiting for UnblockImagePulls calls, to avoid deadlock.
-	f.Unlock()
-	select {
-	case <-ctx.Done():
-	case <-f.imagePullTokenBucket:
-	}
+    // Prepare token bucket for blocking behavior
+    if f.imagePullTokenBucket == nil {
+        f.imagePullTokenBucket = make(chan bool, 1)
+    }
 
-	return imageRef, retErr
-}
+    // Unlock before waiting to avoid deadlock
+    f.Unlock()
+    select {
+    case <-ctx.Done():
+        f.Lock()
+        return "", ctx.Err()
+    case <-f.imagePullTokenBucket:
+        f.Lock()
+    }
 
-
-func (f *FakeRuntime) FetchRemoteImageDigest(_ context.Context) ([]kubecontainer.Image, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "FetchRemoteImageDigest")
-	return snapshot(f.ImageList), f.Err
+    return imageRef, f.Err
 }
 
 
