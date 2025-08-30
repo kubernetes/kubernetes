@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/client-go/informers"
@@ -162,18 +163,18 @@ func TestRejectsMirrorPodWithServiceAccountTokenVolumeProjections(t *testing.T) 
 func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.MountServiceAccountToken = true
-
-	// Add the default service account for the ns into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+	client := fake.NewSimpleClientset(&corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},
 	})
+
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.MountServiceAccountToken = true
+	informerFactory.Start(wait.NeverStop)
 
 	v1PodIn := &corev1.Pod{
 		Spec: corev1.PodSpec{
@@ -253,9 +254,10 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 	})
 
 	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	admit.SetExternalKubeInformerFactory(informerFactory)
 	admit.client = client
+	informerFactory.Start(wait.NeverStop)
 
 	pod := &api.Pod{}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
@@ -288,16 +290,24 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 }
 
 func TestAutomountsAPIToken(t *testing.T) {
-
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.generateName = testGenerateName
-	admit.MountServiceAccountToken = true
-
 	ns := "myns"
 	serviceAccountName := DefaultServiceAccountName
 	serviceAccountUID := "12345"
+
+	client := fake.NewSimpleClientset(&corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceAccountName,
+			Namespace: ns,
+			UID:       types.UID(serviceAccountUID),
+		},
+	})
+
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.generateName = testGenerateName
+	admit.MountServiceAccountToken = true
+	informerFactory.Start(wait.NeverStop)
 
 	tokenName := generatedVolumeName
 
@@ -312,14 +322,6 @@ func TestAutomountsAPIToken(t *testing.T) {
 		ReadOnly:  true,
 		MountPath: DefaultAPITokenMountPath,
 	}
-	// Add the default service account for the ns with a token into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceAccountName,
-			Namespace: ns,
-			UID:       types.UID(serviceAccountUID),
-		},
-	})
 
 	pod := &api.Pod{
 		Spec: api.PodSpec{
@@ -389,19 +391,19 @@ func TestRespectsExistingMount(t *testing.T) {
 		MountPath: DefaultAPITokenMountPath,
 	}
 
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.MountServiceAccountToken = true
-
-	// Add the default service account for the ns with a token into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+	client := fake.NewSimpleClientset(&corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceAccountName,
 			Namespace: ns,
 			UID:       types.UID(serviceAccountUID),
 		},
 	})
+
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.MountServiceAccountToken = true
+	informerFactory.Start(wait.NeverStop)
 
 	// Define a pod with a container that already mounts a volume at the API token path
 	// Admission should respect that
@@ -468,13 +470,7 @@ func TestRespectsExistingMount(t *testing.T) {
 func TestAllowsReferencedSecret(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.LimitSecretReferences = true
-
-	// Add the default service account for the ns with a secret reference into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+	client := fake.NewSimpleClientset(&corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
@@ -483,6 +479,12 @@ func TestAllowsReferencedSecret(t *testing.T) {
 			{Name: "foo"},
 		},
 	})
+
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.LimitSecretReferences = true
+	informerFactory.Start(wait.NeverStop)
 
 	pod1 := &api.Pod{
 		Spec: api.PodSpec{
@@ -636,18 +638,18 @@ func TestAllowsReferencedSecret(t *testing.T) {
 func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.LimitSecretReferences = true
-
-	// Add the default service account for the ns into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+	client := fake.NewSimpleClientset(&corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},
 	})
+
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.LimitSecretReferences = true
+	informerFactory.Start(wait.NeverStop)
 
 	pod1 := &api.Pod{
 		Spec: api.PodSpec{
@@ -844,13 +846,7 @@ func TestAllowUnreferencedSecretVolumesForPermissiveSAs(t *testing.T) {
 func TestAllowsReferencedImagePullSecrets(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.LimitSecretReferences = true
-
-	// Add the default service account for the ns with a secret reference into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+	client := fake.NewSimpleClientset(&corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
@@ -859,6 +855,12 @@ func TestAllowsReferencedImagePullSecrets(t *testing.T) {
 			{Name: "foo"},
 		},
 	})
+
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.LimitSecretReferences = true
+	informerFactory.Start(wait.NeverStop)
 
 	pod := &api.Pod{
 		Spec: api.PodSpec{
@@ -903,13 +905,7 @@ func TestRejectsUnreferencedImagePullSecrets(t *testing.T) {
 func TestDoNotAddImagePullSecrets(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.LimitSecretReferences = true
-
-	// Add the default service account for the ns with a secret reference into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+	client := fake.NewSimpleClientset(&corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
@@ -919,6 +915,12 @@ func TestDoNotAddImagePullSecrets(t *testing.T) {
 			{Name: "bar"},
 		},
 	})
+
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.LimitSecretReferences = true
+	informerFactory.Start(wait.NeverStop)
 
 	pod := &api.Pod{
 		Spec: api.PodSpec{
@@ -939,11 +941,6 @@ func TestDoNotAddImagePullSecrets(t *testing.T) {
 func TestAddImagePullSecrets(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.LimitSecretReferences = true
-
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
@@ -954,13 +951,20 @@ func TestAddImagePullSecrets(t *testing.T) {
 			{Name: "bar"},
 		},
 	}
+
+	client := fake.NewSimpleClientset(sa)
+
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.LimitSecretReferences = true
+	informerFactory.Start(wait.NeverStop)
+
 	originalSA := sa.DeepCopy()
 	expected := []api.LocalObjectReference{
 		{Name: "foo"},
 		{Name: "bar"},
 	}
-	// Add the default service account for the ns with a secret reference into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(sa)
 
 	pod := &api.Pod{}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
