@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -193,7 +194,8 @@ func CreateTestClient() *fake.Clientset {
 		return true, createAction.GetObject(), nil
 	})
 
-	fakeWatch := watch.NewFake()
+	logger := klog.NewKlogr()
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
 	return fakeClient
