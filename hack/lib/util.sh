@@ -714,7 +714,17 @@ function kube::util::ensure-gnu-sed {
   elif command -v gsed &>/dev/null; then
     SED="gsed"
   else
-    kube::log::error "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      kube::log::error "GNU sed (gsed) is required on macOS." >&2
+      kube::log::error "Please install it using: brew install gnu-sed" >&2
+      kube::log::error "" >&2
+      kube::log::error "Alternatively, you can install all required tools with:" >&2
+      kube::log::error "  brew install gnu-sed coreutils" >&2
+      kube::log::error "" >&2
+      kube::log::error "After installation, restart your terminal and try again." >&2
+    else
+      kube::log::error "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
+    fi
     return 1
   fi
   kube::util::sourced_variable "${SED}"

@@ -32,6 +32,17 @@ if (( KUBE_VERBOSE >= 2 )); then
   set -x
 fi
 
+# Check OS early and provide helpful guidance
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  echo "=== macOS (Darwin) Detected ==="
+  echo "Note: This script will run in limited mode on macOS:"
+  echo "  - kubelet and kube-proxy are not supported on macOS"
+  echo "  - Only API server, controller manager, and scheduler will run"
+  echo "  - You may need to install additional tools:"
+  echo "    brew install gnu-sed coreutils"
+  echo ""
+fi
+
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
