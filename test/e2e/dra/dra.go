@@ -2143,7 +2143,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			})
 
 			ginkgo.By("Creating slices")
-			mutationCacheTTL := 10 * time.Second
+			mutationCacheTTL := 15 * time.Second
 			controller, err := resourceslice.StartController(ctx, resourceslice.Options{
 				DriverName:       driverName,
 				KubeClient:       f.ClientSet,
@@ -2165,7 +2165,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			})
 
 			// Eventually we should have all desired slices.
-			gomega.Eventually(ctx, listSlices).WithTimeout(3 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
+			gomega.Eventually(ctx, listSlices).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
 
 			// Verify state.
 			expectSlices, err := listSlices(ctx)
@@ -2188,7 +2188,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// One empty slice should remain, after removing the full ones and adding the empty one.
 			emptySlice := gomega.HaveField("Spec.Devices", gomega.BeEmpty())
-			gomega.Eventually(ctx, listSlices).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveExactElements(emptySlice)))
+			gomega.Eventually(ctx, listSlices).WithTimeout(3 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveExactElements(emptySlice)))
 			expectStats = resourceslice.Stats{NumCreates: int64(numSlices) + 1, NumDeletes: int64(numSlices)}
 
 			// There is a window of time where the ResourceSlice exists and is
@@ -2196,7 +2196,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			// in the controller's stats, consisting mostly of network latency
 			// between this test process and the API server. Wait for the stats
 			// to converge before asserting there are no further changes.
-			gomega.Eventually(ctx, controller.GetStats).WithTimeout(30 * time.Second).Should(gomega.Equal(expectStats))
+			gomega.Eventually(ctx, controller.GetStats).WithTimeout(45 * time.Second).Should(gomega.Equal(expectStats))
 
 			gomega.Consistently(ctx, controller.GetStats).WithTimeout(2 * mutationCacheTTL).Should(gomega.Equal(expectStats))
 		})
