@@ -30,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -49,6 +48,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
 	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
 	"k8s.io/utils/ptr"
+)
+
+const (
+	jobControllerUIDIndex = "jobControllerUID"
 )
 
 var (
@@ -70,11 +73,13 @@ type ControllerV2 struct {
 	jobControl     jobControlInterface
 	cronJobControl cjControlInterface
 
-	jobLister     batchv1listers.JobLister
 	cronJobLister batchv1listers.CronJobLister
 
 	jobListerSynced     cache.InformerSynced
 	cronJobListerSynced cache.InformerSynced
+
+	// jobIndexer allows looking up jobs by ControllerRef UID
+	jobIndexer cache.Indexer
 
 	// now is a function that returns current time, done to facilitate unit tests
 	now func() time.Time
@@ -99,12 +104,14 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 		jobControl:     realJobControl{KubeClient: kubeClient},
 		cronJobControl: &realCJControl{KubeClient: kubeClient},
 
-		jobLister:     jobInformer.Lister(),
 		cronJobLister: cronJobsInformer.Lister(),
 
 		jobListerSynced:     jobInformer.Informer().HasSynced,
 		cronJobListerSynced: cronJobsInformer.Informer().HasSynced,
-		now:                 time.Now,
+
+		jobIndexer: jobInformer.Informer().GetIndexer(),
+
+		now: time.Now,
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -124,6 +131,22 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 			jm.enqueueController(obj)
 		},
 	})
+
+	err := jm.jobIndexer.AddIndexers(cache.Indexers{
+		jobControllerUIDIndex: func(obj interface{}) ([]string, error) {
+			job, ok := obj.(*batchv1.Job)
+			if !ok {
+				return nil, nil
+			}
+			if controllerRef := metav1.GetControllerOf(job); controllerRef != nil {
+				return []string{string(controllerRef.UID)}, nil
+			}
+			return nil, nil
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("adding job controller UID indexer: %w", err)
+	}
 
 	metrics.Register()
 
@@ -197,7 +220,7 @@ func (jm *ControllerV2) sync(ctx context.Context, cronJobKey string) (*time.Dura
 		return nil, err
 	}
 
-	jobsToBeReconciled, err := jm.getJobsToBeReconciled(cronJob)
+	jobs, err := jm.getCronJobJobsByIndexer(cronJob)
 	if err != nil {
 		return nil, err
 	}
@@ -206,9 +229,9 @@ func (jm *ControllerV2) sync(ctx context.Context, cronJobKey string) (*time.Dura
 	// CronJob object and perform an actual update only once.
 	cronJobCopy := cronJob.DeepCopy()
 
-	updateStatusAfterCleanup := jm.cleanupFinishedJobs(ctx, cronJobCopy, jobsToBeReconciled)
+	updateStatusAfterCleanup := jm.cleanupFinishedJobs(ctx, cronJobCopy, jobs)
 
-	requeueAfter, updateStatusAfterSync, syncErr := jm.syncCronJob(ctx, cronJobCopy, jobsToBeReconciled)
+	requeueAfter, updateStatusAfterSync, syncErr := jm.syncCronJob(ctx, cronJobCopy, jobs)
 	if syncErr != nil {
 		logger.V(2).Info("Error reconciling cronjob", "cronjob", klog.KObj(cronJob), "err", syncErr)
 	}
@@ -227,6 +250,23 @@ func (jm *ControllerV2) sync(ctx context.Context, cronJobKey string) (*time.Dura
 	}
 	// this marks the key done, currently only happens when the cronjob is suspended or spec has invalid schedule format
 	return nil, syncErr
+}
+
+func (jm *ControllerV2) getCronJobJobsByIndexer(cronJob *batchv1.CronJob) ([]*batchv1.Job, error) {
+	jobsForCronJob := []*batchv1.Job{}
+	jobs, err := jm.jobIndexer.ByIndex(jobControllerUIDIndex, string(cronJob.UID)) // なぜ cronjob の uid と job を検索できているのか
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range jobs {
+		job, ok := obj.(*batchv1.Job)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("unexpected object type in job indexer: %v", obj))
+			continue
+		}
+		jobsForCronJob = append(jobsForCronJob, job)
+	}
+	return jobsForCronJob, nil
 }
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,
@@ -248,32 +288,6 @@ func (jm *ControllerV2) resolveControllerRef(namespace string, controllerRef *me
 		return nil
 	}
 	return cronJob
-}
-
-func (jm *ControllerV2) getJobsToBeReconciled(cronJob *batchv1.CronJob) ([]*batchv1.Job, error) {
-	// list all jobs: there may be jobs with labels that don't match the template anymore,
-	// but that still have a ControllerRef to the given cronjob
-	jobList, err := jm.jobLister.Jobs(cronJob.Namespace).List(labels.Everything())
-	if err != nil {
-		return nil, err
-	}
-
-	jobsToBeReconciled := []*batchv1.Job{}
-
-	for _, job := range jobList {
-		// If it has a ControllerRef, that's all that matters.
-		controllerRef := metav1.GetControllerOf(job)
-		if controllerRef == nil {
-			continue
-		}
-		refedCronJob := jm.resolveControllerRef(job.Namespace, controllerRef)
-		if refedCronJob == nil {
-			continue
-		}
-		// this job is needs to be reconciled
-		jobsToBeReconciled = append(jobsToBeReconciled, job)
-	}
-	return jobsToBeReconciled, nil
 }
 
 // When a job is created, enqueue the controller that manages it and update it's expectations.
