@@ -252,14 +252,16 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 		framework.Failf("Failed to start port-forward command: %v", err)
 	}
 
-	buf := make([]byte, 128)
-
 	var n int
+	var buf []byte
+
 	framework.Logf("reading from `kubectl port-forward` command's stdout")
-	if n, err = portOutput.Read(buf); err != nil {
+	if buf, err = io.ReadAll(portOutput); err != nil {
 		framework.Failf("Failed to read from kubectl port-forward stdout: %v", err)
 	}
-	portForwardOutput := string(buf[:n])
+	framework.Logf("stdout: %s", string(buf))
+
+	portForwardOutput := string(buf)
 	match := portForwardRegexp.FindStringSubmatch(portForwardOutput)
 	if len(match) != 3 {
 		framework.Failf("Failed to parse kubectl port-forward output: %s", portForwardOutput)
@@ -270,14 +272,12 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 		framework.Failf("Error converting %s to an int: %v", match[2], err)
 	}
 
-	framework.Logf("port-forward stdout:")
-	framework.Logf(string(buf))
-
-	framework.Logf("port-forward stderr:")
-	stderrBuf := make([]byte, 128)
-	if _, err = portStderr.Read(stderrBuf); err != nil {
-		framework.Logf("failed to read port-forward stderr: %s", err)
-	}
+	go func() {
+		if stderrBuf, stderrErr := io.ReadAll(portStderr); stderrErr != nil {
+			framework.Failf("Failed to read from kubectl port-forward stderr: %v", err)
+		}
+		framework.Logf("stderr: %s", string(stderrBuf))
+	}()
 
 	return &portForwardCommand{
 		cmd:  cmd,
