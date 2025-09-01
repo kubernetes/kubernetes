@@ -140,7 +140,7 @@ func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 					os.Exit(1)
 				}
 			}
-		} else if err == nil {
+		} else {
 			// Command exists(e.g. kubectl create), but it is not certain that
 			// subcommand also exists (e.g. kubectl create networkpolicy)
 			// we also have to eliminate kubectl create -f
