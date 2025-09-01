@@ -314,7 +314,7 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 
 	ctrl.initializeCaches(logger, ctrl.volumeLister, ctrl.claimLister)
 
-	go wait.Until(func() { ctrl.resync(ctx) }, ctrl.resyncPeriod, ctx.Done())
+	go wait.UntilWithContext(ctx, ctrl.resync, ctrl.resyncPeriod)
 	go wait.UntilWithContext(ctx, ctrl.volumeWorker, time.Second)
 	go wait.UntilWithContext(ctx, ctrl.claimWorker, time.Second)
 

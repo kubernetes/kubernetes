@@ -287,10 +287,10 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 	logger.V(2).Info("Starting service queue worker threads", "total", workers)
 	for i := 0; i < workers; i++ {
-		go wait.Until(func() { c.serviceQueueWorker(logger) }, c.workerLoopPeriod, ctx.Done())
+		go wait.UntilWithContext(ctx, func(ctx context.Context) { c.serviceQueueWorker(logger) }, c.workerLoopPeriod)
 	}
 	logger.V(2).Info("Starting topology queue worker threads", "total", 1)
-	go wait.Until(func() { c.topologyQueueWorker(logger) }, c.workerLoopPeriod, ctx.Done())
+	go wait.UntilWithContext(ctx, func(ctx context.Context) { c.topologyQueueWorker(logger) }, c.workerLoopPeriod)
 
 	<-ctx.Done()
 }

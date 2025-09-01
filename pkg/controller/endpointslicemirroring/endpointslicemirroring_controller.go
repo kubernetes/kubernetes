@@ -233,7 +233,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 	logger.V(2).Info("Starting worker threads", "total", workers)
 	for i := 0; i < workers; i++ {
-		go wait.Until(func() { c.worker(logger) }, c.workerLoopPeriod, ctx.Done())
+		go wait.UntilWithContext(ctx, func(ctx context.Context) { c.worker(logger) }, c.workerLoopPeriod)
 	}
 
 	<-ctx.Done()

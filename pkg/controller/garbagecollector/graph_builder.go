@@ -360,7 +360,7 @@ func (gb *GraphBuilder) Run(ctx context.Context) {
 	// Start monitors and begin change processing until the stop channel is
 	// closed.
 	gb.startMonitors(logger)
-	wait.Until(func() { gb.runProcessGraphChanges(logger) }, 1*time.Second, ctx.Done())
+	wait.UntilWithContext(ctx, func(ctx context.Context) { gb.runProcessGraphChanges(logger) }, 1*time.Second)
 
 	// Stop any running monitors.
 	gb.monitorLock.Lock()
