@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -152,6 +152,24 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 
 			if addUnauthenticated {
 				groups = append(groups, user.AllUnauthenticated)
+			}
+		}
+
+		// Add original impersonator information
+		if requestor != nil {
+			if originalName := requestor.GetName(); originalName != "" {
+				userExtra["impersonator.kubernetes.io/original-user"] = []string{originalName}
+			}
+			if originalUID := requestor.GetUID(); originalUID != "" {
+				userExtra["impersonator.kubernetes.io/original-uid"] = []string{originalUID}
+			}
+			if originalGroups := requestor.GetGroups(); len(originalGroups) > 0 {
+				userExtra["impersonator.kubernetes.io/original-groups"] = originalGroups
+			}
+			// Preserve original extra information with namespace prefix
+			for key, values := range requestor.GetExtra() {
+				prefixedKey := "impersonator.kubernetes.io/original-extra-" + key
+				userExtra[prefixedKey] = values
 			}
 		}
 

@@ -192,7 +192,10 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:admin",
 				Groups: []string{"some-group", "system:authenticated"},
-				Extra:  map[string][]string{},
+				Extra: map[string][]string{
+					"impersonator.kubernetes.io/original-user":   {"dev"},
+					"impersonator.kubernetes.io/original-groups": {"wheel", "group-impersonater"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -252,7 +255,11 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:admin",
 				Groups: []string{"system:authenticated"},
-				Extra:  map[string][]string{"scopes": {"scope-a", "scope-b"}},
+				Extra: map[string][]string{
+					"scopes": {"scope-a", "scope-b"},
+					"impersonator.kubernetes.io/original-user":   {"dev"},
+					"impersonator.kubernetes.io/original-groups": {"wheel", "extra-setter-scopes"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -267,7 +274,11 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:admin",
 				Groups: []string{"system:authenticated"},
-				Extra:  map[string][]string{"example.com/escapedᛄscopes": {"scope-a", "scope-b"}},
+				Extra: map[string][]string{
+					"example.com/escapedᛄscopes":                 {"scope-a", "scope-b"},
+					"impersonator.kubernetes.io/original-user":   {"dev"},
+					"impersonator.kubernetes.io/original-groups": {"wheel", "escaped-scopes"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -282,7 +293,11 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:admin",
 				Groups: []string{"system:authenticated"},
-				Extra:  map[string][]string{"almost%zzpercent%xxencoded": {"scope-a", "scope-b"}},
+				Extra: map[string][]string{
+					"almost%zzpercent%xxencoded":                 {"scope-a", "scope-b"},
+					"impersonator.kubernetes.io/original-user":   {"dev"},
+					"impersonator.kubernetes.io/original-groups": {"wheel", "almost-escaped-scopes"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -296,7 +311,10 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "tester",
 				Groups: []string{"system:authenticated"},
-				Extra:  map[string][]string{},
+				Extra: map[string][]string{
+					"impersonator.kubernetes.io/original-user":   {"dev"},
+					"impersonator.kubernetes.io/original-groups": {"regular-impersonater"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -324,7 +342,10 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:serviceaccount:foo:default",
 				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:foo", "system:authenticated"},
-				Extra:  map[string][]string{},
+				Extra: map[string][]string{
+					"impersonator.kubernetes.io/original-user":   {"dev"},
+					"impersonator.kubernetes.io/original-groups": {"sa-impersonater"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -337,7 +358,9 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:anonymous",
 				Groups: []string{"system:unauthenticated"},
-				Extra:  map[string][]string{},
+				Extra: map[string][]string{
+					"impersonator.kubernetes.io/original-user": {"system:admin"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -351,7 +374,9 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "unknown",
 				Groups: []string{"system:unauthenticated"},
-				Extra:  map[string][]string{},
+				Extra: map[string][]string{
+					"impersonator.kubernetes.io/original-user": {"system:admin"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -365,7 +390,9 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "unknown",
 				Groups: []string{"system:authenticated"},
-				Extra:  map[string][]string{},
+				Extra: map[string][]string{
+					"impersonator.kubernetes.io/original-user": {"system:admin"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -380,7 +407,10 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:admin",
 				Groups: []string{"some-group", "system:authenticated"},
-				Extra:  map[string][]string{},
+				Extra: map[string][]string{
+					"impersonator.kubernetes.io/original-user":   {"dev"},
+					"impersonator.kubernetes.io/original-groups": {"wheel", "group-impersonater"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -393,7 +423,9 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:anonymous",
 				Groups: []string{"system:unauthenticated"},
-				Extra:  map[string][]string{},
+				Extra: map[string][]string{
+					"impersonator.kubernetes.io/original-user": {"system:admin"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -407,7 +439,9 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:anonymous",
 				Groups: []string{"system:unauthenticated"},
-				Extra:  map[string][]string{},
+				Extra: map[string][]string{
+					"impersonator.kubernetes.io/original-user": {"system:admin"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -424,8 +458,11 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name:   "tester",
 				Groups: []string{"system:authenticated"},
-				Extra:  map[string][]string{},
-				UID:    "some-uid",
+				Extra: map[string][]string{
+					"impersonator.kubernetes.io/original-user":   {"dev"},
+					"impersonator.kubernetes.io/original-groups": {"everything-impersonater"},
+				},
+				UID: "some-uid",
 			},
 			expectedCode: http.StatusOK,
 		},
@@ -461,7 +498,33 @@ func TestImpersonationFilter(t *testing.T) {
 				Name:   "tester",
 				Groups: []string{"system:authenticated"},
 				UID:    "some-uid",
-				Extra:  map[string][]string{"scopes": {"scope-a", "scope-b"}},
+				Extra: map[string][]string{
+					"scopes": {"scope-a", "scope-b"},
+					"impersonator.kubernetes.io/original-user":   {"dev"},
+					"impersonator.kubernetes.io/original-groups": {"everything-impersonater"},
+				},
+			},
+			expectedCode: http.StatusOK,
+		},
+		{
+			name: "impersonation-preserves-original-user-info",
+			user: &user.DefaultInfo{
+				Name:   "original-user",
+				Groups: []string{"everything-impersonater"},
+				UID:    "original-uid",
+				Extra:  map[string][]string{"original-key": {"original-value"}},
+			},
+			impersonationUser:   "impersonated-user",
+			impersonationGroups: []string{"impersonated-group"},
+			expectedUser: &user.DefaultInfo{
+				Name:   "impersonated-user",
+				Groups: []string{"impersonated-group", "system:authenticated"},
+				Extra: map[string][]string{
+					"impersonator.kubernetes.io/original-user":               {"original-user"},
+					"impersonator.kubernetes.io/original-uid":                {"original-uid"},
+					"impersonator.kubernetes.io/original-groups":             {"everything-impersonater"},
+					"impersonator.kubernetes.io/original-extra-original-key": {"original-value"},
+				},
 			},
 			expectedCode: http.StatusOK,
 		},
