@@ -1082,7 +1082,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						}
 
 						ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
-						queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(*ar), internalqueue.WithAPIDispatcher(apiDispatcher))
+						queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 						if asyncAPICallsEnabled {
 							schedFramework.SetAPICacher(apicache.New(queue, cache))
 						}
@@ -1411,7 +1411,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 
 					informerFactory := informers.NewSharedInformerFactory(client, 0)
 					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
-					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(*ar), internalqueue.WithAPIDispatcher(apiDispatcher))
+					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 
 					schedFramework, err := NewFakeFramework(
 						ctx,
@@ -2063,7 +2063,7 @@ func TestSchedulerBinding(t *testing.T) {
 				if asyncAPICallsEnabled {
 					informerFactory := informers.NewSharedInformerFactory(client, 0)
 					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
-					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(*ar), internalqueue.WithAPIDispatcher(apiDispatcher))
+					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 					fwk.SetAPICacher(apicache.New(queue, cache))
 				}
 
@@ -2318,7 +2318,7 @@ func TestUpdatePod(t *testing.T) {
 
 					informerFactory := informers.NewSharedInformerFactory(cs, 0)
 					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
-					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(*ar), internalqueue.WithAPIDispatcher(apiDispatcher))
+					queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
 					apiCacher = apicache.New(queue, nil)
 				}
 
