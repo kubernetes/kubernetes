@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,8 +39,8 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -928,7 +929,7 @@ func TestHandlePodResourcesResizeForGuanteedQOSPods(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
 	nodeConfig := cm.NodeConfig{}
-	nodeConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+	nodeConfig.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
 	nodeConfig.MemoryManagerPolicy = string(memorymanager.PolicyTypeStatic)
 
 	createTestPod := func(uid types.UID, name, namespace string, req, lim v1.ResourceList, isSidecar bool) *v1.Pod {

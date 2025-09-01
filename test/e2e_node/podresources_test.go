@@ -40,7 +40,6 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -1078,7 +1077,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 			ginkgo.Context("", func() {
 				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 					// Set the CPU Manager policy to static.
-					initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+					initialConfig.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
 
 					// Set the CPU Manager reconcile period to 1 second.
 					initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
@@ -1187,7 +1186,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 			ginkgo.Context("", func() {
 				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 					// Set the CPU Manager policy to static.
-					initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+					initialConfig.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
 
 					// Set the CPU Manager reconcile period to 1 second.
 					initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
@@ -1339,7 +1338,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 		ginkgo.When("listing with restricted list output enabled", func() {
 
 			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-				initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+				initialConfig.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
 				initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Minute} // set it long enough it is practically disabled
 				cpus := reservedSystemCPUs.String()
 				framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
@@ -1619,7 +1618,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 		ginkgo.When("listing with restricted list output disabled for backward compatible defaults", func() {
 
 			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-				initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+				initialConfig.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
 				initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Minute} // set it long enough it is practically disabled
 				cpus := reservedSystemCPUs.String()
 				framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
@@ -1871,7 +1870,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 			ginkgo.Context("", func() {
 				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 					// Set the CPU Manager policy to static.
-					initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+					initialConfig.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
 
 					// Set the CPU Manager reconcile period to 1 second.
 					initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
