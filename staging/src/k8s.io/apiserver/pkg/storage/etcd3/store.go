@@ -186,7 +186,8 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 		newListFunc:    newListFunc,
 		compactor:      compactor,
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+	// Collecting stats requires properly set resourcePrefix to call getKeys.
+	if resourcePrefix != "" && utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
 		stats := newStatsCache(pathPrefix, s.getKeys)
 		s.stats = stats
 		w.stats = stats
