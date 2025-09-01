@@ -252,7 +252,6 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 		framework.Failf("Failed to start port-forward command: %v", err)
 	}
 
-	var n int
 	var buf []byte
 
 	framework.Logf("reading from `kubectl port-forward` command's stdout")
@@ -273,8 +272,9 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 	}
 
 	go func() {
-		if stderrBuf, stderrErr := io.ReadAll(portStderr); stderrErr != nil {
-			framework.Failf("Failed to read from kubectl port-forward stderr: %v", err)
+		stderrBuf, stderrErr := io.ReadAll(portStderr)
+		if stderrErr != nil {
+			framework.Failf("Failed to read from kubectl port-forward stderr: %v", stderrErr)
 		}
 		framework.Logf("stderr: %s", string(stderrBuf))
 	}()
