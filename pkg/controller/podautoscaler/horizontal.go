@@ -1248,38 +1248,23 @@ func (a *HorizontalController) convertDesiredReplicasWithBehaviorRate(args Norma
 	return args.DesiredReplicas, "DesiredWithinRange", "the desired count is within the acceptable range"
 }
 
-// convertDesiredReplicas performs the actual normalization, without depending on `HorizontalController` or `HorizontalPodAutoscaler`
+// convertDesiredReplicasWithRules normalizes the desired replica count
+// by enforcing min/max limits and scale-up restrictions.
 func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinReplicas, hpaMaxReplicas int32) (int32, string, string) {
-
-	var minimumAllowedReplicas int32
-	var maximumAllowedReplicas int32
-
-	var possibleLimitingCondition string
-	var possibleLimitingReason string
-
-	minimumAllowedReplicas = hpaMinReplicas
+	if desiredReplicas < hpaMinReplicas {
+		return hpaMinReplicas, "TooFewReplicas", "the desired replica count is less than the minimum replica count"
+	}
 
 	// Do not scaleup too much to prevent incorrect rapid increase of the number of master replicas caused by
 	// bogus CPU usage report from heapster/kubelet (like in issue #32304).
 	scaleUpLimit := calculateScaleUpLimit(currentReplicas)
+	cappedMaxReplicas := minInt32(hpaMaxReplicas, scaleUpLimit)
 
-	if hpaMaxReplicas > scaleUpLimit {
-		maximumAllowedReplicas = scaleUpLimit
-		possibleLimitingCondition = "ScaleUpLimit"
-		possibleLimitingReason = "the desired replica count is increasing faster than the maximum scale rate"
-	} else {
-		maximumAllowedReplicas = hpaMaxReplicas
-		possibleLimitingCondition = "TooManyReplicas"
-		possibleLimitingReason = "the desired replica count is more than the maximum replica count"
-	}
-
-	if desiredReplicas < minimumAllowedReplicas {
-		possibleLimitingCondition = "TooFewReplicas"
-		possibleLimitingReason = "the desired replica count is less than the minimum replica count"
-
-		return minimumAllowedReplicas, possibleLimitingCondition, possibleLimitingReason
-	} else if desiredReplicas > maximumAllowedReplicas {
-		return maximumAllowedReplicas, possibleLimitingCondition, possibleLimitingReason
+	if desiredReplicas > cappedMaxReplicas {
+		if hpaMaxReplicas > scaleUpLimit {
+			return scaleUpLimit, "ScaleUpLimit", "the desired replica count is increasing faster than the maximum scale rate"
+		}
+		return hpaMaxReplicas, "TooManyReplicas", "the desired replica count is more than the maximum replica count"
 	}
 
 	return desiredReplicas, "DesiredWithinRange", "the desired count is within the acceptable range"
