@@ -93,7 +93,7 @@ func statusOkWithOverrides(overrides ...autoscalingv2.HorizontalPodAutoscalerCon
 	resv1 := make([]autoscalingv2.HorizontalPodAutoscalerCondition, len(resv2))
 	for i, cond := range resv2 {
 		resv1[i] = autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.HorizontalPodAutoscalerConditionType(cond.Type),
+			Type:   cond.Type,
 			Status: cond.Status,
 			Reason: cond.Reason,
 		}
@@ -4003,7 +4003,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {
 	policy := autoscalingv2.MaxChangePolicySelect
 	directionBehavior := autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: ptr.To(int32(stabilizationWindow)),
+		StabilizationWindowSeconds: ptr.To(stabilizationWindow),
 		SelectPolicy:               &policy,
 	}
 	if pods != 0 {
