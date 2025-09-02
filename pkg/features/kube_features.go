@@ -778,6 +778,12 @@ const (
 	// resume work after restarts.
 	NominatedNodeNameForExpectation featuregate.Feature = "NominatedNodeNameForExpectation"
 
+	// owner: @HirazawaUi
+	//
+	// Restore checkpointed pods before processing API pod updates on kubelet startup,
+	// without repeating admission checks.
+	NotEvictPodOnKubeletRestart featuregate.Feature = "NotEvictPodOnKubeletRestart"
+
 	// owner: @bwsalmon
 	// kep: https://kep.k8s.io/5598
 	//
@@ -1768,6 +1774,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	NotEvictPodOnKubeletRestart: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	OpportunisticBatching: {
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2559,6 +2569,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	NodeSwap: {},
 
 	NominatedNodeNameForExpectation: {},
+
+	NotEvictPodOnKubeletRestart: {},
 
 	OpportunisticBatching: {},
 
