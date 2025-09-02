@@ -30,7 +30,7 @@ func RequiredValue[T comparable](_ context.Context, _ operation.Operation, fldPa
 	if *value != zero {
 		return nil
 	}
-	return field.ErrorList{field.Required(fldPath, "").WithOrigin("required")}
+	return field.ErrorList{field.Required(fldPath, "")}
 }
 
 // RequiredPointer verifies that the specified pointer is not nil.
@@ -38,7 +38,7 @@ func RequiredPointer[T any](_ context.Context, _ operation.Operation, fldPath *f
 	if value != nil {
 		return nil
 	}
-	return field.ErrorList{field.Required(fldPath, "").WithOrigin("required")}
+	return field.ErrorList{field.Required(fldPath, "")}
 }
 
 // RequiredSlice verifies that the specified slice is not empty.
@@ -46,7 +46,7 @@ func RequiredSlice[T any](_ context.Context, _ operation.Operation, fldPath *fie
 	if len(value) > 0 {
 		return nil
 	}
-	return field.ErrorList{field.Required(fldPath, "").WithOrigin("required")}
+	return field.ErrorList{field.Required(fldPath, "")}
 }
 
 // RequiredMap verifies that the specified map is not empty.
@@ -54,7 +54,7 @@ func RequiredMap[K comparable, T any](_ context.Context, _ operation.Operation, 
 	if len(value) > 0 {
 		return nil
 	}
-	return field.ErrorList{field.Required(fldPath, "").WithOrigin("required")}
+	return field.ErrorList{field.Required(fldPath, "")}
 }
 
 // ForbiddenValue verifies that the specified value is the zero-value for its
@@ -64,7 +64,7 @@ func ForbiddenValue[T comparable](_ context.Context, _ operation.Operation, fldP
 	if *value == zero {
 		return nil
 	}
-	return field.ErrorList{field.Forbidden(fldPath, "").WithOrigin("forbidden")}
+	return field.ErrorList{field.Forbidden(fldPath, "")}
 }
 
 // ForbiddenPointer verifies that the specified pointer is nil.
@@ -72,7 +72,7 @@ func ForbiddenPointer[T any](_ context.Context, _ operation.Operation, fldPath *
 	if value == nil {
 		return nil
 	}
-	return field.ErrorList{field.Forbidden(fldPath, "").WithOrigin("forbidden")}
+	return field.ErrorList{field.Forbidden(fldPath, "")}
 }
 
 // ForbiddenSlice verifies that the specified slice is empty.
@@ -80,7 +80,7 @@ func ForbiddenSlice[T any](_ context.Context, _ operation.Operation, fldPath *fi
 	if len(value) == 0 {
 		return nil
 	}
-	return field.ErrorList{field.Forbidden(fldPath, "").WithOrigin("forbidden")}
+	return field.ErrorList{field.Forbidden(fldPath, "")}
 }
 
 // ForbiddenMap verifies that the specified map is empty.
@@ -88,7 +88,7 @@ func ForbiddenMap[K comparable, T any](_ context.Context, _ operation.Operation,
 	if len(value) == 0 {
 		return nil
 	}
-	return field.ErrorList{field.Forbidden(fldPath, "").WithOrigin("forbidden")}
+	return field.ErrorList{field.Forbidden(fldPath, "")}
 }
 
 // OptionalValue verifies that the specified value is not the zero-value for
@@ -119,7 +119,7 @@ func OptionalSlice[T any](_ context.Context, _ operation.Operation, fldPath *fie
 	if len(value) > 0 {
 		return nil
 	}
-	return field.ErrorList{field.Required(fldPath, "optional value was not specified").WithOrigin("optional")}
+	return field.ErrorList{field.Required(fldPath, "optional value was not specified")}
 }
 
 // OptionalMap verifies that the specified map is not empty. This is identical
@@ -129,5 +129,5 @@ func OptionalMap[K comparable, T any](_ context.Context, _ operation.Operation, 
 	if len(value) > 0 {
 		return nil
 	}
-	return field.ErrorList{field.Required(fldPath, "optional value was not specified").WithOrigin("optional")}
+	return field.ErrorList{field.Required(fldPath, "optional value was not specified")}
 }

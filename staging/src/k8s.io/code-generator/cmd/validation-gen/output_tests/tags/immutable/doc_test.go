@@ -64,16 +64,16 @@ func Test(t *testing.T) {
 	st.Value(&structA).OldValue(&structA2).ExpectValid()
 	st.Value(&structA2).OldValue(&structA).ExpectValid()
 
-	st.Value(&structA).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Forbidden(field.NewPath("stringField"), "immutable").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("stringPtrField"), "immutable").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("structField"), "immutable").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("structPtrField"), "immutable").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("noncomparableStructField"), "immutable").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("noncomparableStructPtrField"), "immutable").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("sliceField"), "immutable").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("mapField"), "immutable").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("immutableField"), "immutable").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("immutablePtrField"), "immutable").WithOrigin("immutable"),
+	st.Value(&structA).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
+		field.Forbidden(field.NewPath("stringField"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("stringPtrField"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("structField"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("structPtrField"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("noncomparableStructField"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("noncomparableStructPtrField"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("sliceField"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("mapField"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("immutableField"), "").WithOrigin("immutable"),
+		field.Forbidden(field.NewPath("immutablePtrField"), "").WithOrigin("immutable"),
 	})
 }

@@ -171,9 +171,10 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 
 func (lttv listTypeTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:         lttv.TagName(),
-		Scopes:      lttv.ValidScopes().UnsortedList(),
-		Description: "Declares a list field's semantic type and ownership behavior. atomic: single ownership, set: shared ownership with uniqueness, map: shared ownership with key-based uniqueness.",
+		Tag:            lttv.TagName(),
+		StabilityLevel: Stable,
+		Scopes:         lttv.ValidScopes().UnsortedList(),
+		Description:    "Declares a list field's semantic type and ownership behavior. atomic: single ownership, set: shared ownership with uniqueness, map: shared ownership with key-based uniqueness.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<type>",
 			Docs:        "atomic | map | set",
@@ -233,9 +234,10 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 
 func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:         lmktv.TagName(),
-		Scopes:      lmktv.ValidScopes().UnsortedList(),
-		Description: "Declares a named sub-field of a list's value-type to be part of the list-map key.",
+		Tag:            lmktv.TagName(),
+		StabilityLevel: Stable,
+		Scopes:         lmktv.ValidScopes().UnsortedList(),
+		Description:    "Declares a named sub-field of a list's value-type to be part of the list-map key.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<field-json-name>",
 			Docs:        "The name of the field.",

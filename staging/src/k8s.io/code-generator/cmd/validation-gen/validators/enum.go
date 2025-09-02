@@ -107,6 +107,7 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 			switch tag.Name {
 			case enumExcludeTagName:
 				isExcluded = true
+				break
 			case ifEnabledTag, ifDisabledTag:
 				if tag.ValueTag != nil && tag.ValueTag.Name == enumExcludeTagName {
 					if option, ok := tag.PositionalArg(); ok {
@@ -192,9 +193,10 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 
 func (etv *enumTagValidator) Docs() TagDoc {
 	return TagDoc{
-		Tag:         etv.TagName(),
-		Scopes:      etv.ValidScopes().UnsortedList(),
-		Description: "Indicates that a string type is an enum. All constant values of this type are considered values in the enum unless excluded using +k8s:enumExclude.",
+		Tag:            etv.TagName(),
+		StabilityLevel: Stable,
+		Scopes:         etv.ValidScopes().UnsortedList(),
+		Description:    "Indicates that a string type is an enum. All constant values of this type are considered values in the enum unless excluded using +k8s:enumExclude.",
 	}
 }
 
