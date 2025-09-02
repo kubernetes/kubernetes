@@ -73,22 +73,22 @@ type SecureServingOptions struct {
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
 
+	// HTTP2ReadIdleTimeout is the timeout after which a health check using a ping
+	// frame will be carried out if no frame is received on the connection.
+	// If zero, no health check is performed.
+	HTTP2ReadIdleTimeout time.Duration
+
+	// HTTP2PingTimeout is the timeout after which the connection will be closed
+	// if a response to a ping is not received.
+	// If zero, a default of 15 seconds is used.
+	HTTP2PingTimeout time.Duration
+
 	// PermitPortSharing controls if SO_REUSEPORT is used when binding the port, which allows
 	// more than one instance to bind on the same address and port.
 	PermitPortSharing bool
 
 	// PermitAddressSharing controls if SO_REUSEADDR is used when binding the port.
 	PermitAddressSharing bool
-
-	// ReadIdleTimeout is the timeout after which a health check using a ping
-	// frame will be carried out if no frame is received on the connection.
-	// If zero, no health check is performed.
-	HTTP2ReadIdleTimeout time.Duration
-
-	// PingTimeout is the timeout after which the connection will be closed
-	// if a response to a ping is not received.
-	// If zero, a default of 15 seconds is used.
-	HTTP2PingTimeout time.Duration
 }
 
 type CertKey struct {
