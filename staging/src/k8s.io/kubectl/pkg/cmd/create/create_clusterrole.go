@@ -51,10 +51,10 @@ var (
 		# Create a cluster role named "foo" with SubResource specified
 		kubectl create clusterrole foo --verb=get,list,watch --resource=pods,pods/status
 
-		# Create a cluster role name "foo" with NonResourceURL specified
-		kubectl create clusterrole "foo" --verb=get --non-resource-url=/logs/*
+		# Create a cluster role named "foo" with NonResourceURL specified
+		kubectl create clusterrole foo --verb=get --non-resource-url=/logs/*
 
-		# Create a cluster role name "monitoring" with AggregationRule specified
+		# Create a cluster role named "monitoring" with AggregationRule specified
 		kubectl create clusterrole monitoring --aggregation-rule="rbac.example.com/aggregate-to-monitoring=true"`))
 
 	// Valid nonResource verb list for validation.
