@@ -44,6 +44,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -990,10 +991,19 @@ func TestImpersonateWithUID(t *testing.T) {
 			Usages:     []certificatesv1.KeyUsage{"client auth"},
 			Username:   "alice",
 			UID:        "1234",
+			Extra: map[string]certificatesv1.ExtraValue{
+				"impersonator.kubernetes.io/original-user":   {"system:apiserver"},
+				"impersonator.kubernetes.io/original-groups": {"system:authenticated", "system:masters"},
+			},
 		}
 		actualCsrSpec := createdCsr.Spec
 
-		if diff := cmp.Diff(expectedCsrSpec, actualCsrSpec); diff != "" {
+		ignoreUIDFilter := func(k string, v any) bool {
+			return k == "impersonator.kubernetes.io/original-uid"
+		}
+
+		if diff := cmp.Diff(expectedCsrSpec, actualCsrSpec,
+			cmpopts.IgnoreMapEntries(ignoreUIDFilter)); diff != "" {
 			t.Fatalf("CSR spec was different than expected, -got, +want:\n %s", diff)
 		}
 	})

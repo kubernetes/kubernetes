@@ -130,12 +130,9 @@ var _ = SIGDescribe("SelfSubjectReview", func() {
 			gomega.Expect(config.Impersonate.UID).To(gomega.Equal(res.Status.UserInfo.UID))
 			gomega.Expect(config.Impersonate.Groups).To(gomega.Equal(res.Status.UserInfo.Groups))
 
-			extra := make(map[string][]string, len(res.Status.UserInfo.Extra))
-			for k, v := range res.Status.UserInfo.Extra {
-				extra[k] = v
+			for expectedKey, expectedValue := range config.Impersonate.Extra {
+				gomega.Expect(res.Status.UserInfo.Extra).To(gomega.HaveKeyWithValue(expectedKey, expectedValue))
 			}
-
-			gomega.Expect(config.Impersonate.Extra).To(gomega.Equal(extra))
 		}
 
 		ginkgo.By("creating SSR authentication/v1beta1")
@@ -153,12 +150,9 @@ var _ = SIGDescribe("SelfSubjectReview", func() {
 			gomega.Expect(config.Impersonate.UID).To(gomega.Equal(res.Status.UserInfo.UID))
 			gomega.Expect(config.Impersonate.Groups).To(gomega.Equal(res.Status.UserInfo.Groups))
 
-			extra := make(map[string][]string, len(res.Status.UserInfo.Extra))
-			for k, v := range res.Status.UserInfo.Extra {
-				extra[k] = v
+			for expectedKey, expectedValue := range config.Impersonate.Extra {
+				gomega.Expect(res.Status.UserInfo.Extra).To(gomega.HaveKeyWithValue(expectedKey, expectedValue))
 			}
-
-			gomega.Expect(config.Impersonate.Extra).To(gomega.Equal(extra))
 		}
 
 		ginkgo.By("creating SSR authentication/v1")
@@ -173,12 +167,9 @@ var _ = SIGDescribe("SelfSubjectReview", func() {
 			gomega.Expect(config.Impersonate.UID).To(gomega.Equal(res.Status.UserInfo.UID))
 			gomega.Expect(config.Impersonate.Groups).To(gomega.Equal(res.Status.UserInfo.Groups))
 
-			extra := make(map[string][]string, len(res.Status.UserInfo.Extra))
-			for k, v := range res.Status.UserInfo.Extra {
-				extra[k] = v
+			for expectedKey, expectedValue := range config.Impersonate.Extra {
+				gomega.Expect(res.Status.UserInfo.Extra).To(gomega.HaveKeyWithValue(expectedKey, expectedValue))
 			}
-
-			gomega.Expect(config.Impersonate.Extra).To(gomega.Equal(extra))
 		}
 	})
 })
