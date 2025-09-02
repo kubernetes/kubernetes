@@ -21,7 +21,7 @@ nodes:
           vmodule: "controller=6" # resourceclaim/controller.go - should have renamed it when copying the controller it was based on!
     apiServer:
         extraArgs:
-          runtime-config: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true"
+          runtime-config: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true,api/alpha=true,api/beta=true"
   - |
     kind: InitConfiguration
     nodeRegistration:
@@ -54,3 +54,6 @@ nodes:
 #    --config <(cat test/e2e/dra/kind.yaml; echo "  <some feature>: true")
 featureGates:
   DynamicResourceAllocation: true
+  AllAlpha: true
+  AllBeta: true
+  EventedPLEG: false

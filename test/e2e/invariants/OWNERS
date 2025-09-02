@@ -1,0 +1,14 @@
+# Special checks that run after the entire suite
+# must be specially reviewed.
+approvers:
+  - bentheelder
+  - aojea
+  - pohly
+reviewers:
+  - bentheelder
+  - aojea
+  - pohly
+required_reviewers:
+  - bentheelder
+  - aojea
+  - pohly
