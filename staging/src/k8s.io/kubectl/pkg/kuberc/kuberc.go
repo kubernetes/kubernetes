@@ -294,7 +294,10 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 	if aliasArgs.command.Annotations == nil {
 		aliasArgs.command.Annotations = make(map[string]string, 1)
 	}
-	aliasArgs.command.Annotations[KubeRCOriginalCommandAnnotation] = fmt.Sprintf("%s %s %s %s", originalCommand, strings.Join(aliasArgs.prependArgs, " "), strings.Join(originalNameValueFlags, " "), strings.Join(aliasArgs.appendArgs, " "))
+	// Trim space if any arg is not referenced or is empty
+	aliasArgs.command.Annotations[KubeRCOriginalCommandAnnotation] = strings.TrimSpace(
+		fmt.Sprintf("%s %s %s %s %s", originalCommand, strings.Join(aliasArgs.prependArgs, " "), strings.Join(args, " "), strings.Join(originalNameValueFlags, " "), strings.Join(aliasArgs.appendArgs, " ")),
+	)
 	return args, nil
 }
 
