@@ -50,9 +50,6 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/features"
-
-	"k8s.io/utils/ptr"
-
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -64,6 +61,7 @@ import (
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -100,7 +98,7 @@ var httpProbe = &v1.Probe{
 
 // GCE Quota requirements: 3 pds, one per stateful pod manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
-var _ = SIGDescribe("StatefulSet", framework.WithFeatureGate(features.MaxUnavailableStatefulSet), func() {
+var _ = SIGDescribe("StatefulSet", func() {
 	f := framework.NewDefaultFramework("statefulset")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var ns string
