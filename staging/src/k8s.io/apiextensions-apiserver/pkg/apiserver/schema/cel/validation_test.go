@@ -2363,7 +2363,7 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 			schema: objectTypePtr(map[string]schema.Structural{
 				"f/2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2"),
 			}),
-			errors: []string{"Invalid value: \"object\": failed rule: self.m == 2"},
+			errors: []string{"Invalid value: failed rule: self.m == 2"},
 		},
 		// unescapable field names that are not accessed by the CEL rule are allowed and should not impact CEL rule validation
 		{name: "invalid rule under unescapable field name",
@@ -2397,7 +2397,7 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 			schema: objectTypePtr(map[string]schema.Structural{
 				"a@b": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2"),
 			}),
-			errors: []string{"Invalid value: \"object\": failed rule: self.m == 2"},
+			errors: []string{"Invalid value: failed rule: self.m == 2"},
 		},
 		{name: "matchExpressions - 'values' must be specified when 'operator' is 'In' or 'NotIn'",
 			obj: map[string]interface{}{
@@ -4295,7 +4295,7 @@ func TestRatcheting(t *testing.T) {
 				bar: invalid
 			`),
 			errors: []string{
-				`root.foo: Invalid value: "object": gotta be baz`,
+				`root.foo: Invalid value: gotta be baz`,
 			},
 		},
 		{
