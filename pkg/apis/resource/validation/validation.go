@@ -1097,28 +1097,93 @@ func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// validationOptions are the options for validation.
+type validationOptions struct {
+	// The validation of each item is covered by declarative validation.
+	ItemsCovered bool
+	// The list size check is covered by declarative validation.
+	SizeCovered bool
+	// The uniqueness check is covered by declarative validation.
+	UniquenessCovered bool
+}
+
+// validationOption is a function that configures validation options.
+type validationOption func(*validationOptions)
+
+// withItemsCovered is a validationOption that marks item validation as covered by declarative validation.
+//
+// TODO: remove nolint comment once there is actual use.
+//
+//nolint:unused
+func withItemsCovered() validationOption {
+	return func(o *validationOptions) {
+		o.ItemsCovered = true
+	}
+}
+
+// withSizeCovered is a validationOption that marks list size validation as covered by declarative validation.
+//
+// TODO: remove nolint comment once there is actual use.
+//
+//nolint:unused
+func withSizeCovered() validationOption {
+	return func(o *validationOptions) {
+		o.SizeCovered = true
+	}
+}
+
+// withUniquenessCovered is a validationOption that marks uniqueness validation as covered by declarative validation.
+//
+// TODO: remove nolint comment once there is actual use.
+//
+//nolint:unused
+func withUniquenessCovered() validationOption {
+	return func(o *validationOptions) {
+		o.UniquenessCovered = true
+	}
+}
+
 // validateSlice ensures that a slice does not exceed a certain maximum size
 // and that all entries are valid.
 // A negative maxSize disables the length check.
-func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ...validationOption) field.ErrorList {
+	var options validationOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	var allErrs field.ErrorList
 	for i, item := range slice {
 		idxPath := fldPath.Index(i)
-		allErrs = append(allErrs, validateItem(item, idxPath)...)
+		errs := validateItem(item, idxPath)
+		if options.ItemsCovered {
+			errs = errs.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, errs...)
 	}
 	if maxSize >= 0 && len(slice) > maxSize {
 		// Dumping the entire field into the error message is likely to be too long,
 		// in particular when it is already beyond the maximum size. Instead this
 		// just shows the number of entries.
-		allErrs = append(allErrs, field.TooMany(fldPath, len(slice), maxSize))
+		err := field.TooMany(fldPath, len(slice), maxSize)
+		if options.SizeCovered {
+			err = err.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
 	}
 	return allErrs
 }
 
 // validateSet ensures that a slice contains no duplicates, does not
 // exceed a certain maximum size and that all entries are valid.
-func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) (K, string), fldPath *field.Path) field.ErrorList {
-	allErrs := validateSlice(slice, maxSize, validateItem, fldPath)
+func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) (K, string), fldPath *field.Path, opts ...validationOption) field.ErrorList {
+	var options validationOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	allErrs := validateSlice(slice, maxSize, validateItem, fldPath, opts...)
+
 	allItems := sets.New[K]()
 	for i, item := range slice {
 		idxPath := fldPath.Index(i)
@@ -1128,7 +1193,11 @@ func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(
 			childPath = childPath.Child(fieldName)
 		}
 		if allItems.Has(key) {
-			allErrs = append(allErrs, field.Duplicate(childPath, key))
+			err := field.Duplicate(childPath, key)
+			if options.UniquenessCovered {
+				err = err.MarkCoveredByDeclarative()
+			}
+			allErrs = append(allErrs, err)
 		} else {
 			allItems.Insert(key)
 		}
