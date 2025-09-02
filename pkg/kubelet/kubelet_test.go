@@ -404,7 +404,7 @@ func newTestKubeletWithImageList(
 		ShutdownGracePeriodCriticalPods: 0,
 	})
 	kubelet.shutdownManager = shutdownManager
-	kubelet.usernsManager, err = userns.MakeUserNsManager(kubelet)
+	kubelet.usernsManager, err = userns.MakeUserNsManager(logger, kubelet)
 	if err != nil {
 		t.Fatalf("Failed to create UserNsManager: %v", err)
 	}

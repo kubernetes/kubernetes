@@ -35,6 +35,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -100,6 +101,7 @@ func (m *testUserNsPodsManager) GetUserNamespacesIDsPerPod() uint32 {
 }
 
 func TestUserNsManagerAllocate(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	customUserNsLength := uint32(1048576)
@@ -131,34 +133,34 @@ func TestUserNsManagerAllocate(t *testing.T) {
 				mappingFirstID: tc.mappingFirstID,
 				mappingLen:     tc.mappingLen,
 			}
-			m, err := MakeUserNsManager(testUserNsPodsManager)
+			m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 			require.NoError(t, err)
 
-			allocated, length, err := m.allocateOne("one")
+			allocated, length, err := m.allocateOne(logger, "one")
 			require.NoError(t, err)
 			assert.Equal(t, tc.userNsLength, length, "m.isSet(%d).length=%v", allocated, length)
 			assert.True(t, m.isSet(allocated), "m.isSet(%d)", allocated)
 
-			allocated2, length2, err := m.allocateOne("two")
+			allocated2, length2, err := m.allocateOne(logger, "two")
 			require.NoError(t, err)
 			assert.NotEqual(t, allocated, allocated2, "allocated != allocated2")
 			assert.Equal(t, length, length2, "length == length2")
 
 			// verify that re-adding the same pod with the same settings won't fail
-			err = m.record("two", allocated2, length2)
+			err = m.record(logger, "two", allocated2, length2)
 			require.NoError(t, err)
 			// but it fails if anyting is different
-			err = m.record("two", allocated2+1, length2)
+			err = m.record(logger, "two", allocated2+1, length2)
 			require.Error(t, err)
 
-			m.Release("one")
-			m.Release("two")
+			m.Release(logger, "one")
+			m.Release(logger, "two")
 			assert.False(t, m.isSet(allocated), "m.isSet(%d)", allocated)
 			assert.False(t, m.isSet(allocated2), "m.nsSet(%d)", allocated2)
 
 			var allocs []uint32
 			for i := 0; i < 1000; i++ {
-				allocated, length, err = m.allocateOne(types.UID(fmt.Sprintf("%d", i)))
+				allocated, length, err = m.allocateOne(logger, types.UID(fmt.Sprintf("%d", i)))
 				assert.Equal(t, tc.userNsLength, length, "length is not the expected. iter: %v", i)
 				require.NoError(t, err)
 				assert.GreaterOrEqual(t, allocated, tc.mappingFirstID)
@@ -168,12 +170,12 @@ func TestUserNsManagerAllocate(t *testing.T) {
 			}
 			for i, v := range allocs {
 				assert.True(t, m.isSet(v), "m.isSet(%d) should be true", v)
-				m.Release(types.UID(fmt.Sprintf("%d", i)))
+				m.Release(logger, types.UID(fmt.Sprintf("%d", i)))
 				assert.False(t, m.isSet(v), "m.isSet(%d) should be false", v)
 
-				err = m.record(types.UID(fmt.Sprintf("%d", i)), v, tc.userNsLength)
+				err = m.record(logger, types.UID(fmt.Sprintf("%d", i)), v, tc.userNsLength)
 				require.NoError(t, err)
-				m.Release(types.UID(fmt.Sprintf("%d", i)))
+				m.Release(logger, types.UID(fmt.Sprintf("%d", i)))
 				assert.False(t, m.isSet(v), "m.isSet(%d) should be false", v)
 			}
 		})
@@ -181,6 +183,7 @@ func TestUserNsManagerAllocate(t *testing.T) {
 }
 
 func TestMakeUserNsManager(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	cases := []struct {
@@ -223,7 +226,7 @@ func TestMakeUserNsManager(t *testing.T) {
 				mappingLen:     tc.mappingLen,
 				maxPods:        tc.maxPods,
 			}
-			_, err := MakeUserNsManager(testUserNsPodsManager)
+			_, err := MakeUserNsManager(logger, testUserNsPodsManager)
 
 			if tc.success {
 				assert.NoError(t, err)
@@ -235,6 +238,7 @@ func TestMakeUserNsManager(t *testing.T) {
 }
 
 func TestUserNsManagerParseUserNsFile(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	cases := []struct {
@@ -301,13 +305,13 @@ func TestUserNsManagerParseUserNsFile(t *testing.T) {
 	}
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
-	m, err := MakeUserNsManager(testUserNsPodsManager)
+	m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 	assert.NoError(t, err)
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// We don't validate the result. It was parsed with the json parser, we trust that.
-			_, err = m.parseUserNsFileAndRecord(types.UID(tc.name), []byte(tc.file))
+			_, err = m.parseUserNsFileAndRecord(logger, types.UID(tc.name), []byte(tc.file))
 			if (tc.success && err == nil) || (!tc.success && err != nil) {
 				return
 			}
@@ -392,10 +396,11 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 				podDir: t.TempDir(),
 				userns: tc.runtimeUserns,
 			}
-			m, err := MakeUserNsManager(testUserNsPodsManager)
+			logger, ctx := ktesting.NewTestContext(t)
+			m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 			assert.NoError(t, err)
 
-			userns, err := m.GetOrCreateUserNamespaceMappings(tc.pod, tc.runtimeHandler)
+			userns, err := m.GetOrCreateUserNamespaceMappings(ctx, tc.pod, tc.runtimeHandler)
 			if (tc.success && err != nil) || (!tc.success && err == nil) {
 				t.Errorf("expected success: %v but got error: %v", tc.success, err)
 			}
@@ -408,6 +413,7 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 }
 
 func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	cases := []struct {
@@ -464,16 +470,16 @@ func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
 				podDir:  t.TempDir(),
 				podList: tc.listPods,
 			}
-			m, err := MakeUserNsManager(testUserNsPodsManager)
+			m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 			require.NoError(t, err)
 
 			// Record the userns range as used
 			for i, pod := range tc.podSetBeforeCleanup {
-				err := m.record(pod, uint32((i+1)*65536), 65536)
+				err := m.record(logger, pod, uint32((i+1)*65536), 65536)
 				require.NoError(t, err)
 			}
 
-			err = m.CleanupOrphanedPodUsernsAllocations(tc.pods, tc.runningPods)
+			err = m.CleanupOrphanedPodUsernsAllocations(ctx, tc.pods, tc.runningPods)
 			require.NoError(t, err)
 
 			for _, pod := range tc.podSetAfterCleanup {
@@ -498,15 +504,17 @@ func (m *failingUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
 }
 
 func TestMakeUserNsManagerFailsListPod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	testUserNsPodsManager := &failingUserNsPodsManager{}
-	_, err := MakeUserNsManager(testUserNsPodsManager)
+	_, err := MakeUserNsManager(logger, testUserNsPodsManager)
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "read pods from disk")
 }
 
 func TestRecordBounds(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	// Allow exactly for 1 pod
@@ -515,15 +523,15 @@ func TestRecordBounds(t *testing.T) {
 		mappingLen:     65536,
 		maxPods:        1,
 	}
-	m, err := MakeUserNsManager(testUserNsPodsManager)
+	m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 	require.NoError(t, err)
 
 	// The first pod allocation should succeed.
-	err = m.record(types.UID(fmt.Sprintf("%d", 0)), 65536, 65536)
+	err = m.record(logger, types.UID(fmt.Sprintf("%d", 0)), 65536, 65536)
 	require.NoError(t, err)
 
 	// The next allocation should fail, as there is no space left.
-	err = m.record(types.UID(fmt.Sprintf("%d", 2)), uint32(2*65536), 65536)
+	err = m.record(logger, types.UID(fmt.Sprintf("%d", 2)), uint32(2*65536), 65536)
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "out of range")
 }
