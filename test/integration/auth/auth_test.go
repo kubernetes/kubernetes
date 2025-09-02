@@ -60,6 +60,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/token/cache"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	unionauthz "k8s.io/apiserver/pkg/authorization/union"
+	"k8s.io/apiserver/pkg/endpoints/filters"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	clientset "k8s.io/client-go/kubernetes"
@@ -992,14 +993,14 @@ func TestImpersonateWithUID(t *testing.T) {
 			Username:   "alice",
 			UID:        "1234",
 			Extra: map[string]certificatesv1.ExtraValue{
-				"impersonator.kubernetes.io/original-user":   {"system:apiserver"},
-				"impersonator.kubernetes.io/original-groups": {"system:authenticated", "system:masters"},
+				filters.ImpersonatorOriginalUserExtraKey:   {"system:apiserver"},
+				filters.ImpersonatorOriginalGroupsExtraKey: {"system:authenticated", "system:masters"},
 			},
 		}
 		actualCsrSpec := createdCsr.Spec
 
 		ignoreUIDFilter := func(k string, v any) bool {
-			return k == "impersonator.kubernetes.io/original-uid"
+			return k == filters.ImpersonatorOriginalUIDExtraKey
 		}
 
 		if diff := cmp.Diff(expectedCsrSpec, actualCsrSpec,

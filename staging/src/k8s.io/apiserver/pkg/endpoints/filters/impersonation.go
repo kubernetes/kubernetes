@@ -37,6 +37,14 @@ import (
 	"k8s.io/apiserver/pkg/server/httplog"
 )
 
+// Impersonation extra keys constants
+const (
+	ImpersonatorOriginalUserExtraKey   = "impersonator.kubernetes.io/original-user"
+	ImpersonatorOriginalUIDExtraKey    = "impersonator.kubernetes.io/original-uid"
+	ImpersonatorOriginalGroupsExtraKey = "impersonator.kubernetes.io/original-groups"
+	ImpersonatorOriginalExtraKeyPrefix = "impersonator.kubernetes.io/original-extra-"
+)
+
 // WithImpersonation is a filter that will inspect and check requests that attempt to change the user.Info for their requests
 func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -158,17 +166,17 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 		// Add original impersonator information
 		if requestor != nil {
 			if originalName := requestor.GetName(); originalName != "" {
-				userExtra["impersonator.kubernetes.io/original-user"] = []string{originalName}
+				userExtra[ImpersonatorOriginalUserExtraKey] = []string{originalName}
 			}
 			if originalUID := requestor.GetUID(); originalUID != "" {
-				userExtra["impersonator.kubernetes.io/original-uid"] = []string{originalUID}
+				userExtra[ImpersonatorOriginalUIDExtraKey] = []string{originalUID}
 			}
 			if originalGroups := requestor.GetGroups(); len(originalGroups) > 0 {
-				userExtra["impersonator.kubernetes.io/original-groups"] = originalGroups
+				userExtra[ImpersonatorOriginalGroupsExtraKey] = originalGroups
 			}
 			// Preserve original extra information with namespace prefix
 			for key, values := range requestor.GetExtra() {
-				prefixedKey := "impersonator.kubernetes.io/original-extra-" + key
+				prefixedKey := ImpersonatorOriginalExtraKeyPrefix + key
 				userExtra[prefixedKey] = values
 			}
 		}
