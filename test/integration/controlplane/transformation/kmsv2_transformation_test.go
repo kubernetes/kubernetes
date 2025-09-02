@@ -405,13 +405,13 @@ resources:
 // 7. when kms-plugin is down, no-op update for a pod should succeed and not result in RV change even once the DEK/seed is valid
 func TestKMSv2ProviderKeyIDStaleness(t *testing.T) {
 	t.Parallel()
+	// testKMSv2ProviderKeyIDStaleness modifies global state (kmsv2.NowFunc) and thus the following two tests
+	// have to run sequentially. No other test is allowed to change kmsv2.NowFunc.
 	t.Run("regular gcm", func(t *testing.T) {
-		t.Parallel()
 		kmsName := "kms-provider-key-id-stale-false"
 		testKMSv2ProviderKeyIDStaleness(t, kmsName, encryptionconfig.SetKDFForTests(kmsName, false))
 	})
 	t.Run("extended nonce gcm", func(t *testing.T) {
-		t.Parallel()
 		testKMSv2ProviderKeyIDStaleness(t, "kms-provider-key-id-stale-true", func() {})
 	})
 }

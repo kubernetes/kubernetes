@@ -34,7 +34,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -77,12 +76,6 @@ const (
 	defaultStubAccessToken  = "_fake_access_token_"
 
 	rsaKeyBitSize = 2048
-)
-
-var (
-	// testServerMutex serializes test server starts to prevent data races
-	// in admission plugin flag registration
-	testServerMutex sync.Mutex
 )
 
 var (
@@ -2011,15 +2004,12 @@ egressSelections:
 	}
 	customFlags = append(customFlags, "--authorization-mode=RBAC")
 
-	// Serialize test server starts to prevent data races in admission plugin flag registration
-	testServerMutex.Lock()
 	server, err := kubeapiserverapptesting.StartTestServer(
 		t,
 		kubeapiserverapptesting.NewDefaultTestServerOptions(),
 		customFlags,
 		framework.SharedEtcd(),
 	)
-	testServerMutex.Unlock()
 	require.NoError(t, err)
 
 	t.Cleanup(server.TearDownFn)
