@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"k8s.io/component-base/cli"
@@ -28,6 +29,19 @@ import (
 
 func main() {
 	command := app.NewSchedulerCommand()
+	fakeDataRace()
 	code := cli.Run(command)
 	os.Exit(code)
+}
+
+func fakeDataRace() {
+	var a int
+
+	go func() {
+		a = 1
+	}()
+
+	go func() {
+		_ = fmt.Sprintf("%d", a)
+	}()
 }
