@@ -2126,14 +2126,15 @@ func TestAddDependencies(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 
-				deps := *f.dependencies.Load()
+				deps := f.Dependencies()
 				finalDeps := tc.finalDeps
 				if finalDeps == nil {
 					finalDeps = tc.newDeps
 				}
 				assert.Equal(t, finalDeps, deps)
 
-				clone := *f.DeepCopy().(*featureGate).dependencies.Load()
+				// Verify that DeepCopy clones dependencies.
+				clone := f.DeepCopy().Dependencies()
 				assert.Equal(t, deps, clone, "dependencies should identical after DeepCopy")
 			}
 		})

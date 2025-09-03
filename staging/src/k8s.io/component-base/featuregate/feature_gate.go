@@ -19,6 +19,7 @@ package featuregate
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"sort"
@@ -112,6 +113,8 @@ type FeatureGate interface {
 	Enabled(key Feature) bool
 	// KnownFeatures returns a slice of strings describing the FeatureGate's known features.
 	KnownFeatures() []string
+	// Dependencies returns ap copy of the known feature dependencies.
+	Dependencies() map[Feature][]Feature
 	// DeepCopy returns a deep copy of the FeatureGate object, such that gates can be
 	// set on the copy without mutating the original. This is useful for validating
 	// config against potential feature gate changes before committing those changes.
@@ -608,6 +611,10 @@ func (f *featureGate) AddDependencies(dependencies map[Feature][]Feature) error 
 	f.dependencies.Store(&dependencies)
 
 	return nil
+}
+
+func (f *featureGate) Dependencies() map[Feature][]Feature {
+	return maps.Clone(*f.dependencies.Load())
 }
 
 func (f *featureGate) OverrideDefault(name Feature, override bool) error {
