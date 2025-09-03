@@ -5843,7 +5843,7 @@ type IPFamilyPolicyType = IPFamilyPolicy
 // ServiceSpec describes the attributes that a user creates on a service.
 type ServiceSpec struct {
 	// The list of ports that are exposed by this service.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+	// More info: https://kubernetes.io/docs/reference/networking/ports-and-protocols
 	// +patchMergeKey=port
 	// +patchStrategy=merge
 	// +listType=map
@@ -5875,7 +5875,7 @@ type ServiceSpec struct {
 	// types ClusterIP, NodePort, and LoadBalancer. If this field is specified
 	// when creating a Service of type ExternalName, creation will fail. This
 	// field will be wiped when updating a Service to type ExternalName.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-clusterip
 	// +optional
 	ClusterIP string `json:"clusterIP,omitempty" protobuf:"bytes,3,opt,name=clusterIP"`
 
@@ -5901,7 +5901,7 @@ type ServiceSpec struct {
 	// This field may hold a maximum of two entries (dual-stack IPs, in either order).
 	// These IPs must correspond to the values of the ipFamilies field. Both
 	// clusterIPs and ipFamilies are governed by the ipFamilyPolicy field.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-clusterip
 	// +listType=atomic
 	// +optional
 	ClusterIPs []string `json:"clusterIPs,omitempty" protobuf:"bytes,18,opt,name=clusterIPs"`
@@ -5938,7 +5938,7 @@ type ServiceSpec struct {
 	// Enable client IP based session affinity.
 	// Must be ClientIP or None.
 	// Defaults to None.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ip-addressing-mechanism
 	// +optional
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty" protobuf:"bytes,7,opt,name=sessionAffinity,casttype=ServiceAffinity"`
 

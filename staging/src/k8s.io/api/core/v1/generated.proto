@@ -6141,7 +6141,7 @@ message ServiceProxyOptions {
 // ServiceSpec describes the attributes that a user creates on a service.
 message ServiceSpec {
   // The list of ports that are exposed by this service.
-  // More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+  // More info: https://kubernetes.io/docs/reference/networking/ports-and-protocols
   // +patchMergeKey=port
   // +patchStrategy=merge
   // +listType=map
@@ -6173,7 +6173,7 @@ message ServiceSpec {
   // types ClusterIP, NodePort, and LoadBalancer. If this field is specified
   // when creating a Service of type ExternalName, creation will fail. This
   // field will be wiped when updating a Service to type ExternalName.
-  // More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+  // More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-clusterip
   // +optional
   optional string clusterIP = 3;
 
@@ -6199,7 +6199,7 @@ message ServiceSpec {
   // This field may hold a maximum of two entries (dual-stack IPs, in either order).
   // These IPs must correspond to the values of the ipFamilies field. Both
   // clusterIPs and ipFamilies are governed by the ipFamilyPolicy field.
-  // More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+  // More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-clusterip
   // +listType=atomic
   // +optional
   repeated string clusterIPs = 18;
@@ -6236,7 +6236,7 @@ message ServiceSpec {
   // Enable client IP based session affinity.
   // Must be ClientIP or None.
   // Defaults to None.
-  // More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+  // More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ip-addressing-mechanism
   // +optional
   optional string sessionAffinity = 7;
 
