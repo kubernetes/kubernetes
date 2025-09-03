@@ -815,7 +815,7 @@ kube::golang::build_binaries_for_platform() {
   for binary in "${binaries[@]}"; do
     if [[ "${binary}" =~ ".test"$ ]]; then
       tests+=("${binary}")
-      kube::log::info "    ${binary} (test)"
+      kube::log::info "    ${binary} (test${KUBE_RACE:+, race detection})"
     elif kube::golang::is_statically_linked "${binary}"; then
       statics+=("${binary}")
       kube::log::info "    ${binary} (static)"
@@ -848,7 +848,7 @@ kube::golang::build_binaries_for_platform() {
       -tags="${gotags:-}"
     )
     if [[ -n "${KUBE_RACE:-}" ]]; then
-        build_args+=("${KUBE_RACE}")
+      build_args+=("${KUBE_RACE}")
     fi
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
@@ -859,13 +859,18 @@ kube::golang::build_binaries_for_platform() {
     testpkg=$(dirname "${test}")
 
     mkdir -p "$(dirname "${outfile}")"
-    go test -c \
-      ${goflags:+"${goflags[@]}"} \
-      -gcflags="${gogcflags}" \
-      -ldflags="${goldflags}" \
-      -tags="${gotags:-}" \
-      -o "${outfile}" \
-      "${testpkg}"
+    build_args=(
+      -c
+      ${goflags:+"${goflags[@]}"}
+      -gcflags="${gogcflags}"
+      -ldflags="${goldflags}"
+      -tags="${gotags:-}"
+      -o "${outfile}"
+    )
+    if [[ -n "${KUBE_RACE:-}" ]]; then
+      build_args+=("${KUBE_RACE}")
+    fi
+    go test "${build_args[@]}" "${testpkg}"
   done
 }
 
