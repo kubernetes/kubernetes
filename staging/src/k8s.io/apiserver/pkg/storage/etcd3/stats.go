@@ -18,6 +18,7 @@ package etcd3
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 
@@ -78,6 +79,8 @@ type sizeRevision struct {
 	revision  int64
 }
 
+var errStatsDisabled = errors.New("key size stats disabled")
+
 func (sc *statsCache) Stats(ctx context.Context) (storage.Stats, error) {
 	keys, err := sc.GetKeys(ctx)
 	if err != nil {
@@ -100,6 +103,9 @@ func (sc *statsCache) GetKeys(ctx context.Context) ([]string, error) {
 	getKeys := sc.getKeys
 	sc.getKeysLock.Unlock()
 
+	if getKeys == nil {
+		return nil, errStatsDisabled
+	}
 	// Don't execute getKeys under lock.
 	return getKeys(ctx)
 }
@@ -133,7 +139,10 @@ func (sc *statsCache) cleanKeysIfNeeded(ctx context.Context) {
 	}
 	keys, err := sc.GetKeys(ctx)
 	if err != nil {
-		klog.InfoS("Error getting keys", "err", err)
+		if !errors.Is(err, errStatsDisabled) {
+			klog.InfoS("Error getting keys", "err", err)
+		}
+		return
 	}
 	sc.keysLock.Lock()
 	defer sc.keysLock.Unlock()
