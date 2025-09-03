@@ -762,7 +762,7 @@ func RunTestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.
 			currentObjs := map[string]*example.Pod{}
 			for _, watchTest := range tt.watchTests {
 				out := &example.Pod{}
-				key := "pods/" + watchTest.obj.Name
+				key := "/pods/" + watchTest.obj.Name
 				err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 					func(runtime.Object) (runtime.Object, error) {
 						obj := watchTest.obj.DeepCopy()
@@ -1076,7 +1076,7 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 			currentObjs := map[string]*example.Pod{}
 			for _, watchTest := range tt.watchTests {
 				out := &example.Pod{}
-				key := "pods/" + watchTest.obj.Namespace + "/" + watchTest.obj.Name
+				key := "/pods/" + watchTest.obj.Namespace + "/" + watchTest.obj.Name
 				err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 					func(runtime.Object) (runtime.Object, error) {
 						obj := watchTest.obj.DeepCopy()
