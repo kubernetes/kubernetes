@@ -3742,7 +3742,7 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "multiprotocol-test"
 		testLabels := map[string]string{"app": "multiport"}
 		ns := f.Namespace.Name
-		containerPort := 80
+		containerPort := 100
 
 		svcTCPport := v1.ServicePort{
 			Name:       "tcp-port",
