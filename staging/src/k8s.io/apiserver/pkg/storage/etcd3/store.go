@@ -188,7 +188,7 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	}
 	// Collecting stats requires properly set resourcePrefix to call getKeys.
 	if resourcePrefix != "" && utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		stats := newStatsCache(pathPrefix, s.getKeys)
+		stats := newStatsCache(pathPrefix, nil)
 		s.stats = stats
 		w.stats = stats
 	}
@@ -632,7 +632,10 @@ func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Obje
 
 func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
 	if s.stats != nil {
-		return s.stats.Stats(ctx)
+		stats, err := s.stats.Stats(ctx)
+		if !errors.Is(err, errStatsDisabled) {
+			return stats, err
+		}
 	}
 	startTime := time.Now()
 	prefix, err := s.prepareKey(s.resourcePrefix)
