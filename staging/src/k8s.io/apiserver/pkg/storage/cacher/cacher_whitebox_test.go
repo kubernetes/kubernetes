@@ -64,7 +64,7 @@ import (
 )
 
 func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cacher, storage.Versioner, error) {
-	prefix := "pods"
+	prefix := "/pods"
 	config := Config{
 		Storage:             s,
 		Versioner:           storage.APIObjectVersioner{},
@@ -626,7 +626,7 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 			}
 
 			start := cacher.clock.Now()
-			err = delegator.GetList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: "", Recursive: true}, result)
+			err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "", Recursive: true}, result)
 			clockStepCancelFn()
 			duration := cacher.clock.Since(start)
 			if (err != nil) != tc.expectError {
@@ -718,7 +718,7 @@ func TestMatchExactResourceVersionFallback(t *testing.T) {
 			delegator := NewCacheDelegator(cacher, backingStorage)
 
 			result := &example.PodList{}
-			err = delegator.GetList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: "20", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Recursive: true}, result)
+			err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "20", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Recursive: true}, result)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -761,7 +761,7 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
 	backingStorage.injectGetListError(errDummy)
-	err = delegator.GetList(context.TODO(), "pods/ns", storage.ListOptions{
+	err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred,
 	}, result)
@@ -769,7 +769,7 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 		t.Errorf("GetList with Limit and RV=0 should be served from cache: %v", err)
 	}
 
-	err = delegator.GetList(context.TODO(), "pods/ns", storage.ListOptions{
+	err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "",
 		Predicate:       pred,
 	}, result)
@@ -842,7 +842,7 @@ func TestGetListNonRecursiveCacheWithConsistentListFromCache(t *testing.T) {
 			defer delegator.Stop()
 
 			// Setup test object
-			key := "pods/ns"
+			key := "/pods/ns"
 			input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}}
 			if err := v.UpdateObject(input, 100); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
@@ -917,7 +917,7 @@ func TestGetCacheBypass(t *testing.T) {
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
 	backingStorage.injectGetListError(errDummy)
-	err = delegator.Get(context.TODO(), "pods/ns/pod-0", storage.GetOptions{
+	err = delegator.Get(context.TODO(), "/pods/ns/pod-0", storage.GetOptions{
 		IgnoreNotFound:  true,
 		ResourceVersion: "0",
 	}, result)
@@ -925,7 +925,7 @@ func TestGetCacheBypass(t *testing.T) {
 		t.Errorf("Get with RV=0 should be served from cache: %v", err)
 	}
 
-	err = delegator.Get(context.TODO(), "pods/ns/pod-0", storage.GetOptions{
+	err = delegator.Get(context.TODO(), "/pods/ns/pod-0", storage.GetOptions{
 		IgnoreNotFound:  true,
 		ResourceVersion: "",
 	}, result)
@@ -1120,7 +1120,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 	// Watch hangs waiting on watchcache being initialized.
 	// Ensure that it terminates when its context is cancelled
 	// (e.g. the request is terminated for whatever reason).
-	_, err = cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0"})
+	_, err = cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "0"})
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 		if err == nil || err.Error() != apierrors.NewServiceUnavailable(context.Canceled.Error()).Error() {
 			t.Errorf("Unexpected error: %#v", err)
@@ -1165,7 +1165,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 	totalPods := 100
 
 	// Create watcher that will be slowing down reading.
-	w1, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{
+	w1, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "999",
 		Predicate:       storage.Everything,
 	})
@@ -1190,7 +1190,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 	}
 
 	// Create fast watcher and ensure it will get each object exactly once.
-	w2, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything})
+	w2, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
@@ -1235,7 +1235,7 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 		}
 	}
 
-	w, err := delegator.Watch(context.Background(), "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	w, err := delegator.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
@@ -1255,13 +1255,13 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 
 	cacher.Stop()
 
-	_, err = delegator.Watch(context.Background(), "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	_, err = delegator.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err == nil {
 		t.Fatalf("Success to create Watch: %v", err)
 	}
 
 	result := &example.Pod{}
-	err = delegator.Get(context.TODO(), "pods/ns/pod-0", storage.GetOptions{
+	err = delegator.Get(context.TODO(), "/pods/ns/pod-0", storage.GetOptions{
 		IgnoreNotFound:  true,
 		ResourceVersion: "1",
 	}, result)
@@ -1276,7 +1276,7 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 	}
 
 	listResult := &example.PodList{}
-	err = delegator.GetList(context.TODO(), "pods/ns", storage.ListOptions{
+	err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "1",
 		Recursive:       true,
 		Predicate: storage.SelectionPredicate{
@@ -1374,7 +1374,7 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			defer wg.Done()
-			w, err := cacher.Watch(ctx, "pods", storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything})
+			w, err := cacher.Watch(ctx, "/pods", storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything})
 			if err != nil {
 				// Watch failed to initialize (this most probably means that cacher
 				// already moved back to Pending state before watch initialized.
@@ -1443,7 +1443,7 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 			default:
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
-				w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
+				w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
 				if err != nil {
 					watchErr = fmt.Errorf("Failed to create watch: %v", err)
 					return
@@ -1508,7 +1508,7 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
+	w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
@@ -1677,7 +1677,7 @@ func TestInitialEventsEndBookmark(t *testing.T) {
 			pred.AllowWatchBookmarks = scenario.allowWatchBookmarks
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
-			w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "100", SendInitialEvents: scenario.sendInitialEvents, Predicate: pred})
+			w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "100", SendInitialEvents: scenario.sendInitialEvents, Predicate: pred})
 			if err != nil {
 				t.Fatalf("Failed to create watch: %v", err)
 			}
@@ -1724,7 +1724,7 @@ func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "100", Predicate: pred})
+	w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "100", Predicate: pred})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
@@ -1795,7 +1795,7 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 		pred.AllowWatchBookmarks = true
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred})
+		w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred})
 		if err != nil {
 			t.Fatalf("Failed to create watch: %v", err)
 		}
@@ -1969,7 +1969,7 @@ func TestStartingResourceVersion(t *testing.T) {
 	// Advance RV by 10.
 	startVersion := uint64(1010)
 
-	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", storage.ListOptions{ResourceVersion: strconv.FormatUint(startVersion, 10), Predicate: storage.Everything})
+	watcher, err := cacher.Watch(context.TODO(), "/pods/ns/foo", storage.ListOptions{ResourceVersion: strconv.FormatUint(startVersion, 10), Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -2046,14 +2046,14 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	totalPods := 50
 
 	// Create watcher that will be blocked.
-	w1, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything})
+	w1, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
 	defer w1.Stop()
 
 	// Create fast watcher and ensure it will get all objects.
-	w2, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything})
+	w2, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
 	}
@@ -2168,7 +2168,7 @@ func TestCachingDeleteEvents(t *testing.T) {
 	}
 
 	createWatch := func(pred storage.SelectionPredicate) watch.Interface {
-		w, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred})
+		w, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred})
 		if err != nil {
 			t.Fatalf("Failed to create watch: %v", err)
 		}
@@ -2249,7 +2249,7 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 
 	watchers := make([]watch.Interface, 0, watchersCount)
 	for i := 0; i < watchersCount; i++ {
-		w, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: "1000", Predicate: storage.Everything})
+		w, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "1000", Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("Failed to create watch: %v", err)
 		}
@@ -2385,7 +2385,7 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{
+	w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{
 		ResourceVersion: "999",
 		Predicate:       storage.Everything,
 	})
@@ -2547,7 +2547,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 				}
 			}
 
-			w, err := cacher.Watch(context.Background(), "pods/ns", scenario.opts)
+			w, err := cacher.Watch(context.Background(), "/pods/ns", scenario.opts)
 			require.NoError(t, err, "failed to create watch: %v")
 			defer w.Stop()
 			var expectedErr *apierrors.StatusError
@@ -2573,7 +2573,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 					t.Errorf("failed adding a pod to the watchCache %v", err)
 				}
 			}(t)
-			w, err = cacher.Watch(context.Background(), "pods/ns", scenario.opts)
+			w, err = cacher.Watch(context.Background(), "/pods/ns", scenario.opts)
 			require.NoError(t, err, "failed to create watch: %v")
 			defer w.Stop()
 			verifyEvents(t, w, []watch.Event{
@@ -2680,7 +2680,7 @@ func BenchmarkCacher_GetList(b *testing.B) {
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 					result := &example.PodList{}
-					err = delegator.GetList(context.TODO(), "pods", storage.ListOptions{
+					err = delegator.GetList(context.TODO(), "/pods", storage.ListOptions{
 						Predicate:       pred,
 						Recursive:       true,
 						ResourceVersion: "12345",
@@ -2717,7 +2717,7 @@ func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
 		Predicate:         pred,
 		SendInitialEvents: ptr.To(true),
 	}
-	w, err := cacher.Watch(context.Background(), "pods/ns", opts)
+	w, err := cacher.Watch(context.Background(), "/pods/ns", opts)
 	require.NoError(t, err, "failed to create watch: %v")
 	defer w.Stop()
 
