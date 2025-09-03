@@ -56,7 +56,7 @@ func (frtv fixedResultTagValidator) TagName() string {
 	return validateFalseTagName
 }
 
-var fixedResultTagValidScopes = sets.New(ScopeAny)
+var fixedResultTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 
 func (fixedResultTagValidator) ValidScopes() sets.Set[Scope] {
 	return fixedResultTagValidScopes

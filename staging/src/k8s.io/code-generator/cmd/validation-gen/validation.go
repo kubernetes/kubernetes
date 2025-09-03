@@ -148,21 +148,60 @@ func (g *genValidations) GenerateType(c *generator.Context, t *types.Type, w io.
 
 // typeDiscoverer contains fields necessary to build graphs of types.
 type typeDiscoverer struct {
-	validator  validators.Validator
-	inputToPkg map[string]string
+	initialized bool
+	validator   validators.Validator
+	inputToPkg  map[string]string
+
+	// constantsByType holds a map of type to constants of that type.
+	constantsByType map[*types.Type][]*validators.Constant
 
 	// typeNodes holds a map of gengo Type to typeNode for all of the types
 	// encountered during discovery.
 	typeNodes map[*types.Type]*typeNode
 }
 
-// NewTypeDiscoverer creates and initializes a NewTypeDiscoverer.
+// NewTypeDiscoverer creates a NewTypeDiscoverer.
+// Init must be called before calling DiscoverType.
 func NewTypeDiscoverer(validator validators.Validator, inputToPkg map[string]string) *typeDiscoverer {
 	return &typeDiscoverer{
-		validator:  validator,
-		inputToPkg: inputToPkg,
-		typeNodes:  map[*types.Type]*typeNode{},
+		validator:       validator,
+		inputToPkg:      inputToPkg,
+		constantsByType: map[*types.Type][]*validators.Constant{},
+		typeNodes:       map[*types.Type]*typeNode{},
 	}
+}
+
+// Init uses the generator context to prepare for type discovery.
+func (td *typeDiscoverer) Init(c *generator.Context) error {
+	packages := c.Universe
+	for _, pkg := range packages {
+		// We only care about packages we are generating for or are readonly.
+		if _, ok := td.inputToPkg[pkg.Path]; !ok {
+			continue
+		}
+		for _, cnst := range pkg.Constants {
+			context := validators.Context{
+				Scope:      validators.ScopeConst,
+				Type:       cnst.Underlying,
+				Path:       nil, // NA when discovering a constant
+				Member:     nil, // NA when discovering a constant
+				ParentPath: nil, // NA when discovering a constant
+			}
+			tgs, err := td.validator.ExtractTags(context, cnst.CommentLines)
+			if err != nil {
+				return fmt.Errorf("constant %s: %w", cnst.Name, err)
+			}
+			if len(tgs) > 0 {
+				// Also check that the tgs are valid.
+				if _, err := td.validator.ExtractValidations(context, tgs...); err != nil {
+					return fmt.Errorf("constant %s: %w", cnst.Name, err)
+				}
+			}
+			td.constantsByType[cnst.Underlying] = append(td.constantsByType[cnst.Underlying], &validators.Constant{Constant: cnst, Tags: tgs})
+		}
+	}
+	td.initialized = true
+	return nil
 }
 
 // childNode represents a type which is used in another type (e.g. a struct
@@ -210,6 +249,9 @@ type typeNode struct {
 // typeDiscoverer.  If this is called multiple times for different types, the
 // graphs will be will be merged.
 func (td *typeDiscoverer) DiscoverType(t *types.Type) error {
+	if !td.initialized {
+		return fmt.Errorf("typeDiscoverer not initialized")
+	}
 	if t.Kind == types.Pointer {
 		return fmt.Errorf("type %v: pointer root-types are not supported", t)
 	}
@@ -349,11 +391,14 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		if fldPath.String() != t.String() {
 			panic(fmt.Sprintf("path for type != the type name: %s, %s", t.String(), fldPath.String()))
 		}
+		consts := td.constantsByType[t]
 		context := validators.Context{
 			Scope:      validators.ScopeType,
 			Type:       t,
-			ParentPath: nil,
 			Path:       fldPath,
+			Member:     nil, // NA when discovering a type
+			ParentPath: nil, // NA when discovering a type
+			Constants:  consts,
 		}
 		extractedTags, err := td.validator.ExtractTags(context, t.CommentLines)
 		if err != nil {
@@ -1210,7 +1255,7 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 			sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
 			for _, arg := range v.Args {
 				sw.Do(", ", nil)
-				toGolangSourceDataLiteral(sw, c, arg)
+				toGolangSourceDataLiteral(sw, emitterContext{Context: c}, arg)
 			}
 			sw.Do(")", targs)
 		}
@@ -1286,33 +1331,13 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 			return cmp.Compare(a.Variable.Name, b.Variable.Name)
 		})
 		for _, variable := range variables {
-			fn := variable.InitFunc
 			targs := generator.Args{
 				"varName": c.Universe.Type(types.Name(variable.Variable)),
-				"initFn":  c.Universe.Type(fn.Function),
 			}
-			for _, comment := range fn.Comments {
-				sw.Do("// $.$\n", comment)
-			}
-			sw.Do("var $.varName|private$ = $.initFn|raw$", targs)
-			if typeArgs := fn.TypeArgs; len(typeArgs) > 0 {
-				sw.Do("[", nil)
-				for i, typeArg := range typeArgs {
-					sw.Do("$.|raw$", c.Universe.Type(typeArg))
-					if i < len(typeArgs)-1 {
-						sw.Do(",", nil)
-					}
-				}
-				sw.Do("]", nil)
-			}
-			sw.Do("(", targs)
-			for i, arg := range fn.Args {
-				if i != 0 {
-					sw.Do(", ", nil)
-				}
-				toGolangSourceDataLiteral(sw, c, arg)
-			}
-			sw.Do(")\n", nil)
+
+			sw.Do("var $.varName|private$ = ", targs)
+			toGolangSourceDataLiteral(sw, emitterContext{Context: c}, variable.Initializer)
+			sw.Do("\n", nil)
 		}
 	}
 	// TODO: Handle potential variable name collisions when multiple validators
@@ -1325,7 +1350,13 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 	}
 }
 
-func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context, value any) {
+type emitterContext struct {
+	*generator.Context
+	// True if the literal to be emitted is a slice or array element.
+	isElement bool
+}
+
+func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, value any) {
 	// For safety, be strict in what values we output to visited source, and ensure strings
 	// are quoted.
 
@@ -1369,9 +1400,9 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			// a "standard signature" validation function to wrap it.
 			targs := generator.Args{
 				"funcName":   c.Universe.Type(v.Function.Function),
-				"field":      mkSymbolArgs(c, fieldPkgSymbols),
-				"operation":  mkSymbolArgs(c, operationPkgSymbols),
-				"context":    mkSymbolArgs(c, contextPkgSymbols),
+				"field":      mkSymbolArgs(c.Context, fieldPkgSymbols),
+				"operation":  mkSymbolArgs(c.Context, operationPkgSymbols),
+				"context":    mkSymbolArgs(c.Context, contextPkgSymbols),
 				"objType":    v.ObjType,
 				"objTypePfx": "*",
 			}
@@ -1379,37 +1410,23 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 				targs["objTypePfx"] = ""
 			}
 
-			emitCall := func() {
-				sw.Do("return $.funcName|raw$", targs)
-				typeArgs := v.Function.TypeArgs
-				if len(typeArgs) > 0 {
-					sw.Do("[", nil)
-					for i, typeArg := range typeArgs {
-						sw.Do("$.|raw$", c.Universe.Type(typeArg))
-						if i < len(typeArgs)-1 {
-							sw.Do(",", nil)
-						}
-					}
-					sw.Do("]", nil)
-				}
-				sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
-				for _, arg := range extraArgs {
-					sw.Do(", ", nil)
-					toGolangSourceDataLiteral(sw, c, arg)
-				}
-				sw.Do(")", targs)
-			}
 			sw.Do("func(", targs)
 			sw.Do("    ctx $.context.Context|raw$, ", targs)
 			sw.Do("    op $.operation.Operation|raw$, ", targs)
 			sw.Do("    fldPath *$.field.Path|raw$, ", targs)
 			sw.Do("    obj, oldObj $.objTypePfx$$.objType|raw$ ", targs)
 			sw.Do(")    $.field.ErrorList|raw$ {\n", targs)
-			emitCall()
+			sw.Do("return ", nil)
+			emitFunctionCall(sw, c, v.Function, "ctx", "op", "fldPath", "obj", "oldObj")
 			sw.Do("\n}", targs)
 		}
 	case validators.Literal:
 		sw.Do("$.$", v)
+	case validators.FunctionGen:
+		for _, comment := range v.Comments {
+			sw.Do("// $.$\\n", comment)
+		}
+		emitFunctionCall(sw, c, v)
 	case validators.FunctionLiteral:
 		sw.Do("func(", nil)
 		for i, param := range v.Parameters {
@@ -1440,10 +1457,57 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			sw.Do(")", nil)
 		}
 		sw.Do(" { $.$ }", v.Body)
+	case validators.StructLiteral:
+		targs := generator.Args{
+			"type": c.Universe.Type(v.Type),
+		}
+		if !c.isElement { // To conform to gofmt, omit type names for array/slice elements.
+			sw.Do("$.type|raw$", targs)
+			if len(v.TypeArgs) > 0 {
+				sw.Do("[", nil)
+				for i, typeArg := range v.TypeArgs {
+					if i > 0 {
+						sw.Do(", ", nil)
+					}
+					sw.Do("$.|raw$", typeArg)
+				}
+				sw.Do("]", nil)
+			}
+		}
+		sw.Do("{\n", nil)
+		for _, f := range v.Fields {
+			sw.Do(f.Name, nil)
+			sw.Do(": ", nil)
+			toGolangSourceDataLiteral(sw, c, f.Value)
+			sw.Do(", ", nil)
+		}
+		sw.Do("}", targs)
+	case validators.SliceLiteral:
+		sw.Do("[]", nil)
+		targs := generator.Args{
+			"type": c.Universe.Type(v.ElementType),
+		}
+		sw.Do("$.type|raw$", targs)
+		if len(v.ElementTypeArgs) > 0 {
+			sw.Do("[", nil)
+			for i, typeArg := range v.ElementTypeArgs {
+				if i > 0 {
+					sw.Do(", ", nil)
+				}
+				sw.Do("$.|raw$", typeArg)
+			}
+			sw.Do("]", nil)
+		}
+		sw.Do("{\n", nil)
+		for _, e := range v.Elements {
+			toGolangSourceDataLiteral(sw, emitterContext{Context: c.Context, isElement: true}, e)
+			sw.Do(",\n", nil)
+		}
+		sw.Do("}", nil)
 	default:
 		rv := reflect.ValueOf(value)
 		switch rv.Kind() {
-		case reflect.Slice, reflect.Array:
+		case reflect.Array:
 			arraySize := ""
 			if rv.Kind() == reflect.Array {
 				arraySize = strconv.Itoa(rv.Len())
@@ -1470,6 +1534,37 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			panic(fmt.Sprintf("Unsupported extraArg type: %T", value))
 		}
 	}
+}
+
+func emitFunctionCall(sw *generator.SnippetWriter, c emitterContext, v validators.FunctionGen, leadingArgs ...string) {
+	targs := generator.Args{
+		"funcName": c.Universe.Type(v.Function),
+	}
+	sw.Do("$.funcName|raw$", targs)
+	if typeArgs := v.TypeArgs; len(typeArgs) > 0 {
+		sw.Do("[", nil)
+		for i, typeArg := range typeArgs {
+			sw.Do("$.|raw$", c.Universe.Type(typeArg))
+			if i < len(typeArgs)-1 {
+				sw.Do(",", nil)
+			}
+		}
+		sw.Do("]", nil)
+	}
+	sw.Do("(", nil)
+	if len(leadingArgs) > 0 {
+		sw.Do(strings.Join(leadingArgs, ", "), nil)
+	}
+	if len(leadingArgs) > 0 && len(v.Args) > 0 {
+		sw.Do(", ", nil)
+	}
+	for i, arg := range v.Args {
+		if i != 0 {
+			sw.Do(", ", nil)
+		}
+		toGolangSourceDataLiteral(sw, c, arg)
+	}
+	sw.Do(")", nil)
 }
 
 // getLeafTypeAndPrefixes returns the "leaf value type" for a given type, as
