@@ -1295,4 +1295,3 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/kyaml
-# k8s.io/gengo/v2 => github.com/jpbetz/gengo/v2 v2.0.0-20250603173426-b37a58d7aba8
