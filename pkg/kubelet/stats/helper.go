@@ -38,6 +38,29 @@ import (
 // is not reliable.
 const defaultNetworkInterfaceName = "eth0"
 
+func cadvisorInfoToCPUInstStats(info *cadvisorapiv2.ContainerInfo) *statsapi.CPUInstStats {
+    cstat, found := latestContainerStats(info)
+    if !found {
+        return nil
+    }
+
+    if !info.Spec.HasCpu || cstat.CpuInst == nil {
+        return nil
+    }
+
+    perCPU := make([]uint64, len(cstat.CpuInst.Usage.PerCpu))
+    copy(perCPU, cstat.CpuInst.Usage.PerCpu)
+
+    return &statsapi.CPUInstStats{
+        Usage: statsapi.CPUInstUsage{
+            Total:  cstat.CpuInst.Usage.Total,
+            PerCPU: perCPU,
+            User:   cstat.CpuInst.Usage.User,
+            System: cstat.CpuInst.Usage.System,
+        },
+    }
+}
+
 func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsapi.CPUStats, *statsapi.MemoryStats) {
 	cstat, found := latestContainerStats(info)
 	if !found {
