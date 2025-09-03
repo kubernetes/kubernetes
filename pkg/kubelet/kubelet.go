@@ -2640,6 +2640,62 @@ func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandle
 	handler.HandlePodSyncs([]*v1.Pod{pod})
 }
 
+func (kl *Kubelet) findPodStat(podStats []statsapi.PodStats, podName string) (*statsapi.PodStats, bool) {
+    for _, stat := range podStats {
+        if stat.PodRef.Name == podName {
+            return &stat, true
+        }
+    }
+    return nil, false
+}
+
+func (kl *Kubelet) findContainerStat(podStat *statsapi.PodStats, containerName string) (*statsapi.ContainerStats, bool) {
+    for _, cStat := range podStat.Containers {
+        if cStat.Name == containerName {
+            return &cStat, true
+        }
+    }
+    return nil, false
+}
+
+func (kl *Kubelet) getCPUUsage(uid types.UID) {
+	pod, found := kl.podManager.GetPodByUID(uid)
+	if !found {
+		klog.V(4).InfoS("pod does not exist, can not get the CPU usage for the pod", "podUID", uid)
+		return
+	}
+
+	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed || !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) || kl.containerManager.GetNodeConfig().CPUManagerPolicy != "static"{
+	    return
+	}
+
+	ctx := context.Background()
+	podStats, err := kl.ListPodStats(ctx)
+	if err != nil {
+		klog.InfoS("ListPodStats error", "err", err)
+	}
+	klog.InfoS("getCpuUsage", "podStats", podStats)
+
+    // Find Pod in podStats
+    podStat, podFind := kl.findPodStat(podStats, pod.Name)
+    klog.InfoS("getCpuUsage", "podStat", podStat, "podFind", podFind)
+    if !podFind {
+        return
+    }
+
+    // Get sorted CPUs for every container in the Pod
+    for i, container := range pod.Spec.Containers {
+        // Find container in podStat
+        cStat, cFind := kl.findContainerStat(podStat, container.Name)
+        klog.InfoS("getCpuUsage", "cStat", cStat, "cFind", cFind)
+        if !cFind || cStat.CPUInst == nil{
+            continue
+        }
+ 		pod.Spec.Containers[i].Resources.PerCPU = cStat.CPUInst.Usage.PerCPU
+ 		klog.InfoS("getCpuUsage", "pod.Spec.Containers[i].Resources.PerCPU", pod.Spec.Containers[i].Resources.PerCPU)
+ 	}
+}
+
 // HandlePodAdditions is the callback in SyncHandler for pods being added from
 // a config source.
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
@@ -2712,6 +2768,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		kl.statusManager.BackfillPodResizeConditions(pods)
 		for _, uid := range pendingResizes {
 			kl.allocationManager.PushPendingResize(uid)
+			kl.getCPUUsage(uid)
 		}
 		if len(pendingResizes) > 0 {
 			kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonPodsAdded)
@@ -2740,6 +2797,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 				_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 				if updatedFromAllocation {
 					kl.allocationManager.PushPendingResize(pod.UID)
+					kl.getCPUUsage(pod.UID)
 					// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
 					// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
 					kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonPodUpdated)

@@ -86,6 +86,7 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:     struct{}{},
+		cadvisormetrics.PerCpuUsageMetrics:  struct{}{},
 		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
 		cadvisormetrics.CpuLoadMetrics:      struct{}{},
 		cadvisormetrics.DiskIOMetrics:       struct{}{},
