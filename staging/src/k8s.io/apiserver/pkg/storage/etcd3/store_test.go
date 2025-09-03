@@ -628,7 +628,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 	versioner := storage.APIObjectVersioner{}
 	compactor := NewCompactor(client.Client, 0, clock.RealClock{}, nil)
 	t.Cleanup(compactor.Stop)
-	store := New(
+	store, err := New(
 		client,
 		compactor,
 		setupOpts.codec,
@@ -642,6 +642,9 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		NewDefaultDecoder(setupOpts.codec, versioner),
 		versioner,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(store.Close)
 	ctx := context.Background()
 	return ctx, store, client
