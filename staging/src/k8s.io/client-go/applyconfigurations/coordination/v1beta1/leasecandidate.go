@@ -46,29 +46,15 @@ func LeaseCandidate(name, namespace string) *LeaseCandidateApplyConfiguration {
 	return b
 }
 
-// ExtractLeaseCandidate extracts the applied configuration owned by fieldManager from
-// leaseCandidate. If no managedFields are found in leaseCandidate for fieldManager, a
-// LeaseCandidateApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractLeaseCandidateFrom extracts the applied configuration owned by fieldManager from
+// leaseCandidate for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // leaseCandidate must be a unmodified LeaseCandidate API object that was retrieved from the Kubernetes API.
-// ExtractLeaseCandidate provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractLeaseCandidateFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractLeaseCandidate(leaseCandidate *coordinationv1beta1.LeaseCandidate, fieldManager string) (*LeaseCandidateApplyConfiguration, error) {
-	return extractLeaseCandidate(leaseCandidate, fieldManager, "")
-}
-
-// ExtractLeaseCandidateStatus is the same as ExtractLeaseCandidate except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractLeaseCandidateStatus(leaseCandidate *coordinationv1beta1.LeaseCandidate, fieldManager string) (*LeaseCandidateApplyConfiguration, error) {
-	return extractLeaseCandidate(leaseCandidate, fieldManager, "status")
-}
-
-func extractLeaseCandidate(leaseCandidate *coordinationv1beta1.LeaseCandidate, fieldManager string, subresource string) (*LeaseCandidateApplyConfiguration, error) {
+func ExtractLeaseCandidateFrom(leaseCandidate *coordinationv1beta1.LeaseCandidate, fieldManager string, subresource string) (*LeaseCandidateApplyConfiguration, error) {
 	b := &LeaseCandidateApplyConfiguration{}
 	err := managedfields.ExtractInto(leaseCandidate, internal.Parser().Type("io.k8s.api.coordination.v1beta1.LeaseCandidate"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,6 +67,22 @@ func extractLeaseCandidate(leaseCandidate *coordinationv1beta1.LeaseCandidate, f
 	b.WithAPIVersion("coordination.k8s.io/v1beta1")
 	return b, nil
 }
+
+// ExtractLeaseCandidate extracts the applied configuration owned by fieldManager from
+// leaseCandidate. If no managedFields are found in leaseCandidate for fieldManager, a
+// LeaseCandidateApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// leaseCandidate must be a unmodified LeaseCandidate API object that was retrieved from the Kubernetes API.
+// ExtractLeaseCandidate provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractLeaseCandidate(leaseCandidate *coordinationv1beta1.LeaseCandidate, fieldManager string) (*LeaseCandidateApplyConfiguration, error) {
+	return ExtractLeaseCandidateFrom(leaseCandidate, fieldManager, "")
+}
+
 func (b LeaseCandidateApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

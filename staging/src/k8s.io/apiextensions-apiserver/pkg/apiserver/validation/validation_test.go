@@ -463,7 +463,7 @@ func TestValidateCustomResource(t *testing.T) {
 					object:    map[string]interface{}{"field": "y"},
 					oldObject: map[string]interface{}{"field": "x"},
 					expectErrs: []string{
-						`field: Invalid value: "string": failed rule: self == oldSelf`,
+						`field: Invalid value: "y": failed rule: self == oldSelf`,
 					}},
 			},
 		},
@@ -511,7 +511,7 @@ func TestValidateCustomResource(t *testing.T) {
 					object:    map[string]interface{}{"field": []interface{}{map[string]interface{}{"k1": "a", "k2": "b", "v1": 0.9}}},
 					oldObject: map[string]interface{}{"field": []interface{}{map[string]interface{}{"k1": "a", "k2": "b", "v1": 1.0}}},
 					expectErrs: []string{
-						`field[0].v1: Invalid value: "number": failed rule: self >= oldSelf`,
+						`field[0].v1: Invalid value: 0.9: failed rule: self >= oldSelf`,
 					}},
 			},
 		},
@@ -550,7 +550,7 @@ func TestValidateCustomResource(t *testing.T) {
 				{
 					object: map[string]interface{}{"field": []interface{}{map[string]interface{}{"x": "y"}}},
 					expectErrs: []string{
-						`field[0].x: Invalid value: "string": failed rule: self == 'x'`,
+						`field[0].x: Invalid value: "y": failed rule: self == 'x'`,
 					}},
 			},
 		},

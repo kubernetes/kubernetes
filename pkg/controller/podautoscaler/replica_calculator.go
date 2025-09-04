@@ -185,7 +185,7 @@ func (c *ReplicaCalculator) GetMetricReplicas(currentReplicas int32, targetUsage
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v", metricName, err)
 	}
 
-	replicaCount, usage, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUsage, tolerances, namespace, selector, v1.ResourceName(""))
+	replicaCount, usage, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUsage, tolerances, namespace, selector, "")
 	return replicaCount, usage, timestamp, err
 }
 
@@ -290,7 +290,14 @@ func (c *ReplicaCalculator) getUsageRatioReplicaCount(currentReplicas int32, usa
 		if err != nil {
 			return 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err)
 		}
-		replicaCount = int32(math.Ceil(usageRatio * float64(readyPodCount)))
+		// Calculate replicaCount as float64 first
+		replicaCountFloat := usageRatio * float64(readyPodCount)
+		// Check if replicaCount exceeds max int32
+		if replicaCountFloat > math.MaxInt32 {
+			replicaCount = math.MaxInt32
+		} else {
+			replicaCount = int32(math.Ceil(replicaCountFloat))
+		}
 	} else {
 		// Scale to zero or n pods depending on usageRatio
 		replicaCount = int32(math.Ceil(usageRatio))
@@ -501,7 +508,6 @@ func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, er
 // resource by summing requests from all containers in the pod.
 // If a container name is specified, it uses only that container.
 func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource v1.ResourceName) (int64, error) {
-	// Calculate all regular containers and restartable init containers requests.
 	containers := append([]v1.Container{}, pod.Spec.Containers...)
 	for _, c := range pod.Spec.InitContainers {
 		if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
@@ -518,7 +524,17 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 			}
 			request += containerRequest.MilliValue()
 		}
+		// container names are unique inside the pod
+		if container == c.Name {
+			return request, nil
+		}
 	}
+
+	// If we're looking for a specific container and didn't find it
+	if container != "" {
+		return 0, fmt.Errorf("container %s not found in Pod %s", container, pod.Name)
+	}
+
 	return request, nil
 }
 

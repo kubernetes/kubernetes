@@ -114,7 +114,6 @@ func (rc *reconciler) updateStates(logger klog.Logger, reconstructedVolumes map[
 				VolumeName:          volume.volumeName,
 				Mounter:             volume.mounter,
 				BlockVolumeMapper:   volume.blockVolumeMapper,
-				OuterVolumeSpecName: volume.outerVolumeSpecName,
 				VolumeGIDVolume:     volume.volumeGIDValue,
 				VolumeSpec:          volume.volumeSpec,
 				VolumeMountState:    operationexecutor.VolumeMountUncertain,

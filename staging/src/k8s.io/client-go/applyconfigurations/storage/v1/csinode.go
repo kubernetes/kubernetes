@@ -45,6 +45,27 @@ func CSINode(name string) *CSINodeApplyConfiguration {
 	return b
 }
 
+// ExtractCSINodeFrom extracts the applied configuration owned by fieldManager from
+// cSINode for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// cSINode must be a unmodified CSINode API object that was retrieved from the Kubernetes API.
+// ExtractCSINodeFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractCSINodeFrom(cSINode *storagev1.CSINode, fieldManager string, subresource string) (*CSINodeApplyConfiguration, error) {
+	b := &CSINodeApplyConfiguration{}
+	err := managedfields.ExtractInto(cSINode, internal.Parser().Type("io.k8s.api.storage.v1.CSINode"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(cSINode.Name)
+
+	b.WithKind("CSINode")
+	b.WithAPIVersion("storage.k8s.io/v1")
+	return b, nil
+}
+
 // ExtractCSINode extracts the applied configuration owned by fieldManager from
 // cSINode. If no managedFields are found in cSINode for fieldManager, a
 // CSINodeApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func CSINode(name string) *CSINodeApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractCSINode(cSINode *storagev1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
-	return extractCSINode(cSINode, fieldManager, "")
+	return ExtractCSINodeFrom(cSINode, fieldManager, "")
 }
 
-// ExtractCSINodeStatus is the same as ExtractCSINode except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractCSINodeStatus(cSINode *storagev1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
-	return extractCSINode(cSINode, fieldManager, "status")
-}
-
-func extractCSINode(cSINode *storagev1.CSINode, fieldManager string, subresource string) (*CSINodeApplyConfiguration, error) {
-	b := &CSINodeApplyConfiguration{}
-	err := managedfields.ExtractInto(cSINode, internal.Parser().Type("io.k8s.api.storage.v1.CSINode"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(cSINode.Name)
-
-	b.WithKind("CSINode")
-	b.WithAPIVersion("storage.k8s.io/v1")
-	return b, nil
-}
 func (b CSINodeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

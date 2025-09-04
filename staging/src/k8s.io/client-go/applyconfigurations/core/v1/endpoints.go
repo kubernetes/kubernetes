@@ -46,29 +46,15 @@ func Endpoints(name, namespace string) *EndpointsApplyConfiguration {
 	return b
 }
 
-// ExtractEndpoints extracts the applied configuration owned by fieldManager from
-// endpoints. If no managedFields are found in endpoints for fieldManager, a
-// EndpointsApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractEndpointsFrom extracts the applied configuration owned by fieldManager from
+// endpoints for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // endpoints must be a unmodified Endpoints API object that was retrieved from the Kubernetes API.
-// ExtractEndpoints provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractEndpointsFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractEndpoints(endpoints *corev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
-	return extractEndpoints(endpoints, fieldManager, "")
-}
-
-// ExtractEndpointsStatus is the same as ExtractEndpoints except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractEndpointsStatus(endpoints *corev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
-	return extractEndpoints(endpoints, fieldManager, "status")
-}
-
-func extractEndpoints(endpoints *corev1.Endpoints, fieldManager string, subresource string) (*EndpointsApplyConfiguration, error) {
+func ExtractEndpointsFrom(endpoints *corev1.Endpoints, fieldManager string, subresource string) (*EndpointsApplyConfiguration, error) {
 	b := &EndpointsApplyConfiguration{}
 	err := managedfields.ExtractInto(endpoints, internal.Parser().Type("io.k8s.api.core.v1.Endpoints"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,6 +67,22 @@ func extractEndpoints(endpoints *corev1.Endpoints, fieldManager string, subresou
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractEndpoints extracts the applied configuration owned by fieldManager from
+// endpoints. If no managedFields are found in endpoints for fieldManager, a
+// EndpointsApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// endpoints must be a unmodified Endpoints API object that was retrieved from the Kubernetes API.
+// ExtractEndpoints provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractEndpoints(endpoints *corev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
+	return ExtractEndpointsFrom(endpoints, fieldManager, "")
+}
+
 func (b EndpointsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

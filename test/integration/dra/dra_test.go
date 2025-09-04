@@ -52,6 +52,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
@@ -1617,21 +1618,27 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 	}))), "second allocated claim")
 
 	// fail the binding condition for the second claim, so that it gets scheduled later.
-	claim2.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
-		Driver: driverName,
-		Pool:   poolWithBinding,
-		Device: "with-binding",
-		Conditions: []metav1.Condition{{
-			Type:               failureCondition,
-			Status:             metav1.ConditionTrue,
-			ObservedGeneration: claim2.Generation,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "Testing",
-			Message:            "The test has seen the allocation and is failing the binding.",
-		}},
-	}}
-
-	claim2, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, claim2, metav1.UpdateOptions{})
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim2.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		latest.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
+			Driver: driverName,
+			Pool:   poolWithBinding,
+			Device: "with-binding",
+			Conditions: []metav1.Condition{{
+				Type:               failureCondition,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: latest.Generation,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "Testing",
+				Message:            "The test has seen the allocation and is failing the binding.",
+			}},
+		}}
+		_, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, latest, metav1.UpdateOptions{})
+		return err
+	})
 	tCtx.ExpectNoError(err, "add binding failure condition to second claim")
 
 	// Wait until the claim.status.Devices[0].Conditions become nil again after rescheduling.
@@ -1652,21 +1659,27 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 	}).WithTimeout(30*time.Second).WithPolling(time.Second).Should(gomega.BeNil(), "claim should not have any condition")
 
 	// Allow the scheduler to proceed.
-	claim2.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
-		Driver: driverName,
-		Pool:   poolWithBinding,
-		Device: "with-binding",
-		Conditions: []metav1.Condition{{
-			Type:               bindingCondition,
-			Status:             metav1.ConditionTrue,
-			ObservedGeneration: claim2.Generation,
-			LastTransitionTime: metav1.Now(),
-			Reason:             "Testing",
-			Message:            "The test has seen the allocation.",
-		}},
-	}}
-
-	claim2, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, claim2, metav1.UpdateOptions{})
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim2.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		latest.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
+			Driver: driverName,
+			Pool:   poolWithBinding,
+			Device: "with-binding",
+			Conditions: []metav1.Condition{{
+				Type:               bindingCondition,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: latest.Generation,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "Testing",
+				Message:            "The test has seen the allocation.",
+			}},
+		}}
+		_, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, latest, metav1.UpdateOptions{})
+		return err
+	})
 	tCtx.ExpectNoError(err, "add binding condition to second claim")
 	err = waitForPodScheduled(tCtx, tCtx.Client(), namespace, pod.Name)
 	tCtx.ExpectNoError(err, "second pod scheduled")

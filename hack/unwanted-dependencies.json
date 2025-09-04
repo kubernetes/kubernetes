@@ -85,6 +85,7 @@
       "google.golang.org/appengine": "cloud dependency",
       "google.golang.org/genproto": "refer to #113366",
       "gopkg.in/square/go-jose.v2": "obsolete, use gopkg.in/go-jose/go-jose.v2",
+      "gopkg.in/evanphx/json-patch.v5": "refer to https://github.com/kubernetes/kubernetes/pull/91622#issuecomment-637087847",
       "gopkg.in/fsnotify.v1": "obsolete, use github.com/fsnotify/fsnotify",
       "gopkg.in/yaml.v2": "prefer sigs.k8s.io/yaml",
       "gopkg.in/yaml.v3": "prefer sigs.k8s.io/yaml/goyaml.v3",
@@ -153,7 +154,6 @@
         "k8s.io/client-go",
         "k8s.io/code-generator",
         "k8s.io/kube-aggregator",
-        "k8s.io/kubelet",
         "k8s.io/kubernetes",
         "k8s.io/metrics"
       ],
@@ -234,6 +234,7 @@
         "github.com/prometheus/common"
       ],
       "gopkg.in/yaml.v3": [
+        "github.com/containerd/containerd/api",
         "github.com/coreos/go-semver",
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",

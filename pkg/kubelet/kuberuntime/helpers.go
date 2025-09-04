@@ -51,9 +51,14 @@ func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
 // Newest first.
 type podSandboxByCreated []*runtimeapi.PodSandbox
 
-func (p podSandboxByCreated) Len() int           { return len(p) }
-func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p podSandboxByCreated) Less(i, j int) bool { return p[i].CreatedAt > p[j].CreatedAt }
+func (p podSandboxByCreated) Len() int      { return len(p) }
+func (p podSandboxByCreated) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p podSandboxByCreated) Less(i, j int) bool {
+	if p[i].Metadata == nil || p[j].Metadata == nil {
+		return p[i].CreatedAt > p[j].CreatedAt
+	}
+	return p[i].Metadata.Attempt > p[j].Metadata.Attempt
+}
 
 type containerStatusByCreated []*kubecontainer.Status
 

@@ -46,6 +46,27 @@ func ImageReview(name string) *ImageReviewApplyConfiguration {
 	return b
 }
 
+// ExtractImageReviewFrom extracts the applied configuration owned by fieldManager from
+// imageReview for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// imageReview must be a unmodified ImageReview API object that was retrieved from the Kubernetes API.
+// ExtractImageReviewFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractImageReviewFrom(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string, subresource string) (*ImageReviewApplyConfiguration, error) {
+	b := &ImageReviewApplyConfiguration{}
+	err := managedfields.ExtractInto(imageReview, internal.Parser().Type("io.k8s.api.imagepolicy.v1alpha1.ImageReview"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(imageReview.Name)
+
+	b.WithKind("ImageReview")
+	b.WithAPIVersion("imagepolicy.k8s.io/v1alpha1")
+	return b, nil
+}
+
 // ExtractImageReview extracts the applied configuration owned by fieldManager from
 // imageReview. If no managedFields are found in imageReview for fieldManager, a
 // ImageReviewApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -58,28 +79,16 @@ func ImageReview(name string) *ImageReviewApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
-	return extractImageReview(imageReview, fieldManager, "")
+	return ExtractImageReviewFrom(imageReview, fieldManager, "")
 }
 
-// ExtractImageReviewStatus is the same as ExtractImageReview except
-// that it extracts the status subresource applied configuration.
+// ExtractImageReviewStatus extracts the applied configuration owned by fieldManager from
+// imageReview for the status subresource.
 // Experimental!
 func ExtractImageReviewStatus(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
-	return extractImageReview(imageReview, fieldManager, "status")
+	return ExtractImageReviewFrom(imageReview, fieldManager, "status")
 }
 
-func extractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string, subresource string) (*ImageReviewApplyConfiguration, error) {
-	b := &ImageReviewApplyConfiguration{}
-	err := managedfields.ExtractInto(imageReview, internal.Parser().Type("io.k8s.api.imagepolicy.v1alpha1.ImageReview"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(imageReview.Name)
-
-	b.WithKind("ImageReview")
-	b.WithAPIVersion("imagepolicy.k8s.io/v1alpha1")
-	return b, nil
-}
 func (b ImageReviewApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

@@ -18,7 +18,7 @@ dependencies:
 
   # CNI plugins
   - name: "cni"
-    version: 1.7.1
+    version: 1.8.0
     refPaths:
     - path: cluster/gce/config-common.sh
       match: WINDOWS_CNI_VERSION=
@@ -31,7 +31,7 @@ dependencies:
 
   # CoreDNS
   - name: "coredns-kube-up"
-    version: 1.12.1
+    version: 1.12.3
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: registry.k8s.io/coredns
@@ -41,14 +41,14 @@ dependencies:
       match: registry.k8s.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.12.1
+    version: 1.12.3
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
 
   # CRI Tools
   - name: "crictl"
-    version: 1.33.0
+    version: 1.34.0
     refPaths:
     - path: cluster/gce/windows/k8s-node-setup.psm1
       match: CRICTL_VERSION =

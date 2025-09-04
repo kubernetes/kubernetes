@@ -89,9 +89,10 @@ func (f *PullManager) RecordPullIntent(image string) error {
 	return nil
 }
 
-func (f *PullManager) RecordImagePulled(image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) {
-	if err := f.writePulledRecordIfChanged(image, imageRef, credentials); err != nil {
-		klog.ErrorS(err, "failed to write image pulled record", "imageRef", imageRef)
+func (f *PullManager) RecordImagePulled(ctx context.Context, image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) {
+	logger := klog.FromContext(ctx)
+	if err := f.writePulledRecordIfChanged(ctx, image, imageRef, credentials); err != nil {
+		logger.Error(err, "failed to write image pulled record", "imageRef", imageRef)
 		return
 	}
 
@@ -100,7 +101,7 @@ func (f *PullManager) RecordImagePulled(image, imageRef string, credentials *kub
 	// This is done so that the successfully pulled image is still considered as pulled by the kubelet.
 	// The kubelet will attempt to turn the imagePullIntent into a pulled record again when
 	// it's restarted.
-	f.decrementImagePullIntent(image)
+	f.decrementImagePullIntent(ctx, image)
 }
 
 // writePulledRecordIfChanged writes an ImagePulledRecord into the f.pulledDir directory.
@@ -113,7 +114,8 @@ func (f *PullManager) RecordImagePulled(image, imageRef string, credentials *kub
 // unknown circumstances. We should record the image as tracked but no credentials
 // should be written in order to force credential verification when the image is
 // accessed the next time.
-func (f *PullManager) writePulledRecordIfChanged(image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) error {
+func (f *PullManager) writePulledRecordIfChanged(ctx context.Context, image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) error {
+	logger := klog.FromContext(ctx)
 	f.pulledAccessors.Lock(imageRef)
 	defer f.pulledAccessors.Unlock(imageRef)
 
@@ -124,7 +126,7 @@ func (f *PullManager) writePulledRecordIfChanged(image, imageRef string, credent
 
 	pulledRecord, _, err := f.recordsAccessor.GetImagePulledRecord(imageRef)
 	if err != nil {
-		klog.InfoS("failed to retrieve an ImagePulledRecord", "image", image, "err", err)
+		logger.Info("failed to retrieve an ImagePulledRecord", "image", image, "err", err)
 		pulledRecord = nil
 	}
 
@@ -154,20 +156,21 @@ func (f *PullManager) writePulledRecordIfChanged(image, imageRef string, credent
 	return f.recordsAccessor.WriteImagePulledRecord(pulledRecord)
 }
 
-func (f *PullManager) RecordImagePullFailed(image string) {
-	f.decrementImagePullIntent(image)
+func (f *PullManager) RecordImagePullFailed(ctx context.Context, image string) {
+	f.decrementImagePullIntent(ctx, image)
 }
 
 // decrementImagePullIntent decreses the number of how many times image pull
 // intent for a given `image` was requested, and removes the ImagePullIntent file
 // if the reference counter for the image reaches zero.
-func (f *PullManager) decrementImagePullIntent(image string) {
+func (f *PullManager) decrementImagePullIntent(ctx context.Context, image string) {
+	logger := klog.FromContext(ctx)
 	f.intentAccessors.Lock(image)
 	defer f.intentAccessors.Unlock(image)
 
 	if f.getIntentCounterForImage(image) <= 1 {
 		if err := f.recordsAccessor.DeleteImagePullIntent(image); err != nil {
-			klog.ErrorS(err, "failed to remove image pull intent", "image", image)
+			logger.Error(err, "failed to remove image pull intent", "image", image)
 			return
 		}
 		// only delete the intent counter once the file was deleted to be consistent
@@ -179,11 +182,12 @@ func (f *PullManager) decrementImagePullIntent(image string) {
 	f.decrementIntentCounterForImage(image)
 }
 
-func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
+func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
 	if len(imageRef) == 0 {
 		return true
 	}
 
+	logger := klog.FromContext(ctx)
 	var imagePulledByKubelet bool
 	var pulledRecord *kubeletconfiginternal.ImagePulledRecord
 
@@ -224,7 +228,7 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 	}()
 
 	if err != nil {
-		klog.ErrorS(err, "Unable to access cache records about image pulls")
+		logger.Error(err, "Unable to access cache records about image pulls")
 		return true
 	}
 
@@ -239,7 +243,7 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 
 	sanitizedImage, err := trimImageTagDigest(image)
 	if err != nil {
-		klog.ErrorS(err, "failed to parse image name, forcing image credentials reverification", "image", sanitizedImage)
+		logger.Error(err, "failed to parse image name, forcing image credentials reverification", "image", sanitizedImage)
 		return true
 	}
 
@@ -271,8 +275,8 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 					// While we're only matching at this point, we want to ensure this secret is considered valid in the future
 					// and so we make an additional write to the cache.
 					// writePulledRecord() is a noop in case the secret with the updated hash already appears in the cache.
-					if err := f.writePulledRecordIfChanged(image, imageRef, &kubeletconfiginternal.ImagePullCredentials{KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{podSecret}}); err != nil {
-						klog.ErrorS(err, "failed to write an image pulled record", "image", image, "imageRef", imageRef)
+					if err := f.writePulledRecordIfChanged(ctx, image, imageRef, &kubeletconfiginternal.ImagePullCredentials{KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{podSecret}}); err != nil {
+						logger.Error(err, "failed to write an image pulled record", "image", image, "imageRef", imageRef)
 					}
 				}
 				return false
@@ -283,8 +287,8 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 					// While we're only matching at this point, we want to ensure the updated credentials are considered valid in the future
 					// and so we make an additional write to the cache.
 					// writePulledRecord() is a noop in case the hash got updated in the meantime.
-					if err := f.writePulledRecordIfChanged(image, imageRef, &kubeletconfiginternal.ImagePullCredentials{KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{podSecret}}); err != nil {
-						klog.ErrorS(err, "failed to write an image pulled record", "image", image, "imageRef", imageRef)
+					if err := f.writePulledRecordIfChanged(ctx, image, imageRef, &kubeletconfiginternal.ImagePullCredentials{KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{podSecret}}); err != nil {
+						logger.Error(err, "failed to write an image pulled record", "image", image, "imageRef", imageRef)
 					}
 					return false
 				}
@@ -300,13 +304,14 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 	return true
 }
 
-func (f *PullManager) PruneUnknownRecords(imageList []string, until time.Time) {
+func (f *PullManager) PruneUnknownRecords(ctx context.Context, imageList []string, until time.Time) {
 	f.pulledAccessors.GlobalLock()
 	defer f.pulledAccessors.GlobalUnlock()
 
+	logger := klog.FromContext(ctx)
 	pulledRecords, err := f.recordsAccessor.ListImagePulledRecords()
 	if err != nil {
-		klog.ErrorS(err, "there were errors listing ImagePulledRecords, garbage collection will proceed with incomplete records list")
+		logger.Error(err, "there were errors listing ImagePulledRecords, garbage collection will proceed with incomplete records list")
 	}
 
 	imagesInUse := sets.New(imageList...)
@@ -321,7 +326,7 @@ func (f *PullManager) PruneUnknownRecords(imageList []string, until time.Time) {
 		}
 
 		if err := f.recordsAccessor.DeleteImagePulledRecord(imageRecord.ImageRef); err != nil {
-			klog.ErrorS(err, "failed to remove an ImagePulledRecord", "imageRef", imageRecord.ImageRef)
+			logger.Error(err, "failed to remove an ImagePulledRecord", "imageRef", imageRecord.ImageRef)
 		}
 	}
 
@@ -335,9 +340,10 @@ func (f *PullManager) PruneUnknownRecords(imageList []string, until time.Time) {
 // This method is not thread-safe and it should only be called upon the creation
 // of the PullManager.
 func (f *PullManager) initialize(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	pullIntents, err := f.recordsAccessor.ListImagePullIntents()
 	if err != nil {
-		klog.ErrorS(err, "there were errors listing ImagePullIntents, continuing with an incomplete records list")
+		logger.Error(err, "there were errors listing ImagePullIntents, continuing with an incomplete records list")
 	}
 
 	if len(pullIntents) == 0 {
@@ -346,7 +352,7 @@ func (f *PullManager) initialize(ctx context.Context) {
 
 	imageObjs, err := f.imageService.ListImages(ctx)
 	if err != nil {
-		klog.ErrorS(err, "failed to list images")
+		logger.Error(err, "failed to list images")
 	}
 
 	inFlightPulls := sets.New[string]()
@@ -362,13 +368,13 @@ func (f *PullManager) initialize(ctx context.Context) {
 
 		for _, image := range existingRecordedImages.UnsortedList() {
 
-			if err := f.writePulledRecordIfChanged(image, imageObj.ID, nil); err != nil {
-				klog.ErrorS(err, "failed to write an image pull record", "imageRef", imageObj.ID)
+			if err := f.writePulledRecordIfChanged(ctx, image, imageObj.ID, nil); err != nil {
+				logger.Error(err, "failed to write an image pull record", "imageRef", imageObj.ID)
 				continue
 			}
 
 			if err := f.recordsAccessor.DeleteImagePullIntent(image); err != nil {
-				klog.V(2).InfoS("failed to remove image pull intent file", "imageName", image, "error", err)
+				logger.V(2).Info("failed to remove image pull intent file", "imageName", image, "error", err)
 			}
 		}
 	}

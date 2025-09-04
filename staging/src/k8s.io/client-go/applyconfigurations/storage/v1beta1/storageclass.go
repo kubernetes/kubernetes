@@ -53,6 +53,27 @@ func StorageClass(name string) *StorageClassApplyConfiguration {
 	return b
 }
 
+// ExtractStorageClassFrom extracts the applied configuration owned by fieldManager from
+// storageClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// storageClass must be a unmodified StorageClass API object that was retrieved from the Kubernetes API.
+// ExtractStorageClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractStorageClassFrom(storageClass *storagev1beta1.StorageClass, fieldManager string, subresource string) (*StorageClassApplyConfiguration, error) {
+	b := &StorageClassApplyConfiguration{}
+	err := managedfields.ExtractInto(storageClass, internal.Parser().Type("io.k8s.api.storage.v1beta1.StorageClass"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(storageClass.Name)
+
+	b.WithKind("StorageClass")
+	b.WithAPIVersion("storage.k8s.io/v1beta1")
+	return b, nil
+}
+
 // ExtractStorageClass extracts the applied configuration owned by fieldManager from
 // storageClass. If no managedFields are found in storageClass for fieldManager, a
 // StorageClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -65,28 +86,9 @@ func StorageClass(name string) *StorageClassApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractStorageClass(storageClass *storagev1beta1.StorageClass, fieldManager string) (*StorageClassApplyConfiguration, error) {
-	return extractStorageClass(storageClass, fieldManager, "")
+	return ExtractStorageClassFrom(storageClass, fieldManager, "")
 }
 
-// ExtractStorageClassStatus is the same as ExtractStorageClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractStorageClassStatus(storageClass *storagev1beta1.StorageClass, fieldManager string) (*StorageClassApplyConfiguration, error) {
-	return extractStorageClass(storageClass, fieldManager, "status")
-}
-
-func extractStorageClass(storageClass *storagev1beta1.StorageClass, fieldManager string, subresource string) (*StorageClassApplyConfiguration, error) {
-	b := &StorageClassApplyConfiguration{}
-	err := managedfields.ExtractInto(storageClass, internal.Parser().Type("io.k8s.api.storage.v1beta1.StorageClass"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(storageClass.Name)
-
-	b.WithKind("StorageClass")
-	b.WithAPIVersion("storage.k8s.io/v1beta1")
-	return b, nil
-}
 func (b StorageClassApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

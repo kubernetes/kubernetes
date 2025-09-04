@@ -46,6 +46,27 @@ func PersistentVolume(name string) *PersistentVolumeApplyConfiguration {
 	return b
 }
 
+// ExtractPersistentVolumeFrom extracts the applied configuration owned by fieldManager from
+// persistentVolume for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// persistentVolume must be a unmodified PersistentVolume API object that was retrieved from the Kubernetes API.
+// ExtractPersistentVolumeFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractPersistentVolumeFrom(persistentVolume *corev1.PersistentVolume, fieldManager string, subresource string) (*PersistentVolumeApplyConfiguration, error) {
+	b := &PersistentVolumeApplyConfiguration{}
+	err := managedfields.ExtractInto(persistentVolume, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolume"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(persistentVolume.Name)
+
+	b.WithKind("PersistentVolume")
+	b.WithAPIVersion("v1")
+	return b, nil
+}
+
 // ExtractPersistentVolume extracts the applied configuration owned by fieldManager from
 // persistentVolume. If no managedFields are found in persistentVolume for fieldManager, a
 // PersistentVolumeApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -58,28 +79,16 @@ func PersistentVolume(name string) *PersistentVolumeApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPersistentVolume(persistentVolume *corev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
-	return extractPersistentVolume(persistentVolume, fieldManager, "")
+	return ExtractPersistentVolumeFrom(persistentVolume, fieldManager, "")
 }
 
-// ExtractPersistentVolumeStatus is the same as ExtractPersistentVolume except
-// that it extracts the status subresource applied configuration.
+// ExtractPersistentVolumeStatus extracts the applied configuration owned by fieldManager from
+// persistentVolume for the status subresource.
 // Experimental!
 func ExtractPersistentVolumeStatus(persistentVolume *corev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
-	return extractPersistentVolume(persistentVolume, fieldManager, "status")
+	return ExtractPersistentVolumeFrom(persistentVolume, fieldManager, "status")
 }
 
-func extractPersistentVolume(persistentVolume *corev1.PersistentVolume, fieldManager string, subresource string) (*PersistentVolumeApplyConfiguration, error) {
-	b := &PersistentVolumeApplyConfiguration{}
-	err := managedfields.ExtractInto(persistentVolume, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolume"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(persistentVolume.Name)
-
-	b.WithKind("PersistentVolume")
-	b.WithAPIVersion("v1")
-	return b, nil
-}
 func (b PersistentVolumeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

@@ -36,86 +36,6 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*Claim)(nil), (*v1.Claim)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Claim_To_v1_Claim(a.(*Claim), b.(*v1.Claim), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.Claim)(nil), (*Claim)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Claim_To_v1beta1_Claim(a.(*v1.Claim), b.(*Claim), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*Device)(nil), (*v1.Device)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Device_To_v1_Device(a.(*Device), b.(*v1.Device), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.Device)(nil), (*Device)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Device_To_v1beta1_Device(a.(*v1.Device), b.(*Device), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*NodePrepareResourceResponse)(nil), (*v1.NodePrepareResourceResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NodePrepareResourceResponse_To_v1_NodePrepareResourceResponse(a.(*NodePrepareResourceResponse), b.(*v1.NodePrepareResourceResponse), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodePrepareResourceResponse)(nil), (*NodePrepareResourceResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodePrepareResourceResponse_To_v1beta1_NodePrepareResourceResponse(a.(*v1.NodePrepareResourceResponse), b.(*NodePrepareResourceResponse), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*NodePrepareResourcesRequest)(nil), (*v1.NodePrepareResourcesRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NodePrepareResourcesRequest_To_v1_NodePrepareResourcesRequest(a.(*NodePrepareResourcesRequest), b.(*v1.NodePrepareResourcesRequest), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodePrepareResourcesRequest)(nil), (*NodePrepareResourcesRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodePrepareResourcesRequest_To_v1beta1_NodePrepareResourcesRequest(a.(*v1.NodePrepareResourcesRequest), b.(*NodePrepareResourcesRequest), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*NodePrepareResourcesResponse)(nil), (*v1.NodePrepareResourcesResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NodePrepareResourcesResponse_To_v1_NodePrepareResourcesResponse(a.(*NodePrepareResourcesResponse), b.(*v1.NodePrepareResourcesResponse), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodePrepareResourcesResponse)(nil), (*NodePrepareResourcesResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodePrepareResourcesResponse_To_v1beta1_NodePrepareResourcesResponse(a.(*v1.NodePrepareResourcesResponse), b.(*NodePrepareResourcesResponse), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*NodeUnprepareResourceResponse)(nil), (*v1.NodeUnprepareResourceResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NodeUnprepareResourceResponse_To_v1_NodeUnprepareResourceResponse(a.(*NodeUnprepareResourceResponse), b.(*v1.NodeUnprepareResourceResponse), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodeUnprepareResourceResponse)(nil), (*NodeUnprepareResourceResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodeUnprepareResourceResponse_To_v1beta1_NodeUnprepareResourceResponse(a.(*v1.NodeUnprepareResourceResponse), b.(*NodeUnprepareResourceResponse), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*NodeUnprepareResourcesRequest)(nil), (*v1.NodeUnprepareResourcesRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NodeUnprepareResourcesRequest_To_v1_NodeUnprepareResourcesRequest(a.(*NodeUnprepareResourcesRequest), b.(*v1.NodeUnprepareResourcesRequest), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodeUnprepareResourcesRequest)(nil), (*NodeUnprepareResourcesRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodeUnprepareResourcesRequest_To_v1beta1_NodeUnprepareResourcesRequest(a.(*v1.NodeUnprepareResourcesRequest), b.(*NodeUnprepareResourcesRequest), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*NodeUnprepareResourcesResponse)(nil), (*v1.NodeUnprepareResourcesResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NodeUnprepareResourcesResponse_To_v1_NodeUnprepareResourcesResponse(a.(*NodeUnprepareResourcesResponse), b.(*v1.NodeUnprepareResourcesResponse), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodeUnprepareResourcesResponse)(nil), (*NodeUnprepareResourcesResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodeUnprepareResourcesResponse_To_v1beta1_NodeUnprepareResourcesResponse(a.(*v1.NodeUnprepareResourcesResponse), b.(*NodeUnprepareResourcesResponse), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*UnimplementedDRAPluginServer)(nil), (*v1.UnimplementedDRAPluginServer)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_UnimplementedDRAPluginServer_To_v1_UnimplementedDRAPluginServer(a.(*UnimplementedDRAPluginServer), b.(*v1.UnimplementedDRAPluginServer), scope)
 	}); err != nil {
@@ -126,211 +46,365 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*v1.Claim)(nil), (*Claim)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Claim_To_v1beta1_Claim(a.(*v1.Claim), b.(*Claim), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.Device)(nil), (*Device)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Device_To_v1beta1_Device(a.(*v1.Device), b.(*Device), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.NodePrepareResourceResponse)(nil), (*NodePrepareResourceResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodePrepareResourceResponse_To_v1beta1_NodePrepareResourceResponse(a.(*v1.NodePrepareResourceResponse), b.(*NodePrepareResourceResponse), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.NodePrepareResourcesRequest)(nil), (*NodePrepareResourcesRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodePrepareResourcesRequest_To_v1beta1_NodePrepareResourcesRequest(a.(*v1.NodePrepareResourcesRequest), b.(*NodePrepareResourcesRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.NodePrepareResourcesResponse)(nil), (*NodePrepareResourcesResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodePrepareResourcesResponse_To_v1beta1_NodePrepareResourcesResponse(a.(*v1.NodePrepareResourcesResponse), b.(*NodePrepareResourcesResponse), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.NodeUnprepareResourceResponse)(nil), (*NodeUnprepareResourceResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeUnprepareResourceResponse_To_v1beta1_NodeUnprepareResourceResponse(a.(*v1.NodeUnprepareResourceResponse), b.(*NodeUnprepareResourceResponse), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.NodeUnprepareResourcesRequest)(nil), (*NodeUnprepareResourcesRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeUnprepareResourcesRequest_To_v1beta1_NodeUnprepareResourcesRequest(a.(*v1.NodeUnprepareResourcesRequest), b.(*NodeUnprepareResourcesRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.NodeUnprepareResourcesResponse)(nil), (*NodeUnprepareResourcesResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NodeUnprepareResourcesResponse_To_v1beta1_NodeUnprepareResourcesResponse(a.(*v1.NodeUnprepareResourcesResponse), b.(*NodeUnprepareResourcesResponse), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*Claim)(nil), (*v1.Claim)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Claim_To_v1_Claim(a.(*Claim), b.(*v1.Claim), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*Device)(nil), (*v1.Device)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Device_To_v1_Device(a.(*Device), b.(*v1.Device), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*NodePrepareResourceResponse)(nil), (*v1.NodePrepareResourceResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodePrepareResourceResponse_To_v1_NodePrepareResourceResponse(a.(*NodePrepareResourceResponse), b.(*v1.NodePrepareResourceResponse), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*NodePrepareResourcesRequest)(nil), (*v1.NodePrepareResourcesRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodePrepareResourcesRequest_To_v1_NodePrepareResourcesRequest(a.(*NodePrepareResourcesRequest), b.(*v1.NodePrepareResourcesRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*NodePrepareResourcesResponse)(nil), (*v1.NodePrepareResourcesResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodePrepareResourcesResponse_To_v1_NodePrepareResourcesResponse(a.(*NodePrepareResourcesResponse), b.(*v1.NodePrepareResourcesResponse), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*NodeUnprepareResourceResponse)(nil), (*v1.NodeUnprepareResourceResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodeUnprepareResourceResponse_To_v1_NodeUnprepareResourceResponse(a.(*NodeUnprepareResourceResponse), b.(*v1.NodeUnprepareResourceResponse), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*NodeUnprepareResourcesRequest)(nil), (*v1.NodeUnprepareResourcesRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodeUnprepareResourcesRequest_To_v1_NodeUnprepareResourcesRequest(a.(*NodeUnprepareResourcesRequest), b.(*v1.NodeUnprepareResourcesRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*NodeUnprepareResourcesResponse)(nil), (*v1.NodeUnprepareResourcesResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodeUnprepareResourcesResponse_To_v1_NodeUnprepareResourcesResponse(a.(*NodeUnprepareResourcesResponse), b.(*v1.NodeUnprepareResourcesResponse), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_v1beta1_Claim_To_v1_Claim(in *Claim, out *v1.Claim, s conversion.Scope) error {
+	// WARNING: out.state is not exported and cannot be set
 	out.Namespace = in.Namespace
-	out.UID = in.UID
+	out.Uid = in.Uid
 	out.Name = in.Name
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: out.unknownFields is not exported and cannot be set
+	// WARNING: out.sizeCache is not exported and cannot be set
 	return nil
-}
-
-// Convert_v1beta1_Claim_To_v1_Claim is an autogenerated conversion function.
-func Convert_v1beta1_Claim_To_v1_Claim(in *Claim, out *v1.Claim, s conversion.Scope) error {
-	return autoConvert_v1beta1_Claim_To_v1_Claim(in, out, s)
 }
 
 func autoConvert_v1_Claim_To_v1beta1_Claim(in *v1.Claim, out *Claim, s conversion.Scope) error {
+	// WARNING: in.state is not exported and cannot be read
 	out.Namespace = in.Namespace
-	out.UID = in.UID
+	out.Uid = in.Uid
 	out.Name = in.Name
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: in.unknownFields is not exported and cannot be read
+	// WARNING: in.sizeCache is not exported and cannot be read
 	return nil
-}
-
-// Convert_v1_Claim_To_v1beta1_Claim is an autogenerated conversion function.
-func Convert_v1_Claim_To_v1beta1_Claim(in *v1.Claim, out *Claim, s conversion.Scope) error {
-	return autoConvert_v1_Claim_To_v1beta1_Claim(in, out, s)
 }
 
 func autoConvert_v1beta1_Device_To_v1_Device(in *Device, out *v1.Device, s conversion.Scope) error {
+	// WARNING: out.state is not exported and cannot be set
 	out.RequestNames = *(*[]string)(unsafe.Pointer(&in.RequestNames))
 	out.PoolName = in.PoolName
 	out.DeviceName = in.DeviceName
-	out.CDIDeviceIDs = *(*[]string)(unsafe.Pointer(&in.CDIDeviceIDs))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.CdiDeviceIds = *(*[]string)(unsafe.Pointer(&in.CdiDeviceIds))
+	// WARNING: out.unknownFields is not exported and cannot be set
+	// WARNING: out.sizeCache is not exported and cannot be set
 	return nil
-}
-
-// Convert_v1beta1_Device_To_v1_Device is an autogenerated conversion function.
-func Convert_v1beta1_Device_To_v1_Device(in *Device, out *v1.Device, s conversion.Scope) error {
-	return autoConvert_v1beta1_Device_To_v1_Device(in, out, s)
 }
 
 func autoConvert_v1_Device_To_v1beta1_Device(in *v1.Device, out *Device, s conversion.Scope) error {
+	// WARNING: in.state is not exported and cannot be read
 	out.RequestNames = *(*[]string)(unsafe.Pointer(&in.RequestNames))
 	out.PoolName = in.PoolName
 	out.DeviceName = in.DeviceName
-	out.CDIDeviceIDs = *(*[]string)(unsafe.Pointer(&in.CDIDeviceIDs))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.CdiDeviceIds = *(*[]string)(unsafe.Pointer(&in.CdiDeviceIds))
+	// WARNING: in.unknownFields is not exported and cannot be read
+	// WARNING: in.sizeCache is not exported and cannot be read
 	return nil
-}
-
-// Convert_v1_Device_To_v1beta1_Device is an autogenerated conversion function.
-func Convert_v1_Device_To_v1beta1_Device(in *v1.Device, out *Device, s conversion.Scope) error {
-	return autoConvert_v1_Device_To_v1beta1_Device(in, out, s)
 }
 
 func autoConvert_v1beta1_NodePrepareResourceResponse_To_v1_NodePrepareResourceResponse(in *NodePrepareResourceResponse, out *v1.NodePrepareResourceResponse, s conversion.Scope) error {
-	out.Devices = *(*[]*v1.Device)(unsafe.Pointer(&in.Devices))
+	// WARNING: out.state is not exported and cannot be set
+	if in.Devices != nil {
+		in, out := &in.Devices, &out.Devices
+		*out = make([]*v1.Device, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				(*out)[i] = new(v1.Device)
+				if err := Convert_v1beta1_Device_To_v1_Device((*in)[i], (*out)[i], s); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		out.Devices = nil
+	}
 	out.Error = in.Error
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: out.unknownFields is not exported and cannot be set
+	// WARNING: out.sizeCache is not exported and cannot be set
 	return nil
-}
-
-// Convert_v1beta1_NodePrepareResourceResponse_To_v1_NodePrepareResourceResponse is an autogenerated conversion function.
-func Convert_v1beta1_NodePrepareResourceResponse_To_v1_NodePrepareResourceResponse(in *NodePrepareResourceResponse, out *v1.NodePrepareResourceResponse, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodePrepareResourceResponse_To_v1_NodePrepareResourceResponse(in, out, s)
 }
 
 func autoConvert_v1_NodePrepareResourceResponse_To_v1beta1_NodePrepareResourceResponse(in *v1.NodePrepareResourceResponse, out *NodePrepareResourceResponse, s conversion.Scope) error {
-	out.Devices = *(*[]*Device)(unsafe.Pointer(&in.Devices))
+	// WARNING: in.state is not exported and cannot be read
+	if in.Devices != nil {
+		in, out := &in.Devices, &out.Devices
+		*out = make([]*Device, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				(*out)[i] = new(Device)
+				if err := Convert_v1_Device_To_v1beta1_Device((*in)[i], (*out)[i], s); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		out.Devices = nil
+	}
 	out.Error = in.Error
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: in.unknownFields is not exported and cannot be read
+	// WARNING: in.sizeCache is not exported and cannot be read
 	return nil
-}
-
-// Convert_v1_NodePrepareResourceResponse_To_v1beta1_NodePrepareResourceResponse is an autogenerated conversion function.
-func Convert_v1_NodePrepareResourceResponse_To_v1beta1_NodePrepareResourceResponse(in *v1.NodePrepareResourceResponse, out *NodePrepareResourceResponse, s conversion.Scope) error {
-	return autoConvert_v1_NodePrepareResourceResponse_To_v1beta1_NodePrepareResourceResponse(in, out, s)
 }
 
 func autoConvert_v1beta1_NodePrepareResourcesRequest_To_v1_NodePrepareResourcesRequest(in *NodePrepareResourcesRequest, out *v1.NodePrepareResourcesRequest, s conversion.Scope) error {
-	out.Claims = *(*[]*v1.Claim)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: out.state is not exported and cannot be set
+	if in.Claims != nil {
+		in, out := &in.Claims, &out.Claims
+		*out = make([]*v1.Claim, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				(*out)[i] = new(v1.Claim)
+				if err := Convert_v1beta1_Claim_To_v1_Claim((*in)[i], (*out)[i], s); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		out.Claims = nil
+	}
+	// WARNING: out.unknownFields is not exported and cannot be set
+	// WARNING: out.sizeCache is not exported and cannot be set
 	return nil
-}
-
-// Convert_v1beta1_NodePrepareResourcesRequest_To_v1_NodePrepareResourcesRequest is an autogenerated conversion function.
-func Convert_v1beta1_NodePrepareResourcesRequest_To_v1_NodePrepareResourcesRequest(in *NodePrepareResourcesRequest, out *v1.NodePrepareResourcesRequest, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodePrepareResourcesRequest_To_v1_NodePrepareResourcesRequest(in, out, s)
 }
 
 func autoConvert_v1_NodePrepareResourcesRequest_To_v1beta1_NodePrepareResourcesRequest(in *v1.NodePrepareResourcesRequest, out *NodePrepareResourcesRequest, s conversion.Scope) error {
-	out.Claims = *(*[]*Claim)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: in.state is not exported and cannot be read
+	if in.Claims != nil {
+		in, out := &in.Claims, &out.Claims
+		*out = make([]*Claim, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				(*out)[i] = new(Claim)
+				if err := Convert_v1_Claim_To_v1beta1_Claim((*in)[i], (*out)[i], s); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		out.Claims = nil
+	}
+	// WARNING: in.unknownFields is not exported and cannot be read
+	// WARNING: in.sizeCache is not exported and cannot be read
 	return nil
-}
-
-// Convert_v1_NodePrepareResourcesRequest_To_v1beta1_NodePrepareResourcesRequest is an autogenerated conversion function.
-func Convert_v1_NodePrepareResourcesRequest_To_v1beta1_NodePrepareResourcesRequest(in *v1.NodePrepareResourcesRequest, out *NodePrepareResourcesRequest, s conversion.Scope) error {
-	return autoConvert_v1_NodePrepareResourcesRequest_To_v1beta1_NodePrepareResourcesRequest(in, out, s)
 }
 
 func autoConvert_v1beta1_NodePrepareResourcesResponse_To_v1_NodePrepareResourcesResponse(in *NodePrepareResourcesResponse, out *v1.NodePrepareResourcesResponse, s conversion.Scope) error {
-	out.Claims = *(*map[string]*v1.NodePrepareResourceResponse)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: out.state is not exported and cannot be set
+	if in.Claims != nil {
+		in, out := &in.Claims, &out.Claims
+		*out = make(map[string]*v1.NodePrepareResourceResponse, len(*in))
+		for key, val := range *in {
+			newVal := new(*v1.NodePrepareResourceResponse)
+			if val != nil {
+				*newVal = new(v1.NodePrepareResourceResponse)
+				if err := Convert_v1beta1_NodePrepareResourceResponse_To_v1_NodePrepareResourceResponse(val, *newVal, s); err != nil {
+					return err
+				}
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Claims = nil
+	}
+	// WARNING: out.unknownFields is not exported and cannot be set
+	// WARNING: out.sizeCache is not exported and cannot be set
 	return nil
-}
-
-// Convert_v1beta1_NodePrepareResourcesResponse_To_v1_NodePrepareResourcesResponse is an autogenerated conversion function.
-func Convert_v1beta1_NodePrepareResourcesResponse_To_v1_NodePrepareResourcesResponse(in *NodePrepareResourcesResponse, out *v1.NodePrepareResourcesResponse, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodePrepareResourcesResponse_To_v1_NodePrepareResourcesResponse(in, out, s)
 }
 
 func autoConvert_v1_NodePrepareResourcesResponse_To_v1beta1_NodePrepareResourcesResponse(in *v1.NodePrepareResourcesResponse, out *NodePrepareResourcesResponse, s conversion.Scope) error {
-	out.Claims = *(*map[string]*NodePrepareResourceResponse)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: in.state is not exported and cannot be read
+	if in.Claims != nil {
+		in, out := &in.Claims, &out.Claims
+		*out = make(map[string]*NodePrepareResourceResponse, len(*in))
+		for key, val := range *in {
+			newVal := new(*NodePrepareResourceResponse)
+			if val != nil {
+				*newVal = new(NodePrepareResourceResponse)
+				if err := Convert_v1_NodePrepareResourceResponse_To_v1beta1_NodePrepareResourceResponse(val, *newVal, s); err != nil {
+					return err
+				}
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Claims = nil
+	}
+	// WARNING: in.unknownFields is not exported and cannot be read
+	// WARNING: in.sizeCache is not exported and cannot be read
 	return nil
-}
-
-// Convert_v1_NodePrepareResourcesResponse_To_v1beta1_NodePrepareResourcesResponse is an autogenerated conversion function.
-func Convert_v1_NodePrepareResourcesResponse_To_v1beta1_NodePrepareResourcesResponse(in *v1.NodePrepareResourcesResponse, out *NodePrepareResourcesResponse, s conversion.Scope) error {
-	return autoConvert_v1_NodePrepareResourcesResponse_To_v1beta1_NodePrepareResourcesResponse(in, out, s)
 }
 
 func autoConvert_v1beta1_NodeUnprepareResourceResponse_To_v1_NodeUnprepareResourceResponse(in *NodeUnprepareResourceResponse, out *v1.NodeUnprepareResourceResponse, s conversion.Scope) error {
+	// WARNING: out.state is not exported and cannot be set
 	out.Error = in.Error
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: out.unknownFields is not exported and cannot be set
+	// WARNING: out.sizeCache is not exported and cannot be set
 	return nil
-}
-
-// Convert_v1beta1_NodeUnprepareResourceResponse_To_v1_NodeUnprepareResourceResponse is an autogenerated conversion function.
-func Convert_v1beta1_NodeUnprepareResourceResponse_To_v1_NodeUnprepareResourceResponse(in *NodeUnprepareResourceResponse, out *v1.NodeUnprepareResourceResponse, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodeUnprepareResourceResponse_To_v1_NodeUnprepareResourceResponse(in, out, s)
 }
 
 func autoConvert_v1_NodeUnprepareResourceResponse_To_v1beta1_NodeUnprepareResourceResponse(in *v1.NodeUnprepareResourceResponse, out *NodeUnprepareResourceResponse, s conversion.Scope) error {
+	// WARNING: in.state is not exported and cannot be read
 	out.Error = in.Error
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: in.unknownFields is not exported and cannot be read
+	// WARNING: in.sizeCache is not exported and cannot be read
 	return nil
-}
-
-// Convert_v1_NodeUnprepareResourceResponse_To_v1beta1_NodeUnprepareResourceResponse is an autogenerated conversion function.
-func Convert_v1_NodeUnprepareResourceResponse_To_v1beta1_NodeUnprepareResourceResponse(in *v1.NodeUnprepareResourceResponse, out *NodeUnprepareResourceResponse, s conversion.Scope) error {
-	return autoConvert_v1_NodeUnprepareResourceResponse_To_v1beta1_NodeUnprepareResourceResponse(in, out, s)
 }
 
 func autoConvert_v1beta1_NodeUnprepareResourcesRequest_To_v1_NodeUnprepareResourcesRequest(in *NodeUnprepareResourcesRequest, out *v1.NodeUnprepareResourcesRequest, s conversion.Scope) error {
-	out.Claims = *(*[]*v1.Claim)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: out.state is not exported and cannot be set
+	if in.Claims != nil {
+		in, out := &in.Claims, &out.Claims
+		*out = make([]*v1.Claim, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				(*out)[i] = new(v1.Claim)
+				if err := Convert_v1beta1_Claim_To_v1_Claim((*in)[i], (*out)[i], s); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		out.Claims = nil
+	}
+	// WARNING: out.unknownFields is not exported and cannot be set
+	// WARNING: out.sizeCache is not exported and cannot be set
 	return nil
-}
-
-// Convert_v1beta1_NodeUnprepareResourcesRequest_To_v1_NodeUnprepareResourcesRequest is an autogenerated conversion function.
-func Convert_v1beta1_NodeUnprepareResourcesRequest_To_v1_NodeUnprepareResourcesRequest(in *NodeUnprepareResourcesRequest, out *v1.NodeUnprepareResourcesRequest, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodeUnprepareResourcesRequest_To_v1_NodeUnprepareResourcesRequest(in, out, s)
 }
 
 func autoConvert_v1_NodeUnprepareResourcesRequest_To_v1beta1_NodeUnprepareResourcesRequest(in *v1.NodeUnprepareResourcesRequest, out *NodeUnprepareResourcesRequest, s conversion.Scope) error {
-	out.Claims = *(*[]*Claim)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: in.state is not exported and cannot be read
+	if in.Claims != nil {
+		in, out := &in.Claims, &out.Claims
+		*out = make([]*Claim, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				(*out)[i] = new(Claim)
+				if err := Convert_v1_Claim_To_v1beta1_Claim((*in)[i], (*out)[i], s); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		out.Claims = nil
+	}
+	// WARNING: in.unknownFields is not exported and cannot be read
+	// WARNING: in.sizeCache is not exported and cannot be read
 	return nil
-}
-
-// Convert_v1_NodeUnprepareResourcesRequest_To_v1beta1_NodeUnprepareResourcesRequest is an autogenerated conversion function.
-func Convert_v1_NodeUnprepareResourcesRequest_To_v1beta1_NodeUnprepareResourcesRequest(in *v1.NodeUnprepareResourcesRequest, out *NodeUnprepareResourcesRequest, s conversion.Scope) error {
-	return autoConvert_v1_NodeUnprepareResourcesRequest_To_v1beta1_NodeUnprepareResourcesRequest(in, out, s)
 }
 
 func autoConvert_v1beta1_NodeUnprepareResourcesResponse_To_v1_NodeUnprepareResourcesResponse(in *NodeUnprepareResourcesResponse, out *v1.NodeUnprepareResourcesResponse, s conversion.Scope) error {
-	out.Claims = *(*map[string]*v1.NodeUnprepareResourceResponse)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: out.state is not exported and cannot be set
+	if in.Claims != nil {
+		in, out := &in.Claims, &out.Claims
+		*out = make(map[string]*v1.NodeUnprepareResourceResponse, len(*in))
+		for key, val := range *in {
+			newVal := new(*v1.NodeUnprepareResourceResponse)
+			if val != nil {
+				*newVal = new(v1.NodeUnprepareResourceResponse)
+				if err := Convert_v1beta1_NodeUnprepareResourceResponse_To_v1_NodeUnprepareResourceResponse(val, *newVal, s); err != nil {
+					return err
+				}
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Claims = nil
+	}
+	// WARNING: out.unknownFields is not exported and cannot be set
+	// WARNING: out.sizeCache is not exported and cannot be set
 	return nil
-}
-
-// Convert_v1beta1_NodeUnprepareResourcesResponse_To_v1_NodeUnprepareResourcesResponse is an autogenerated conversion function.
-func Convert_v1beta1_NodeUnprepareResourcesResponse_To_v1_NodeUnprepareResourcesResponse(in *NodeUnprepareResourcesResponse, out *v1.NodeUnprepareResourcesResponse, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodeUnprepareResourcesResponse_To_v1_NodeUnprepareResourcesResponse(in, out, s)
 }
 
 func autoConvert_v1_NodeUnprepareResourcesResponse_To_v1beta1_NodeUnprepareResourcesResponse(in *v1.NodeUnprepareResourcesResponse, out *NodeUnprepareResourcesResponse, s conversion.Scope) error {
-	out.Claims = *(*map[string]*NodeUnprepareResourceResponse)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	// WARNING: in.state is not exported and cannot be read
+	if in.Claims != nil {
+		in, out := &in.Claims, &out.Claims
+		*out = make(map[string]*NodeUnprepareResourceResponse, len(*in))
+		for key, val := range *in {
+			newVal := new(*NodeUnprepareResourceResponse)
+			if val != nil {
+				*newVal = new(NodeUnprepareResourceResponse)
+				if err := Convert_v1_NodeUnprepareResourceResponse_To_v1beta1_NodeUnprepareResourceResponse(val, *newVal, s); err != nil {
+					return err
+				}
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Claims = nil
+	}
+	// WARNING: in.unknownFields is not exported and cannot be read
+	// WARNING: in.sizeCache is not exported and cannot be read
 	return nil
-}
-
-// Convert_v1_NodeUnprepareResourcesResponse_To_v1beta1_NodeUnprepareResourcesResponse is an autogenerated conversion function.
-func Convert_v1_NodeUnprepareResourcesResponse_To_v1beta1_NodeUnprepareResourcesResponse(in *v1.NodeUnprepareResourcesResponse, out *NodeUnprepareResourcesResponse, s conversion.Scope) error {
-	return autoConvert_v1_NodeUnprepareResourcesResponse_To_v1beta1_NodeUnprepareResourcesResponse(in, out, s)
 }
 
 func autoConvert_v1beta1_UnimplementedDRAPluginServer_To_v1_UnimplementedDRAPluginServer(in *UnimplementedDRAPluginServer, out *v1.UnimplementedDRAPluginServer, s conversion.Scope) error {

@@ -46,6 +46,27 @@ func StorageVersion(name string) *StorageVersionApplyConfiguration {
 	return b
 }
 
+// ExtractStorageVersionFrom extracts the applied configuration owned by fieldManager from
+// storageVersion for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// storageVersion must be a unmodified StorageVersion API object that was retrieved from the Kubernetes API.
+// ExtractStorageVersionFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractStorageVersionFrom(storageVersion *apiserverinternalv1alpha1.StorageVersion, fieldManager string, subresource string) (*StorageVersionApplyConfiguration, error) {
+	b := &StorageVersionApplyConfiguration{}
+	err := managedfields.ExtractInto(storageVersion, internal.Parser().Type("io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(storageVersion.Name)
+
+	b.WithKind("StorageVersion")
+	b.WithAPIVersion("internal.apiserver.k8s.io/v1alpha1")
+	return b, nil
+}
+
 // ExtractStorageVersion extracts the applied configuration owned by fieldManager from
 // storageVersion. If no managedFields are found in storageVersion for fieldManager, a
 // StorageVersionApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -58,28 +79,16 @@ func StorageVersion(name string) *StorageVersionApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractStorageVersion(storageVersion *apiserverinternalv1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
-	return extractStorageVersion(storageVersion, fieldManager, "")
+	return ExtractStorageVersionFrom(storageVersion, fieldManager, "")
 }
 
-// ExtractStorageVersionStatus is the same as ExtractStorageVersion except
-// that it extracts the status subresource applied configuration.
+// ExtractStorageVersionStatus extracts the applied configuration owned by fieldManager from
+// storageVersion for the status subresource.
 // Experimental!
 func ExtractStorageVersionStatus(storageVersion *apiserverinternalv1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
-	return extractStorageVersion(storageVersion, fieldManager, "status")
+	return ExtractStorageVersionFrom(storageVersion, fieldManager, "status")
 }
 
-func extractStorageVersion(storageVersion *apiserverinternalv1alpha1.StorageVersion, fieldManager string, subresource string) (*StorageVersionApplyConfiguration, error) {
-	b := &StorageVersionApplyConfiguration{}
-	err := managedfields.ExtractInto(storageVersion, internal.Parser().Type("io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(storageVersion.Name)
-
-	b.WithKind("StorageVersion")
-	b.WithAPIVersion("internal.apiserver.k8s.io/v1alpha1")
-	return b, nil
-}
 func (b StorageVersionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

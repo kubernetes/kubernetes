@@ -1431,7 +1431,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod) []v1.C
 // bindClaim gets called by PreBind for claim which is not reserved for the pod yet.
 // It might not even be allocated. bindClaim then ensures that the allocation
 // and reservation are recorded. This finishes the work started in Reserve.
-func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (patchedClaim *resourceapi.ResourceClaim, finalErr error) {
+func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (*resourceapi.ResourceClaim, error) {
 	logger := klog.FromContext(ctx)
 	claim := state.claims.get(index)
 	allocation := state.informationsForClaim[index].allocation
@@ -1444,38 +1444,38 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		isExtendedResourceClaim = true
 	}
 	claimUIDs := []types.UID{claim.UID}
+	resourceClaimModified := false
 	defer func() {
-		if allocation != nil {
-			// The scheduler was handling allocation. Now that has
-			// completed, either successfully or with a failure.
-			if finalErr == nil {
+		// The scheduler was handling allocation. Now that has
+		// completed, either successfully or with a failure.
+		if resourceClaimModified {
+			if isExtendedResourceClaim {
+				// Unlike other claims, extended resource claim is created in API server below.
+				// AssumeClaimAfterAPICall returns ErrNotFound when the informer update has not reached assumed cache yet.
+				// Hence we must poll and wait for it.
+				pollErr := wait.PollUntilContextTimeout(ctx, 1*time.Second, time.Duration(AssumeExtendedResourceTimeoutDefaultSeconds)*time.Second, true,
+					func(ctx context.Context) (bool, error) {
+						if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
+							if errors.Is(err, assumecache.ErrNotFound) {
+								return false, nil
+							}
+							logger.V(5).Info("Claim not stored in assume cache", "claim", klog.KObj(claim), "err", err)
+							return false, err
+						}
+						return true, nil
+					})
+				if pollErr != nil {
+					logger.V(5).Info("Claim not stored in assume cache after retries", "claim", klog.KObj(claim), "err", pollErr)
+				}
+			} else {
 				// This can fail, but only for reasons that are okay (concurrent delete or update).
 				// Shouldn't happen in this case.
-				if isExtendedResourceClaim {
-					// Unlike other claims, extended resource claim is created in API server below.
-					// AssumeClaimAfterAPICall returns ErrNotFound when the informer update has not reached assumed cache yet.
-					// Hence we must poll and wait for it.
-					pollErr := wait.PollUntilContextTimeout(ctx, 1*time.Second, time.Duration(AssumeExtendedResourceTimeoutDefaultSeconds)*time.Second, true,
-						func(ctx context.Context) (bool, error) {
-							if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
-								if errors.Is(err, assumecache.ErrNotFound) {
-									return false, nil
-								}
-								logger.V(5).Info("Claim not stored in assume cache", "claim", klog.KObj(claim), "err", err)
-								return false, err
-							}
-							return true, nil
-						})
-					if pollErr != nil {
-						logger.V(5).Info("Claim not stored in assume cache after retries", "claim", klog.KObj(claim), "err", pollErr)
-					}
-				} else {
-					if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
-						logger.V(5).Info("Claim not stored in assume cache", "err", err)
-					}
+				if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
+					logger.V(5).Info("Claim not stored in assume cache", "err", err)
 				}
 			}
-
+		}
+		if allocation != nil {
 			for _, claimUID := range claimUIDs {
 				pl.draManager.ResourceClaims().RemoveClaimPendingAllocation(claimUID)
 			}
@@ -1501,6 +1501,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		if err != nil {
 			return nil, fmt.Errorf("create claim for extended resources %v: %w", klog.KObj(claim), err)
 		}
+		resourceClaimModified = true
 		logger.V(5).Info("created claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
 
 		// Track the actual extended ResourceClaim from now.
@@ -1568,6 +1569,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			return fmt.Errorf("add reservation to claim %s: %w", klog.KObj(claim), err)
 		}
 		claim = updatedClaim
+		resourceClaimModified = true
 		return nil
 	})
 

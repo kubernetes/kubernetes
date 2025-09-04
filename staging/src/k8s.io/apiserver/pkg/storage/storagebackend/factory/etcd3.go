@@ -440,6 +440,8 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 
 	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client.Client, c.DBMetricPollInterval)
 	if err != nil {
+		stopCompactor()
+		_ = client.Close()
 		return nil, nil, err
 	}
 
@@ -455,7 +457,13 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 		transformer = etcd3.WithCorruptObjErrorHandlingTransformer(transformer)
 		decoder = etcd3.WithCorruptObjErrorHandlingDecoder(decoder)
 	}
-	store := etcd3.New(client, compactor, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
+	store, err := etcd3.New(client, compactor, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
+	if err != nil {
+		stopCompactor()
+		stopDBSizeMonitor()
+		_ = client.Close()
+		return nil, nil, err
+	}
 	var once sync.Once
 	destroyFunc := func() {
 		// we know that storage destroy funcs are called multiple times (due to reuse in subresources).

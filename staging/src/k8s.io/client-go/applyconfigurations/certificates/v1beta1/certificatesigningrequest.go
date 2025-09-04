@@ -46,6 +46,27 @@ func CertificateSigningRequest(name string) *CertificateSigningRequestApplyConfi
 	return b
 }
 
+// ExtractCertificateSigningRequestFrom extracts the applied configuration owned by fieldManager from
+// certificateSigningRequest for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// certificateSigningRequest must be a unmodified CertificateSigningRequest API object that was retrieved from the Kubernetes API.
+// ExtractCertificateSigningRequestFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractCertificateSigningRequestFrom(certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, fieldManager string, subresource string) (*CertificateSigningRequestApplyConfiguration, error) {
+	b := &CertificateSigningRequestApplyConfiguration{}
+	err := managedfields.ExtractInto(certificateSigningRequest, internal.Parser().Type("io.k8s.api.certificates.v1beta1.CertificateSigningRequest"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(certificateSigningRequest.Name)
+
+	b.WithKind("CertificateSigningRequest")
+	b.WithAPIVersion("certificates.k8s.io/v1beta1")
+	return b, nil
+}
+
 // ExtractCertificateSigningRequest extracts the applied configuration owned by fieldManager from
 // certificateSigningRequest. If no managedFields are found in certificateSigningRequest for fieldManager, a
 // CertificateSigningRequestApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -58,28 +79,16 @@ func CertificateSigningRequest(name string) *CertificateSigningRequestApplyConfi
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractCertificateSigningRequest(certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
-	return extractCertificateSigningRequest(certificateSigningRequest, fieldManager, "")
+	return ExtractCertificateSigningRequestFrom(certificateSigningRequest, fieldManager, "")
 }
 
-// ExtractCertificateSigningRequestStatus is the same as ExtractCertificateSigningRequest except
-// that it extracts the status subresource applied configuration.
+// ExtractCertificateSigningRequestStatus extracts the applied configuration owned by fieldManager from
+// certificateSigningRequest for the status subresource.
 // Experimental!
 func ExtractCertificateSigningRequestStatus(certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
-	return extractCertificateSigningRequest(certificateSigningRequest, fieldManager, "status")
+	return ExtractCertificateSigningRequestFrom(certificateSigningRequest, fieldManager, "status")
 }
 
-func extractCertificateSigningRequest(certificateSigningRequest *certificatesv1beta1.CertificateSigningRequest, fieldManager string, subresource string) (*CertificateSigningRequestApplyConfiguration, error) {
-	b := &CertificateSigningRequestApplyConfiguration{}
-	err := managedfields.ExtractInto(certificateSigningRequest, internal.Parser().Type("io.k8s.api.certificates.v1beta1.CertificateSigningRequest"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(certificateSigningRequest.Name)
-
-	b.WithKind("CertificateSigningRequest")
-	b.WithAPIVersion("certificates.k8s.io/v1beta1")
-	return b, nil
-}
 func (b CertificateSigningRequestApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

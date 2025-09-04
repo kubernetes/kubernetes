@@ -45,6 +45,27 @@ func IPAddress(name string) *IPAddressApplyConfiguration {
 	return b
 }
 
+// ExtractIPAddressFrom extracts the applied configuration owned by fieldManager from
+// iPAddress for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// iPAddress must be a unmodified IPAddress API object that was retrieved from the Kubernetes API.
+// ExtractIPAddressFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractIPAddressFrom(iPAddress *networkingv1beta1.IPAddress, fieldManager string, subresource string) (*IPAddressApplyConfiguration, error) {
+	b := &IPAddressApplyConfiguration{}
+	err := managedfields.ExtractInto(iPAddress, internal.Parser().Type("io.k8s.api.networking.v1beta1.IPAddress"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(iPAddress.Name)
+
+	b.WithKind("IPAddress")
+	b.WithAPIVersion("networking.k8s.io/v1beta1")
+	return b, nil
+}
+
 // ExtractIPAddress extracts the applied configuration owned by fieldManager from
 // iPAddress. If no managedFields are found in iPAddress for fieldManager, a
 // IPAddressApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func IPAddress(name string) *IPAddressApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractIPAddress(iPAddress *networkingv1beta1.IPAddress, fieldManager string) (*IPAddressApplyConfiguration, error) {
-	return extractIPAddress(iPAddress, fieldManager, "")
+	return ExtractIPAddressFrom(iPAddress, fieldManager, "")
 }
 
-// ExtractIPAddressStatus is the same as ExtractIPAddress except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractIPAddressStatus(iPAddress *networkingv1beta1.IPAddress, fieldManager string) (*IPAddressApplyConfiguration, error) {
-	return extractIPAddress(iPAddress, fieldManager, "status")
-}
-
-func extractIPAddress(iPAddress *networkingv1beta1.IPAddress, fieldManager string, subresource string) (*IPAddressApplyConfiguration, error) {
-	b := &IPAddressApplyConfiguration{}
-	err := managedfields.ExtractInto(iPAddress, internal.Parser().Type("io.k8s.api.networking.v1beta1.IPAddress"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(iPAddress.Name)
-
-	b.WithKind("IPAddress")
-	b.WithAPIVersion("networking.k8s.io/v1beta1")
-	return b, nil
-}
 func (b IPAddressApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

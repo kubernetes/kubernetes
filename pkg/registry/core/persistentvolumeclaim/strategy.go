@@ -122,8 +122,7 @@ func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, ol
 	newPvc := obj.(*api.PersistentVolumeClaim)
 	oldPvc := old.(*api.PersistentVolumeClaim)
 	opts := validation.ValidationOptionsForPersistentVolumeClaim(newPvc, oldPvc)
-	errorList := validation.ValidatePersistentVolumeClaim(newPvc, opts)
-	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc, opts)...)
+	return validation.ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
