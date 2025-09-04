@@ -489,6 +489,10 @@ type namespacedName struct {
 }
 
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	if opts.WatchWithoutPrevKV {
+		return nil, fmt.Errorf("option WatchWithoutPrevKV can only be used by cacher")
+	}
+
 	pred := opts.Predicate
 	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
