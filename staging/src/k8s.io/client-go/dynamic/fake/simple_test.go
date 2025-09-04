@@ -494,7 +494,10 @@ func TestInformerSyncWithFakeClient(t *testing.T) {
 	var localSchemeBuilder = runtime.SchemeBuilder{
 		v1.AddToScheme,
 	}
-	localSchemeBuilder.AddToScheme(scheme)
+	err := localSchemeBuilder.AddToScheme(scheme)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testGVR := v1.SchemeGroupVersion.WithResource("secrets")
 	fakeClient := NewSimpleDynamicClient(scheme, makeSecret("secret-1"))
@@ -518,7 +521,7 @@ func TestInformerSyncWithFakeClient(t *testing.T) {
 	go targetInformer.Run(stopCh)
 
 	ctx := context.TODO()
-	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (done bool, err error) {
+	if err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (done bool, err error) {
 		return targetInformer.HasSynced(), nil
 	}); err != nil {
 		t.Fatal(err)
