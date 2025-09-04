@@ -492,6 +492,101 @@ func TestResourceAndPortCompletionFunc(t *testing.T) {
 	}
 }
 
+func TestResourceTypeAndNameCompletionFuncResourceList(t *testing.T) {
+	// Set up a fake discovery client with some API resources
+	dc := cmdtesting.NewFakeCachedDiscoveryClient()
+	dc.PreferredResources = []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name:       "pods",
+					Namespaced: true,
+					Kind:       "Pod",
+					Verbs:      []string{"get", "list"},
+				},
+				{
+					Name:       "services",
+					Namespaced: true,
+					Kind:       "Service",
+					Verbs:      []string{"get", "list"},
+				},
+				{
+					Name:       "secrets",
+					Namespaced: true,
+					Kind:       "Secret",
+					Verbs:      []string{"get", "list"},
+				},
+			},
+		},
+		{
+			GroupVersion: "apps/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name:       "deployments",
+					Namespaced: true,
+					Kind:       "Deployment",
+					Verbs:      []string{"get", "list"},
+				},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name              string
+		args              []string
+		toComplete        string
+		expectedComps     []string
+		expectedDirective cobra.ShellCompDirective
+	}{
+		{
+			name:              "complete resources starting with 's'",
+			args:              []string{},
+			toComplete:        "s",
+			expectedComps:     []string{"secrets", "services"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "complete resources starting with 'p'",
+			args:              []string{},
+			toComplete:        "p",
+			expectedComps:     []string{"pods"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "complete resources starting with 'd'",
+			args:              []string{},
+			toComplete:        "d",
+			expectedComps:     []string{"deployments.apps"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "complete all resources with empty string",
+			args:              []string{},
+			toComplete:        "",
+			expectedComps:     []string{"deployments.apps", "pods", "secrets", "services"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "no matches",
+			args:              []string{},
+			toComplete:        "xyz",
+			expectedComps:     []string{},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tf, cmd := prepareCompletionTest()
+			tf.WithDiscoveryClient(dc)
+			compFunc := ResourceTypeAndNameCompletionFunc(tf)
+			comps, directive := compFunc(cmd, tc.args, tc.toComplete)
+			checkCompletion(t, comps, tc.expectedComps, directive, tc.expectedDirective)
+		})
+	}
+}
+
 func setMockFactory(config api.Config) {
 	clientConfig := clientcmd.NewDefaultClientConfig(config, nil)
 	testFactory := cmdtesting.NewTestFactory().WithClientConfig(clientConfig)
