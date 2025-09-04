@@ -988,7 +988,7 @@ func assertOptionalSingleArgument[T any](arguments []T) (T, error) {
 }
 
 func isWatchListRequest(opts metav1.ListOptions) (bool, error) {
-	if opts.Watch == true && opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+	if opts.Watch && opts.SendInitialEvents != nil && *opts.SendInitialEvents {
 		internalListOptions := &metainternalversion.ListOptions{}
 		if err := scheme.Convert(&opts, internalListOptions, nil); err != nil {
 			return false, err
