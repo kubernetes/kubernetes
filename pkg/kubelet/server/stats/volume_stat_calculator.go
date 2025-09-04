@@ -125,7 +125,7 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 	}
 
 	// Get volume specs for the pod - key'd by volume name
-	volumesSpec := make(map[string]v1.Volume)
+	volumesSpec := make(map[string]v1.Volume, len(s.pod.Spec.Volumes))
 	for _, v := range s.pod.Spec.Volumes {
 		volumesSpec[v.Name] = v
 	}
