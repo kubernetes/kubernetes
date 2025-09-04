@@ -345,7 +345,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 			expectedConflicts: []Conflict{},
 		},
 		{
-			name:        "existing volume in a new pod with existing policy and new incomparable label (missing categories)",
+			name:        "existing volume in a new pod with existing policy and new comparable label (missing categories)",
 			initialPods: existingPods,
 			podToAdd: podWithVolume{
 				podNamespace: "testns",
@@ -354,7 +354,16 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 				label:        "system_u:system_r:label7",
 				changePolicy: v1.SELinuxChangePolicyMountOption,
 			},
-			expectedConflicts: []Conflict{},
+			expectedConflicts: []Conflict{
+				{
+					PropertyName:       "SELinuxLabel",
+					EventReason:        "SELinuxLabelConflict",
+					Pod:                cache.ObjectName{Namespace: "testns", Name: "testpod"},
+					PropertyValue:      "system_u:system_r:label7",
+					OtherPod:           cache.ObjectName{Namespace: "ns7", Name: "pod7"},
+					OtherPropertyValue: "::label7:c0,c1",
+				},
+			},
 		},
 		{
 			name:        "existing volume in a new pod with existing policy and new incomparable label (missing everything)",
@@ -367,6 +376,27 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 				changePolicy: v1.SELinuxChangePolicyMountOption,
 			},
 			expectedConflicts: []Conflict{},
+		},
+		{
+			name:        "existing volume in a new pod with existing policy and new comparable label (missing everything but categories)",
+			initialPods: existingPods,
+			podToAdd: podWithVolume{
+				podNamespace: "testns",
+				podName:      "testpod",
+				volumeName:   "vol8",
+				label:        "system_u:system_r:label8:c0,c1",
+				changePolicy: v1.SELinuxChangePolicyMountOption,
+			},
+			expectedConflicts: []Conflict{
+				{
+					PropertyName:       "SELinuxLabel",
+					EventReason:        "SELinuxLabelConflict",
+					Pod:                cache.ObjectName{Namespace: "testns", Name: "testpod"},
+					PropertyValue:      "system_u:system_r:label8:c0,c1",
+					OtherPod:           cache.ObjectName{Namespace: "ns8", Name: "pod8"},
+					OtherPropertyValue: "",
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
