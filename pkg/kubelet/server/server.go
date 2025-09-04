@@ -456,19 +456,25 @@ func (s *Server) InstallAuthNotRequiredHandlers() {
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := compbasemetrics.NewKubeRegistry()
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) {
-		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
-	} else {
-		cadvisorOpts := cadvisorv2.RequestOptions{
-			IdType:    cadvisorv2.TypeName,
-			Count:     1,
-			Recursive: true,
-		}
-		r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
-	}
-	s.restfulCont.Handle(cadvisorMetricsPath,
-		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
-	)
+       if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) {
+	       r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
+	       // Register /metrics/cri endpoint for CRI metrics
+	       criRegistry := compbasemetrics.NewKubeRegistry()
+	       criRegistry.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
+	       s.restfulCont.Handle("/metrics/cri",
+		       compbasemetrics.HandlerFor(criRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
+	       )
+       } else {
+	       cadvisorOpts := cadvisorv2.RequestOptions{
+		       IdType:    cadvisorv2.TypeName,
+		       Count:     1,
+		       Recursive: true,
+	       }
+	       r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
+       }
+       s.restfulCont.Handle(cadvisorMetricsPath,
+	       compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
+       )
 
 	s.addMetricsBucketMatcher("metrics/resource")
 	resourceRegistry := compbasemetrics.NewKubeRegistry()
