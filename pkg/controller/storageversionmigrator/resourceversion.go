@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/metadata"
@@ -195,17 +196,25 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 		return err
 	}
 	if !exists {
-		_, err = rv.kubeClient.StoragemigrationV1alpha1().
-			StorageVersionMigrations().
-			UpdateStatus(
-				ctx,
-				setStatusConditions(toBeProcessedSVM, svmv1alpha1.MigrationFailed, migrationFailedStatusReason, "resource does not exist in discovery"),
-				metav1.UpdateOptions{},
-			)
+		err := rv.setMigrationError(ctx, toBeProcessedSVM, "resource does not exist in discovery")
 		if err != nil {
 			return err
 		}
+		return nil
+	}
 
+	isUpdatable, err := rv.isResourceMigratable(gvr)
+	if err != nil {
+		return err
+	}
+
+	if !isUpdatable {
+		err := fmt.Errorf("resource %q does not support update verb", gvr.String())
+		logger.Error(err, "resource is not able to be migrated, not retrying", "gvr", gvr.String())
+		err = rv.setMigrationError(ctx, toBeProcessedSVM, "resource is not migratable, check if update, patch, and list operations are supported")
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -283,4 +292,37 @@ func (rv *ResourceVersionController) isResourceNamespaceScoped(gvr schema.GroupV
 	}
 
 	return false, fmt.Errorf("resource %q not found", gvr.String())
+}
+
+func (rv *ResourceVersionController) isResourceMigratable(gvr schema.GroupVersionResource) (bool, error) {
+	resourceList, err := rv.discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
+	if err != nil {
+		return false, err
+	}
+
+	for _, resource := range resourceList.APIResources {
+		if resource.Name == gvr.Resource {
+			verbs := sets.NewString(resource.Verbs...)
+			if resource.Verbs != nil && verbs.Has("update") && verbs.Has("patch") && verbs.Has("list") {
+				return true, nil
+			}
+			return false, nil
+		}
+	}
+
+	return false, fmt.Errorf("resource %q not found", gvr.String())
+}
+
+func (rv *ResourceVersionController) setMigrationError(ctx context.Context, svm *svmv1alpha1.StorageVersionMigration, message string) error {
+	_, err := rv.kubeClient.StoragemigrationV1alpha1().
+		StorageVersionMigrations().
+		UpdateStatus(
+			ctx,
+			setStatusConditions(svm, svmv1alpha1.MigrationFailed, migrationFailedStatusReason, message),
+			metav1.UpdateOptions{},
+		)
+	if err != nil {
+		return err
+	}
+	return nil
 }

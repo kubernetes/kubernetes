@@ -25,11 +25,8 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -56,7 +53,6 @@ type SVMController struct {
 	controllerName         string
 	kubeClient             kubernetes.Interface
 	dynamicClient          *dynamic.DynamicClient
-	discoveryClient        discovery.DiscoveryInterface
 	svmListers             svmlisters.StorageVersionMigrationLister
 	svmSynced              cache.InformerSynced
 	queue                  workqueue.TypedRateLimitingInterface[string]
@@ -68,7 +64,6 @@ func NewSVMController(
 	ctx context.Context,
 	kubeClient kubernetes.Interface,
 	dynamicClient *dynamic.DynamicClient,
-	discoveryClient discovery.DiscoveryInterface,
 	svmInformer svminformers.StorageVersionMigrationInformer,
 	controllerName string,
 	mapper meta.ResettableRESTMapper,
@@ -79,7 +74,6 @@ func NewSVMController(
 	svmController := &SVMController{
 		kubeClient:             kubeClient,
 		dynamicClient:          dynamicClient,
-		discoveryClient:        discoveryClient,
 		controllerName:         controllerName,
 		svmListers:             svmInformer.Lister(),
 		svmSynced:              svmInformer.Informer().HasSynced,
@@ -200,17 +194,6 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 	toBeProcessedSVM := svm.DeepCopy()
 
 	gvr := getGVRFromResource(toBeProcessedSVM)
-
-	isUpdatable, err := svmc.isResourceUpdatable(gvr)
-	if err != nil {
-		return err
-	}
-
-	if !isUpdatable {
-		err := fmt.Errorf("resource %q does not support update verb", gvr.String())
-		logger.Error(err, "resource is not able to be migrated, not retrying", "gvr", gvr.String())
-		return nil
-	}
 
 	if IsConditionTrue(toBeProcessedSVM, svmv1alpha1.MigrationSucceeded) || IsConditionTrue(toBeProcessedSVM, svmv1alpha1.MigrationFailed) {
 		logger.V(4).Info("Migration has already succeeded or failed previously, skipping", "svm", name)
@@ -355,24 +338,6 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 
 	logger.V(4).Info("Finished syncing svm resource", "key", key, "gvr", gvr.String(), "elapsed", time.Since(startTime))
 	return nil
-}
-
-func (sv *SVMController) isResourceUpdatable(gvr schema.GroupVersionResource) (bool, error) {
-	resourceList, err := sv.discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
-	if err != nil {
-		return false, err
-	}
-
-	for _, resource := range resourceList.APIResources {
-		if resource.Name == gvr.Resource {
-			if resource.Verbs != nil && sets.NewString(resource.Verbs...).Has("update") {
-				return true, nil
-			}
-			return false, nil
-		}
-	}
-
-	return false, fmt.Errorf("resource %q not found", gvr.String())
 }
 
 type typeMetaUIDRV struct {

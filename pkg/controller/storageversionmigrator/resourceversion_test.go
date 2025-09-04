@@ -36,13 +36,14 @@ func TestIsResourceUpdatable(t *testing.T) {
 		wantErr   bool
 	}{
 		{
-			name: "updatable resource",
+			name: "migratable resource",
 			resources: []*metav1.APIResourceList{
 				{
 					GroupVersion: "v1",
 					APIResources: []metav1.APIResource{
 						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
 						{Name: "events", Namespaced: true, Kind: "Event", Verbs: []string{"get", "list", "watch", "create", "delete"}},
+						{Name: "configmaps", Namespaced: true, Kind: "Event", Verbs: []string{"get", "watch", "create", "delete", "update", "patch", "delete"}},
 					},
 				},
 			},
@@ -57,10 +58,42 @@ func TestIsResourceUpdatable(t *testing.T) {
 					APIResources: []metav1.APIResource{
 						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
 						{Name: "events", Namespaced: true, Kind: "Event", Verbs: []string{"get", "list", "watch", "create", "delete"}},
+						{Name: "configmaps", Namespaced: true, Kind: "Event", Verbs: []string{"get", "watch", "create", "delete", "update", "patch", "delete"}},
 					},
 				},
 			},
 			resource: schema.GroupVersionResource{Group: "", Version: "v1", Resource: "events"},
+			want:     false,
+		},
+		{
+			name: "non-patchable resource",
+			resources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
+						{Name: "events", Namespaced: true, Kind: "Event", Verbs: []string{"get", "list", "watch", "create", "delete"}},
+						{Name: "configmaps", Namespaced: true, Kind: "Event", Verbs: []string{"get", "watch", "create", "delete", "update", "patch", "delete"}},
+						{Name: "secrets", Namespaced: true, Kind: "Event", Verbs: []string{"get", "watch", "create", "delete", "update", "delete"}},
+					},
+				},
+			},
+			resource: schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"},
+			want:     false,
+		},
+		{
+			name: "non-listable resource",
+			resources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
+						{Name: "events", Namespaced: true, Kind: "Event", Verbs: []string{"get", "list", "watch", "create", "delete"}},
+						{Name: "configmaps", Namespaced: true, Kind: "Event", Verbs: []string{"get", "watch", "create", "delete", "update", "patch", "delete"}},
+					},
+				},
+			},
+			resource: schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"},
 			want:     false,
 		},
 		{
@@ -71,6 +104,7 @@ func TestIsResourceUpdatable(t *testing.T) {
 					APIResources: []metav1.APIResource{
 						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
 						{Name: "events", Namespaced: true, Kind: "Event", Verbs: []string{"get", "list", "watch", "create", "delete"}},
+						{Name: "configmaps", Namespaced: true, Kind: "Event", Verbs: []string{"get", "watch", "create", "delete", "update", "patch", "delete"}},
 					},
 				},
 			},
@@ -85,11 +119,11 @@ func TestIsResourceUpdatable(t *testing.T) {
 			defer server.Close()
 			discoveryClient := fakediscovery.FakeDiscovery{Fake: &kubetesting.Fake{}}
 			discoveryClient.Resources = tc.resources
-			svmController := &SVMController{
+			rvController := ResourceVersionController{
 				discoveryClient: &discoveryClient,
 			}
 
-			isUpdatable, err := svmController.isResourceUpdatable(tc.resource)
+			isUpdatable, err := rvController.isResourceMigratable(tc.resource)
 			if err != nil {
 				if !tc.wantErr {
 					t.Errorf("Unexpected error: %v", err)
