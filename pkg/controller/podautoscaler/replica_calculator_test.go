@@ -2477,3 +2477,21 @@ func TestCalculatePodRequestsFromContainers_NonExistentContainer(t *testing.T) {
 	assert.Equal(t, expectedErr, err.Error(), "error message should match expected format")
 	assert.Equal(t, int64(0), request, "request should be 0 when container does not exist")
 }
+
+func TestReplicaCalcExternalMetricUsageOverflow(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 3,
+		metric: &metricInfo{
+			name: "qps",
+			// Two values that when added together will overflow int64
+			levels:        []int64{math.MaxInt64/2 + 1, math.MaxInt64/2 + 1},
+			targetUsage:   math.MaxInt64, // Set high target
+			metricType:    externalMetric,
+			selector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			expectedUsage: math.MaxInt64, // expect capped value
+
+		},
+	}
+	tc.runTest(t)
+}
