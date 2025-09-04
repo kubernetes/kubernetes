@@ -533,14 +533,12 @@ func (f *featureGate) AddDependencies(dependencies map[Feature][]Feature) error 
 		switch p {
 		case Deprecated:
 			return 0 // Non-deprecated features cannot depend on deprecated features.
-		case PreAlpha:
+		case PreAlpha, Alpha: // Alpha features are allowed to depend on pre-alpha features.
 			return 1
-		case Alpha:
-			return 2
 		case Beta:
-			return 3
+			return 2
 		case GA:
-			return 4
+			return 3
 		default:
 			return -1 // Unknown prerelease
 		}

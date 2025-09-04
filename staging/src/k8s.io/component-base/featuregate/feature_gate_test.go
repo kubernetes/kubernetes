@@ -2038,6 +2038,14 @@ func TestAddDependencies(t *testing.T) {
 			expectedErr: "BETA feature FeatureA cannot depend on ALPHA feature FeatureB at version 1.30",
 		},
 		{
+			name: "valid: alpha feature depending on pre-alpha",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Alpha}, {Version: v131, PreRelease: Beta}},
+				fB: {{Version: v130, PreRelease: Alpha}, {Version: v131, PreRelease: Beta}},
+			},
+			newDeps: map[Feature][]Feature{fA: {fB}},
+		},
+		{
 			name: "valid: default-enabled depends on default-enabled",
 			features: map[Feature]VersionedSpecs{
 				fA: {{Version: v129, PreRelease: Beta, Default: true}},
