@@ -1274,9 +1274,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(OrphanPodCleanedVolumes)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumesErrors)
 
-		for _, collector := range collectors {
-			legacyregistry.CustomMustRegister(collector)
-		}
+		legacyregistry.CustomMustRegister(collectors...)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) &&
 			utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
