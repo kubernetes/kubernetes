@@ -18,12 +18,18 @@ package volumeattachment
 
 import (
 	"context"
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/generic"
+	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -153,4 +159,35 @@ func (volumeAttachmentStatusStrategy) PrepareForUpdate(ctx context.Context, obj,
 			}
 		}
 	}
+}
+
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	va, ok := obj.(*storage.VolumeAttachment)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a volumeattachment")
+	}
+	return va.Labels, SelectableFields(va), nil
+}
+
+// Matcher returns a selection predicate for a given label and field selector.
+func Matcher(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
+	return pkgstorage.SelectionPredicate{
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
+	}
+}
+
+// SelectableFields returns a field set that can be used for filter selection
+func SelectableFields(va *storage.VolumeAttachment) fields.Set {
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&va.ObjectMeta, false)
+	vaSpecificFieldsSet := fields.Set{
+		"spec.nodeName": va.Spec.NodeName,
+		"spec.attacher": va.Spec.Attacher,
+	}
+	if va.Spec.Source.PersistentVolumeName != nil {
+		vaSpecificFieldsSet["spec.persistentVolumeName"] = *va.Spec.Source.PersistentVolumeName
+	}
+	return generic.MergeFieldsSets(objectMetaFieldsSet, vaSpecificFieldsSet)
 }
