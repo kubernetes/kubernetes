@@ -8,7 +8,7 @@
       "name": "deviceclasses",
       "namespaced": false,
       "singularName": "deviceclass",
-      "storageVersionHash": "weQRMT6DeYM=",
+      "storageVersionHash": "Yk2PTc1Ybxk=",
       "verbs": [
         "create",
         "delete",
@@ -25,7 +25,7 @@
       "name": "resourceclaims",
       "namespaced": true,
       "singularName": "resourceclaim",
-      "storageVersionHash": "EJAWH5WrAYg=",
+      "storageVersionHash": "wgAZaHcZxUg=",
       "verbs": [
         "create",
         "delete",
@@ -53,7 +53,7 @@
       "name": "resourceclaimtemplates",
       "namespaced": true,
       "singularName": "resourceclaimtemplate",
-      "storageVersionHash": "24m0okHrUtk=",
+      "storageVersionHash": "TuzjC49aUfM=",
       "verbs": [
         "create",
         "delete",
@@ -70,7 +70,7 @@
       "name": "resourceslices",
       "namespaced": false,
       "singularName": "resourceslice",
-      "storageVersionHash": "z6Bc9vgk6yE=",
+      "storageVersionHash": "KsC072WgaEY=",
       "verbs": [
         "create",
         "delete",
