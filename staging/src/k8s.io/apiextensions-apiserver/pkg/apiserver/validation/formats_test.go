@@ -165,6 +165,12 @@ func TestGetUnrecognizedFormats(t *testing.T) {
 			expectedFormats:      []string{"unknown-format"},
 		},
 		{
+			name:                 "recognizes int32 at version 1.0",
+			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "int32"}},
+			compatibilityVersion: version.MajorMinor(1, 0),
+			expectedFormats:      []string{},
+		},
+		{
 			name:                 "recognized format with normalization",
 			schema:               &spec.Schema{SchemaProps: spec.SchemaProps{Format: "k8s-short-name"}},
 			compatibilityVersion: version.MajorMinor(1, 34),

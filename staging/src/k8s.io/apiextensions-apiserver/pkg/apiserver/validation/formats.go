@@ -58,6 +58,10 @@ var supportedVersionedFormats = []versionedFormats{
 			"date",         // a date string like "2006-01-02" as defined by full-date in RFC3339
 			"duration",     // a duration string like "22 ns" as parsed by Golang time.ParseDuration or compatible with Scala duration format
 			"datetime",     // a date time string like "2014-12-15T19:30:20.000Z" as defined by date-time in RFC3339
+			"float",        // a number with a Golang type of float32
+			"double",       // a number with a Golang type of float64
+			"int32",        // a number with a Golang type of int32
+			"int64",        // a number with a Golang type of int64
 		),
 	},
 	{
