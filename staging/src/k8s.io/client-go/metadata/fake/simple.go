@@ -360,15 +360,16 @@ func (c *metadataResourceClient) List(ctx context.Context, opts metav1.ListOptio
 }
 
 func (c *metadataResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	gvkFakeList := schema.GroupVersionKind{Group: "fake-metadata-client-group", Version: "v1", Kind: "List"}
 	opts.Watch = true
 	switch {
 	case len(c.namespace) == 0:
 		return c.client.Fake.
-			InvokesWatch(testing.NewRootWatchAction(c.resource, opts))
+			InvokesWatch(testing.NewRootWatchAction(c.resource, gvkFakeList, opts))
 
 	case len(c.namespace) > 0:
 		return c.client.Fake.
-			InvokesWatch(testing.NewWatchAction(c.resource, c.namespace, opts))
+			InvokesWatch(testing.NewWatchAction(c.resource, gvkFakeList, c.namespace, opts))
 	}
 
 	panic("math broke")
