@@ -58,6 +58,20 @@ type Helper struct {
 	// FieldValidation is the directive used to indicate how the server should perform
 	// field validation (Ignore, Warn, or Strict)
 	FieldValidation string
+
+	// ctx is an optional context that will be used for all REST requests made by this Helper.
+	// Adding context allows timeout, cancellation, and deadline control for API calls,
+	// which is especially useful for operations like delete where we want to respect user-specified timeouts.
+	ctx context.Context
+}
+
+// WithContext returns a shallow copy of the Helper with the provided context.
+// This ensures immutability of the original Helper and allows chaining.
+// The context is used to control request lifetime (e.g., timeout, cancel).
+func (h *Helper) WithContext(ctx context.Context) *Helper {
+    copy := *h
+    copy.ctx = ctx
+    return &copy
 }
 
 // NewHelper creates a Helper from a ResourceMapping
@@ -193,23 +207,9 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 	if m.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
-
-	return m.RESTClient.Delete().
-		NamespaceIfScoped(namespace, m.NamespaceScoped).
-		Resource(m.Resource).
-		Name(name).
-		Body(options).
-		Do(context.TODO()).
-		Get()
-}
-
-// DeleteWithOptionsWithContext performs a DELETE request with the given context for timeout control
-func (m *Helper) DeleteWithOptionsWithContext(ctx context.Context, namespace, name string, options *metav1.DeleteOptions) (runtime.Object, error) {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	if m.ServerDryRun {
-		options.DryRun = []string{metav1.DryRunAll}
+	ctx := m.ctx
+	if ctx == nil {
+		ctx = context.TODO()
 	}
 
 	return m.RESTClient.Delete().

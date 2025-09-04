@@ -492,7 +492,8 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 	deleteResponse, err := resource.
 		NewHelper(info.Client, info.Mapping).
 		DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
-		DeleteWithOptionsWithContext(ctx, info.Namespace, info.Name, deleteOptions)
+		WithContext(ctx).
+		DeleteWithOptions(info.Namespace, info.Name, deleteOptions)
 	if err != nil {
 		// Check if the error is due to timeout
 		if ctx.Err() == context.DeadlineExceeded {
