@@ -51,11 +51,11 @@ func TestBasic(t *testing.T) {
 		queueShutDown func(workqueue.Interface)
 	}{
 		{
-			queue:         workqueue.New(),
+			queue:         workqueue.NewTyped[any](),
 			queueShutDown: workqueue.Interface.ShutDown,
 		},
 		{
-			queue:         workqueue.New(),
+			queue:         workqueue.NewTyped[any](),
 			queueShutDown: workqueue.Interface.ShutDownWithDrain,
 		},
 	}
@@ -115,11 +115,11 @@ func TestAddWhileProcessing(t *testing.T) {
 		queueShutDown func(workqueue.Interface)
 	}{
 		{
-			queue:         workqueue.New(),
+			queue:         workqueue.NewTyped[any](),
 			queueShutDown: workqueue.Interface.ShutDown,
 		},
 		{
-			queue:         workqueue.New(),
+			queue:         workqueue.NewTyped[any](),
 			queueShutDown: workqueue.Interface.ShutDownWithDrain,
 		},
 	}
@@ -170,7 +170,7 @@ func TestAddWhileProcessing(t *testing.T) {
 }
 
 func TestLen(t *testing.T) {
-	q := workqueue.New()
+	q := workqueue.NewTyped[any]()
 	q.Add("foo")
 	if e, a := 1, q.Len(); e != a {
 		t.Errorf("Expected %v, got %v", e, a)
@@ -186,7 +186,7 @@ func TestLen(t *testing.T) {
 }
 
 func TestReinsert(t *testing.T) {
-	q := workqueue.New()
+	q := workqueue.NewTyped[any]()
 	q.Add("foo")
 
 	// Start processing
@@ -217,7 +217,7 @@ func TestReinsert(t *testing.T) {
 
 func TestCollapse(t *testing.T) {
 	tq := &traceQueue{Queue: workqueue.DefaultQueue[any]()}
-	q := workqueue.NewWithConfig(workqueue.QueueConfig{
+	q := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{
 		Name:  "",
 		Queue: tq,
 	})
@@ -246,7 +246,7 @@ func TestCollapse(t *testing.T) {
 
 func TestCollapseWhileProcessing(t *testing.T) {
 	tq := &traceQueue{Queue: workqueue.DefaultQueue[any]()}
-	q := workqueue.NewWithConfig(workqueue.QueueConfig{
+	q := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{
 		Name:  "",
 		Queue: tq,
 	})
@@ -299,7 +299,7 @@ func TestCollapseWhileProcessing(t *testing.T) {
 
 func TestQueueDrainageUsingShutDownWithDrain(t *testing.T) {
 
-	q := workqueue.New()
+	q := workqueue.NewTyped[any]()
 
 	q.Add("foo")
 	q.Add("bar")
@@ -331,7 +331,7 @@ func TestQueueDrainageUsingShutDownWithDrain(t *testing.T) {
 
 func TestNoQueueDrainageUsingShutDown(t *testing.T) {
 
-	q := workqueue.New()
+	q := workqueue.NewTyped[any]()
 
 	q.Add("foo")
 	q.Add("bar")
@@ -354,7 +354,7 @@ func TestNoQueueDrainageUsingShutDown(t *testing.T) {
 
 func TestForceQueueShutdownUsingShutDown(t *testing.T) {
 
-	q := workqueue.New()
+	q := workqueue.NewTyped[any]()
 
 	q.Add("foo")
 	q.Add("bar")
@@ -386,7 +386,7 @@ func TestForceQueueShutdownUsingShutDown(t *testing.T) {
 }
 
 func TestQueueDrainageUsingShutDownWithDrainWithDirtyItem(t *testing.T) {
-	q := workqueue.New()
+	q := workqueue.NewTyped[any]()
 
 	q.Add("foo")
 	gotten, _ := q.Get()
@@ -431,7 +431,7 @@ func TestGarbageCollection(t *testing.T) {
 	type bigObject struct {
 		data []byte
 	}
-	leakQueue := workqueue.New()
+	leakQueue := workqueue.NewTyped[any]()
 	t.Cleanup(func() {
 		// Make sure leakQueue doesn't go out of scope too early
 		runtime.KeepAlive(leakQueue)
