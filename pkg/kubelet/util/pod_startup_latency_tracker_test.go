@@ -145,9 +145,9 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		if !ok {
 			t.Errorf("expected to track pod: %s, but pod not found", podInit.UID)
 		}
-		if !podState.lastFinishedPulling.Equal(podState.firstStartedPulling.Add(time.Millisecond * 100)) {
-			t.Errorf("expected pod firstStartedPulling: %s and lastFinishedPulling: %s but got firstStartedPulling: %s and lastFinishedPulling: %s",
-				podState.firstStartedPulling, podState.firstStartedPulling.Add(time.Millisecond*100), podState.firstStartedPulling, podState.lastFinishedPulling)
+
+		if len(podState.imagePullSessions) != 1 {
+			t.Errorf("expected one image pull session to be recorded")
 		}
 
 		podStarted := buildRunningPod()
@@ -170,7 +170,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 
 func TestSinglePodMultipleDownloadsAndRestartsRecorded(t *testing.T) {
 
-	t.Run("single pod; started in 30s, image pulling between 10th and 20th seconds", func(t *testing.T) {
+	t.Run("single pod; started in 30s, overlapping image pulling between 10th and 20th seconds", func(t *testing.T) {
 
 		wants := `
 # HELP kubelet_pod_start_sli_duration_seconds [ALPHA] Duration in seconds to start a pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch
@@ -216,21 +216,19 @@ kubelet_pod_start_sli_duration_seconds_count 1
 
 		podInitializing := buildInitializingPod()
 		tracker.ObservedPodOnWatch(podInitializing, frozenTime)
-
-		// image pulling started at 10s and the last one finished at 30s
-		// first image starts pulling at 10s
+		// Image 1: 10-16s
 		fakeClock.SetTime(frozenTime.Add(time.Second * 10))
 		tracker.RecordImageStartedPulling(podInitializing.UID)
-		// second image starts pulling at 11s
+		// Image 2: 11-18s
 		fakeClock.SetTime(frozenTime.Add(time.Second * 11))
 		tracker.RecordImageStartedPulling(podInitializing.UID)
-		// third image starts pulling at 14s
+		// Image 3: 14-20s
 		fakeClock.SetTime(frozenTime.Add(time.Second * 14))
 		tracker.RecordImageStartedPulling(podInitializing.UID)
-		// first image finished pulling at 18s
+		fakeClock.SetTime(frozenTime.Add(time.Second * 16))
+		tracker.RecordImageFinishedPulling(podInitializing.UID)
 		fakeClock.SetTime(frozenTime.Add(time.Second * 18))
 		tracker.RecordImageFinishedPulling(podInitializing.UID)
-		// second and third finished pulling at 20s
 		fakeClock.SetTime(frozenTime.Add(time.Second * 20))
 		tracker.RecordImageFinishedPulling(podInitializing.UID)
 
@@ -238,13 +236,13 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		if !ok {
 			t.Errorf("expected to track pod: %s, but pod not found", podInitializing.UID)
 		}
-		if !podState.firstStartedPulling.Equal(frozenTime.Add(time.Second * 10)) { // second and third image start pulling should not affect pod firstStartedPulling
-			t.Errorf("expected pod firstStartedPulling: %s but got firstStartedPulling: %s",
-				podState.firstStartedPulling.Add(time.Second*10), podState.firstStartedPulling)
+		if len(podState.imagePullSessions) != 3 {
+			t.Errorf("expected 3 image pull sessions but got %d", len(podState.imagePullSessions))
 		}
-		if !podState.lastFinishedPulling.Equal(frozenTime.Add(time.Second * 20)) { // should be updated when the pod's last image finished pulling
-			t.Errorf("expected pod lastFinishedPulling: %s but got lastFinishedPulling: %s",
-				podState.lastFinishedPulling.Add(time.Second*20), podState.lastFinishedPulling)
+		totalTime := calculateImagePullingTime(podState.imagePullSessions)
+		expectedTime := time.Second * 10
+		if totalTime != expectedTime {
+			t.Errorf("expected total pulling time: %v but got %v", expectedTime, totalTime)
 		}
 
 		// pod started
@@ -266,6 +264,119 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
 			t.Fatal(err)
 		}
+
+		// cleanup
+		tracker.DeletePodStartupState(podStarted.UID)
+
+		assert.Empty(t, tracker.pods)
+		metrics.PodStartSLIDuration.Reset()
+	})
+}
+
+func TestPodWithInitContainersAndMainContainers(t *testing.T) {
+
+	t.Run("single pod with multiple init containers and main containers", func(t *testing.T) {
+
+		wants := `
+# HELP kubelet_pod_start_sli_duration_seconds [ALPHA] Duration in seconds to start a pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch
+# TYPE kubelet_pod_start_sli_duration_seconds histogram
+kubelet_pod_start_sli_duration_seconds_bucket{le="0.5"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{le="1"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{le="2"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{le="3"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{le="4"} 0
+kubelet_pod_start_sli_duration_seconds_bucket{le="5"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="6"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="8"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="10"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="20"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="30"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="45"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="60"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="120"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="180"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="240"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="300"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="360"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="480"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="600"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="900"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="1200"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="1800"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="2700"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="3600"} 1
+kubelet_pod_start_sli_duration_seconds_bucket{le="+Inf"} 1
+kubelet_pod_start_sli_duration_seconds_sum 4.2
+kubelet_pod_start_sli_duration_seconds_count 1
+		`
+
+		fakeClock := testingclock.NewFakeClock(frozenTime)
+
+		metrics.Register()
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods:  map[types.UID]*perPodState{},
+			clock: fakeClock,
+		}
+
+		podInit := buildInitializingPod("init-1", "init-2")
+		tracker.ObservedPodOnWatch(podInit, frozenTime)
+
+		// Init container 1 image pull: 0.5s-1.5s
+		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 500))
+		tracker.RecordImageStartedPulling(podInit.UID)
+		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 1500))
+		tracker.RecordImageFinishedPulling(podInit.UID)
+		// Init container 1 runtime: 2s-4s
+		fakeClock.SetTime(frozenTime.Add(time.Second * 2))
+		tracker.RecordInitContainerStarted(types.UID(uid), fakeClock.Now())
+		fakeClock.SetTime(frozenTime.Add(time.Second * 4))
+		tracker.RecordInitContainerFinished(types.UID(uid), fakeClock.Now())
+
+		// Init container 2 image pull: 4.2s-5.2s (sequential - after init-1 completes)
+		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 4200))
+		tracker.RecordImageStartedPulling(podInit.UID)
+		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 5200))
+		tracker.RecordImageFinishedPulling(podInit.UID)
+		// Init container 2 runtime: 5.5s-7s
+		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 5500))
+		tracker.RecordInitContainerStarted(types.UID(uid), fakeClock.Now())
+		fakeClock.SetTime(frozenTime.Add(time.Second * 7))
+		tracker.RecordInitContainerFinished(types.UID(uid), fakeClock.Now())
+
+		// Main container 1 image pull: 7.2s-8.2s
+		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 7200))
+		tracker.RecordImageStartedPulling(podInit.UID)
+		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 8200))
+		tracker.RecordImageFinishedPulling(podInit.UID)
+		// Main container 2 image pull: 7.3s-8.5s
+		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 7300))
+		tracker.RecordImageStartedPulling(podInit.UID)
+		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 8500))
+		tracker.RecordImageFinishedPulling(podInit.UID)
+
+		// Pod becomes running at 11s
+		podStarted := buildRunningPod()
+		tracker.RecordStatusUpdated(podStarted)
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*11))
+
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
+			t.Fatal(err)
+		}
+
+		state := tracker.pods[types.UID(uid)]
+		assert.NotNil(t, state, "Pod state should exist")
+
+		expectedInitRuntime := 2*time.Second + 1500*time.Millisecond
+		assert.Equal(t, expectedInitRuntime, state.totalInitContainerRuntime,
+			"Total init container runtime should be 3.5s (2s + 1.5s)")
+
+		totalImageTime := calculateImagePullingTime(state.imagePullSessions)
+		expectedImageTime := 3300 * time.Millisecond // 1s + 1s + 1.3s concurrent overlap
+		assert.Equal(t, expectedImageTime, totalImageTime,
+			"Image pulling time should be 3.3s: init-1(1s) + init-2(1s) + concurrent-main(1.3s)")
+
+		assert.Len(t, state.imagePullSessions, 4, "Should have 4 image pull sessions")
 
 		// cleanup
 		tracker.DeletePodStartupState(podStarted.UID)
@@ -338,10 +449,20 @@ kubelet_first_network_pod_start_sli_duration_seconds 30
 	})
 }
 
-func buildInitializingPod() *corev1.Pod {
-	return buildPodWithStatus([]corev1.ContainerStatus{
+func buildInitializingPod(initContainerNames ...string) *corev1.Pod {
+	pod := buildPodWithStatus([]corev1.ContainerStatus{
 		{State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "PodInitializing"}}},
 	})
+
+	// Add init containers if specified
+	if len(initContainerNames) > 0 {
+		pod.Spec.InitContainers = make([]corev1.Container, len(initContainerNames))
+		for i, name := range initContainerNames {
+			pod.Spec.InitContainers[i] = corev1.Container{Name: name}
+		}
+	}
+
+	return pod
 }
 
 func buildRunningPod() *corev1.Pod {
