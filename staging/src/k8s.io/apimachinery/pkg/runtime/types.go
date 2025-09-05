@@ -35,6 +35,8 @@ package runtime
 // +k8s:deepcopy-gen=false
 // +protobuf=true
 // +k8s:openapi-gen=true
+// +k8s:openapi-model-gen=true
+// +modelName=io.k8s.apimachinery.pkg.runtime.TypeMeta
 type TypeMeta struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
@@ -100,6 +102,8 @@ const (
 // +k8s:deepcopy-gen=true
 // +protobuf=true
 // +k8s:openapi-gen=true
+// +k8s:openapi-model-gen=true
+// +modelName=io.k8s.apimachinery.pkg.runtime.RawExtension
 type RawExtension struct {
 	// Raw is the underlying serialization of this object.
 	//
@@ -120,6 +124,8 @@ type RawExtension struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +protobuf=true
 // +k8s:openapi-gen=true
+// +k8s:openapi-model-gen=true
+// +modelName=io.k8s.apimachinery.pkg.runtime.Unknown
 type Unknown struct {
 	TypeMeta `json:",inline" protobuf:"bytes,1,opt,name=typeMeta"`
 	// Raw will hold the complete serialized object which couldn't be matched

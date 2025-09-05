@@ -27,6 +27,9 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/controller-manager/config/v1alpha1
 // +k8s:openapi-gen=true
 // +k8s:defaulter-gen=TypeMeta
+// +k8s:openapi-model-gen=true
+
 // +groupName=cloudcontrollermanager.config.k8s.io
+// +modelPackageName=io.k8s.cloud-provider.config.v1alpha1
 
 package v1alpha1

@@ -18,7 +18,10 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-gen=true
+
 // +groupName=admissionregistration.k8s.io
+// +modelPackageName=io.k8s.api.admissionregistration.v1alpha1
 
 // Package v1alpha1 is the v1alpha1 version of the API.
 package v1alpha1

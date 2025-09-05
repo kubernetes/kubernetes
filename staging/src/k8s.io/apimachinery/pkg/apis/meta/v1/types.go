@@ -1560,6 +1560,8 @@ type PartialObjectMetadata struct {
 
 // PartialObjectMetadataList contains a list of objects containing only their metadata
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:openapi-model-gen=true
+// +modelName=io.k8s.apimachinery.pkg.apis.meta.v1.PartialObjectMetadataList
 type PartialObjectMetadataList struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.

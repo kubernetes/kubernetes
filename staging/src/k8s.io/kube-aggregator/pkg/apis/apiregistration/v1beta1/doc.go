@@ -18,9 +18,12 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +k8s:conversion-gen=k8s.io/kube-aggregator/pkg/apis/apiregistration
 // +k8s:openapi-gen=true
-// +groupName=apiregistration.k8s.io
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-gen=true
+
+// +groupName=apiregistration.k8s.io
+// +modelPackageName=io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1
 
 // Package v1beta1 contains the API Registration API, which is responsible for
 // registering an API `Group`/`Version` with another kubernetes like API server.

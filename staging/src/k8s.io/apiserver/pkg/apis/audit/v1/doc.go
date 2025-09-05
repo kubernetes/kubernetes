@@ -19,7 +19,9 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/apiserver/pkg/apis/audit
 // +k8s:openapi-gen=true
 // +k8s:defaulter-gen=TypeMeta
+// +k8s:openapi-model-gen=true
 
 // +groupName=audit.k8s.io
+// +modelPackageName=io.k8s.apiserver.pkg.apis.audit.v1
 
 package v1

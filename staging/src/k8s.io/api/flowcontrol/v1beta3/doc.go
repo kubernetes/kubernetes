@@ -18,8 +18,10 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-gen=true
 
 // +groupName=flowcontrol.apiserver.k8s.io
+// +modelPackageName=io.k8s.api.flowcontrol.v1beta3
 
 // Package v1beta3 holds api types of version v1beta3 for group "flowcontrol.apiserver.k8s.io".
 package v1beta3

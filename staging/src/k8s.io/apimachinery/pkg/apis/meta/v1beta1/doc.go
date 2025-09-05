@@ -17,7 +17,9 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:openapi-gen=true
 // +k8s:defaulter-gen=TypeMeta
+// +k8s:openapi-model-gen=true
 
 // +groupName=meta.k8s.io
+// +modelPackageName=io.k8s.apimachinery.pkg.apis.meta.v1beta1
 
 package v1beta1

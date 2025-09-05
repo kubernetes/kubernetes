@@ -18,7 +18,9 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-gen=true
 
 // +groupName=coordination.k8s.io
+// +modelPackageName=io.k8s.api.coordination.v1
 
 package v1
