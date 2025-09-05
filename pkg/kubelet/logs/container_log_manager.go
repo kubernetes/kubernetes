@@ -167,7 +167,13 @@ func (c *containerLogManager) Clean(ctx context.Context, containerID string) err
 	if resp.GetStatus() == nil {
 		return fmt.Errorf("container status is nil for %q", containerID)
 	}
-	pattern := fmt.Sprintf("%s*", resp.GetStatus().GetLogPath())
+
+	logPath := resp.GetStatus().GetLogPath()
+	if logPath == "" || logPath == "/" {
+		return fmt.Errorf("invalid container logs path for %q: %q", containerID, logPath)
+	}
+
+	pattern := fmt.Sprintf("%s*", logPath)
 	logs, err := c.osInterface.Glob(pattern)
 	if err != nil {
 		return fmt.Errorf("failed to list all log files with pattern %q: %w", pattern, err)

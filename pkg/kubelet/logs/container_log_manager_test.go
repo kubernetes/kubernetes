@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	containertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	critest "k8s.io/cri-api/pkg/apis/testing"
@@ -187,6 +188,59 @@ func TestRotateLogs(t *testing.T) {
 	assert.Equal(t, testLogs[4]+compressSuffix, logs[2].Name())
 	assert.Equal(t, testLogs[2]+"."+timestamp, logs[3].Name())
 	assert.Equal(t, testLogs[3], logs[4].Name())
+}
+
+func TestSafeLogsPath(t *testing.T) {
+	ctx := context.Background()
+	fakeOS := &containertesting.FakeOS{}
+
+	now := time.Now()
+	f := critest.NewFakeRuntimeService()
+	c := &containerLogManager{
+		runtimeService: f,
+		policy:         LogRotatePolicy{},
+		osInterface:    fakeOS,
+		clock:          testingclock.NewFakeClock(now),
+		mutex:          sync.Mutex{},
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
+		),
+		maxWorkers:       10,
+		monitoringPeriod: v1.Duration{Duration: 10 * time.Second},
+	}
+
+	f.SetFakeContainers([]*critest.FakeContainer{
+		{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:      "unsafe-log-container-1",
+				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
+				LogPath: "",
+			},
+		},
+		{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:      "unsafe-log-container-2",
+				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
+				LogPath: "/",
+			},
+		},
+		{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:      "safe-log-container",
+				State:   runtimeapi.ContainerState_CONTAINER_RUNNING,
+				LogPath: "/var/log/containers-1",
+			},
+		},
+	})
+	err := c.Clean(ctx, "unsafe-log-container-1")
+	require.Error(t, err)
+
+	err = c.Clean(ctx, "unsafe-log-container-2")
+	require.Error(t, err)
+
+	err = c.Clean(ctx, "safe-log-container")
+	require.NoError(t, err)
 }
 
 func TestClean(t *testing.T) {
