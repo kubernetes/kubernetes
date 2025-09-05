@@ -55,8 +55,8 @@ const (
 	objectMetaSchemaRef = "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
 	listMetaSchemaRef   = "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
 
-	typeMetaType   = "k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta"
-	objectMetaType = "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"
+	typeMetaType   = "io.k8s.apimachinery.pkg.apis.meta.v1.TypeMeta"
+	objectMetaType = "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
 
 	definitionPrefix   = "#/definitions/"
 	v3DefinitionPrefix = "#/components/schemas/"
