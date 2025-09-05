@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	resourceapi "k8s.io/api/resource/v1"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/dynamic-resource-allocation/structured/internal/allocatortesting"
@@ -34,7 +34,7 @@ func TestAllocator(t *testing.T) {
 			features Features,
 			allocatedState AllocatedState,
 			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
+			slices []*draapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (allocatortesting.Allocator, error) {
 			return NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)

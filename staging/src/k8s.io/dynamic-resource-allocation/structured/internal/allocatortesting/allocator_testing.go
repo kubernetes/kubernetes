@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/klog/v2/ktesting"
@@ -811,7 +812,7 @@ func TestAllocator(t *testing.T,
 		features Features,
 		allocateState AllocatedState,
 		classLister DeviceClassLister,
-		slices []*resourceapi.ResourceSlice,
+		slices []*draapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)) {
 	nonExistentAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "NonExistentAttribute")
@@ -4900,7 +4901,7 @@ func TestAllocator(t *testing.T,
 				AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
 				AggregatedCapacity:       allocatedShare,
 			}
-			allocator, err := newAllocator(ctx, tc.features, allocatedState, classLister, slices, cel.NewCache(1, cel.Features{EnableConsumableCapacity: tc.features.ConsumableCapacity}))
+			allocator, err := newAllocator(ctx, tc.features, allocatedState, classLister, toDRASlices(slices), cel.NewCache(1, cel.Features{EnableConsumableCapacity: tc.features.ConsumableCapacity}))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			if _, ok := allocator.(internal.AllocatorExtended); tc.expectNumAllocateOneInvocations > 0 && !ok {
@@ -4980,7 +4981,7 @@ func TestAllocator(t *testing.T,
 					ctx = c
 				}
 
-				allocator, err := newAllocator(ctx, Features{}, AllocatedState{}, classLister, slices, cel.NewCache(1, cel.Features{}))
+				allocator, err := newAllocator(ctx, Features{}, AllocatedState{}, classLister, toDRASlices(slices), cel.NewCache(1, cel.Features{}))
 				g.Expect(err).ToNot(gomega.HaveOccurred())
 				_, err = allocator.Allocate(ctx, node, claimsToAllocate)
 				t.Logf("got error %v", err)
@@ -4996,6 +4997,18 @@ func TestAllocator(t *testing.T,
 			})
 		}
 	})
+}
+
+func toDRASlices(slices []*resourceapi.ResourceSlice) []*draapi.ResourceSlice {
+	draSlices := make([]*draapi.ResourceSlice, len(slices))
+	for i := range slices {
+		var slice draapi.ResourceSlice
+		if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(slices[i], &slice, nil); err != nil {
+			panic(fmt.Errorf("convert ResourceSlice #%d: %w", i, err))
+		}
+		draSlices[i] = &slice
+	}
+	return draSlices
 }
 
 type informerLister[T any] struct {

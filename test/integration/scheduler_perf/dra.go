@@ -36,6 +36,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -288,7 +289,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaints:       utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
 		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
-		SliceInformer:            informerFactory.Resource().V1().ResourceSlices(),
+		SliceInformer:            draapi.NewResourceSliceInformer(informerFactory),
 		KubeClient:               tCtx.Client(),
 	}
 	if resourceSliceTrackerOpts.EnableDeviceTaints {
@@ -307,7 +308,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	expectSyncedInformers := map[reflect.Type]bool{
 		reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
 		reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-		reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
+		reflect.TypeOf(&draapi.ResourceSlice{}):      true,
 		reflect.TypeOf(&v1.Node{}):                   true,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {

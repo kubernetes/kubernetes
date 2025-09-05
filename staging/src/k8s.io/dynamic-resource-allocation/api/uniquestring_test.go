@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package api contains a variant of the API where strings are unique. These
-// unique strings are faster to compare and more efficient when used as key in
-// a map.
-//
-// +k8s:conversion-gen=k8s.io/api/resource/v1
-// +k8s:deepcopy-gen=package
 package api
+
+import "testing"
+
+// BenchmarkUniqueStrString demonstrates that retrieving the string in a unique string triggers no memory allocation.
+func BenchmarkUniqueStrString(b *testing.B) {
+	expect := "hello-world"
+	u := MakeUniqueString(expect)
+	var actual string
+	for b.Loop() {
+		actual = u.String()
+	}
+	if expect != actual {
+		b.Fatalf("expected %q, got %q", expect, actual)
+	}
+}

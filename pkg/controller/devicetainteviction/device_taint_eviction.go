@@ -46,6 +46,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
@@ -89,7 +90,7 @@ type Controller struct {
 	podInformer   coreinformers.PodInformer
 	podLister     corelisters.PodLister
 	claimInformer resourceinformers.ResourceClaimInformer
-	sliceInformer resourceinformers.ResourceSliceInformer
+	sliceInformer draapi.ResourceSliceInformer
 	taintInformer resourcealphainformers.DeviceTaintRuleInformer
 	classInformer resourceinformers.DeviceClassInformer
 	haveSynced    []cache.InformerSynced
@@ -117,17 +118,17 @@ type poolID struct {
 }
 
 type pool struct {
-	slices        sets.Set[*resourceapi.ResourceSlice]
+	slices        sets.Set[*draapi.ResourceSlice]
 	maxGeneration int64
 }
 
 // addSlice adds one slice to the pool.
-func (p *pool) addSlice(slice *resourceapi.ResourceSlice) {
+func (p *pool) addSlice(slice *draapi.ResourceSlice) {
 	if slice == nil {
 		return
 	}
 	if p.slices == nil {
-		p.slices = sets.New[*resourceapi.ResourceSlice]()
+		p.slices = sets.New[*draapi.ResourceSlice]()
 		p.maxGeneration = math.MinInt64
 	}
 	p.slices.Insert(slice)
@@ -139,7 +140,7 @@ func (p *pool) addSlice(slice *resourceapi.ResourceSlice) {
 }
 
 // removeSlice removes a slice. It must have been added before.
-func (p *pool) removeSlice(slice *resourceapi.ResourceSlice) {
+func (p *pool) removeSlice(slice *draapi.ResourceSlice) {
 	if slice == nil {
 		return
 	}
@@ -171,7 +172,7 @@ func (p pool) getTaintedDevices() []taintedDevice {
 				if taint.Effect != resourceapi.DeviceTaintEffectNoExecute {
 					continue
 				}
-				buffer = append(buffer, taintedDevice{deviceName: device.Name, taint: taint})
+				buffer = append(buffer, taintedDevice{deviceName: device.Name.String(), taint: taint})
 			}
 		}
 	}
@@ -184,13 +185,13 @@ func (p pool) getTaintedDevices() []taintedDevice {
 }
 
 // getDevice looks up one device by name. Out-dated slices are ignored.
-func (p pool) getDevice(deviceName string) *resourceapi.Device {
+func (p pool) getDevice(deviceName string) *draapi.Device {
 	for slice := range p.slices {
 		if slice.Spec.Pool.Generation != p.maxGeneration {
 			continue
 		}
 		for i := range slice.Spec.Devices {
-			if slice.Spec.Devices[i].Name == deviceName {
+			if slice.Spec.Devices[i].Name.String() == deviceName {
 				return &slice.Spec.Devices[i]
 			}
 		}
@@ -283,7 +284,7 @@ func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, podRef
 
 // New creates a new Controller that will use passed clientset to communicate with the API server.
 // Spawns no goroutines. That happens in Run.
-func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, taintInformer resourcealphainformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string) *Controller {
+func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer draapi.ResourceSliceInformer, taintInformer resourcealphainformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string) *Controller {
 	metrics.Register() // It would be nicer to pass the controller name here, but that probably would break generating https://kubernetes.io/docs/reference/instrumentation/metrics.
 
 	tc := &Controller{
@@ -485,7 +486,7 @@ func (tc *Controller) Run(ctx context.Context) error {
 
 	_, err = sliceTracker.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
-			slice, ok := obj.(*resourceapi.ResourceSlice)
+			slice, ok := obj.(*draapi.ResourceSlice)
 			if !ok {
 				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", obj))
 				return
@@ -495,12 +496,12 @@ func (tc *Controller) Run(ctx context.Context) error {
 			tc.handleSliceChange(nil, slice)
 		},
 		UpdateFunc: func(oldObj, newObj any) {
-			oldSlice, ok := oldObj.(*resourceapi.ResourceSlice)
+			oldSlice, ok := oldObj.(*draapi.ResourceSlice)
 			if !ok {
 				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", oldObj))
 				return
 			}
-			newSlice, ok := newObj.(*resourceapi.ResourceSlice)
+			newSlice, ok := newObj.(*draapi.ResourceSlice)
 			if !ok {
 				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", newObj))
 			}
@@ -510,7 +511,7 @@ func (tc *Controller) Run(ctx context.Context) error {
 		},
 		DeleteFunc: func(obj any) {
 			// No need to check for DeletedFinalStateUnknown here, the resourceslicetracker doesn't use that.
-			slice, ok := obj.(*resourceapi.ResourceSlice)
+			slice, ok := obj.(*draapi.ResourceSlice)
 			if !ok {
 				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", obj))
 				return
@@ -669,14 +670,14 @@ func (tc *Controller) evictionTime(allocation *resourceapi.AllocationResult) *me
 	return evictionTime
 }
 
-func (tc *Controller) handleSliceChange(oldSlice, newSlice *resourceapi.ResourceSlice) {
+func (tc *Controller) handleSliceChange(oldSlice, newSlice *draapi.ResourceSlice) {
 	slice := newSlice
 	if slice == nil {
 		slice = oldSlice
 	}
 	poolID := poolID{
-		driverName: slice.Spec.Driver,
-		poolName:   slice.Spec.Pool.Name,
+		driverName: slice.Spec.Driver.String(),
+		poolName:   slice.Spec.Pool.Name.String(),
 	}
 	if tc.eventLogger != nil {
 		// This is intentionally very verbose for debugging.

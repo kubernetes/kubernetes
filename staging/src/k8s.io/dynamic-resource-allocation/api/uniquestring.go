@@ -41,6 +41,19 @@ func (us UniqueString) MarshalJSON() ([]byte, error) {
 	return json.Marshal(us.String())
 }
 
+func (us *UniqueString) DeepCopyInto(out *UniqueString) {
+	*out = *us
+}
+
+func (us *UniqueString) DeepCopy() *UniqueString {
+	if us == nil {
+		return nil
+	}
+
+	out := *us
+	return &out
+}
+
 // MakeUniqueString constructs a new unique string.
 func MakeUniqueString(str string) UniqueString {
 	return UniqueString(unique.Make(str))

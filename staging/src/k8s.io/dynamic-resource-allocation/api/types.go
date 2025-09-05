@@ -23,6 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type ResourceSlice struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -102,4 +104,13 @@ type CapacityRequestPolicyRange struct {
 
 type Counter struct {
 	Value resource.Quantity `json:"value"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type ResourceSliceList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metata,omitempty"`
+
+	Items []ResourceSlice `json:"items,omitempty"`
 }

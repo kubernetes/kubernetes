@@ -219,7 +219,8 @@
   - k8s.io/klog
   - k8s.io/kube-scheduler
   - k8s.io/utils
-  - k8s.io/dynamic-resource-allocation/structured 
+  - k8s.io/dynamic-resource-allocation/api
+  - k8s.io/dynamic-resource-allocation/structured
 
 - baseImportPath: "./staging/src/k8s.io/kubelet"
   allowedImports:
