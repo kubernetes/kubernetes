@@ -90,17 +90,21 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 
 	if isIPTablesBased(s.Config.Mode) {
 		// Check for the iptables and ip6tables binaries.
-		ipts, errDS := utiliptables.NewDualStack()
+		errv4 := utiliptables.New(utiliptables.ProtocolIPv4).Present()
+		errv6 := utiliptables.New(utiliptables.ProtocolIPv6).Present()
 
-		ipv4Supported = ipts[v1.IPv4Protocol] != nil
-		ipv6Supported = ipts[v1.IPv6Protocol] != nil
+		ipv4Supported = errv4 == nil
+		ipv6Supported = errv6 == nil
 
 		if !ipv4Supported && !ipv6Supported {
-			err = fmt.Errorf("iptables is not available on this host : %w", errDS)
+			// errv4 and errv6 are almost certainly the same underlying error
+			// ("iptables isn't installed" or "kernel modules not available")
+			// so it doesn't make sense to try to combine them.
+			err = fmt.Errorf("iptables is not available on this host : %w", errv4)
 		} else if !ipv4Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol, "error", errDS)
+			logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol, "error", errv4)
 		} else if !ipv6Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol, "error", errDS)
+			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol, "error", errv6)
 		}
 	} else {
 		// The nft CLI always supports both families.
@@ -130,7 +134,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 
 	if config.Mode == proxyconfigapi.ProxyModeIPTables {
 		logger.Info("Using iptables Proxier")
-		ipts, _ := utiliptables.NewDualStack()
+		ipts := utiliptables.NewBestEffort()
 
 		if dualStack {
 			// TODO this has side effects that should only happen when Run() is invoked.
@@ -184,7 +188,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		if err := ipvs.CanUseIPVSProxier(ctx, ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
 		}
-		ipts, _ := utiliptables.NewDualStack()
+		ipts := utiliptables.NewBestEffort()
 
 		logger.Info("Using ipvs Proxier")
 		if dualStack {
