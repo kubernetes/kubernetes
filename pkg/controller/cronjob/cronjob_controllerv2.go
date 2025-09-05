@@ -145,7 +145,7 @@ func (jm *ControllerV2) Run(ctx context.Context, workers int) {
 	logger.Info("Starting cronjob controller v2")
 	defer logger.Info("Shutting down cronjob controller v2")
 
-	if !cache.WaitForNamedCacheSync("cronjob", ctx.Done(), jm.jobListerSynced, jm.cronJobListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, jm.jobListerSynced, jm.cronJobListerSynced) {
 		return
 	}
 
