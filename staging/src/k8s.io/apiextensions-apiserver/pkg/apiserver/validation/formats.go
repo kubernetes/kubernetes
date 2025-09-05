@@ -28,9 +28,10 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-// supportedVersionedFormats tracks the formats supported by CRD schemas, and the version at which support was introduced.
-// Formats in CRD schemas are ignored when used in versions where they are not supported.
-var supportedVersionedFormats = []versionedFormats{
+// supportedStringVersionedFormats tracks the formats supported by CRD schemas when type=string,
+// and the version at which support was introduced. Formats in CRD schemas are ignored when used
+// in versions where they are not supported.
+var supportedStringVersionedFormats = []versionedFormats{
 	{
 		introducedVersion: version.MajorMinor(1, 0),
 		formats: sets.New(
@@ -81,6 +82,34 @@ var supportedVersionedFormats = []versionedFormats{
 	},
 }
 
+// supportedIntFormats tracks the formats supported by CRD schemas when type=integer,
+// Formats in CRD schemas are ignored when used in versions where they are not supported.
+var supportedIntFormats = map[string]bool{
+	"int32":  true,
+	"int64":  true,
+	"uint32": true,
+	"uint64": true,
+}
+
+// supportedIntFormats tracks the formats supported by CRD schemas when type=number,
+// Formats in CRD schemas are ignored when used in versions where they are not supported.
+var supportedNumberFormats = map[string]bool{
+	"float32": true,
+	"float64": true,
+	"float":   true,
+	"double":  true,
+}
+
+// getType returns the type of a CustomResourceDefinition schema. Only one type is supported.
+// If multiple types are configured, they are all ignored.
+func getType(s *spec.Schema) string {
+	if s == nil || len(s.Type) != 1 {
+		return ""
+	}
+
+	return s.Type[0]
+}
+
 // StripUnsupportedFormatsPostProcess sets unsupported formats to empty string.
 // Only supports formats supported by all known version of Kubernetes.
 // Deprecated: Use StripUnsupportedFormatsPostProcessorForVersion instead.
@@ -96,8 +125,21 @@ func StripUnsupportedFormatsPostProcessorForVersion(compatibilityVersion *versio
 			return nil
 		}
 
-		normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
-		if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+		switch getType(s) {
+		case "integer":
+			if !supportedIntFormats[s.Format] {
+				s.Format = ""
+			}
+		case "number":
+			if !supportedNumberFormats[s.Format] {
+				s.Format = ""
+			}
+		case "string":
+			normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
+			if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+				s.Format = ""
+			}
+		default:
 			s.Format = ""
 		}
 
@@ -113,11 +155,22 @@ func GetUnrecognizedFormats(schema *spec.Schema, compatibilityVersion *version.V
 		return unrecognizedFormats
 	}
 
-	if len(schema.Type) == 1 && schema.Type[0] == "string" {
+	switch getType(schema) {
+	case "integer":
+		if !supportedIntFormats[schema.Format] {
+			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
+		}
+	case "number":
+		if !supportedNumberFormats[schema.Format] {
+			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
+		}
+	case "string":
 		normalized := strings.ReplaceAll(schema.Format, "-", "") // go-openapi default format name normalization
 		if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
 			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
 		}
+	default:
+		unrecognizedFormats = append(unrecognizedFormats, schema.Format)
 	}
 
 	return unrecognizedFormats
@@ -142,7 +195,7 @@ func supportedFormatsAtVersion(ver *version.Version) *supportedFormats {
 		return entry.(*supportedFormats)
 	}
 	entry, _, _ = baseEnvsSingleflight.Do(key, func() (interface{}, error) {
-		entry := newFormatsAtVersion(ver, supportedVersionedFormats)
+		entry := newFormatsAtVersion(ver, supportedStringVersionedFormats)
 		if cacheFormatSets {
 			baseEnvs.Store(key, entry)
 		}
