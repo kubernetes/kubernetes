@@ -33,6 +33,8 @@ option go_package = "k8s.io/apimachinery/pkg/util/intstr";
 // +protobuf=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:openapi-gen=true
+// +k8s:openapi-model-gen=true
+// +modelName=io.k8s.apimachinery.pkg.util.intstr.IntOrString
 message IntOrString {
   optional int64 type = 1;
 
