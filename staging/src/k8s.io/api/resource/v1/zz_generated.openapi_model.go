@@ -23,215 +23,215 @@ package v1
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in AllocatedDeviceStatus) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.AllocatedDeviceStatus"
+	return "io.k8s.api.resource.v1.AllocatedDeviceStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in AllocationResult) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.AllocationResult"
+	return "io.k8s.api.resource.v1.AllocationResult"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CELDeviceSelector) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.CELDeviceSelector"
+	return "io.k8s.api.resource.v1.CELDeviceSelector"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CapacityRequestPolicy) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.CapacityRequestPolicy"
+	return "io.k8s.api.resource.v1.CapacityRequestPolicy"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CapacityRequestPolicyRange) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.CapacityRequestPolicyRange"
+	return "io.k8s.api.resource.v1.CapacityRequestPolicyRange"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CapacityRequirements) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.CapacityRequirements"
+	return "io.k8s.api.resource.v1.CapacityRequirements"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Counter) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.Counter"
+	return "io.k8s.api.resource.v1.Counter"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CounterSet) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.CounterSet"
+	return "io.k8s.api.resource.v1.CounterSet"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Device) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.Device"
+	return "io.k8s.api.resource.v1.Device"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceAllocationConfiguration) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceAllocationConfiguration"
+	return "io.k8s.api.resource.v1.DeviceAllocationConfiguration"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceAllocationResult) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceAllocationResult"
+	return "io.k8s.api.resource.v1.DeviceAllocationResult"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceAttribute) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceAttribute"
+	return "io.k8s.api.resource.v1.DeviceAttribute"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceCapacity) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceCapacity"
+	return "io.k8s.api.resource.v1.DeviceCapacity"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceClaim) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceClaim"
+	return "io.k8s.api.resource.v1.DeviceClaim"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceClaimConfiguration) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceClaimConfiguration"
+	return "io.k8s.api.resource.v1.DeviceClaimConfiguration"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceClass) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceClass"
+	return "io.k8s.api.resource.v1.DeviceClass"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceClassConfiguration) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceClassConfiguration"
+	return "io.k8s.api.resource.v1.DeviceClassConfiguration"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceClassList) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceClassList"
+	return "io.k8s.api.resource.v1.DeviceClassList"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceClassSpec) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceClassSpec"
+	return "io.k8s.api.resource.v1.DeviceClassSpec"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceConfiguration) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceConfiguration"
+	return "io.k8s.api.resource.v1.DeviceConfiguration"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceConstraint) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceConstraint"
+	return "io.k8s.api.resource.v1.DeviceConstraint"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceCounterConsumption) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceCounterConsumption"
+	return "io.k8s.api.resource.v1.DeviceCounterConsumption"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceRequest) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceRequest"
+	return "io.k8s.api.resource.v1.DeviceRequest"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceRequestAllocationResult) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceRequestAllocationResult"
+	return "io.k8s.api.resource.v1.DeviceRequestAllocationResult"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceSelector) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceSelector"
+	return "io.k8s.api.resource.v1.DeviceSelector"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceSubRequest) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceSubRequest"
+	return "io.k8s.api.resource.v1.DeviceSubRequest"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceTaint) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceTaint"
+	return "io.k8s.api.resource.v1.DeviceTaint"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceToleration) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.DeviceToleration"
+	return "io.k8s.api.resource.v1.DeviceToleration"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ExactDeviceRequest) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ExactDeviceRequest"
+	return "io.k8s.api.resource.v1.ExactDeviceRequest"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NetworkDeviceData) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.NetworkDeviceData"
+	return "io.k8s.api.resource.v1.NetworkDeviceData"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in OpaqueDeviceConfiguration) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.OpaqueDeviceConfiguration"
+	return "io.k8s.api.resource.v1.OpaqueDeviceConfiguration"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceClaim) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourceClaim"
+	return "io.k8s.api.resource.v1.ResourceClaim"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceClaimConsumerReference) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourceClaimConsumerReference"
+	return "io.k8s.api.resource.v1.ResourceClaimConsumerReference"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceClaimList) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourceClaimList"
+	return "io.k8s.api.resource.v1.ResourceClaimList"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceClaimSpec) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourceClaimSpec"
+	return "io.k8s.api.resource.v1.ResourceClaimSpec"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceClaimStatus) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourceClaimStatus"
+	return "io.k8s.api.resource.v1.ResourceClaimStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceClaimTemplate) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourceClaimTemplate"
+	return "io.k8s.api.resource.v1.ResourceClaimTemplate"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceClaimTemplateList) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourceClaimTemplateList"
+	return "io.k8s.api.resource.v1.ResourceClaimTemplateList"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceClaimTemplateSpec) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourceClaimTemplateSpec"
+	return "io.k8s.api.resource.v1.ResourceClaimTemplateSpec"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourcePool) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourcePool"
+	return "io.k8s.api.resource.v1.ResourcePool"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceSlice) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourceSlice"
+	return "io.k8s.api.resource.v1.ResourceSlice"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceSliceList) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourceSliceList"
+	return "io.k8s.api.resource.v1.ResourceSliceList"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ResourceSliceSpec) OpenAPIModelName() string {
-	return "io.k8s.api.resource.v1alpha1.ResourceSliceSpec"
+	return "io.k8s.api.resource.v1.ResourceSliceSpec"
 }
