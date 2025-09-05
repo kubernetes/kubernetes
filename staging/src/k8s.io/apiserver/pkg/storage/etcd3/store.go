@@ -196,9 +196,7 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 		w.stats = stats
 	}
 
-	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
-		return s.GetCurrentResourceVersion(ctx)
-	}
+	w.getCurrentStorageRV = s.GetCurrentResourceVersion
 	w.getList = s.getList
 	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
 		etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
