@@ -83,6 +83,20 @@ const (
 	DefaultPodMaxBackoffDuration time.Duration = 10 * time.Second
 )
 
+// MetricAsyncRecorder is an interface for recording metrics asynchronously.
+// This interface abstracts the metrics recording functionality, allowing
+// for dependency injection and easier testing with mocks.
+type MetricAsyncRecorder interface {
+	// ObservePluginDurationAsync observes the plugin_execution_duration_seconds metric.
+	ObservePluginDurationAsync(extensionPoint, pluginName, status string, value float64)
+	// ObserveQueueingHintDurationAsync observes the queueing_hint_execution_duration_seconds metric.
+	ObserveQueueingHintDurationAsync(pluginName, event, hint string, value float64)
+	// ObserveInFlightEventsAsync observes the in_flight_events metric.
+	ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64, forceFlush bool)
+	// FlushMetrics flushes the metrics to the underlying metrics system.
+	FlushMetrics()
+}
+
 // PreEnqueueCheck is a function type. It's used to build functions that
 // run against a Pod and the caller can choose to enqueue or skip the Pod
 // by the checking result.
@@ -194,7 +208,7 @@ type PriorityQueue struct {
 
 	nsLister listersv1.NamespaceLister
 
-	metricsRecorder *metrics.MetricAsyncRecorder
+	metricsRecorder MetricAsyncRecorder
 	// pluginMetricsSamplePercent is the percentage of plugin metrics to be sampled.
 	pluginMetricsSamplePercent int
 
@@ -229,7 +243,7 @@ type priorityQueueOptions struct {
 	podMaxBackoffDuration             time.Duration
 	podMaxInUnschedulablePodsDuration time.Duration
 	podLister                         listersv1.PodLister
-	metricsRecorder                   *metrics.MetricAsyncRecorder
+	metricsRecorder                   MetricAsyncRecorder
 	pluginMetricsSamplePercent        int
 	preEnqueuePluginMap               map[string]map[string]fwk.PreEnqueuePlugin
 	queueingHintMap                   QueueingHintMapPerProfile
@@ -295,7 +309,7 @@ func WithPreEnqueuePluginMap(m map[string]map[string]fwk.PreEnqueuePlugin) Optio
 }
 
 // WithMetricsRecorder sets metrics recorder.
-func WithMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
+func WithMetricsRecorder(recorder MetricAsyncRecorder) Option {
 	return func(o *priorityQueueOptions) {
 		o.metricsRecorder = recorder
 	}
