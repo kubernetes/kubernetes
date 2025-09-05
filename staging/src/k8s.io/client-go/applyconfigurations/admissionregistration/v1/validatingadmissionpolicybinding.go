@@ -45,6 +45,27 @@ func ValidatingAdmissionPolicyBinding(name string) *ValidatingAdmissionPolicyBin
 	return b
 }
 
+// ExtractValidatingAdmissionPolicyBindingFrom extracts the applied configuration owned by fieldManager from
+// validatingAdmissionPolicyBinding for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// validatingAdmissionPolicyBinding must be a unmodified ValidatingAdmissionPolicyBinding API object that was retrieved from the Kubernetes API.
+// ExtractValidatingAdmissionPolicyBindingFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractValidatingAdmissionPolicyBindingFrom(validatingAdmissionPolicyBinding *admissionregistrationv1.ValidatingAdmissionPolicyBinding, fieldManager string, subresource string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
+	b := &ValidatingAdmissionPolicyBindingApplyConfiguration{}
+	err := managedfields.ExtractInto(validatingAdmissionPolicyBinding, internal.Parser().Type("io.k8s.api.admissionregistration.v1.ValidatingAdmissionPolicyBinding"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(validatingAdmissionPolicyBinding.Name)
+
+	b.WithKind("ValidatingAdmissionPolicyBinding")
+	b.WithAPIVersion("admissionregistration.k8s.io/v1")
+	return b, nil
+}
+
 // ExtractValidatingAdmissionPolicyBinding extracts the applied configuration owned by fieldManager from
 // validatingAdmissionPolicyBinding. If no managedFields are found in validatingAdmissionPolicyBinding for fieldManager, a
 // ValidatingAdmissionPolicyBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func ValidatingAdmissionPolicyBinding(name string) *ValidatingAdmissionPolicyBin
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *admissionregistrationv1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
-	return extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding, fieldManager, "")
+	return ExtractValidatingAdmissionPolicyBindingFrom(validatingAdmissionPolicyBinding, fieldManager, "")
 }
 
-// ExtractValidatingAdmissionPolicyBindingStatus is the same as ExtractValidatingAdmissionPolicyBinding except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractValidatingAdmissionPolicyBindingStatus(validatingAdmissionPolicyBinding *admissionregistrationv1.ValidatingAdmissionPolicyBinding, fieldManager string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
-	return extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding, fieldManager, "status")
-}
-
-func extractValidatingAdmissionPolicyBinding(validatingAdmissionPolicyBinding *admissionregistrationv1.ValidatingAdmissionPolicyBinding, fieldManager string, subresource string) (*ValidatingAdmissionPolicyBindingApplyConfiguration, error) {
-	b := &ValidatingAdmissionPolicyBindingApplyConfiguration{}
-	err := managedfields.ExtractInto(validatingAdmissionPolicyBinding, internal.Parser().Type("io.k8s.api.admissionregistration.v1.ValidatingAdmissionPolicyBinding"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(validatingAdmissionPolicyBinding.Name)
-
-	b.WithKind("ValidatingAdmissionPolicyBinding")
-	b.WithAPIVersion("admissionregistration.k8s.io/v1")
-	return b, nil
-}
 func (b ValidatingAdmissionPolicyBindingApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

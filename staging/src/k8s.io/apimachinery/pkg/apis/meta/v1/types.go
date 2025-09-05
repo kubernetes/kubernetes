@@ -784,7 +784,6 @@ type Status struct {
 	// is not guaranteed to conform to any schema except that defined by
 	// the reason type.
 	// +optional
-	// +listType=atomic
 	Details *StatusDetails `json:"details,omitempty" protobuf:"bytes,5,opt,name=details"`
 	// Suggested HTTP return code for this status, 0 if not set.
 	// +optional

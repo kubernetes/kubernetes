@@ -112,14 +112,8 @@ func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume
 }
 
 func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec *volume.Spec, pod *v1.Pod) *resource.Quantity {
-	// if feature is disabled, continue the default behavior of linux host default
-	sizeLimit := &resource.Quantity{}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SizeMemoryBackedVolumes) {
-		return sizeLimit
-	}
-
 	// size limit defaults to node allocatable (pods can't consume more memory than all pods)
-	sizeLimit = nodeAllocatableMemory
+	sizeLimit := nodeAllocatableMemory
 	zero := resource.MustParse("0")
 
 	// determine pod resource allocation

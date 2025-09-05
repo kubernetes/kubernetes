@@ -782,7 +782,6 @@ message Container {
   // container. Instead, the next init container starts immediately after this
   // init container is started, or after any startupProbe has successfully
   // completed.
-  // +featureGate=SidecarContainers
   // +optional
   optional string restartPolicy = 24;
 
@@ -1148,7 +1147,6 @@ message ContainerStatus {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=mountPath
-  // +featureGate=RecursiveReadOnlyMounts
   repeated VolumeMountStatus volumeMounts = 12;
 
   // User represents user identity information initially attached to the first process of the container
@@ -1582,7 +1580,6 @@ message EphemeralContainerCommon {
   // Restart policy for the container to manage the restart behavior of each
   // container within a pod.
   // You cannot set this field on ephemeral containers.
-  // +featureGate=SidecarContainers
   // +optional
   optional string restartPolicy = 24;
 
@@ -2346,7 +2343,6 @@ message LifecycleHandler {
   optional TCPSocketAction tcpSocket = 3;
 
   // Sleep represents a duration that the container should sleep.
-  // +featureGate=PodLifecycleSleepAction
   // +optional
   optional SleepAction sleep = 4;
 }
@@ -2811,7 +2807,6 @@ message NodeRuntimeHandler {
 // NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.
 message NodeRuntimeHandlerFeatures {
   // RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
-  // +featureGate=RecursiveReadOnlyMounts
   // +optional
   optional bool recursiveReadOnlyMounts = 1;
 
@@ -2978,7 +2973,6 @@ message NodeStatus {
   optional NodeConfigStatus config = 11;
 
   // The available runtime handlers.
-  // +featureGate=RecursiveReadOnlyMounts
   // +featureGate=UserNamespacesSupport
   // +optional
   // +listType=atomic
@@ -3206,7 +3200,7 @@ message PersistentVolumeClaimSpec {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 4;
 
   // resources represents the minimum resources the volume should have.
-  // If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
+  // Users are allowed to specify resource requirements
   // that are lower than previous value but must still be higher than capacity recorded in the
   // status field of the claim.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
@@ -3324,9 +3318,6 @@ message PersistentVolumeClaimStatus {
   // should ignore the update for the purpose it was designed. For example - a controller that
   // only is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid
   // resources associated with PVC.
-  //
-  // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
-  // +featureGate=RecoverVolumeExpansionFailure
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 5;
 
@@ -3363,9 +3354,6 @@ message PersistentVolumeClaimStatus {
   // should ignore the update for the purpose it was designed. For example - a controller that
   // only is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid
   // resources associated with PVC.
-  //
-  // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
-  // +featureGate=RecoverVolumeExpansionFailure
   // +mapType=granular
   // +optional
   map<string, string> allocatedResourceStatuses = 7;
@@ -4681,8 +4669,8 @@ message PodSpec {
   // will be made available to those containers which consume them
   // by name.
   //
-  // This is an alpha field and requires enabling the
-  // DynamicResourceAllocation feature gate.
+  // This is a stable field but requires that the
+  // DynamicResourceAllocation feature gate is enabled.
   //
   // This field is immutable.
   //
@@ -6378,7 +6366,6 @@ message ServiceSpec {
   // field is not set, the implementation will apply its default routing
   // strategy. If set to "PreferClose", implementations should prioritize
   // endpoints that are in the same zone.
-  // +featureGate=ServiceTrafficDistribution
   // +optional
   optional string trafficDistribution = 23;
 }
@@ -6800,8 +6787,6 @@ message VolumeMount {
   // None (or be unspecified, which defaults to None).
   //
   // If this field is not specified, it is treated as an equivalent of Disabled.
-  //
-  // +featureGate=RecursiveReadOnlyMounts
   // +optional
   optional string recursiveReadOnly = 7;
 
@@ -6846,7 +6831,6 @@ message VolumeMountStatus {
   // RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
   // An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
   // depending on the mount result.
-  // +featureGate=RecursiveReadOnlyMounts
   // +optional
   optional string recursiveReadOnly = 4;
 }
@@ -6929,7 +6913,8 @@ message VolumeProjection {
   // issues; consult the signer implementation's documentation to learn how to
   // use the certificates it issues.
   //
-  // +featureGate=PodCertificateProjection +optional
+  // +featureGate=PodCertificateProjection
+  // +optional
   optional PodCertificateProjection podCertificate = 6;
 }
 

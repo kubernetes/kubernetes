@@ -223,7 +223,7 @@ func getUnrecognizedFormatsInSchema(schema *apiextensions.JSONSchemaProps, compa
 	validation.SchemaHas(schema, func(s *apiextensions.JSONSchemaProps) bool {
 		if len(s.Format) > 0 {
 			// Convert to spec.Schema for format validation
-			specSchema := &spec.Schema{SchemaProps: spec.SchemaProps{Format: s.Format}}
+			specSchema := &spec.Schema{SchemaProps: spec.SchemaProps{Format: s.Format, Type: []string{s.Type}}}
 			if formats := apiservervalidation.GetUnrecognizedFormats(specSchema, compatibilityVersion); len(formats) > 0 {
 				unrecognizedFormats = append(unrecognizedFormats, formats...)
 			}

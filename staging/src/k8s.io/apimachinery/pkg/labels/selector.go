@@ -848,7 +848,6 @@ func (p *Parser) parseIdentifiersList() (sets.String, error) {
 				return s, nil
 			}
 			if tok2 == CommaToken {
-				p.consume(Values)
 				s.Insert("") // to handle ,, Double "" removed by StringSet
 			}
 		default: // it can be operator

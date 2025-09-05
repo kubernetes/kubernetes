@@ -83,6 +83,7 @@ const GroupName = "$.groupName$"
 var GroupVersion = $.groupVersion|raw${Group: GroupName, Version: "$.version$"}
 
 // SchemeGroupVersion is group version used to register these objects
+//
 // Deprecated: use GroupVersion instead.
 var SchemeGroupVersion = $.schemaGroupVersion|raw${Group: GroupName, Version: "$.version$"}
 

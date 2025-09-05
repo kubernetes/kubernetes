@@ -3445,61 +3445,15 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 		return "", err
 	}
 
-	tokens := []corev1.Secret{}
-
-	// missingSecrets is the set of all secrets present in the
-	// serviceAccount but not present in the set of existing secrets.
-	missingSecrets := sets.New[string]()
-	secrets := corev1.SecretList{}
-	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
-		func(options metav1.ListOptions) (runtime.Object, error) {
-			newList, err := d.CoreV1().Secrets(namespace).List(context.TODO(), options)
-			if err != nil {
-				return nil, runtimeresource.EnhanceListError(err, options, corev1.ResourceSecrets.String())
-			}
-			secrets.Items = append(secrets.Items, newList.Items...)
-			return newList, nil
-		})
-
-	// errors are tolerated here in order to describe the serviceAccount with all
-	// of the secrets that it references, even if those secrets cannot be fetched.
-	if err == nil {
-		// existingSecrets is the set of all secrets remaining on a
-		// service account that are not present in the "tokens" slice.
-		existingSecrets := sets.New[string]()
-
-		for _, s := range secrets.Items {
-			if s.Type == corev1.SecretTypeServiceAccountToken {
-				name := s.Annotations[corev1.ServiceAccountNameKey]
-				uid := s.Annotations[corev1.ServiceAccountUIDKey]
-				if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
-					tokens = append(tokens, s)
-				}
-			}
-			existingSecrets.Insert(s.Name)
-		}
-
-		for _, s := range serviceAccount.Secrets {
-			if !existingSecrets.Has(s.Name) {
-				missingSecrets.Insert(s.Name)
-			}
-		}
-		for _, s := range serviceAccount.ImagePullSecrets {
-			if !existingSecrets.Has(s.Name) {
-				missingSecrets.Insert(s.Name)
-			}
-		}
-	}
-
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = searchEvents(d.CoreV1(), serviceAccount, describerSettings.ChunkSize)
 	}
 
-	return describeServiceAccount(serviceAccount, tokens, missingSecrets, events)
+	return describeServiceAccount(serviceAccount, events)
 }
 
-func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []corev1.Secret, missingSecrets sets.Set[string], events *corev1.EventList) (string, error) {
+func describeServiceAccount(serviceAccount *corev1.ServiceAccount, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
@@ -3510,28 +3464,16 @@ func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []core
 		var (
 			emptyHeader = "                   "
 			pullHeader  = "Image pull secrets:"
-			mountHeader = "Mountable secrets: "
-			tokenHeader = "Tokens:            "
 
-			pullSecretNames  = []string{}
-			mountSecretNames = []string{}
-			tokenSecretNames = []string{}
+			pullSecretNames = []string{}
 		)
 
 		for _, s := range serviceAccount.ImagePullSecrets {
 			pullSecretNames = append(pullSecretNames, s.Name)
 		}
-		for _, s := range serviceAccount.Secrets {
-			mountSecretNames = append(mountSecretNames, s.Name)
-		}
-		for _, s := range tokens {
-			tokenSecretNames = append(tokenSecretNames, s.Name)
-		}
 
 		types := map[string][]string{
-			pullHeader:  pullSecretNames,
-			mountHeader: mountSecretNames,
-			tokenHeader: tokenSecretNames,
+			pullHeader: pullSecretNames,
 		}
 		for _, header := range sets.List(sets.KeySet(types)) {
 			names := types[header]
@@ -3540,11 +3482,7 @@ func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []core
 			} else {
 				prefix := header
 				for _, name := range names {
-					if missingSecrets.Has(name) {
-						w.Write(LEVEL_0, "%s\t%s (not found)\n", prefix, name)
-					} else {
-						w.Write(LEVEL_0, "%s\t%s\n", prefix, name)
-					}
+					w.Write(LEVEL_0, "%s\t%s\n", prefix, name)
 					prefix = emptyHeader
 				}
 			}

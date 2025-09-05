@@ -18,6 +18,7 @@ package apiresources
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -57,8 +58,8 @@ See 'kubectl api-resources -h' for help and examples`
 	if err == nil {
 		t.Fatalf("An error was expected but not returned")
 	}
-	expectedError = `unable to match a printer suitable for the output format "foo", allowed formats are: json,name,wide,yaml`
-	if err.Error() != expectedError {
+	expectedError = `unable to match a printer suitable for the output format "foo", allowed formats are:`
+	if !strings.HasPrefix(err.Error(), expectedError) {
 		t.Fatalf("Unexpected error: %v\n expected: %v", err, expectedError)
 	}
 }

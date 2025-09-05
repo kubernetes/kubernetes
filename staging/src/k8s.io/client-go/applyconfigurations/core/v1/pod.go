@@ -47,29 +47,15 @@ func Pod(name, namespace string) *PodApplyConfiguration {
 	return b
 }
 
-// ExtractPod extracts the applied configuration owned by fieldManager from
-// pod. If no managedFields are found in pod for fieldManager, a
-// PodApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractPodFrom extracts the applied configuration owned by fieldManager from
+// pod for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // pod must be a unmodified Pod API object that was retrieved from the Kubernetes API.
-// ExtractPod provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractPodFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPod(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
-	return extractPod(pod, fieldManager, "")
-}
-
-// ExtractPodStatus is the same as ExtractPod except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractPodStatus(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
-	return extractPod(pod, fieldManager, "status")
-}
-
-func extractPod(pod *corev1.Pod, fieldManager string, subresource string) (*PodApplyConfiguration, error) {
+func ExtractPodFrom(pod *corev1.Pod, fieldManager string, subresource string) (*PodApplyConfiguration, error) {
 	b := &PodApplyConfiguration{}
 	err := managedfields.ExtractInto(pod, internal.Parser().Type("io.k8s.api.core.v1.Pod"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +68,43 @@ func extractPod(pod *corev1.Pod, fieldManager string, subresource string) (*PodA
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractPod extracts the applied configuration owned by fieldManager from
+// pod. If no managedFields are found in pod for fieldManager, a
+// PodApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// pod must be a unmodified Pod API object that was retrieved from the Kubernetes API.
+// ExtractPod provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractPod(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return ExtractPodFrom(pod, fieldManager, "")
+}
+
+// ExtractPodEphemeralcontainers extracts the applied configuration owned by fieldManager from
+// pod for the ephemeralcontainers subresource.
+// Experimental!
+func ExtractPodEphemeralcontainers(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return ExtractPodFrom(pod, fieldManager, "ephemeralcontainers")
+}
+
+// ExtractPodResize extracts the applied configuration owned by fieldManager from
+// pod for the resize subresource.
+// Experimental!
+func ExtractPodResize(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return ExtractPodFrom(pod, fieldManager, "resize")
+}
+
+// ExtractPodStatus extracts the applied configuration owned by fieldManager from
+// pod for the status subresource.
+// Experimental!
+func ExtractPodStatus(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return ExtractPodFrom(pod, fieldManager, "status")
+}
+
 func (b PodApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

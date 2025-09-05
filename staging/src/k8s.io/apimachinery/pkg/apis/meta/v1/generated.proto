@@ -1038,7 +1038,6 @@ message Status {
   // is not guaranteed to conform to any schema except that defined by
   // the reason type.
   // +optional
-  // +listType=atomic
   optional StatusDetails details = 5;
 
   // Suggested HTTP return code for this status, 0 if not set.
@@ -1114,6 +1113,7 @@ message StatusDetails {
 }
 
 // TableOptions are used when a Table is requested by the caller.
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message TableOptions {
   // includeObject decides whether to include each object along with its columnar information.

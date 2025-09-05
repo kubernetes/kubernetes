@@ -33,6 +33,7 @@ var (
 
 // V1ServerWrapper implements the [NodeServer] interface by wrapping a [v1.DRAPluginServer].
 type V1ServerWrapper struct {
+	UnsafeDRAPluginServer
 	v1.DRAPluginServer
 }
 
@@ -72,6 +73,7 @@ func (w V1ServerWrapper) NodeUnprepareResources(ctx context.Context, req *NodeUn
 
 // V1Beta1ServerWrapper implements the [v1.DRAPluginServer] interface by wrapping a [NodeServer].
 type V1Beta1ServerWrapper struct {
+	v1.UnsafeDRAPluginServer
 	DRAPluginServer
 }
 

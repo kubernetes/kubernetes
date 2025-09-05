@@ -160,6 +160,9 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapMultiplePVsSameID:              true,
 		storageframework.CapFSResizeFromSourceNotSupported: true,
 		storageframework.CapVolumeGroupSnapshot:            true,
+		// There are extensive tests that NodeStage / NodePublish are called with -o context in csimock/csi_selinux_mount.go,
+		// but the csi-driver-hostpath can't physically make -o context to appear in the mount table that the CapSELinuxMount tests expect.
+		storageframework.CapSELinuxMount: false,
 
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`

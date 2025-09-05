@@ -11,4 +11,4 @@ test:
 verify:
 	GODEBUG=gotypesalias=0 ./hack/verify-examples.sh
 	GODEBUG=gotypesalias=1 ./hack/verify-examples.sh
-	./hack/verify-go-directive.sh 1.20
+	./hack/verify-go-directive.sh 1.23

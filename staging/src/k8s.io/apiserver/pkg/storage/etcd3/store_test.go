@@ -384,6 +384,7 @@ func TestStats(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedListCostEstimate)
 			// Match transformer with cacher tests.
 			ctx, store, _ := testSetup(t)
+			store.SetKeysFunc(store.getKeys)
 			storagetesting.RunTestStats(ctx, t, store, store.codec, store.transformer, sizeBasedListCostEstimate)
 		})
 	}
@@ -627,7 +628,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 	versioner := storage.APIObjectVersioner{}
 	compactor := NewCompactor(client.Client, 0, clock.RealClock{}, nil)
 	t.Cleanup(compactor.Stop)
-	store := New(
+	store, err := New(
 		client,
 		compactor,
 		setupOpts.codec,
@@ -641,6 +642,9 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		NewDefaultDecoder(setupOpts.codec, versioner),
 		versioner,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(store.Close)
 	ctx := context.Background()
 	return ctx, store, client
@@ -1041,15 +1045,30 @@ func TestPrefixStats(t *testing.T) {
 	tcs := []struct {
 		name        string
 		estimate    bool
+		setKeys     bool
 		expectStats storage.Stats
 	}{
 		{
-			name:        "SizeBasedListCostEstimate=false",
+			name:        "SizeBasedListCostEstimate=false,SetKeys=false",
+			setKeys:     false,
 			estimate:    false,
 			expectStats: storage.Stats{ObjectCount: 1},
 		},
 		{
-			name:        "SizeBasedListCostEstimate=true",
+			name:        "SizeBasedListCostEstimate=false,SetKeys=true",
+			setKeys:     true,
+			estimate:    false,
+			expectStats: storage.Stats{ObjectCount: 1},
+		},
+		{
+			name:        "SizeBasedListCostEstimate=true,SetKeys=false",
+			setKeys:     false,
+			estimate:    true,
+			expectStats: storage.Stats{ObjectCount: 1},
+		},
+		{
+			name:        "SizeBasedListCostEstimate=true,SetKeys=true",
+			setKeys:     true,
 			estimate:    true,
 			expectStats: storage.Stats{ObjectCount: 1, EstimatedAverageObjectSizeBytes: 3},
 		},
@@ -1058,6 +1077,9 @@ func TestPrefixStats(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, tc.estimate)
 			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("pods"))
+			if tc.setKeys {
+				store.SetKeysFunc(store.getKeys)
+			}
 			_, err := c.KV.Put(ctx, "key", "a")
 			if err != nil {
 				t.Fatal(err)

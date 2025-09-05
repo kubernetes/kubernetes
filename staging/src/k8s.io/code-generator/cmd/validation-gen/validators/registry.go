@@ -152,7 +152,8 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 	for _, tags := range phases {
 		for _, tag := range tags {
 			tv := reg.tagValidators[tag.Name]
-			if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) && !scopes.Has(ScopeAny) {
+			// At this point we know tv exists and is not nil due to the upfront check
+			if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
 				return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
 			}
 			if err := typeCheck(tag, tv.Docs()); err != nil {
@@ -195,28 +196,24 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 
 func (reg *registry) sortTagsIntoPhases(tags []codetags.Tag) [][]codetags.Tag {
 	// First sort all tags by their name, so the final output is deterministic.
+	// It is important to do this before validations are generated.
 	//
-	// It makes more sense to sort here, rather than when emitting because:
+	// Some tags are "meta" tags which wrap other tags. For example:
 	//
-	// Consider a type or field with the following comments:
+	//   // +k8s:validateFalse="111"
+	//   // +k8s:validateFalse="222"
+	//   // +k8s:ifEnabled(Foo)=+k8s:validateFalse="333"
 	//
-	//    // +k8s:validateFalse="111"
-	//    // +k8s:validateFalse="222"
-	//    // +k8s:ifOptionEnabled(Foo)=+k8s:validateFalse="333"
+	// Tag extraction will group these by tag name. The first two are
+	// instances of "k8s:validateFalse", while the third is an instance of
+	// "k8s:ifEnabled".
 	//
-	// Tag extraction will retain the relative order between 111 and 222, but
-	// 333 is extracted as tag "k8s:ifOptionEnabled".  Those are all in a map,
-	// which we iterate (in a random order).  When it reaches the emit stage,
-	// the "ifOptionEnabled" part is gone, and we will have 3 FunctionGen
-	// objects, all with tag "k8s:validateFalse", in a non-deterministic order
-	// because of the map iteration.  If we sort them at that point, we won't
-	// have enough information to do something smart, unless we look at the
-	// args, which are opaque to us.
-	//
-	// Sorting it earlier means we can sort "k8s:ifOptionEnabled" against
-	// "k8s:validateFalse".  All of the records within each of those is
-	// relatively ordered, so the result here would be to put "ifOptionEnabled"
-	// before "validateFalse" (lexicographical is better than random).
+	// Without sorting, the order in which tag validators are called is not defined
+	// (map iteration). This can lead to non-deterministic order of the generated
+	// validations. By sorting the tags by name first, we ensure that "k8s:ifEnabled"
+	// is processed before or after "k8s:validateFalse" consistently, allowing the
+	// "k8s:validateFalse" tags to remain grouped together. The tags for each name
+	// are processed in order of appearance, so relative ordering is preserved.
 	sortedTags := make([]codetags.Tag, len(tags))
 	copy(sortedTags, tags)
 	slices.SortFunc(sortedTags, func(a, b codetags.Tag) int {

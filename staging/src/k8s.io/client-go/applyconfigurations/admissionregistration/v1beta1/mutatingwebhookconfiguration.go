@@ -45,6 +45,27 @@ func MutatingWebhookConfiguration(name string) *MutatingWebhookConfigurationAppl
 	return b
 }
 
+// ExtractMutatingWebhookConfigurationFrom extracts the applied configuration owned by fieldManager from
+// mutatingWebhookConfiguration for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// mutatingWebhookConfiguration must be a unmodified MutatingWebhookConfiguration API object that was retrieved from the Kubernetes API.
+// ExtractMutatingWebhookConfigurationFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractMutatingWebhookConfigurationFrom(mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfiguration, fieldManager string, subresource string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+	b := &MutatingWebhookConfigurationApplyConfiguration{}
+	err := managedfields.ExtractInto(mutatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1beta1.MutatingWebhookConfiguration"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(mutatingWebhookConfiguration.Name)
+
+	b.WithKind("MutatingWebhookConfiguration")
+	b.WithAPIVersion("admissionregistration.k8s.io/v1beta1")
+	return b, nil
+}
+
 // ExtractMutatingWebhookConfiguration extracts the applied configuration owned by fieldManager from
 // mutatingWebhookConfiguration. If no managedFields are found in mutatingWebhookConfiguration for fieldManager, a
 // MutatingWebhookConfigurationApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func MutatingWebhookConfiguration(name string) *MutatingWebhookConfigurationAppl
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
-	return extractMutatingWebhookConfiguration(mutatingWebhookConfiguration, fieldManager, "")
+	return ExtractMutatingWebhookConfigurationFrom(mutatingWebhookConfiguration, fieldManager, "")
 }
 
-// ExtractMutatingWebhookConfigurationStatus is the same as ExtractMutatingWebhookConfiguration except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractMutatingWebhookConfigurationStatus(mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
-	return extractMutatingWebhookConfiguration(mutatingWebhookConfiguration, fieldManager, "status")
-}
-
-func extractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfiguration, fieldManager string, subresource string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
-	b := &MutatingWebhookConfigurationApplyConfiguration{}
-	err := managedfields.ExtractInto(mutatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1beta1.MutatingWebhookConfiguration"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(mutatingWebhookConfiguration.Name)
-
-	b.WithKind("MutatingWebhookConfiguration")
-	b.WithAPIVersion("admissionregistration.k8s.io/v1beta1")
-	return b, nil
-}
 func (b MutatingWebhookConfigurationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
