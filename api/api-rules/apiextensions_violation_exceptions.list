@@ -31,8 +31,6 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrStringArray,Schema
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,APIResourceList,APIResources
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Duration,Duration
-API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Object
-API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Type
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,MicroTime,Time
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,StatusCause,Type
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Time,Time
