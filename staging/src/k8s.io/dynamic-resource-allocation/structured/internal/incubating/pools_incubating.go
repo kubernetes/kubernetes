@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	draapi "k8s.io/dynamic-resource-allocation/api"
@@ -51,7 +50,7 @@ func nodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 // Out-dated slices are silently ignored. Pools may be incomplete (not all
 // required slices available) or invalid (for example, device names not unique).
 // Both is recorded in the result.
-func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, features Features) ([]*Pool, error) {
+func GatherPools(ctx context.Context, slices []*draapi.ResourceSlice, node *v1.Node, features Features) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
 
 	for _, slice := range slices {
@@ -59,7 +58,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 			continue
 		}
 
-		if nodeName, allNodes := ptr.Deref(slice.Spec.NodeName, ""), ptr.Deref(slice.Spec.AllNodes, false); nodeName != "" || allNodes || slice.Spec.NodeSelector != nil {
+		if nodeName, allNodes := ptr.Deref(slice.Spec.NodeName, ""), slice.Spec.AllNodes; nodeName != "" || allNodes || slice.Spec.NodeSelector != nil {
 			match, err := nodeMatches(node, nodeName, allNodes, slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
@@ -74,7 +73,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 				match, err := nodeMatches(node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
 				if err != nil {
 					return nil, fmt.Errorf("failed to perform node selection for device %s in slice %s: %w",
-						device.String(), slice.Name, err)
+						device.Name, slice.Name, err)
 				}
 				if match {
 					if err := addSlice(pools, slice); err != nil {
@@ -107,19 +106,14 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	return result, nil
 }
 
-func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) error {
-	var slice draapi.ResourceSlice
-	if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(s, &slice, nil); err != nil {
-		return fmt.Errorf("convert ResourceSlice: %w", err)
-	}
-
+func addSlice(pools map[PoolID]*Pool, slice *draapi.ResourceSlice) error {
 	id := PoolID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name}
 	pool := pools[id]
 	if pool == nil {
 		// New pool.
 		pool = &Pool{
 			PoolID: id,
-			Slices: []*draapi.ResourceSlice{&slice},
+			Slices: []*draapi.ResourceSlice{slice},
 		}
 		pools[id] = pool
 		return nil
@@ -136,7 +130,7 @@ func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) error {
 	}
 
 	// Add to pool.
-	pool.Slices = append(pool.Slices, &slice)
+	pool.Slices = append(pool.Slices, slice)
 	return nil
 }
 
