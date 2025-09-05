@@ -61,13 +61,13 @@ func goTrackerLocalName(tracker namer.ImportTracker, localPkg string, t types.Na
 	path := t.Package
 
 	// Using backslashes in package names causes gengo to produce Go code which
-	// will not compile with the gc compiler. See the comment on GoSeperator.
+	// will not compile with the gc compiler. See the comment on GoSeparator.
 	if strings.ContainsRune(path, '\\') {
 		klog.Warningf("Warning: backslash used in import path '%v', this is unsupported.\n", path)
 	}
 	localLeaf := filepath.Base(localPkg)
 
-	dirs := strings.Split(path, namer.GoSeperator)
+	dirs := strings.Split(path, namer.GoSeparator)
 	for n := len(dirs) - 1; n >= 0; n-- {
 		// follow kube convention of not having anything between directory names
 		name := strings.Join(dirs[n:], "")

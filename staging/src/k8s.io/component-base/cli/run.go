@@ -117,13 +117,14 @@ func run(cmd *cobra.Command) (logsInitialized bool, err error) {
 	logs.AddFlags(cmd.PersistentFlags())
 
 	// Inject logs.InitLogs after command line parsing into one of the
-	// PersistentPre* functions.
+	// PersistentPre* functions. Also inform about race detection, if enabled.
 	switch {
 	case cmd.PersistentPreRun != nil:
 		pre := cmd.PersistentPreRun
 		cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 			logs.InitLogs()
 			logsInitialized = true
+			logRaceDetection()
 			pre(cmd, args)
 		}
 	case cmd.PersistentPreRunE != nil:
@@ -131,12 +132,14 @@ func run(cmd *cobra.Command) (logsInitialized bool, err error) {
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			logs.InitLogs()
 			logsInitialized = true
+			logRaceDetection()
 			return pre(cmd, args)
 		}
 	default:
 		cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 			logs.InitLogs()
 			logsInitialized = true
+			logRaceDetection()
 		}
 	}
 

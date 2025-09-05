@@ -748,6 +748,105 @@ func TestHandlePodCleanups(t *testing.T) {
 	fakeRuntime.AssertKilledPods([]string(nil))
 }
 
+func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
+	const podCount = 500
+	tk := newTestKubelet(t, true /* controller-attach-detach enabled */)
+	defer tk.Cleanup()
+	kl := tk.kubelet
+
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{{
+		ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourcePods:   *resource.NewQuantity(1000, resource.DecimalSI),
+				v1.ResourceCPU:    resource.MustParse("10"),
+				v1.ResourceMemory: resource.MustParse("20Gi"),
+			},
+		},
+	}}}
+
+	kl.workQueue = queue.NewBasicWorkQueue(clock.RealClock{})
+	kl.podWorkers = newPodWorkers(
+		kl, kl.recorder, kl.workQueue,
+		kl.resyncInterval, backOffPeriod,
+		kl.podCache, kl.allocationManager,
+	)
+
+	kl.volumeManager = kubeletvolume.NewFakeVolumeManager(nil, 0, nil, true /* volumeAttachLimitExceededError  */)
+
+	pods, _ := newTestPodsWithResources(podCount)
+
+	kl.podManager.SetPods(pods)
+	kl.HandlePodSyncs(pods)
+
+	ctx := context.Background()
+
+	// all pods must reach a terminal, Failed state due to VolumeAttachmentLimitExceeded.
+	if err := wait.PollUntilContextTimeout(
+		ctx, 200*time.Millisecond, 30*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			for _, p := range pods {
+				st, ok := kl.statusManager.GetPodStatus(p.UID)
+				if !ok || st.Phase != v1.PodFailed && st.Reason != "VolumeAttachmentLimitExceeded" {
+					return false, nil
+				}
+			}
+			return true, nil
+		}); err != nil {
+		t.Fatalf("pods did not reach a terminal, Failed state: %v", err)
+	}
+
+	// validate that SyncTerminatedPod completed successfully for each pod.
+	if err := wait.PollUntilContextTimeout(
+		ctx, 200*time.Millisecond, 30*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			for _, p := range pods {
+				if !kl.podWorkers.ShouldPodBeFinished(p.UID) {
+					return false, nil
+				}
+			}
+			return true, nil
+		}); err != nil {
+		t.Fatalf("pod workers did not finish cleanup: %v", err)
+	}
+
+	// validate container-level resource allocations are released.
+	for _, p := range pods {
+		cn := p.Spec.Containers[0].Name
+		if _, still := kl.allocationManager.GetContainerResourceAllocation(p.UID, cn); still {
+			t.Fatalf("allocation for pod %q container %q not released", p.Name, cn)
+		}
+	}
+}
+
+func newTestPodsWithResources(count int) (pods []*v1.Pod, containerNames []string) {
+	pods = make([]*v1.Pod, count)
+	containerNames = make([]string, count)
+	for i := 0; i < count; i++ {
+		containerName := fmt.Sprintf("container%d", i)
+		containerNames[i] = containerName
+		pods[i] = &v1.Pod{
+			Spec: v1.PodSpec{
+				HostNetwork: true,
+				Containers: []v1.Container{{
+					Name: containerName,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1m"),
+							v1.ResourceMemory: resource.MustParse("1Mi"),
+						},
+					},
+				}},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  types.UID(strconv.Itoa(10000 + i)),
+				Name: fmt.Sprintf("pod%d", i),
+			},
+		}
+	}
+	return pods, containerNames
+}
+
 func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")

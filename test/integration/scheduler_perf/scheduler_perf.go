@@ -2059,6 +2059,8 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 				return
 			}
 
+			mutex.Lock()
+			defer mutex.Unlock()
 			existingPods--
 			if pod.Spec.NodeName != "" {
 				runningPods--

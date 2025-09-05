@@ -53,7 +53,8 @@ type pluginServiceV1Beta1 struct {
 }
 
 func (s *pluginServiceV1Beta1) GetExampleInfo(ctx context.Context, rqt *v1beta1.ExampleRequest) (*v1beta1.ExampleResponse, error) {
-	klog.InfoS("GetExampleInfo v1beta1field", "field", rqt.V1Beta1Field)
+	logger := klog.FromContext(ctx)
+	logger.Info("GetExampleInfo v1beta1field", "field", rqt.V1Beta1Field)
 	return &v1beta1.ExampleResponse{}, nil
 }
 
@@ -67,7 +68,8 @@ type pluginServiceV1Beta2 struct {
 }
 
 func (s *pluginServiceV1Beta2) GetExampleInfo(ctx context.Context, rqt *v1beta2.ExampleRequest) (*v1beta2.ExampleResponse, error) {
-	klog.InfoS("GetExampleInfo v1beta2_field", "field", rqt.V1Beta2Field)
+	logger := klog.FromContext(ctx)
+	logger.Info("GetExampleInfo v1beta2_field", "field", rqt.V1Beta2Field)
 	return &v1beta2.ExampleResponse{}, nil
 }
 
@@ -109,7 +111,8 @@ func (e *examplePlugin) GetInfo(ctx context.Context, req *registerapi.InfoReques
 }
 
 func (e *examplePlugin) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
-	klog.InfoS("Notify registration status", "status", status)
+	logger := klog.FromContext(ctx)
+	logger.Info("Notify registration status", "status", status)
 
 	if e.registrationStatus != nil {
 		e.registrationStatus <- *status
@@ -119,14 +122,15 @@ func (e *examplePlugin) NotifyRegistrationStatus(ctx context.Context, status *re
 }
 
 // Serve starts a pluginwatcher server and one or more of the plugin services
-func (e *examplePlugin) Serve(services ...string) error {
-	klog.InfoS("Starting example server", "endpoint", e.endpoint)
+func (e *examplePlugin) Serve(ctx context.Context, services ...string) error {
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting example server", "endpoint", e.endpoint)
 	lis, err := net.Listen("unix", e.endpoint)
 	if err != nil {
 		return err
 	}
 
-	klog.InfoS("Example server started", "endpoint", e.endpoint)
+	logger.Info("Example server started", "endpoint", e.endpoint)
 	e.grpcServer = grpc.NewServer()
 
 	// Registers kubelet plugin watcher api.
@@ -151,15 +155,16 @@ func (e *examplePlugin) Serve(services ...string) error {
 		defer e.wg.Done()
 		// Blocking call to accept incoming connections.
 		if err := e.grpcServer.Serve(lis); err != nil {
-			klog.ErrorS(err, "Example server stopped serving")
+			logger.Error(err, "Example server stopped serving")
 		}
 	}()
 
 	return nil
 }
 
-func (e *examplePlugin) Stop() error {
-	klog.InfoS("Stopping example server", "endpoint", e.endpoint)
+func (e *examplePlugin) Stop(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
+	logger.Info("Stopping example server", "endpoint", e.endpoint)
 
 	e.grpcServer.Stop()
 	c := make(chan struct{})

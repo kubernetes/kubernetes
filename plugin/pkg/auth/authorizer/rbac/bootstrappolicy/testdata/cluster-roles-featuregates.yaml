@@ -129,7 +129,6 @@ items:
     - ""
     resources:
     - configmaps
-    - events
     - persistentvolumeclaims
     - replicationcontrollers
     - replicationcontrollers/scale
@@ -149,6 +148,17 @@ items:
     - serviceaccounts/token
     verbs:
     - create
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - patch
+    - update
   - apiGroups:
     - apps
     resources:
@@ -281,7 +291,6 @@ items:
     - ""
     resources:
     - bindings
-    - events
     - limitranges
     - namespaces/status
     - pods/log
@@ -297,6 +306,15 @@ items:
     - ""
     resources:
     - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
     verbs:
     - get
     - list
@@ -1087,6 +1105,7 @@ items:
     - update
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:

@@ -45,7 +45,7 @@ func (subfieldTagValidator) TagName() string {
 	return subfieldTagName
 }
 
-var subfieldTagValidScopes = sets.New(ScopeAny)
+var subfieldTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 
 func (subfieldTagValidator) ValidScopes() sets.Set[Scope] {
 	return subfieldTagValidScopes
