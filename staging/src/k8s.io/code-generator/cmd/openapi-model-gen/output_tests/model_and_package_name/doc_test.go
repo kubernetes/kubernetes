@@ -20,12 +20,12 @@ import "testing"
 
 func TestOutput(t *testing.T) {
 	t1 := &T1{}
-	if t1.OpenAPICanonicalTypeName() != "io.k8s.api.core.v1.T1" {
-		t.Errorf("unexpected type name: %s", t1.OpenAPICanonicalTypeName())
+	if t1.OpenAPIModelName() != "io.k8s.api.core.v1.T1" {
+		t.Errorf("unexpected type name: %s", t1.OpenAPIModelName())
 	}
 
 	t2 := &T2{}
-	if t2.OpenAPICanonicalTypeName() != "io.k8s.api.core.v1.T2" {
-		t.Errorf("unexpected type name: %s", t2.OpenAPICanonicalTypeName())
+	if t2.OpenAPIModelName() != "io.k8s.api.core.v1.T2" {
+		t.Errorf("unexpected type name: %s", t2.OpenAPIModelName())
 	}
 }
