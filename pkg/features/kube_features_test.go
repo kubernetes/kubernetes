@@ -17,6 +17,8 @@ limitations under the License.
 package features
 
 import (
+	"maps"
+	"slices"
 	"testing"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -88,6 +90,15 @@ func TestEnsureAlphaGatesAreNotSwitchedOnByDefault(t *testing.T) {
 	for feature, specs := range defaultVersionedKubernetesFeatureGates {
 		for _, spec := range specs {
 			checkAlphaGates(feature, spec)
+		}
+	}
+}
+
+func TestAllDependenciesRegistered(t *testing.T) {
+	registeredDependencies := utilfeature.DefaultFeatureGate.Dependencies()
+	for _, f := range slices.Sorted(maps.Keys(defaultVersionedKubernetesFeatureGates)) {
+		if _, depsRegistered := registeredDependencies[f]; !depsRegistered {
+			t.Errorf("Feature %s did not register dependencies. All features must record explicit feature dependencies, even if there are none.", f)
 		}
 	}
 }
