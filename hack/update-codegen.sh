@@ -512,6 +512,75 @@ function codegen::validation() {
     fi
 }
 
+# OpenAPI model generation
+#
+# Any package that wants openapi model name functions generated must include a
+# comment-tag in column 0 of one file of the form:
+#     // +k8s:openapi-model-gen=<VALUE>
+#
+# The <VALUE> depends on context:
+#     on packages:
+#       *: all exported types are candidates for having openapi model name functions generated
+#       FIELDNAME: any type with a field of this name is a candidate for
+#                  having openapi model name functions generated
+#     on types:
+#       true:  always generate openapi model name functions for this type
+#       false: never generate openapi model name functions for this type
+function codegen::apimodels() {
+    # Build the tool.
+    GOPROXY=off go install \
+        k8s.io/code-generator/cmd/openapi-model-gen
+
+    # TODO: Where do we want these output?  It should be somewhere internal..
+    # The result file, in each pkg, of openapi model generation.
+    local output_file="${GENERATED_FILE_PREFIX}openapi_model.go"
+
+    # All directories that request any form of openapi model generation.
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: finding all +k8s:openapi-model-gen tags"
+    fi
+    local tag_dirs=()
+    kube::util::read-array tag_dirs < <( \
+        grep -l --null '+k8s:openapi-model-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
+            | sort -u)
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:openapi-model-gen tagged dirs"
+    fi
+
+    local tag_pkgs=()
+    for dir in "${tag_dirs[@]}"; do
+        tag_pkgs+=("./$dir")
+    done
+
+    kube::log::status "apimodels: ${#tag_pkgs[@]} targets"
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: running openapi-model-gen for:"
+        for dir in "${tag_dirs[@]}"; do
+            kube::log::status "DBG:     $dir"
+        done
+    fi
+
+    local lint_flag=() # empty arrays expand to no-value (as opposed to "")
+    if [[ -n "${LINT:-}" ]]; then
+        lint_flag+=("--lint")
+    else
+        git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
+    fi
+
+    openapi-model-gen \
+        -v "${KUBE_VERBOSE}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file "${output_file}" \
+        "${lint_flag[@]}" `# may expand to nothing` \
+        "${tag_pkgs[@]}" \
+        "$@"
+
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "Generated openapi-model code"
+    fi
+}
+
 # Conversion generation
 
 # Any package that wants conversion functions generated into it must
@@ -748,6 +817,7 @@ function codegen::openapi() {
         --output-dir "${output_dir}" \
         --output-pkg "${output_pkg}" \
         --report-filename "${report_file}" \
+        --use-openapi-model-names \
         "${tag_pkgs[@]}" \
         "$@"
 
