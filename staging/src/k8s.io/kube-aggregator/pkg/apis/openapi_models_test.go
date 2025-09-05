@@ -17,7 +17,6 @@ limitations under the License.
 package apis
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -52,11 +51,11 @@ func TestOpenAPIDefinitionNames(t *testing.T) {
 				t.Fatalf("unexpected error creating example: %v", err)
 			}
 
-			namer, ok := example.(util.OpenAPICanonicalTypeNamer)
+			namer, ok := example.(util.OpenAPIModelNamer)
 			if !ok {
-				fmt.Printf("type %v does not implement OpenAPICanonicalTypeName\n", gvk)
+				t.Fatalf("type %v does not implement OpenAPICanonicalTypeName\n", gvk)
 			}
-			lookupName := namer.OpenAPICanonicalTypeName()
+			lookupName := namer.OpenAPIModelName()
 
 			rtype := reflect.TypeOf(example).Elem()
 			reflectName := util.ToRESTFriendlyName(rtype.PkgPath() + "." + rtype.Name())
