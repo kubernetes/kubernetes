@@ -39,6 +39,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	pkgcontroller "k8s.io/kubernetes/pkg/controller"
@@ -270,7 +271,7 @@ func newDeviceTaintEvictionController(ctx context.Context, controllerContext Con
 		client,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
-		controllerContext.InformerFactory.Resource().V1().ResourceSlices(),
+		draapi.NewResourceSliceInformer(controllerContext.InformerFactory),
 		controllerContext.InformerFactory.Resource().V1alpha3().DeviceTaintRules(),
 		controllerContext.InformerFactory.Resource().V1().DeviceClasses(),
 		controllerName,

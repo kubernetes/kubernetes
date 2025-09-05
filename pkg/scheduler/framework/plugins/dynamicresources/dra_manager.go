@@ -28,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
@@ -86,7 +87,7 @@ type resourceSliceLister struct {
 	tracker *resourceslicetracker.Tracker
 }
 
-func (l *resourceSliceLister) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error) {
+func (l *resourceSliceLister) ListWithDeviceTaintRules() ([]*draapi.ResourceSlice, error) {
 	return l.tracker.ListPatchedResourceSlices()
 }
 

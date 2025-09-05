@@ -45,6 +45,7 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
@@ -2282,7 +2283,7 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaints: true,
-		SliceInformer:      tc.informerFactory.Resource().V1().ResourceSlices(),
+		SliceInformer:      draapi.NewResourceSliceInformer(tc.informerFactory),
 		TaintInformer:      tc.informerFactory.Resource().V1alpha3().DeviceTaintRules(),
 		ClassInformer:      tc.informerFactory.Resource().V1().DeviceClasses(),
 		KubeClient:         tc.client,
