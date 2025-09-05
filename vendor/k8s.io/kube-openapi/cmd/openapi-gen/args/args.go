@@ -33,6 +33,10 @@ type Args struct {
 	// by API linter. If specified, API rule violations will be printed to report file.
 	// Otherwise default value "-" will be used which indicates stdout.
 	ReportFilename string
+
+	// UseOpenAPIModelNames specifies the use of OpenAPI model names instead of
+	// Go '<package>.<type>' names for types in the OpenAPI spec.
+	UseOpenAPIModelNames bool
 }
 
 // New returns default arguments for the generator. Returning the arguments instead
@@ -58,6 +62,7 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 	fs.StringVarP(&args.ReportFilename, "report-filename", "r", args.ReportFilename,
 		"Name of report file used by API linter to print API violations. Default \"-\" stands for standard output. NOTE that if valid filename other than \"-\" is specified, API linter won't return error on detected API violations. This allows further check of existing API violations without stopping the OpenAPI generation toolchain.")
+	fs.BoolVar(&args.UseOpenAPIModelNames, "use-openapi-model-names", false, "Use OpenAPI model names instead of Go '<package>.<type>' names for types in the OpenAPI spec.")
 }
 
 // Validate checks the given arguments.

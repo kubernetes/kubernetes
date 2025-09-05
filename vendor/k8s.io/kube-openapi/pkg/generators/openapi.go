@@ -127,17 +127,19 @@ const (
 type openAPIGen struct {
 	generator.GoGenerator
 	// TargetPackage is the package that will get GetOpenAPIDefinitions function returns all open API definitions.
-	targetPackage string
-	imports       namer.ImportTracker
+	targetPackage        string
+	imports              namer.ImportTracker
+	useOpenAPIModelNames bool
 }
 
-func newOpenAPIGen(outputFilename string, targetPackage string) generator.Generator {
+func newOpenAPIGen(outputFilename string, targetPackage string, useOpenAPIModelNames bool) generator.Generator {
 	return &openAPIGen{
 		GoGenerator: generator.GoGenerator{
 			OutputFilename: outputFilename,
 		},
-		imports:       generator.NewImportTrackerForPackage(targetPackage),
-		targetPackage: targetPackage,
+		imports:              generator.NewImportTrackerForPackage(targetPackage),
+		targetPackage:        targetPackage,
+		useOpenAPIModelNames: useOpenAPIModelNames,
 	}
 }
 
@@ -179,7 +181,7 @@ func (g *openAPIGen) Init(c *generator.Context, w io.Writer) error {
 	sw.Do("return map[string]$.OpenAPIDefinition|raw${\n", argsFromType(nil))
 
 	for _, t := range c.Order {
-		err := newOpenAPITypeWriter(sw, c).generateCall(t)
+		err := newOpenAPITypeWriter(sw, c, g.useOpenAPIModelNames).generateCall(t)
 		if err != nil {
 			return err
 		}
@@ -194,7 +196,7 @@ func (g *openAPIGen) Init(c *generator.Context, w io.Writer) error {
 func (g *openAPIGen) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	klog.V(5).Infof("generating for type %v", t)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	err := newOpenAPITypeWriter(sw, c).generate(t)
+	err := newOpenAPITypeWriter(sw, c, g.useOpenAPIModelNames).generate(t)
 	if err != nil {
 		return err
 	}
@@ -233,14 +235,16 @@ type openAPITypeWriter struct {
 	refTypes               map[string]*types.Type
 	enumContext            *enumContext
 	GetDefinitionInterface *types.Type
+	useOpenAPIModelNames   bool
 }
 
-func newOpenAPITypeWriter(sw *generator.SnippetWriter, c *generator.Context) openAPITypeWriter {
+func newOpenAPITypeWriter(sw *generator.SnippetWriter, c *generator.Context, useOpenAPIModelNames bool) openAPITypeWriter {
 	return openAPITypeWriter{
-		SnippetWriter: sw,
-		context:       c,
-		refTypes:      map[string]*types.Type{},
-		enumContext:   newEnumContext(c),
+		SnippetWriter:        sw,
+		context:              c,
+		refTypes:             map[string]*types.Type{},
+		enumContext:          newEnumContext(c),
+		useOpenAPIModelNames: useOpenAPIModelNames,
 	}
 }
 
@@ -339,8 +343,18 @@ func (g openAPITypeWriter) generateCall(t *types.Type) error {
 	// Only generate for struct type and ignore the rest
 	switch t.Kind {
 	case types.Struct:
+		if namer.IsPrivateGoName(t.Name.Name) { // skip private types
+			return nil
+		}
+
 		args := argsFromType(t)
-		g.Do("\"$.$\": ", t.Name)
+
+		if g.useOpenAPIModelNames {
+			g.Do("$.|raw${}.OpenAPIModelName(): ", t)
+		} else {
+			// Legacy case: use the "canonical type name"
+			g.Do("\"$.$\": ", t.Name)
+		}
 
 		hasV2Definition := hasOpenAPIDefinitionMethod(t)
 		hasV2DefinitionTypeAndFormat := hasOpenAPIDefinitionMethods(t)
@@ -667,7 +681,12 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		if len(deps) > 0 {
 			g.Do("Dependencies: []string{\n", args)
 			for _, k := range deps {
-				g.Do("\"$.$\",", k)
+				t := g.refTypes[k]
+				if g.useOpenAPIModelNames {
+					g.Do("$.|raw${}.OpenAPIModelName(),", t)
+				} else {
+					g.Do("\"$.$\",", k)
+				}
 			}
 			g.Do("},\n", nil)
 		}
@@ -1027,7 +1046,11 @@ func (g openAPITypeWriter) generateSimpleProperty(typeString, format string) {
 
 func (g openAPITypeWriter) generateReferenceProperty(t *types.Type) {
 	g.refTypes[t.Name.String()] = t
-	g.Do("Ref: ref(\"$.$\"),\n", t.Name.String())
+	if g.useOpenAPIModelNames {
+		g.Do("Ref: ref($.|raw${}.OpenAPIModelName()),\n", t)
+	} else {
+		g.Do("Ref: ref(\"$.$\"),\n", t.Name.String())
+	}
 }
 
 func resolvePtrType(t *types.Type) *types.Type {
