@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"net/http"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +31,39 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 )
+
+// httpProbeRequestHolder maintains and reuses the HTTP request object for probes
+type httpProbeRequestHolder struct {
+	request *http.Request
+	httpGet *v1.HTTPGetAction
+	podIP   string
+}
+
+// getRequest returns the cached HTTP request or creates a new one if needed
+func (h *httpProbeRequestHolder) getRequest(container *v1.Container, currentPodIP string) (*http.Request, error) {
+	// If the pod IP has changed, we need to create a new request and clear the cached request.
+	if h.podIP != currentPodIP {
+		h.podIP = currentPodIP
+		h.request = nil
+		h.reset()
+	}
+
+	if h.request == nil {
+		req, err := httpprobe.NewRequestForHTTPGetAction(h.httpGet, container, h.podIP, "probe")
+		if err != nil {
+			return nil, err
+		}
+		h.request = req
+	}
+	return h.request, nil
+}
+
+// reset clears the cached HTTP request
+func (h *httpProbeRequestHolder) reset() {
+	h.request = nil
+}
 
 // worker handles the periodic probing of its assigned container. Each worker has a go-routine
 // associated with it which runs the probe loop until the container permanently terminates, or the
@@ -71,6 +104,9 @@ type worker struct {
 
 	// If set, skip probing.
 	onHold bool
+
+	// Holder for HTTP probe request object
+	httpProbeRequest *httpProbeRequestHolder
 
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
@@ -140,6 +176,14 @@ func newWorker(
 
 	w.proberDurationSuccessfulMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
 	w.proberDurationUnknownMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
+
+	// Initailzie the HTTP probe request holder if this worker will perform HTTP probing
+	if w.spec != nil && w.spec.HTTPGet != nil {
+		w.httpProbeRequest = &httpProbeRequestHolder{
+			httpGet: w.spec.HTTPGet,
+			podIP:   "", // Empty Initially because we are not sure if the pod IP is available yet (better to dynamically set in worker loop)
+		}
+	}
 
 	return w
 }
@@ -238,6 +282,10 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
 		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		// We've got a new container so we will reset the HTTP probe request
+		if w.httpProbeRequest != nil {
+			w.httpProbeRequest.reset()
+		}
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}
@@ -293,8 +341,20 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		}
 	}
 
+	var req *http.Request
+	var err error
+	// Use cached HTTP request if available
+	if w.httpProbeRequest != nil {
+		req, err = w.httpProbeRequest.getRequest(&w.container, status.PodIP) // either returns cached request or creates a new one
+		if err != nil {
+			// Request creation/reuse failed, try again next time.
+			klog.V(4).InfoS("HTTP-Probe worker failed to create request", "error", err)
+			return true
+		}
+	}
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID, req)
+
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
