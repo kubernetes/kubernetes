@@ -495,7 +495,7 @@ func addTypeMetaProperties(s *spec.Schema, v2 bool) {
 
 // buildListSchema builds the list kind schema for the CRD
 func (b *builder) buildListSchema(crd *apiextensionsv1.CustomResourceDefinition, opts Options) *spec.Schema {
-	name := definitionPrefix + util.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", b.group, b.version, b.kind))
+	name := definitionPrefix + fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)
 	doc := fmt.Sprintf("List of %s. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md", b.plural)
 	s := new(spec.Schema).
 		Typed("object", "").
