@@ -193,8 +193,6 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 	// working with a copy to avoid race condition between this and resource version controller
 	toBeProcessedSVM := svm.DeepCopy()
 
-	gvr := getGVRFromResource(toBeProcessedSVM)
-
 	if IsConditionTrue(toBeProcessedSVM, svmv1alpha1.MigrationSucceeded) || IsConditionTrue(toBeProcessedSVM, svmv1alpha1.MigrationFailed) {
 		logger.V(4).Info("Migration has already succeeded or failed previously, skipping", "svm", name)
 		return nil
@@ -204,6 +202,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		logger.V(4).Info("The latest resource version is empty. We will attempt to migrate once the resource version is available.")
 		return nil
 	}
+	gvr := getGVRFromResource(toBeProcessedSVM)
 
 	// prevent unsynced monitor from blocking forever
 	// use a short timeout so that we can fail quickly and possibly handle other migrations while this monitor gets ready.

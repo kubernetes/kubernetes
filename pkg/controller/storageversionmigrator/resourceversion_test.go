@@ -19,6 +19,7 @@ package storageversionmigrator
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,13 +28,13 @@ import (
 	kubetesting "k8s.io/client-go/testing"
 )
 
-func TestIsResourceUpdatable(t *testing.T) {
+func TestIsResourceMigratable(t *testing.T) {
 	tcs := []struct {
 		name      string
 		resources []*metav1.APIResourceList
 		resource  schema.GroupVersionResource
 		want      bool
-		wantErr   bool
+		wantErr   string
 	}{
 		{
 			name: "migratable resource",
@@ -73,8 +74,8 @@ func TestIsResourceUpdatable(t *testing.T) {
 					APIResources: []metav1.APIResource{
 						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
 						{Name: "events", Namespaced: true, Kind: "Event", Verbs: []string{"get", "list", "watch", "create", "delete"}},
-						{Name: "configmaps", Namespaced: true, Kind: "Event", Verbs: []string{"get", "watch", "create", "delete", "update", "patch", "delete"}},
-						{Name: "secrets", Namespaced: true, Kind: "Event", Verbs: []string{"get", "watch", "create", "delete", "update", "delete"}},
+						{Name: "configmaps", Namespaced: true, Kind: "Configmap", Verbs: []string{"get", "watch", "create", "delete", "update", "patch", "delete"}},
+						{Name: "secrets", Namespaced: true, Kind: "Secret", Verbs: []string{"get", "watch", "create", "delete", "update", "delete"}},
 					},
 				},
 			},
@@ -104,12 +105,56 @@ func TestIsResourceUpdatable(t *testing.T) {
 					APIResources: []metav1.APIResource{
 						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
 						{Name: "events", Namespaced: true, Kind: "Event", Verbs: []string{"get", "list", "watch", "create", "delete"}},
-						{Name: "configmaps", Namespaced: true, Kind: "Event", Verbs: []string{"get", "watch", "create", "delete", "update", "patch", "delete"}},
+						{Name: "configmaps", Namespaced: true, Kind: "Configmap", Verbs: []string{"get", "watch", "create", "delete", "update", "patch", "delete"}},
 					},
 				},
 			},
 			resource: schema.GroupVersionResource{Group: "", Version: "v1", Resource: "foo"},
-			wantErr:  true,
+			wantErr:  "resource \"/v1, Resource=foo\" not found in discovery",
+		},
+		{
+			name: "multiple versions",
+			resources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{Name: "foo", Namespaced: true, Kind: "Pod", Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
+					},
+				},
+				{
+					GroupVersion: "v1alpha1",
+					APIResources: []metav1.APIResource{
+						{Name: "foo", Namespaced: true, Kind: "Pod", Verbs: []string{"get", "watch", "create", "update", "patch", "delete"}},
+					},
+				},
+			},
+			resource: schema.GroupVersionResource{Group: "", Version: "v1alpha", Resource: "foo"},
+			want:     false,
+		},
+		{
+			name: "multiple versions and groups",
+			resources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{Name: "foo", Namespaced: true, Kind: "Foo", Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
+					},
+				},
+				{
+					GroupVersion: "v1alpha1",
+					APIResources: []metav1.APIResource{
+						{Name: "foo", Namespaced: true, Kind: "Foo", Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
+					},
+				},
+				{
+					GroupVersion: "bar/v1alpha1",
+					APIResources: []metav1.APIResource{
+						{Name: "foo", Namespaced: true, Kind: "Foo", Group: "bar", Verbs: []string{"get", "watch", "create", "update", "patch", "delete"}},
+					},
+				},
+			},
+			resource: schema.GroupVersionResource{Group: "bar", Version: "v1alpha1", Resource: "foo"},
+			want:     false,
 		},
 	}
 
@@ -123,15 +168,15 @@ func TestIsResourceUpdatable(t *testing.T) {
 				discoveryClient: &discoveryClient,
 			}
 
-			isUpdatable, err := rvController.isResourceMigratable(tc.resource)
+			isMigratable, err := rvController.isResourceMigratable(tc.resource)
 			if err != nil {
-				if !tc.wantErr {
-					t.Errorf("Unexpected error: %v", err)
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Errorf("Unexpected error: %v, want: %v", err, tc.wantErr)
 				}
 				return
 			}
-			if isUpdatable != tc.want {
-				t.Errorf("Expected %v, got %v", tc.want, isUpdatable)
+			if isMigratable != tc.want {
+				t.Errorf("Expected %v, got %v", tc.want, isMigratable)
 			}
 		})
 	}

@@ -47,6 +47,8 @@ const (
 	ResourceVersionControllerName string = "resource-version-controller"
 )
 
+var verbsRequiredForMigration = []string{"update", "patch", "list"}
+
 // ResourceVersionController adds the resource version obtained from a randomly nonexistent namespace
 // to the SVM status before the migration is initiated. This resource version is utilized for checking
 // freshness of GC cache before the migration is initiated.
@@ -196,26 +198,18 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 		return err
 	}
 	if !exists {
-		err := rv.setMigrationError(ctx, toBeProcessedSVM, "resource does not exist in discovery")
-		if err != nil {
-			return err
-		}
-		return nil
+		return rv.failMigration(ctx, toBeProcessedSVM, "resource does not exist in discovery")
 	}
 
-	isUpdatable, err := rv.isResourceMigratable(gvr)
+	isMigratable, err := rv.isResourceMigratable(gvr)
 	if err != nil {
 		return err
 	}
 
-	if !isUpdatable {
-		err := fmt.Errorf("resource %q does not support update verb", gvr.String())
+	if !isMigratable {
+		err := fmt.Errorf("resource %q does not support discovery operations: %v", gvr.String(), verbsRequiredForMigration)
 		logger.Error(err, "resource is not able to be migrated, not retrying", "gvr", gvr.String())
-		err = rv.setMigrationError(ctx, toBeProcessedSVM, "resource is not migratable, check if update, patch, and list operations are supported")
-		if err != nil {
-			return err
-		}
-		return nil
+		return rv.failMigration(ctx, toBeProcessedSVM, err.Error())
 	}
 
 	toBeProcessedSVM.Status.ResourceVersion, err = rv.getLatestResourceVersion(gvr, ctx)
@@ -294,26 +288,36 @@ func (rv *ResourceVersionController) isResourceNamespaceScoped(gvr schema.GroupV
 	return false, fmt.Errorf("resource %q not found", gvr.String())
 }
 
+// isResourceMigratable checks if the GVR has the list of verbs required for
+// migration. Returns true if all verbs are in the discovery document and false
+// otherwise. If there is an error querying the discovery client or we fail to
+// get the GVR, return an error.
 func (rv *ResourceVersionController) isResourceMigratable(gvr schema.GroupVersionResource) (bool, error) {
 	resourceList, err := rv.discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
-	if err != nil {
-		return false, err
+	if apierrors.IsNotFound(err) {
+		return false, nil
 	}
 
-	for _, resource := range resourceList.APIResources {
-		if resource.Name == gvr.Resource {
-			verbs := sets.NewString(resource.Verbs...)
-			if resource.Verbs != nil && verbs.Has("update") && verbs.Has("patch") && verbs.Has("list") {
-				return true, nil
+	if resourceList != nil {
+		// even in case of an error above there might be a partial list for APIs that
+		// were already successfully discovered.
+		for _, resource := range resourceList.APIResources {
+			if resource.Name == gvr.Resource {
+				if resource.Verbs != nil && sets.NewString(resource.Verbs...).HasAll(verbsRequiredForMigration...) {
+					return true, nil
+				}
+				return false, nil
 			}
-			return false, nil
 		}
 	}
 
-	return false, fmt.Errorf("resource %q not found", gvr.String())
+	if err != nil {
+		return false, err
+	}
+	return false, fmt.Errorf("resource %q not found in discovery", gvr.String())
 }
 
-func (rv *ResourceVersionController) setMigrationError(ctx context.Context, svm *svmv1alpha1.StorageVersionMigration, message string) error {
+func (rv *ResourceVersionController) failMigration(ctx context.Context, svm *svmv1alpha1.StorageVersionMigration, message string) error {
 	_, err := rv.kubeClient.StoragemigrationV1alpha1().
 		StorageVersionMigrations().
 		UpdateStatus(
