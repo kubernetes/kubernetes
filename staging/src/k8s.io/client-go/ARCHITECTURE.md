@@ -65,8 +65,7 @@ The **`kubernetes.Clientset`** provides compile-time, type-safe access to core, 
 The **`dynamic.DynamicClient`** represents all objects as `unstructured.Unstructured`, allowing it
 to interact with any API resource, including CRDs. It relies on two discovery mechanisms:
 1.  The **`discovery.DiscoveryClient`** determines *what* resources exist. The
-    **`CachedDiscoveryClient`** is a critical optimization that caches this data on disk to solve
-    the severe N+1 request performance bottleneck that can occur during discovery.
+    **`CachedDiscoveryClient`** is an optimization that caches this data on disk to solve.
 2.  The **OpenAPI schema** (fetched from `/openapi/v3`) describes the *structure* of those
     resources, providing the schema awareness needed by the dynamic client.
 
@@ -84,6 +83,8 @@ several key components:
 
 A contributor modifying a built-in API type **must** run the code generation scripts to update all
 of these dependent components. For the Kubernetes project, `hack/update-codegen.sh` runs code generation.
+
+`sample-controller` shows how code generate can be configured to build custom controllers.
 
 ## Controller Infrastructure
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -373,15 +373,17 @@ func Example_leaderElection() {
 	}()
 
 	// Create the lock object.
-	lock := &resourcelock.LeaseLock{
-		LeaseMeta: metav1.ObjectMeta{
-			Name:      leaseName,
-			Namespace: leaseNamespace,
-		},
-		Client: clientset.CoordinationV1(),
-		LockConfig: resourcelock.ResourceLockConfig{
+	lock, err := resourcelock.New(resourcelock.LeasesResourceLock,
+		leaseNamespace,
+		leaseName,
+		clientset.CoreV1(),
+		clientset.CoordinationV1(),
+		resourcelock.ResourceLockConfig{
 			Identity: id,
-		},
+		})
+	if err != nil {
+		fmt.Printf("Error creating lock: %v\n", err)
+		return
 	}
 
 	// Create the leader elector.
