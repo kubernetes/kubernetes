@@ -181,14 +181,14 @@ type activeQueue struct {
 	// isSchedulingQueueHintEnabled indicates whether the feature gate for the scheduling queue is enabled.
 	isSchedulingQueueHintEnabled bool
 
-	metricsRecorder metrics.MetricAsyncRecorder
+	metricsRecorder MetricAsyncRecorder
 
 	// backoffQPopper is used to pop from backoffQ when activeQ is empty.
 	// It is non-nil only when SchedulerPopFromBackoffQ feature is enabled.
 	backoffQPopper backoffQPopper
 }
 
-func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
+func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
 	aq := &activeQueue{
 		queue:                        queue,
 		inFlightPods:                 make(map[types.UID]*list.Element),
