@@ -161,7 +161,7 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	}
 
 	w := &watcher{
-		client:        c.Client,
+		client:        c.Client.Watcher,
 		codec:         codec,
 		newFunc:       newFunc,
 		groupResource: groupResource,

@@ -70,7 +70,7 @@ func TestOnlySetFatalOnDecodeError(b bool) {
 }
 
 type watcher struct {
-	client              *clientv3.Client
+	client              clientv3.Watcher
 	codec               runtime.Codec
 	newFunc             func() runtime.Object
 	objectType          string
