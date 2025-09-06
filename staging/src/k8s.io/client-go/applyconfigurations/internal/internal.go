@@ -1972,6 +1972,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: podManagementPolicy
       type:
         scalar: string
+    - name: progressDeadlineSeconds
+      type:
+        scalar: numeric
     - name: replicas
       type:
         scalar: numeric

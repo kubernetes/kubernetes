@@ -761,6 +761,14 @@ message StatefulSetSpec {
   // increments the index by one for each additional replica requested.
   // +optional
   optional StatefulSetOrdinals ordinals = 11;
+
+  // The maximum time in seconds for a deployment to make progress before it
+  // is considered to be failed. The StatefulSet controller will continue to
+  // process failed StatefulSets and a condition with a ProgressDeadlineExceeded
+  // reason will be surfaced in the StatefulSet status. Note that progress will
+  // not be estimated during the time a StatefulSet is paused. This field defaults to 600s.
+  // +optional
+  optional int32 progressDeadlineSeconds = 12;
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.

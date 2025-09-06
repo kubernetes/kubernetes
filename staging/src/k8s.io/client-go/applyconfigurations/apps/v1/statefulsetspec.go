@@ -38,6 +38,7 @@ type StatefulSetSpecApplyConfiguration struct {
 	MinReadySeconds                      *int32                                                             `json:"minReadySeconds,omitempty"`
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
 	Ordinals                             *StatefulSetOrdinalsApplyConfiguration                             `json:"ordinals,omitempty"`
+	ProgressDeadlineSeconds              *int32                                                             `json:"progressDeadlineSeconds,omitempty"`
 }
 
 // StatefulSetSpecApplyConfiguration constructs a declarative configuration of the StatefulSetSpec type for use with
@@ -136,5 +137,13 @@ func (b *StatefulSetSpecApplyConfiguration) WithPersistentVolumeClaimRetentionPo
 // If called multiple times, the Ordinals field is set to the value of the last call.
 func (b *StatefulSetSpecApplyConfiguration) WithOrdinals(value *StatefulSetOrdinalsApplyConfiguration) *StatefulSetSpecApplyConfiguration {
 	b.Ordinals = value
+	return b
+}
+
+// WithProgressDeadlineSeconds sets the ProgressDeadlineSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ProgressDeadlineSeconds field is set to the value of the last call.
+func (b *StatefulSetSpecApplyConfiguration) WithProgressDeadlineSeconds(value int32) *StatefulSetSpecApplyConfiguration {
+	b.ProgressDeadlineSeconds = &value
 	return b
 }

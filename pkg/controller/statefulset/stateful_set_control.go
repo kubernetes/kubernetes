@@ -312,6 +312,8 @@ type replicaStatus struct {
 	availableReplicas int32
 	currentReplicas   int32
 	updatedReplicas   int32
+	progressing       *apps.StatefulSetCondition
+	available         *apps.StatefulSetCondition
 }
 
 func computeReplicaStatus(pods []*v1.Pod, minReadySeconds int32, currentRevision, updateRevision *apps.ControllerRevision) replicaStatus {
@@ -328,7 +330,6 @@ func computeReplicaStatus(pods []*v1.Pod, minReadySeconds int32, currentRevision
 			if isRunningAndAvailable(pod, minReadySeconds) {
 				status.availableReplicas++
 			}
-
 		}
 
 		// count the number of current and update replicas
@@ -342,6 +343,41 @@ func computeReplicaStatus(pods []*v1.Pod, minReadySeconds int32, currentRevision
 			}
 		}
 	}
+
+	// Compute progressing condition
+	if status.updatedReplicas == status.replicas {
+		status.progressing = NewStatefulSetCondition(
+			apps.StatefulSetProgressing,
+			v1.ConditionTrue,
+			MinimumReplicasAvailable,
+			"StatefulSet has minimum availability.",
+		)
+	} else {
+		status.progressing = NewStatefulSetCondition(
+			apps.StatefulSetProgressing,
+			v1.ConditionTrue,
+			ScalingUpReason,
+			"StatefulSet is scaling up new pods.",
+		)
+	}
+
+	// Compute available condition
+	if status.availableReplicas >= status.replicas {
+		status.available = NewStatefulSetCondition(
+			apps.StatefulSetAvailable,
+			v1.ConditionTrue,
+			MinimumReplicasAvailable,
+			"StatefulSet has minimum availability.",
+		)
+	} else {
+		status.available = NewStatefulSetCondition(
+			apps.StatefulSetAvailable,
+			v1.ConditionFalse,
+			MinimumReplicasUnavailable,
+			"StatefulSet does not have minimum availability.",
+		)
+	}
+
 	return status
 }
 
@@ -351,6 +387,8 @@ func updateStatus(status *apps.StatefulSetStatus, minReadySeconds int32, current
 	status.AvailableReplicas = 0
 	status.CurrentReplicas = 0
 	status.UpdatedReplicas = 0
+
+	var lastStatus replicaStatus
 	for _, list := range podLists {
 		replicaStatus := computeReplicaStatus(list, minReadySeconds, currentRevision, updateRevision)
 		status.Replicas += replicaStatus.replicas
@@ -358,6 +396,15 @@ func updateStatus(status *apps.StatefulSetStatus, minReadySeconds int32, current
 		status.AvailableReplicas += replicaStatus.availableReplicas
 		status.CurrentReplicas += replicaStatus.currentReplicas
 		status.UpdatedReplicas += replicaStatus.updatedReplicas
+		lastStatus = replicaStatus
+	}
+
+	// Update conditions using the computed status
+	if lastStatus.progressing != nil {
+		SetStatefulSetCondition(status, *lastStatus.progressing)
+	}
+	if lastStatus.available != nil {
+		SetStatefulSetCondition(status, *lastStatus.available)
 	}
 }
 
