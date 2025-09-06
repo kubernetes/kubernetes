@@ -580,7 +580,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPASelection
 				rc := e2eautoscaling.NewDynamicResourceConsumer(ctx,
 					hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 					initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
-					f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+					f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle, nil,
 				)
 				ginkgo.DeferCleanup(rc.CleanUp)
 
@@ -676,7 +676,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPASelection
 				rc := e2eautoscaling.NewDynamicResourceConsumer(ctx,
 					hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 					initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
-					f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+					f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle, nil,
 				)
 				ginkgo.DeferCleanup(rc.CleanUp)
 
@@ -760,6 +760,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPASelection
 				f.ScalesGetter,
 				e2eautoscaling.Disable,
 				e2eautoscaling.Idle,
+				nil,
 			)
 			ginkgo.DeferCleanup(rc1.CleanUp)
 
@@ -777,6 +778,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPASelection
 				f.ScalesGetter,
 				e2eautoscaling.Disable,
 				e2eautoscaling.Idle,
+				nil,
 			)
 			ginkgo.DeferCleanup(rc2.CleanUp)
 
@@ -793,6 +795,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPASelection
 				f.ScalesGetter,
 				e2eautoscaling.Disable,
 				e2eautoscaling.Idle,
+				nil,
 			)
 			ginkgo.DeferCleanup(rc3.CleanUp)
 
