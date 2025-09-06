@@ -38,9 +38,10 @@ const (
 
 var (
 	testDeviceHealth = state.DeviceHealth{
-		PoolName:   testPool,
-		DeviceName: testDevice,
-		Health:     state.DeviceHealthStatusHealthy,
+		PoolName:           testPool,
+		DeviceName:         testDevice,
+		Health:             state.DeviceHealthStatusHealthy,
+		HealthCheckTimeout: DefaultHealthTimeout,
 	}
 )
 
@@ -206,7 +207,7 @@ func TestGetHealthInfo(t *testing.T) {
 		driverState := (*cache.HealthInfo)[testDriver]
 		deviceKey := testPool + "/" + testDevice
 		device := driverState.Devices[deviceKey]
-		device.LastUpdated = time.Now().Add((-healthTimeout) - time.Second)
+		device.LastUpdated = time.Now().Add((-DefaultHealthTimeout) - time.Second)
 		driverState.Devices[deviceKey] = device
 		(*cache.HealthInfo)[testDriver] = driverState
 		return nil
@@ -237,7 +238,7 @@ func TestGetHealthInfoRobust(t *testing.T) {
 			name: "device exists and is healthy",
 			initialState: &state.DevicesHealthMap{
 				testDriver: {Devices: map[string]state.DeviceHealth{
-					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now()},
+					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now(), HealthCheckTimeout: DefaultHealthTimeout},
 				}},
 			},
 			driverName:     testDriver,
@@ -249,7 +250,7 @@ func TestGetHealthInfoRobust(t *testing.T) {
 			name: "device exists and is unhealthy",
 			initialState: &state.DevicesHealthMap{
 				testDriver: {Devices: map[string]state.DeviceHealth{
-					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusUnhealthy, LastUpdated: time.Now()},
+					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusUnhealthy, LastUpdated: time.Now(), HealthCheckTimeout: DefaultHealthTimeout},
 				}},
 			},
 			driverName:     testDriver,
@@ -261,7 +262,7 @@ func TestGetHealthInfoRobust(t *testing.T) {
 			name: "device exists but timed out",
 			initialState: &state.DevicesHealthMap{
 				testDriver: {Devices: map[string]state.DeviceHealth{
-					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now().Add((-1 * healthTimeout) - time.Second)},
+					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now().Add((-1 * DefaultHealthTimeout) - time.Second), HealthCheckTimeout: DefaultHealthTimeout},
 				}},
 			},
 			driverName:     testDriver,
@@ -273,7 +274,7 @@ func TestGetHealthInfoRobust(t *testing.T) {
 			name: "device exists, just within timeout",
 			initialState: &state.DevicesHealthMap{
 				testDriver: {Devices: map[string]state.DeviceHealth{
-					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now().Add((-1 * healthTimeout) + time.Second)},
+					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now().Add((-1 * DefaultHealthTimeout) + time.Second), HealthCheckTimeout: DefaultHealthTimeout},
 				}},
 			},
 			driverName:     testDriver,
@@ -285,7 +286,7 @@ func TestGetHealthInfoRobust(t *testing.T) {
 			name: "device does not exist, just outside of timeout",
 			initialState: &state.DevicesHealthMap{
 				testDriver: {Devices: map[string]state.DeviceHealth{
-					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now().Add((-1 * healthTimeout) - time.Second)},
+					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now().Add((-1 * DefaultHealthTimeout) - time.Second), HealthCheckTimeout: DefaultHealthTimeout},
 				}},
 			},
 			driverName:     testDriver,
@@ -297,7 +298,7 @@ func TestGetHealthInfoRobust(t *testing.T) {
 			name: "device does not exist",
 			initialState: &state.DevicesHealthMap{
 				testDriver: {Devices: map[string]state.DeviceHealth{
-					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now()},
+					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now(), HealthCheckTimeout: DefaultHealthTimeout},
 				}},
 			},
 			driverName:     testDriver,
@@ -309,7 +310,7 @@ func TestGetHealthInfoRobust(t *testing.T) {
 			name: "driver does not exist",
 			initialState: &state.DevicesHealthMap{
 				testDriver: {Devices: map[string]state.DeviceHealth{
-					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now()},
+					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now(), HealthCheckTimeout: DefaultHealthTimeout},
 				}},
 			},
 			driverName:     "driver2",
@@ -321,7 +322,7 @@ func TestGetHealthInfoRobust(t *testing.T) {
 			name: "pool does not exist",
 			initialState: &state.DevicesHealthMap{
 				testDriver: {Devices: map[string]state.DeviceHealth{
-					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now()},
+					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now(), HealthCheckTimeout: DefaultHealthTimeout},
 				}},
 			},
 			driverName:     testDriver,
@@ -333,8 +334,8 @@ func TestGetHealthInfoRobust(t *testing.T) {
 			name: "multiple devices",
 			initialState: &state.DevicesHealthMap{
 				testDriver: {Devices: map[string]state.DeviceHealth{
-					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now()},
-					testPool + "/device2":       {PoolName: testPool, DeviceName: "device2", Health: state.DeviceHealthStatusUnhealthy, LastUpdated: time.Now()},
+					testPool + "/" + testDevice: {PoolName: testPool, DeviceName: testDevice, Health: state.DeviceHealthStatusHealthy, LastUpdated: time.Now(), HealthCheckTimeout: DefaultHealthTimeout},
+					testPool + "/device2":       {PoolName: testPool, DeviceName: "device2", Health: state.DeviceHealthStatusUnhealthy, LastUpdated: time.Now(), HealthCheckTimeout: DefaultHealthTimeout},
 				}},
 			},
 			driverName:     testDriver,
@@ -382,7 +383,7 @@ func TestUpdateHealthInfo(t *testing.T) {
 	assert.Equal(t, state.DeviceHealthStatusUnhealthy, cache.getHealthInfo(testDriver, testPool, testDevice))
 
 	// 4 -- Add second device, omit first
-	secondDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "device2", Health: state.DeviceHealthStatusHealthy}
+	secondDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "device2", Health: state.DeviceHealthStatusHealthy, HealthCheckTimeout: DefaultHealthTimeout}
 	// When the first device is omitted, it should be marked as "Unknown" after a timeout.
 	// For this test, we simulate the timeout by not reporting it.
 	firstDeviceAsUnknown := newHealth
@@ -392,7 +393,7 @@ func TestUpdateHealthInfo(t *testing.T) {
 	err = cache.withLock(func() error {
 		deviceKey := testPool + "/" + testDevice
 		device := (*cache.HealthInfo)[testDriver].Devices[deviceKey]
-		device.LastUpdated = time.Now().Add(-healthTimeout * 2)
+		device.LastUpdated = time.Now().Add(-DefaultHealthTimeout * 2)
 		(*cache.HealthInfo)[testDriver].Devices[deviceKey] = device
 		return nil
 	})
@@ -411,7 +412,7 @@ func TestUpdateHealthInfo(t *testing.T) {
 	assert.Equal(t, state.DeviceHealthStatusUnknown, cache2.getHealthInfo(testDriver, testPool, testDevice))
 
 	// 6 -- Test how updateHealthInfo handles device timeouts
-	timeoutDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "timeoutDevice", Health: "Unhealthy"}
+	timeoutDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "timeoutDevice", Health: "Unhealthy", HealthCheckTimeout: DefaultHealthTimeout}
 	_, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{timeoutDevice})
 	require.NoError(t, err)
 
@@ -420,14 +421,14 @@ func TestUpdateHealthInfo(t *testing.T) {
 		driverState := (*cache.HealthInfo)[testDriver]
 		deviceKey := testPool + "/timeoutDevice"
 		device := driverState.Devices[deviceKey]
-		device.LastUpdated = time.Now().Add((-healthTimeout) - time.Second)
+		device.LastUpdated = time.Now().Add((-DefaultHealthTimeout) - time.Second)
 		driverState.Devices[deviceKey] = device
 		(*cache.HealthInfo)[testDriver] = driverState
 		return nil
 	})
 	require.NoError(t, err)
 
-	expectedTimeoutDeviceUnknown := state.DeviceHealth{PoolName: testPool, DeviceName: "timeoutDevice", Health: state.DeviceHealthStatusUnknown}
+	expectedTimeoutDeviceUnknown := state.DeviceHealth{PoolName: testPool, DeviceName: "timeoutDevice", Health: state.DeviceHealthStatusUnknown, HealthCheckTimeout: DefaultHealthTimeout}
 	expectedChanged6 := []state.DeviceHealth{expectedTimeoutDeviceUnknown}
 	changedDevices, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{})
 	require.NoError(t, err)
