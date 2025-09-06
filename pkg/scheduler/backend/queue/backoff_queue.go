@@ -104,6 +104,8 @@ type backoffQueue struct {
 
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
 	isPopFromBackoffQEnabled bool
+
+	notify func()
 }
 
 func newBackoffQueue(clock clock.WithTicker, podInitialBackoffDuration time.Duration, podMaxBackoffDuration time.Duration, activeQLessFn framework.LessFunc, popFromBackoffQEnabled bool) *backoffQueue {
@@ -293,10 +295,18 @@ func (bq *backoffQueue) popAllBackoffCompleted(logger klog.Logger) []*framework.
 // It also ensures that pInfo is not in both queues.
 func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) {
 	bq.lock.Lock()
-	defer bq.lock.Unlock()
 
-	// If pod has empty both unschedulable plugins and pending plugins,
+	preEmpty := (bq.podBackoffQ.Len()+bq.podErrorBackoffQ.Len() == 0)
+	needNotify := false
+	defer func() {
+		bq.lock.Unlock()
+		if needNotify && bq.notify != nil {
+			bq.notify()
+		}
+	}()
+
 	// it means that it failed because of error and should be moved to podErrorBackoffQ.
+	// If pod has empty both unschedulable plugins and pending plugins,
 	if pInfo.UnschedulablePlugins.Len() == 0 && pInfo.PendingPlugins.Len() == 0 {
 		bq.podErrorBackoffQ.AddOrUpdate(pInfo)
 		// Ensure the pod is not in the podBackoffQ and report the error if it happens.
@@ -307,9 +317,15 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
 		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQ)
+		if preEmpty {
+			needNotify = true
+		}
 		return
 	}
 	bq.podBackoffQ.AddOrUpdate(pInfo)
+	if preEmpty {
+		needNotify = true
+	}
 	// Ensure the pod is not in the podErrorBackoffQ and report the error if it happens.
 	err := bq.podErrorBackoffQ.Delete(pInfo)
 	if err == nil {
@@ -318,6 +334,11 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 	}
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
 	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQ)
+}
+
+// setNotifyFunc injects the activeQ-side notifier.
+func (bq *backoffQueue) setNotifyFunc(f func()) {
+	bq.notify = f
 }
 
 // update updates the pod in backoffQueue if oldPodInfo is already in the queue.
