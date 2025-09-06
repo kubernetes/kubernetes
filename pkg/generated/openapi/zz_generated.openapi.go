@@ -18039,6 +18039,12 @@ func schema_k8sio_api_batch_v1_CronJobStatus(ref common.ReferenceCallback) commo
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
+					"lastFailureTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Information when was the last time the job completed with failure.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 				},
 			},
 		},
