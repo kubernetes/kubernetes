@@ -67,8 +67,13 @@ var (
 	groupVersions = []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
 )
 
+// DEPRECATED: The ImagePolicyWebhook admission plugin is deprecated and will be removed in a future release.
+// Please migrate to ValidatingAdmissionWebhook or other supported mechanisms.
+//
+// TODO: Remove this plugin after deprecation period.
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
+	klog.Warning("ImagePolicyWebhook admission plugin is DEPRECATED and will be removed in a future release. Please migrate to ValidatingAdmissionWebhook or other supported mechanisms.")
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		newImagePolicyWebhook, err := NewImagePolicyWebhook(config)
 		if err != nil {
@@ -216,57 +221,76 @@ func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admissio
 	return nil
 }
 
+// Versioned config for ImagePolicyWebhook
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type ImagePolicyWebhookConfigurationV1Alpha1 struct {
+	APIVersion  string                   `json:"apiVersion"`
+	Kind        string                   `json:"kind"`
+	ImagePolicy imagePolicyWebhookConfig `json:"imagePolicy"`
+}
+
+// DEPRECATED: The ImagePolicyWebhook admission plugin is deprecated and will be removed in a future release.
+// Please migrate to ValidatingAdmissionWebhook or other supported mechanisms.
+//
+// TODO: Remove this plugin after deprecation period.
 // NewImagePolicyWebhook a new ImagePolicyWebhook plugin from the provided config file.
 // The config file is specified by --admission-control-config-file and has the
 // following format for a webhook:
 //
+// Versioned format (recommended):
+//
 //	{
-//	  "imagePolicy": {
-//	     "kubeConfigFile": "path/to/kubeconfig/for/backend",
-//	     "allowTTL": 30,           # time in s to cache approval
-//	     "denyTTL": 30,            # time in s to cache denial
-//	     "retryBackoff": 500,      # time in ms to wait between retries
-//	     "defaultAllow": true      # determines behavior if the webhook backend fails
-//	  }
+//	  "apiVersion": "imagepolicy.admission.k8s.io/v1alpha1",
+//	  "kind": "ImagePolicyWebhookConfiguration",
+//	  "imagePolicy": { ... }
 //	}
 //
-// The config file may be json or yaml.
+// Legacy format (deprecated, still supported for backward compatibility):
 //
-// The kubeconfig property refers to another file in the kubeconfig format which
-// specifies how to connect to the webhook backend.
+//	{
+//	  "imagePolicy": { ... }
+//	}
 //
-// The kubeconfig's cluster field is used to refer to the remote service, user refers to the returned authorizer.
-//
-//	# clusters refers to the remote service.
-//	clusters:
-//	- name: name-of-remote-imagepolicy-service
-//	  cluster:
-//	    certificate-authority: /path/to/ca.pem      # CA for verifying the remote service.
-//	    server: https://images.example.com/policy # URL of remote service to query. Must use 'https'.
-//
-//	# users refers to the API server's webhook configuration.
-//	users:
-//	- name: name-of-api-server
-//	  user:
-//	    client-certificate: /path/to/cert.pem # cert for the webhook plugin to use
-//	    client-key: /path/to/key.pem          # key matching the cert
-//
-// For additional HTTP configuration, refer to the kubeconfig documentation
-// http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.
+// Register registers a plugin
 func NewImagePolicyWebhook(configFile io.Reader) (*Plugin, error) {
 	if configFile == nil {
 		return nil, fmt.Errorf("no config specified")
 	}
 
-	// TODO: move this to a versioned configuration file format
-	var config AdmissionConfig
-	d := yaml.NewYAMLOrJSONDecoder(configFile, 4096)
-	err := d.Decode(&config)
-	if err != nil {
-		return nil, err
+	// Require io.ReadSeeker for versioned config support
+	readSeeker, ok := configFile.(io.ReadSeeker)
+	if !ok {
+		return nil, fmt.Errorf("ImagePolicyWebhook config reader must be an io.ReadSeeker for versioned config support")
 	}
 
-	whConfig := config.ImagePolicyWebhook
+	// Support both versioned and legacy config formats
+	var versioned struct {
+		APIVersion string `json:"apiVersion" yaml:"apiVersion"`
+		Kind       string `json:"kind" yaml:"kind"`
+		AdmissionConfig
+	}
+	var legacy AdmissionConfig
+
+	d := yaml.NewYAMLOrJSONDecoder(readSeeker, 4096)
+	err := d.Decode(&versioned)
+	if err == nil && versioned.APIVersion != "" && versioned.Kind != "" {
+		// Versioned config detected
+		legacy = versioned.AdmissionConfig
+	} else {
+		// Try legacy config
+		_, errSeek := readSeeker.Seek(0, io.SeekStart)
+		if errSeek != nil {
+			return nil, errSeek
+		}
+		d = yaml.NewYAMLOrJSONDecoder(readSeeker, 4096)
+		err = d.Decode(&legacy)
+		if err != nil {
+			return nil, err
+		}
+		klog.Warning("Using legacy (unversioned) configuration for ImagePolicyWebhook. Please migrate to the versioned format.")
+	}
+
+	whConfig := legacy.ImagePolicyWebhook
 	if err := normalizeWebhookConfig(&whConfig); err != nil {
 		return nil, err
 	}
