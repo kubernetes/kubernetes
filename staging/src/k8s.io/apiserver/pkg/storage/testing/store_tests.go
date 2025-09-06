@@ -193,12 +193,12 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 		rv:               strconv.FormatInt(math.MaxInt64, 10),
 	}, {
 		name:              "get non-existing",
-		key:               "/non-existing",
+		key:               "/pods/non-existing",
 		ignoreNotFound:    false,
 		expectNotFoundErr: true,
 	}, {
 		name:              "get non-existing, ignore not found",
-		key:               "/non-existing",
+		key:               "/pods/non-existing",
 		ignoreNotFound:    true,
 		expectNotFoundErr: false,
 		expectedOut:       &example.Pod{},
@@ -258,7 +258,7 @@ func RunTestUnconditionalDelete(ctx context.Context, t *testing.T, store storage
 		expectNotFoundErr: false,
 	}, {
 		name:              "non-existing key",
-		key:               "/non-existing",
+		key:               "/pods/non-existing",
 		expectedObj:       nil,
 		expectNotFoundErr: true,
 	}}
@@ -640,11 +640,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		Predicate:       storage.Everything,
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/second", storageOpts, list); err != nil {
+	if err := store.GetList(ctx, "/pods/second", storageOpts, list); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	continueRV, _ := strconv.Atoi(list.ResourceVersion)
-	secondContinuation, err := storage.EncodeContinue("/second/foo", "/second/", int64(continueRV))
+	secondContinuation, err := storage.EncodeContinue("/pods/second/foo", "/pods/second/", int64(continueRV))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2037,12 +2037,12 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV In
 		expectRVTooLarge: true,
 	}, {
 		name:        "non-existing key",
-		key:         "/non-existing",
+		key:         "/pods/non-existing",
 		pred:        storage.Everything,
 		expectedOut: []example.Pod{},
 	}, {
 		name: "with matching pod name",
-		key:  "/non-existing",
+		key:  "/pods/non-existing",
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
@@ -2784,7 +2784,7 @@ func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceW
 		hasSelfLink         bool
 	}{{
 		name:                "non-existing key, ignoreNotFound=false",
-		key:                 "/non-existing",
+		key:                 "/pods/non-existing",
 		ignoreNotFound:      false,
 		precondition:        nil,
 		expectNotFoundErr:   true,
@@ -2792,7 +2792,7 @@ func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceW
 		expectNoUpdate:      false,
 	}, {
 		name:                "non-existing key, ignoreNotFound=true",
-		key:                 "/non-existing",
+		key:                 "/pods/non-existing",
 		ignoreNotFound:      true,
 		precondition:        nil,
 		expectNotFoundErr:   false,

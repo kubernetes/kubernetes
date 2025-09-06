@@ -519,15 +519,15 @@ func TestLeaseMaxObjectCount(t *testing.T) {
 		expectAttachedCount int64
 	}{
 		{
-			key:                 "testkey1",
+			key:                 "/pods/testkey1",
 			expectAttachedCount: 1,
 		},
 		{
-			key:                 "testkey2",
+			key:                 "/pods/testkey2",
 			expectAttachedCount: 2,
 		},
 		{
-			key: "testkey3",
+			key: "/pods/testkey3",
 			// We assume each time has 1 object attached to the lease
 			// so after granting a new lease, the recorded count is set to 1
 			expectAttachedCount: 1,
@@ -652,16 +652,30 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 
 func TestValidateKey(t *testing.T) {
 	validKeys := []string{
-		"/foo/bar/baz/a.b.c/",
-		"/foo",
-		"foo/bar/baz",
-		"/foo/bar..baz/",
-		"/foo/bar..",
-		"foo",
-		"foo/bar",
-		"/foo/bar/",
+		"/pods/foo/bar/baz/a.b.c/",
+		"/pods/foo",
+		"/pods/foo/bar/baz",
+		"/pods/foo/bar..baz/",
+		"/pods/foo/bar..",
+		"/pods/foo",
+		"/pods/foo/bar",
+		"/pods/foo/bar/",
+		"/pods/",
+		"/pods",
 	}
 	invalidKeys := []string{
+		"/pods/foo/bar/../a.b.c/",
+		"/pods/..",
+		"/pods/../",
+		"/pods/foo/bar/..",
+		"/pods/../foo/bar",
+		"/pods/../foo",
+		"/pods/foo/bar/../",
+		"/pods/.",
+		"/pods/./",
+		"/pods/foo/.",
+		"/pods/./bar",
+		"/pods/foo/./bar/",
 		"/foo/bar/../a.b.c/",
 		"..",
 		"/..",
@@ -920,14 +934,14 @@ func TestGetCurrentResourceVersion(t *testing.T) {
 		}
 	}
 	createPod := func(obj *example.Pod) *example.Pod {
-		key := "pods/" + obj.Namespace + "/" + obj.Name
+		key := "/pods/" + obj.Namespace + "/" + obj.Name
 		out := &example.Pod{}
 		err := store.Create(context.TODO(), key, obj, out, 0)
 		require.NoError(t, err)
 		return out
 	}
 	getPod := func(name, ns string) *example.Pod {
-		key := "pods/" + ns + "/" + name
+		key := "/pods/" + ns + "/" + name
 		out := &example.Pod{}
 		err := store.Get(context.TODO(), key, storage.GetOptions{}, out)
 		require.NoError(t, err)
@@ -1009,7 +1023,7 @@ func BenchmarkStatsCacheCleanKeys(b *testing.B) {
 }
 
 func TestPrefixGetKeys(t *testing.T) {
-	ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("pods"))
+	ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods"))
 	_, err := c.KV.Put(ctx, "key", "a")
 	if err != nil {
 		t.Fatal(err)
@@ -1076,7 +1090,7 @@ func TestPrefixStats(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, tc.estimate)
-			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("pods"))
+			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods"))
 			if tc.setKeys {
 				store.SetKeysFunc(store.getKeys)
 			}
@@ -1102,7 +1116,7 @@ func TestPrefixStats(t *testing.T) {
 
 			listOut := &example.PodList{}
 			// Ignore error as decode is expected to fail
-			_ = store.GetList(ctx, "pods", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, listOut)
+			_ = store.GetList(ctx, "/pods", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, listOut)
 
 			gotStats, err := store.Stats(ctx)
 			if err != nil {

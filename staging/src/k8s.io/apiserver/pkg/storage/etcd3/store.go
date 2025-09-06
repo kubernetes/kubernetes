@@ -154,6 +154,12 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	if resourcePrefix == "" {
 		return nil, fmt.Errorf("resourcePrefix cannot be empty")
 	}
+	if resourcePrefix == "/" {
+		return nil, fmt.Errorf("resourcePrefix cannot be /")
+	}
+	if !strings.HasPrefix(resourcePrefix, "/") {
+		return nil, fmt.Errorf("resourcePrefix needs to start from /")
+	}
 
 	listErrAggrFactory := defaultListErrorAggregatorFactory
 	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
@@ -1120,6 +1126,9 @@ func (s *store) prepareKey(key string) (string, error) {
 	}
 	if key == "" || key == "/" {
 		return "", fmt.Errorf("empty key: %q", key)
+	}
+	if !strings.HasPrefix(key, s.resourcePrefix) {
+		return "", fmt.Errorf("invalid key: %q lacks resource prefix: %q", key, s.resourcePrefix)
 	}
 	// We ensured that pathPrefix ends in '/' in construction, so skip any leading '/' in the key now.
 	startIndex := 0
