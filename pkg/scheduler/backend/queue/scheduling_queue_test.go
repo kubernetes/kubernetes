@@ -4414,3 +4414,205 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 		})
 	}
 }
+
+func makePod(ns, name string) *v1.Pod {
+	return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name, UID: types.UID(name)}}
+}
+
+// Run q.Pop in a goroutine and collect the result with a timeout.
+func popAsync(t *testing.T, logger klog.Logger, q *PriorityQueue, timeout time.Duration) (*framework.QueuedPodInfo, error, bool) {
+	t.Helper()
+	resCh := make(chan *framework.QueuedPodInfo, 1)
+	errCh := make(chan error, 1)
+
+	go func() {
+		p, err := q.Pop(logger)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		resCh <- p
+	}()
+
+	select {
+	case err := <-errCh:
+		return nil, err, true
+	case p := <-resCh:
+		return p, nil, true
+	case <-time.After(timeout):
+		return nil, nil, false
+	}
+}
+
+// Feature ON: activeQ is empty, backoffQ has items -> Pop returns from backoffQ immediately (no unnecessary wait).
+func TestPriorityQueue_PopFromBackoffWhenActiveEmpty_FeatureOn_NoBlock(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), nil)
+
+	p := makePod("ns", "from-backoff")
+	bi := q.newQueuedPodInfo(p, "unschedulable")
+	q.backoffQ.add(logger, bi, framework.EventUnscheduledPodAdd.Label())
+
+	got, err, ok := popAsync(t, logger, q, 200*time.Millisecond)
+	if err != nil {
+		t.Fatalf("Pop error: %v", err)
+	}
+	if !ok {
+		t.Fatal("Pop timed out (unexpected wait)")
+	}
+	if got == nil || got.Pod.Name != "from-backoff" {
+		t.Fatalf("want backoff pod, got=%v", got)
+	}
+}
+
+// Feature ON: while Pop is blocked, backoffQ transitions from empty to non-empty -> Pop wakes immediately and returns.
+func TestPriorityQueue_PopWakesWhenBackoffBecomesNonEmpty_FeatureOn(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), nil)
+
+	doneCh := make(chan struct{})
+	var popped *framework.QueuedPodInfo
+	var popErr error
+	go func() {
+		popped, popErr = q.Pop(logger)
+		close(doneCh)
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+
+	p := makePod("ns", "late-backoff")
+	bi := q.newQueuedPodInfo(p, "unschedulable")
+	q.backoffQ.add(logger, bi, framework.EventUnscheduledPodAdd.Label())
+
+	select {
+	case <-doneCh:
+		if popErr != nil {
+			t.Fatalf("Pop error: %v", popErr)
+		}
+		if popped == nil || popped.Pod.Name != "late-backoff" {
+			t.Fatalf("want late-backoff, got=%v", popped)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("Pop did not wake after backoff became non-empty (possible lost wake-up)")
+	}
+}
+
+// Feature ON: both activeQ and backoffQ have items -> Pop must prefer activeQ.
+func TestPriorityQueue_PopPrefersActiveOverBackoff_FeatureOn(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), nil)
+
+	bp := makePod("ns", "from-backoff")
+	q.backoffQ.add(logger, q.newQueuedPodInfo(bp, "unschedulable"), framework.EventUnscheduledPodAdd.Label())
+
+	ap := makePod("ns", "from-active")
+	q.Add(logger, ap)
+
+	got, err, ok := popAsync(t, logger, q, 200*time.Millisecond)
+	if err != nil {
+		t.Fatalf("Pop error: %v", err)
+	}
+	if !ok {
+		t.Fatal("Pop timed out")
+	}
+	if got == nil || got.Pod.Name != "from-active" {
+		t.Fatalf("want active first, got=%v", got)
+	}
+}
+
+// Feature OFF: activeQ is empty and backoffQ has items -> Pop blocks (backoffQ is ignored).
+func TestPriorityQueue_FeatureOff_IgnoresBackoff(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, false)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), nil)
+
+	p := makePod("ns", "ignored-backoff")
+	q.backoffQ.add(logger, q.newQueuedPodInfo(p, "unschedulable"), framework.EventUnscheduledPodAdd.Label())
+
+	_, err, ok := popAsync(t, logger, q, 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("Pop error: %v", err)
+	}
+	if ok {
+		t.Fatal("Pop should block when feature is OFF and activeQ is empty")
+	}
+
+	// Cleanup: unblock Pop by closing the queue.
+	q.Close()
+}
+
+// Both queues empty -> Pop blocks
+func TestPriorityQueue_PopBlocksWhenBothEmpty(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), nil)
+
+	_, err, ok := popAsync(t, logger, q, 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("Pop error: %v", err)
+	}
+	if ok {
+		t.Fatal("Pop should block when both queues are empty")
+	}
+
+	// Cleanup: unblock Pop by closing the queue.
+	q.Close()
+}
+
+// If Close() is called while Pop is blocked, it should unblock immediately
+func TestPriorityQueue_Pop_UnblocksOnClose(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), nil)
+
+	resCh := make(chan *framework.QueuedPodInfo, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		p, err := q.Pop(logger)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		resCh <- p
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+
+	q.Close()
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("Pop returned error after Close: %v", err)
+	case <-resCh:
+		// OK
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("Pop did not unblock after Close")
+	}
+}
