@@ -18,7 +18,9 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-gen=true
 
 // +groupName=certificates.k8s.io
+// +modelPackageName=io.k8s.api.certificates.v1beta1
 
 package v1beta1

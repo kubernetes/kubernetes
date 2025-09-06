@@ -18,6 +18,9 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +k8s:openapi-gen=false
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-gen=true
+
 // +groupName=admission.k8s.io
+// +modelPackageName=io.k8s.api.admission.v1
 
 package v1

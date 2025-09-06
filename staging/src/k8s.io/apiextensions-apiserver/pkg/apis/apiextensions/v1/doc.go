@@ -20,7 +20,10 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:openapi-gen=true
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-gen=true
+
 // +groupName=apiextensions.k8s.io
+// +modelPackageName=io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1
 
 // Package v1 is the v1 version of the API.
 package v1

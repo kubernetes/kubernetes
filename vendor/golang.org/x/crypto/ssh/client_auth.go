@@ -289,7 +289,7 @@ func pickSignatureAlgorithm(signer Signer, extensions map[string][]byte) (MultiA
 		}
 	}
 
-	algo, err := findCommon("public key signature algorithm", keyAlgos, serverAlgos)
+	algo, err := findCommon("public key signature algorithm", keyAlgos, serverAlgos, true)
 	if err != nil {
 		// If there is no overlap, return the fallback algorithm to support
 		// servers that fail to list all supported algorithms.

@@ -18,7 +18,9 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:protobuf-gen=package
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-gen=true
 // +groupName=resource.k8s.io
+// +modelPackageName=io.k8s.api.resource.v1
 
 // Package v1 is the v1 version of the resource API.
 package v1

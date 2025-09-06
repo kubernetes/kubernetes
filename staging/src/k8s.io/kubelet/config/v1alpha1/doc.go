@@ -16,6 +16,9 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +k8s:openapi-gen=true
+// +k8s:openapi-model-gen=true
+
 // +groupName=kubelet.config.k8s.io
+// +modelPackageName=io.k8s.kubelet.config.v1
 
 package v1alpha1

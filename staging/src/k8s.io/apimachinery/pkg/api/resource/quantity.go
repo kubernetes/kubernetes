@@ -99,6 +99,8 @@ import (
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:deepcopy-gen=true
 // +k8s:openapi-gen=true
+// +k8s:openapi-model-gen=true
+// +modelName=io.k8s.apimachinery.pkg.api.resource.Quantity
 type Quantity struct {
 	// i is the quantity in int64 scaled form, if d.Dec == nil
 	i int64Amount
@@ -858,6 +860,8 @@ func (q *Quantity) SetScaled(value int64, scale Scale) {
 // +protobuf.options.marshal=false
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:deepcopy-gen=true
+// +k8s:openapi-model-gen=true
+// +modelName=io.k8s.apimachinery.pkg.api.resource.QuantityValue
 type QuantityValue struct {
 	Quantity
 }

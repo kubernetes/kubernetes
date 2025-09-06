@@ -76,6 +76,7 @@ func Convert_v1_WatchEvent_To_v1_InternalEvent(in *WatchEvent, out *InternalEven
 
 // InternalEvent makes watch.Event versioned
 // +protobuf=false
+// +k8s:openapi-gen=false
 type InternalEvent watch.Event
 
 func (e *InternalEvent) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }

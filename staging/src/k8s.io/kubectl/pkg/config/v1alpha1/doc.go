@@ -19,5 +19,8 @@ limitations under the License.
 // +groupName=kubectl.config.k8s.io
 // +k8s:conversion-gen=k8s.io/kubectl/pkg/config
 // +k8s:defaulter-gen=TypeMeta
+// +k8s:openapi-model-gen=true
+
+// +modelPackageName=io.k8s.kubectl.pkg.config.v1alpha1
 
 package v1alpha1 // Package v1alpha1 import "k8s.io/kubectl/pkg/config/v1alpha1"

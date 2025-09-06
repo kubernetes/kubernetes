@@ -918,6 +918,8 @@ message PartialObjectMetadata {
 
 // PartialObjectMetadataList contains a list of objects containing only their metadata
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:openapi-model-gen=true
+// +modelName=io.k8s.apimachinery.pkg.apis.meta.v1.PartialObjectMetadataList
 message PartialObjectMetadataList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds

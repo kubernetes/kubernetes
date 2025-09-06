@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -147,17 +148,22 @@ func NewDefinitionNamer(schemes ...*runtime.Scheme) *DefinitionNamer {
 		typeGroupVersionKinds: map[string]groupVersionKinds{},
 	}
 	for _, s := range schemes {
-		for gvk, rtype := range s.AllKnownTypes() {
+		for gvk := range s.AllKnownTypes() {
 			newGVK := gvkConvert(gvk)
 			exists := false
-			for _, existingGVK := range ret.typeGroupVersionKinds[typeName(rtype)] {
+			name, err := s.ToOpenAPIDefinitionName(gvk)
+			if err != nil {
+				klog.Fatalf("failed to get OpenAPI definition name for %v: %v", gvk, err)
+				continue
+			}
+			for _, existingGVK := range ret.typeGroupVersionKinds[name] {
 				if newGVK == existingGVK {
 					exists = true
 					break
 				}
 			}
 			if !exists {
-				ret.typeGroupVersionKinds[typeName(rtype)] = append(ret.typeGroupVersionKinds[typeName(rtype)], newGVK)
+				ret.typeGroupVersionKinds[name] = append(ret.typeGroupVersionKinds[name], newGVK)
 			}
 		}
 	}
@@ -170,9 +176,9 @@ func NewDefinitionNamer(schemes ...*runtime.Scheme) *DefinitionNamer {
 // GetDefinitionName returns the name and tags for a given definition
 func (d *DefinitionNamer) GetDefinitionName(name string) (string, spec.Extensions) {
 	if groupVersionKinds, ok := d.typeGroupVersionKinds[name]; ok {
-		return util.ToRESTFriendlyName(name), spec.Extensions{
+		return name, spec.Extensions{
 			extensionGVK: groupVersionKinds.JSON(),
 		}
 	}
-	return util.ToRESTFriendlyName(name), nil
+	return name, nil
 }

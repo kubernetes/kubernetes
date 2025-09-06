@@ -40,6 +40,7 @@ kube::codegen::gen_openapi \
     --output-dir "${SCRIPT_ROOT}/pkg/generated/openapi" \
     --output-pkg "${THIS_PKG}/pkg/generated/openapi" \
     --report-filename "${report_filename:-"/dev/null"}" \
+    --use-openapi-model-names \
     ${update_report:+"${update_report}"} \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
     "${SCRIPT_ROOT}/pkg/apis"

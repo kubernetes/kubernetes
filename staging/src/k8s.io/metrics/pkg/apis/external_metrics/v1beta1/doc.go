@@ -18,6 +18,9 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +k8s:conversion-gen=k8s.io/metrics/pkg/apis/external_metrics
 // +k8s:openapi-gen=true
+// +k8s:openapi-model-gen=true
+
+// +modelPackageName=io.k8s.metrics.pkg.apis.external_metrics.v1beta1
 
 // Package v1beta1 is the v1beta1 version of the external metrics API.
 package v1beta1

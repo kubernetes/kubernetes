@@ -19,5 +19,8 @@ limitations under the License.
 // +groupName=storage.k8s.io
 // +k8s:openapi-gen=true
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-gen=true
+
+// +modelPackageName=io.k8s.api.storage.v1beta1
 
 package v1beta1

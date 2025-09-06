@@ -18,7 +18,9 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/abac
 // +k8s:openapi-gen=true
 // +k8s:defaulter-gen=TypeMeta
+// +k8s:openapi-model-gen=true
 
 // +groupName=abac.authorization.kubernetes.io
+// +modelPackageName=pkg.apis.abac.v1beta1
 
 package v1beta1

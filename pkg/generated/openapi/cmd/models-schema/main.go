@@ -22,7 +22,6 @@ import (
 	"os"
 
 	"k8s.io/kube-openapi/pkg/common"
-	"k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
@@ -38,7 +37,7 @@ func main() {
 
 func output() error {
 	refFunc := func(name string) spec.Ref {
-		return spec.MustCreateRef(fmt.Sprintf("#/definitions/%s", util.ToRESTFriendlyName(name)))
+		return spec.MustCreateRef(fmt.Sprintf("#/definitions/%s", name))
 	}
 	defs := openapi.GetOpenAPIDefinitions(refFunc)
 	schemaDefs := make(map[string]spec.Schema, len(defs))
@@ -50,12 +49,12 @@ func output() error {
 		// the type.
 		if schema, ok := v.Schema.Extensions[common.ExtensionV2Schema]; ok {
 			if v2Schema, isOpenAPISchema := schema.(spec.Schema); isOpenAPISchema {
-				schemaDefs[util.ToRESTFriendlyName(k)] = v2Schema
+				schemaDefs[k] = v2Schema
 				continue
 			}
 		}
 
-		schemaDefs[util.ToRESTFriendlyName(k)] = v.Schema
+		schemaDefs[k] = v.Schema
 	}
 	data, err := json.Marshal(&spec.Swagger{
 		SwaggerProps: spec.SwaggerProps{

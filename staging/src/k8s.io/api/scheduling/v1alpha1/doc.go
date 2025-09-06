@@ -17,7 +17,9 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
+// +k8s:openapi-model-gen=true
 
 // +groupName=scheduling.k8s.io
+// +modelPackageName=io.k8s.api.scheduling.v1alpha1
 
 package v1alpha1

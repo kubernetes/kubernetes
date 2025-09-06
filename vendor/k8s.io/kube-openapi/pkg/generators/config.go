@@ -74,6 +74,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 					newOpenAPIGen(
 						args.OutputFile,
 						args.OutputPkg,
+						args.UseOpenAPIModelNames,
 					),
 					newAPIViolationGen(),
 				}
