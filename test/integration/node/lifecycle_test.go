@@ -142,6 +142,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				100,              // Secondary eviction limiter QPS
 				50,               // Large cluster threshold
 				0.55,             // Unhealthy zone threshold
+				true,             // Pause Pod evictions during FullZonalDisruption
 			)
 			if err != nil {
 				t.Fatalf("Failed to create node controller: %v", err)
@@ -359,6 +360,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 				100,              // Secondary eviction limiter QPS
 				50,               // Large cluster threshold
 				0.55,             // Unhealthy zone threshold
+				true,             // Pause Pod evictions during FullZonalDisruption
 			)
 			if err != nil {
 				t.Fatalf("Failed to create node controller: %v", err)
