@@ -143,8 +143,12 @@ func (s *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		// we only mutate pods during create requests
 		return nil
 	}
-	pod := a.GetObject().(*api.Pod)
 
+	if !s.WaitForReady() {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+	}
+
+	pod := a.GetObject().(*api.Pod)
 	// Don't modify the spec of mirror pods.
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
@@ -180,8 +184,11 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		return nil
 	}
 
-	pod := a.GetObject().(*api.Pod)
+	if !s.WaitForReady() {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+	}
 
+	pod := a.GetObject().(*api.Pod)
 	if a.GetOperation() == admission.Update && a.GetSubresource() == "ephemeralcontainers" {
 		return s.limitEphemeralContainerSecretReferences(pod, a)
 	}
