@@ -605,7 +605,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.EnableSystemLogQuery = true
 				return conf
 			},
-			errMsg: "invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler",
+			errMsg: "invalid configuration: NodeLogQuery feature gate is required for enableSystemLogQuery",
 		}, {
 			name: "enableSystemLogQuery is enabled without enableSystemLogHandler",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
