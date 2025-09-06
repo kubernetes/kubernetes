@@ -117,7 +117,7 @@ func (tc *TokenCleaner) Run(ctx context.Context) {
 	logger.Info("Starting token cleaner controller")
 	defer logger.Info("Shutting down token cleaner controller")
 
-	if !cache.WaitForNamedCacheSync("token_cleaner", ctx.Done(), tc.secretSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.secretSynced) {
 		return
 	}
 
