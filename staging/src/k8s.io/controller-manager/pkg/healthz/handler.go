@@ -35,8 +35,9 @@ type MutableHealthzHandler struct {
 	handler http.Handler
 	// mutex is a RWMutex that allows concurrent health checks (read)
 	// but disallow replacing the handler at the same time (write).
-	mutex  sync.RWMutex
-	checks []healthz.HealthChecker
+	mutex            sync.RWMutex
+	checks           []healthz.HealthChecker
+	resettableChecks []healthz.HealthChecker
 }
 
 func (h *MutableHealthzHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -57,6 +58,31 @@ func (h *MutableHealthzHandler) AddHealthChecker(checks ...healthz.HealthChecker
 	h.checks = append(h.checks, checks...)
 	newMux := mux.NewPathRecorderMux("healthz")
 	healthz.InstallHandler(newMux, h.checks...)
+	h.handler = newMux
+}
+
+func (h *MutableHealthzHandler) AddResettableHealthChecker(checks ...healthz.HealthChecker) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+
+	h.resettableChecks = append(h.resettableChecks, checks...)
+	newMux := mux.NewPathRecorderMux("healthz")
+	aggregate := append(h.checks, h.resettableChecks...)
+	healthz.InstallHandler(newMux, aggregate...)
+	h.handler = newMux
+}
+
+// RemoveHealthChecker removes a health check from the handler by name.
+//
+// Every time this function is called, the handler has to be re-initiated.
+func (h *MutableHealthzHandler) Reset() {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+
+	h.resettableChecks = []healthz.HealthChecker{}
+	newMux := mux.NewPathRecorderMux("healthz")
+	aggregate := append(h.checks, h.resettableChecks...)
+	healthz.InstallHandler(newMux, aggregate...)
 	h.handler = newMux
 }
 
