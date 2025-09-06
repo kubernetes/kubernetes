@@ -61,6 +61,7 @@ func BuildPeerProxy(
 	}
 
 	proxyClientConfig := &transport.Config{
+		Context: loopbackClientConfig.Context,
 		TLS: transport.TLSConfig{
 			Insecure:   false,
 			CertFile:   proxyClientCertFile,

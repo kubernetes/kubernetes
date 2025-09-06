@@ -36,21 +36,33 @@ import (
 // the config has no custom TLS options, http.DefaultTransport is returned.
 type tlsTransportCache struct {
 	mu         sync.Mutex
-	transports map[tlsCacheKey]*http.Transport
+	transports map[tlsCacheKey]http.RoundTripper
 }
 
-// DialerStopCh is stop channel that is passed down to dynamic cert dialer.
+// DialerStopCh is stop channel that is passed down to dynamic cert dialer and
+// the CA rototation atomicTransportHolder.
 // It's exposed as variable for testing purposes to avoid testing for goroutine
 // leakages.
 var DialerStopCh = wait.NeverStop
 
 const idleConnsPerHost = 25
 
-var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*http.Transport)}
+var tlsCache = &tlsTransportCache{
+	transports: make(map[tlsCacheKey]http.RoundTripper),
+}
+
+// Add this new public function to reset the tlsCache for testing
+func ResetTLSCacheForTesting() {
+	tlsCache =  &tlsTransportCache{
+		transports: make(map[tlsCacheKey]http.RoundTripper),
+	}
+	klog.Info("Reset tlsCache.")
+}
 
 type tlsCacheKey struct {
 	insecure           bool
 	caData             string
+	caFile             string
 	certData           string
 	keyData            string `datapolicy:"security-key"`
 	certFile           string
@@ -68,8 +80,8 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, getCert:%p, dial:%p",
-		t.insecure, t.caData, t.certData, keyText, t.serverName, t.disableCompression, t.getCert, t.dial)
+	return fmt.Sprintf("insecure:%v, caData:%#v, caFile:%s, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, getCert:%p, dial:%p",
+		t.insecure, t.caData, t.caFile, t.certData, keyText, t.serverName, t.disableCompression, t.getCert, t.dial)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -77,6 +89,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("Log the key %s and canCache %v", key.String(), canCache)
 
 	if canCache {
 		// Ensure we only create a single transport for the given TLS options
@@ -87,6 +100,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		// See if we already have a custom transport for this config
 		if t, ok := c.transports[key]; ok {
 			metrics.TransportCreateCalls.Increment("hit")
+			fmt.Printf("Reuse the transport, key: %#v", key)
 			return t, nil
 		}
 		metrics.TransportCreateCalls.Increment("miss")
@@ -130,8 +144,9 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	if config.Proxy != nil {
 		proxy = config.Proxy
 	}
-
-	transport := utilnet.SetTransportDefaults(&http.Transport{
+	
+	var transport http.RoundTripper
+	httpTransport := utilnet.SetTransportDefaults(&http.Transport{
 		Proxy:               proxy,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
@@ -140,11 +155,28 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		DisableCompression:  config.DisableCompression,
 	})
 
+	if config.TLS.ReloadCAFiles && tlsConfig != nil {
+		// For CA rotation, wrap the transport in an atomicTransportHolder
+		holderStopCh := context.Background().Done()
+		if config.Context != nil {
+			klog.Errorf("The config context is not nil: %#v", config.Context)
+			holderStopCh = config.Context.Done()
+		} else {
+			klog.Errorf("The config context is nil: %#v", config)	
+		}
+		holder := newAtomicTransportHolder(config, httpTransport, holderStopCh)
+		// Start the CA rotation controller
+		go holder.run(CARotationRefreshDuration)
+		transport = holder
+	} else {
+		transport = httpTransport
+	}
+
 	if canCache {
 		// Cache a single transport for these options
 		c.transports[key] = transport
 	}
-
+	
 	return transport, nil
 }
 
@@ -162,7 +194,6 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 
 	k := tlsCacheKey{
 		insecure:           c.TLS.Insecure,
-		caData:             string(c.TLS.CAData),
 		serverName:         c.TLS.ServerName,
 		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
 		disableCompression: c.DisableCompression,
@@ -176,6 +207,15 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 	} else {
 		k.certData = string(c.TLS.CertData)
 		k.keyData = string(c.TLS.KeyData)
+	}
+
+	if c.TLS.ReloadCAFiles {
+		// When reloading CA files, include CA file path in cache key instead of CA data
+		// This allows the CA to be reloaded from disk on each transport creation
+		k.caFile = c.TLS.CAFile
+	} else {
+		// When not reloading, cache the CA data directly
+		k.caData = string(c.TLS.CAData)
 	}
 
 	return k, true, nil
