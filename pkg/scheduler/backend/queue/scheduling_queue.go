@@ -669,9 +669,8 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 		p.unschedulablePods.delete(pInfo.Pod, gatedBefore)
 		p.backoffQ.delete(pInfo)
 
-		unlockedActiveQ.add(pInfo, event)
+		unlockedActiveQ.add(logger, pInfo, event)
 		added = true
-		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
 		if event == framework.EventUnscheduledPodAdd.Label() || event == framework.EventUnscheduledPodUpdate.Label() {
 			p.nominator.addNominatedPod(logger, pInfo.PodInfo, nil)
 		}
@@ -700,7 +699,6 @@ func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, pInfo *framework.Queu
 	p.unschedulablePods.delete(pInfo.Pod, gatedBefore)
 
 	p.backoffQ.add(logger, pInfo, event)
-	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQ)
 	return true
 }
 
@@ -1239,7 +1237,6 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 
 		p.unschedulablePods.delete(pInfo.Pod, pInfo.Gated())
 		queue := p.requeuePodWithQueueingStrategy(logger, pInfo, schedulingHint, event.Label())
-		logger.V(4).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event.Label(), "queue", queue, "hint", schedulingHint)
 		if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 			activated = true
 		}
