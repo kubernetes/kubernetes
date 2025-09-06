@@ -1222,3 +1222,76 @@ func TestMergeRawConfigDoOverride(t *testing.T) {
 		t.Errorf("Expected namespace %v, got %v", config.Contexts["clean"].Namespace, act.Contexts["clean"].Namespace)
 	}
 }
+
+func TestClientCertOverrideData(t *testing.T) {
+	// Test that when overrides contain cert/key file paths, the corresponding
+	// data fields are properly handled to avoid validation conflicts
+	// in particular code in DirectClientConfig::getAuthInfo
+
+	certFile, err := os.CreateTemp("", "test-client-*.crt")
+	if err != nil {
+		t.Fatalf("Failed to create temp cert file: %v", err)
+	}
+	defer utiltesting.CloseAndRemove(t, certFile)
+
+	keyFile, err := os.CreateTemp("", "test-client-*.key")
+	if err != nil {
+		t.Fatalf("Failed to create temp key file: %v", err)
+	}
+	defer utiltesting.CloseAndRemove(t, keyFile)
+
+	if err := os.WriteFile(certFile.Name(), []byte("dummy-cert-content"), 0600); err != nil {
+		t.Fatalf("Failed to write cert file: %v", err)
+	}
+	if err := os.WriteFile(keyFile.Name(), []byte("dummy-key-content"), 0600); err != nil {
+		t.Fatalf("Failed to write key file: %v", err)
+	}
+
+	baseConfig := clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"test-cluster": {
+				Server:                   "https://example.com:6443",
+				CertificateAuthorityData: []byte("fake-ca-data"),
+			},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"test-user": {
+				ClientCertificateData: []byte("base-cert-data"),
+				ClientKeyData:         []byte("base-key-data"),
+			},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"test-context": {
+				Cluster:  "test-cluster",
+				AuthInfo: "test-user",
+			},
+		},
+		CurrentContext: "test-context",
+	}
+
+	overrides := &ConfigOverrides{
+		AuthInfo: clientcmdapi.AuthInfo{
+			ClientCertificate:     certFile.Name(),
+			ClientCertificateData: nil,
+			ClientKey:             keyFile.Name(),
+			ClientKeyData:         nil,
+		},
+	}
+
+	clientConfig := NewNonInteractiveClientConfig(baseConfig, "test-context", overrides, nil)
+
+	mergedConfig, err := clientConfig.MergedRawConfig()
+	if err != nil {
+		t.Fatalf("MergedRawConfig() failed: %v", err)
+	}
+
+	authInfo := mergedConfig.AuthInfos["test-user"]
+	if authInfo == nil {
+		t.Fatalf("Expected AuthInfo 'test-user' not found")
+	}
+
+	matchStringArg(certFile.Name(), authInfo.ClientCertificate, t)
+	matchStringArg(keyFile.Name(), authInfo.ClientKey, t)
+	matchByteArg(nil, authInfo.ClientCertificateData, t)
+	matchByteArg(nil, authInfo.ClientKeyData, t)
+}
