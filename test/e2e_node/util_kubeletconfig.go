@@ -76,22 +76,17 @@ type updateKubeletOptions struct {
 func updateKubeletConfigWithOptions(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, opts updateKubeletOptions) {
 	ginkgo.GinkgoHelper()
 
-	nodeIdent := identifyNode(getLocalNode(ctx, f))
-
 	// Update the Kubelet configuration.
-	ginkgo.By("Stopping the kubelet on " + nodeIdent)
 	restartKubelet := mustStopKubelet(ctx, f)
 
 	// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
 	if opts.deleteStateFiles {
-		ginkgo.By("Deleting the kubelet state files on " + nodeIdent)
 		deleteStateFile(cpuManagerStateFile)
 		deleteStateFile(memoryManagerStateFile)
 	}
 
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
 
-	ginkgo.By("Restarting the kubelet on " + nodeIdent)
 	restartKubelet(ctx)
 
 	if opts.ensureConsistentReadyNode {
