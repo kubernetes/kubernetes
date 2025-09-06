@@ -32,7 +32,7 @@ func (k *Value) Format(w io.Writer, buf []byte, l label.Label) {
 }
 
 // Get can be used to get a label for the key from a label.Map.
-func (k *Value) Get(lm label.Map) interface{} {
+func (k *Value) Get(lm label.Map) any {
 	if t := lm.Find(k); t.Valid() {
 		return k.From(t)
 	}
@@ -40,10 +40,10 @@ func (k *Value) Get(lm label.Map) interface{} {
 }
 
 // From can be used to get a value from a Label.
-func (k *Value) From(t label.Label) interface{} { return t.UnpackValue() }
+func (k *Value) From(t label.Label) any { return t.UnpackValue() }
 
 // Of creates a new Label with this key and the supplied value.
-func (k *Value) Of(value interface{}) label.Label { return label.OfValue(k, value) }
+func (k *Value) Of(value any) label.Label { return label.OfValue(k, value) }
 
 // Tag represents a key for tagging labels that have no value.
 // These are used when the existence of the label is the entire information it

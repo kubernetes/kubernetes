@@ -2482,6 +2482,8 @@ const (
 	PullNever PullPolicy = "Never"
 	// PullIfNotPresent means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
 	PullIfNotPresent PullPolicy = "IfNotPresent"
+	// PullIfNewerNotPresent means that kubelet pulls if the image isn't present on disk or if image present on registry has different SHA than image present on disk. Container will fail if the image isn't present and the pull fails.
+	PullIfNewerNotPresent PullPolicy = "IfNewerNotPresent"
 )
 
 // ResourceResizeRestartPolicy specifies how to handle container resource resize.

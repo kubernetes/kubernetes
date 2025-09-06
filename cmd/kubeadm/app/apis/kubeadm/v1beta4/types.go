@@ -271,7 +271,7 @@ type NodeRegistrationOptions struct {
 	IgnorePreflightErrors []string `json:"ignorePreflightErrors,omitempty"`
 
 	// ImagePullPolicy specifies the policy for image pulling during kubeadm "init" and "join" operations.
-	// The value of this field must be one of "Always", "IfNotPresent" or "Never".
+	// The value of this field must be one of "Always", "IfNotPresent" or "Never", "IfNewerNotPresent".
 	// If this field is unset kubeadm will default it to "IfNotPresent", or pull the required images if not present on the host.
 	// +optional
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
@@ -670,7 +670,7 @@ type UpgradeApplyConfiguration struct {
 	SkipPhases []string `json:"skipPhases,omitempty"`
 
 	// ImagePullPolicy specifies the policy for image pulling during kubeadm "upgrade apply" operations.
-	// The value of this field must be one of "Always", "IfNotPresent" or "Never".
+	// The value of this field must be one of "Always", "IfNotPresent" or "Never", "IfNewerNotPresent".
 	// If this field is unset kubeadm will default it to "IfNotPresent", or pull the required images if not present on the host.
 	// +optional
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
@@ -723,7 +723,7 @@ type UpgradeNodeConfiguration struct {
 	Patches *Patches `json:"patches,omitempty"`
 
 	// ImagePullPolicy specifies the policy for image pulling during kubeadm "upgrade node" operations.
-	// The value of this field must be one of "Always", "IfNotPresent" or "Never".
+	// The value of this field must be one of "Always", "IfNotPresent" or "Never", "IfNewerNotPresent".
 	// If this field is unset kubeadm will default it to "IfNotPresent", or pull the required images if not present on the host.
 	// +optional
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
