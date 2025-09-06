@@ -22,15 +22,18 @@ import (
 	"runtime"
 
 	v1 "k8s.io/api/core/v1"
+	metatypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/utils/ptr"
 )
@@ -96,21 +99,25 @@ type AdmissionFailureHandler interface {
 	HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []PredicateFailureReason) ([]PredicateFailureReason, error)
 }
 
+type podStatusFuncType func(ctx context.Context, podUID metatypes.UID, podName, podNamespace string) (*kubecontainer.PodStatus, error)
+
 type predicateAdmitHandler struct {
 	getNodeAnyWayFunc        getNodeAnyWayFuncType
 	pluginResourceUpdateFunc pluginResourceUpdateFuncType
 	admissionFailureHandler  AdmissionFailureHandler
+	getPodStatusFunc         podStatusFuncType
 }
 
 var _ PodAdmitHandler = &predicateAdmitHandler{}
 
 // NewPredicateAdmitHandler returns a PodAdmitHandler which is used to evaluates
 // if a pod can be admitted from the perspective of predicates.
-func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) PodAdmitHandler {
+func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType, getPodStatusFunc podStatusFuncType) PodAdmitHandler {
 	return &predicateAdmitHandler{
 		getNodeAnyWayFunc,
 		pluginResourceUpdateFunc,
 		admissionFailureHandler,
+		getPodStatusFunc,
 	}
 }
 
@@ -183,6 +190,52 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
 	reasons := generalFilter(podWithoutMissingExtendedResources, nodeInfo)
+	if utilfeature.DefaultFeatureGate.Enabled(features.NotEvictPodOnKubeletRestart) && len(reasons) > 0 {
+		// If the pod failed predicate checks, we want to see if the pod is already running.
+		// If it is, we want to disregard failures that may be due to pod affinity or taints.
+		// This is because we don't want to evict a running pod due to a change in node labels or taints.
+		hasIgnorableReason := false
+		for _, reason := range reasons {
+			if pfe, ok := reason.(*PredicateFailureError); ok {
+				if pfe.PredicateDesc == nodeaffinity.ErrReasonPod || pfe.PredicateDesc == tainttoleration.ErrReasonNotMatch {
+					hasIgnorableReason = true
+					break
+				}
+			}
+		}
+
+		if hasIgnorableReason {
+			// If we found any ignorable failure reasons (taints or node affinity),
+			// we proceed to check if the pod is already running on this node.
+			// If it is, we can waive these specific failures. This is to prevent the kubelet from restarting due to
+			// any issue after changes to node labels or taints,
+			// which could result in the eviction of pods that are already running on the node.
+			//
+			// This check is only performed for pods that are likely to be on the node,
+			// i.e., pods that have a StartTime, and only when the
+			// NotEvictPodOnKubeletRestart feature gate is enabled. For brand-new pods
+			// (StartTime is nil), affinity and taint failures are respected.
+			if admitPod.Status.StartTime != nil {
+				podStatus, err := w.getPodStatusFunc(ctx, admitPod.UID, admitPod.Name, admitPod.Namespace)
+				if err != nil {
+					logger.Info("Failed to get pod status, assuming it's not running", "pod", klog.KObj(admitPod), "err", err)
+				}
+				if podStatus != nil && len(podStatus.ContainerStatuses) > 0 {
+					// The container is already running, so we can ignore the failures.
+					var newReasons []PredicateFailureReason
+					for _, reason := range reasons {
+						if pfe, ok := reason.(*PredicateFailureError); ok {
+							if pfe.PredicateDesc != nodeaffinity.ErrReasonPod && pfe.PredicateDesc != tainttoleration.ErrReasonNotMatch {
+								newReasons = append(newReasons, reason)
+							}
+						}
+					}
+					reasons = newReasons
+				}
+			}
+		}
+	}
+
 	fit := len(reasons) == 0
 	if !fit {
 		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons)
@@ -201,12 +254,11 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		var reason string
 		var message string
 		if len(reasons) == 0 {
-			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
 			logger.Info("Failed to admit pod: GeneralPredicates failed due to unknown reason, which is unexpected", "pod", klog.KObj(admitPod))
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  UnknownReason,
-				Message: message,
+				Message: "GeneralPredicates failed due to unknown reason, which is unexpected.",
 			}
 		}
 		// If there are failed predicates, we only return the first one as a reason.

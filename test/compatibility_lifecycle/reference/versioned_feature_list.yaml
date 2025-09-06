@@ -1077,6 +1077,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.34"
+- name: NotEvictPodOnKubeletRestart
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.35"
 - name: OpenAPIEnums
   versionedSpecs:
   - default: false
