@@ -21,8 +21,15 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/compatibility"
+	"k8s.io/component-base/zpages/statusz"
 
 	v1 "k8s.io/api/core/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -58,6 +65,23 @@ func (s *fakeProxyServerError) Run(ctx context.Context) error {
 func (s *fakeProxyServerError) CleanupAndExit() error {
 	return errors.New("mocking error from ProxyServer.CleanupAndExit()")
 }
+
+// fakeMux matches the statusz mux interface used by statusz.Install:
+// it needs Handle(path, handler) and ListedPaths().
+type fakeMux struct {
+	handlers map[string]http.Handler
+	paths    []string
+}
+
+func newFakeMux(paths []string) *fakeMux {
+	return &fakeMux{
+		handlers: make(map[string]http.Handler),
+		paths:    paths,
+	}
+}
+
+func (m *fakeMux) Handle(path string, h http.Handler) { m.handlers[path] = h }
+func (m *fakeMux) ListedPaths() []string              { return m.paths }
 
 func Test_detectNodeIPs(t *testing.T) {
 	cases := []struct {
@@ -563,5 +587,60 @@ func Test_checkBadIPConfig(t *testing.T) {
 				t.Errorf("expected fatal=%v, got %v", c.dsFatal, fatal)
 			}
 		})
+	}
+}
+func TestStatuszRegistryReceivesListedPaths(t *testing.T) {
+	wantPaths := []string{"/livez", "/readyz", "/healthz", statusz.DefaultStatuszPath}
+	m := newFakeMux(wantPaths)
+
+	reg := statusz.NewRegistry(
+		compatibility.DefaultBuildEffectiveVersion(),
+		statusz.WithListedPaths(m.ListedPaths()),
+	)
+	statusz.Install(m, "kube-proxy", reg)
+
+	h, ok := m.handlers[statusz.DefaultStatuszPath]
+	if !ok {
+		t.Fatalf("statusz handler not installed at %q", statusz.DefaultStatuszPath)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, statusz.DefaultStatuszPath, nil)
+	req.Header.Add("Accept", "text/plain")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d; body:\n%s", rr.Code, rr.Body.String())
+	}
+
+	body := rr.Body.String()
+
+	// Look for the "Paths" line manually instead of regex
+	lines := strings.Split(body, "\n")
+	var foundPathsLine string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Paths") {
+			foundPathsLine = line
+			break
+		}
+	}
+	if foundPathsLine == "" {
+		t.Fatalf("failed to find Paths line in body:\n%s", body)
+	}
+
+	fields := strings.Fields(foundPathsLine)
+	if len(fields) < 2 {
+		t.Fatalf("unexpected format in Paths line: %q", foundPathsLine)
+	}
+	gotPaths := fields[1:]
+
+	// Use sets for order-independent comparison
+	wantSet := sets.New[string](wantPaths...)
+	gotSet := sets.New[string](gotPaths...)
+
+	if !wantSet.Equal(gotSet) {
+		t.Errorf("statusz listed paths mismatch.\nwant: %v\ngot:  %v\nbody:\n%s",
+			wantSet.UnsortedList(), gotSet.UnsortedList(), body)
 	}
 }
