@@ -243,20 +243,32 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
-	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "horizontal-pod-autoscaler"},
-		Rules: []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule("get", "list", "watch").Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
-			rbacv1helpers.NewRule("update").Groups(autoscalingGroup).Resources("horizontalpodautoscalers/status").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "update").Groups("*").Resources("*/scale").RuleOrDie(),
-			rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			// allow listing resource, custom, and external metrics
-			rbacv1helpers.NewRule("list", "watch").Groups(resMetricsGroup).Resources("pods").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list", "watch").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list", "watch").Groups(externalMetricsGroup).Resources("*").RuleOrDie(),
-			eventsRule(),
-		},
-	})
+	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbacv1.ClusterRole {
+		role := rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "horizontal-pod-autoscaler"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
+				rbacv1helpers.NewRule("update").Groups(autoscalingGroup).Resources("horizontalpodautoscalers/status").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "update").Groups("*").Resources("*/scale").RuleOrDie(),
+				rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+
+				// allow listing resource, custom, and external metrics
+				rbacv1helpers.NewRule("list", "watch").Groups(resMetricsGroup).Resources("pods").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(externalMetricsGroup).Resources("*").RuleOrDie(),
+				eventsRule(),
+			},
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.HPASelectionStrategy) {
+			// StrictPodSelection requires access to pod level Resources (Deployment, StatefulSet, etc.)
+			role.Rules = append(role.Rules, rbacv1helpers.NewRule("get").Groups(appsGroup, extensionsGroup).Resources("replicasets").RuleOrDie())
+			role.Rules = append(role.Rules, rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("pods").RuleOrDie())
+		}
+
+		return role
+	}())
+
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "job-controller"},
 		Rules: []rbacv1.PolicyRule{
