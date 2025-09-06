@@ -52,6 +52,7 @@ import (
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econformance "k8s.io/kubernetes/test/e2e/framework/conformance"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -76,6 +77,151 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	// The driver containers have to run with sufficient privileges to
 	// modify /var/lib/kubelet/plugins.
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	f.Context("CRUD Tests", func() {
+		/*
+		   Release: v1.?
+		   Testname: CRUD operations for deviceclasses
+		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 DeviceClass.
+		*/
+		framework.It("resource.k8s.io/v1 DeviceClass", func(ctx context.Context) {
+			e2econformance.TestResource(ctx, f,
+				e2econformance.ResourceTestcase{
+					APIVersion: "resource.k8s.io/v1",
+					Resource:   "deviceclasses",
+					InitialData: `
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata:
+  name: example
+spec:
+  selectors:
+  - cel:
+      expression: "false" # Matches no devices.
+`,
+					PatchData: `
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+spec:
+  selectors:
+  - cel:
+      expression: "1 == 0" # Still matches no devices.
+`,
+				},
+			)
+		})
+
+		/*
+		   Release: v1.?
+		   Testname: CRUD operations for resourceclaims
+		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 ResourceClaim.
+		*/
+		framework.It("resource.k8s.io/v1 ResourceClaim", func(ctx context.Context) {
+			e2econformance.TestResource(ctx, f,
+				e2econformance.ResourceTestcase{
+					APIVersion: "resource.k8s.io/v1",
+					Resource:   "resourceclaims",
+					Namespaced: true,
+					HasStatus:  true,
+					InitialData: `
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: example
+spec:
+  devices:
+    requests:
+    - name: req-0
+      exactly:
+        deviceClassName: dra.example.com
+`,
+					PatchData: `
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+# The spec is immutable, so let's add a label instead.
+metadata:
+  labels:
+    test.dra.example.com: test
+status:
+  # "Nothing allocated" is a valid allocation result.
+  allocation: {}
+`,
+				},
+			)
+		})
+
+		/*
+		   Release: v1.?
+		   Testname: CRUD operations for resourceclaimtemplates
+		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 ResourceClaimTemplate.
+		*/
+		framework.It("resource.k8s.io/v1 ResourceClaimTemplate", func(ctx context.Context) {
+			e2econformance.TestResource(ctx, f,
+				e2econformance.ResourceTestcase{
+					APIVersion: "resource.k8s.io/v1",
+					Resource:   "resourceclaimtemplates",
+					Namespaced: true,
+					InitialData: `
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: example
+spec:
+  spec:
+    devices:
+      requests:
+      - name: req-0
+        exactly:
+          deviceClassName: dra.example.com
+`,
+					PatchData: `
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+# The spec is immutable, so let's add a label instead.
+metadata:
+  labels:
+    test.dra.example.com: test
+`,
+				},
+			)
+		})
+
+		/*
+		   Release: v1.?
+		   Testname: CRUD operations for resoureslices
+		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 ResourceSlice.
+		*/
+		framework.It("resource.k8s.io/v1 ResourceSlice", func(ctx context.Context) {
+			e2econformance.TestResource(ctx, f,
+				e2econformance.ResourceTestcase{
+					APIVersion: "resource.k8s.io/v1",
+					Resource:   "resourceslices",
+					InitialData: `
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+metadata:
+  name: example
+spec:
+  driver: dra.example.com
+  pool:
+    name: cluster
+    generation: 1
+    resourceSliceCount: 1
+  nodeName: no-such-node
+  # The pool is empty -> no devices.
+`,
+					PatchData: `
+apiVersion: resource.k8s.io/v1
+kind: ResourceSlice
+spec:
+  # The patch adds one device.
+  devices:
+  - name: device-0
+`,
+				},
+			)
+		})
+	})
 
 	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
 		nodes := drautils.NewNodes(f, 1, 1)
