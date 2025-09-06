@@ -72,7 +72,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 			obj.NodeStatusReportFrequency = metav1.Duration{Duration: time.Minute}
 			obj.NodeLeaseDurationSeconds = 40
-			obj.CPUManagerPolicy = "none"
+			obj.CPUManagerPolicy = kubeletconfig.NoneCPUManagerPolicy
 			obj.CPUManagerPolicyOptions = nil
 			obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency
 			obj.NodeStatusMaxImages = 50
