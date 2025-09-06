@@ -41,6 +41,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/websocket"
 
+	"math/rand"
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -60,6 +63,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/utils/ptr"
 )
@@ -1320,3 +1324,69 @@ func backendKey() []byte { return readTestFile("server-key.pem") }
 func backendCaCertificate() []byte { return readTestFile("server-ca.pem") }
 
 func clientCaCrt() []byte { return readTestFile("client-ca.pem") }
+
+func TestRecordExtApiserverMetricsMetrics(t *testing.T) {
+	metrics := []string{
+		"extension_apiserver_request_total",
+	}
+
+	testCases := []struct {
+		desc string
+		err  int
+		want string
+	}{
+		{
+			desc: "OK",
+			err:  200,
+			want: `
+			# HELP extension_apiserver_request_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either '200', '404', '503' or '500'.
+			# TYPE extension_apiserver_request_total counter
+			extension_apiserver_request_total{code="200", resource="testResource"} 1
+				`,
+		},
+		{
+			desc: "Not Found",
+			err:  404,
+			want: `
+			# HELP extension_apiserver_request_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either '200', '404', '503' or '500'.
+			# TYPE extension_apiserver_request_total counter
+			extension_apiserver_request_total{code="404", resource="testResource"} 1
+				`,
+		},
+		{
+			desc: "Service Unavailable",
+			err:  503,
+			want: `
+			# HELP extension_apiserver_request_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either '200', '404', '503' or '500'.
+			# TYPE extension_apiserver_request_total counter
+			extension_apiserver_request_total{code="503", resource="testResource"} 1
+				`,
+		},
+		{
+			desc: "Internal Server Error",
+			err:  500,
+			want: `
+			# HELP extension_apiserver_request_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either '200', '404', '503' or '500'.
+			# TYPE extension_apiserver_request_total counter
+            extension_apiserver_request_total{code="500", resource="testResource"} 1
+				`,
+		},
+	}
+
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	extensionApiserverRequestCounter.Reset()
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			defer extensionApiserverRequestCounter.Reset()
+			aggregationStart := time.Now()
+			ctx := context.TODO()
+			time.Sleep(time.Duration(random.Intn(100)) * time.Millisecond)
+			recordExtensionApiserverMetrics(ctx, tt.err, aggregationStart, "testResource")
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), metrics...); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
