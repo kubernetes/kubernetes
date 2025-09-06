@@ -763,7 +763,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 			func(rv string) { resourceVersion = rv },
 			r.clock, make(chan error))
 		if err != nil {
-			w.Stop() // stop and retry with clean state
+			//w.Stop() // stop and retry with clean state
 			if errors.Is(err, errorStopRequested) {
 				return nil, nil
 			}
@@ -965,6 +965,9 @@ loop:
 			initialEventsEndBookmarkWarningTicker.observeLastEventTimeStamp(clock.Now())
 		case <-initialEventsEndBookmarkWarningTicker.C():
 			initialEventsEndBookmarkWarningTicker.warnIfExpired()
+			if initialEventsEndBookmarkWarningTicker.expired() {
+				return false, fmt.Errorf("watch bookmark event was not expired")
+			}
 		}
 	}
 
@@ -1142,6 +1145,13 @@ func (t *initialEventsEndBookmarkTicker) warnIfExpired() {
 	if err := t.produceWarningIfExpired(); err != nil {
 		t.logger.Info("Warning: event bookmark expired", "err", err)
 	}
+}
+
+func (t *initialEventsEndBookmarkTicker) expired() bool {
+	if err := t.produceWarningIfExpired(); err != nil {
+		return true
+	}
+	return false
 }
 
 // produceWarningIfExpired returns an error that represents a warning when

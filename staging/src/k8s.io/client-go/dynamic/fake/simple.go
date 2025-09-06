@@ -116,7 +116,13 @@ func NewSimpleDynamicClientWithCustomListKinds(scheme *runtime.Scheme, gvrToList
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
-		watch, err := o.Watch(gvr, ns)
+		var gvk schema.GroupVersionKind
+		var opts metav1.ListOptions
+		if watchAction, ok := action.(testing.WatchActionImpl); ok {
+			gvk = watchAction.Kind
+			opts = watchAction.ListOptions
+		}
+		watch, err := o.Watch(gvr, gvk, ns, opts)
 		if err != nil {
 			return false, nil, err
 		}
@@ -405,15 +411,16 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 }
 
 func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	objectGVKForFakeClient := c.resource.GroupVersion().WithKind(c.listKind[:len(c.listKind)-4]) /*base library appends List*/
 	opts.Watch = true
 	switch {
 	case len(c.namespace) == 0:
 		return c.client.Fake.
-			InvokesWatch(testing.NewRootWatchActionWithOptions(c.resource, opts))
+			InvokesWatch(testing.NewRootWatchActionWithOptions(c.resource, objectGVKForFakeClient, opts))
 
 	case len(c.namespace) > 0:
 		return c.client.Fake.
-			InvokesWatch(testing.NewWatchActionWithOptions(c.resource, c.namespace, opts))
+			InvokesWatch(testing.NewWatchActionWithOptions(c.resource, objectGVKForFakeClient, c.namespace, opts))
 	}
 
 	panic("math broke")
