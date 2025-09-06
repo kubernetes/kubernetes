@@ -279,7 +279,7 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 				actualCauses := getCauses(t, err)
 				for _, expectCause := range expectedErrors {
 					found := false
-					for _, cause := range actualCauses.UnsortedList() {
+					for cause := range actualCauses {
 						if expectCause.MatchString(cause) {
 							actualCauses.Delete(cause)
 							found = true
