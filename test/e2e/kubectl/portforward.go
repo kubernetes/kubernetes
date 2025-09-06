@@ -247,19 +247,20 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 	// by the port-forward command. We don't want to hard code the port as we have no
 	// way of guaranteeing we can pick one that isn't in use, particularly on Jenkins.
 	framework.Logf("starting port-forward command and streaming output")
-	portOutput, _, err := framework.StartCmdAndStreamOutput(cmd)
+	portOutput, portStderr, err := framework.StartCmdAndStreamOutput(cmd)
 	if err != nil {
 		framework.Failf("Failed to start port-forward command: %v", err)
 	}
 
-	buf := make([]byte, 128)
+	var buf []byte
 
-	var n int
 	framework.Logf("reading from `kubectl port-forward` command's stdout")
-	if n, err = portOutput.Read(buf); err != nil {
+	if buf, err = io.ReadAll(portOutput); err != nil {
 		framework.Failf("Failed to read from kubectl port-forward stdout: %v", err)
 	}
-	portForwardOutput := string(buf[:n])
+	framework.Logf("stdout: %s", string(buf))
+
+	portForwardOutput := string(buf)
 	match := portForwardRegexp.FindStringSubmatch(portForwardOutput)
 	if len(match) != 3 {
 		framework.Failf("Failed to parse kubectl port-forward output: %s", portForwardOutput)
@@ -269,6 +270,14 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 	if err != nil {
 		framework.Failf("Error converting %s to an int: %v", match[2], err)
 	}
+
+	go func() {
+		stderrBuf, stderrErr := io.ReadAll(portStderr)
+		if stderrErr != nil {
+			framework.Failf("Failed to read from kubectl port-forward stderr: %v", stderrErr)
+		}
+		framework.Logf("stderr: %s", string(stderrBuf))
+	}()
 
 	return &portForwardCommand{
 		cmd:  cmd,

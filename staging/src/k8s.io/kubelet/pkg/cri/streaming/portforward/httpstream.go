@@ -30,11 +30,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utiltrace "k8s.io/utils/trace"
 
 	"k8s.io/klog/v2"
 )
 
 func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
+	opTrace := utiltrace.New("handleHTTPStreams")
+	defer opTrace.Log()
+
 	_, err := httpstream.Handshake(req, w, supportedPortForwardProtocols)
 	// negotiated protocol isn't currently used server side, but could be in the future
 	if err != nil {
@@ -211,14 +215,19 @@ func (h *httpStreamHandler) requestID(stream httpstream.Stream) string {
 // streams, invoking portForward for each complete stream pair. The loop exits
 // when the httpstream.Connection is closed.
 func (h *httpStreamHandler) run() {
+	opTrace := utiltrace.New("httpStreamHandler.run")
+	defer opTrace.Log()
+
 	klog.V(5).InfoS("Connection waiting for port forward streams", "connection", h.conn)
 Loop:
 	for {
 		select {
 		case <-h.conn.CloseChan():
 			klog.V(5).InfoS("Connection upgraded connection closed", "connection", h.conn)
+			opTrace.Step("Connection closed")
 			break Loop
 		case stream := <-h.streamChan:
+			opTrace.Step("handling stream")
 			requestID := h.requestID(stream)
 			streamType := stream.Headers().Get(api.StreamType)
 			klog.V(5).InfoS("Connection request received new type of stream", "connection", h.conn, "request", requestID, "streamType", streamType)
