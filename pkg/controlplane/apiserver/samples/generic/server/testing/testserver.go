@@ -147,7 +147,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	pkgPath, err := pkgPath(t)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("determine package path: %w", err)
 	}
 	o.SecureServing.ServerCert.FixtureDirectory = filepath.Join(pkgPath, "testdata")
 
@@ -155,7 +155,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	utilruntime.Must(o.APIEnablement.RuntimeConfig.Set("api/all=true"))
 
 	if err := fs.Parse(customFlags); err != nil {
-		return result, err
+		return result, fmt.Errorf("parse custom flags: %w", err)
 	}
 
 	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
@@ -184,11 +184,11 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	config, err := server.NewConfig(completedOptions)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("create config: %w", err)
 	}
 	completed, err := config.Complete()
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("complete config: %w", err)
 	}
 	s, err := server.CreateServerChain(completed)
 	if err != nil {
@@ -263,7 +263,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("create etcd client config: %w", err)
 	}
 	etcdConfig := clientv3.Config{
 		Endpoints:   storageConfig.Transport.ServerList,
@@ -275,7 +275,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	}
 	etcdClient, err := clientv3.New(etcdConfig)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("create etcd client: %w", err)
 	}
 
 	// from here the caller must call tearDown
