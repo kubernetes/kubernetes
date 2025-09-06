@@ -193,7 +193,7 @@ func (c *claimTracker) Get(namespace, claimName string) (*resourceapi.ResourceCl
 func (c *claimTracker) List() ([]*resourceapi.ResourceClaim, error) {
 	var result []*resourceapi.ResourceClaim
 	// Probably not worth adding an index for?
-	objs := c.cache.List(nil)
+	objs := c.cache.List()
 	for _, obj := range objs {
 		claim, ok := obj.(*resourceapi.ResourceClaim)
 		if ok {

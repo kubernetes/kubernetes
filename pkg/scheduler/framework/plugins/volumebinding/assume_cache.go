@@ -73,11 +73,7 @@ func (c *PVAssumeCache) GetAPIPV(pvName string) (*v1.PersistentVolume, error) {
 }
 
 func (c *PVAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume {
-	objs := c.List(&v1.PersistentVolume{
-		Spec: v1.PersistentVolumeSpec{
-			StorageClassName: storageClassName,
-		},
-	})
+	objs := c.ByIndex(storageClassName)
 	pvs := []*v1.PersistentVolume{}
 	for _, obj := range objs {
 		pv, ok := obj.(*v1.PersistentVolume)

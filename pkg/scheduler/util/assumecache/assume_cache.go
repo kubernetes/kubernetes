@@ -22,17 +22,18 @@ import (
 	"strconv"
 	"sync"
 
-	"k8s.io/klog/v2"
-	"k8s.io/utils/buffer"
-
 	"k8s.io/apimachinery/pkg/api/meta"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/buffer"
 )
 
 // Informer is the subset of [cache.SharedInformer] that NewAssumeCache depends upon.
 type Informer interface {
 	AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error)
+	GetIndexer() cache.Indexer
 }
 
 // AddTestObject adds an object to the assume cache.
@@ -86,15 +87,15 @@ func (e NotFoundError) Is(err error) bool {
 	return err == ErrNotFound
 }
 
-type ObjectNameError struct {
+type ObjectMetaError struct {
 	DetailedErr error
 }
 
-func (e ObjectNameError) Error() string {
-	return fmt.Sprintf("failed to get object name: %v", e.DetailedErr)
+func (e ObjectMetaError) Error() string {
+	return fmt.Sprintf("failed to get object metadata: %v", e.DetailedErr)
 }
 
-func (e ObjectNameError) Is(err error) bool {
+func (e ObjectMetaError) Is(err error) bool {
 	return err == ErrObjectName
 }
 
@@ -152,39 +153,11 @@ type AssumeCache struct {
 	// describes the object stored
 	description string
 
-	// Stores objInfo pointers
-	store cache.Indexer
+	// Objects from informer
+	store   cache.Indexer
+	assumed map[string]v1.Object
 
-	// Index function for object
-	indexFunc cache.IndexFunc
 	indexName string
-}
-
-type objInfo struct {
-	// name of the object
-	name string
-
-	// Latest version of object could be cached-only or from informer
-	latestObj interface{}
-
-	// Latest object from informer
-	apiObj interface{}
-}
-
-func objInfoKeyFunc(obj interface{}) (string, error) {
-	objInfo, ok := obj.(*objInfo)
-	if !ok {
-		return "", &WrongTypeError{TypeName: "objInfo", Object: obj}
-	}
-	return objInfo.name, nil
-}
-
-func (c *AssumeCache) objInfoIndexFunc(obj interface{}) ([]string, error) {
-	objInfo, ok := obj.(*objInfo)
-	if !ok {
-		return []string{""}, &WrongTypeError{TypeName: "objInfo", Object: obj}
-	}
-	return c.indexFunc(objInfo.latestObj)
 }
 
 // NewAssumeCache creates an assume cache for general objects.
@@ -192,79 +165,71 @@ func NewAssumeCache(logger klog.Logger, informer Informer, description, indexNam
 	c := &AssumeCache{
 		logger:      logger,
 		description: description,
-		indexFunc:   indexFunc,
+		store:       informer.GetIndexer(),
+		assumed:     make(map[string]v1.Object),
 		indexName:   indexName,
 		eventQueue:  *buffer.NewRing[func()](buffer.RingOptions{InitialSize: 0, NormalSize: 4}),
 	}
-	indexers := cache.Indexers{}
 	if indexName != "" && indexFunc != nil {
-		indexers[indexName] = c.objInfoIndexFunc
+		utilruntime.Must(c.store.AddIndexers(cache.Indexers{indexName: indexFunc}))
 	}
-	c.store = cache.NewIndexer(objInfoKeyFunc, indexers)
 
-	// Unit tests don't use informers
-	if informer != nil {
-		// Cannot fail in practice?! No-one bothers checking the error.
-		c.handlerRegistration, _ = informer.AddEventHandler(
-			cache.ResourceEventHandlerFuncs{
-				AddFunc:    c.add,
-				UpdateFunc: c.update,
-				DeleteFunc: c.delete,
-			},
-		)
-	}
+	var err error
+	c.handlerRegistration, err = informer.AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    c.add,
+			UpdateFunc: c.update,
+			DeleteFunc: c.delete,
+		},
+	)
+	utilruntime.Must(err)
+
 	return c
 }
 
 func (c *AssumeCache) add(obj interface{}) {
+	c.update(nil, obj)
+}
+
+// Receives the new object from informer. May expire the assumed object if it is older.
+func (c *AssumeCache) update(oldObj interface{}, obj interface{}) {
 	if obj == nil {
 		return
 	}
 
-	name, err := cache.MetaNamespaceKeyFunc(obj)
+	newMeta, err := meta.Accessor(obj)
 	if err != nil {
-		utilruntime.HandleErrorWithLogger(c.logger, &ObjectNameError{err}, "Add failed")
+		utilruntime.HandleErrorWithLogger(c.logger, ObjectMetaError{DetailedErr: err}, "Add failed")
 		return
 	}
+	name := cache.MetaObjectToName(newMeta).String()
 
 	defer c.emitEvents()
 	c.rwMutex.Lock()
 	defer c.rwMutex.Unlock()
 
-	var oldObj interface{}
-	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
-		newVersion, err := c.getObjVersion(name, obj)
+	assumed, ok := c.assumed[name]
+	if ok {
+		// Object is assumed, check if the informer object is newer.
+		cmp, err := compareRV(newMeta, assumed)
 		if err != nil {
-			utilruntime.HandleErrorWithLogger(c.logger, err, "Add failed: couldn't get object version")
-			return
-		}
-
-		storedVersion, err := c.getObjVersion(name, objInfo.latestObj)
-		if err != nil {
-			utilruntime.HandleErrorWithLogger(c.logger, err, "Add failed: couldn't get stored object version")
+			utilruntime.HandleErrorWithLogger(c.logger, ObjectMetaError{DetailedErr: err}, "Add failed")
 			return
 		}
 
 		// Only update object if version is newer.
 		// This is so we don't override assumed objects due to informer resync.
-		if newVersion <= storedVersion {
-			c.logger.V(10).Info("Skip adding object to assume cache because version is not newer than storedVersion", "description", c.description, "cacheKey", name, "newVersion", newVersion, "storedVersion", storedVersion)
+		if cmp <= 0 {
+			c.logger.V(10).Info("Skip adding object to assume cache because version is not newer than assumedVersion",
+				"description", c.description, "cacheKey", name, "newVersion", newMeta.GetResourceVersion(), "assumedVersion", assumed.GetResourceVersion())
 			return
 		}
-		oldObj = objInfo.latestObj
+		oldObj = assumed
+		delete(c.assumed, name)
+		c.logger.V(10).Info("assumed object expired", "description", c.description, "cacheKey", name, "assumeCache", obj)
 	}
 
-	objInfo := &objInfo{name: name, latestObj: obj, apiObj: obj}
-	if err = c.store.Update(objInfo); err != nil {
-		c.logger.Info("Error occurred while updating stored object", "err", err)
-	} else {
-		c.logger.V(10).Info("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", obj)
-		c.pushEvent(oldObj, obj)
-	}
-}
-
-func (c *AssumeCache) update(oldObj interface{}, newObj interface{}) {
-	c.add(newObj)
+	c.pushEvent(oldObj, obj)
 }
 
 func (c *AssumeCache) delete(obj interface{}) {
@@ -272,30 +237,27 @@ func (c *AssumeCache) delete(obj interface{}) {
 		return
 	}
 
-	name, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = d.Obj
+	}
+	metadata, err := meta.Accessor(obj)
 	if err != nil {
-		utilruntime.HandleErrorWithLogger(c.logger, &ObjectNameError{err}, "Failed to delete")
+		utilruntime.HandleErrorWithLogger(c.logger, ObjectMetaError{DetailedErr: err}, "Failed to delete")
 		return
 	}
+	name := cache.MetaObjectToName(metadata).String()
 
 	defer c.emitEvents()
 	c.rwMutex.Lock()
 	defer c.rwMutex.Unlock()
 
-	var oldObj interface{}
-	if len(c.eventHandlers) > 0 {
-		if objInfo, _ := c.getObjInfo(name); objInfo != nil {
-			oldObj = objInfo.latestObj
-		}
+	assumed, ok := c.assumed[name]
+	if ok {
+		obj = assumed
+		delete(c.assumed, name)
 	}
 
-	objInfo := &objInfo{name: name}
-	err = c.store.Delete(objInfo)
-	if err != nil {
-		utilruntime.HandleErrorWithLogger(c.logger, err, "Failed to delete", "description", c.description, "cacheKey", name)
-	}
-
-	c.pushEvent(oldObj, nil)
+	c.pushEvent(obj, nil)
 }
 
 // pushEvent gets called while the mutex is locked for writing.
@@ -324,21 +286,28 @@ func (c *AssumeCache) pushEvent(oldObj, newObj interface{}) {
 	}
 }
 
-func (c *AssumeCache) getObjVersion(name string, obj interface{}) (int64, error) {
-	objAccessor, err := meta.Accessor(obj)
-	if err != nil {
-		return -1, err
-	}
-
-	objResourceVersion, err := strconv.ParseInt(objAccessor.GetResourceVersion(), 10, 64)
-	if err != nil {
-		//nolint:errorlint // Intentionally not wrapping the error, the underlying error is an implementation detail.
-		return -1, fmt.Errorf("error parsing ResourceVersion %q for %v %q: %v", objAccessor.GetResourceVersion(), c.description, name, err)
-	}
-	return objResourceVersion, nil
+func parseRV(rv string) (int64, error) {
+	return strconv.ParseInt(rv, 10, 64)
 }
 
-func (c *AssumeCache) getObjInfo(key string) (*objInfo, error) {
+func compareRV(a, b v1.Object) (int, error) {
+	av, err := parseRV(a.GetResourceVersion())
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse resource version for %q: %v", a.GetName(), err)
+	}
+	bv, err := parseRV(b.GetResourceVersion())
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse resource version for %q: %v", b.GetName(), err)
+	}
+	if av < bv {
+		return -1, nil
+	} else if av > bv {
+		return 1, nil
+	}
+	return 0, nil
+}
+
+func (c *AssumeCache) get(key string) (v1.Object, error) {
 	obj, ok, err := c.store.GetByKey(key)
 	if err != nil {
 		return nil, err
@@ -347,68 +316,101 @@ func (c *AssumeCache) getObjInfo(key string) (*objInfo, error) {
 		return nil, &NotFoundError{TypeName: c.description, ObjectKey: key}
 	}
 
-	objInfo, ok := obj.(*objInfo)
+	metadata, ok := obj.(v1.Object)
 	if !ok {
-		return nil, &WrongTypeError{"objInfo", obj}
+		return nil, &WrongTypeError{TypeName: "v1.Object", Object: obj}
 	}
-	return objInfo, nil
+	return metadata, nil
 }
 
 // Get the object by its key.
-func (c *AssumeCache) Get(key string) (interface{}, error) {
+func (c *AssumeCache) Get(key string) (v1.Object, error) {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
 
-	objInfo, err := c.getObjInfo(key)
+	obj, err := c.get(key)
 	if err != nil {
 		return nil, err
 	}
-	return objInfo.latestObj, nil
+
+	assumed, ok := c.assumed[cache.MetaObjectToName(obj).String()]
+	if !ok { // not assumed
+		return obj, nil
+	}
+	cmp, err := compareRV(obj, assumed)
+	if err != nil {
+		return nil, err
+	}
+	if cmp > 0 { // Informer object is newer
+		return obj, nil
+	}
+	return assumed, nil
 }
 
 // GetAPIObj gets the informer cache's version by its key.
-func (c *AssumeCache) GetAPIObj(key string) (interface{}, error) {
+func (c *AssumeCache) GetAPIObj(key string) (v1.Object, error) {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
 
-	objInfo, err := c.getObjInfo(key)
-	if err != nil {
-		return nil, err
-	}
-	return objInfo.apiObj, nil
+	return c.get(key)
 }
 
 // List all the objects in the cache.
-func (c *AssumeCache) List(indexObj interface{}) []interface{} {
+func (c *AssumeCache) List() []interface{} {
 	c.rwMutex.RLock()
 	defer c.rwMutex.RUnlock()
 
-	return c.listLocked(indexObj)
+	return c.listLocked()
 }
 
-func (c *AssumeCache) listLocked(indexObj interface{}) []interface{} {
-	allObjs := []interface{}{}
-	var objs []interface{}
-	if c.indexName != "" {
-		o, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
-		if err != nil {
-			utilruntime.HandleErrorWithLogger(c.logger, err, "List index error")
-			return nil
-		}
-		objs = o
-	} else {
-		objs = c.store.List()
-	}
+// ByIndex returns the stored objects whose set of indexed values
+// for the named index includes the given indexed value
+//
+// Assumed objects will not be returned
+func (c *AssumeCache) ByIndex(indexedValue string) []interface{} {
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 
+	objs, err := c.store.ByIndex(c.indexName, indexedValue)
+	if err != nil {
+		utilruntime.HandleErrorWithLogger(c.logger, err, "List index error")
+		return nil
+	}
+	return c.filterList(objs, false)
+}
+
+func (c *AssumeCache) filterList(objs []interface{}, includeAssumed bool) []interface{} {
+	allObjs := make([]interface{}, 0, len(objs))
 	for _, obj := range objs {
-		objInfo, ok := obj.(*objInfo)
-		if !ok {
-			utilruntime.HandleErrorWithLogger(c.logger, &WrongTypeError{TypeName: "objInfo", Object: obj}, "List error")
+		metadata, err := meta.Accessor(obj)
+		if err != nil {
+			utilruntime.HandleErrorWithLogger(c.logger, err, "List error")
 			continue
 		}
-		allObjs = append(allObjs, objInfo.latestObj)
+		key := cache.MetaObjectToName(metadata).String()
+
+		assumed, ok := c.assumed[key]
+		if ok {
+			cmp, err := compareRV(metadata, assumed)
+			if err != nil {
+				utilruntime.HandleErrorWithLogger(c.logger, err, "List error")
+				continue
+			}
+			if cmp <= 0 { // assumed object is not in informer yet
+				if includeAssumed {
+					allObjs = append(allObjs, assumed)
+				}
+				continue
+			}
+		}
+		allObjs = append(allObjs, obj)
 	}
 	return allObjs
+}
+
+func (c *AssumeCache) listLocked() []interface{} {
+	objs := c.store.List()
+	return c.filterList(objs, true)
 }
 
 // Assume updates the object in-memory only.
@@ -424,40 +426,30 @@ func (c *AssumeCache) listLocked(indexObj interface{}) []interface{} {
 //
 // Only assuming objects that were returned by an apiserver
 // operation (Update, Patch) is safe.
-func (c *AssumeCache) Assume(obj interface{}) error {
-	name, err := cache.MetaNamespaceKeyFunc(obj)
-	if err != nil {
-		return &ObjectNameError{err}
-	}
+func (c *AssumeCache) Assume(obj v1.Object) error {
+	key := cache.MetaObjectToName(obj).String()
 
 	defer c.emitEvents()
 	c.rwMutex.Lock()
 	defer c.rwMutex.Unlock()
 
-	objInfo, err := c.getObjInfo(name)
+	stored, err := c.get(key)
 	if err != nil {
 		return err
 	}
 
-	newVersion, err := c.getObjVersion(name, obj)
+	cmp, err := compareRV(stored, obj)
 	if err != nil {
 		return err
 	}
 
-	storedVersion, err := c.getObjVersion(name, objInfo.latestObj)
-	if err != nil {
-		return err
+	if cmp > 0 {
+		return fmt.Errorf("%v %q is out of sync (stored: %s, assume: %s)", c.description, key, stored.GetResourceVersion(), obj.GetResourceVersion())
 	}
 
-	if newVersion < storedVersion {
-		return fmt.Errorf("%v %q is out of sync (stored: %d, assume: %d)", c.description, name, storedVersion, newVersion)
-	}
-
-	c.pushEvent(objInfo.latestObj, obj)
-
-	// Only update the cached object
-	objInfo.latestObj = obj
-	c.logger.V(4).Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion)
+	c.assumed[key] = obj
+	c.pushEvent(stored, obj)
+	c.logger.V(4).Info("Assumed object", "description", c.description, "cacheKey", key, "version", obj.GetResourceVersion())
 	return nil
 }
 
@@ -467,15 +459,20 @@ func (c *AssumeCache) Restore(objName string) {
 	c.rwMutex.Lock()
 	defer c.rwMutex.Unlock()
 
-	objInfo, err := c.getObjInfo(objName)
-	if err != nil {
+	assumed, ok := c.assumed[objName]
+	if !ok {
+		c.logger.V(5).Info("No need to restore object, not assumed", "description", c.description, "cacheKey", objName)
+		return
+	}
+
+	delete(c.assumed, objName)
+	obj, exists, err := c.store.GetByKey(objName)
+
+	if err != nil || !exists {
 		// This could be expected if object got deleted
 		c.logger.V(5).Info("Restore object", "description", c.description, "cacheKey", objName, "err", err)
 	} else {
-		if objInfo.latestObj != objInfo.apiObj {
-			c.pushEvent(objInfo.latestObj, objInfo.apiObj)
-			objInfo.latestObj = objInfo.apiObj
-		}
+		c.pushEvent(assumed, obj)
 		c.logger.V(4).Info("Restored object", "description", c.description, "cacheKey", objName)
 	}
 }
@@ -492,7 +489,7 @@ func (c *AssumeCache) AddEventHandler(handler cache.ResourceEventHandler) cache.
 	defer c.rwMutex.Unlock()
 
 	c.eventHandlers = append(c.eventHandlers, handler)
-	allObjs := c.listLocked(nil)
+	allObjs := c.listLocked()
 	for _, obj := range allObjs {
 		c.eventQueue.WriteOne(func() {
 			handler.OnAdd(obj, true)

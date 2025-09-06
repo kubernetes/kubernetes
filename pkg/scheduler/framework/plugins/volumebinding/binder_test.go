@@ -331,13 +331,9 @@ func (env *testEnv) updateVolumes(ctx context.Context, pvs []*v1.PersistentVolum
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, pv := range pvs {
-			obj, err := env.internalBinder.pvCache.GetAPIObj(pv.Name)
-			if obj == nil || err != nil {
+			pvInCache, err := env.internalBinder.pvCache.GetAPIPV(pv.Name)
+			if pvInCache == nil || err != nil {
 				return false, nil
-			}
-			pvInCache, ok := obj.(*v1.PersistentVolume)
-			if !ok {
-				return false, fmt.Errorf("PV %s invalid object", pvInCache.Name)
 			}
 			if versioner.CompareResourceVersion(pvInCache, pv) != 0 {
 				return false, nil

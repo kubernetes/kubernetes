@@ -37,6 +37,7 @@ import (
 // sufficient for one assume cache.
 type testInformer struct {
 	handler cache.ResourceEventHandler
+	indexer cache.Indexer
 }
 
 func (i *testInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
@@ -44,21 +45,28 @@ func (i *testInformer) AddEventHandler(handler cache.ResourceEventHandler) (cach
 	return nil, nil
 }
 
+func (i *testInformer) GetIndexer() cache.Indexer {
+	return i.indexer
+}
+
 func (i *testInformer) add(obj interface{}) {
+	i.indexer.Add(obj)
 	if i.handler == nil {
 		return
 	}
 	i.handler.OnAdd(obj, false)
 }
 
-func (i *testInformer) update(obj interface{}) {
+func (i *testInformer) update(oldObj, obj interface{}) {
+	i.indexer.Update(obj)
 	if i.handler == nil {
 		return
 	}
-	i.handler.OnUpdate(nil, obj)
+	i.handler.OnUpdate(oldObj, obj)
 }
 
 func (i *testInformer) delete(obj interface{}) {
+	i.indexer.Delete(obj)
 	if i.handler == nil {
 		return
 	}
@@ -79,7 +87,9 @@ func newTest(t *testing.T) (ktesting.TContext, *AssumeCache, *testInformer) {
 
 func newTestWithIndexer(t *testing.T, indexName string, indexFunc cache.IndexFunc) (ktesting.TContext, *AssumeCache, *testInformer) {
 	tCtx := ktesting.Init(t)
-	informer := new(testInformer)
+	informer := &testInformer{
+		indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{}),
+	}
 	cache := NewAssumeCache(tCtx.Logger(), informer, "TestObject", indexName, indexFunc)
 	return tCtx, cache, informer
 }
@@ -102,8 +112,7 @@ func verify(tCtx ktesting.TContext, cache *AssumeCache, key string, expectedObje
 	}
 }
 
-func verifyList(tCtx ktesting.TContext, assumeCache *AssumeCache, expectedObjs []interface{}, indexObj interface{}) {
-	actualObjs := assumeCache.List(indexObj)
+func verifyList(tCtx ktesting.TContext, actualObjs, expectedObjs []interface{}) {
 	diff := cmp.Diff(expectedObjs, actualObjs, cmpopts.SortSlices(func(x, y interface{}) bool {
 		xKey, err := cache.MetaNamespaceKeyFunc(x)
 		if err != nil {
@@ -145,7 +154,7 @@ func (m *mockEventHandler) OnAdd(obj interface{}, initialList bool) {
 
 	if m.cache != nil {
 		// Must not deadlock!
-		m.cache.List(nil)
+		m.cache.List()
 	}
 	if m.block != nil {
 		<-m.block
@@ -196,7 +205,7 @@ func (m *mockEventHandler) sortEvents(cmp func(objI, objJ interface{}) bool) {
 func TestAssume(t *testing.T) {
 	scenarios := map[string]struct {
 		oldObj    metav1.Object
-		newObj    interface{}
+		newObj    metav1.Object
 		expectErr error
 	}{
 		"success-same-version": {
@@ -229,8 +238,8 @@ func TestAssume(t *testing.T) {
 		},
 		"fail-new-bad-object": {
 			oldObj:    makeObj("pvc1", "5", ""),
-			newObj:    1,
-			expectErr: ErrObjectName,
+			newObj:    makeObj("pvc1", "a", ""),
+			expectErr: cmpopts.AnyError,
 		},
 	}
 
@@ -250,7 +259,7 @@ func TestAssume(t *testing.T) {
 				t.Errorf("Assume() returned error: %v\ndiff (- expected, + actual):\n%s", err, diff)
 			}
 
-			// Check that Get returns correct object and
+			// Check that Get/List returns correct object and
 			// that events were delivered correctly.
 			expectEvents := []event{{What: "add", Obj: scenario.oldObj}}
 			expectedObj := scenario.newObj
@@ -260,6 +269,7 @@ func TestAssume(t *testing.T) {
 				expectEvents = append(expectEvents, event{What: "update", OldObj: scenario.oldObj, Obj: scenario.newObj})
 			}
 			verify(tCtx, cache, scenario.oldObj.GetName(), expectedObj, scenario.oldObj)
+			verifyList(tCtx, cache.List(), []interface{}{expectedObj})
 			events.verifyAndFlush(tCtx, expectEvents)
 		})
 	}
@@ -332,7 +342,7 @@ func TestEvents(t *testing.T) {
 
 	// Update object.
 	ktesting.Step(tCtx, "initial update", func(tCtx ktesting.TContext) {
-		informer.update(newObj)
+		informer.update(oldObj, newObj)
 		verify(tCtx, cache, key, newObj, newObj)
 		events.verifyAndFlush(tCtx, []event{{What: "update", OldObj: oldObj, Obj: newObj}})
 	})
@@ -348,13 +358,8 @@ func TestEvents(t *testing.T) {
 		verify(tCtx, cache, key, newObj, newObj)
 		events.verifyAndFlush(tCtx, nil)
 	})
-	ktesting.Step(tCtx, "nop update", func(tCtx ktesting.TContext) {
-		informer.update(oldObj)
-		events.verifyAndFlush(tCtx, nil)
-		verify(tCtx, cache, key, newObj, newObj)
-	})
 	ktesting.Step(tCtx, "nil update", func(tCtx ktesting.TContext) {
-		informer.update(nil)
+		informer.update(nil, nil)
 		verify(tCtx, cache, key, newObj, newObj)
 		events.verifyAndFlush(tCtx, nil)
 	})
@@ -366,7 +371,7 @@ func TestEvents(t *testing.T) {
 
 	// Delete object.
 	ktesting.Step(tCtx, "delete", func(tCtx ktesting.TContext) {
-		informer.delete(oldObj)
+		informer.delete(newObj)
 		events.verifyAndFlush(tCtx, []event{{What: "delete", Obj: newObj}})
 		_, err := cache.Get(key)
 		if diff := cmp.Diff(ErrNotFound, err, cmpopts.EquateErrors()); diff != "" {
@@ -420,7 +425,7 @@ func TestEventHandlers(t *testing.T) {
 	for i, oldObj := range objs {
 		newObj := makeObj(fmt.Sprintf("test-pvc%v", i), "2", "")
 		objs[i] = newObj
-		informer.update(newObj)
+		informer.update(oldObj, newObj)
 		for e := range handlers {
 			handlers[e].verifyAndFlush(tCtx, []event{{What: "update", OldObj: oldObj, Obj: newObj}})
 		}
@@ -496,15 +501,16 @@ func TestListNoIndexer(t *testing.T) {
 	}
 
 	// List them
-	verifyList(ktesting.WithStep(tCtx, "after add"), cache, objs, "")
+	verifyList(ktesting.WithStep(tCtx, "after add"), cache.List(), objs)
 
 	// Update an object.
 	updatedObj := makeObj("test-pvc3", "2", "")
+	oldObj := objs[3]
 	objs[3] = updatedObj
-	informer.update(updatedObj)
+	informer.update(oldObj, updatedObj)
 
 	// List them
-	verifyList(ktesting.WithStep(tCtx, "after update"), cache, objs, "")
+	verifyList(ktesting.WithStep(tCtx, "after update"), cache.List(), objs)
 
 	// Delete a PV
 	deletedObj := objs[7]
@@ -512,7 +518,43 @@ func TestListNoIndexer(t *testing.T) {
 	informer.delete(deletedObj)
 
 	// List them
-	verifyList(ktesting.WithStep(tCtx, "after delete"), cache, objs, "")
+	verifyList(ktesting.WithStep(tCtx, "after delete"), cache.List(), objs)
+
+	// Assume a PV
+	newObj := makeObj("test-pvc5", "5", "")
+	if err := cache.Assume(newObj); err != nil {
+		tCtx.Fatalf("Assume() returned error %v", err)
+	}
+	objs[5] = newObj // Assumed objects will be listed by List()
+
+	// List them
+	verifyList(ktesting.WithStep(tCtx, "after assume"), cache.List(), objs)
+
+	// Out-of-date event from informer, should be ignored.
+	updatedObj = makeObj("test-pvc5", "3", "")
+	informer.update(oldObj, updatedObj)
+	verifyList(ktesting.WithStep(tCtx, "after out-of-date update"), cache.List(), objs)
+
+	// Update from informer, should overwrite assumed object.
+	updatedObj = makeObj("test-pvc5", "6", "")
+	informer.update(oldObj, updatedObj)
+	objs[5] = updatedObj
+	verifyList(ktesting.WithStep(tCtx, "after real update"), cache.List(), objs)
+
+	// Assume again
+	newObj = makeObj("test-pvc5", "7", "")
+	if err := cache.Assume(newObj); err != nil {
+		tCtx.Fatalf("Assume() returned error %v", err)
+	}
+	if len(cache.assumed) != 1 {
+		tCtx.Fatalf("Expected 1 assumed object, got %d", len(cache.assumed))
+	}
+
+	// Delete from informer, should also clear the assumed object.
+	informer.delete(updatedObj)
+	if len(cache.assumed) != 0 {
+		tCtx.Fatalf("Expected 0 assumed objects, got %d", len(cache.assumed))
+	}
 }
 
 func TestListWithIndexer(t *testing.T) {
@@ -541,15 +583,16 @@ func TestListWithIndexer(t *testing.T) {
 	}
 
 	// List them
-	verifyList(ktesting.WithStep(tCtx, "after add"), cache, objs, objs[0])
+	verifyList(ktesting.WithStep(tCtx, "after add"), cache.ByIndex(ns), objs)
 
 	// Update an object.
 	updatedObj := makeObj("test-pvc3", "2", ns)
+	oldObj := objs[3]
 	objs[3] = updatedObj
-	informer.update(updatedObj)
+	informer.update(oldObj, updatedObj)
 
 	// List them
-	verifyList(ktesting.WithStep(tCtx, "after update"), cache, objs, objs[0])
+	verifyList(ktesting.WithStep(tCtx, "after update"), cache.ByIndex(ns), objs)
 
 	// Delete a PV
 	deletedObj := objs[7]
@@ -557,5 +600,15 @@ func TestListWithIndexer(t *testing.T) {
 	informer.delete(deletedObj)
 
 	// List them
-	verifyList(ktesting.WithStep(tCtx, "after delete"), cache, objs, objs[0])
+	verifyList(ktesting.WithStep(tCtx, "after delete"), cache.ByIndex(ns), objs)
+
+	// Assume a PV
+	newObj := makeObj("test-pvc5", "2", ns)
+	if err := cache.Assume(newObj); err != nil {
+		tCtx.Fatalf("Assume() returned error %v", err)
+	}
+	objs = slices.Delete(objs, 5, 6) // Assumed objects are not listed by ByIndex
+
+	// List them
+	verifyList(ktesting.WithStep(tCtx, "after assume"), cache.ByIndex(ns), objs)
 }

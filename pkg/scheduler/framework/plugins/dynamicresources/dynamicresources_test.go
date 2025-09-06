@@ -2010,7 +2010,7 @@ func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 func (tc *testContext) listAssumedClaims() ([]metav1.Object, []metav1.Object) {
 	var assumedClaims []metav1.Object
 	var sameClaims []metav1.Object
-	for _, obj := range tc.draManager.resourceClaimTracker.cache.List(nil) {
+	for _, obj := range tc.draManager.resourceClaimTracker.cache.List() {
 		claim := obj.(*resourceapi.ResourceClaim)
 		obj, _ := tc.draManager.resourceClaimTracker.cache.Get(claim.Namespace + "/" + claim.Name)
 		apiObj, _ := tc.draManager.resourceClaimTracker.cache.GetAPIObj(claim.Namespace + "/" + claim.Name)
