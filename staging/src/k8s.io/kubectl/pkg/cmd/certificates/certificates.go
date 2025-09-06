@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/kubectl/pkg/util/completion"
 
 	"github.com/spf13/cobra"
 
@@ -41,19 +42,23 @@ import (
 )
 
 // NewCmdCertificate returns `certificate` Cobra command
-func NewCmdCertificate(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCertificate(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+
+	validArgs := []string{"certificatesigningrequests"}
+
 	cmd := &cobra.Command{
 		Use:                   "certificate SUBCOMMAND",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Modify certificate resources"),
 		Long:                  i18n.T("Modify certificate resources."),
+		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
 	}
 
-	cmd.AddCommand(NewCmdCertificateApprove(restClientGetter, ioStreams))
-	cmd.AddCommand(NewCmdCertificateDeny(restClientGetter, ioStreams))
+	cmd.AddCommand(NewCmdCertificateApprove(f, ioStreams))
+	cmd.AddCommand(NewCmdCertificateDeny(f, ioStreams))
 
 	return cmd
 }
@@ -83,7 +88,7 @@ func NewCertificateOptions(ioStreams genericiooptions.IOStreams, operation strin
 }
 
 // Complete loads data from the command environment
-func (o *CertificateOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, args []string) error {
+func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.csrNames = args
 	o.outputStyle = cmdutil.GetFlagString(cmd, "output")
 
@@ -96,9 +101,9 @@ func (o *CertificateOptions) Complete(restClientGetter genericclioptions.RESTCli
 		return printer.PrintObj(obj, out)
 	}
 
-	o.builder = resource.NewBuilder(restClientGetter)
+	o.builder = resource.NewBuilder(f)
 
-	clientConfig, err := restClientGetter.ToRESTConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
@@ -120,7 +125,7 @@ func (o *CertificateOptions) Validate() error {
 }
 
 // NewCmdCertificateApprove returns the `certificate approve` Cobra command
-func NewCmdCertificateApprove(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCertificateOptions(ioStreams, "approved")
 
 	cmd := &cobra.Command{
@@ -143,8 +148,9 @@ func NewCmdCertificateApprove(restClientGetter genericclioptions.RESTClientGette
 			# Approve CSR 'csr-sqgzp'
 			kubectl certificate approve csr-sqgzp
 		`)),
+		ValidArgsFunction: completion.ResourceNameCompletionFunc(f, "certificatesigningrequests"),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunCertificateApprove(cmdutil.GetFlagBool(cmd, "force")))
 		},
@@ -168,7 +174,7 @@ func (o *CertificateOptions) RunCertificateApprove(force bool) error {
 }
 
 // NewCmdCertificateDeny returns the `certificate deny` Cobra command
-func NewCmdCertificateDeny(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCertificateOptions(ioStreams, "denied")
 
 	cmd := &cobra.Command{
@@ -186,8 +192,9 @@ func NewCmdCertificateDeny(restClientGetter genericclioptions.RESTClientGetter, 
 			# Deny CSR 'csr-sqgzp'
 			kubectl certificate deny csr-sqgzp
 		`)),
+		ValidArgsFunction: completion.ResourceNameCompletionFunc(f, "certificatesigningrequests"),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunCertificateDeny(cmdutil.GetFlagBool(cmd, "force")))
 		},
