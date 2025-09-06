@@ -17,6 +17,7 @@ limitations under the License.
 package kuberc
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -33,7 +34,10 @@ import (
 	"k8s.io/kubectl/pkg/config"
 )
 
-const RecommendedKubeRCFileName = "kuberc"
+const (
+	RecommendedKubeRCFileName       = "kuberc"
+	KubeRCOriginalCommandAnnotation = "kubectl.kubernetes.io/original-command"
+)
 
 var (
 	RecommendedConfigDir  = filepath.Join(homedir.HomeDir(), clientcmd.RecommendedHomeDir)
@@ -121,7 +125,8 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 	if err != nil {
 		return nil
 	}
-
+	originalCommand := bytes.Buffer{}
+	originalCommand.WriteString(strings.Join(args, " "))
 	for _, c := range kuberc.Defaults {
 		parsedCmds := strings.Fields(c.Command)
 		overrideCmd, _, err := rootCmd.Find(parsedCmds)
@@ -160,7 +165,13 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 			if err != nil {
 				return fmt.Errorf("could not apply override value %s to flag %s in command %s err: %w", fl.Default, fl.Name, c.Command, err)
 			}
+			originalCommand.WriteString(fmt.Sprintf(" --%s=%s", fl.Name, fl.Default))
 		}
+		// Add annotation to trace back command built with default values set within kuberc
+		if cmd.Annotations == nil {
+			cmd.Annotations = make(map[string]string, 1)
+		}
+		cmd.Annotations[KubeRCOriginalCommandAnnotation] = originalCommand.String()
 	}
 
 	return nil
@@ -178,8 +189,8 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		return args, nil
 	}
 
+	originalCommand := bytes.Buffer{}
 	var aliasArgs *aliasing
-
 	var commandName string // first "non-flag" arguments
 	var commandIndex int
 	for index, arg := range args[1:] {
@@ -213,11 +224,14 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		newCmd.Aliases = []string{}
 		aliasCmd := &newCmd
 
-		aliasArgs = &aliasing{
-			prependArgs: alias.PrependArgs,
-			appendArgs:  alias.AppendArgs,
-			flags:       alias.Options,
-			command:     aliasCmd,
+		if alias.Name == commandName {
+			aliasArgs = &aliasing{
+				prependArgs: alias.PrependArgs,
+				appendArgs:  alias.AppendArgs,
+				flags:       alias.Options,
+				command:     aliasCmd,
+			}
+			originalCommand.WriteString(alias.Command)
 		}
 		break
 	}
@@ -244,7 +258,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 			allShorthands[flag.Shorthand] = struct{}{}
 		}
 	})
-
+	originalNameValueFlags := make([]string, 0, len(aliasArgs.flags))
 	for _, fl := range aliasArgs.flags {
 		existingFlag := foundAliasCmd.Flag(fl.Name)
 		if existingFlag == nil {
@@ -258,6 +272,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		if err != nil {
 			return args, fmt.Errorf("could not apply value %s to flag %s in alias %s err: %w", fl.Default, fl.Name, args[0], err)
 		}
+		originalNameValueFlags = append(originalNameValueFlags, fmt.Sprintf("--%s=%s", fl.Name, fl.Default))
 	}
 
 	if len(aliasArgs.prependArgs) > 0 {
@@ -277,6 +292,18 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 	// We are appending the additional args defined in kuberc in here and
 	// expect that it will be passed along to the actual command.
 	rootCmd.SetArgs(args[1:])
+	sanitizedArgs := strings.ReplaceAll(strings.Join(args[1:], " "), foundAliasCmd.Name(), "")
+	if len(sanitizedArgs) > 0 {
+		originalCommand.WriteString(fmt.Sprintf(" %s", sanitizedArgs))
+	}
+	if len(originalNameValueFlags) > 0 {
+		originalCommand.WriteString(fmt.Sprintf(" %s", strings.Join(originalNameValueFlags, " ")))
+	}
+	// Add annotation to trace back command built without aliases applied
+	if aliasArgs.command.Annotations == nil {
+		aliasArgs.command.Annotations = make(map[string]string, 1)
+	}
+	aliasArgs.command.Annotations[KubeRCOriginalCommandAnnotation] = originalCommand.String()
 	return args, nil
 }
 
