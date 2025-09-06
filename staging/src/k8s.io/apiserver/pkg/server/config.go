@@ -310,6 +310,9 @@ type Config struct {
 	// AggregatedDiscoveryGroupManager serves /apis in an aggregated form.
 	AggregatedDiscoveryGroupManager discoveryendpoint.ResourceManager
 
+	// MergedDiscoveryHandler serves aggregated discovery that combines both local and peer server resources.
+	MergedDiscoveryHandler discoveryendpoint.MergedResourceManager
+
 	// ShutdownWatchTerminationGracePeriod, if set to a positive value,
 	// is the maximum duration the apiserver will wait for all active
 	// watch request(s) to drain.
@@ -838,7 +841,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		readyzRegistry:   healthCheckRegistry{path: "/readyz", checks: c.ReadyzChecks},
 		livezGracePeriod: c.LivezGracePeriod,
 
-		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
+		DiscoveryGroupManager:  discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
+		MergedDiscoveryHandler: c.MergedDiscoveryHandler,
 
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
 
@@ -1123,7 +1127,12 @@ func installAPI(name string, s *GenericAPIServer, c *Config) {
 	routes.Version{Version: c.EffectiveVersion.Info()}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {
-		wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager)
+		var wrapped *discoveryendpoint.WrappedHandler
+		if c.MergedDiscoveryHandler != nil {
+			wrapped = discoveryendpoint.WrapMergedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager, c.MergedDiscoveryHandler)
+		} else {
+			wrapped = discoveryendpoint.WrapAggregatedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager)
+		}
 		s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/apis", metav1.APIGroupList{}))
 	}
 	if c.FlowControl != nil {

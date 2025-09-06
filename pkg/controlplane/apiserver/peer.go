@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/apiserver/pkg/reconcilers"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
@@ -44,6 +45,7 @@ const (
 )
 
 func BuildPeerProxy(
+	discoveryManager aggregated.MergedResourceManager,
 	leaseInformer coordinationv1informers.LeaseInformer,
 	loopbackClientConfig *rest.Config,
 	proxyClientCertFile string,
@@ -71,6 +73,7 @@ func BuildPeerProxy(
 
 	return utilpeerproxy.NewPeerProxyHandler(
 		apiServerID,
+		discoveryManager,
 		IdentityLeaseComponentLabelKey+"="+KubeAPIServer,
 		leaseInformer,
 		reconciler,

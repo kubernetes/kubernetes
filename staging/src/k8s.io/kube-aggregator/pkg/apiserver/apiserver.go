@@ -275,7 +275,12 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		discoveryGroup: discoveryGroup(enabledVersions),
 	}
 
-	apisHandlerWithAggregationSupport := aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedDiscoveryGroupManager)
+	var apisHandlerWithAggregationSupport *aggregated.WrappedHandler
+	if s.GenericAPIServer.MergedDiscoveryHandler != nil {
+		apisHandlerWithAggregationSupport = aggregated.WrapMergedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedDiscoveryGroupManager, s.GenericAPIServer.MergedDiscoveryHandler)
+	} else {
+		apisHandlerWithAggregationSupport = aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedLegacyDiscoveryGroupManager)
+	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandlerWithAggregationSupport)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 
