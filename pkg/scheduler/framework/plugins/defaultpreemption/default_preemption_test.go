@@ -204,7 +204,6 @@ func TestPostFilter(t *testing.T) {
 			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
 				"node1": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."),
 		},
 		{
@@ -219,7 +218,6 @@ func TestPostFilter(t *testing.T) {
 			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
 				"node1": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
 		},
 		{
@@ -232,7 +230,6 @@ func TestPostFilter(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
 			},
 			filteredNodesStatuses: framework.NewDefaultNodeToStatus(),
-			wantResult:            framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus:            fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
 		},
 		{
@@ -313,7 +310,6 @@ func TestPostFilter(t *testing.T) {
 				"node1": fwk.NewStatus(fwk.Unschedulable),
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/2 nodes are available: 2 Insufficient cpu."),
 		},
 		{
@@ -334,7 +330,6 @@ func TestPostFilter(t *testing.T) {
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 				"node3": fwk.NewStatus(fwk.Unschedulable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/3 nodes are available: 1 Insufficient cpu, 2 No preemption victims found for incoming pod."),
 		},
 		{
@@ -355,7 +350,6 @@ func TestPostFilter(t *testing.T) {
 				"node2": fwk.NewStatus(fwk.Unschedulable),
 				"node4": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
 			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/4 nodes are available: 2 Insufficient cpu, 2 Preemption is not helpful for scheduling."),
 		},
 		{
@@ -459,7 +453,9 @@ func TestPostFilter(t *testing.T) {
 					f.SetAPICacher(apicache.New(nil, cache))
 				}
 
-				p, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, feature.Features{})
+				p, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, feature.Features{
+					EnableNominatedNodeNameForExpectation: true,
+				})
 				if err != nil {
 					t.Fatal(err)
 				}
