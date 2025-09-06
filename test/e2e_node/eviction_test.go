@@ -443,7 +443,7 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering", framework.WithSlow(), fram
 					pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
 						Name:            pod.Spec.Containers[0].Name + "-static-allocator",
 						Image:           imageutils.GetE2EImage(imageutils.Agnhost),
-						ImagePullPolicy: "Always",
+						ImagePullPolicy: v1.PullIfNotPresent,
 						Args:            []string{"stress", "--mem-alloc-size", "2Mi", "--mem-alloc-sleep", "1s", "--mem-total", fmt.Sprintf("%d", *nodeSwapInfo.Capacity)},
 					})
 				},
@@ -815,7 +815,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 						{
 							Image:           imageutils.GetPauseImageName(),
 							Name:            podName,
-							ImagePullPolicy: "Always",
+							ImagePullPolicy: v1.PullIfNotPresent,
 						},
 					},
 				},
@@ -1235,8 +1235,9 @@ func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirem
 						"-c",
 						fmt.Sprintf("i=0; while [ $i -lt %d ]; do %s i=$(($i+1)); done; while true; do sleep 5; done", iterations, command),
 					},
-					Resources:    resources,
-					VolumeMounts: volumeMounts,
+					Resources:       resources,
+					VolumeMounts:    volumeMounts,
+					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
 			Volumes: volumes,
@@ -1283,7 +1284,7 @@ func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *
 				{
 					Name:            ctnName,
 					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
-					ImagePullPolicy: "Always",
+					ImagePullPolicy: v1.PullIfNotPresent,
 					Env:             env,
 					// 60 min timeout * 60s / tick per 10s = 360 ticks before timeout => ~11.11Mi/tick
 					// to fill ~4Gi of memory, so initial ballpark 12Mi/tick.
