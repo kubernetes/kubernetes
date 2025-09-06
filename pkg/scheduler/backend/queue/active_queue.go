@@ -140,12 +140,6 @@ type activeQueue struct {
 	// and can be used in the underLock() or underRLock().
 	unlockedQueue *unlockedActiveQueue
 
-	// cond is a condition that is notified when the pod is added to activeQ.
-	// When SchedulerPopFromBackoffQ feature is enabled,
-	// condition is also notified when the pod is added to backoffQ.
-	// It is used with lock.
-	// cond sync.Cond
-
 	// inFlightPods holds the UID of all pods which have been popped out for which Done
 	// hasn't been called yet - in other words, all pods that are currently being
 	// processed (being scheduled, in permit, or in the binding cycle).
@@ -203,7 +197,6 @@ func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueu
 		notifyCh:                     make(chan struct{}, 1),
 		closeCh:                      make(chan struct{}),
 	}
-	// aq.cond.L = &aq.lock
 
 	return aq
 }
@@ -248,9 +241,9 @@ func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) error {
 	return aq.queue.Delete(pInfo)
 }
 
-// // pop removes the head of the queue and returns it.
-// // It blocks if the queue is empty and waits until a new item is added to the queue.
-// // It increments scheduling cycle when a pod is popped.
+// pop removes the head of the queue and returns it.
+// It blocks if the queue is empty and waits until a new item is added to the queue.
+// It increments scheduling cycle when a pod is popped.
 func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 	for {
 		aq.lock.Lock()
