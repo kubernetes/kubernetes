@@ -339,13 +339,15 @@ func (h *testPluginHandler) Lookup(filename string) (string, bool) {
 	}
 
 	filenameWithSuportedPrefix := ""
+	pluginMap := make(map[string]bool)
+	for _, p := range plugins {
+		pluginMap[p.Name()] = true
+	}
 	for _, prefix := range h.validPrefixes {
-		for _, p := range plugins {
-			filenameWithSuportedPrefix = fmt.Sprintf("%s-%s", prefix, filename)
-			if p.Name() == filenameWithSuportedPrefix {
-				h.lookupErr = nil
-				return fmt.Sprintf("%s/%s", h.pluginsDirectory, p.Name()), true
-			}
+		filenameWithSuportedPrefix = fmt.Sprintf("%s-%s", prefix, filename)
+		if pluginMap[filenameWithSuportedPrefix] {
+			h.lookupErr = nil
+			return fmt.Sprintf("%s/%s", h.pluginsDirectory, filenameWithSuportedPrefix), true
 		}
 	}
 
