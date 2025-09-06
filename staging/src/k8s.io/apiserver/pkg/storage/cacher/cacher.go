@@ -461,7 +461,9 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 			}, time.Second, stopCh,
 		)
 	}()
-	config.Storage.SetKeysFunc(cacher.getKeys)
+	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+		config.Storage.EnableResourceSizeEstimation(cacher.getKeys)
+	}
 	return cacher, nil
 }
 

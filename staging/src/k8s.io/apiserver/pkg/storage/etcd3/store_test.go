@@ -381,10 +381,10 @@ func TestListResourceVersionMatch(t *testing.T) {
 func TestStats(t *testing.T) {
 	for _, sizeBasedListCostEstimate := range []bool{true, false} {
 		t.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v", sizeBasedListCostEstimate), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedListCostEstimate)
-			// Match transformer with cacher tests.
 			ctx, store, _ := testSetup(t)
-			store.SetKeysFunc(store.getKeys)
+			if sizeBasedListCostEstimate {
+				store.EnableResourceSizeEstimation(store.getKeys)
+			}
 			storagetesting.RunTestStats(ctx, t, store, store.codec, store.transformer, sizeBasedListCostEstimate)
 		})
 	}
@@ -991,8 +991,8 @@ func BenchmarkStatsCacheCleanKeys(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	if len(store.stats.keys) < namespaceCount*podPerNamespaceCount {
-		b.Fatalf("Unexpected number of keys in stats, want: %d, got: %d", namespaceCount*podPerNamespaceCount, len(store.stats.keys))
+	if len(store.resourceSizeStatsCollector.keys) < namespaceCount*podPerNamespaceCount {
+		b.Fatalf("Unexpected number of keys in stats, want: %d, got: %d", namespaceCount*podPerNamespaceCount, len(store.resourceSizeStatsCollector.keys))
 	}
 	// Get keys to measure only cleanupKeys time
 	keys, err := store.getKeys(ctx)
@@ -1001,10 +1001,10 @@ func BenchmarkStatsCacheCleanKeys(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		store.stats.cleanKeys(keys)
+		store.resourceSizeStatsCollector.cleanKeys(keys)
 	}
-	if len(store.stats.keys) < namespaceCount*podPerNamespaceCount {
-		b.Fatalf("Unexpected number of keys in stats, want: %d, got: %d", namespaceCount*podPerNamespaceCount, len(store.stats.keys))
+	if len(store.resourceSizeStatsCollector.keys) < namespaceCount*podPerNamespaceCount {
+		b.Fatalf("Unexpected number of keys in stats, want: %d, got: %d", namespaceCount*podPerNamespaceCount, len(store.resourceSizeStatsCollector.keys))
 	}
 }
 
@@ -1045,40 +1045,24 @@ func TestPrefixStats(t *testing.T) {
 	tcs := []struct {
 		name        string
 		estimate    bool
-		setKeys     bool
 		expectStats storage.Stats
 	}{
 		{
-			name:        "SizeBasedListCostEstimate=false,SetKeys=false",
-			setKeys:     false,
+			name:        "Estimate=false",
 			estimate:    false,
 			expectStats: storage.Stats{ObjectCount: 1},
 		},
 		{
-			name:        "SizeBasedListCostEstimate=false,SetKeys=true",
-			setKeys:     true,
-			estimate:    false,
-			expectStats: storage.Stats{ObjectCount: 1},
-		},
-		{
-			name:        "SizeBasedListCostEstimate=true,SetKeys=false",
-			setKeys:     false,
-			estimate:    true,
-			expectStats: storage.Stats{ObjectCount: 1},
-		},
-		{
-			name:        "SizeBasedListCostEstimate=true,SetKeys=true",
-			setKeys:     true,
+			name:        "Estimate=true",
 			estimate:    true,
 			expectStats: storage.Stats{ObjectCount: 1, EstimatedAverageObjectSizeBytes: 3},
 		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, tc.estimate)
 			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("pods"))
-			if tc.setKeys {
-				store.SetKeysFunc(store.getKeys)
+			if tc.estimate {
+				store.EnableResourceSizeEstimation(store.getKeys)
 			}
 			_, err := c.KV.Put(ctx, "key", "a")
 			if err != nil {
