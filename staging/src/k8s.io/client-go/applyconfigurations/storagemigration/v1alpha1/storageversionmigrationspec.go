@@ -20,9 +20,18 @@ package v1alpha1
 
 // StorageVersionMigrationSpecApplyConfiguration represents a declarative configuration of the StorageVersionMigrationSpec type for use
 // with apply.
+//
+// Spec of the storage version migration.
 type StorageVersionMigrationSpecApplyConfiguration struct {
-	Resource      *GroupVersionResourceApplyConfiguration `json:"resource,omitempty"`
-	ContinueToken *string                                 `json:"continueToken,omitempty"`
+	// The resource that is being migrated. The migrator sends requests to
+	// the endpoint serving the resource.
+	// Immutable.
+	Resource *GroupVersionResourceApplyConfiguration `json:"resource,omitempty"`
+	// The token used in the list options to get the next chunk of objects
+	// to migrate. When the .status.conditions indicates the migration is
+	// "Running", users can use this token to check the progress of the
+	// migration.
+	ContinueToken *string `json:"continueToken,omitempty"`
 }
 
 // StorageVersionMigrationSpecApplyConfiguration constructs a declarative configuration of the StorageVersionMigrationSpec type for use with

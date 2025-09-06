@@ -29,10 +29,16 @@ import (
 
 // EvictionApplyConfiguration represents a declarative configuration of the Eviction type for use
 // with apply.
+//
+// Eviction evicts a pod from its node subject to certain policies and safety constraints.
+// This is a subresource of Pod.  A request to cause such an eviction is
+// created by POSTing to .../pods/<pod name>/evictions.
 type EvictionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// ObjectMeta describes the pod that is being evicted.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	DeleteOptions                    *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
+	// DeleteOptions may be provided
+	DeleteOptions *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
 }
 
 // Eviction constructs a declarative configuration of the Eviction type for use with
@@ -53,7 +59,6 @@ func Eviction(name, namespace string) *EvictionApplyConfiguration {
 // ExtractEvictionFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractEvictionFrom(eviction *policyv1beta1.Eviction, fieldManager string, subresource string) (*EvictionApplyConfiguration, error) {
 	b := &EvictionApplyConfiguration{}
 	err := managedfields.ExtractInto(eviction, internal.Parser().Type("io.k8s.api.policy.v1beta1.Eviction"), fieldManager, b, subresource)
@@ -78,7 +83,6 @@ func ExtractEvictionFrom(eviction *policyv1beta1.Eviction, fieldManager string, 
 // ExtractEviction provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractEviction(eviction *policyv1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
 	return ExtractEvictionFrom(eviction, fieldManager, "")
 }

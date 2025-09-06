@@ -30,11 +30,27 @@ import (
 
 // ControllerRevisionApplyConfiguration represents a declarative configuration of the ControllerRevision type for use
 // with apply.
+//
+// DEPRECATED - This group version of ControllerRevision is deprecated by apps/v1beta2/ControllerRevision. See the
+// release notes for more information.
+// ControllerRevision implements an immutable snapshot of state data. Clients
+// are responsible for serializing and deserializing the objects that contain
+// their internal state.
+// Once a ControllerRevision has been successfully created, it can not be updated.
+// The API Server will fail validation of all requests that attempt to mutate
+// the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both
+// the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However,
+// it may be subject to name and representation changes in future releases, and clients should not
+// depend on its stability. It is primarily for internal use by controllers.
 type ControllerRevisionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Data                             *runtime.RawExtension `json:"data,omitempty"`
-	Revision                         *int64                `json:"revision,omitempty"`
+	// data is the serialized representation of the state.
+	Data *runtime.RawExtension `json:"data,omitempty"`
+	// revision indicates the revision of the state represented by Data.
+	Revision *int64 `json:"revision,omitempty"`
 }
 
 // ControllerRevision constructs a declarative configuration of the ControllerRevision type for use with
@@ -55,7 +71,6 @@ func ControllerRevision(name, namespace string) *ControllerRevisionApplyConfigur
 // ExtractControllerRevisionFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractControllerRevisionFrom(controllerRevision *appsv1beta1.ControllerRevision, fieldManager string, subresource string) (*ControllerRevisionApplyConfiguration, error) {
 	b := &ControllerRevisionApplyConfiguration{}
 	err := managedfields.ExtractInto(controllerRevision, internal.Parser().Type("io.k8s.api.apps.v1beta1.ControllerRevision"), fieldManager, b, subresource)
@@ -80,7 +95,6 @@ func ExtractControllerRevisionFrom(controllerRevision *appsv1beta1.ControllerRev
 // ExtractControllerRevision provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractControllerRevision(controllerRevision *appsv1beta1.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
 	return ExtractControllerRevisionFrom(controllerRevision, fieldManager, "")
 }

@@ -29,10 +29,16 @@ import (
 
 // PodTemplateApplyConfiguration represents a declarative configuration of the PodTemplate type for use
 // with apply.
+//
+// PodTemplate describes a template for creating copies of a predefined pod.
 type PodTemplateApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Template                             *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
+	// Template defines the pods that will be created from this pod template.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Template *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
 
 // PodTemplate constructs a declarative configuration of the PodTemplate type for use with
@@ -53,7 +59,6 @@ func PodTemplate(name, namespace string) *PodTemplateApplyConfiguration {
 // ExtractPodTemplateFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPodTemplateFrom(podTemplate *corev1.PodTemplate, fieldManager string, subresource string) (*PodTemplateApplyConfiguration, error) {
 	b := &PodTemplateApplyConfiguration{}
 	err := managedfields.ExtractInto(podTemplate, internal.Parser().Type("io.k8s.api.core.v1.PodTemplate"), fieldManager, b, subresource)
@@ -78,7 +83,6 @@ func ExtractPodTemplateFrom(podTemplate *corev1.PodTemplate, fieldManager string
 // ExtractPodTemplate provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPodTemplate(podTemplate *corev1.PodTemplate, fieldManager string) (*PodTemplateApplyConfiguration, error) {
 	return ExtractPodTemplateFrom(podTemplate, fieldManager, "")
 }

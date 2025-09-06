@@ -20,9 +20,14 @@ package v1
 
 // LinuxContainerUserApplyConfiguration represents a declarative configuration of the LinuxContainerUser type for use
 // with apply.
+//
+// LinuxContainerUser represents user identity information in Linux containers
 type LinuxContainerUserApplyConfiguration struct {
-	UID                *int64  `json:"uid,omitempty"`
-	GID                *int64  `json:"gid,omitempty"`
+	// UID is the primary uid initially attached to the first process in the container
+	UID *int64 `json:"uid,omitempty"`
+	// GID is the primary gid initially attached to the first process in the container
+	GID *int64 `json:"gid,omitempty"`
+	// SupplementalGroups are the supplemental groups initially attached to the first process in the container
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty"`
 }
 

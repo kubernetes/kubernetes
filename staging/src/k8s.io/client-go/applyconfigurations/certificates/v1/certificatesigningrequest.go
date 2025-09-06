@@ -29,11 +29,27 @@ import (
 
 // CertificateSigningRequestApplyConfiguration represents a declarative configuration of the CertificateSigningRequest type for use
 // with apply.
+//
+// CertificateSigningRequest objects provide a mechanism to obtain x509 certificates
+// by submitting a certificate signing request, and having it asynchronously approved and issued.
+//
+// Kubelets use this API to obtain:
+// 1. client certificates to authenticate to kube-apiserver (with the "kubernetes.io/kube-apiserver-client-kubelet" signerName).
+// 2. serving certificates for TLS endpoints kube-apiserver can connect to securely (with the "kubernetes.io/kubelet-serving" signerName).
+//
+// This API can be used to request client certificates to authenticate to kube-apiserver
+// (with the "kubernetes.io/kube-apiserver-client" signerName),
+// or to obtain certificates from custom non-Kubernetes signers.
 type CertificateSigningRequestApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration    `json:",inline"`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *CertificateSigningRequestSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *CertificateSigningRequestStatusApplyConfiguration `json:"status,omitempty"`
+	// spec contains the certificate request, and is immutable after creation.
+	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
+	// Other fields are derived by Kubernetes and cannot be modified by users.
+	Spec *CertificateSigningRequestSpecApplyConfiguration `json:"spec,omitempty"`
+	// status contains information about whether the request is approved or denied,
+	// and the certificate issued by the signer, or the failure condition indicating signer failure.
+	Status *CertificateSigningRequestStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // CertificateSigningRequest constructs a declarative configuration of the CertificateSigningRequest type for use with
@@ -53,7 +69,6 @@ func CertificateSigningRequest(name string) *CertificateSigningRequestApplyConfi
 // ExtractCertificateSigningRequestFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractCertificateSigningRequestFrom(certificateSigningRequest *certificatesv1.CertificateSigningRequest, fieldManager string, subresource string) (*CertificateSigningRequestApplyConfiguration, error) {
 	b := &CertificateSigningRequestApplyConfiguration{}
 	err := managedfields.ExtractInto(certificateSigningRequest, internal.Parser().Type("io.k8s.api.certificates.v1.CertificateSigningRequest"), fieldManager, b, subresource)
@@ -77,21 +92,18 @@ func ExtractCertificateSigningRequestFrom(certificateSigningRequest *certificate
 // ExtractCertificateSigningRequest provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractCertificateSigningRequest(certificateSigningRequest *certificatesv1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
 	return ExtractCertificateSigningRequestFrom(certificateSigningRequest, fieldManager, "")
 }
 
 // ExtractCertificateSigningRequestApproval extracts the applied configuration owned by fieldManager from
 // certificateSigningRequest for the approval subresource.
-// Experimental!
 func ExtractCertificateSigningRequestApproval(certificateSigningRequest *certificatesv1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
 	return ExtractCertificateSigningRequestFrom(certificateSigningRequest, fieldManager, "approval")
 }
 
 // ExtractCertificateSigningRequestStatus extracts the applied configuration owned by fieldManager from
 // certificateSigningRequest for the status subresource.
-// Experimental!
 func ExtractCertificateSigningRequestStatus(certificateSigningRequest *certificatesv1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
 	return ExtractCertificateSigningRequestFrom(certificateSigningRequest, fieldManager, "status")
 }

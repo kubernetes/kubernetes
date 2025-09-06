@@ -20,10 +20,32 @@ package v1
 
 // TypedLocalObjectReferenceApplyConfiguration represents a declarative configuration of the TypedLocalObjectReference type for use
 // with apply.
+//
+// TypedLocalObjectReference contains enough information to let you locate the
+// typed referenced object inside the same namespace.
+// ---
+// New uses of this type are discouraged because of difficulty describing its usage when embedded in APIs.
+// 1. Invalid usage help.  It is impossible to add specific help for individual usage.  In most embedded usages, there are particular
+// restrictions like, "must refer only to types A and B" or "UID not honored" or "name must be restricted".
+// Those cannot be well described when embedded.
+// 2. Inconsistent validation.  Because the usages are different, the validation rules are different by usage, which makes it hard for users to predict what will happen.
+// 3. The fields are both imprecise and overly precise.  Kind is not a precise mapping to a URL. This can produce ambiguity
+// during interpretation and require a REST mapping.  In most cases, the dependency is on the group,resource tuple
+// and the version of the actual struct is irrelevant.
+// 4. We cannot easily change it.  Because this type is embedded in many locations, updates to this type
+// will affect numerous schemas.  Don't make new APIs embed an underspecified API type they do not control.
+//
+// Instead of using this type, create a locally provided and used type that is well-focused on your reference.
+// For example, ServiceReferences for admission registration: https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533 .
 type TypedLocalObjectReferenceApplyConfiguration struct {
+	// APIGroup is the group for the resource being referenced.
+	// If APIGroup is not specified, the specified Kind must be in the core API group.
+	// For any other third-party types, APIGroup is required.
 	APIGroup *string `json:"apiGroup,omitempty"`
-	Kind     *string `json:"kind,omitempty"`
-	Name     *string `json:"name,omitempty"`
+	// Kind is the type of resource being referenced
+	Kind *string `json:"kind,omitempty"`
+	// Name is the name of resource being referenced
+	Name *string `json:"name,omitempty"`
 }
 
 // TypedLocalObjectReferenceApplyConfiguration constructs a declarative configuration of the TypedLocalObjectReference type for use with

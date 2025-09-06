@@ -20,9 +20,17 @@ package v1
 
 // PodExtendedResourceClaimStatusApplyConfiguration represents a declarative configuration of the PodExtendedResourceClaimStatus type for use
 // with apply.
+//
+// PodExtendedResourceClaimStatus is stored in the PodStatus for the extended
+// resource requests backed by DRA. It stores the generated name for
+// the corresponding special ResourceClaim created by the scheduler.
 type PodExtendedResourceClaimStatusApplyConfiguration struct {
-	RequestMappings   []ContainerExtendedResourceRequestApplyConfiguration `json:"requestMappings,omitempty"`
-	ResourceClaimName *string                                              `json:"resourceClaimName,omitempty"`
+	// RequestMappings identifies the mapping of <container, extended resource backed by DRA> to  device request
+	// in the generated ResourceClaim.
+	RequestMappings []ContainerExtendedResourceRequestApplyConfiguration `json:"requestMappings,omitempty"`
+	// ResourceClaimName is the name of the ResourceClaim that was
+	// generated for the Pod in the namespace of the Pod.
+	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
 }
 
 // PodExtendedResourceClaimStatusApplyConfiguration constructs a declarative configuration of the PodExtendedResourceClaimStatus type for use with

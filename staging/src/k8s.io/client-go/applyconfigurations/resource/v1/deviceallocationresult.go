@@ -20,9 +20,19 @@ package v1
 
 // DeviceAllocationResultApplyConfiguration represents a declarative configuration of the DeviceAllocationResult type for use
 // with apply.
+//
+// DeviceAllocationResult is the result of allocating devices.
 type DeviceAllocationResultApplyConfiguration struct {
+	// Results lists all allocated devices.
 	Results []DeviceRequestAllocationResultApplyConfiguration `json:"results,omitempty"`
-	Config  []DeviceAllocationConfigurationApplyConfiguration `json:"config,omitempty"`
+	// This field is a combination of all the claim and class configuration parameters.
+	// Drivers can distinguish between those based on a flag.
+	//
+	// This includes configuration parameters for drivers which have no allocated
+	// devices in the result because it is up to the drivers which configuration
+	// parameters they support. They can silently ignore unknown configuration
+	// parameters.
+	Config []DeviceAllocationConfigurationApplyConfiguration `json:"config,omitempty"`
 }
 
 // DeviceAllocationResultApplyConfiguration constructs a declarative configuration of the DeviceAllocationResult type for use with

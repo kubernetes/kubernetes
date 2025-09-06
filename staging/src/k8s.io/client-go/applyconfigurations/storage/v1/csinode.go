@@ -29,10 +29,23 @@ import (
 
 // CSINodeApplyConfiguration represents a declarative configuration of the CSINode type for use
 // with apply.
+//
+// CSINode holds information about all CSI drivers installed on a node.
+// CSI drivers do not need to create the CSINode object directly. As long as
+// they use the node-driver-registrar sidecar container, the kubelet will
+// automatically populate the CSINode object for the CSI driver as part of
+// kubelet plugin registration.
+// CSINode has the same name as a node. If the object is missing, it means either
+// there are no CSI Drivers available on the node, or the Kubelet version is low
+// enough that it doesn't create this object.
+// CSINode has an OwnerReference that points to the corresponding node object.
 type CSINodeApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// metadata.name must be the Kubernetes node name.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *CSINodeSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec is the specification of CSINode
+	Spec *CSINodeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // CSINode constructs a declarative configuration of the CSINode type for use with
@@ -52,7 +65,6 @@ func CSINode(name string) *CSINodeApplyConfiguration {
 // ExtractCSINodeFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractCSINodeFrom(cSINode *storagev1.CSINode, fieldManager string, subresource string) (*CSINodeApplyConfiguration, error) {
 	b := &CSINodeApplyConfiguration{}
 	err := managedfields.ExtractInto(cSINode, internal.Parser().Type("io.k8s.api.storage.v1.CSINode"), fieldManager, b, subresource)
@@ -76,7 +88,6 @@ func ExtractCSINodeFrom(cSINode *storagev1.CSINode, fieldManager string, subreso
 // ExtractCSINode provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractCSINode(cSINode *storagev1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
 	return ExtractCSINodeFrom(cSINode, fieldManager, "")
 }

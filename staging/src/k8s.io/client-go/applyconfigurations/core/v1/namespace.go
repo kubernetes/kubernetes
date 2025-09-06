@@ -29,11 +29,20 @@ import (
 
 // NamespaceApplyConfiguration represents a declarative configuration of the Namespace type for use
 // with apply.
+//
+// Namespace provides a scope for Names.
+// Use of multiple namespaces is optional.
 type NamespaceApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *NamespaceSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *NamespaceStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the behavior of the Namespace.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *NamespaceSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status describes the current status of a Namespace.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *NamespaceStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Namespace constructs a declarative configuration of the Namespace type for use with
@@ -53,7 +62,6 @@ func Namespace(name string) *NamespaceApplyConfiguration {
 // ExtractNamespaceFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractNamespaceFrom(namespace *corev1.Namespace, fieldManager string, subresource string) (*NamespaceApplyConfiguration, error) {
 	b := &NamespaceApplyConfiguration{}
 	err := managedfields.ExtractInto(namespace, internal.Parser().Type("io.k8s.api.core.v1.Namespace"), fieldManager, b, subresource)
@@ -77,14 +85,12 @@ func ExtractNamespaceFrom(namespace *corev1.Namespace, fieldManager string, subr
 // ExtractNamespace provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractNamespace(namespace *corev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
 	return ExtractNamespaceFrom(namespace, fieldManager, "")
 }
 
 // ExtractNamespaceStatus extracts the applied configuration owned by fieldManager from
 // namespace for the status subresource.
-// Experimental!
 func ExtractNamespaceStatus(namespace *corev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
 	return ExtractNamespaceFrom(namespace, fieldManager, "status")
 }

@@ -24,13 +24,25 @@ import (
 
 // HorizontalPodAutoscalerStatusApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscalerStatus type for use
 // with apply.
+//
+// HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerStatusApplyConfiguration struct {
-	ObservedGeneration *int64                                               `json:"observedGeneration,omitempty"`
-	LastScaleTime      *v1.Time                                             `json:"lastScaleTime,omitempty"`
-	CurrentReplicas    *int32                                               `json:"currentReplicas,omitempty"`
-	DesiredReplicas    *int32                                               `json:"desiredReplicas,omitempty"`
-	CurrentMetrics     []MetricStatusApplyConfiguration                     `json:"currentMetrics,omitempty"`
-	Conditions         []HorizontalPodAutoscalerConditionApplyConfiguration `json:"conditions,omitempty"`
+	// observedGeneration is the most recent generation observed by this autoscaler.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods,
+	// used by the autoscaler to control how often the number of pods is changed.
+	LastScaleTime *v1.Time `json:"lastScaleTime,omitempty"`
+	// currentReplicas is current number of replicas of pods managed by this autoscaler,
+	// as last seen by the autoscaler.
+	CurrentReplicas *int32 `json:"currentReplicas,omitempty"`
+	// desiredReplicas is the desired number of replicas of pods managed by this autoscaler,
+	// as last calculated by the autoscaler.
+	DesiredReplicas *int32 `json:"desiredReplicas,omitempty"`
+	// currentMetrics is the last read state of the metrics used by this autoscaler.
+	CurrentMetrics []MetricStatusApplyConfiguration `json:"currentMetrics,omitempty"`
+	// conditions is the set of conditions required for this autoscaler to scale its target,
+	// and indicates whether or not those conditions are met.
+	Conditions []HorizontalPodAutoscalerConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // HorizontalPodAutoscalerStatusApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerStatus type for use with
