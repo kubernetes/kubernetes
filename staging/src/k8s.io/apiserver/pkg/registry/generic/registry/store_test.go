@@ -1635,6 +1635,95 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 }
 
+func TestFinalizerRace(t *testing.T) {
+	var (
+		originalStorage storage.Interface
+		wrappedStorage  *deleteInterceptingStorage
+	)
+	wrapStorage := func(s storage.Interface) storage.Interface {
+		originalStorage = s
+		wrappedStorage = &deleteInterceptingStorage{Interface: originalStorage}
+		return wrappedStorage
+	}
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := newTestGenericStoreRegistryWithOptions(t, scheme, testRegistryOptions{hasCacheEnabled: false, wrapStorage: wrapStorage})
+	defer destroyFunc()
+
+	registry.EnableGarbageCollection = true
+	registry.ReturnDeletedObject = true
+
+	// create pod
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: example.PodSpec{NodeName: "machine"}}
+	_, err := registry.Create(testContext, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// intercept delete requests to mutate the object just before delete requests are processed
+	beforeDeleteCalled := 0
+	wrappedStorage.beforeDelete = func(ctx context.Context, key string) {
+		switch beforeDeleteCalled {
+		case 0:
+			// simulate concurrent update that didn't modify finalizers.
+			// should trigger an internal delete re-attempt.
+			err := originalStorage.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+				input.(*example.Pod).Labels = map[string]string{"test": "true"}
+				return input, nil, nil
+			}, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		case 1:
+			// simulate concurrent update that added a finalizer.
+			// should not trigger an internal re-attempt because there's now a finalizer.
+			err := originalStorage.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+				input.(*example.Pod).Finalizers = []string{"example.com/finalizer"}
+				return input, nil, nil
+			}, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		default:
+			// unexpected
+			t.Fatalf("unexpected 3rd call to beforeDelete")
+		}
+		beforeDeleteCalled++
+	}
+
+	result, wasDeleted, err := registry.Delete(testContext, pod.Name, rest.ValidateAllObjectFunc, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, pod %s should not have been deleted immediately", pod.Name)
+	}
+	if beforeDeleteCalled != 2 {
+		t.Errorf("expected beforeDelete called 2 times, got %d", beforeDeleteCalled)
+	}
+	if result.(*example.Pod).DeletionTimestamp == nil {
+		t.Errorf("expected deletionTimestamp, got nil")
+	}
+	if len(result.(*example.Pod).Finalizers) != 1 {
+		t.Errorf("expected finalizer, got none")
+	}
+	if result.(*example.Pod).Labels["test"] != "true" {
+		t.Errorf("expected test=true label")
+	}
+}
+
+type deleteInterceptingStorage struct {
+	storage.Interface
+
+	beforeDelete func(ctx context.Context, key string)
+}
+
+func (t *deleteInterceptingStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+	if t.beforeDelete != nil {
+		t.beforeDelete(ctx, key)
+	}
+	return t.Interface.Delete(ctx, key, out, preconditions, validateDeletion, cachedExistingObject, opts)
+}
+
 func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	initialGeneration := int64(1)
 	podWithOrphanFinalizer := func(name string) *example.Pod {
@@ -2427,6 +2516,16 @@ func TestStoreWatch(t *testing.T) {
 }
 
 func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
+	return newTestGenericStoreRegistryWithOptions(t, scheme, testRegistryOptions{hasCacheEnabled: hasCacheEnabled})
+}
+
+type testRegistryOptions struct {
+	hasCacheEnabled bool
+
+	wrapStorage func(storage.Interface) storage.Interface
+}
+
+func newTestGenericStoreRegistryWithOptions(t *testing.T, scheme *runtime.Scheme, opts testRegistryOptions) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods"
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
@@ -2439,11 +2538,15 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
+	if opts.wrapStorage != nil {
+		// allow shimming storage to intercept calls
+		s = opts.wrapStorage(s)
+	}
 	destroyFunc := func() {
 		dFunc()
 		server.Terminate(t)
 	}
-	if hasCacheEnabled {
+	if opts.hasCacheEnabled {
 		config := cacherstorage.Config{
 			Storage:             s,
 			Versioner:           storage.APIObjectVersioner{},
