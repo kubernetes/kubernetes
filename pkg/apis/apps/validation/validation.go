@@ -19,6 +19,7 @@ package validation
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -667,7 +668,7 @@ func ValidateDeploymentSpec(spec, oldSpec *apps.DeploymentSpec, fldPath *field.P
 	}
 	if spec.ProgressDeadlineSeconds != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ProgressDeadlineSeconds), fldPath.Child("progressDeadlineSeconds"))...)
-		if *spec.ProgressDeadlineSeconds <= spec.MinReadySeconds {
+		if *spec.ProgressDeadlineSeconds != math.MaxInt32 && *spec.ProgressDeadlineSeconds <= spec.MinReadySeconds {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("progressDeadlineSeconds"), spec.ProgressDeadlineSeconds, "must be greater than minReadySeconds"))
 		}
 	}
