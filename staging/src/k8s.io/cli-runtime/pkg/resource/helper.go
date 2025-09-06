@@ -203,6 +203,24 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 		Get()
 }
 
+// DeleteWithOptionsWithContext performs a DELETE request with the given context for timeout control
+func (m *Helper) DeleteWithOptionsWithContext(ctx context.Context, namespace, name string, options *metav1.DeleteOptions) (runtime.Object, error) {
+	if options == nil {
+		options = &metav1.DeleteOptions{}
+	}
+	if m.ServerDryRun {
+		options.DryRun = []string{metav1.DryRunAll}
+	}
+
+	return m.RESTClient.Delete().
+		NamespaceIfScoped(namespace, m.NamespaceScoped).
+		Resource(m.Resource).
+		Name(name).
+		Body(options).
+		Do(ctx).
+		Get()
+}
+
 func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error) {
 	return m.CreateWithOptions(namespace, modify, obj, nil)
 }

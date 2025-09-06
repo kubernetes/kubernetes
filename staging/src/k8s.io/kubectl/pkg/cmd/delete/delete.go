@@ -17,6 +17,7 @@ limitations under the License.
 package delete
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -478,11 +479,29 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 }
 
 func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) (runtime.Object, error) {
+	// Add request-level timeout to prevent hanging on network issues
+	// Use a reasonable timeout for the DELETE request itself
+	requestTimeout := 30 * time.Second
+	if o.Timeout > 0 && o.Timeout < requestTimeout {
+		requestTimeout = o.Timeout
+	}
+	
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
 	deleteResponse, err := resource.
 		NewHelper(info.Client, info.Mapping).
 		DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
-		DeleteWithOptions(info.Namespace, info.Name, deleteOptions)
+		DeleteWithOptionsWithContext(ctx, info.Namespace, info.Name, deleteOptions)
 	if err != nil {
+		// Check if the error is due to timeout
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("delete request timed out after %v: %w", requestTimeout, err)
+		}
+		// Check for network-related errors
+		if isNetworkError(err) {
+			return nil, fmt.Errorf("network error during delete request: %w", err)
+		}
 		return nil, cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 
@@ -490,6 +509,37 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 		o.PrintObj(info)
 	}
 	return deleteResponse, nil
+}
+
+// isNetworkError checks if the error is related to network issues
+func isNetworkError(err error) bool {
+	if err == nil {
+		return false
+	}
+	
+	// Check for common network error patterns
+	errStr := err.Error()
+	networkErrorPatterns := []string{
+		"connection refused",
+		"connection reset",
+		"connection timeout",
+		"network is unreachable",
+		"no route to host",
+		"broken pipe",
+		"use of closed network connection",
+		"i/o timeout",
+		"context deadline exceeded",
+		"client timeout",
+		"server timeout",
+	}
+	
+	for _, pattern := range networkErrorPatterns {
+		if strings.Contains(strings.ToLower(errStr), pattern) {
+			return true
+		}
+	}
+	
+	return false
 }
 
 // PrintObj for deleted objects is special because we do not have an object to print.

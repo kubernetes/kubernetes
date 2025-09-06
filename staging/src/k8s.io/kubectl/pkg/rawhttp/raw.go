@@ -47,8 +47,18 @@ func RawDelete(restClient *rest.RESTClient, streams genericiooptions.IOStreams, 
 	return raw(restClient, streams, url, filename, "DELETE")
 }
 
+// RawDeleteWithContext uses the REST client to DELETE content with a context
+func RawDeleteWithContext(ctx context.Context, restClient *rest.RESTClient, streams genericiooptions.IOStreams, url, filename string) error {
+	return rawWithContext(ctx, restClient, streams, url, filename, "DELETE")
+}
+
 // raw makes a simple HTTP request to the provided path on the server using the default credentials.
 func raw(restClient *rest.RESTClient, streams genericiooptions.IOStreams, url, filename, requestType string) error {
+	return rawWithContext(context.Background(), restClient, streams, url, filename, requestType)
+}
+
+// rawWithContext makes a simple HTTP request to the provided path on the server using the default credentials with context for timeout control.
+func rawWithContext(ctx context.Context, restClient *rest.RESTClient, streams genericiooptions.IOStreams, url, filename, requestType string) error {
 	var data io.Reader
 	switch {
 	case len(filename) == 0:
@@ -81,7 +91,7 @@ func raw(restClient *rest.RESTClient, streams genericiooptions.IOStreams, url, f
 		return fmt.Errorf("unknown requestType: %q", requestType)
 	}
 
-	stream, err := request.Stream(context.TODO())
+	stream, err := request.Stream(ctx)
 	if err != nil {
 		return err
 	}
