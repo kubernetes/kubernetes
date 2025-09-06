@@ -18,6 +18,7 @@ package factory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -151,69 +152,48 @@ func (a *atomicLastError) Load() error {
 }
 
 func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan struct{}) (func() error, error) {
-	// constructing the etcd v3 client blocks and times out if etcd is not available.
-	// retry in a loop in the background until we successfully create the client, storing the client or error encountered
-
-	lock := sync.RWMutex{}
-	var prober *etcd3ProberMonitor
-	clientErr := fmt.Errorf("etcd client connection not yet established")
-
-	go wait.PollImmediateUntil(time.Second, func() (bool, error) {
-		lock.Lock()
-		defer lock.Unlock()
-		newProber, err := newETCD3ProberMonitor(c)
-		// Ensure that server is already not shutting down.
-		select {
-		case <-stopCh:
-			if err == nil {
-				newProber.Close()
-			}
-			return true, nil
-		default:
-		}
-		if err != nil {
-			clientErr = err
-			return false, nil
-		}
-		prober = newProber
-		clientErr = nil
-		return true, nil
-	}, stopCh)
+	// Create a new prober monitor.
+	prober, err := newETCD3ProberMonitor(c)
+	if err != nil {
+		return nil, err
+	}
 
 	// Close the client on shutdown.
+	var (
+		lock     sync.RWMutex
+		probeErr error
+	)
 	go func() {
 		defer utilruntime.HandleCrash()
 		<-stopCh
 
 		lock.Lock()
 		defer lock.Unlock()
-		if prober != nil {
-			prober.Close()
-			clientErr = fmt.Errorf("server is shutting down")
-		}
+		_ = prober.Close()
+		probeErr = errors.New("server is shutting down")
 	}()
 
-	// limit to a request every half of the configured timeout with a maximum burst of one
-	// rate limited requests will receive the last request sent error (note: not the last received response)
+	// Limit to a request every half of the configured timeout with a maximum burst of one.
+	// Rate limited requests will receive the last received response.
 	limiter := rate.NewLimiter(rate.Every(timeout/2), 1)
-	// initial state is the clientErr
-	lastError := &atomicLastError{err: fmt.Errorf("etcd client connection not yet established")}
+	lastError := &atomicLastError{err: errors.New("etcd client connection not yet established")}
 
 	return func() error {
-		// Given that client is closed on shutdown we hold the lock for
-		// the entire period of healthcheck call to ensure that client will
-		// not be closed during healthcheck.
-		// Given that healthchecks has a 2s timeout, worst case of blocking
-		// shutdown for additional 2s seems acceptable.
+		// Hold the lock to make sure the prober is not closed during the health check.
+		// Given that there is a 2s timeout, the worst case of blocking shutdown for additional 2s seems acceptable.
 		lock.RLock()
 		defer lock.RUnlock()
 
-		if clientErr != nil {
-			return clientErr
+		// Return the guard error object when set.
+		if probeErr != nil {
+			return probeErr
 		}
+
+		// Check the rate limit.
 		if limiter.Allow() == false {
 			return lastError.Load()
 		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		now := time.Now()
@@ -283,7 +263,7 @@ func (t *etcd3ProberMonitor) Monitor(ctx context.Context) (metrics.StorageMetric
 	}, nil
 }
 
-var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
+var newETCD3Client = func(c storagebackend.TransportConfig, grpcOpts ...grpc.DialOption) (*kubernetes.Client, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile:      c.CertFile,
 		KeyFile:       c.KeyFile,
@@ -306,8 +286,7 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client,
 			return nil, err
 		}
 	}
-	dialOptions := []grpc.DialOption{
-		grpc.WithBlock(), // block until the underlying connection is up
+	dialOptions := append(grpcOpts,
 		// use chained interceptors so that the default (retry and backoff) interceptors are added.
 		// otherwise they will be overwritten by the metric interceptor.
 		//
@@ -315,7 +294,7 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client,
 		// which seems to be what we want as the metrics will be collected on each attempt (retry)
 		grpc.WithChainUnaryInterceptor(grpcprom.UnaryClientInterceptor),
 		grpc.WithChainStreamInterceptor(grpcprom.StreamClientInterceptor),
-	}
+	)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		tracingOpts := []otelgrpc.Option{
 			otelgrpc.WithMessageEvents(otelgrpc.ReceivedEvents, otelgrpc.SentEvents),
@@ -385,7 +364,8 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	}
 	key := fmt.Sprintf("%v", c) // gives: {[server1 server2] keyFile certFile caFile}
 	if compactor, foundBefore := compactors[key]; !foundBefore || compactor.interval > interval {
-		client, err := newETCD3Client(c)
+		// nolint:staticcheck // Ignore WithBlock being deprecated.
+		client, err := newETCD3Client(c, grpc.WithBlock())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -429,7 +409,8 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 		return nil, nil, err
 	}
 
-	client, err := newETCD3Client(c.Transport)
+	// nolint:staticcheck // Ignore WithBlock being deprecated.
+	client, err := newETCD3Client(c.Transport, grpc.WithBlock())
 	if err != nil {
 		stopCompactor()
 		return nil, nil, err
