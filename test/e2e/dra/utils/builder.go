@@ -28,7 +28,10 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
+	"github.com/onsi/gomega/gcustom"
 
+	gomegatypes "github.com/onsi/gomega/types"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -38,6 +41,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	clientset "k8s.io/client-go/kubernetes"
 	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -47,6 +51,39 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
+
+// Wait for resource quota status to show the expected used resources value.
+// Other resources are ignored.
+func WaitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
+	var lastResourceQuota *v1.ResourceQuota
+	err := framework.Gomega().Eventually(ctx, framework.GetObject(c.CoreV1().ResourceQuotas(ns).Get, quotaName, metav1.GetOptions{})).Should(haveUsedResources(used, &lastResourceQuota))
+	if lastResourceQuota != nil && err == nil {
+		framework.Logf("Got expected ResourceQuota:\n%s", format.Object(lastResourceQuota, 1))
+	}
+	return err
+}
+
+func haveUsedResources(used v1.ResourceList, lastResourceQuota **v1.ResourceQuota) gomegatypes.GomegaMatcher {
+	// The template emits the actual ResourceQuota object as YAML.
+	// In particular the ManagedFields are interesting because both
+	// kube-apiserver and kube-controller-manager set the status.
+	return gcustom.MakeMatcher(func(resourceQuota *v1.ResourceQuota) (bool, error) {
+		if lastResourceQuota != nil {
+			*lastResourceQuota = resourceQuota
+		}
+		// used may not yet be calculated
+		if resourceQuota.Status.Used == nil {
+			return false, nil
+		}
+		// verify that the quota shows the expected used resource values
+		for k, v := range used {
+			if actualValue, found := resourceQuota.Status.Used[k]; !found || (actualValue.Cmp(v) != 0) {
+				return false, nil
+			}
+		}
+		return true, nil
+	}).WithTemplate("Expected:\n{{.FormattedActual}}\n{{.To}} have the following .status.used entries:\n{{range $key, $value := .Data}}    {{$key}}: \"{{$value.ToUnstructured}}\"\n{{end}}").WithTemplateData(used /* Formatting of the map is done inside the template. */)
+}
 
 // ExtendedResourceName returns hard coded extended resource name with a variable
 // suffix from the input integer when it's greater than or equal to 0.
@@ -353,6 +390,8 @@ func (b *Builder) Create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 			})
 		case *v1.Pod:
 			createdObj, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *v1.ResourceQuota:
+			createdObj, err = b.f.ClientSet.CoreV1().ResourceQuotas(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *v1.ConfigMap:
 			createdObj, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceClaim:
