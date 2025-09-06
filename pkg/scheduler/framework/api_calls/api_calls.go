@@ -18,7 +18,6 @@ package apicalls
 
 import (
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const (
@@ -39,7 +38,7 @@ var Relevances = fwk.APICallRelevances{
 // Implementation is a built-in mapping types to calls' constructors.
 // It's used to construct calls' objects in the scheduler framework and for easier replacement of those.
 // This mapping can be replaced by the out-of-tree plugin in its init() function, if needed.
-var Implementations = framework.APICallImplementations[*PodStatusPatchCall, *PodBindingCall]{
+var Implementations = fwk.APICallImplementations[*PodStatusPatchCall, *PodBindingCall]{
 	PodStatusPatch: NewPodStatusPatchCall,
 	PodBinding:     NewPodBindingCall,
 }

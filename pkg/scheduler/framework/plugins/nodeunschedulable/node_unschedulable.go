@@ -24,7 +24,6 @@ import (
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -36,8 +35,8 @@ type NodeUnschedulable struct {
 	enableSchedulingQueueHint bool
 }
 
-var _ framework.FilterPlugin = &NodeUnschedulable{}
-var _ framework.EnqueueExtensions = &NodeUnschedulable{}
+var _ fwk.FilterPlugin = &NodeUnschedulable{}
+var _ fwk.EnqueueExtensions = &NodeUnschedulable{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.NodeUnschedulable
@@ -150,6 +149,6 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &NodeUnschedulable{enableSchedulingQueueHint: fts.EnableSchedulingQueueHint}, nil
 }

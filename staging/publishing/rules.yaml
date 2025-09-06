@@ -1446,83 +1446,6 @@ rules:
       dirs:
       - staging/src/k8s.io/kubelet
   library: true
-- destination: kube-scheduler
-  branches:
-  - name: master
-    dependencies:
-    - repository: apimachinery
-      branch: master
-    - repository: component-base
-      branch: master
-    - repository: api
-      branch: master
-    - repository: client-go
-      branch: master
-    source:
-      branch: master
-      dirs:
-      - staging/src/k8s.io/kube-scheduler
-  - name: release-1.31
-    go: 1.23.12
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.31
-    - repository: component-base
-      branch: release-1.31
-    - repository: api
-      branch: release-1.31
-    - repository: client-go
-      branch: release-1.31
-    source:
-      branch: release-1.31
-      dirs:
-      - staging/src/k8s.io/kube-scheduler
-  - name: release-1.32
-    go: 1.23.12
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.32
-    - repository: component-base
-      branch: release-1.32
-    - repository: api
-      branch: release-1.32
-    - repository: client-go
-      branch: release-1.32
-    source:
-      branch: release-1.32
-      dirs:
-      - staging/src/k8s.io/kube-scheduler
-  - name: release-1.33
-    go: 1.24.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.33
-    - repository: component-base
-      branch: release-1.33
-    - repository: api
-      branch: release-1.33
-    - repository: client-go
-      branch: release-1.33
-    source:
-      branch: release-1.33
-      dirs:
-      - staging/src/k8s.io/kube-scheduler
-  - name: release-1.34
-    go: 1.24.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.34
-    - repository: component-base
-      branch: release-1.34
-    - repository: api
-      branch: release-1.34
-    - repository: client-go
-      branch: release-1.34
-    source:
-      branch: release-1.34
-      dirs:
-      - staging/src/k8s.io/kube-scheduler
-  library: true
 - destination: controller-manager
   branches:
   - name: master
@@ -2350,6 +2273,103 @@ rules:
       branch: release-1.34
       dirs:
       - staging/src/k8s.io/dynamic-resource-allocation
+- destination: kube-scheduler
+  branches:
+  - name: master
+    dependencies:
+    - repository: apimachinery
+      branch: master
+    - repository: component-base
+      branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
+    - repository: apiserver
+      branch: master
+    - repository: component-helpers
+      branch: master
+    - repository: dynamic-resource-allocation
+      branch: master
+    - repository: kms
+      branch: master
+    - repository: kubelet
+      branch: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/kube-scheduler
+  - name: release-1.31
+    go: 1.23.11
+    dependencies:
+    - repository: apimachinery
+      branch: release-1.31
+    - repository: component-base
+      branch: release-1.31
+    - repository: api
+      branch: release-1.31
+    - repository: client-go
+      branch: release-1.31
+    source:
+      branch: release-1.31
+      dirs:
+      - staging/src/k8s.io/kube-scheduler
+  - name: release-1.32
+    go: 1.23.11
+    dependencies:
+    - repository: apimachinery
+      branch: release-1.32
+    - repository: component-base
+      branch: release-1.32
+    - repository: api
+      branch: release-1.32
+    - repository: client-go
+      branch: release-1.32
+    source:
+      branch: release-1.32
+      dirs:
+      - staging/src/k8s.io/kube-scheduler
+  - name: release-1.33
+    go: 1.24.5
+    dependencies:
+    - repository: apimachinery
+      branch: release-1.33
+    - repository: component-base
+      branch: release-1.33
+    - repository: api
+      branch: release-1.33
+    - repository: client-go
+      branch: release-1.33
+    - repository: apiserver
+      branch: release-1.33
+    - repository: component-helpers
+      branch: release-1.33
+    - repository: dynamic-resource-allocation
+      branch: release-1.33
+    - repository: kms
+      branch: release-1.33
+    - repository: kubelet
+      branch: release-1.33
+    source:
+      branch: release-1.33
+      dirs:
+      - staging/src/k8s.io/kube-scheduler
+  - name: release-1.34
+    go: 1.24.6
+    dependencies:
+    - repository: apimachinery
+      branch: release-1.34
+    - repository: component-base
+      branch: release-1.34
+    - repository: api
+      branch: release-1.34
+    - repository: client-go
+      branch: release-1.34
+    source:
+      branch: release-1.34
+      dirs:
+      - staging/src/k8s.io/kube-scheduler
+  library: true
 - destination: endpointslice
   branches:
   - name: master

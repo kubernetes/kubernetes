@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
 func TestPodStatusPatchCall_IsNoOp(t *testing.T) {
@@ -48,42 +48,42 @@ func TestPodStatusPatchCall_IsNoOp(t *testing.T) {
 		name           string
 		pod            *v1.Pod
 		condition      *v1.PodCondition
-		nominatingInfo *framework.NominatingInfo
+		nominatingInfo *fwk.NominatingInfo
 		want           bool
 	}{
 		{
 			name:           "No-op when condition and node name match",
 			pod:            podWithNode,
 			condition:      &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse},
-			nominatingInfo: &framework.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: framework.ModeOverride},
+			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
 			want:           true,
 		},
 		{
 			name:           "Not no-op when condition is different",
 			pod:            podWithNode,
 			condition:      &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionTrue},
-			nominatingInfo: &framework.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: framework.ModeOverride},
+			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
 			want:           false,
 		},
 		{
 			name:           "Not no-op when nominated node name is different",
 			pod:            podWithNode,
 			condition:      &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse},
-			nominatingInfo: &framework.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: framework.ModeOverride},
+			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeOverride},
 			want:           false,
 		},
 		{
 			name:           "No-op when condition is nil and node name matches",
 			pod:            podWithNode,
 			condition:      nil,
-			nominatingInfo: &framework.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: framework.ModeOverride},
+			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
 			want:           true,
 		},
 		{
 			name:           "Not no-op when condition is nil but node name differs",
 			pod:            podWithNode,
 			condition:      nil,
-			nominatingInfo: &framework.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: framework.ModeOverride},
+			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeOverride},
 			want:           false,
 		},
 	}
@@ -106,9 +106,9 @@ func TestPodStatusPatchCall_Merge(t *testing.T) {
 
 	t.Run("Merges nominating info and condition from the old call", func(t *testing.T) {
 		oldCall := NewPodStatusPatchCall(pod, &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse},
-			&framework.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: framework.ModeOverride},
+			&fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
 		)
-		newCall := NewPodStatusPatchCall(pod, nil, &framework.NominatingInfo{NominatingMode: framework.ModeNoop})
+		newCall := NewPodStatusPatchCall(pod, nil, &fwk.NominatingInfo{NominatingMode: fwk.ModeNoop})
 
 		if err := newCall.Merge(oldCall); err != nil {
 			t.Fatalf("Unexpected error returned by Merge(): %v", err)
@@ -122,9 +122,9 @@ func TestPodStatusPatchCall_Merge(t *testing.T) {
 	})
 
 	t.Run("Doesn't overwrite nominating info and condition of a new call", func(t *testing.T) {
-		oldCall := NewPodStatusPatchCall(pod, nil, &framework.NominatingInfo{NominatingMode: framework.ModeNoop})
+		oldCall := NewPodStatusPatchCall(pod, nil, &fwk.NominatingInfo{NominatingMode: fwk.ModeNoop})
 		newCall := NewPodStatusPatchCall(pod, &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse},
-			&framework.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: framework.ModeOverride})
+			&fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeOverride})
 
 		if err := newCall.Merge(oldCall); err != nil {
 			t.Fatalf("Unexpected error returned by Merge(): %v", err)
@@ -156,7 +156,7 @@ func TestPodStatusPatchCall_Sync(t *testing.T) {
 
 	t.Run("Syncs the status before execution and updates the pod", func(t *testing.T) {
 		call := NewPodStatusPatchCall(pod, nil,
-			&framework.NominatingInfo{NominatedNodeName: "node-c", NominatingMode: framework.ModeOverride})
+			&fwk.NominatingInfo{NominatedNodeName: "node-c", NominatingMode: fwk.ModeOverride})
 
 		updatedPod := pod.DeepCopy()
 		updatedPod.Status.NominatedNodeName = "node-b"
@@ -176,7 +176,7 @@ func TestPodStatusPatchCall_Sync(t *testing.T) {
 
 	t.Run("Doesn't sync internal status during or after execution, but updates the pod", func(t *testing.T) {
 		call := NewPodStatusPatchCall(pod, nil,
-			&framework.NominatingInfo{NominatedNodeName: "node-c", NominatingMode: framework.ModeOverride})
+			&fwk.NominatingInfo{NominatedNodeName: "node-c", NominatingMode: fwk.ModeOverride})
 		call.executed = true
 
 		updatedPod := pod.DeepCopy()
@@ -218,7 +218,7 @@ func TestPodStatusPatchCall_Execute(t *testing.T) {
 		})
 
 		call := NewPodStatusPatchCall(pod, &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse},
-			&framework.NominatingInfo{NominatingMode: framework.ModeNoop})
+			&fwk.NominatingInfo{NominatingMode: fwk.ModeNoop})
 		if err := call.Execute(ctx, client); err != nil {
 			t.Fatalf("Unexpected error returned by Execute(): %v", err)
 		}
@@ -239,7 +239,7 @@ func TestPodStatusPatchCall_Execute(t *testing.T) {
 		})
 
 		noOpCall := NewPodStatusPatchCall(pod, nil,
-			&framework.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: framework.ModeOverride})
+			&fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride})
 		if err := noOpCall.Execute(ctx, client); err != nil {
 			t.Fatalf("Unexpected error returned by Execute(): %v", err)
 		}

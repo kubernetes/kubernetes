@@ -36,7 +36,7 @@ import (
 type FitPredicate func(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status
 
 // PriorityFunc is a function type which is used in fake extender.
-type PriorityFunc func(pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.NodeScoreList, error)
+type PriorityFunc func(pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.NodeScoreList, error)
 
 // PriorityConfig is used in fake extender to perform Prioritize function.
 type PriorityConfig struct {
@@ -78,34 +78,34 @@ func Node2PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 }
 
 // ErrorPrioritizerExtender implements PriorityFunc function to always return error.
-func ErrorPrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.NodeScoreList, error) {
-	return &framework.NodeScoreList{}, fmt.Errorf("some error")
+func ErrorPrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.NodeScoreList, error) {
+	return &fwk.NodeScoreList{}, fmt.Errorf("some error")
 }
 
 // Node1PrioritizerExtender implements PriorityFunc function to give score 10
 // if the given node's name is "node1"; otherwise score 1.
-func Node1PrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.NodeScoreList, error) {
-	result := framework.NodeScoreList{}
+func Node1PrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.NodeScoreList, error) {
+	result := fwk.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
 		if node.Node().Name == "node1" {
 			score = 10
 		}
-		result = append(result, framework.NodeScore{Name: node.Node().Name, Score: int64(score)})
+		result = append(result, fwk.NodeScore{Name: node.Node().Name, Score: int64(score)})
 	}
 	return &result, nil
 }
 
 // Node2PrioritizerExtender implements PriorityFunc function to give score 10
 // if the given node's name is "node2"; otherwise score 1.
-func Node2PrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.NodeScoreList, error) {
-	result := framework.NodeScoreList{}
+func Node2PrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.NodeScoreList, error) {
+	result := fwk.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
 		if node.Node().Name == "node2" {
 			score = 10
 		}
-		result = append(result, framework.NodeScore{Name: node.Node().Name, Score: int64(score)})
+		result = append(result, fwk.NodeScore{Name: node.Node().Name, Score: int64(score)})
 	}
 	return &result, nil
 }
@@ -114,7 +114,7 @@ type node2PrioritizerPlugin struct{}
 
 // NewNode2PrioritizerPlugin returns a factory function to build node2PrioritizerPlugin.
 func NewNode2PrioritizerPlugin() frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &node2PrioritizerPlugin{}, nil
 	}
 }
@@ -134,7 +134,7 @@ func (pl *node2PrioritizerPlugin) Score(_ context.Context, _ fwk.CycleState, _ *
 }
 
 // ScoreExtensions returns nil.
-func (pl *node2PrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
+func (pl *node2PrioritizerPlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
@@ -182,7 +182,7 @@ func (f *FakeExtender) SupportsPreemption() bool {
 func (f *FakeExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeNameToVictims map[string]*extenderv1.Victims,
-	nodeInfos framework.NodeInfoLister,
+	nodeInfos fwk.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
 	nodeNameToVictimsCopy := map[string]*extenderv1.Victims{}
 	// We don't want to change the original nodeNameToVictims
@@ -400,4 +400,4 @@ func (f *FakeExtender) IsInterested(pod *v1.Pod) bool {
 	return !f.UnInterested
 }
 
-var _ framework.Extender = &FakeExtender{}
+var _ fwk.Extender = &FakeExtender{}
