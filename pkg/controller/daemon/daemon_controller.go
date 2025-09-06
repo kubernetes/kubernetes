@@ -319,7 +319,7 @@ func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 		go wait.UntilWithContext(ctx, dsc.runNodeUpdateWorker, time.Second)
 	}
 
-	go wait.Until(dsc.failedPodsBackoff.GC, BackoffGCInterval, ctx.Done())
+	go wait.UntilWithContext(ctx, func(ctx context.Context) { dsc.failedPodsBackoff.GC() }, BackoffGCInterval)
 
 	<-ctx.Done()
 }
