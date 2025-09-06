@@ -183,8 +183,9 @@ func TestEndpointHandlers(t *testing.T) {
 					// the endpoint /readyz/sched-handler-sync needs some time to finish
 					// the initialization, so we need to retry
 					return !tt.useBrokenConfig &&
-						(tt.path == "/readyz" || tt.path == "/readyz/sched-handler-sync") &&
-						strings.Contains(err.Error(), "handlers are not fully synchronized")
+						// The message differ depending on endpoint
+						(tt.path == "/readyz" && strings.Contains(err.Error(), "sched-handler-sync failed: reason withheld") ||
+							tt.path == "/readyz/sched-handler-sync" && strings.Contains(err.Error(), "handlers are not fully synchronized"))
 				},
 				func() error {
 					r, err := client.Do(req)

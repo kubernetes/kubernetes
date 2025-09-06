@@ -62,3 +62,21 @@ type MemoryDifferent struct {
 	AllOf      []MemoryDifferent
 	Bool       bool // differs from external representation
 }
+
+type ConversionPrivate struct {
+	PublicField  string
+	privateField string
+}
+
+type ConversionCustomContainer struct {
+	Slice   []ConversionCustom
+	SliceP  []*ConversionCustom
+	Map     map[string]ConversionCustom
+	MapP    map[string]*ConversionCustom
+	Struct  ConversionCustom
+	StructP *ConversionCustom
+}
+type ConversionCustom struct {
+	PublicField  string
+	privateField string
+}

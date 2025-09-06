@@ -206,7 +206,7 @@ func (flags *ExposeServiceFlags) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&flags.Port, "port", flags.Port, i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
 	cmd.Flags().StringVar(&flags.Type, "type", flags.Type, i18n.T("Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. Default is 'ClusterIP'."))
 	cmd.Flags().StringVar(&flags.LoadBalancerIP, "load-balancer-ip", flags.LoadBalancerIP, i18n.T("IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."))
-	cmd.Flags().StringVar(&flags.Selector, "selector", flags.Selector, i18n.T("A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"))
+	cmd.Flags().StringVar(&flags.Selector, "selector", flags.Selector, i18n.T("A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the resource being exposed."))
 	cmd.Flags().StringVarP(&flags.Labels, "labels", "l", flags.Labels, "Labels to apply to the service created by this call.")
 	cmd.Flags().StringVar(&flags.TargetPort, "target-port", flags.TargetPort, i18n.T("Name or number for the port on the container that the service should direct traffic to. Optional."))
 	cmd.Flags().StringVar(&flags.ExternalIP, "external-ip", flags.ExternalIP, i18n.T("Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."))

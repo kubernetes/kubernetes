@@ -305,8 +305,8 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 		}
 	}()
 
-	// If pod has empty both unschedulable plugins and pending plugins,
 	// it means that it failed because of error and should be moved to podErrorBackoffQ.
+	// If pod has empty both unschedulable plugins and pending plugins,
 	if pInfo.UnschedulablePlugins.Len() == 0 && pInfo.PendingPlugins.Len() == 0 {
 		bq.podErrorBackoffQ.AddOrUpdate(pInfo)
 		// Ensure the pod is not in the podBackoffQ and report the error if it happens.
@@ -316,6 +316,7 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 			return
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
+		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQ)
 		if preEmpty {
 			needNotify = true
 		}
@@ -332,6 +333,7 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 		return
 	}
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
+	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQ)
 }
 
 // setNotifyFunc injects the activeQ-side notifier.

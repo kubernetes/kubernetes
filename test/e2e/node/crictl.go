@@ -19,6 +19,8 @@ package node
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -27,6 +29,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("crictl", func() {
@@ -42,24 +45,32 @@ var _ = SIGDescribe("crictl", func() {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)
 		framework.ExpectNoError(err)
 
-		testCases := []string{
-			"crictl version",
-			"crictl info",
-		}
-
 		hostExec := utils.NewHostExec(f)
 
-		for _, testCase := range testCases {
-			for _, node := range nodes.Items {
-				ginkgo.By(fmt.Sprintf("Testing %q on node %q ", testCase, node.GetName()))
+		for _, node := range nodes.Items {
+			ginkgo.By(fmt.Sprintf("Testing `crictl version` on node %q ", node.GetName()))
 
-				res, err := hostExec.Execute(ctx, testCase, &node)
-				framework.ExpectNoError(err)
-
-				if res.Stdout == "" && res.Stderr == "" {
-					framework.Fail("output is empty")
+			gomega.Eventually(ctx, func() error {
+				// crictl is installed to /home/kubernetes/bin through configure.sh.
+				res, err := hostExec.Execute(ctx, "/home/kubernetes/bin/crictl version", &node)
+				if err != nil {
+					return err
 				}
-			}
+				// crictl version example output:
+				//
+				// Version:  0.1.0
+				// RuntimeName:  containerd
+				// RuntimeVersion:  1.7.27
+				// RuntimeApiVersion:  v1
+				expectedOutput := "RuntimeVersion"
+				if res.Code != 0 {
+					return fmt.Errorf("exit code is not 0, exitCode=%d stdout=%q stderr=%q, might retry", res.Code, res.Stdout, res.Stderr)
+				}
+				if !strings.Contains(res.Stdout, expectedOutput) && !strings.Contains(res.Stderr, expectedOutput) {
+					return fmt.Errorf("output contains stdout=%q stderr=%q expected to contain %q, might retry", res.Stdout, res.Stderr, expectedOutput)
+				}
+				return nil
+			}, time.Minute, 5*time.Second).Should(gomega.Succeed())
 		}
 	})
 })

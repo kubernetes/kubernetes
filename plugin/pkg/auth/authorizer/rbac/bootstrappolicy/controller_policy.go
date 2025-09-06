@@ -396,13 +396,10 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				rbacv1helpers.NewRule("get", "create", "delete", "update", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "create", "delete", "update", "patch", "list", "watch").Groups(appsGroup).Resources("controllerrevisions").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "create", "list", "watch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbacv1helpers.NewRule("update", "delete").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
 				eventsRule(),
 			},
-		}
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-			role.Rules = append(role.Rules, rbacv1helpers.NewRule("update", "delete").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie())
-			role.Rules = append(role.Rules, rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie())
 		}
 
 		return role

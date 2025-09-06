@@ -46,7 +46,7 @@ import (
 
 var (
 	waitLong = templates.LongDesc(i18n.T(`
-		Experimental: Wait for a specific condition on one or many resources.
+		Wait for a specific condition on one or many resources.
 
 		The command takes multiple resources and waits until the specified condition
 		is seen in the Status field of every given resource.
@@ -124,7 +124,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 
 	cmd := &cobra.Command{
 		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=create|--for=delete|--for condition=available|--for=jsonpath='{}'[=value]]",
-		Short:   i18n.T("Experimental: Wait for a specific condition on one or many resources"),
+		Short:   i18n.T("Wait for a specific condition on one or many resources"),
 		Long:    waitLong,
 		Example: waitExample,
 
@@ -343,7 +343,7 @@ func (o *WaitOptions) RunWait() error {
 			return foundResource, nil
 		}); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				return fmt.Errorf("%s", wait.ErrWaitTimeout.Error()) // nolint:staticcheck // SA1019
+				return fmt.Errorf("%s", wait.ErrorInterrupted(nil).Error()) // nolint:staticcheck // SA1019
 			}
 			return err
 		}

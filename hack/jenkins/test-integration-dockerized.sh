@@ -17,7 +17,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
 
 # Runs test-integration
 # This script is intended to be run from prow.k8s.io

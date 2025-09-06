@@ -46,6 +46,27 @@ func VolumeAttributesClass(name string) *VolumeAttributesClassApplyConfiguration
 	return b
 }
 
+// ExtractVolumeAttributesClassFrom extracts the applied configuration owned by fieldManager from
+// volumeAttributesClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// volumeAttributesClass must be a unmodified VolumeAttributesClass API object that was retrieved from the Kubernetes API.
+// ExtractVolumeAttributesClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractVolumeAttributesClassFrom(volumeAttributesClass *storagev1.VolumeAttributesClass, fieldManager string, subresource string) (*VolumeAttributesClassApplyConfiguration, error) {
+	b := &VolumeAttributesClassApplyConfiguration{}
+	err := managedfields.ExtractInto(volumeAttributesClass, internal.Parser().Type("io.k8s.api.storage.v1.VolumeAttributesClass"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(volumeAttributesClass.Name)
+
+	b.WithKind("VolumeAttributesClass")
+	b.WithAPIVersion("storage.k8s.io/v1")
+	return b, nil
+}
+
 // ExtractVolumeAttributesClass extracts the applied configuration owned by fieldManager from
 // volumeAttributesClass. If no managedFields are found in volumeAttributesClass for fieldManager, a
 // VolumeAttributesClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -58,28 +79,9 @@ func VolumeAttributesClass(name string) *VolumeAttributesClassApplyConfiguration
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractVolumeAttributesClass(volumeAttributesClass *storagev1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
-	return extractVolumeAttributesClass(volumeAttributesClass, fieldManager, "")
+	return ExtractVolumeAttributesClassFrom(volumeAttributesClass, fieldManager, "")
 }
 
-// ExtractVolumeAttributesClassStatus is the same as ExtractVolumeAttributesClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractVolumeAttributesClassStatus(volumeAttributesClass *storagev1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
-	return extractVolumeAttributesClass(volumeAttributesClass, fieldManager, "status")
-}
-
-func extractVolumeAttributesClass(volumeAttributesClass *storagev1.VolumeAttributesClass, fieldManager string, subresource string) (*VolumeAttributesClassApplyConfiguration, error) {
-	b := &VolumeAttributesClassApplyConfiguration{}
-	err := managedfields.ExtractInto(volumeAttributesClass, internal.Parser().Type("io.k8s.api.storage.v1.VolumeAttributesClass"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(volumeAttributesClass.Name)
-
-	b.WithKind("VolumeAttributesClass")
-	b.WithAPIVersion("storage.k8s.io/v1")
-	return b, nil
-}
 func (b VolumeAttributesClassApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

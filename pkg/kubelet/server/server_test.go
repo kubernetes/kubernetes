@@ -28,6 +28,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -511,6 +512,41 @@ func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
 	defer resp.Body.Close()
 	if resp.StatusCode != expectedErrorCode {
 		t.Errorf("expected status code %d, got %d", expectedErrorCode, resp.StatusCode)
+	}
+}
+
+func TestStatusz(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	req, err := http.NewRequest(http.MethodGet, fw.testHTTPServer.URL+"/statusz", nil)
+	if err != nil {
+		t.Fatalf("Got error creating request: %v", err)
+	}
+	req.Header.Set("Accept", "text/plain")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer func(resp *http.Response) {
+		closeErr := resp.Body.Close()
+		if closeErr != nil {
+			t.Errorf("Got error closing response body: %v", err)
+		}
+	}(resp)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+	resBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Got error reading response body: %v", err)
+	}
+
+	reg := regexp.MustCompile(`Paths([:=\s]+)/configz /debug /healthz /metrics\n$`)
+	if reg.FindStringSubmatch(string(resBody)) == nil {
+		t.Errorf("statusz paths missing: %s\n\nExpected: %q", string(resBody), "Paths<delimter> /configz /debug /healthz /metrics")
 	}
 }
 

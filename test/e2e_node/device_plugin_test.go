@@ -93,7 +93,7 @@ const (
 )
 
 func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
-	pluginSockDir = filepath.Join(pluginSockDir) + "/"
+	pluginSockDir = filepath.Clean(pluginSockDir) + "/"
 
 	type ResourceValue struct {
 		Allocatable int

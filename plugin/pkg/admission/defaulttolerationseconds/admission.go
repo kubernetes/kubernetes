@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
@@ -34,11 +35,21 @@ import (
 const PluginName = "DefaultTolerationSeconds"
 
 var (
+	// tolerationSecondsMutex protects registration and read in InspectFeatureGates, which is
+	// good enough for concurrent use in integration tests as long as the command
+	// line flags are not actually used by some test. In commands the registration,
+	// parsing and InspectFeatureGates are serialized.
+	tolerationSecondsMutex sync.RWMutex
+
 	defaultNotReadyTolerationSeconds    = int64(300)
 	defaultUnreachableTolerationSeconds = int64(300)
 )
 
 func RegisterFlags(fs *pflag.FlagSet) {
+	// Indirect writes of the default value!
+	tolerationSecondsMutex.Lock()
+	defer tolerationSecondsMutex.Unlock()
+
 	fs.Int64Var(&defaultNotReadyTolerationSeconds, "default-not-ready-toleration-seconds", defaultNotReadyTolerationSeconds,
 		"Indicates the tolerationSeconds of the toleration for notReady:NoExecute"+
 			" that is added by default to every pod that does not already have such a toleration.")
@@ -78,17 +89,24 @@ func NewDefaultTolerationSeconds() *Plugin {
 
 // InspectFeatureGates runs after command-line flags have been parsed
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
+	// Read the default values while holding a read lock.
+	tolerationSecondsMutex.RLock()
+	defer tolerationSecondsMutex.RUnlock()
+
+	notReadyTolerationSeconds := defaultNotReadyTolerationSeconds
+	unreachableTolerationSeconds := defaultUnreachableTolerationSeconds
+
 	p.notReadyToleration = api.Toleration{
 		Key:               v1.TaintNodeNotReady,
 		Operator:          api.TolerationOpExists,
 		Effect:            api.TaintEffectNoExecute,
-		TolerationSeconds: &defaultNotReadyTolerationSeconds,
+		TolerationSeconds: &notReadyTolerationSeconds,
 	}
 	p.unreachableToleration = api.Toleration{
 		Key:               v1.TaintNodeUnreachable,
 		Operator:          api.TolerationOpExists,
 		Effect:            api.TaintEffectNoExecute,
-		TolerationSeconds: &defaultUnreachableTolerationSeconds,
+		TolerationSeconds: &unreachableTolerationSeconds,
 	}
 }
 

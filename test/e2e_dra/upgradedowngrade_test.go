@@ -62,6 +62,8 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
+var errHTTP404 = errors.New("resource not found (404)")
+
 func init() {
 	// -v=5 may be useful to debug driver operations, but usually isn't needed.
 	ktesting.SetDefaultVerbosity(2)
@@ -121,6 +123,7 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		version, err := version.ParseGeneric(gitVersion)
 		tCtx.ExpectNoError(err, "parse version %s of repo root %q", gitVersion, repoRoot)
 		major, previousMinor := version.Major(), version.Minor()-1
+		tCtx.Logf("got version: major: %d, minor: %d, previous minor: %d", major, version.Minor(), previousMinor)
 		tCtx = ktesting.End(tCtx)
 
 		// KUBERNETES_SERVER_CACHE_DIR can be set to keep downloaded files across test restarts.
@@ -130,8 +133,18 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		}
 		haveBinaries := false
 
-		// Get the previous release, if necessary.
-		previousURL, previousVersion := serverDownloadURL(tCtx, major, previousMinor)
+		// Get the previous release.
+		tCtx = ktesting.Begin(tCtx, "get previous release info")
+		tCtx.Logf("stable release %d.%d", major, previousMinor)
+		previousURL, previousVersion, err := serverDownloadURL(tCtx, "stable", major, previousMinor)
+		if errors.Is(err, errHTTP404) {
+			tCtx.Logf("stable doesn't exist, get latest release %d.%d", major, previousMinor)
+			previousURL, previousVersion, err = serverDownloadURL(tCtx, "latest", major, previousMinor)
+		}
+		tCtx.ExpectNoError(err)
+		tCtx.Logf("got previous release version: %s, URL: %s", previousVersion, previousURL)
+		tCtx = ktesting.End(tCtx)
+
 		if cacheBinaries {
 			binDir = path.Join(binDir, previousVersion)
 			_, err := os.Stat(path.Join(binDir, string(localupcluster.KubeClusterComponents[0])))
@@ -299,6 +312,7 @@ func sourceVersion(tCtx ktesting.TContext, kubeRoot string) (gitVersion string, 
 	if err != nil {
 		return "", "", err
 	}
+	tCtx.Logf("workspace status:\n%s", output)
 
 	// Parse it.
 	for _, line := range strings.Split(string(output), "\n") {
@@ -355,29 +369,54 @@ func sourceVersion(tCtx ktesting.TContext, kubeRoot string) (gitVersion string, 
 // 	return output.String()
 // }
 
-// serverDownloadURL returns the full URL for a kubernetes-server archive matching
-// the current GOOS/GOARCH for the given major/minor version of Kubernetes.
+// serverDownloadURL constructs a download URL for a Kubernetes server tarball based on the given
+// prefix, major, and minor version numbers. It performs an HTTP GET request to retrieve the version
+// string from a remote text file, then builds the final tarball URL using the retrieved version,
+// the current OS, and architecture. If the version file is not found (HTTP 404), it returns
+// errHTTP404 to allow the caller to try another prefix. Returns the tarball URL, the version string,
+// or an error if any step fails.
+// The function uses the provided testing context for logging and error handling.
 //
-// This considers only proper releases.
-func serverDownloadURL(tCtx ktesting.TContext, major, minor uint) (string, string) {
+// Parameters:
+//   - tCtx: a ktesting.TContext used for test context and error handling.
+//   - prefix: the release prefix (e.g., "stable", "latest").
+//   - major: the major version number.
+//   - minor: the minor version number.
+//
+// Returns:
+//   - The constructed tarball download URL as a string.
+//   - The version string as retrieved from the remote file.
+//   - An error if the request fails, the response is invalid, or the version file is not found.
+func serverDownloadURL(tCtx ktesting.TContext, prefix string, major, minor uint) (string, string, error) {
 	tCtx.Helper()
-	url := fmt.Sprintf("https://dl.k8s.io/release/stable-%d.%d.txt", major, minor)
+	url := fmt.Sprintf("https://dl.k8s.io/release/%s-%d.%d.txt", prefix, major, minor)
 	get, err := http.NewRequestWithContext(tCtx, http.MethodGet, url, nil)
-	tCtx.ExpectNoError(err, "construct GET for %s", url)
+	if err != nil {
+		return "", "", fmt.Errorf("constructing GET for %s failed: %w", url, err)
+	}
 	resp, err := http.DefaultClient.Do(get)
-	tCtx.ExpectNoError(err, "get %s", url)
+	if err != nil {
+		return "", "", fmt.Errorf("downloading %s failed: %w", url, err)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		// Caller should be able to distinguish HTTP 404
+		// to try another prefix (usually 'latest' if 'stable' returns 404)
+		return "", "", errHTTP404
+	}
 	if resp.StatusCode != http.StatusOK {
-		tCtx.Fatalf("get %s: %d - %s", url, resp.StatusCode, resp.Status)
+		return "", "", fmt.Errorf("getting %s failed: status code: %d, status: %s", url, resp.StatusCode, resp.Status)
 	}
 	if resp.Body == nil {
-		tCtx.Fatalf("empty response for %s", url)
+		return "", "", fmt.Errorf("empty response for %s", url)
 	}
 	defer func() {
 		tCtx.ExpectNoError(resp.Body.Close(), "close response body")
 	}()
 	version, err := io.ReadAll(resp.Body)
-	tCtx.ExpectNoError(err, "read response body for %s", url)
-	return fmt.Sprintf("https://dl.k8s.io/release/%s/kubernetes-server-%s-%s.tar.gz", string(version), runtime.GOOS, runtime.GOARCH), string(version)
+	if err != nil {
+		return "", "", fmt.Errorf("reading response body for %s failed: %w", url, err)
+	}
+	return fmt.Sprintf("https://dl.k8s.io/release/%s/kubernetes-server-%s-%s.tar.gz", string(version), runtime.GOOS, runtime.GOARCH), string(version), nil
 }
 
 // testResourceClaimDeviceStatus corresponds to testResourceClaimDeviceStatus in test/integration/dra

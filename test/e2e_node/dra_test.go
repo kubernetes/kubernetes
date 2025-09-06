@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -930,7 +931,16 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 	})
 
-	f.Context("Resource Health with Feature Gate Disabled", framework.WithLabel("[FeatureGate:ResourceHealthStatus:Disabled]"), f.WithSerial(), func() {
+	// This matches the "Resource Health" context above, except that it contains tests which need to run
+	// when the feature gate is disabled. This has to be checked at runtime because there is no generic
+	// way to filter out such tests in advance.
+	f.Context("Resource Health", f.WithSerial(), func() {
+
+		ginkgo.BeforeEach(func() {
+			if e2eskipper.IsFeatureGateEnabled(features.ResourceHealthStatus) {
+				e2eskipper.Skipf("feature %s is enabled", features.ResourceHealthStatus)
+			}
+		})
 
 		// Verifies that the Kubelet adds no health status to the Pod when the
 		// ResourceHealthStatus feature gate is disabled.

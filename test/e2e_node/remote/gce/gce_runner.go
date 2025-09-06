@@ -583,7 +583,7 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 		if err != nil {
 			continue
 		}
-		if strings.ToUpper(instance.Status) != "RUNNING" {
+		if !strings.EqualFold(instance.Status, "RUNNING") {
 			_ = fmt.Errorf("instance %s not in state RUNNING, was %s", name, instance.Status)
 			continue
 		}
@@ -669,7 +669,7 @@ func (g *GCERunner) registerGceHostIP(host string) error {
 	if err != nil {
 		return err
 	}
-	if strings.ToUpper(instance.Status) != "RUNNING" {
+	if !strings.EqualFold(instance.Status, "RUNNING") {
 		return fmt.Errorf("instance %s not in state RUNNING, was %s", host, instance.Status)
 	}
 	externalIP := g.getExternalIP(instance)

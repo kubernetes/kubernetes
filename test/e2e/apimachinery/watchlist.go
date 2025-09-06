@@ -252,10 +252,19 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		framework.ExpectNoError(err)
 		defer w.Stop()
 
-		for _, expectedSecret := range expectedSecrets {
-			expectEvent(w, watch.Added, expectedSecret)
+		var ageColIndex int
+		for i, expectedSecret := range expectedSecrets {
+			actualSecret := retrieveObjFromEventOfType(w, watch.Added)
+			// clean the Age column value because it's dynamic
+			// and causes flakes in equality checks.
+			if i == 0 {
+				ageColIndex = getAgeColumnIndex(expectedSecret)
+			}
+			cleanedExpectedSecret := removeAgeColumnValueAtIndex(expectedSecret, ageColIndex)
+			cleanedActualSecret := removeAgeColumnValueAtIndex(actualSecret, ageColIndex)
+			gomega.Expect(cmp.Equal(cleanedExpectedSecret, cleanedActualSecret)).To(gomega.BeTrueBecause("received object must match expected (ignoring dynamic 'Age' column)"))
 		}
-		rawBookmark := retrieveEventOfType(w, watch.Bookmark)
+		rawBookmark := retrieveObjFromEventOfType(w, watch.Bookmark)
 		if !hasTableObjectInitialEventsAnnotationInBookmarkObj(rawBookmark) {
 			framework.Failf("expected the bookmark object to contain the required annotation, obj: %v", rawBookmark)
 		}
@@ -452,12 +461,13 @@ func toPartialObjectMetadata(rawItems []interface{}) ([]*metav1.PartialObjectMet
 	return ret, nil
 }
 
-func retrieveEventOfType(watch watch.Interface, expectedType watch.EventType) runtime.Object {
+func retrieveObjFromEventOfType(watch watch.Interface, expectedType watch.EventType) runtime.Object {
 	select {
 	case event, ok := <-watch.ResultChan():
 		if !ok {
 			framework.Failf("watch closed unexpectedly")
 		}
+		framework.Logf("Got : %v %v", event.Type, event.Object)
 		if event.Type != expectedType {
 			framework.Failf("unexpected watch event type: %v, expected: %v", event.Type, expectedType)
 		}
@@ -534,4 +544,34 @@ func removeColumnDefinitionsFromTable(rawObject *unstructured.Unstructured) *uns
 	rawTable, err := runtime.DefaultUnstructuredConverter.ToUnstructured(table)
 	framework.ExpectNoError(err)
 	return &unstructured.Unstructured{Object: rawTable}
+}
+
+func getAgeColumnIndex(rawObj runtime.Object) int {
+	table, err := decodeIntoTable(rawObj)
+	framework.ExpectNoError(err)
+
+	for i, col := range table.ColumnDefinitions {
+		if col.Name == "Age" {
+			return i
+		}
+	}
+	return -1
+}
+
+func removeAgeColumnValueAtIndex(rawObj runtime.Object, ageColIndex int) runtime.Object {
+	if ageColIndex == -1 {
+		return rawObj
+	}
+
+	table, err := decodeIntoTable(rawObj)
+	framework.ExpectNoError(err)
+
+	for i := range table.Rows {
+		cells := table.Rows[i].Cells
+		if ageColIndex < len(cells) {
+			cells[ageColIndex] = ""
+		}
+	}
+
+	return table
 }

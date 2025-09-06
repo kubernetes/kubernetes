@@ -5959,11 +5959,6 @@ func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback) common.OpenAPI
 						},
 					},
 					"details": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails"),

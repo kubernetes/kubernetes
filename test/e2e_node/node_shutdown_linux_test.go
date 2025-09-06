@@ -261,7 +261,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 				})
 
 				// Ignore timeout error since the context will be explicitly cancelled and the watch will never return true
-				if err != nil && err != wait.ErrWaitTimeout {
+				if err != nil && !wait.Interrupted(err) {
 					framework.Failf("watch for invalid pod status failed: %v", err.Error())
 				}
 			}()
@@ -640,14 +640,6 @@ func emitSignalPrepareForShutdown(b bool) error {
 	}
 	defer conn.Close()
 	return conn.Emit("/org/freedesktop/login1", "org.freedesktop.login1.Manager.PrepareForShutdown", b)
-}
-
-func getNodeReadyStatus(ctx context.Context, f *framework.Framework) bool {
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
-	// Assuming that there is only one node, because this is a node e2e test.
-	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1), "the number of nodes is not as expected")
-	return isNodeReady(&nodeList.Items[0])
 }
 
 const (

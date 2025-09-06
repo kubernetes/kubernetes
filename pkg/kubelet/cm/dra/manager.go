@@ -372,7 +372,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			// Loop through all drivers and prepare for calling NodePrepareResources.
 			claim := &drapb.Claim{
 				Namespace: claimInfo.Namespace,
-				UID:       string(claimInfo.ClaimUID),
+				Uid:       string(claimInfo.ClaimUID),
 				Name:      claimInfo.ClaimName,
 			}
 			for driverName := range claimInfo.DriverState {
@@ -417,7 +417,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s", claim.Name)
 				}
 				for _, device := range result.GetDevices() {
-					info.addDevice(plugin.DriverName(), state.Device{PoolName: device.PoolName, DeviceName: device.DeviceName, RequestNames: device.RequestNames, CDIDeviceIDs: device.CDIDeviceIDs})
+					info.addDevice(plugin.DriverName(), state.Device{PoolName: device.PoolName, DeviceName: device.DeviceName, RequestNames: device.RequestNames, CDIDeviceIDs: device.CdiDeviceIds})
 				}
 				return nil
 			})
@@ -462,7 +462,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 
 func lookupClaimRequest(claims []*drapb.Claim, claimUID string) *drapb.Claim {
 	for _, claim := range claims {
-		if claim.UID == claimUID {
+		if claim.Uid == claimUID {
 			return claim
 		}
 	}
@@ -622,7 +622,7 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 			// Loop through all drivers and prepare for calling NodeUnprepareResources.
 			claim := &drapb.Claim{
 				Namespace: claimInfo.Namespace,
-				UID:       string(claimInfo.ClaimUID),
+				Uid:       string(claimInfo.ClaimUID),
 				Name:      claimInfo.ClaimName,
 			}
 			for driverName := range claimInfo.DriverState {

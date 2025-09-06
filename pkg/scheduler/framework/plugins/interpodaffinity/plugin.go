@@ -159,12 +159,12 @@ func (pl *InterPodAffinity) isSchedulableAfterPodChange(logger klog.Logger, pod 
 		return fwk.QueueSkip, nil
 	}
 
-	terms, err := framework.GetAffinityTerms(pod, framework.GetPodAffinityTerms(pod.Spec.Affinity))
+	terms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		return fwk.Queue, err
 	}
 
-	antiTerms, err := framework.GetAffinityTerms(pod, framework.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	antiTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		return fwk.Queue, err
 	}
@@ -217,7 +217,7 @@ func (pl *InterPodAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod
 		return fwk.Queue, err
 	}
 
-	terms, err := framework.GetAffinityTerms(pod, framework.GetPodAffinityTerms(pod.Spec.Affinity))
+	terms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		return fwk.Queue, err
 	}
@@ -254,7 +254,7 @@ func (pl *InterPodAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod
 		}
 	}
 
-	antiTerms, err := framework.GetAffinityTerms(pod, framework.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	antiTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		return fwk.Queue, err
 	}

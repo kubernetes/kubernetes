@@ -706,7 +706,7 @@ func Test_InFlightPods(t *testing.T) {
 				// Simulate a bug, putting pod into activeQ, while pod is being scheduled.
 				{callback: func(t *testing.T, q *PriorityQueue) {
 					q.activeQ.underLock(func(unlocked unlockedActiveQueuer) {
-						unlocked.add(newQueuedPodInfoForLookup(pod1), framework.EventUnscheduledPodAdd.Label())
+						unlocked.add(logger, newQueuedPodInfoForLookup(pod1), framework.EventUnscheduledPodAdd.Label())
 					})
 				}},
 				// At this point, in the activeQ, we have pod1 and pod3 in this order.
@@ -1458,7 +1458,7 @@ func TestPriorityQueue_Activate(t *testing.T) {
 			if tt.qPodInInFlightPod != nil {
 				// Put -> Pop the Pod to make it registered in inFlightPods.
 				q.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-					unlockedActiveQ.add(newQueuedPodInfoForLookup(tt.qPodInInFlightPod), framework.EventUnscheduledPodAdd.Label())
+					unlockedActiveQ.add(logger, newQueuedPodInfoForLookup(tt.qPodInInFlightPod), framework.EventUnscheduledPodAdd.Label())
 				})
 				p, err := q.activeQ.pop(logger)
 				if err != nil {
@@ -1550,6 +1550,7 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 		plugins                []framework.PreEnqueuePlugin
 		pod                    *v1.Pod
 		event                  string
+		movesFromBackoffQ      bool
 		popFromBackoffQEnabled []bool
 		wantUnschedulablePods  int
 		wantSuccess            bool
@@ -1581,9 +1582,7 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 			wantSuccess:           false,
 		},
 		{
-			// With SchedulerPopFromBackoffQ enabled, the queue assumes the pod has already passed PreEnqueue,
-			// and it doesn't run PreEnqueue again, always puts the pod to activeQ.
-			name: "preEnqueue plugin registered, preEnqueue plugin would reject the pod, but isn't run",
+			name: "preEnqueue plugin registered, preEnqueue rejects the pod, even if it is after backoff",
 			plugins: []framework.PreEnqueuePlugin{
 				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
 				&preEnqueuePlugin{allowlists: []string{"foo"}},
@@ -1595,13 +1594,42 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 			wantSuccess:            false,
 		},
 		{
-			name: "preEnqueue plugin registered, pod would fail one preEnqueue plugin, but is after backoff",
+			// With SchedulerPopFromBackoffQ enabled, the queue assumes the pod has already passed PreEnqueue,
+			// and it doesn't run PreEnqueue again, always puts the pod to activeQ.
+			name: "preEnqueue plugin registered, pod would fail one preEnqueue plugin, but it is moved from backoffQ after completing backoff, so preEnqueue is not executed",
 			plugins: []framework.PreEnqueuePlugin{
 				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
 				&preEnqueuePlugin{allowlists: []string{"foo"}},
 			},
 			pod:                    st.MakePod().Name("bar").Label("bar", "").Obj(),
 			event:                  framework.BackoffComplete,
+			movesFromBackoffQ:      true,
+			popFromBackoffQEnabled: []bool{true},
+			wantUnschedulablePods:  0,
+			wantSuccess:            true,
+		},
+		{
+			name: "preEnqueue plugin registered, pod failed one preEnqueue plugin when activated from unschedulablePods",
+			plugins: []framework.PreEnqueuePlugin{
+				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
+				&preEnqueuePlugin{allowlists: []string{"foo"}},
+			},
+			pod:                    st.MakePod().Name("bar").Label("bar", "").Obj(),
+			event:                  framework.ForceActivate,
+			movesFromBackoffQ:      false,
+			popFromBackoffQEnabled: []bool{true},
+			wantUnschedulablePods:  1,
+			wantSuccess:            false,
+		},
+		{
+			name: "preEnqueue plugin registered, pod would fail one preEnqueue plugin, but was activated from backoffQ, so preEnqueue is not executed",
+			plugins: []framework.PreEnqueuePlugin{
+				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
+				&preEnqueuePlugin{allowlists: []string{"foo"}},
+			},
+			pod:                    st.MakePod().Name("bar").Label("bar", "").Obj(),
+			event:                  framework.ForceActivate,
+			movesFromBackoffQ:      true,
 			popFromBackoffQEnabled: []bool{true},
 			wantUnschedulablePods:  0,
 			wantSuccess:            true,
@@ -1636,7 +1664,7 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 				}
 				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m),
 					WithPodInitialBackoffDuration(time.Second*30), WithPodMaxBackoffDuration(time.Second*60))
-				got := q.moveToActiveQ(logger, q.newQueuedPodInfo(tt.pod), tt.event)
+				got := q.moveToActiveQ(logger, q.newQueuedPodInfo(tt.pod), tt.event, tt.movesFromBackoffQ)
 				if got != tt.wantSuccess {
 					t.Errorf("Unexpected result: want %v, but got %v", tt.wantSuccess, got)
 				}
@@ -3128,7 +3156,7 @@ var (
 	}
 	addPodActiveQDirectly = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-			unlockedActiveQ.add(pInfo, framework.EventUnscheduledPodAdd.Label())
+			unlockedActiveQ.add(logger, pInfo, framework.EventUnscheduledPodAdd.Label())
 		})
 	}
 	addPodUnschedulablePods = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
@@ -3542,7 +3570,7 @@ scheduler_plugin_execution_duration_seconds_count{extension_point="PreEnqueue",p
 			}
 			preenq := map[string]map[string]framework.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{queueable}}}}
 			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
-			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithPreEnqueuePluginMap(preenq), WithPluginMetricsSamplePercent(test.pluginMetricsSamplePercent), WithMetricsRecorder(*recorder), WithQueueingHintMapPerProfile(m))
+			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithPreEnqueuePluginMap(preenq), WithPluginMetricsSamplePercent(test.pluginMetricsSamplePercent), WithMetricsRecorder(recorder), WithQueueingHintMapPerProfile(m))
 			for i, op := range test.operations {
 				for _, pInfo := range test.operands[i] {
 					op(t, logger, queue, pInfo)
@@ -4324,7 +4352,7 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	q := NewTestQueue(ctx, newDefaultQueueSort())
 	q.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-		unlockedActiveQ.add(newQueuedPodInfoForLookup(activeQPod), framework.EventUnscheduledPodAdd.Label())
+		unlockedActiveQ.add(logger, newQueuedPodInfoForLookup(activeQPod), framework.EventUnscheduledPodAdd.Label())
 	})
 	q.backoffQ.add(logger, newQueuedPodInfoForLookup(backoffQPod), framework.EventUnscheduledPodAdd.Label())
 	q.unschedulablePods.addOrUpdate(newQueuedPodInfoForLookup(unschedPod), framework.EventUnscheduledPodAdd.Label())

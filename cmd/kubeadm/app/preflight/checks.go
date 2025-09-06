@@ -84,6 +84,7 @@ func (ContainerRuntimeCheck) Name() string {
 // Check validates the container runtime
 func (crc ContainerRuntimeCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("validating the container runtime")
+	defer crc.runtime.Close()
 	if err := crc.runtime.IsRunning(); err != nil {
 		errorList = append(errorList, err)
 	}
@@ -1087,6 +1088,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	if err := containerRuntime.Connect(); err != nil {
 		return handleError(os.Stderr, err.Error())
 	}
+	defer containerRuntime.Close()
 
 	serialPull := true
 	if cfg.NodeRegistration.ImagePullSerial != nil {

@@ -1184,7 +1184,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 				if isInitContainerFailed(status) {
 					restartOnFailure := restartOnFailure
 					if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-						restartOnFailure = kubecontainer.ShouldContainerBeRestarted(container, pod, podStatus)
+						restartOnFailure = kubecontainer.ShouldContainerBeRestarted(logger, container, pod, podStatus)
 					}
 					if !restartOnFailure {
 						changes.KillPod = true

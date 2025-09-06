@@ -381,7 +381,16 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 		ginkgo.It("should report CPU pressure in PSI metrics", func(ctx context.Context) {
 			podName := "cpu-pressure-pod"
 			ginkgo.By("Creating a pod to generate CPU pressure")
-			pod := e2epod.NewPodClient(f).Create(ctx, getStressTestPod(podName, "cpu-stress", []string{"stress", "--cpus", "1"}))
+			podSpec := getStressTestPod(podName, "cpu-stress", []string{"stress", "--cpus", "1"})
+			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("500m"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("500m"),
+				},
+			}
+			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
 
 			ginkgo.By("Waiting for the pod to start")
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))

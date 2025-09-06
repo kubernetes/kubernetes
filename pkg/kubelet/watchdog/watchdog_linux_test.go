@@ -20,17 +20,14 @@ limitations under the License.
 package watchdog
 
 import (
-	"bytes"
 	"errors"
-	"flag"
-	"io"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
 
 // Mock syncLoopHealthChecker
@@ -84,8 +81,8 @@ func TestNewHealthChecker(t *testing.T) {
 				enabledVal: tt.mockEnabled,
 				enabledErr: tt.mockErr,
 			}
-
-			_, err := NewHealthChecker(WithWatchdogClient(mockClient))
+			logger, _ := ktesting.NewTestContext(t)
+			_, err := NewHealthChecker(logger, WithWatchdogClient(mockClient))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewHealthChecker() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -150,19 +147,11 @@ func TestHealthCheckerStart(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
 			defer func() {
 				tCtx.Cancel("test has completed")
 			}()
-			// Capture logs
-			var logBuffer bytes.Buffer
-			flags := &flag.FlagSet{}
-			klog.InitFlags(flags)
-			if err := flags.Set("v", "5"); err != nil {
-				t.Fatal(err)
-			}
-			klog.LogToStderr(false)
-			klog.SetOutput(&logBuffer)
 
 			// Mock SdWatchdogEnabled to return a valid value
 			mockClient := &mockWatchdogClient{
@@ -172,7 +161,7 @@ func TestHealthCheckerStart(t *testing.T) {
 			}
 
 			// Create a healthChecker
-			hc, err := NewHealthChecker(WithWatchdogClient(mockClient))
+			hc, err := NewHealthChecker(logger, WithWatchdogClient(mockClient))
 			if err != nil {
 				t.Fatalf("NewHealthChecker() failed: %v", err)
 			}
@@ -187,10 +176,11 @@ func TestHealthCheckerStart(t *testing.T) {
 			time.Sleep(2 * interval)
 
 			// Check logs to verify the health check ran
-			klog.Flush()
-			// prevent further writes into buf
-			klog.SetOutput(io.Discard)
-			logs := logBuffer.String()
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
 			for _, expectedLog := range tt.expectedLogs {
 				if !strings.Contains(logs, expectedLog) {
 					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)

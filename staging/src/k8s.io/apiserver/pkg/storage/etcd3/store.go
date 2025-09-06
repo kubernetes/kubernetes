@@ -142,7 +142,7 @@ func (a *abortOnFirstError) Aggregate(key string, err error) bool {
 func (a *abortOnFirstError) Err() error { return a.err }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
+func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) (*store, error) {
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
 	// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
@@ -150,6 +150,9 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	if !strings.HasSuffix(pathPrefix, "/") {
 		// Ensure the pathPrefix ends in "/" here to simplify key concatenation later.
 		pathPrefix += "/"
+	}
+	if resourcePrefix == "" {
+		return nil, fmt.Errorf("resourcePrefix cannot be empty")
 	}
 
 	listErrAggrFactory := defaultListErrorAggregatorFactory
@@ -186,8 +189,9 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 		newListFunc:    newListFunc,
 		compactor:      compactor,
 	}
+	// Collecting stats requires properly set resourcePrefix to call getKeys.
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		stats := newStatsCache(pathPrefix, s.getKeys)
+		stats := newStatsCache(pathPrefix, nil)
 		s.stats = stats
 		w.stats = stats
 	}
@@ -198,7 +202,7 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
 		etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
 	}
-	return s
+	return s, nil
 }
 
 func (s *store) CompactRevision() int64 {
@@ -631,10 +635,20 @@ func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Obje
 
 func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
 	if s.stats != nil {
-		return s.stats.Stats(ctx)
+		stats, err := s.stats.Stats(ctx)
+		if !errors.Is(err, errStatsDisabled) {
+			return stats, err
+		}
 	}
 	startTime := time.Now()
-	count, err := s.client.Kubernetes.Count(ctx, s.pathPrefix, kubernetes.CountOptions{})
+	prefix, err := s.prepareKey(s.resourcePrefix)
+	if err != nil {
+		return storage.Stats{}, err
+	}
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	count, err := s.client.Kubernetes.Count(ctx, prefix, kubernetes.CountOptions{})
 	metrics.RecordEtcdRequest("listWithCount", s.groupResource, err, startTime)
 	if err != nil {
 		return storage.Stats{}, err
@@ -652,7 +666,14 @@ func (s *store) SetKeysFunc(keys storage.KeysFunc) {
 
 func (s *store) getKeys(ctx context.Context) ([]string, error) {
 	startTime := time.Now()
-	resp, err := s.client.KV.Get(ctx, s.pathPrefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
+	prefix, err := s.prepareKey(s.resourcePrefix)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	resp, err := s.client.KV.Get(ctx, prefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 	metrics.RecordEtcdRequest("listOnlyKeys", s.groupResource, err, startTime)
 	if err != nil {
 		return nil, err

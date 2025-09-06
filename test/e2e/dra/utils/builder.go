@@ -53,14 +53,15 @@ import (
 // "example.com/resource" is not special, any valid extended resource name can be used
 // instead, except when using example device plugin in the test, which hard coded it,
 // see test/e2e/dra/deploy_device_plugin.go.
-// i == -1 is special, the extended resource name has no extra suffix, it is
-// used in the test where a cluster has both DRA driver and device plugin.
-func ExtendedResourceName(i int) string {
-	suffix := ""
-	if i >= 0 {
-		suffix = strconv.Itoa(i)
+// i == -1 == SingletonIndex is special, the extended resource name has no extra suffix
+// and matches the one used by the example device plugin.
+func (b *Builder) ExtendedResourceName(i int) string {
+	switch i {
+	case SingletonIndex:
+		return "example.com/resource"
+	default:
+		return b.driver.Name + "/resource" + fmt.Sprintf("-%d", i)
 	}
-	return "example.com/resource" + suffix
 }
 
 // Builder contains a running counter to make objects unique within thir
@@ -80,17 +81,26 @@ func (b *Builder) ClassName() string {
 	return b.f.UniqueName + b.driver.NameSuffix + "-class"
 }
 
+// SingletonIndex causes Builder.Class and ExtendedResourceName to create a
+// DeviceClass where the the extended resource name has no %d
+// suffix and matches the name as used by the example device plugin.
+const SingletonIndex = -1
+
 // Class returns the device Class that the builder's other objects
 // reference.
 // The input i is used to pick the extended resource name whose suffix has the
 // same i for the device class.
-// i == -1 is special, the extended resource name has no extra suffix, it is
-// used in the test where a cluster has both DRA driver and device plugin.
+// i == -1 == SingletonIndex is special, the extended resource name has no extra suffix.
 func (b *Builder) Class(i int) *resourceapi.DeviceClass {
-	ern := ExtendedResourceName(i)
+	ern := b.ExtendedResourceName(i)
 	name := b.ClassName()
-	if i >= 0 {
-		name = b.ClassName() + strconv.Itoa(i)
+	switch i {
+	case SingletonIndex:
+		name += "-singleton"
+	case 0:
+		// No numeric suffix. This is what most tests use.
+	default:
+		name += "-" + strconv.Itoa(i)
 	}
 	class := &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -467,9 +477,7 @@ func NewBuilderNow(ctx context.Context, f *framework.Framework, driver *Driver) 
 func (b *Builder) setUp(ctx context.Context) {
 	b.podCounter = 0
 	b.claimCounter = 0
-	for i := -1; i < 6; i++ {
-		b.Create(ctx, b.Class(i))
-	}
+	b.Create(ctx, b.Class(0))
 	ginkgo.DeferCleanup(b.tearDown)
 }
 
