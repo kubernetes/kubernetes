@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -207,11 +207,11 @@ func getVolumesFromPodDir(logger klog.Logger, podDir string) ([]podVolume, error
 		// Find filesystem volume information
 		// ex. filesystem volume: /pods/{podUid}/volumes/{escapeQualifiedPluginName}/{volumeName}
 		volumesDirs := map[v1.PersistentVolumeMode]string{
-			v1.PersistentVolumeFilesystem: filepath.Join(podDir, config.DefaultKubeletVolumesDirName),
+			v1.PersistentVolumeFilesystem: filepath.Join(podDir, kubeletconfig.DefaultKubeletVolumesDirName),
 		}
 		// Find block volume information
 		// ex. block volume: /pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
-		volumesDirs[v1.PersistentVolumeBlock] = filepath.Join(podDir, config.DefaultKubeletVolumeDevicesDirName)
+		volumesDirs[v1.PersistentVolumeBlock] = filepath.Join(podDir, kubeletconfig.DefaultKubeletVolumeDevicesDirName)
 
 		for volumeMode, volumesDir := range volumesDirs {
 			var volumesDirInfo []fs.DirEntry
