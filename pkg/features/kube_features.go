@@ -1789,10 +1789,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	UserNamespacesPodSecurityStandards: {
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
 	UserNamespacesSupport: {
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
