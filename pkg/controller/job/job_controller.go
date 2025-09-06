@@ -1782,10 +1782,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 					if completionIndex != unknownCompletionIndex {
 						template = podTemplate.DeepCopy()
 						addCompletionIndexAnnotation(template, completionIndex)
-
-						if feature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
-							addCompletionIndexLabel(template, completionIndex)
-						}
+						addCompletionIndexLabel(template, completionIndex)
 						template.Spec.Hostname = fmt.Sprintf("%s-%d", job.Name, completionIndex)
 						generateName = podGenerateNameWithIndex(job.Name, completionIndex)
 						if hasBackoffLimitPerIndex(job) {
