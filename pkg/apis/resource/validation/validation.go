@@ -1097,28 +1097,53 @@ func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-// validateSlice ensures that a slice does not exceed a certain maximum size
+// ValidationOptions are the options for validation.
+type ValidationOptions struct {
+	// The validation of each item is covered by declarative validation.
+	ItemsCovered bool
+	// The list size check is covered by declarative validation.
+	SizeCovered bool
+	// The uniqueness check is covered by declarative validation.
+	UniquenessCovered bool
+}
+
+// validateSliceWithOptions ensures that a slice does not exceed a certain maximum size
 // and that all entries are valid.
 // A negative maxSize disables the length check.
-func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+func validateSliceWithOptions[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path, opts ValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	for i, item := range slice {
 		idxPath := fldPath.Index(i)
-		allErrs = append(allErrs, validateItem(item, idxPath)...)
+		errs := validateItem(item, idxPath)
+		if opts.ItemsCovered {
+			errs = errs.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, errs...)
 	}
 	if maxSize >= 0 && len(slice) > maxSize {
 		// Dumping the entire field into the error message is likely to be too long,
 		// in particular when it is already beyond the maximum size. Instead this
 		// just shows the number of entries.
-		allErrs = append(allErrs, field.TooMany(fldPath, len(slice), maxSize))
+		err := field.TooMany(fldPath, len(slice), maxSize)
+		if opts.SizeCovered {
+			err = err.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
 	}
 	return allErrs
 }
 
-// validateSet ensures that a slice contains no duplicates, does not
+// validateSlice ensures that a slice does not exceed a certain maximum size
+// and that all entries are valid.
+// A negative maxSize disables the length check.
+func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+	return validateSliceWithOptions(slice, maxSize, validateItem, fldPath, ValidationOptions{})
+}
+
+// validateSetWithOptions ensures that a slice contains no duplicates, does not
 // exceed a certain maximum size and that all entries are valid.
-func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) (K, string), fldPath *field.Path) field.ErrorList {
-	allErrs := validateSlice(slice, maxSize, validateItem, fldPath)
+func validateSetWithOptions[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) (K, string), fldPath *field.Path, opts ValidationOptions) field.ErrorList {
+	allErrs := validateSliceWithOptions(slice, maxSize, validateItem, fldPath, opts)
 	allItems := sets.New[K]()
 	for i, item := range slice {
 		idxPath := fldPath.Index(i)
@@ -1128,12 +1153,22 @@ func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(
 			childPath = childPath.Child(fieldName)
 		}
 		if allItems.Has(key) {
-			allErrs = append(allErrs, field.Duplicate(childPath, key))
+			err := field.Duplicate(childPath, key)
+			if opts.UniquenessCovered {
+				err = err.MarkCoveredByDeclarative()
+			}
+			allErrs = append(allErrs, err)
 		} else {
 			allItems.Insert(key)
 		}
 	}
 	return allErrs
+}
+
+// validateSet ensures that a slice contains no duplicates, does not
+// exceed a certain maximum size and that all entries are valid.
+func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) (K, string), fldPath *field.Path) field.ErrorList {
+	return validateSetWithOptions(slice, maxSize, validateItem, itemKey, fldPath, ValidationOptions{})
 }
 
 // stringKey uses the item itself as a key for validateSet.
