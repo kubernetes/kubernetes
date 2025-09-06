@@ -613,6 +613,16 @@ func (m *IssuingManager) TrackPod(ctx context.Context, pod *corev1.Pod) {
 // The pod worker will notice that the pod no longer exists and clear any
 // pending and live credentials associated with it.
 func (m *IssuingManager) ForgetPod(ctx context.Context, pod *corev1.Pod) {
+	// Immediately clean up credStore entries for this pod to prevent race conditions
+	m.lock.Lock()
+	for k := range m.credStore {
+		if k.namespace == pod.Namespace && k.podName == pod.Name && k.podUID == string(pod.UID) {
+			delete(m.credStore, k)
+		}
+	}
+	m.lock.Unlock()
+
+	// Queue projections for processing (this will be a no-op since pod is already removed from podManager)
 	m.queueAllProjectionsForPod(pod.ObjectMeta.UID)
 }
 
