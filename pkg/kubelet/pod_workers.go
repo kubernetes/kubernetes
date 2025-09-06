@@ -253,6 +253,8 @@ type PodWorkers interface {
 	// deleting a terminating static pod from the apiserver before the pod is shut
 	// down.
 	IsPodForMirrorPodTerminatingByFullName(podFullname string) bool
+
+	GetNewStatus(podUID types.UID) (*kubecontainer.PodStatus, error) 
 }
 
 // podSyncer describes the core lifecyle operations of the pod state machine. A pod is first
@@ -613,6 +615,8 @@ type podWorkers struct {
 
 	// clock is used for testing timing
 	clock clock.PassiveClock
+
+	lastSyncTime time.Time
 }
 
 func newPodWorkers(
@@ -1221,6 +1225,12 @@ func podUIDAndRefForUpdate(update UpdatePodOptions) (types.UID, klog.ObjectRef) 
 	return update.Pod.UID, klog.KObj(update.Pod)
 }
 
+func (p *podWorkers) GetNewStatus(podUID types.UID) (*kubecontainer.PodStatus, error) {
+	status, err := p.podCache.GetNewerThan(podUID, p.lastSyncTime)
+	klog.V(4).InfoS("GetNewStatus", "podUID", podUID, "p.lastSyncTime", p.lastSyncTime, "status", status)
+	return status, err
+}
+
 // podWorkerLoop manages sequential state updates to a pod in a goroutine, exiting once the final
 // state is reached. The loop is responsible for driving the pod through four main phases:
 //
@@ -1277,6 +1287,7 @@ func (p *podWorkers) podWorkerLoop(podUID types.UID, podUpdates <-chan struct{})
 				//  container's status is garbage collected before we have a chance to update the
 				//  API server (thus losing the exit code).
 				status, err = p.podCache.GetNewerThan(update.Options.Pod.UID, lastSyncTime)
+				klog.V(4).InfoS("p.podCache.GetNewerThan", "pod", podRef, "lastSyncTime", lastSyncTime, "status", status)
 
 				if err != nil {
 					// This is the legacy event thrown by manage pod loop all other events are now dispatched
@@ -1310,6 +1321,7 @@ func (p *podWorkers) podWorkerLoop(podUID types.UID, podUpdates <-chan struct{})
 			}
 
 			lastSyncTime = p.clock.Now()
+			p.lastSyncTime = lastSyncTime
 			return err
 		}()
 
