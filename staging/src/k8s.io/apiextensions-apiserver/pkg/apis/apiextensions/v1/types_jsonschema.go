@@ -194,7 +194,15 @@ type JSONSchemaProps struct {
 	// +listType=map
 	// +listMapKey=rule
 	XValidations ValidationRules `json:"x-kubernetes-validations,omitempty" patchStrategy:"merge" patchMergeKey:"rule" protobuf:"bytes,44,rep,name=xKubernetesValidations"`
+
+	// x-kubernetes-unions defines a list of unions for a struct or an array of list-type map.
+	// Note that at most one member of a union can be specified.
+	// +listType=atomic
+	// +optional
+	XUnions Unions `json:"x-kubernetes-unions,omitempty" protobuf:"bytes,45,opt,name=xKubernetesUnions"`
 }
+
+type Unions []Union
 
 // ValidationRules describes a list of validation rules written in the CEL expression language.
 type ValidationRules []ValidationRule

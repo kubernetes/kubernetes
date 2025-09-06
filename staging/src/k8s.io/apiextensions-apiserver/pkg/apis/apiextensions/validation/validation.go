@@ -1,19 +1,3 @@
-/*
-Copyright 2017 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package validation
 
 import (
@@ -998,6 +982,7 @@ func (o *OpenAPISchemaErrorList) AllErrors() field.ErrorList {
 
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
 func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, celContext *CELSchemaContext) *OpenAPISchemaErrorList {
+	fmt.Printf("DEBUG: Entering ValidateCustomResourceDefinitionOpenAPISchema for field path: %s\n", fldPath.String())
 	allErrs := &OpenAPISchemaErrorList{SchemaErrors: field.ErrorList{}, CELErrors: field.ErrorList{}}
 
 	if schema == nil {
@@ -1194,6 +1179,9 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 
 	if opts.requireMapListKeysMapSetValidation {
 		allErrs.SchemaErrors = append(allErrs.SchemaErrors, validateMapListKeysMapSet(schema, fldPath)...)
+	}
+	if len(schema.XUnions) > 0 {
+		allErrs.SchemaErrors = append(allErrs.SchemaErrors, validateUnions(schema, fldPath)...)
 	}
 	if len(schema.XValidations) > 0 {
 		for i, rule := range schema.XValidations {
@@ -1889,4 +1877,48 @@ func SchemaHasInvalidTypes(s *apiextensions.JSONSchemaProps) bool {
 	return SchemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
 		return len(s.Type) > 0 && !openapiV3Types.Has(s.Type)
 	})
+}
+
+func validateUnions(schema *apiextensions.JSONSchemaProps, fldPath *field.Path) field.ErrorList {
+
+	allErrs := field.ErrorList{}
+	if len(schema.XUnions) == 0 {
+		return allErrs
+	}
+	if schema.Type != "object" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-unions"), schema.XUnions, "unions are only supported for objects"))
+	}
+
+	for unionIndex, union := range schema.XUnions {
+		unionPath := fldPath.Child("x-kubernetes-unions").Index(unionIndex)
+
+		if len(union.Members) < 2 {
+			allErrs = append(allErrs, field.Invalid(unionPath.Child("members"), union.Members, "must have at least two members"))
+		}
+
+		if union.ZeroOrOneOf && len(union.Discriminator) > 0 {
+			allErrs = append(allErrs, field.Invalid(unionPath.Child("zeroOrOneOf"), union.ZeroOrOneOf, "cannot be used with a discriminator"))
+		}
+
+		if len(union.Discriminator) > 0 {
+			if _, ok := schema.Properties[union.Discriminator]; !ok {
+				allErrs = append(allErrs, field.Invalid(unionPath.Child("discriminator"), union.Discriminator, "must be a property of the object"))
+			}
+		}
+
+		for memberIndex, member := range union.Members {
+			memberPath := unionPath.Child("members").Index(memberIndex)
+
+			if len(member.FieldName) == 0 {
+				allErrs = append(allErrs, field.Required(memberPath.Child("fieldName"), ""))
+			} else if _, ok := schema.Properties[member.FieldName]; !ok {
+				allErrs = append(allErrs, field.Invalid(memberPath.Child("fieldName"), member.FieldName, "must be a property of the object"))
+			}
+
+			if len(union.Discriminator) > 0 && len(member.DiscriminatorValue) == 0 {
+				allErrs = append(allErrs, field.Required(memberPath.Child("discriminatorValue"), "discriminatorValue is required if discriminator is specified"))
+			}
+		}
+	}
+	return allErrs
 }
