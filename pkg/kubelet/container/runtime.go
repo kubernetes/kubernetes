@@ -138,10 +138,13 @@ type Runtime interface {
 	// ListPodSandboxMetrics retrieves the metrics for all pod sandboxes.
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
 	// GetContainerStatus returns the status for the container.
-	GetContainerStatus(ctx context.Context, id ContainerID) (*Status, error)
+	GetContainerStatus(ctx context.Context, podUID types.UID, id ContainerID) (*Status, error)
 	// GetContainerSwapBehavior reports whether a container could be swappable.
 	// This is used to decide whether to handle InPlacePodVerticalScaling for containers.
 	GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubelettypes.SwapBehavior
+	// IsPodResizeInProgress checks whether the given pod is in the process of resizing
+	// (allocated resources != actuated resources).
+	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
