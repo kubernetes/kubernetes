@@ -75,6 +75,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/pager"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	baseversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -3358,10 +3359,11 @@ func TestAllowedEmulationVersions(t *testing.T) {
 }
 
 func TestEnableEmulationVersion(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	currentVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, currentVersion)
 	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
-		[]string{"--emulated-version=kube=1.31", "--runtime-config=api/beta=true"}, framework.SharedEtcd())
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: baseversion.DefaultKubeBinaryVersion},
+		[]string{fmt.Sprintf("--emulated-version=kube=%s", currentVersion.SubtractMinor(3)), "--runtime-config=api/beta=true"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	rt, err := restclient.TransportFor(server.ClientConfig)
@@ -3387,7 +3389,7 @@ func TestEnableEmulationVersion(t *testing.T) {
 		},
 		{
 			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
-			expectedStatusCode: 200,
+			expectedStatusCode: 404,
 		},
 		{
 			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
@@ -3420,10 +3422,11 @@ func TestEnableEmulationVersion(t *testing.T) {
 }
 
 func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	currentVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, currentVersion)
 	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
-		[]string{"--emulated-version=kube=1.31", "--runtime-config=api/beta=true", "--emulation-forward-compatible=true"}, framework.SharedEtcd())
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: baseversion.DefaultKubeBinaryVersion},
+		[]string{fmt.Sprintf("--emulated-version=kube=%s", currentVersion.SubtractMinor(3)), "--runtime-config=api/beta=true", "--emulation-forward-compatible=true"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	rt, err := restclient.TransportFor(server.ClientConfig)
@@ -3449,7 +3452,7 @@ func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
 		},
 		{
 			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
-			expectedStatusCode: 200,
+			expectedStatusCode: 404,
 		},
 		{
 			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
@@ -3482,10 +3485,11 @@ func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
 }
 
 func TestEnableRuntimeConfigEmulationVersionForwardCompatible(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	currentVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, currentVersion)
 	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
-		[]string{"--emulated-version=kube=1.31", "--runtime-config-emulation-forward-compatible=true", "--runtime-config=api/beta=true,networking.k8s.io/v1=true"}, framework.SharedEtcd())
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: baseversion.DefaultKubeBinaryVersion},
+		[]string{fmt.Sprintf("--emulated-version=kube=%s", currentVersion.SubtractMinor(3)), "--runtime-config-emulation-forward-compatible=true", "--runtime-config=api/beta=true,networking.k8s.io/v1=true"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	rt, err := restclient.TransportFor(server.ClientConfig)
@@ -3511,7 +3515,7 @@ func TestEnableRuntimeConfigEmulationVersionForwardCompatible(t *testing.T) {
 		},
 		{
 			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
-			expectedStatusCode: 200,
+			expectedStatusCode: 404,
 		},
 		{
 			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
