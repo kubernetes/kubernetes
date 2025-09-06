@@ -485,6 +485,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(UserNamespaces)
 		(*in).DeepCopyInto(*out)
 	}
+	out.PodHousekeepingPeriod = in.PodHousekeepingPeriod
 	return
 }
 
