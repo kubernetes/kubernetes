@@ -76,9 +76,22 @@ func mergeValues(fieldNames []string, dst, src reflect.Value) error {
 		}
 
 	case reflect.Slice:
-		if dst.CanSet() && src.Len() > 0 {
-			// overwrite dst with non-empty src slice
-			dst.Set(src)
+		if dst.CanSet() {
+			// For byte slices ([]byte), handle empty slices as explicit field clearing
+			// when the field is one of the certificate/key data fields
+			if src.Type().Elem().Kind() == reflect.Uint8 && src.Len() == 0 {
+				// Check if this is a certificate or key data field that should be cleared
+				fieldName := getFieldName(fieldNames)
+				if fieldName == "ClientCertificateData" || fieldName == "ClientKeyData" {
+					// Clear the field by setting it to nil
+					dst.Set(reflect.Zero(dst.Type()))
+					return nil
+				}
+			}
+			if src.Len() > 0 {
+				// overwrite dst with non-empty src slice
+				dst.Set(src)
+			}
 		}
 
 	case reflect.Pointer:
@@ -118,4 +131,12 @@ func hasExportedField(dstType reflect.Type) bool {
 		}
 	}
 	return false
+}
+
+// getFieldName returns the last field name from the field names path
+func getFieldName(fieldNames []string) string {
+	if len(fieldNames) == 0 {
+		return ""
+	}
+	return fieldNames[len(fieldNames)-1]
 }

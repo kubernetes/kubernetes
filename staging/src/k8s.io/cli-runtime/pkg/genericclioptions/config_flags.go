@@ -170,9 +170,15 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	// bind auth info flag values to overrides
 	if f.CertFile != nil {
 		overrides.AuthInfo.ClientCertificate = *f.CertFile
+		// Clear inline certificate data when file-based certificate is specified
+		// Set to empty slice to indicate this field should be cleared during merge
+		overrides.AuthInfo.ClientCertificateData = []byte{}
 	}
 	if f.KeyFile != nil {
 		overrides.AuthInfo.ClientKey = *f.KeyFile
+		// Clear inline key data when file-based key is specified
+		// Set to empty slice to indicate this field should be cleared during merge
+		overrides.AuthInfo.ClientKeyData = []byte{}
 	}
 	if f.BearerToken != nil {
 		overrides.AuthInfo.Token = *f.BearerToken
