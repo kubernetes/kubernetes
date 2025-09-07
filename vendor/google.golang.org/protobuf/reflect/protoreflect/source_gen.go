@@ -21,6 +21,8 @@ func (p *SourcePath) appendFileDescriptorProto(b []byte) []byte {
 		b = p.appendRepeatedField(b, "public_dependency", nil)
 	case 11:
 		b = p.appendRepeatedField(b, "weak_dependency", nil)
+	case 15:
+		b = p.appendRepeatedField(b, "option_dependency", nil)
 	case 4:
 		b = p.appendRepeatedField(b, "message_type", (*SourcePath).appendDescriptorProto)
 	case 5:
@@ -66,6 +68,8 @@ func (p *SourcePath) appendDescriptorProto(b []byte) []byte {
 		b = p.appendRepeatedField(b, "reserved_range", (*SourcePath).appendDescriptorProto_ReservedRange)
 	case 10:
 		b = p.appendRepeatedField(b, "reserved_name", nil)
+	case 11:
+		b = p.appendSingularField(b, "visibility", nil)
 	}
 	return b
 }
@@ -85,6 +89,8 @@ func (p *SourcePath) appendEnumDescriptorProto(b []byte) []byte {
 		b = p.appendRepeatedField(b, "reserved_range", (*SourcePath).appendEnumDescriptorProto_EnumReservedRange)
 	case 5:
 		b = p.appendRepeatedField(b, "reserved_name", nil)
+	case 6:
+		b = p.appendSingularField(b, "visibility", nil)
 	}
 	return b
 }
@@ -400,6 +406,8 @@ func (p *SourcePath) appendFeatureSet(b []byte) []byte {
 		b = p.appendSingularField(b, "json_format", nil)
 	case 7:
 		b = p.appendSingularField(b, "enforce_naming_style", nil)
+	case 8:
+		b = p.appendSingularField(b, "default_symbol_visibility", nil)
 	}
 	return b
 }
