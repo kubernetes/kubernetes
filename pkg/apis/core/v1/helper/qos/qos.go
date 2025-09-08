@@ -103,6 +103,17 @@ func resourceListEqual(a v1.ResourceList, b v1.ResourceList) bool {
 // TODO(ndixita): Refactor ComputePodQOS into smaller functions to make it more
 // readable and maintainable.
 func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
+	requests, limits, isGuaranteed := collectPodResources(pod)
+	if len(requests) == 0 && len(limits) == 0 {
+		return v1.PodQOSBestEffort
+	}
+	if isGuaranteed && resourceListEqual(requests, limits) {
+		return v1.PodQOSGuaranteed
+	}
+	return v1.PodQOSBurstable
+}
+
+func collectPodResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
 	requests := v1.ResourceList{}
 	limits := v1.ResourceList{}
 	isGuaranteed := true
@@ -166,12 +177,5 @@ func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 			}
 		}
 	}
-
-	if len(requests) == 0 && len(limits) == 0 {
-		return v1.PodQOSBestEffort
-	}
-	if isGuaranteed && resourceListEqual(requests, limits) {
-		return v1.PodQOSGuaranteed
-	}
-	return v1.PodQOSBurstable
+	return requests, limits, isGuaranteed
 }
