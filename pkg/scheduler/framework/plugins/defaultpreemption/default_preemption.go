@@ -114,7 +114,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feat
 		podLister: podLister,
 		pdbLister: pdbLister,
 	}
-	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, fts.EnableAsyncPreemption)
+	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, fts.EnableAsyncPreemption, fts.EnableNominatedNodeNameForExpectation)
 
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim pod
 	// have lower priority than the preemptor pod.
