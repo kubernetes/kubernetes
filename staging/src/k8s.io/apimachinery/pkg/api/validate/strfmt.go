@@ -24,6 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+const (
+	uuidErrorMessage = "must be a lowercase UUID in 8-4-4-4-12 format"
+)
+
 // ShortName verifies that the specified value is a valid "short name"
 // (sometimes known as a "DNS label").
 //   - must not be empty
@@ -64,4 +68,33 @@ func LongName[T ~string](_ context.Context, op operation.Operation, fldPath *fie
 		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-long-name"))
 	}
 	return allErrs
+}
+
+// UUID verifies that the specified value is a valid UUID (RFC 4122).
+//   - must be 36 characters long
+//   - must be in the normalized form `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+//   - must use only lowercase hexadecimal characters
+func UUID[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	val := (string)(*value)
+	if len(val) != 36 {
+		return field.ErrorList{field.Invalid(fldPath, val, uuidErrorMessage).WithOrigin("format=k8s-uuid")}
+	}
+	for idx := 0; idx < len(val); idx++ {
+		character := val[idx]
+		switch idx {
+		case 8, 13, 18, 23:
+			if character != '-' {
+				return field.ErrorList{field.Invalid(fldPath, val, uuidErrorMessage).WithOrigin("format=k8s-uuid")}
+			}
+		default:
+			// should be lower case hexadecimal.
+			if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+				return field.ErrorList{field.Invalid(fldPath, val, uuidErrorMessage).WithOrigin("format=k8s-uuid")}
+			}
+		}
+	}
+	return nil
 }
