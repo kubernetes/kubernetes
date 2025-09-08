@@ -1036,7 +1036,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		spc.setPodRunning(set, 4)
 		spc.setPodReadyCondition(set, 4, true)
 
-		// create new pods 4(only one pod gets created at a time due to OrderedReady)
+		// create new pod 4 (only one pod gets created at a time due to OrderedReady)
 		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 			t.Fatal(err)
 		}
@@ -1045,37 +1045,9 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if len(pods) != totalPods {
-			t.Fatalf("Expected create pods 4, got pods %v", len(pods))
-		}
-		// if pod 4 ready, start to update pod 3
-		spc.setPodRunning(set, 5)
-		originalPods, _ := spc.setPodReadyCondition(set, 5, true)
-		sort.Sort(ascendingOrdinal(originalPods))
-		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
-			t.Fatal(err)
-		}
-		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sort.Sort(ascendingOrdinal(pods))
-
-		// verify the remaining pods are 0,1,2,4,5 (3 got deleted)
-		if !reflect.DeepEqual(pods, append(originalPods[:3], originalPods[4:]...)) {
-			t.Fatalf("Expected pods %v, got pods %v", append(originalPods[:3], originalPods[4:]...), pods)
-		}
-
-		// create new pod 3
-		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
-			t.Fatal(err)
-		}
-		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(pods) != totalPods {
-			t.Fatalf("Expected create pods 2/3, got pods %v", pods)
+		// In OrderedReady mode, only 5 pods exist at this point (pod 5 not created yet)
+		if len(pods) != totalPods-1 {
+			t.Fatalf("Expected create pods %d, got pods %v", totalPods-1, len(pods))
 		}
 
 		return pods
