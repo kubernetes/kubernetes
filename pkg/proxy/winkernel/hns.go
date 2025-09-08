@@ -349,17 +349,21 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 func (hns hns) getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
 	var id loadBalancerIdentifier
 	vips := []string{}
-	// Compute hash from backends (endpoint IDs)
-	hash, err := hashEndpoints(endpoints)
-	if err != nil {
-		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
-		return nil, err
+	id, lbIdErr := findLoadBalancerID(
+		endpoints,
+		vip,
+		protocol,
+		internalPort,
+		externalPort,
+	)
+
+	if lbIdErr != nil {
+		klog.V(2).ErrorS(lbIdErr, "Error hashing endpoints", "endpoints", endpoints)
+		return nil, lbIdErr
 	}
+
 	if len(vip) > 0 {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}
 		vips = append(vips, vip)
-	} else {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}
 	}
 
 	if lb, found := previousLoadBalancers[id]; found {
