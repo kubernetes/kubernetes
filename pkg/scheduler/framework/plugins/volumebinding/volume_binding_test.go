@@ -99,7 +99,7 @@ func TestVolumeBinding(t *testing.T) {
 		capacities              []*storagev1.CSIStorageCapacity
 		fts                     feature.Features
 		args                    *config.VolumeBindingArgs
-		wantPreFilterResult     *framework.PreFilterResult
+		wantPreFilterResult     *fwk.PreFilterResult
 		wantPreFilterStatus     *fwk.Status
 		wantStateAfterPreFilter *stateData
 		wantFilterStatus        []*fwk.Status

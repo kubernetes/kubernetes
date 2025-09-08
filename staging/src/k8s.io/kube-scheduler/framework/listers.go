@@ -21,19 +21,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
-	fwk "k8s.io/kube-scheduler/framework"
 )
 
 // NodeInfoLister interface represents anything that can list/get NodeInfo objects from node name.
 type NodeInfoLister interface {
 	// List returns the list of NodeInfos.
-	List() ([]fwk.NodeInfo, error)
+	List() ([]NodeInfo, error)
 	// HavePodsWithAffinityList returns the list of NodeInfos of nodes with pods with affinity terms.
-	HavePodsWithAffinityList() ([]fwk.NodeInfo, error)
+	HavePodsWithAffinityList() ([]NodeInfo, error)
 	// HavePodsWithRequiredAntiAffinityList returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
-	HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error)
+	HavePodsWithRequiredAntiAffinityList() ([]NodeInfo, error)
 	// Get returns the NodeInfo of the given node name.
-	Get(nodeName string) (fwk.NodeInfo, error)
+	Get(nodeName string) (NodeInfo, error)
 }
 
 // StorageInfoLister interface represents anything that handles storage-related operations and resources.

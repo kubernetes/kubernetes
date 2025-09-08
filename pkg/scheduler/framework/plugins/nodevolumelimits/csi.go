@@ -33,7 +33,6 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -70,9 +69,9 @@ type CSILimits struct {
 	translator InTreeToCSITranslator
 }
 
-var _ framework.PreFilterPlugin = &CSILimits{}
-var _ framework.FilterPlugin = &CSILimits{}
-var _ framework.EnqueueExtensions = &CSILimits{}
+var _ fwk.PreFilterPlugin = &CSILimits{}
+var _ fwk.FilterPlugin = &CSILimits{}
+var _ fwk.EnqueueExtensions = &CSILimits{}
 
 // CSIName is the name of the plugin used in the plugin registry and configurations.
 const CSIName = names.NodeVolumeLimits
@@ -234,7 +233,7 @@ func (pl *CSILimits) isSchedulableAfterCSINodeUpdated(logger klog.Logger, pod *v
 // PreFilter invoked at the prefilter extension point
 //
 // If the pod haven't those types of volumes, we'll skip the Filter phase
-func (pl *CSILimits) PreFilter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *CSILimits) PreFilter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	volumes := pod.Spec.Volumes
 	for i := range volumes {
 		vol := &volumes[i]
@@ -247,7 +246,7 @@ func (pl *CSILimits) PreFilter(ctx context.Context, _ fwk.CycleState, pod *v1.Po
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *CSILimits) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *CSILimits) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
@@ -547,7 +546,7 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(logger klog.Logger, csiNode *storage
 }
 
 // NewCSI initializes a new plugin and returns it.
-func NewCSI(_ context.Context, _ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()

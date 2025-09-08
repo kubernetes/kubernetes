@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 func TestSetup(t *testing.T) {
@@ -510,22 +509,22 @@ leaderElection:
 // Simulates an out-of-tree plugin.
 type foo struct{}
 
-var _ framework.PreFilterPlugin = &foo{}
-var _ framework.FilterPlugin = &foo{}
+var _ fwk.PreFilterPlugin = &foo{}
+var _ fwk.FilterPlugin = &foo{}
 
 func (*foo) Name() string {
 	return "Foo"
 }
 
-func newFoo(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newFoo(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 	return &foo{}, nil
 }
 
-func (*foo) PreFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (*foo) PreFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	return nil, nil
 }
 
-func (*foo) PreFilterExtensions() framework.PreFilterExtensions {
+func (*foo) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 

@@ -41,7 +41,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 		requestedPod   *v1.Pod
 		nodes          []*v1.Node
 		existingPods   []*v1.Pod
-		expectedScores framework.NodeScoreList
+		expectedScores fwk.NodeScoreList
 		resources      []config.ResourceSpec
 		wantErrs       field.ErrorList
 		wantStatusCode fwk.Code
@@ -62,7 +62,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
 			},
 			existingPods:   nil,
-			expectedScores: []framework.NodeScore{{Name: "node1", Score: framework.MinNodeScore}, {Name: "node2", Score: framework.MinNodeScore}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: fwk.MinNodeScore}, {Name: "node2", Score: fwk.MinNodeScore}},
 			resources:      defaultResources,
 		},
 		{
@@ -84,7 +84,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
 			},
 			existingPods:   nil,
-			expectedScores: []framework.NodeScore{{Name: "node1", Score: 62}, {Name: "node2", Score: 50}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: 62}, {Name: "node2", Score: 50}},
 			resources:      defaultResources,
 		},
 		{
@@ -98,7 +98,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
 			},
 			existingPods:   nil,
-			expectedScores: []framework.NodeScore{{Name: "node1", Score: framework.MinNodeScore}, {Name: "node2", Score: framework.MinNodeScore}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: fwk.MinNodeScore}, {Name: "node2", Score: fwk.MinNodeScore}},
 			resources:      nil,
 			wantStatusCode: fwk.Error,
 		},
@@ -123,7 +123,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "3000", "memory": "0"}).Obj(),
 				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "3000", "memory": "5000"}).Obj(),
 			},
-			expectedScores: []framework.NodeScore{{Name: "node1", Score: 30}, {Name: "node2", Score: 42}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: 30}, {Name: "node2", Score: 42}},
 			resources:      defaultResources,
 		},
 		{
@@ -148,7 +148,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "3000", "memory": "0"}).Obj(),
 				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "3000", "memory": "5000"}).Obj(),
 			},
-			expectedScores: []framework.NodeScore{{Name: "node1", Score: 42}, {Name: "node2", Score: 55}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: 42}, {Name: "node2", Score: 55}},
 			resources:      defaultResources,
 		},
 		{
@@ -170,7 +170,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "10000", "memory": "9000"}).Obj(),
 			},
 			existingPods:   nil,
-			expectedScores: []framework.NodeScore{{Name: "node1", Score: 95}, {Name: "node2", Score: 75}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: 95}, {Name: "node2", Score: 75}},
 			resources:      defaultResources,
 		},
 		{
@@ -190,7 +190,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
 			},
 			existingPods:   nil,
-			expectedScores: []framework.NodeScore{{Name: "node1", Score: 58}, {Name: "node2", Score: 50}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: 58}, {Name: "node2", Score: 50}},
 			resources: []config.ResourceSpec{
 				{Name: "memory", Weight: 2},
 				{Name: "cpu", Weight: 1},
@@ -215,7 +215,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				st.MakePod().Node("node1").Container("container").Obj(),
 				st.MakePod().Node("node1").Container("container").Obj(),
 			},
-			expectedScores: []framework.NodeScore{{Name: "node1", Score: 80}, {Name: "node2", Score: 30}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: 80}, {Name: "node2", Score: 30}},
 			resources:      defaultResources,
 		},
 		{
@@ -298,7 +298,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 			},
 			resources:      extendedResourceSet,
 			existingPods:   nil,
-			expectedScores: []framework.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 50}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 50}},
 		},
 		{
 			// Honor extended resource if the pod requests.
@@ -319,7 +319,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 			},
 			resources:      extendedResourceSet,
 			existingPods:   nil,
-			expectedScores: []framework.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 40}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 40}},
 		},
 		{
 			// If the node doesn't have a resource
@@ -335,7 +335,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000", v1.ResourceName(extendedRes): "4"}).Obj(),
 			},
-			expectedScores: []framework.NodeScore{{Name: "node1", Score: 45}, {Name: "node2", Score: 45}},
+			expectedScores: []fwk.NodeScore{{Name: "node1", Score: 45}, {Name: "node2", Score: 45}},
 			resources: []config.ResourceSpec{
 				{Name: extendedRes, Weight: 2},
 				{Name: string(v1.ResourceCPU), Weight: 1},
@@ -369,22 +369,22 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				return
 			}
 
-			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, tf.BuildNodeInfos(test.nodes))
+			status := p.(fwk.PreScorePlugin).PreScore(ctx, state, test.requestedPod, tf.BuildNodeInfos(test.nodes))
 			if !status.IsSuccess() {
 				t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 			}
 
-			var gotScores framework.NodeScoreList
+			var gotScores fwk.NodeScoreList
 			for _, n := range test.nodes {
 				nodeInfo, err := snapshot.Get(n.Name)
 				if err != nil {
 					t.Errorf("failed to get node %q from snapshot: %v", n.Name, err)
 				}
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, nodeInfo)
+				score, status := p.(fwk.ScorePlugin).Score(ctx, state, test.requestedPod, nodeInfo)
 				if status.Code() != test.wantStatusCode {
 					t.Errorf("unexpected status code, want: %v, got: %v", test.wantStatusCode, status.Code())
 				}
-				gotScores = append(gotScores, framework.NodeScore{Name: n.Name, Score: score})
+				gotScores = append(gotScores, fwk.NodeScore{Name: n.Name, Score: score})
 			}
 
 			if diff := cmp.Diff(test.expectedScores, gotScores); diff != "" {
