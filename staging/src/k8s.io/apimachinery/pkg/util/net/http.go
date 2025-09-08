@@ -411,23 +411,30 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 		}
 	}
 
-	if len(cidrs) == 0 {
-		return delegate
-	}
-
 	return func(req *http.Request) (*url.URL, error) {
 		ip := netutils.ParseIPSloppy(req.URL.Hostname())
-		if ip == nil {
-			return delegate(req)
-		}
-
-		for _, cidr := range cidrs {
-			if cidr.Contains(ip) {
-				return nil, nil
+		if ip != nil {
+			for _, cidr := range cidrs {
+				if cidr.Contains(ip) {
+					klog.V(6).Infof("[APIServer-EgressProxy] url=%s status=Bypassed reason=CIDRMatch", req.URL.String())
+					return nil, nil
+				}
 			}
 		}
 
-		return delegate(req)
+		// If it's a DNS name or an IP that didn't match a CIDR,
+		// let the standard Go library function decide.
+		proxyURL, err := delegate(req)
+
+		if err != nil {
+			klog.V(5).Infof("[APIServer-EgressProxy] url=%s status=Error error='%v'", req.URL.String(), err)
+		} else if proxyURL == nil {
+			klog.V(6).Infof("[APIServer-EgressProxy] url=%s status=Bypassed", req.URL.String())
+		} else {
+			klog.V(6).Infof("[APIServer-EgressProxy] url=%s status=Proxied proxy_url=%s", req.URL.String(), proxyURL.String())
+		}
+
+		return proxyURL, err
 	}
 }
 
