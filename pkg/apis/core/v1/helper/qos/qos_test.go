@@ -30,6 +30,104 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+func TestResourceListEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		a    map[v1.ResourceName]string
+		b    map[v1.ResourceName]string
+		want bool
+	}{
+		{
+			name: "both nil",
+			a:    nil,
+			b:    nil,
+			want: true,
+		},
+		{
+			name: "nil vs empty map",
+			a:    nil,
+			b:    map[v1.ResourceName]string{},
+			want: true,
+		},
+		{
+			name: "identical keys and values",
+			a: map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "1Gi",
+			},
+			b: map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "1Gi",
+			},
+			want: true,
+		},
+		{
+			name: "different textual forms but equal quantities",
+			a: map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1000m",      // == 1
+				v1.ResourceMemory: "1073741824", // bytes == 1Gi
+			},
+			b: map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "1Gi",
+			},
+			want: true,
+		},
+		{
+			name: "value differs",
+			a: map[v1.ResourceName]string{
+				v1.ResourceCPU:    "999m",
+				v1.ResourceMemory: "1Gi",
+			},
+			b: map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "1Gi",
+			},
+			want: false,
+		},
+		{
+			name: "missing key in b",
+			a: map[v1.ResourceName]string{
+				v1.ResourceMemory: "1Gi",
+			},
+			b:    map[v1.ResourceName]string{},
+			want: false,
+		},
+		{
+			name: "extra key in b",
+			a: map[v1.ResourceName]string{
+				v1.ResourceCPU: "1",
+			},
+			b: map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "1Gi",
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := resourceListEqual(mustResourceList(tc.a), mustResourceList(tc.b))
+			if got != tc.want {
+				t.Fatalf("resourceListEqual() = %v, want %v\n a=%v\n b=%v", got, tc.want, tc.a, tc.b)
+			}
+		})
+	}
+}
+
+func mustResourceList(m map[v1.ResourceName]string) v1.ResourceList {
+	if m == nil {
+		return nil
+	}
+	out := v1.ResourceList{}
+	for k, s := range m {
+		out[k] = resource.MustParse(s)
+	}
+	return out
+}
+
 func TestComputePodQOS(t *testing.T) {
 	testCases := []struct {
 		pod                      *v1.Pod

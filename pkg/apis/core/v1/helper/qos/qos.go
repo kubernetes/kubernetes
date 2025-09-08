@@ -82,6 +82,19 @@ func getQOSResources(list v1.ResourceList) sets.Set[string] {
 	return qosResources
 }
 
+func resourceListEqual(a v1.ResourceList, b v1.ResourceList) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for name, qa := range a {
+		qb, exists := b[name]
+		if !exists || qb.Cmp(qa) != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // ComputePodQOS evaluates the list of containers to determine a pod's QoS class. This function is more
 // expensive than GetPodQOS which should be used for pods having a non-empty .Status.QOSClass.
 // A pod is besteffort if none of its containers have specified any requests or limits.
@@ -157,17 +170,7 @@ func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 	if len(requests) == 0 && len(limits) == 0 {
 		return v1.PodQOSBestEffort
 	}
-	// Check is requests match limits for all resources.
-	if isGuaranteed {
-		for name, req := range requests {
-			if lim, exists := limits[name]; !exists || lim.Cmp(req) != 0 {
-				isGuaranteed = false
-				break
-			}
-		}
-	}
-	if isGuaranteed &&
-		len(requests) == len(limits) {
+	if isGuaranteed && resourceListEqual(requests, limits) {
 		return v1.PodQOSGuaranteed
 	}
 	return v1.PodQOSBurstable
