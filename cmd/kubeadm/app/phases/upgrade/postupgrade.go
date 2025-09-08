@@ -171,7 +171,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 			}
 
 			if dryRun { // Print what contents would be written
-				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
 				if err != nil {
 					return errors.Wrap(err, "error printing kubelet instance configuration file on dryrun")
 				}
