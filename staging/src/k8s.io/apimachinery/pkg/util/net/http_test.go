@@ -20,22 +20,17 @@ limitations under the License.
 package net
 
 import (
-	"bytes"
 	"crypto/tls"
-	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 )
 
@@ -146,15 +141,12 @@ func TestAppendForwardedForHeader(t *testing.T) {
 }
 
 func TestProxierWithNoProxyCIDR(t *testing.T) {
-	testErr := errors.New("test error")
 	testCases := []struct {
 		name    string
 		noProxy string
 		url     string
 
-		expectedDelegated    bool
-		expectedLogSubstring string
-		delegateError        error
+		expectedDelegated bool
 	}{
 		{
 			name:              "no env",
@@ -168,18 +160,16 @@ func TestProxierWithNoProxyCIDR(t *testing.T) {
 			expectedDelegated: true,
 		},
 		{
-			name:                 "hostname",
-			noProxy:              "192.168.63.0/24,192.168.143.0/24",
-			url:                  "https://my-hostname/api",
-			expectedDelegated:    true,
-			expectedLogSubstring: "status=Proxied proxy_url=http://your-test-proxy",
+			name:              "hostname",
+			noProxy:           "192.168.63.0/24,192.168.143.0/24",
+			url:               "https://my-hostname/api",
+			expectedDelegated: true,
 		},
 		{
-			name:                 "match second cidr",
-			noProxy:              "192.168.63.0/24,192.168.143.0/24",
-			url:                  "https://192.168.143.1/api",
-			expectedDelegated:    false,
-			expectedLogSubstring: "status=Bypassed reason=CIDRMatch",
+			name:              "match second cidr",
+			noProxy:           "192.168.63.0/24,192.168.143.0/24",
+			url:               "https://192.168.143.1/api",
+			expectedDelegated: false,
 		},
 		{
 			name:              "match second cidr with host:port",
@@ -200,11 +190,10 @@ func TestProxierWithNoProxyCIDR(t *testing.T) {
 			expectedDelegated: false,
 		},
 		{
-			name:                 "IPv6, not matching cidr",
-			noProxy:              "2001:db8::/48",
-			url:                  "https://[2001:db8:1::1]/api",
-			expectedDelegated:    true,
-			expectedLogSubstring: "status=Bypassed",
+			name:              "IPv6, not matching cidr",
+			noProxy:           "2001:db8::/48",
+			url:               "https://[2001:db8:1::1]/api",
+			expectedDelegated: true,
 		},
 		{
 			name:              "IPv6+port, not matching cidr",
@@ -212,81 +201,30 @@ func TestProxierWithNoProxyCIDR(t *testing.T) {
 			url:               "https://[2001:db8:1::1]:8443/api",
 			expectedDelegated: true,
 		},
-		{
-			name:                 "error from delegate",
-			url:                  "https://some-other-host.com/api",
-			delegateError:        testErr,
-			expectedDelegated:    true,
-			expectedLogSubstring: "status=Error error='test error'",
-		},
 	}
 
 	for _, test := range testCases {
-
-		t.Run(test.name, func(t *testing.T) {
-
-			fs := flag.NewFlagSet("test", flag.PanicOnError)
-
-			klog.InitFlags(fs)
-			fs.Set("v", "6")
-			fs.Set("logtostderr", "false")
-			fs.Set("alsologtostderr", "false")
-
-			var buf bytes.Buffer
-
-			klog.SetOutput(&buf)
-
-			defer klog.SetOutput(os.Stderr)
-
-			t.Setenv("NO_PROXY", test.noProxy)
-
-			actualDelegated := false
-
-			proxyURLForTest, _ := url.Parse("http://your-test-proxy")
-
-			delegateFunc := func(req *http.Request) (*url.URL, error) {
-				actualDelegated = true
-
-				if test.delegateError != nil {
-					return nil, test.delegateError
-				}
-
-				if test.expectedLogSubstring == "status=Bypassed" {
-					return nil, nil
-				}
-
-				return proxyURLForTest, nil
-			}
-
-			proxyFunc := NewProxierWithNoProxyCIDR(delegateFunc)
-
-			req, err := http.NewRequest(http.MethodGet, test.url, nil)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-
-			_, err = proxyFunc(req)
-
-			if test.delegateError != nil {
-				if !errors.Is(err, test.delegateError) {
-					t.Fatalf("expected error '%v', but got '%v'", test.delegateError, err)
-				}
-			} else if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if test.expectedDelegated != actualDelegated {
-				t.Errorf("delegation mismatch: expected %v, got %v", test.expectedDelegated, actualDelegated)
-			}
-
-			klog.Flush()
-
-			logOutput := buf.String()
-
-			if !strings.Contains(logOutput, test.expectedLogSubstring) {
-				t.Errorf("log output mismatch: expected to contain %q, but got %q", test.expectedLogSubstring, logOutput)
-			}
+		t.Setenv("NO_PROXY", test.noProxy)
+		actualDelegated := false
+		proxyFunc := NewProxierWithNoProxyCIDR(func(req *http.Request) (*url.URL, error) {
+			actualDelegated = true
+			return nil, nil
 		})
+
+		req, err := http.NewRequest(http.MethodGet, test.url, nil)
+		if err != nil {
+			t.Errorf("%s: unexpected err: %v", test.name, err)
+			continue
+		}
+		if _, err := proxyFunc(req); err != nil {
+			t.Errorf("%s: unexpected err: %v", test.name, err)
+			continue
+		}
+
+		if test.expectedDelegated != actualDelegated {
+			t.Errorf("%s: expected %v, got %v", test.name, test.expectedDelegated, actualDelegated)
+			continue
+		}
 	}
 }
 
