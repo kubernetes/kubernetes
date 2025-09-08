@@ -1290,6 +1290,7 @@ func newClientset(opts fakeClient) *fake.Clientset {
 }
 
 type fakeWatch struct {
+	counter        int
 	version        string
 	failureType    fakeClientFailureType
 	certificatePEM []byte
@@ -1300,6 +1301,7 @@ func (w *fakeWatch) Stop() {
 
 func (w *fakeWatch) ResultChan() <-chan watch.Event {
 	var csr runtime.Object
+	var csr2 runtime.Object
 
 	switch w.version {
 	case "v1":
@@ -1321,6 +1323,11 @@ func (w *fakeWatch) ResultChan() <-chan watch.Event {
 					condition,
 				},
 				Certificate: []byte(w.certificatePEM),
+			},
+		}
+		csr2 = &certificatesv1.CertificateSigningRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 			},
 		}
 
@@ -1345,13 +1352,31 @@ func (w *fakeWatch) ResultChan() <-chan watch.Event {
 				Certificate: []byte(w.certificatePEM),
 			},
 		}
+
+		csr2 = &certificatesv1beta1.CertificateSigningRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+			},
+		}
 	}
 
 	c := make(chan watch.Event, 1)
-	c <- watch.Event{
-		Type:   watch.Added,
-		Object: csr,
+	if w.counter == 0 {
+		c <- watch.Event{
+			Type:   watch.Added,
+			Object: csr,
+		}
+		w.counter++
+		return c
 	}
+
+	c <- watch.Event{
+		Type:   watch.Bookmark,
+		Object: csr2,
+	}
+
+	w.counter--
+
 	return c
 }
 
