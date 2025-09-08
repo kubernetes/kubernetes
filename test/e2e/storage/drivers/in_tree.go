@@ -1276,7 +1276,7 @@ func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func() stor
 	}
 	return func() storageframework.TestDriver {
 		// custom tag to distinguish from tests of other volume types
-		testTags := []interface{}{fmt.Sprintf("[LocalVolumeType: %s]", volumeType)}
+		testTags := []interface{}{framework.WithLabel("LocalVolumeType: " + string(volumeType))}
 		// For GCE Local SSD volumes, we must run serially
 		if volumeType == utils.LocalVolumeGCELocalSSD {
 			testTags = append(testTags, framework.WithSerial())
