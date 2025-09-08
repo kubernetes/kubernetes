@@ -425,7 +425,7 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 			defer klog.LogToStderr(true)
 			ctx := context.Background()
 
-			CompareDeclarativeErrorsAndEmitMismatches(ctx, tc.imperativeErrs, tc.declarativeErrs, tc.takeover)
+			CompareDeclarativeErrorsAndEmitMismatches(ctx, tc.imperativeErrs, tc.declarativeErrs, tc.takeover, "test_validationIdentifier")
 
 			klog.Flush()
 			logOutput := buf.String()
@@ -511,7 +511,7 @@ func TestWithRecover(t *testing.T) {
 			defer klog.LogToStderr(true)
 
 			// Pass the takeover flag to panicSafeValidateFunc instead of relying on the feature gate
-			wrapped := panicSafeValidateFunc(tc.validateFn, tc.takeoverEnabled)
+			wrapped := panicSafeValidateFunc(tc.validateFn, tc.takeoverEnabled, "test_validationIdentifier")
 			gotErrs := wrapped(ctx, scheme, obj, nil, &validationConfigOption{opType: operation.Create, options: options, takeover: tc.takeoverEnabled})
 
 			klog.Flush()
@@ -605,7 +605,7 @@ func TestWithRecoverUpdate(t *testing.T) {
 			defer klog.LogToStderr(true)
 
 			// Pass the takeover flag to panicSafeValidateUpdateFunc instead of relying on the feature gate
-			wrapped := panicSafeValidateFunc(tc.validateFn, tc.takeoverEnabled)
+			wrapped := panicSafeValidateFunc(tc.validateFn, tc.takeoverEnabled, "test_validationIdentifier")
 			gotErrs := wrapped(ctx, scheme, obj, oldObj, &validationConfigOption{opType: operation.Update, options: options, takeover: tc.takeoverEnabled})
 
 			klog.Flush()
