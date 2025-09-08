@@ -185,6 +185,44 @@ func TestGRPCConnIsReused(t *testing.T) {
 	require.Equal(t, 2, reusedConns[conn], "expected counter to be 2 but got %d", reusedConns[conn])
 }
 
+func TestGRPCConnUsableAfterIdle(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	service := drapbv1.DRAPluginService
+	addr := path.Join(t.TempDir(), "dra.sock")
+	teardown, err := setupFakeGRPCServer(service, addr)
+	require.NoError(t, err)
+	defer teardown()
+
+	driverName := "dummy-driver"
+
+	// ensure the plugin we are using is registered
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	draPlugins.withIdleTimeout = 5 * time.Second
+	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, defaultClientCallTimeout), "add plugin")
+	plugin, err := draPlugins.GetPlugin(driverName)
+	tCtx.ExpectNoError(err, "get plugin")
+
+	// The connection doesn't really become idle because HandleConn
+	// kicks it back to ready by calling Connect. Just sleep long
+	// enough here, the code should be reached...
+	tCtx.Log("Waiting for idle timeout...")
+	time.Sleep(2 * draPlugins.withIdleTimeout)
+
+	req := &drapbv1.NodePrepareResourcesRequest{
+		Claims: []*drapbv1.Claim{
+			{
+				Namespace: "dummy-namespace",
+				UID:       "dummy-uid",
+				Name:      "dummy-claim",
+			},
+		},
+	}
+
+	callCtx := ktesting.WithTimeout(tCtx, 10*time.Second, "call timed out")
+	_, err = plugin.NodePrepareResources(callCtx, req)
+	tCtx.ExpectNoError(err, "NodePrepareResources")
+}
+
 func TestGetDRAPlugin(t *testing.T) {
 	for _, test := range []struct {
 		description string
