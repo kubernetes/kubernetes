@@ -41,6 +41,7 @@ import (
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -172,7 +173,7 @@ func TestRootFsStats(t *testing.T) {
 }
 
 func TestHasDedicatedImageFs(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	imageStatsExpected := &statsapi.FsStats{AvailableBytes: ptr.To[uint64](1)}
 
 	for desc, test := range map[string]struct {
@@ -215,7 +216,7 @@ func TestHasDedicatedImageFs(t *testing.T) {
 			containerFs: test.containerFsStats,
 		})
 
-		dedicated, err := provider.HasDedicatedImageFs(ctx)
+		dedicated, err := provider.HasDedicatedImageFs(tCtx)
 		assert.NoError(t, err)
 		assert.Equal(t, test.dedicated, dedicated)
 	}
