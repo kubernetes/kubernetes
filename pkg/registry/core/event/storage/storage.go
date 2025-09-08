@@ -17,6 +17,8 @@ limitations under the License.
 package storage
 
 import (
+	"sync"
+	
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -64,4 +66,20 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"ev"}
+}
+
+// Singleton storage variables
+var (
+	eventOnce       sync.Once
+	eventREST       *REST
+	eventInitErr    error
+)
+
+// GetOrCreateREST returns a singleton instance of REST for events.
+// This ensures multiple API versions reuse the same storage.
+func GetOrCreateREST(optsGetter generic.RESTOptionsGetter, ttl uint64) (*REST, error) {
+	eventOnce.Do(func() {
+		eventREST, eventInitErr = NewREST(optsGetter, ttl)
+	})
+	return eventREST, eventInitErr
 }
