@@ -1042,6 +1042,169 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"), "Device health should recover to Healthy after plugin restarts")
 		})
 
+		// Reconnection verification after connection drop
+		ginkgo.It("should automatically reconnect both DRA and Health API after connection drop", func(ctx context.Context) {
+			ginkgo.By("Starting the test driver")
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, f.Namespace.Name, getNodeName(ctx, f), driverName)
+
+			className := "reconnect-test-class"
+			claimName := "reconnect-test-claim"
+			podName := "reconnect-test-pod"
+			poolNameForTest := "pool-reconnect"
+			deviceNameForTest := "dev-reconnect-0"
+
+			ginkgo.By("Creating initial pod to establish connection")
+			pod := createHealthTestPodAndClaim(ctx, f, driverName, podName, claimName, className, poolNameForTest, deviceNameForTest)
+
+			ginkgo.By("Waiting for the pod to be running")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+
+			ginkgo.By("Establishing baseline health status")
+			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
+				PoolName:   poolNameForTest,
+				DeviceName: deviceNameForTest,
+				Health:     "Healthy",
+			}
+			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
+			}).WithTimeout(30*time.Second).WithPolling(1*time.Second).Should(gomega.Equal("Healthy"),
+				"Initial health status should be Healthy")
+
+			ginkgo.By("Simulating connection drop by stopping the plugin")
+			kubeletPlugin.Stop()
+
+			ginkgo.By("Verifying health transitions to Unknown after connection drop")
+			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal("Unknown"),
+				"Health should become Unknown when plugin connection is lost")
+
+			ginkgo.By("Restarting the plugin to simulate reconnection")
+			kubeletPlugin = newKubeletPlugin(ctx, f.ClientSet, f.Namespace.Name, getNodeName(ctx, f), driverName)
+
+			ginkgo.By("Waiting for plugin registration after restart")
+			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered,
+				"Plugin should re-register after restart")
+
+			ginkgo.By("Creating a new pod to trigger NodePrepareResources after reconnection")
+			className2 := "reconnect-test-class-2"
+			claimName2 := "reconnect-test-claim-2"
+			podName2 := "reconnect-test-pod-2"
+			poolNameForTest2 := "pool-reconnect-2"
+			deviceNameForTest2 := "dev-reconnect-1"
+
+			pod2 := createHealthTestPodAndClaim(ctx, f, driverName, podName2, claimName2, className2, poolNameForTest2, deviceNameForTest2)
+
+			ginkgo.By("Verifying NodePrepareResources works after reconnection")
+			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodePrepareResourcesSucceeded,
+				"NodePrepareResources should work with the new connection")
+
+			ginkgo.By("Waiting for the new pod to be running")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2))
+
+			ginkgo.By("Verifying Health API works with the new connection")
+			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
+				PoolName:   poolNameForTest2,
+				DeviceName: deviceNameForTest2,
+				Health:     "Healthy",
+			}
+
+			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+				return getDeviceHealthFromAPIServer(f, pod2.Namespace, pod2.Name, driverName, claimName2, poolNameForTest2, deviceNameForTest2)
+			}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"),
+				"Health API should work with the reconnected connection")
+
+			ginkgo.By("Verifying health updates continue to work")
+			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
+				PoolName:   poolNameForTest2,
+				DeviceName: deviceNameForTest2,
+				Health:     "Unhealthy",
+			}
+
+			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+				return getDeviceHealthFromAPIServer(f, pod2.Namespace, pod2.Name, driverName, claimName2, poolNameForTest2, deviceNameForTest2)
+			}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Unhealthy"),
+				"Health API should continue working after reconnection")
+		})
+
+		// Concurrent operations verification
+		ginkgo.It("should handle concurrent DRA operations and health monitoring without connection issues", func(ctx context.Context) {
+			ginkgo.By("Starting the test driver")
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, f.Namespace.Name, getNodeName(ctx, f), driverName)
+
+			numPods := 3
+			pods := make([]*v1.Pod, numPods)
+			claimNames := make([]string, numPods)
+			poolNames := make([]string, numPods)
+			deviceNames := make([]string, numPods)
+
+			ginkgo.By(fmt.Sprintf("Creating %d pods concurrently to stress test connection management", numPods))
+			for i := 0; i < numPods; i++ {
+				className := fmt.Sprintf("concurrent-class-%d", i)
+				claimNames[i] = fmt.Sprintf("concurrent-claim-%d", i)
+				podName := fmt.Sprintf("concurrent-pod-%d", i)
+				poolNames[i] = fmt.Sprintf("pool-concurrent-%d", i)
+				deviceNames[i] = fmt.Sprintf("dev-concurrent-%d", i)
+
+				pods[i] = createHealthTestPodAndClaim(ctx, f, driverName, podName, claimNames[i], className, poolNames[i], deviceNames[i])
+			}
+
+			ginkgo.By("Waiting for all pods to be running")
+			for i, pod := range pods {
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod),
+					fmt.Sprintf("Pod %d should be running", i))
+			}
+
+			ginkgo.By("Verifying NodePrepareResources was called for all pods")
+			gomega.Eventually(func() int {
+				return kubeletPlugin.CountCalls("/NodePrepareResources")
+			}).WithTimeout(retryTestTimeout).Should(gomega.BeNumerically(">=", numPods),
+				"NodePrepareResources should be called at least once per pod")
+
+			ginkgo.By("Sending health updates for all devices concurrently")
+			for i := 0; i < numPods; i++ {
+				kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
+					PoolName:   poolNames[i],
+					DeviceName: deviceNames[i],
+					Health:     "Healthy",
+				}
+			}
+
+			ginkgo.By("Verifying all health updates are correctly reflected")
+			for i := 0; i < numPods; i++ {
+				pod := pods[i]
+				poolName := poolNames[i]
+				deviceName := deviceNames[i]
+				claimName := claimNames[i]
+
+				gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+					return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolName, deviceName)
+				}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"),
+					fmt.Sprintf("Health for device %s should be Healthy", deviceName))
+			}
+
+			ginkgo.By("Changing health status for all devices to verify continued operation")
+			for i := 0; i < numPods; i++ {
+				kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
+					PoolName:   poolNames[i],
+					DeviceName: deviceNames[i],
+					Health:     "Unhealthy",
+				}
+			}
+
+			ginkgo.By("Verifying all health changes are correctly reflected")
+			for i := 0; i < numPods; i++ {
+				pod := pods[i]
+				poolName := poolNames[i]
+				deviceName := deviceNames[i]
+				claimName := claimNames[i]
+
+				gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+					return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolName, deviceName)
+				}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Unhealthy"),
+					fmt.Sprintf("Health for device %s should be Unhealthy", deviceName))
+			}
+		})
 	})
 
 	// This matches the "Resource Health" context above, except that it contains tests which need to run
