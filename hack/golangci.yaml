@@ -239,6 +239,7 @@ linters:
             contextual k8s.io/kubernetes/pkg/kubelet/cadvisor/.*
             contextual k8s.io/kubernetes/pkg/kubelet/config/.*
             contextual k8s.io/kubernetes/pkg/kubelet/oom/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/server/.*
             contextual k8s.io/kubernetes/pkg/kubelet/status/.*
             contextual k8s.io/kubernetes/pkg/kubelet/sysctl/.*
             contextual k8s.io/kubernetes/pkg/kubelet/winstats/.*

@@ -617,7 +617,7 @@ type fakeResourceAnalyzer struct {
 	podVolumeStats serverstats.PodVolumeStats
 }
 
-func (o *fakeResourceAnalyzer) Start()                                               {}
+func (o *fakeResourceAnalyzer) Start(context.Context)                                {}
 func (o *fakeResourceAnalyzer) Get(context.Context, bool) (*statsapi.Summary, error) { return nil, nil }
 func (o *fakeResourceAnalyzer) GetCPUAndMemoryStats(context.Context) (*statsapi.Summary, error) {
 	return nil, nil
