@@ -18,6 +18,7 @@ package qos
 
 import (
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -82,19 +83,6 @@ func getQOSResources(list v1.ResourceList) sets.Set[string] {
 	return qosResources
 }
 
-func resourceListEqual(a v1.ResourceList, b v1.ResourceList) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for name, qa := range a {
-		qb, exists := b[name]
-		if !exists || qb.Cmp(qa) != 0 {
-			return false
-		}
-	}
-	return true
-}
-
 // ComputePodQOS evaluates the list of containers to determine a pod's QoS class. This function is more
 // expensive than GetPodQOS which should be used for pods having a non-empty .Status.QOSClass.
 // A pod is besteffort if none of its containers have specified any requests or limits.
@@ -107,7 +95,7 @@ func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 	if len(requests) == 0 && len(limits) == 0 {
 		return v1.PodQOSBestEffort
 	}
-	if isGuaranteed && resourceListEqual(requests, limits) {
+	if isGuaranteed && apiequality.Semantic.DeepEqual(requests, limits) {
 		return v1.PodQOSGuaranteed
 	}
 	return v1.PodQOSBurstable

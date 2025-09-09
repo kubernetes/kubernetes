@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -275,103 +276,6 @@ func newPodWithInitContainers(name string, containers []v1.Container, initContai
 	}
 }
 
-func TestResourceListEqual(t *testing.T) {
-	tests := []struct {
-		name     string
-		a        map[v1.ResourceName]string
-		b        map[v1.ResourceName]string
-		expected bool
-	}{
-		{
-			name:     "both nil",
-			a:        nil,
-			b:        nil,
-			expected: true,
-		},
-		{
-			name:     "nil vs empty map",
-			a:        nil,
-			b:        map[v1.ResourceName]string{},
-			expected: true,
-		},
-		{
-			name: "identical keys and values",
-			a: map[v1.ResourceName]string{
-				v1.ResourceCPU:    "1",
-				v1.ResourceMemory: "1Gi",
-			},
-			b: map[v1.ResourceName]string{
-				v1.ResourceCPU:    "1",
-				v1.ResourceMemory: "1Gi",
-			},
-			expected: true,
-		},
-		{
-			name: "different textual forms but equal quantities",
-			a: map[v1.ResourceName]string{
-				v1.ResourceCPU:    "1000m",      // == 1
-				v1.ResourceMemory: "1073741824", // bytes == 1Gi
-			},
-			b: map[v1.ResourceName]string{
-				v1.ResourceCPU:    "1",
-				v1.ResourceMemory: "1Gi",
-			},
-			expected: true,
-		},
-		{
-			name: "value differs",
-			a: map[v1.ResourceName]string{
-				v1.ResourceCPU:    "999m",
-				v1.ResourceMemory: "1Gi",
-			},
-			b: map[v1.ResourceName]string{
-				v1.ResourceCPU:    "1",
-				v1.ResourceMemory: "1Gi",
-			},
-			expected: false,
-		},
-		{
-			name: "missing key in b",
-			a: map[v1.ResourceName]string{
-				v1.ResourceMemory: "1Gi",
-			},
-			b:        map[v1.ResourceName]string{},
-			expected: false,
-		},
-		{
-			name: "extra key in b",
-			a: map[v1.ResourceName]string{
-				v1.ResourceCPU: "1",
-			},
-			b: map[v1.ResourceName]string{
-				v1.ResourceCPU:    "1",
-				v1.ResourceMemory: "1Gi",
-			},
-			expected: false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			actual := resourceListEqual(mustResourceList(tc.a), mustResourceList(tc.b))
-			if actual != tc.expected {
-				t.Errorf("resourceListEqual() = %v, expected %v\n a=%v\n b=%v", actual, tc.expected, tc.a, tc.b)
-			}
-		})
-	}
-}
-
-func mustResourceList(m map[v1.ResourceName]string) v1.ResourceList {
-	if m == nil {
-		return nil
-	}
-	out := v1.ResourceList{}
-	for k, s := range m {
-		out[k] = resource.MustParse(s)
-	}
-	return out
-}
-
 func TestCollectPodLevelResources(t *testing.T) {
 	testCases := []struct {
 		name               string
@@ -431,10 +335,10 @@ func TestCollectPodLevelResources(t *testing.T) {
 			if actualGuaranteed != testCase.expectedGuaranteed {
 				t.Errorf("invalid isGuaranteed, expected: %v, actual: %v", testCase.expectedGuaranteed, actualGuaranteed)
 			}
-			if !resourceListEqual(actualReqs, testCase.expectedReqs) {
+			if !apiequality.Semantic.DeepEqual(actualReqs, testCase.expectedReqs) {
 				t.Errorf("invalid requests resource, expected: %v, actual: %v", testCase.expectedReqs, actualReqs)
 			}
-			if !resourceListEqual(actualLims, testCase.expectedLims) {
+			if !apiequality.Semantic.DeepEqual(actualLims, testCase.expectedLims) {
 				t.Errorf("invalid limits resource, expected: %v, actual: %v", testCase.expectedLims, actualLims)
 			}
 		})
@@ -567,10 +471,10 @@ func TestCollectContainerLevelResources(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actualReq, actualLim, actualGuaranteed := collectContainerLevelResources(tc.pod)
 
-			if !resourceListEqual(actualReq, tc.expectedReq) {
+			if !apiequality.Semantic.DeepEqual(actualReq, tc.expectedReq) {
 				t.Errorf("requests mismatch: actual=%v expected=%v", actualReq, tc.expectedReq)
 			}
-			if !resourceListEqual(actualLim, tc.expectedLim) {
+			if !apiequality.Semantic.DeepEqual(actualLim, tc.expectedLim) {
 				t.Errorf("limits mismatch: actual=%v expected=%v", actualLim, tc.expectedLim)
 			}
 			if actualGuaranteed != tc.expectedGuaranteed {
