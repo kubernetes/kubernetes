@@ -71,6 +71,11 @@ func recognizers() []csrRecognizer {
 			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "nodeclient", Version: "*"},
 			successMessage: "Auto approving kubelet client certificate after SubjectAccessReview.",
 		},
+		{
+			recognize:      isSelfNodeServingCert,
+			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "selfnodeserving", Version: "*"},
+			successMessage: "Auto approving self kubelet server certificate after SubjectAccessReview.",
+		},
 	}
 	return recognizers
 }
@@ -168,4 +173,20 @@ func usagesToSet(usages []capi.KeyUsage) sets.String {
 		result.Insert(string(usage))
 	}
 	return result
+}
+
+func isSelfNodeServingCert(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {
+	if csr.Spec.Username != x509cr.Subject.CommonName {
+		return false
+	}
+	if csr.Spec.SignerName != capi.KubeletServingSignerName {
+		return false
+	}
+	// dnsNames and ipAddresses are not validated because this generic controller cannot check infra details.
+	// letting any kubelet get a serving cert for any DNS/IP still seems better than turning off all TLS verification.
+	// combined with --kubelet-validate-node-name, we can know that TLS connections from API server to kubelet
+	// are landing on a node that at one point could authenticate to the API server as that node name.  Thus,
+	// the security of that TLS connection is the same as the security of bootstrapping process that gave the node
+	// its client identity.
+	return capihelper.IsKubeletServingCSR(x509cr, usagesToSet(csr.Spec.Usages))
 }
