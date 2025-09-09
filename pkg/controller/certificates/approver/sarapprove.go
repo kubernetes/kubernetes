@@ -183,7 +183,8 @@ func isSelfNodeServingCert(csr *capi.CertificateSigningRequest, x509cr *x509.Cer
 		return false
 	}
 	// dnsNames and ipAddresses are not validated because this generic controller cannot check infra details.
-	// letting any kubelet get a serving cert for any DNS/IP still seems better than turning off all TLS verification.
+	// letting any kubelet get a serving cert for any DNS/IP still seems better than turning off all TLS verification
+	// (assuming that the signer uses a distinct CA for this purpose and therefore nodes cannot MITM unrelated traffic).
 	// combined with --kubelet-validate-node-name, we can know that TLS connections from API server to kubelet
 	// are landing on a node that at one point could authenticate to the API server as that node name.  Thus,
 	// the security of that TLS connection is the same as the security of bootstrapping process that gave the node
