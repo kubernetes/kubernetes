@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -91,7 +92,7 @@ var _ = SIGDescribe("LimitRange", func() {
 				return f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Watch(ctx, options)
 			},
 		}
-		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.LimitRange{})
+		_, informer, w, _ := watchtools.NewIndexerInformerWatcherWithLogger(klog.FromContext(ctx), lw, &v1.LimitRange{})
 		defer w.Stop()
 
 		timeoutCtx, cancel := context.WithTimeout(ctx, wait.ForeverTestTimeout)
