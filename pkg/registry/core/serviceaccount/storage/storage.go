@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -86,4 +87,38 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"sa"}
+}
+
+// Singleton storage for ServiceAccounts
+var (
+	serviceAccountOnce    sync.Once
+	serviceAccountREST    *REST
+	serviceAccountInitErr error
+)
+
+// GetOrCreateREST returns a singleton instance of REST for service accounts.
+// This ensures multiple API versions reuse the same storage.
+func GetOrCreateREST(
+	optsGetter generic.RESTOptionsGetter,
+	issuer token.TokenGenerator,
+	auds authenticator.Audiences,
+	max time.Duration,
+	podStorage, secretStorage, nodeStorage rest.Getter,
+	extendExpiration bool,
+	maxExtendedExpiration time.Duration,
+) (*REST, error) {
+	serviceAccountOnce.Do(func() {
+		serviceAccountREST, serviceAccountInitErr = NewREST(
+			optsGetter,
+			issuer,
+			auds,
+			max,
+			podStorage,
+			secretStorage,
+			nodeStorage,
+			extendExpiration,
+			maxExtendedExpiration,
+		)
+	})
+	return serviceAccountREST, serviceAccountInitErr
 }
