@@ -118,12 +118,15 @@ func collectPodResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
 		return collectPodLevelResources(pod)
 	}
+	return collectContainerLevelResources(pod)
+}
 
-	// note, ephemeral containers are not considered for QoS as they cannot define resources
+func collectContainerLevelResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
 	requests := v1.ResourceList{}
 	limits := v1.ResourceList{}
 	isGuaranteed := true
 
+	// note, ephemeral containers are not considered for QoS as they cannot define resources
 	allContainers := []v1.Container{}
 	allContainers = append(allContainers, pod.Spec.Containers...)
 	allContainers = append(allContainers, pod.Spec.InitContainers...)

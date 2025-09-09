@@ -197,6 +197,145 @@ func TestCollectPodLevelResources(t *testing.T) {
 	}
 }
 
+func TestCollectContainerLevelResources(t *testing.T) {
+	tests := []struct {
+		name               string
+		pod                *v1.Pod
+		expectedReq        v1.ResourceList
+		expectedLim        v1.ResourceList
+		expectedGuaranteed bool
+	}{
+		{
+			name: "single container: full CPU+Mem limits -> Guaranteed",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer("c1",
+							getResourceList("100m", "200Mi"),
+							getResourceList("200m", "400Mi"),
+						),
+					},
+				},
+			},
+			expectedReq:        getResourceList("100m", "200Mi"),
+			expectedLim:        getResourceList("200m", "400Mi"),
+			expectedGuaranteed: true,
+		},
+		{
+			name: "multiple containers + init: one container missing CPU limit -> NotGuaranteed (sums include init)",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							getResourceList("100m", "100Mi"),
+							getResourceList("200m", "300Mi"),
+						),
+						newContainer(
+							"c2",
+							getResourceList("300m", "100Mi"),
+							getResourceList("", "300Mi"), // missing CPU limit
+						),
+					},
+					InitContainers: []v1.Container{
+						newContainer(
+							"init1",
+							getResourceList("50m", "50Mi"),
+							getResourceList("50m", "50Mi"),
+						),
+					},
+				},
+			},
+			// Requests sum : CPU 100m+300m+50m=450m, Mem 100Mi+100Mi+50Mi=250Mi
+			expectedReq: getResourceList("450m", "250Mi"),
+			// Limits sum : CPU 200m+0+50m=250m,    Mem 300Mi+300Mi+50Mi=650Mi
+			expectedLim:        getResourceList("250m", "650Mi"),
+			expectedGuaranteed: false,
+		},
+		{
+			name: "only CPU limit (Mem limit absent/zero) -> NotGuaranteed",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							getResourceList("0", "0"),   // ignoring zero req
+							getResourceList("100m", ""), // missing memory limit, ignoring absent
+						),
+					},
+				},
+			},
+			expectedReq:        v1.ResourceList{},
+			expectedLim:        getResourceList("100m", ""),
+			expectedGuaranteed: false,
+		},
+		{
+			name: "two containers both with CPU+Mem limits -> Guaranteed; sums across both",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							getResourceList("100m", "100Mi"),
+							getResourceList("200m", "200Mi"),
+						),
+						newContainer(
+							"c2",
+							getResourceList("300m", "400Mi"),
+							getResourceList("800m", "1Gi"),
+						),
+					},
+				},
+			},
+			// Requests sum : CPU 400m, Mem 500Mi
+			expectedReq: getResourceList("400m", "500Mi"),
+			// Limits sum : CPU 1000m, Mem 200Mi + 1Gi = 1224Mi
+			expectedLim:        getResourceList("1000m", "1224Mi"),
+			expectedGuaranteed: true,
+		},
+		{
+			name: "ephemeral-container ignored for QoS; Guaranteed if CPU+Mem limits exist",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							getResourceList("250m", "256Mi"),
+							getResourceList("500m", "512Mi"),
+						),
+					},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: v1.EphemeralContainerCommon{
+								Name: "ec1",
+							},
+						},
+					},
+				},
+			},
+			expectedReq:        getResourceList("250m", "256Mi"),
+			expectedLim:        getResourceList("500m", "512Mi"),
+			expectedGuaranteed: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actualReq, actualLim, actualGuaranteed := collectContainerLevelResources(tc.pod)
+
+			if !resourceListEqual(actualReq, tc.expectedReq) {
+				t.Errorf("requests mismatch: actual=%v expected=%v", actualReq, tc.expectedReq)
+			}
+			if !resourceListEqual(actualLim, tc.expectedLim) {
+				t.Errorf("limits mismatch: actual=%v expected=%v", actualLim, tc.expectedLim)
+			}
+			if actualGuaranteed != tc.expectedGuaranteed {
+				t.Errorf("isGuaranteed mismatch: actual=%v expected=%v", actualGuaranteed, tc.expectedGuaranteed)
+			}
+		})
+	}
+}
+
 func TestComputePodQOS(t *testing.T) {
 	testCases := []struct {
 		pod                      *v1.Pod
