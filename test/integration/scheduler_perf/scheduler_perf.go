@@ -2103,6 +2103,23 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 		select {
 		case <-tCtx.Done():
 			tCtx.Logf("Completed after seeing %d scheduled pod: %v", countScheduledPods, context.Cause(tCtx))
+
+			// Sanity check: at least one pod should have been scheduled,
+			// giving us a non-zero average.
+			//
+			// This is important because otherwise "no pods scheduled because of constant
+			// failure" would not get detected in unit tests. For benchmarks
+			// it's less important, but indicates that the time period
+			// might have been too small.
+			//
+			// The collector logs "Failed to measure SchedulingThroughput ... Increase pods and/or nodes to make scheduling take longer"
+			// but that is hard to spot.
+			//
+			// The non-steady case blocks until all pods have been scheduled
+			// and doesn't need this check.
+			if countScheduledPods == 0 {
+				return errors.New("no pod at all got scheduled, either because of a problem or because the test interval was too small")
+			}
 			return nil
 		case <-scheduledPods:
 			countScheduledPods++
