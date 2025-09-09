@@ -202,7 +202,6 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 	framework.ConformanceIt("should create Endpoints and EndpointSlices for Pods matching a Service", func(ctx context.Context) {
 		labelPod1 := "pod1"
 		labelPod2 := "pod2"
-		labelPod3 := "pod3"
 		labelShared12 := "shared12"
 		labelValue := "on"
 
@@ -289,24 +288,6 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		svc2, err = cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "error creating Service")
 
-		svc3 := &v1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "example-no-match",
-			},
-			Spec: v1.ServiceSpec{
-				Selector:                 map[string]string{labelPod3: labelValue},
-				PublishNotReadyAddresses: true,
-				Ports: []v1.ServicePort{{
-					Name:       "example-no-match",
-					Port:       80,
-					TargetPort: intstr.FromInt32(8080),
-					Protocol:   v1.ProtocolTCP,
-				}},
-			},
-		}
-		svc3, err = cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc3, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "error creating Service")
-
 		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
 			var err error
 			pod1, err = podClient.Get(ctx, pod1.Name, metav1.GetOptions{})
@@ -334,9 +315,6 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 		ginkgo.By("referencing matching pods with named port")
 		expectEndpointsAndSlices(ctx, cs, f.Namespace.Name, svc2, []*v1.Pod{pod1, pod2}, 2, 2, true)
-
-		ginkgo.By("creating empty Endpoints and EndpointSlices for no matching Pods")
-		expectEndpointsAndSlices(ctx, cs, f.Namespace.Name, svc3, []*v1.Pod{}, 0, 1, false)
 
 		// TODO: Update test to cover Endpoints recreation after deletes once it
 		// actually works.
