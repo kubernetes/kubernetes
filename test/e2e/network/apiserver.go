@@ -19,7 +19,6 @@ package network
 import (
 	"context"
 
-	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -69,6 +68,23 @@ var _ = common.SIGDescribe("API Server", func() {
 		if len(endpoints.Subsets) == 0 {
 			framework.Failf("Expected at least 1 subset in endpoints, got %d: %#v", len(endpoints.Subsets), endpoints.Subsets)
 		}
+
+		// get the addresses and ports from the Endpoints
+		epAddresses := sets.New[string]()
+		epPorts := sets.New[int32]()
+		for _, subset := range endpoints.Subsets {
+			for _, addr := range subset.Addresses {
+				epAddresses.Insert(addr.IP)
+			}
+			for _, addr := range subset.NotReadyAddresses {
+				epAddresses.Insert(addr.IP)
+			}
+			for _, port := range subset.Ports {
+				epPorts.Insert(port.Port)
+			}
+		}
+		framework.Logf("Endpoints addresses: %v , ports: %v", sets.List(epAddresses), sets.List(epPorts))
+
 		// verify EndpointSlices for the API servers exist
 		endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{
 			LabelSelector: "kubernetes.io/service-name=" + name,
@@ -78,63 +94,39 @@ var _ = common.SIGDescribe("API Server", func() {
 			framework.Failf("Expected at least 1 EndpointSlice, got %d: %#v", len(endpoints.Subsets), endpoints.Subsets)
 		}
 
-		if !endpointSlicesEqual(endpoints, endpointSliceList) {
-			framework.Failf("Expected EndpointSlice to have same addresses and port as Endpoints, got %#v: %#v", endpoints, endpointSliceList)
+		// get the addresses and ports from the EndpointSlice(s). Since the
+		// Endpoints are single stack, and match the cluster's primary IP family,
+		// we ignore EndpointSlice(s) of the other IP family.
+		var addrType discoveryv1.AddressType
+		if framework.TestContext.ClusterIsIPv6() {
+			addrType = discoveryv1.AddressTypeIPv6
+		} else {
+			addrType = discoveryv1.AddressTypeIPv4
 		}
 
-	})
-})
-
-// endpointSlicesEqual compare if the Endpoint and the EndpointSliceList contains the same endpoints values
-// as in addresses and ports, considering Ready and Unready addresses
-func endpointSlicesEqual(endpoints *v1.Endpoints, endpointSliceList *discoveryv1.EndpointSliceList) bool {
-	// get the apiserver endpoint addresses
-	epAddresses := sets.NewString()
-	epPorts := sets.NewInt32()
-	for _, subset := range endpoints.Subsets {
-		for _, addr := range subset.Addresses {
-			epAddresses.Insert(addr.IP)
-		}
-		for _, addr := range subset.NotReadyAddresses {
-			epAddresses.Insert(addr.IP)
-		}
-		for _, port := range subset.Ports {
-			epPorts.Insert(port.Port)
-		}
-	}
-	framework.Logf("Endpoints addresses: %v , ports: %v", epAddresses.List(), epPorts.List())
-
-	// Endpoints are single stack, and must match the primary IP family of the Service kubernetes.default
-	// However, EndpointSlices can be IPv4 or IPv6, we can only compare the Slices that match the same IP family
-	// framework.TestContext.ClusterIsIPv6() reports the IP family of the kubernetes.default service
-	var addrType discoveryv1.AddressType
-	if framework.TestContext.ClusterIsIPv6() {
-		addrType = discoveryv1.AddressTypeIPv6
-	} else {
-		addrType = discoveryv1.AddressTypeIPv4
-	}
-
-	// get the apiserver addresses from the endpoint slice list
-	sliceAddresses := sets.NewString()
-	slicePorts := sets.NewInt32()
-	for _, slice := range endpointSliceList.Items {
-		if slice.AddressType != addrType {
-			framework.Logf("Skipping slice %s: wanted %s family, got %s", slice.Name, addrType, slice.AddressType)
-			continue
-		}
-		for _, s := range slice.Endpoints {
-			sliceAddresses.Insert(s.Addresses...)
-		}
-		for _, ports := range slice.Ports {
-			if ports.Port != nil {
-				slicePorts.Insert(*ports.Port)
+		sliceAddresses := sets.New[string]()
+		slicePorts := sets.New[int32]()
+		for _, slice := range endpointSliceList.Items {
+			if slice.AddressType != addrType {
+				framework.Logf("Skipping slice %s: wanted %s family, got %s", slice.Name, addrType, slice.AddressType)
+				continue
+			}
+			for _, s := range slice.Endpoints {
+				sliceAddresses.Insert(s.Addresses...)
+			}
+			for _, port := range slice.Ports {
+				if port.Port != nil {
+					slicePorts.Insert(*port.Port)
+				}
 			}
 		}
-	}
 
-	framework.Logf("EndpointSlices addresses: %v , ports: %v", sliceAddresses.List(), slicePorts.List())
-	if sliceAddresses.Equal(epAddresses) && slicePorts.Equal(epPorts) {
-		return true
-	}
-	return false
-}
+		framework.Logf("EndpointSlices addresses: %v , ports: %v", sets.List(sliceAddresses), sets.List(slicePorts))
+		if !sliceAddresses.Equal(epAddresses) {
+			framework.Failf("EndpointSlice addresses do not match Endpoints addresses")
+		}
+		if !slicePorts.Equal(epPorts) {
+			framework.Failf("EndpointSlice ports do not match Endpoints ports")
+		}
+	})
+})
