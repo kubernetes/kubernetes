@@ -47,7 +47,8 @@ func TestNoEvents(t *testing.T) {
 		metrics.Register()
 
 		tracker := &basicPodStartupLatencyTracker{
-			pods: map[types.UID]*perPodState{},
+			pods:         map[types.UID]*perPodState{},
+			excludedPods: map[types.UID]bool{},
 		}
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
@@ -68,7 +69,8 @@ func TestPodsRunningBeforeKubeletStarted(t *testing.T) {
 		metrics.Register()
 
 		tracker := &basicPodStartupLatencyTracker{
-			pods: map[types.UID]*perPodState{},
+			pods:         map[types.UID]*perPodState{},
+			excludedPods: map[types.UID]bool{},
 		}
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
@@ -129,7 +131,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		metrics.Register()
 
 		tracker := &basicPodStartupLatencyTracker{
-			pods:  map[types.UID]*perPodState{},
+			pods: map[types.UID]*perPodState{}, excludedPods: map[types.UID]bool{},
 			clock: fakeClock,
 		}
 
@@ -210,7 +212,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		metrics.Register()
 
 		tracker := &basicPodStartupLatencyTracker{
-			pods:  map[types.UID]*perPodState{},
+			pods: map[types.UID]*perPodState{}, excludedPods: map[types.UID]bool{},
 			clock: fakeClock,
 		}
 
@@ -315,7 +317,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		metrics.Register()
 
 		tracker := &basicPodStartupLatencyTracker{
-			pods:  map[types.UID]*perPodState{},
+			pods: map[types.UID]*perPodState{}, excludedPods: map[types.UID]bool{},
 			clock: fakeClock,
 		}
 
@@ -333,7 +335,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		fakeClock.SetTime(frozenTime.Add(time.Second * 4))
 		tracker.RecordInitContainerFinished(types.UID(uid), fakeClock.Now())
 
-		// Init container 2 image pull: 4.2s-5.2s (sequential - after init-1 completes)
+		// Init container 2 image pull: 4.2s-5.2s
 		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 4200))
 		tracker.RecordImageStartedPulling(podInit.UID)
 		fakeClock.SetTime(frozenTime.Add(time.Millisecond * 5200))
@@ -386,6 +388,211 @@ kubelet_pod_start_sli_duration_seconds_count 1
 	})
 }
 
+func TestImmediatelySchedulablePods(t *testing.T) {
+	t.Run("pods not immediately schedulable should be excluded from tracking", func(t *testing.T) {
+		wants := ""
+
+		fakeClock := testingclock.NewFakeClock(frozenTime)
+		metrics.Register()
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods:         map[types.UID]*perPodState{},
+			excludedPods: map[types.UID]bool{},
+			clock:        fakeClock,
+		}
+
+		// pod that is not immediately schedulable (PodScheduled=False)
+		podNotSchedulable := buildInitializingPod()
+		podNotSchedulable.UID = "not-schedulable-pod"
+		podNotSchedulable.Status.Conditions = []corev1.PodCondition{
+			{
+				Type:   corev1.PodScheduled,
+				Status: corev1.ConditionFalse,
+				Reason: "Unschedulable",
+			},
+		}
+		tracker.ObservedPodOnWatch(podNotSchedulable, frozenTime)
+		assert.Empty(t, tracker.pods, "Pod with PodScheduled=False should not be tracked")
+
+		// pod that is immediately schedulable (PodScheduled=True)
+		podSchedulable := buildInitializingPod()
+		podSchedulable.UID = "schedulable-pod"
+		podSchedulable.Status.Conditions = []corev1.PodCondition{
+			{
+				Type:   corev1.PodScheduled,
+				Status: corev1.ConditionTrue,
+				Reason: "Scheduled",
+			},
+		}
+		tracker.ObservedPodOnWatch(podSchedulable, frozenTime)
+		assert.Len(t, tracker.pods, 1, "Pod with PodScheduled=True should be tracked")
+
+		// pod without PodScheduled condition
+		podNoCondition := buildInitializingPod()
+		podNoCondition.UID = "no-condition-pod"
+		tracker.ObservedPodOnWatch(podNoCondition, frozenTime)
+		assert.Len(t, tracker.pods, 2, "Pod without PodScheduled condition should be tracked by default")
+
+		// Verify metrics are empty
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
+			t.Fatal(err)
+		}
+
+		// cleanup
+		tracker.DeletePodStartupState(podSchedulable.UID)
+		tracker.DeletePodStartupState(podNoCondition.UID)
+		assert.Empty(t, tracker.pods)
+		metrics.PodStartSLIDuration.Reset()
+	})
+
+	t.Run("pod observed as schedulable first, then becomes unschedulable should not be tracked", func(t *testing.T) {
+		wants := ""
+
+		fakeClock := testingclock.NewFakeClock(frozenTime)
+		metrics.Register()
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods: map[types.UID]*perPodState{}, excludedPods: map[types.UID]bool{},
+			clock: fakeClock,
+		}
+
+		// First observe pod as schedulable
+		podSchedulable := buildInitializingPod()
+		podSchedulable.UID = "becomes-unschedulable"
+		tracker.ObservedPodOnWatch(podSchedulable, frozenTime)
+		assert.Len(t, tracker.pods, 1, "Pod should be tracked initially")
+
+		// Later observe the same pod as unschedulable
+		podUnschedulable := buildInitializingPod()
+		podUnschedulable.UID = "becomes-unschedulable"
+		podUnschedulable.Status.Conditions = []corev1.PodCondition{
+			{
+				Type:   corev1.PodScheduled,
+				Status: corev1.ConditionFalse,
+				Reason: "Unschedulable",
+			},
+		}
+
+		tracker.ObservedPodOnWatch(podUnschedulable, frozenTime.Add(time.Second))
+		assert.Empty(t, tracker.pods, "Pod should be removed when it becomes unschedulable")
+
+		// Verify no metrics
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
+			t.Fatal(err)
+		}
+
+		metrics.PodStartSLIDuration.Reset()
+	})
+
+	t.Run("pod observed as unschedulable first, then becomes schedulable should remain not tracked", func(t *testing.T) {
+		wants := ""
+
+		fakeClock := testingclock.NewFakeClock(frozenTime)
+		metrics.Register()
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods:         map[types.UID]*perPodState{},
+			excludedPods: map[types.UID]bool{},
+			clock:        fakeClock,
+		}
+
+		// First observe pod as unschedulable
+		podUnschedulable := buildInitializingPod()
+		podUnschedulable.UID = "unschedulable-first"
+		podUnschedulable.Status.Conditions = []corev1.PodCondition{
+			{
+				Type:   corev1.PodScheduled,
+				Status: corev1.ConditionFalse,
+				Reason: "Unschedulable",
+			},
+		}
+
+		tracker.ObservedPodOnWatch(podUnschedulable, frozenTime)
+		assert.Empty(t, tracker.pods, "Pod should not be tracked when first observed as unschedulable")
+		assert.True(t, tracker.excludedPods[podUnschedulable.UID], "Pod should be in excludedPods map")
+
+		// Later observe the same pod as schedulable (e.g., after cluster autoscaling)
+		podSchedulable := buildInitializingPod()
+		podSchedulable.UID = "unschedulable-first"
+		podSchedulable.Status.Conditions = []corev1.PodCondition{
+			{
+				Type:   corev1.PodScheduled,
+				Status: corev1.ConditionTrue,
+				Reason: "Scheduled",
+			},
+		}
+
+		tracker.ObservedPodOnWatch(podSchedulable, frozenTime.Add(time.Second*5))
+		assert.Empty(t, tracker.pods, "Pod should remain excluded even after becoming schedulable")
+		assert.True(t, tracker.excludedPods[podSchedulable.UID], "Pod should remain in excludedPods map")
+
+		// Complete the startup process - should not record metrics
+		podRunning := buildRunningPod()
+		podRunning.UID = "unschedulable-first"
+		tracker.RecordStatusUpdated(podRunning)
+		tracker.ObservedPodOnWatch(podRunning, frozenTime.Add(time.Second*10))
+
+		// Verify no SLI metrics recorded
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
+			t.Fatal(err)
+		}
+
+		// cleanup
+		tracker.DeletePodStartupState(podRunning.UID)
+		assert.Empty(t, tracker.pods)
+		assert.False(t, tracker.excludedPods[podRunning.UID], "Pod should be removed from excludedPods on cleanup")
+		metrics.PodStartSLIDuration.Reset()
+	})
+}
+
+func TestStatefulPodExclusion(t *testing.T) {
+	t.Run("stateful pods should be excluded from SLI metrics", func(t *testing.T) {
+		wantsSLI := ""
+
+		fakeClock := testingclock.NewFakeClock(frozenTime)
+		metrics.Register()
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods: map[types.UID]*perPodState{}, excludedPods: map[types.UID]bool{},
+			clock: fakeClock,
+		}
+
+		// Create a stateful pod (with PVC volume)
+		statefulPod := buildInitializingPod()
+		statefulPod.UID = "stateful-pod"
+		statefulPod.Spec.Volumes = []corev1.Volume{
+			{
+				Name: "persistent-storage",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "test-pvc",
+					},
+				},
+			},
+		}
+
+		tracker.ObservedPodOnWatch(statefulPod, frozenTime)
+
+		statefulPodRunning := buildRunningPod()
+		statefulPodRunning.UID = "stateful-pod"
+		statefulPodRunning.Spec.Volumes = statefulPod.Spec.Volumes
+		tracker.RecordStatusUpdated(statefulPodRunning)
+
+		// Observe pod as running after 3 seconds
+		tracker.ObservedPodOnWatch(statefulPodRunning, frozenTime.Add(time.Second*3))
+
+		// Verify no SLI metrics for stateful pod (
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wantsSLI), metricsName); err != nil {
+			t.Fatal(err)
+		}
+
+		// cleanup
+		tracker.DeletePodStartupState(statefulPod.UID)
+		assert.Empty(t, tracker.pods)
+		metrics.PodStartSLIDuration.Reset()
+	})
+}
+
 func TestFirstNetworkPodMetrics(t *testing.T) {
 
 	t.Run("first network pod; started in 30s, image pulling between 10th and 20th seconds", func(t *testing.T) {
@@ -401,7 +608,7 @@ kubelet_first_network_pod_start_sli_duration_seconds 30
 		metrics.Register()
 
 		tracker := &basicPodStartupLatencyTracker{
-			pods:  map[types.UID]*perPodState{},
+			pods: map[types.UID]*perPodState{}, excludedPods: map[types.UID]bool{},
 			clock: fakeClock,
 		}
 
