@@ -128,24 +128,17 @@ func (p *DRAPlugin) getOrCreateHealthClient() (drahealthv1alpha1.DRAResourceHeal
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	// If health client already exists, return it
-	if p.healthClient != nil {
+	// If health client already exists and connection is valid, return it
+	if p.healthClient != nil && p.conn != nil && p.conn.GetState() != connectivity.Shutdown {
 		return p.healthClient, nil
 	}
 
 	// Ensure we have a valid connection first
 	if p.conn == nil || p.conn.GetState() == connectivity.Shutdown {
-		// Connection doesn't exist or is shutdown, we need to create it
-		// Unlock temporarily to avoid deadlock when calling getOrCreateGRPCConn
-		p.mutex.Unlock()
-		_, err := p.getOrCreateGRPCConn()
-		p.mutex.Lock()
-		if err != nil {
-			return nil, fmt.Errorf("failed to establish gRPC connection for health client: %w", err)
-		}
+		return nil, fmt.Errorf("no valid gRPC connection available for health client")
 	}
 
-	// Now create the health client
+	// Create the health client
 	p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
 	klog.FromContext(p.backgroundCtx).V(4).Info("Initialized DRAResourceHealthClient lazily")
 
@@ -166,17 +159,21 @@ func (p *DRAPlugin) NodePrepareResources(
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("Calling NodePrepareResources rpc", "request", req)
 
+	conn, err := p.getOrCreateGRPCConn()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get gRPC connection: %w", err)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
 	defer cancel()
 
-	var err error
 	var response *drapbv1.NodePrepareResourcesResponse
 	switch p.chosenService {
 	case drapbv1beta1.DRAPluginService:
-		client := drapbv1beta1.NewDRAPluginClient(p.conn)
+		client := drapbv1beta1.NewDRAPluginClient(conn)
 		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodePrepareResources(ctx, req)
 	case drapbv1.DRAPluginService:
-		client := drapbv1.NewDRAPluginClient(p.conn)
+		client := drapbv1.NewDRAPluginClient(conn)
 		response, err = client.NodePrepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
