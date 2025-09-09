@@ -26,9 +26,8 @@
 # how long this takes.
 - name: PublishResourceSlices
   featureGates:
-    DynamicResourceAllocation: true
-    DRAPrioritizedList: false
-    DRAAdminAccess: false
+    AllAlpha: false
+    AllBeta: false
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -61,7 +60,6 @@
 # device counts are chosen so that the cluster gets filled up completely.
 - name: SchedulingWithResourceClaimTemplate
   featureGates:
-    DynamicResourceAllocation: true
     AllAlpha: false
     AllBeta: false
   workloadTemplate:
@@ -94,6 +92,7 @@
   workloads:
   - name: fast
     featureGates:
+      DynamicResourceAllocation: true # Required because version emulation for queueing hints disablement makes it beta and disabled by default.
       SchedulerQueueingHints: false
     labels: [integration-test, short]
     params:
@@ -132,6 +131,7 @@
       maxClaimsPerNode: 10
   - name: 5000pods_500nodes
     featureGates:
+      DynamicResourceAllocation: true # Required because version emulation for queueing hints disablement makes it beta and disabled by default.
       SchedulerQueueingHints: false
     labels: [performance]
     # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
@@ -164,7 +164,6 @@
 # various degrees of pre-existing resource utilization.
 - name: SteadyStateClusterResourceClaimTemplate
   featureGates:
-    DynamicResourceAllocation: true
     AllAlpha: false
     AllBeta: false
   workloadTemplate:
@@ -212,6 +211,7 @@
       duration: 10s
   - name: empty_500nodes
     featureGates:
+      DynamicResourceAllocation: true # Required because version emulation for queueing hints disablement makes it beta and disabled by default.
       SchedulerQueueingHints: false
     labels: [performance]
     # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fempty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
@@ -251,6 +251,7 @@
       duration: 10s
   - name: half_500nodes
     featureGates:
+      DynamicResourceAllocation: true # Required because version emulation for queueing hints disablement makes it beta and disabled by default.
       SchedulerQueueingHints: false
     labels: [performance]
     # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fhalf_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
@@ -290,6 +291,7 @@
       duration: 10s
   - name: full_500nodes
     featureGates:
+      DynamicResourceAllocation: true # Required because version emulation for queueing hints disablement makes it beta and disabled by default.
       SchedulerQueueingHints: false
     labels: [performance]
     # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Ffull_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
@@ -318,7 +320,6 @@
 # There is a fixed ratio of 1:5 between claims and pods.
 - name: SchedulingWithResourceClaim
   featureGates:
-    DynamicResourceAllocation: true
     AllAlpha: false
     AllBeta: false
   workloadTemplate:
@@ -353,6 +354,7 @@
   workloads:
   - name: fast
     featureGates:
+      DynamicResourceAllocation: true # Required because version emulation for queueing hints disablement makes it beta and disabled by default.
       SchedulerQueueingHints: false
     labels: [integration-test, short]
     params:

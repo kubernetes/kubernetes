@@ -1134,7 +1134,7 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 		})
 	}
 
-	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, featureGates, outOfTreePluginRegistry)
+	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, outOfTreePluginRegistry)
 }
 
 func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featuregate.Feature]bool) map[featuregate.Feature]bool {
@@ -1397,7 +1397,7 @@ func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *workload) []op {
 	return unrolled
 }
 
-func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
+func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
 	if configPath != "" {
@@ -1409,7 +1409,7 @@ func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureG
 			tCtx.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}
-	return mustSetupCluster(tCtx, cfg, featureGates, outOfTreePluginRegistry)
+	return mustSetupCluster(tCtx, cfg, outOfTreePluginRegistry)
 }
 
 func labelsMatch(actualLabels, requiredLabels map[string]string) bool {
