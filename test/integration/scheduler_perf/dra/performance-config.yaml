@@ -192,30 +192,6 @@
     podTemplatePath: templates/pod-with-claim-template.yaml
     collectMetrics: true
   workloads:
-  - name: fast
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      # This testcase runs through all code paths without
-      # taking too long overall.
-      nodesWithDRA: 1
-      nodesWithoutDRA: 1
-      initClaims: 0
-      maxClaimsPerNode: 10
-      duration: 2s
-  - name: fast_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [integration-test, short]
-    params:
-      # This testcase runs through all code paths without
-      # taking too long overall.
-      nodesWithDRA: 1
-      nodesWithoutDRA: 1
-      initClaims: 0
-      maxClaimsPerNode: 10
-      duration: 2s
   - name: empty_100nodes
     params:
       nodesWithDRA: 100
