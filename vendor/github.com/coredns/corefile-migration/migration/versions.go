@@ -30,7 +30,13 @@ type release struct {
 
 // Versions holds a map of plugin/option migrations per CoreDNS release (since 1.1.4)
 var Versions = map[string]release{
+	"1.12.4": {
+		priorVersion:   "1.12.3",
+		dockerImageSHA: "986f04c2e15e147d00bdd51e8c51bcef3644b13ff806be7d2ff1b261d6dfbae1",
+		plugins:        plugins_1_12_0,
+	},
 	"1.12.3": {
+		nextVersion:    "1.12.4",
 		priorVersion:   "1.12.2",
 		dockerImageSHA: "1391544c978029fcddc65068f6ad67f396e55585b664ecccd7fefba029b9b706",
 		plugins:        plugins_1_12_0,
