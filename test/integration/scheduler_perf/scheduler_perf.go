@@ -61,6 +61,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -1020,7 +1021,7 @@ func initTestOutput(tb testing.TB) io.Writer {
 
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
-func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
+func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
 	tCtx := ktesting.Init(t, initoption.PerTestOutput(UseTestingLog))
 	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
 	if !UseTestingLog && doArtifacts {
@@ -1205,7 +1206,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					fixJSONOutput(b)
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
-					informerFactory, tCtx := setupTestCase(b, tc, featureGates, outOfTreePluginRegistry)
+					scheduler, informerFactory, tCtx := setupTestCase(b, tc, featureGates, outOfTreePluginRegistry)
 
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
@@ -1219,7 +1220,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 						}
 					}
 
-					results, err := runWorkload(tCtx, tc, w, informerFactory)
+					results, err := runWorkload(tCtx, tc, w, scheduler, informerFactory)
 					if err != nil {
 						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
 					}
@@ -1314,13 +1315,13 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
 						t.Skipf("disabled by label filter %q", TestSchedulingLabelFilter)
 					}
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
-					informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil)
+					scheduler, informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil)
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
 						t.Fatalf("workload %s is not valid: %v", w.Name, err)
 					}
 
-					_, err = runWorkload(tCtx, tc, w, informerFactory)
+					_, err = runWorkload(tCtx, tc, w, scheduler, informerFactory)
 					if err != nil {
 						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
 					}
@@ -1380,7 +1381,7 @@ func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *workload) []op {
 	return unrolled
 }
 
-func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
+func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
 	if configPath != "" {
@@ -1494,6 +1495,7 @@ func stopCollectingMetrics(tCtx ktesting.TContext, collectorCtx ktesting.TContex
 
 type WorkloadExecutor struct {
 	tCtx                         ktesting.TContext
+	scheduler                    *scheduler.Scheduler
 	wg                           sync.WaitGroup
 	collectorCtx                 ktesting.TContext
 	collectorWG                  sync.WaitGroup
@@ -1507,7 +1509,7 @@ type WorkloadExecutor struct {
 	nextNodeIndex                int
 }
 
-func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory) ([]DataItem, error) {
+func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, scheduler *scheduler.Scheduler, informerFactory informers.SharedInformerFactory) ([]DataItem, error) {
 	b, benchmarking := tCtx.TB().(*testing.B)
 	if benchmarking {
 		start := time.Now()
@@ -1541,6 +1543,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 
 	executor := WorkloadExecutor{
 		tCtx:                         tCtx,
+		scheduler:                    scheduler,
 		numPodsScheduledPerNamespace: make(map[string]int),
 		podInformer:                  podInformer,
 		throughputErrorMargin:        throughputErrorMargin,
@@ -1601,6 +1604,9 @@ func (e *WorkloadExecutor) runOp(op realOp, opIndex int) error {
 		return e.runStartCollectingMetricsOp(opIndex, concreteOp)
 	case *stopCollectingMetricsOp:
 		return e.runStopCollectingMetrics(opIndex)
+	case *createResourceDriverOp:
+		concreteOp.run(e.tCtx, e.scheduler.Profiles["default-scheduler"].SharedDRAManager())
+		return nil
 	default:
 		return e.runDefaultOp(opIndex, concreteOp)
 	}
