@@ -76,12 +76,6 @@ func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 
 	// If connection exists and is ready, return it.
 	if p.conn != nil && p.conn.GetState() != connectivity.Shutdown {
-		// Initialize health client if connection exists but client is nil
-		// This allows lazy init if connection was established before health was added.
-		if p.healthClient == nil {
-			p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
-			klog.FromContext(p.backgroundCtx).V(4).Info("Initialized DRAResourceHealthClient lazily")
-		}
 		return p.conn, nil
 	}
 
@@ -124,9 +118,38 @@ func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	}
 
 	p.conn = conn
-	p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
 
 	return p.conn, nil
+}
+
+// getOrCreateHealthClient lazily initializes and returns the health client.
+// This allows the health client to be created on-demand when needed.
+func (p *DRAPlugin) getOrCreateHealthClient() (drahealthv1alpha1.DRAResourceHealthClient, error) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	// If health client already exists, return it
+	if p.healthClient != nil {
+		return p.healthClient, nil
+	}
+
+	// Ensure we have a valid connection first
+	if p.conn == nil || p.conn.GetState() == connectivity.Shutdown {
+		// Connection doesn't exist or is shutdown, we need to create it
+		// Unlock temporarily to avoid deadlock when calling getOrCreateGRPCConn
+		p.mutex.Unlock()
+		_, err := p.getOrCreateGRPCConn()
+		p.mutex.Lock()
+		if err != nil {
+			return nil, fmt.Errorf("failed to establish gRPC connection for health client: %w", err)
+		}
+	}
+
+	// Now create the health client
+	p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
+	klog.FromContext(p.backgroundCtx).V(4).Info("Initialized DRAResourceHealthClient lazily")
+
+	return p.healthClient, nil
 }
 
 func (p *DRAPlugin) DriverName() string {
@@ -174,17 +197,21 @@ func (p *DRAPlugin) NodeUnprepareResources(
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 	ctx = klog.NewContext(ctx, logger)
 
+	conn, err := p.getOrCreateGRPCConn()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get gRPC connection: %w", err)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
 	defer cancel()
 
-	var err error
 	var response *drapbv1.NodeUnprepareResourcesResponse
 	switch p.chosenService {
 	case drapbv1beta1.DRAPluginService:
-		client := drapbv1beta1.NewDRAPluginClient(p.conn)
+		client := drapbv1beta1.NewDRAPluginClient(conn)
 		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodeUnprepareResources(ctx, req)
 	case drapbv1.DRAPluginService:
-		client := drapbv1.NewDRAPluginClient(p.conn)
+		client := drapbv1.NewDRAPluginClient(conn)
 		response, err = client.NodeUnprepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
@@ -221,17 +248,16 @@ func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
 
 // NodeWatchResources establishes a stream to receive health updates from the DRA plugin.
 func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, error) {
-	// Ensure a connection and the health client exist before proceeding.
-	// This call is idempotent and will create them if they don't exist.
-	_, err := p.getOrCreateGRPCConn()
+	// Lazily initialize the health client when needed
+	healthClient, err := p.getOrCreateHealthClient()
 	if err != nil {
-		klog.FromContext(p.backgroundCtx).Error(err, "Failed to get gRPC connection for health client")
+		klog.FromContext(p.backgroundCtx).Error(err, "Failed to get health client")
 		return nil, err
 	}
 
 	logger := klog.FromContext(ctx).WithValues("pluginName", p.driverName)
 	logger.V(4).Info("Starting WatchResources stream")
-	stream, err := p.healthClient.NodeWatchResources(ctx, &drahealthv1alpha1.NodeWatchResourcesRequest{})
+	stream, err := healthClient.NodeWatchResources(ctx, &drahealthv1alpha1.NodeWatchResourcesRequest{})
 	if err != nil {
 		logger.Error(err, "NodeWatchResources RPC call failed")
 		return nil, err
