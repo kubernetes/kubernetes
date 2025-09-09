@@ -21,7 +21,11 @@ import (
 	"os"
 	"testing"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/component-base/logs/json/register"
+	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/kubernetes/pkg/features"
 	perf "k8s.io/kubernetes/test/integration/scheduler_perf"
 )
 
@@ -35,9 +39,38 @@ func TestMain(m *testing.M) {
 }
 
 func TestSchedulerPerf(t *testing.T) {
-	perf.RunIntegrationPerfScheduling(t, "performance-config.yaml")
+	// Verify correct behavior with all available allocators.
+	for _, allocatorName := range []string{"stable", "incubating", "experimental"} {
+		t.Run(allocatorName, func(t *testing.T) {
+			structured.EnableAllocators(allocatorName)
+			defer structured.EnableAllocators()
+
+			// In order to run with the "stable" implementation, we have to disable
+			// some features, something that isn't specified in the YAML
+			// configuration because for other implementations we want the default
+			// features. Using "AllAlpha" and "AllBeta" would be better here,
+			// but interacts poorly with setting the emulated version to 1.33 later
+			// on ("scheduler_perf.go:1117: failed to set emulation version to 1.33 during test:
+			// cannot set feature gate NominatedNodeNameForExpectation to false, feature is PreAlpha at emulated version 1.33, ...")
+			//
+			// Once the current "incubating" becomes "stable", this can be replaced
+			// with two sub tests:
+			// - "ga-only": keep disabling optional features
+			// - "default": don't change features
+			if allocatorName == "stable" {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, false)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, false)
+			}
+
+			perf.RunIntegrationPerfScheduling(t, "performance-config.yaml")
+		})
+	}
 }
 
 func BenchmarkPerfScheduling(b *testing.B) {
+	// Restrict benchmarking to the default allocator.
+	structured.EnableAllocators("incubating")
+	defer structured.EnableAllocators()
+
 	perf.RunBenchmarkPerfScheduling(b, "performance-config.yaml", "dra", nil)
 }
