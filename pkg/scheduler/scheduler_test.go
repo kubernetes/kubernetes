@@ -50,6 +50,7 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 
+	apicalls "k8s.io/kube-scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
@@ -58,7 +59,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
