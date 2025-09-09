@@ -32,22 +32,22 @@ import (
 
 func TestResourceListEqual(t *testing.T) {
 	tests := []struct {
-		name string
-		a    map[v1.ResourceName]string
-		b    map[v1.ResourceName]string
-		want bool
+		name     string
+		a        map[v1.ResourceName]string
+		b        map[v1.ResourceName]string
+		expected bool
 	}{
 		{
-			name: "both nil",
-			a:    nil,
-			b:    nil,
-			want: true,
+			name:     "both nil",
+			a:        nil,
+			b:        nil,
+			expected: true,
 		},
 		{
-			name: "nil vs empty map",
-			a:    nil,
-			b:    map[v1.ResourceName]string{},
-			want: true,
+			name:     "nil vs empty map",
+			a:        nil,
+			b:        map[v1.ResourceName]string{},
+			expected: true,
 		},
 		{
 			name: "identical keys and values",
@@ -59,7 +59,7 @@ func TestResourceListEqual(t *testing.T) {
 				v1.ResourceCPU:    "1",
 				v1.ResourceMemory: "1Gi",
 			},
-			want: true,
+			expected: true,
 		},
 		{
 			name: "different textual forms but equal quantities",
@@ -71,7 +71,7 @@ func TestResourceListEqual(t *testing.T) {
 				v1.ResourceCPU:    "1",
 				v1.ResourceMemory: "1Gi",
 			},
-			want: true,
+			expected: true,
 		},
 		{
 			name: "value differs",
@@ -83,15 +83,15 @@ func TestResourceListEqual(t *testing.T) {
 				v1.ResourceCPU:    "1",
 				v1.ResourceMemory: "1Gi",
 			},
-			want: false,
+			expected: false,
 		},
 		{
 			name: "missing key in b",
 			a: map[v1.ResourceName]string{
 				v1.ResourceMemory: "1Gi",
 			},
-			b:    map[v1.ResourceName]string{},
-			want: false,
+			b:        map[v1.ResourceName]string{},
+			expected: false,
 		},
 		{
 			name: "extra key in b",
@@ -102,16 +102,15 @@ func TestResourceListEqual(t *testing.T) {
 				v1.ResourceCPU:    "1",
 				v1.ResourceMemory: "1Gi",
 			},
-			want: false,
+			expected: false,
 		},
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			got := resourceListEqual(mustResourceList(tc.a), mustResourceList(tc.b))
-			if got != tc.want {
-				t.Fatalf("resourceListEqual() = %v, want %v\n a=%v\n b=%v", got, tc.want, tc.a, tc.b)
+			actual := resourceListEqual(mustResourceList(tc.a), mustResourceList(tc.b))
+			if actual != tc.expected {
+				t.Errorf("resourceListEqual() = %v, expected %v\n a=%v\n b=%v", actual, tc.expected, tc.a, tc.b)
 			}
 		})
 	}
