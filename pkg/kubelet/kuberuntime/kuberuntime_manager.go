@@ -273,7 +273,6 @@ func NewKubeGenericRuntimeManager(
 		internalLifecycle:            containerManager.InternalContainerLifecycle(),
 		logManager:                   logManager,
 		runtimeClassManager:          runtimeClassManager,
-		allocationManager:            allocationManager,
 		logReduction:                 logreduction.NewLogReduction(identicalErrorDelay),
 		seccompDefault:               seccompDefault,
 		memorySwapBehavior:           memorySwapBehavior,

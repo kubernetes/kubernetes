@@ -44,6 +44,9 @@ type basicPodStartupLatencyTracker struct {
 	// protect against concurrent read and write on pods map
 	lock sync.Mutex
 	pods map[types.UID]*perPodState
+	// Track pods that were excluded from SLI due to unschedulability
+	// These pods should never be re-added even if they later become schedulable
+	excludedPods map[types.UID]bool
 	// metrics for the first network pod only
 	firstNetworkPodSeen bool
 	// For testability
@@ -59,18 +62,20 @@ type perPodState struct {
 	imagePullSessions       []imagePullSession
 	imagePullSessionsStarts []time.Time // Track multiple concurrent pull starts
 	// Init container tracking
-	totalInitContainerRuntime time.Duration // Accumulated runtime of all init containers
-	currentInitContainerStart time.Time     // Track current init container start
-	// Pod lifecycle tracking
+	totalInitContainerRuntime time.Duration
+	currentInitContainerStart time.Time
+	// first time, when pod status changed into Running
 	observedRunningTime time.Time
-	metricRecorded      bool
+	// log, if pod latency was already Observed
+	metricRecorded bool
 }
 
 // NewPodStartupLatencyTracker creates an instance of PodStartupLatencyTracker
 func NewPodStartupLatencyTracker() PodStartupLatencyTracker {
 	return &basicPodStartupLatencyTracker{
-		pods:  map[types.UID]*perPodState{},
-		clock: clock.RealClock{},
+		pods:         map[types.UID]*perPodState{},
+		excludedPods: map[types.UID]bool{},
+		clock:        clock.RealClock{},
 	}
 }
 
@@ -84,23 +89,31 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 		return
 	}
 
-	// if the pod is not immediately schedulable, we do not have to track it anymore for startup
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == v1.PodScheduled && condition.Status == v1.ConditionFalse {
-			delete(p.pods, pod.UID)
-			return
-		}
-	}
-
 	state := p.pods[pod.UID]
 	if state == nil {
-		// create a new record for pod, only if it was not yet acknowledged by the Kubelet
-		// this is required, as we want to log metric only for those pods, that where scheduled
-		// after Kubelet started
-		if pod.Status.StartTime.IsZero() {
-			p.pods[pod.UID] = &perPodState{}
+		// if pod was previously unschedulable, don't track it again
+		if p.excludedPods[pod.UID] {
+			return
 		}
 
+		// create a new record for pod
+		if pod.Status.StartTime.IsZero() {
+			if isPodUnschedulable(pod) {
+				p.excludedPods[pod.UID] = true
+				return
+			}
+
+			// if pod is schedulable then track it
+			state = &perPodState{}
+			p.pods[pod.UID] = state
+		}
+		return
+	}
+
+	// remove existing pods from tracking (this handles cases where scheduling state becomes known later)
+	if isPodUnschedulable(pod) {
+		delete(p.pods, pod.UID)
+		p.excludedPods[pod.UID] = true
 		return
 	}
 
@@ -316,9 +329,24 @@ func isStatefulPod(pod *v1.Pod) bool {
 	return false
 }
 
+// isPodUnschedulable determines if a pod should be excluded from SLI tracking
+// according to the SLI definition: "By schedulable pod we mean a pod that has to be
+// immediately (without actions from any other components) schedulable in the cluster
+// without causing any preemption."
+// Any pod with PodScheduled=False is not immediately schedulable and should be excluded.
+func isPodUnschedulable(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodScheduled && condition.Status == v1.ConditionFalse {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *basicPodStartupLatencyTracker) DeletePodStartupState(podUID types.UID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	delete(p.pods, podUID)
+	delete(p.excludedPods, podUID)
 }
