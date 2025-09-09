@@ -129,9 +129,10 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 
 func TestGRPCConnIsReused(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	service := drapbv1.DRAPluginService
 	addr := path.Join(t.TempDir(), "dra.sock")
-	teardown, err := setupFakeGRPCServer(service, addr)
+
+	// Setup server with all services for comprehensive testing
+	teardown, err := setupFakeGRPCServer("", addr)
 	require.NoError(t, err)
 	defer teardown()
 
@@ -143,7 +144,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 
 	// ensure the plugin we are using is registered
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
-	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, defaultClientCallTimeout), "add plugin")
+	tCtx.ExpectNoError(draPlugins.add(driverName, addr, drapbv1.DRAPluginService, defaultClientCallTimeout), "add plugin")
 	plugin, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get plugin")
 	conn := plugin.conn
@@ -184,6 +185,35 @@ func TestGRPCConnIsReused(t *testing.T) {
 	// We should have only one entry otherwise it means another gRPC connection has been created
 	require.Len(t, reusedConns, 1, "expected length to be 1 but got %d", len(reusedConns))
 	require.Equal(t, 2, reusedConns[conn], "expected counter to be 2 but got %d", reusedConns[conn])
+
+	// Test that health API also reuses the same connection (Extended as requested)
+	t.Run("health_api_reuses_connection", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(tCtx, 5*time.Second)
+		defer cancel()
+
+		// Store original connection reference
+		originalConn := plugin.conn
+
+		// Start health stream
+		stream, err := plugin.NodeWatchResources(ctx)
+		require.NoError(t, err, "Health stream should work")
+		require.NotNil(t, stream)
+
+		// Verify same connection is still being used
+		require.Equal(t, originalConn, plugin.conn, "Health API should reuse the same connection")
+
+		// Verify stream works
+		resp, err := stream.Recv()
+		require.NoError(t, err, "Should receive health data")
+		require.NotNil(t, resp)
+		require.Len(t, resp.Devices, 1)
+		assert.Equal(t, "pool1", resp.Devices[0].GetDevice().GetPoolName())
+		assert.Equal(t, "dev1", resp.Devices[0].GetDevice().GetDeviceName())
+		assert.Equal(t, drahealthv1alpha1.HealthStatus_HEALTHY, resp.Devices[0].GetHealth())
+
+		// Connection should still be the same after stream operations
+		require.Equal(t, originalConn, plugin.conn, "Connection should remain unchanged after health operations")
+	})
 }
 
 func TestGRPCConnUsableAfterIdle(t *testing.T) {
