@@ -31,7 +31,7 @@ else \
     cp config/NAS.samples/make.def.gcc_x86 config/make.def; \
 fi
 # Add gfortran compatibility flags for newer compiler versions
-RUN sed -i 's/FFLAGS[ \t]*=/FFLAGS = -std=legacy -fallow-argument-mismatch /' config/make.def
+RUN sed -i 's/FFLAGS[ \t]*=/FFLAGS = -std=legacy -fallow-argument-mismatch -fallow-invalid-boz /' config/make.def
 RUN make IS CLASS=D
 
 # Copying the required libraries (shared object files) to a convenient location so that it can be copied into the
