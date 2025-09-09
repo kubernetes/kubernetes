@@ -31,6 +31,11 @@ const (
 	itemTagName = "k8s:item"
 )
 
+func init() {
+	// Processing item tags requires the list metadata.
+	RegisterTagValidator(&itemTagValidator{listByPath: globalListMeta})
+}
+
 type keyValuePair struct {
 	key       string
 	value     any
