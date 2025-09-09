@@ -61,12 +61,8 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 	/*
 		Release: v1.21
-		Testname: EndpointSlice API
-		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
-		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
-		The cluster MUST have a service named "kubernetes" on the default namespace referencing the API servers.
-		The "kubernetes.default" service MUST have Endpoints and EndpointSlices pointing to each API server instance.
+		Testname: kubernetes.default Endpoints and EndpointSlices
+		Description: The "kubernetes.default" service MUST have Endpoints and EndpointSlices pointing to each API server instance.
 	*/
 	framework.ConformanceIt("should have Endpoints and EndpointSlices pointing to API Server", func(ctx context.Context) {
 		namespace := "default"
@@ -98,13 +94,10 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 	/*
 		Release: v1.21
-		Testname: EndpointSlice API
-		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
-		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
-		The endpointslice controller should create and delete EndpointSlices for Pods matching a Service.
+		Testname: EndpointSlice, "empty" Service
+		Description: The EndpointSlice controller should create and delete empty EndpointSlices for a Service that matches no pods.
 	*/
-	framework.ConformanceIt("should create and delete Endpoints and EndpointSlices for a Service with a selector specified", func(ctx context.Context) {
+	framework.ConformanceIt("should create and delete Endpoints and EndpointSlices for a Service with a selector that matches no pods", func(ctx context.Context) {
 		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-empty-selector",
@@ -203,11 +196,8 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 	/*
 		Release: v1.21
-		Testname: EndpointSlice API
-		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
-		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
-		The endpointslice controller must create EndpointSlices for Pods mataching a Service.
+		Testname: EndpointSlice, creation/deletion
+		Description: The endpointslice controller must create and delete EndpointSlices for Pods matching a Service.
 	*/
 	framework.ConformanceIt("should create Endpoints and EndpointSlices for Pods matching a Service", func(ctx context.Context) {
 		labelPod1 := "pod1"
