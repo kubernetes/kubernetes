@@ -121,6 +121,21 @@ func collectPodResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
 	return collectContainerLevelResources(pod)
 }
 
+func collectPodLevelResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
+	requests := v1.ResourceList{}
+	limits := v1.ResourceList{}
+
+	// process requests
+	processResourceList(requests, pod.Spec.Resources.Requests)
+	// process limits
+	processResourceList(limits, pod.Spec.Resources.Limits)
+
+	qosLimitResources := getQOSResources(pod.Spec.Resources.Limits)
+	isGuaranteed := qosLimitResources.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU))
+
+	return requests, limits, isGuaranteed
+}
+
 func collectContainerLevelResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
 	requests := v1.ResourceList{}
 	limits := v1.ResourceList{}
@@ -168,21 +183,6 @@ func collectContainerLevelResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceLi
 			isGuaranteed = false
 		}
 	}
-
-	return requests, limits, isGuaranteed
-}
-
-func collectPodLevelResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
-	requests := v1.ResourceList{}
-	limits := v1.ResourceList{}
-
-	// process requests
-	processResourceList(requests, pod.Spec.Resources.Requests)
-	// process limits
-	processResourceList(limits, pod.Spec.Resources.Limits)
-
-	qosLimitResources := getQOSResources(pod.Spec.Resources.Limits)
-	isGuaranteed := qosLimitResources.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU))
 
 	return requests, limits, isGuaranteed
 }
