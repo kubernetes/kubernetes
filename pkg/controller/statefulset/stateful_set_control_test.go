@@ -1057,7 +1057,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatalf("Expected create pods 5, got pods %v", len(pods))
 		}
 		spc.setPodRunning(set, 4)
-		spc.setPodReadyCondition(set, 4, true)
+		_, _ = spc.setPodReadyCondition(set, 4, true)
 
 		// create new pod 4 (only one pod gets created at a time due to OrderedReady)
 		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
@@ -3798,7 +3798,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		var pods []*v1.Pod
 		for i := 0; i < test.unavailablePodCount; i++ {
 			if test.podManagementPolicy == apps.OrderedReadyPodManagement {
-				spc.setPodRunning(set, i)
+				_, _ = spc.setPodRunning(set, i)
 				pods, _ = spc.setPodReadyCondition(set, i, false)
 			} else {
 				pods, _ = spc.addTerminatingPod(set, i)
@@ -3807,7 +3807,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 
 		// Make remaining pods ready
 		for i := test.unavailablePodCount; i < int(test.totalPods); i++ {
-			spc.setPodRunning(set, i)
+			_, _ = spc.setPodRunning(set, i)
 			pods, _ = spc.setPodReadyCondition(set, i, true)
 		}
 		sort.Sort(ascendingOrdinal(pods))
