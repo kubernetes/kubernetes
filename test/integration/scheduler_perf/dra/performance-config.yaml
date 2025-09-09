@@ -62,6 +62,8 @@
 - name: SchedulingWithResourceClaimTemplate
   featureGates:
     DynamicResourceAllocation: true
+    AllAlpha: false
+    AllBeta: false
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -163,6 +165,8 @@
 - name: SteadyStateClusterResourceClaimTemplate
   featureGates:
     DynamicResourceAllocation: true
+    AllAlpha: false
+    AllBeta: false
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -315,7 +319,8 @@
 - name: SchedulingWithResourceClaim
   featureGates:
     DynamicResourceAllocation: true
-    # SchedulerQueueingHints: true
+    AllAlpha: false
+    AllBeta: false
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
