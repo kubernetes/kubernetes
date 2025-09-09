@@ -53,21 +53,8 @@ func init() {
 	RegisterFieldValidator(listValidator{byPath: listMeta})
 	RegisterTypeValidator(listValidator{byPath: listMeta})
 
-	// List-map item validator uses shared listType and listMapKey information
-	itemMeta := make(map[string]*itemMetadata) // keyed by the fieldpath
-
-	// Accumulate item metadata via tags.
-	RegisterTagValidator(&itemTagValidator{byPath: itemMeta})
-
-	// Finish work on the accumulated item metadata.
-	RegisterTypeValidator(&itemValidator{
-		listByPath: listMeta,
-		itemByPath: itemMeta,
-	})
-	RegisterFieldValidator(&itemValidator{
-		listByPath: listMeta,
-		itemByPath: itemMeta,
-	})
+	// Processing item tags requires the list metadata.
+	RegisterTagValidator(&itemTagValidator{listByPath: listMeta})
 
 	// Iterating values of lists and maps is a special tag, which can be called
 	// directly by the code-generator logic.
@@ -314,7 +301,8 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 		if util.IsDirectComparable(util.NonPointer(util.NativeType(nt.Elem))) {
 			matchArg = validateDirectEqual
 		}
-		f := Function("listValidator", DefaultFlags, validateUnique, Identifier(matchArg))
+		f := Function("listValidator", DefaultFlags, validateUnique, Identifier(matchArg)).
+			WithComment("listType=set requires unique values")
 		result.AddFunction(f)
 	}
 	// TODO: enable the following once we have a way to either opt-out from this validation
@@ -400,19 +388,23 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 	switch nt.Kind {
 	case types.Slice, types.Array, types.Map:
 	default:
-		return Validations{}, fmt.Errorf("can only be used on list or map types (%s)", t.Kind)
+		return Validations{}, fmt.Errorf("can only be used on list or map types (%s)", nt.Kind)
 	}
 
 	elemContext := Context{
+		// Scope is initialized below.
 		Type:       nt.Elem,
+		Path:       context.Path.Key("(vals)"),
+		Member:     nil, // NA for list/map values
 		ParentPath: context.Path,
-		Path:       context.Path.Key("*"),
 	}
 	switch nt.Kind {
 	case types.Slice, types.Array:
 		elemContext.Scope = ScopeListVal
+		elemContext.ListSelector = []ListSelectorTerm{} // empty == "all"
 	case types.Map:
 		elemContext.Scope = ScopeMapVal
+		// TODO: We may need map selectors at some point.
 	}
 	if tag.ValueTag == nil {
 		return Validations{}, fmt.Errorf("missing validation tag")
@@ -503,7 +495,9 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		// The matchArg and equivArg are both nil.
 	}
 	for _, vfn := range validations.Functions {
-		f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{vfn, nt.Elem})
+		comm := vfn.Comments
+		vfn.Comments = nil
+		f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{vfn, nt.Elem}).WithComments(comm...)
 		result.AddFunction(f)
 	}
 
@@ -522,7 +516,9 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 		equivArg = Identifier(validateDirectEqual)
 	}
 	for _, vfn := range validations.Functions {
-		f := Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{vfn, nt.Elem})
+		comm := vfn.Comments
+		vfn.Comments = nil
+		f := Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{vfn, nt.Elem}).WithComments(comm...)
 		result.AddFunction(f)
 	}
 
@@ -566,16 +562,18 @@ var (
 
 func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
-	t := util.NativeType(context.Type)
-	if t.Kind != types.Map {
-		return Validations{}, fmt.Errorf("can only be used on map types (%s)", t.Kind)
+	t := context.Type
+	nt := util.NativeType(t)
+	if nt.Kind != types.Map {
+		return Validations{}, fmt.Errorf("can only be used on map types (%s)", nt.Kind)
 	}
 
 	elemContext := Context{
 		Scope:      ScopeMapKey,
-		Type:       t.Elem,
+		Type:       nt.Elem,
+		Path:       context.Path.Key("(keys)"),
+		Member:     nil, // NA for map keys
 		ParentPath: context.Path,
-		Path:       context.Path.Child("(keys)"),
 	}
 
 	if validations, err := ektv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
@@ -590,10 +588,13 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 }
 
 func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Validations) (Validations, error) {
+	nt := util.NativeType(t)
 	result := Validations{}
 	result.OpaqueKeyType = validations.OpaqueType
 	for _, vfn := range validations.Functions {
-		f := Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{vfn, t.Key})
+		comm := vfn.Comments
+		vfn.Comments = nil
+		f := Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{vfn, nt.Key}).WithComments(comm...)
 		result.AddFunction(f)
 	}
 	return result, nil
