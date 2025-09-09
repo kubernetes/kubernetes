@@ -29,12 +29,12 @@ import (
 // invariantsSelected returns true if the invariant check should be done
 // because the corresponding test (identified by context and invariantsLeafText)
 // ran.
+//
+// Note that this does not check whether the test is merely meant to run (when
+// called before the test run after an internal dry-run) or really ran (when
+// called after a test run). If the caller cares about that difference, it
+// has to check report.SuiteConfig.DryRun itself.
 func invariantsSelected(report ginkgo.Report, sig, invariantsContextText, invariantsLeafText string) bool {
-	// Skip early if we are in dry-run mode and didn't really run any tests.
-	if report.SuiteConfig.DryRun {
-		return false
-	}
-
 	// Check if we ran the dummy test.
 	// The actual hierarchy text includes the SIG.
 	hierarchyText := fmt.Sprintf("[sig-%s] %s", sig, invariantsContextText)

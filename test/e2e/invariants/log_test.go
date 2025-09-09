@@ -19,17 +19,23 @@ package invariants
 import (
 	"context"
 	"errors"
-	"slices"
+	"io"
+	"strings"
 	"testing"
+	"testing/synctest"
 
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/test/e2e/storage/podlogs"
 )
 
 type containerLogs struct {
-	podName, containerName, output string
+	namespace, pod, container, output string
 }
 
 const (
@@ -45,24 +51,24 @@ E0901 17:10:42.630037       1 reflector.go:203] "Failed to watch" err="failed to
 
 func TestCheckLogs(t *testing.T) {
 	for name, tc := range map[string]struct {
-		logs                []containerLogs
-		check               logCheck
-		expectFailed        bool
-		expectNumLogEntries int
-		expectReport        string
+		logs         []containerLogs
+		check        logCheck
+		podLogsError error
+		expectFailed bool
+		expectReport string
 	}{
 		"empty": {},
 		"data-race": {
-			logs: []containerLogs{{"pod", "container", `==================
+			logs: []containerLogs{{"kube-system", "pod", "container", `==================
 WARNING: DATA RACE
 Write at ...
 Goroutine created at:
   scheduleHandler()
 ==================
 `}},
-			check:        logCheck{dataRaces: true, errors: true},
+			check:        logCheck{dataRaces: true},
 			expectFailed: true,
-			expectReport: `#### pod
+			expectReport: `#### kube-system/pod/container
 
 DATA RACE:
 
@@ -72,22 +78,30 @@ DATA RACE:
 `,
 		},
 		"disabled-data-race": {
-			logs: []containerLogs{{"pod", "container", `==================
+			logs: []containerLogs{{"kube-system", "pod", "container", `==================
 WARNING: DATA RACE
 Write at ...
 Goroutine created at:
   scheduleHandler()
 ==================
 `}},
-			check:        logCheck{dataRaces: false, errors: true},
+			check:        logCheck{dataRaces: false},
 			expectFailed: false,
-			expectReport: `#### pod
+			expectReport: ``,
+		},
+		"monitoring-errors": {
+			logs:         []containerLogs{{"kube-system", "pod", "container", ``}},
+			check:        logCheck{dataRaces: true},
+			podLogsError: errors.New("fake pod logs error"),
+			expectFailed: true,
+			expectReport: `#### Errors
 
-Okay.
+ERROR: log output collection failed for kube-system: fake pod logs error
+ERROR: fake error: no log output
 `,
 		},
 		"two-data-races": {
-			logs: []containerLogs{{"pod", "container", `==================
+			logs: []containerLogs{{"kube-system", "pod", "container", `==================
 WARNING: DATA RACE
 Write at ...
 Goroutine created at:
@@ -100,9 +114,9 @@ Goroutine created at:
   otherScheduleHandler()
 ==================
 `}},
-			check:        logCheck{dataRaces: true, errors: true},
+			check:        logCheck{dataRaces: true},
 			expectFailed: true,
-			expectReport: `#### pod
+			expectReport: `#### kube-system/pod/container
 
 - DATA RACE:
   
@@ -118,17 +132,16 @@ Goroutine created at:
 `,
 		},
 		"both": {
-			logs: []containerLogs{{"pod", "container", logHeader + `==================
+			logs: []containerLogs{{"kube-system", "pod", "container", logHeader + `==================
 WARNING: DATA RACE
 Write at ...
 Goroutine created at:
   scheduleHandler()
 ==================
 ` + logTail}},
-			check:               logCheck{dataRaces: true, errors: true},
-			expectFailed:        true,
-			expectNumLogEntries: 6,
-			expectReport: `#### pod
+			check:        logCheck{dataRaces: true},
+			expectFailed: true,
+			expectReport: `#### kube-system/pod/container
 
 DATA RACE:
 
@@ -139,8 +152,8 @@ DATA RACE:
 		},
 		"two-containers": {
 			logs: []containerLogs{
-				{"pod", "container1", logHeader},
-				{"pod", "container2", `==================
+				{"kube-system", "pod", "container1", logHeader},
+				{"kube-system", "pod", "container2", `==================
 WARNING: DATA RACE
 Write at ...
 Goroutine created at:
@@ -148,14 +161,13 @@ Goroutine created at:
 ==================
 `},
 			},
-			check:               logCheck{dataRaces: true, errors: true},
-			expectFailed:        true,
-			expectNumLogEntries: 3,
-			expectReport: `#### pod container1
+			check:        logCheck{dataRaces: true},
+			expectFailed: true,
+			expectReport: `#### kube-system/pod/container1
 
 Okay.
 
-#### pod container2
+#### kube-system/pod/container2
 
 DATA RACE:
 
@@ -166,8 +178,8 @@ DATA RACE:
 		},
 		"two-pods": {
 			logs: []containerLogs{
-				{"pod1", "container", logHeader},
-				{"pod2", "container", `==================
+				{"kube-system", "pod1", "container", logHeader},
+				{"kube-system", "pod2", "container", `==================
 WARNING: DATA RACE
 Write at ...
 Goroutine created at:
@@ -175,14 +187,13 @@ Goroutine created at:
 ==================
 `},
 			},
-			check:               logCheck{dataRaces: true, errors: true},
-			expectFailed:        true,
-			expectNumLogEntries: 3,
-			expectReport: `#### pod1
+			check:        logCheck{dataRaces: true},
+			expectFailed: true,
+			expectReport: `#### kube-system/pod1/container
 
 Okay.
 
-#### pod2
+#### kube-system/pod2/container
 
 DATA RACE:
 
@@ -193,37 +204,44 @@ DATA RACE:
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			ctx := context.Background()
-			getLogs := func(ctx context.Context, namespace, podName, containerName string) (string, error) {
-				for _, log := range tc.logs {
-					if log.podName == podName && log.containerName == containerName {
-						if log.output == "" {
-							return "", errors.New("fake error: no log output")
+			synctest.Test(t, func(t *testing.T) {
+				ctx := context.Background()
+				ctx, cancel := context.WithCancel(ctx)
+				var objs []runtime.Object
+				for _, name := range []string{"kube-system", "default", "custom"} {
+					objs = append(objs, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}})
+				}
+				client := fake.NewClientset(objs...)
+				lc := newLogChecker(client, cancel, tc.check)
+				podLogs := func(ctx context.Context, cs kubernetes.Interface, ns string, to podlogs.LogOutput) error {
+					go func() {
+						for _, log := range tc.logs {
+							if log.namespace != ns {
+								continue
+							}
+							if log.output == "" {
+								to.StatusWriter.Write([]byte("ERROR: fake error: no log output\n"))
+								continue
+							}
+							writer := to.LogOpen(log.pod, log.container)
+							if writer == nil {
+								continue
+							}
+							for _, line := range strings.Split(log.output, "\n") {
+								_, _ = writer.Write([]byte(line))
+							}
+							_ = writer.(io.Closer).Close()
 						}
-						return log.output, nil
-					}
-				}
-				return "", errors.New("log output not found")
-			}
+					}()
 
-			// We test with every container which is listed in the test case.
-			// Retrieving their log output can be made to fail if it is empty.
-			var pods []v1.Pod
-			for _, log := range tc.logs {
-				index := slices.IndexFunc(pods, func(pod v1.Pod) bool {
-					return pod.Name == log.podName
-				})
-				if index < 0 {
-					pods = append(pods, v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: log.podName}})
-					index = len(pods) - 1
+					return tc.podLogsError
 				}
-				pods[index].Spec.Containers = append(pods[index].Spec.Containers, v1.Container{Name: log.containerName})
-			}
-
-			actualFailed, actualNumLogEntries, actualReport := checkLogs(ctx, getLogs, pods, tc.check)
-			assert.Equal(t, tc.expectFailed, actualFailed, "check failed")
-			assert.Equal(t, tc.expectNumLogEntries, actualNumLogEntries, "number of log entries")
-			assert.Equal(t, tc.expectReport, actualReport, "report")
+				lc.run(ctx, podLogs)
+				synctest.Wait()
+				actualFailed, actualReport := lc.stop()
+				assert.Equal(t, tc.expectFailed, actualFailed, "check failed")
+				assert.Equal(t, tc.expectReport, actualReport, "report")
+			})
 		})
 	}
 }
