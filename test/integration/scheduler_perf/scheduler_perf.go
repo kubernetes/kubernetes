@@ -1463,10 +1463,17 @@ func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup,
 			collector.run(collectorCtx)
 		}()
 	}
+	if b, ok := tCtx.TB().(*testing.B); ok {
+		b.ResetTimer()
+	}
+	tCtx.Log("Started metrics collection")
 	return collectorCtx, collectors, nil
 }
 
 func stopCollectingMetrics(tCtx ktesting.TContext, collectorCtx ktesting.TContext, collectorWG *sync.WaitGroup, threshold float64, tms thresholdMetricSelector, opIndex int, collectors []testDataCollector) ([]DataItem, error) {
+	if b, ok := tCtx.TB().(*testing.B); ok {
+		b.StopTimer()
+	}
 	if collectorCtx == nil {
 		return nil, fmt.Errorf("missing startCollectingMetrics operation before stopping")
 	}
@@ -1481,6 +1488,7 @@ func stopCollectingMetrics(tCtx ktesting.TContext, collectorCtx ktesting.TContex
 			tCtx.Errorf("op %d: %s", opIndex, err)
 		}
 	}
+	tCtx.Log("Stopped metrics collection")
 	return dataItems, nil
 }
 
