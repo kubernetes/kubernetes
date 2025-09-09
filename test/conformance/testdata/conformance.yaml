@@ -1703,35 +1703,25 @@
     DNS configuration MUST be configured in the Pod.
   release: v1.17
   file: test/e2e/network/dns.go
-- testname: EndpointSlice API
+- testname: EndpointSlice, creation/deletion
   codename: '[sig-network] EndpointSlice should create Endpoints and EndpointSlices
     for Pods matching a Service [Conformance]'
-  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
-    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
-    discovery document. The endpointslice controller must create EndpointSlices for
-    Pods mataching a Service.
-  release: v1.21
-  file: test/e2e/network/endpointslice.go
-- testname: EndpointSlice API
-  codename: '[sig-network] EndpointSlice should create and delete Endpoints and EndpointSlices
-    for a Service with a selector specified [Conformance]'
-  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
-    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
-    discovery document. The endpointslice controller should create and delete EndpointSlices
+  description: The endpointslice controller must create and delete EndpointSlices
     for Pods matching a Service.
   release: v1.21
   file: test/e2e/network/endpointslice.go
-- testname: EndpointSlice API
+- testname: EndpointSlice, "empty" Service
+  codename: '[sig-network] EndpointSlice should create and delete Endpoints and EndpointSlices
+    for a Service with a selector that matches no pods [Conformance]'
+  description: The EndpointSlice controller should create and delete empty EndpointSlices
+    for a Service that matches no pods.
+  release: v1.21
+  file: test/e2e/network/endpointslice.go
+- testname: kubernetes.default Endpoints and EndpointSlices
   codename: '[sig-network] EndpointSlice should have Endpoints and EndpointSlices
     pointing to API Server [Conformance]'
-  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
-    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
-    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
-    discovery document. The cluster MUST have a service named "kubernetes" on the
-    default namespace referencing the API servers. The "kubernetes.default" service
-    MUST have Endpoints and EndpointSlices pointing to each API server instance.
+  description: The "kubernetes.default" service MUST have Endpoints and EndpointSlices
+    pointing to each API server instance.
   release: v1.21
   file: test/e2e/network/endpointslice.go
 - testname: EndpointSlice, multiple IPs, multiple ports
