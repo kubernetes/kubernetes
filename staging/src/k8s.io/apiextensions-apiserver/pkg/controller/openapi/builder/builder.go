@@ -24,6 +24,8 @@ import (
 
 	"github.com/emicklei/go-restful/v3"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	v1 "k8s.io/api/autoscaling/v1"
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -314,7 +316,7 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		To(func(req *restful.Request, res *restful.Response) {}).
 		Doc(b.descriptionFor(path, operationVerb)).
 		Param(b.ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-		Operation(operationVerb+namespaced+b.kind+strings.Title(subresource(path))).
+		Operation(operationVerb+namespaced+b.kind+cases.Title(language.English).String(subresource(path))).
 		Metadata(endpoints.RouteMetaGVK, metav1.GroupVersionKind{
 			Group:   b.group,
 			Version: b.version,
