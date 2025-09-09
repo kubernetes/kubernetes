@@ -36,6 +36,8 @@
   - opcode: createAny
     templatePath: ../templates/deviceclass.yaml
   - opcode: createAny
+    templatePath: ../templates/deviceclass-no-devices.yaml
+  - opcode: createAny
     templatePath: ../templates/resourceclaim.yaml
     countParam: $initClaims
     namespace: init
