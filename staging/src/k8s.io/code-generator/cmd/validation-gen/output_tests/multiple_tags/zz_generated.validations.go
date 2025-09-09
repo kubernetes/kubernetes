@@ -37,6 +37,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type T1
 	scheme.AddValidationFunc((*T1)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -47,10 +48,13 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_T1 validates an instance of T1 according
+// to declarative validation rules in the API schema.
 func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
 	// type T1
+	// don't revalidate unchanged data
 	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil // no changes
+		return nil
 	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T1 #1")...)
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T1 #2")...)
@@ -62,9 +66,11 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T1.S
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.S false #1")...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.S false #2")...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.S false #3")...)
@@ -75,13 +81,16 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T1.T2
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *T2) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.T2 false #1")...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.T2 false #2")...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.T2 false #3")...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T1.T2 true")...)
+			// call the type's validation function
 			errs = append(errs, Validate_T2(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("t2"), &obj.T2, safe.Field(oldObj, func(oldObj *T1) *T2 { return &oldObj.T2 }))...)
@@ -89,10 +98,13 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	return errs
 }
 
+// Validate_T2 validates an instance of T2 according
+// to declarative validation rules in the API schema.
 func Validate_T2(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T2) (errs field.ErrorList) {
 	// type T2
+	// don't revalidate unchanged data
 	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil // no changes
+		return nil
 	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T2 false #1")...)
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T2 false #2")...)
@@ -101,9 +113,11 @@ func Validate_T2(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T2.S
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T2.S false #1")...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T2.S false #2")...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T2.S true")...)

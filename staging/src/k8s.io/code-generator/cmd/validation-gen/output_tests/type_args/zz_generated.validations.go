@@ -38,6 +38,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type T1
 	scheme.AddValidationFunc((*T1)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -48,26 +49,34 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_E1 validates an instance of E1 according
+// to declarative validation rules in the API schema.
 func Validate_E1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *E1) (errs field.ErrorList) {
 	// type E1
+	// don't revalidate unchanged data
 	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil // no changes
+		return nil
 	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type E1")...)
 
 	return errs
 }
 
+// Validate_T1 validates an instance of T1 according
+// to declarative validation rules in the API schema.
 func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
 	// field T1.TypeMeta has no validation
 
 	// field T1.S1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *primitives.T1) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.FixedResult[*primitives.T1](ctx, op, fldPath, obj, oldObj, false, "T1.S1")...)
+			// call the type's validation function
 			errs = append(errs, primitives.Validate_T1(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("s1"), obj.S1, safe.Field(oldObj, func(oldObj *T1) *primitives.T1 { return oldObj.S1 }))...)
@@ -75,10 +84,13 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T1.PS1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *primitives.T1) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.FixedResult[*primitives.T1](ctx, op, fldPath, obj, oldObj, false, "PT1.PS1")...)
+			// call the type's validation function
 			errs = append(errs, primitives.Validate_T1(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("ps1"), obj.PS1, safe.Field(oldObj, func(oldObj *T1) *primitives.T1 { return oldObj.PS1 }))...)
@@ -86,10 +98,13 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T1.E1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *E1) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.FixedResult[*E1](ctx, op, fldPath, obj, oldObj, false, "T1.E1")...)
+			// call the type's validation function
 			errs = append(errs, Validate_E1(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("e1"), &obj.E1, safe.Field(oldObj, func(oldObj *T1) *E1 { return &oldObj.E1 }))...)
@@ -97,10 +112,13 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T1.PE1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *E1) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.FixedResult[*E1](ctx, op, fldPath, obj, oldObj, true, "T1.PE1")...)
+			// call the type's validation function
 			errs = append(errs, Validate_E1(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("pe1"), obj.PE1, safe.Field(oldObj, func(oldObj *T1) *E1 { return oldObj.PE1 }))...)
@@ -108,9 +126,11 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T1.I1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.FixedResult[*int](ctx, op, fldPath, obj, oldObj, false, "T1.I1")...)
 			return
 		}(fldPath.Child("i1"), &obj.I1, safe.Field(oldObj, func(oldObj *T1) *int { return &oldObj.I1 }))...)
@@ -118,9 +138,11 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T1.PI1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.FixedResult[*int](ctx, op, fldPath, obj, oldObj, true, "T1.PI1")...)
 			return
 		}(fldPath.Child("pi1"), obj.PI1, safe.Field(oldObj, func(oldObj *T1) *int { return oldObj.PI1 }))...)

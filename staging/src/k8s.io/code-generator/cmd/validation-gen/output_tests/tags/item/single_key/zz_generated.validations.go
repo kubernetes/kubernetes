@@ -38,6 +38,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type Struct
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -45,6 +46,7 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
+	// type StructWithNestedTypedef
 	scheme.AddValidationFunc((*StructWithNestedTypedef)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -55,15 +57,19 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_Struct validates an instance of Struct according
+// to declarative validation rules in the API schema.
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// field Struct.TypeMeta has no validation
 
 	// field Struct.Items
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []Item) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item Items[key=target]")
 			})...)
@@ -73,9 +79,11 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.IntKeyItems
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []IntKeyItem) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *IntKeyItem) bool { return item.IntField == 42 }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *IntKeyItem) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item IntKeyItems[intField=42]")
 			})...)
@@ -85,9 +93,11 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.BoolKeyItems
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []BoolKeyItem) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *BoolKeyItem) bool { return item.BoolField == true }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *BoolKeyItem) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item BoolKeyItems[boolField=true]")
 			})...)
@@ -97,9 +107,11 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.TypedefItems
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj TypedefItemList) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *TypedefItem) bool { return item.ID == "typedef-target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *TypedefItem) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item TypedefItems[id=typedef-target]")
 			})...)
@@ -109,15 +121,19 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	return errs
 }
 
+// Validate_StructWithNestedTypedef validates an instance of StructWithNestedTypedef according
+// to declarative validation rules in the API schema.
 func Validate_StructWithNestedTypedef(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StructWithNestedTypedef) (errs field.ErrorList) {
 	// field StructWithNestedTypedef.TypeMeta has no validation
 
 	// field StructWithNestedTypedef.NestedItems
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []NestedTypedefItem) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *NestedTypedefItem) bool { return item.Key == "nested-target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NestedTypedefItem) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item NestedItems[key=nested-target]")
 			})...)
