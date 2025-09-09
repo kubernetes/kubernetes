@@ -128,6 +128,75 @@ func mustResourceList(m map[v1.ResourceName]string) v1.ResourceList {
 	return out
 }
 
+func TestCollectPodLevelResources(t *testing.T) {
+	testCases := []struct {
+		name               string
+		reqs               v1.ResourceList
+		lims               v1.ResourceList
+		expectedReqs       v1.ResourceList
+		expectedLims       v1.ResourceList
+		expectedGuaranteed bool
+	}{
+		{
+			name:               "cpu+mem limits present -> Guaranteed",
+			reqs:               getResourceList("100m", "128Mi"),
+			lims:               getResourceList("750m", "512Mi"),
+			expectedReqs:       getResourceList("100m", "128Mi"),
+			expectedLims:       getResourceList("750m", "512Mi"),
+			expectedGuaranteed: true,
+		},
+		{
+			name:               "only cpu limit -> not Guaranteed",
+			reqs:               getResourceList("100m", "128Mi"),
+			lims:               getResourceList("750m", ""),
+			expectedReqs:       getResourceList("100m", "128Mi"),
+			expectedLims:       getResourceList("750m", ""),
+			expectedGuaranteed: false,
+		},
+		{
+			name:               "only memory limit -> not Guaranteed",
+			reqs:               getResourceList("100m", "128Mi"),
+			lims:               getResourceList("", "512Mi"),
+			expectedReqs:       getResourceList("100m", "128Mi"),
+			expectedLims:       getResourceList("", "512Mi"),
+			expectedGuaranteed: false,
+		},
+		{
+			name:               "no limits -> not Guaranteed",
+			reqs:               getResourceList("100m", "128Mi"),
+			lims:               getResourceList("", ""),
+			expectedReqs:       getResourceList("100m", "128Mi"),
+			expectedLims:       getResourceList("", ""),
+			expectedGuaranteed: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: testCase.reqs,
+						Limits:   testCase.lims,
+					},
+				},
+			}
+
+			actualReqs, actualLims, actualGuaranteed := collectPodLevelResources(pod)
+
+			if actualGuaranteed != testCase.expectedGuaranteed {
+				t.Errorf("invalid isGuaranteed, expected: %v, actual: %v", testCase.expectedGuaranteed, actualGuaranteed)
+			}
+			if !resourceListEqual(actualReqs, testCase.expectedReqs) {
+				t.Errorf("invalid requests resource, expected: %v, actual: %v", testCase.expectedReqs, actualReqs)
+			}
+			if !resourceListEqual(actualLims, testCase.expectedLims) {
+				t.Errorf("invalid limits resource, expected: %v, actual: %v", testCase.expectedLims, actualLims)
+			}
+		})
+	}
+}
+
 func TestComputePodQOS(t *testing.T) {
 	testCases := []struct {
 		pod                      *v1.Pod

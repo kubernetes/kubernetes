@@ -114,24 +114,16 @@ func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 }
 
 func collectPodResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
-	requests := v1.ResourceList{}
-	limits := v1.ResourceList{}
-	isGuaranteed := true
 	// When pod-level resources are specified, we use them to determine QoS class.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		pod.Spec.Resources != nil {
-		// process requests
-		processResourceList(requests, pod.Spec.Resources.Requests)
-
-		// process limits
-		processResourceList(limits, pod.Spec.Resources.Limits)
-		qosLimitResources := getQOSResources(pod.Spec.Resources.Limits)
-		isGuaranteed = qosLimitResources.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU))
-
-		return requests, limits, isGuaranteed
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
+		return collectPodLevelResources(pod)
 	}
 
 	// note, ephemeral containers are not considered for QoS as they cannot define resources
+	requests := v1.ResourceList{}
+	limits := v1.ResourceList{}
+	isGuaranteed := true
+
 	allContainers := []v1.Container{}
 	allContainers = append(allContainers, pod.Spec.Containers...)
 	allContainers = append(allContainers, pod.Spec.InitContainers...)
@@ -173,6 +165,21 @@ func collectPodResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
 			isGuaranteed = false
 		}
 	}
+
+	return requests, limits, isGuaranteed
+}
+
+func collectPodLevelResources(pod *v1.Pod) (v1.ResourceList, v1.ResourceList, bool) {
+	requests := v1.ResourceList{}
+	limits := v1.ResourceList{}
+
+	// process requests
+	processResourceList(requests, pod.Spec.Resources.Requests)
+	// process limits
+	processResourceList(limits, pod.Spec.Resources.Limits)
+
+	qosLimitResources := getQOSResources(pod.Spec.Resources.Limits)
+	isGuaranteed := qosLimitResources.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU))
 
 	return requests, limits, isGuaranteed
 }
