@@ -88,8 +88,6 @@ func getQOSResources(list v1.ResourceList) sets.Set[string] {
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
-// TODO(ndixita): Refactor ComputePodQOS into smaller functions to make it more
-// readable and maintainable.
 func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 	requests, limits, isGuaranteed := collectPodResources(pod)
 	if len(requests) == 0 && len(limits) == 0 {
