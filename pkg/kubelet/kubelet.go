@@ -688,8 +688,6 @@ func NewMainKubelet(ctx context.Context,
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 	klet.allocationManager = allocation.NewManager(
 		klet.getRootDir(),
-		klet.containerManager.GetNodeConfig(),
-		klet.containerManager.GetNodeAllocatableAbsolute(),
 		klet.statusManager,
 		func(pod *v1.Pod) { klet.HandlePodSyncs([]*v1.Pod{pod}) },
 		klet.GetActivePods,
@@ -697,6 +695,8 @@ func NewMainKubelet(ctx context.Context,
 		klet.sourcesReady,
 		kubeDeps.Recorder,
 	)
+	handlers := []lifecycle.PodAdmitHandler{}
+	handlers = append(handlers, allocation.NewPodResizesAdmitHandler(klet.containerManager, klet.allocationManager))
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(ctx, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
@@ -1011,7 +1011,6 @@ func NewMainKubelet(ctx context.Context,
 		killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation)
 
 	klet.evictionManager = evictionManager
-	handlers := []lifecycle.PodAdmitHandler{}
 	handlers = append(handlers, evictionAdmitHandler)
 
 	// Safe, allowed sysctls can always be used as unsafe sysctls in the spec.

@@ -2073,8 +2073,6 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 		containerManager = cm.NewFakeContainerManagerWithNodeConfig(*nodeConfig)
 	}
 	allocationManager := NewInMemoryManager(
-		containerManager.GetNodeConfig(),
-		containerManager.GetNodeAllocatableAbsolute(),
 		statusManager,
 		func(pod *v1.Pod) {
 			/* For testing, just mark the pod as having a pod sync triggered in an annotation. */
@@ -2111,9 +2109,10 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 			},
 		}, nil
 	}
-	handler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
-	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 
+	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
+	resizeHandler := NewPodResizesAdmitHandler(containerManager, allocationManager)
+	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{resizeHandler, predicateHandler})
 	return allocationManager
 }
 
