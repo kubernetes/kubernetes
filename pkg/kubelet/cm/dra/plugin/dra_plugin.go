@@ -76,6 +76,10 @@ func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 
 	// If connection exists and is ready, return it.
 	if p.conn != nil && p.conn.GetState() != connectivity.Shutdown {
+		// Ensure health client exists
+		if p.healthClient == nil {
+			p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
+		}
 		return p.conn, nil
 	}
 
@@ -118,31 +122,9 @@ func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	}
 
 	p.conn = conn
+	p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
 
 	return p.conn, nil
-}
-
-// getOrCreateHealthClient lazily initializes and returns the health client.
-// This allows the health client to be created on demand. 
-func (p *DRAPlugin) getOrCreateHealthClient() (drahealthv1alpha1.DRAResourceHealthClient, error) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	// If health client already exists and connection is valid, return it
-	if p.healthClient != nil && p.conn != nil && p.conn.GetState() != connectivity.Shutdown {
-		return p.healthClient, nil
-	}
-
-	// Ensure we have a valid connection first
-	if p.conn == nil || p.conn.GetState() == connectivity.Shutdown {
-		return nil, fmt.Errorf("no valid gRPC connection available for health client")
-	}
-
-	// Create the health client
-	p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
-	klog.FromContext(p.backgroundCtx).V(4).Info("Initialized DRAResourceHealthClient lazily")
-
-	return p.healthClient, nil
 }
 
 func (p *DRAPlugin) DriverName() string {
@@ -159,21 +141,17 @@ func (p *DRAPlugin) NodePrepareResources(
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("Calling NodePrepareResources rpc", "request", req)
 
-	conn, err := p.getOrCreateGRPCConn()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get gRPC connection: %w", err)
-	}
-
 	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
 	defer cancel()
 
+	var err error
 	var response *drapbv1.NodePrepareResourcesResponse
 	switch p.chosenService {
 	case drapbv1beta1.DRAPluginService:
-		client := drapbv1beta1.NewDRAPluginClient(conn)
+		client := drapbv1beta1.NewDRAPluginClient(p.conn)
 		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodePrepareResources(ctx, req)
 	case drapbv1.DRAPluginService:
-		client := drapbv1.NewDRAPluginClient(conn)
+		client := drapbv1.NewDRAPluginClient(p.conn)
 		response, err = client.NodePrepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
@@ -245,16 +223,16 @@ func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
 
 // NodeWatchResources establishes a stream to receive health updates from the DRA plugin.
 func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, error) {
-	// Lazily initialize the health client.
-	healthClient, err := p.getOrCreateHealthClient()
+	// Ensure gRPC connection exists (which also creates health client)
+	_, err := p.getOrCreateGRPCConn()
 	if err != nil {
-		klog.FromContext(p.backgroundCtx).Error(err, "Failed to get health client")
+		klog.FromContext(p.backgroundCtx).Error(err, "Failed to get gRPC connection for health client")
 		return nil, err
 	}
 
 	logger := klog.FromContext(ctx).WithValues("pluginName", p.driverName)
 	logger.V(4).Info("Starting WatchResources stream")
-	stream, err := healthClient.NodeWatchResources(ctx, &drahealthv1alpha1.NodeWatchResourcesRequest{})
+	stream, err := p.healthClient.NodeWatchResources(ctx, &drahealthv1alpha1.NodeWatchResourcesRequest{})
 	if err != nil {
 		logger.Error(err, "NodeWatchResources RPC call failed")
 		return nil, err
