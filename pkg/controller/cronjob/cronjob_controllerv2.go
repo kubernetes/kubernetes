@@ -75,11 +75,11 @@ type ControllerV2 struct {
 
 	cronJobLister batchv1listers.CronJobLister
 
-	jobListerSynced     cache.InformerSynced
-	cronJobListerSynced cache.InformerSynced
-
 	// jobIndexer allows looking up jobs by ControllerRef UID
 	jobIndexer cache.Indexer
+
+	jobListerSynced     cache.InformerSynced
+	cronJobListerSynced cache.InformerSynced
 
 	// now is a function that returns current time, done to facilitate unit tests
 	now func() time.Time
@@ -106,10 +106,10 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 
 		cronJobLister: cronJobsInformer.Lister(),
 
+		jobIndexer: jobInformer.Informer().GetIndexer(),
+
 		jobListerSynced:     jobInformer.Informer().HasSynced,
 		cronJobListerSynced: cronJobsInformer.Informer().HasSynced,
-
-		jobIndexer: jobInformer.Informer().GetIndexer(),
 
 		now: time.Now,
 	}
