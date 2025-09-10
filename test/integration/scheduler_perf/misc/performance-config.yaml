@@ -45,13 +45,11 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
-    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 1000
@@ -230,7 +228,6 @@
       initPods: 20
       measurePods: 5
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 2000
@@ -299,13 +296,11 @@
       initPods: 1
       measurePods: 10
   - name: 500Nodes/10Init/1kPods
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 10
       measurePods: 1000
   - name: 5kNodes/100Init/1kPods
-    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 100
@@ -377,12 +372,10 @@
       initNodes: 10
       measurePods: 100
   - name: 1000Nodes
-    labels: [performance, short]
     params:
       initNodes: 1000
       measurePods: 1000
   - name: 5000Nodes
-    labels: [performance, short]
     params:
       initNodes: 5000
       measurePods: 2000
@@ -513,7 +506,6 @@
   - name: 1000Node_1000DeletingPods
     featureGates:
       SchedulerQueueingHints: false
-    labels: [performance, short]
     params:
       initNodes: 1000
       deletingPods: 1000
@@ -521,8 +513,23 @@
   - name: 1000Node_1000DeletingPods_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
-    labels: [performance, short]
     params:
       initNodes: 1000
       deletingPods: 1000
       measurePods: 1000
+  - name: 5000Node_5000DeletingPods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    params:
+      initNodes: 5000
+      deletingPods: 5000
+      measurePods: 5000
+  - name: 5000Node_5000DeletingPods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      deletingPods: 5000
+      measurePods: 5000
