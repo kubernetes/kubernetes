@@ -29,10 +29,16 @@ import (
 
 // LimitRangeApplyConfiguration represents a declarative configuration of the LimitRange type for use
 // with apply.
+//
+// LimitRange sets resource usage limits for each kind of resource in a Namespace.
 type LimitRangeApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *LimitRangeSpecApplyConfiguration `json:"spec,omitempty"`
+	// Spec defines the limits enforced.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *LimitRangeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // LimitRange constructs a declarative configuration of the LimitRange type for use with
@@ -53,7 +59,6 @@ func LimitRange(name, namespace string) *LimitRangeApplyConfiguration {
 // ExtractLimitRangeFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractLimitRangeFrom(limitRange *corev1.LimitRange, fieldManager string, subresource string) (*LimitRangeApplyConfiguration, error) {
 	b := &LimitRangeApplyConfiguration{}
 	err := managedfields.ExtractInto(limitRange, internal.Parser().Type("io.k8s.api.core.v1.LimitRange"), fieldManager, b, subresource)
@@ -78,7 +83,6 @@ func ExtractLimitRangeFrom(limitRange *corev1.LimitRange, fieldManager string, s
 // ExtractLimitRange provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractLimitRange(limitRange *corev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
 	return ExtractLimitRangeFrom(limitRange, fieldManager, "")
 }

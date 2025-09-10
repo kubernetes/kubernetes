@@ -29,11 +29,17 @@ import (
 
 // DeploymentApplyConfiguration represents a declarative configuration of the Deployment type for use
 // with apply.
+//
+// Deployment enables declarative updates for Pods and ReplicaSets.
 type DeploymentApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *DeploymentSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the Deployment.
+	Spec *DeploymentSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the Deployment.
+	Status *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Deployment constructs a declarative configuration of the Deployment type for use with
@@ -54,7 +60,6 @@ func Deployment(name, namespace string) *DeploymentApplyConfiguration {
 // ExtractDeploymentFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractDeploymentFrom(deployment *appsv1.Deployment, fieldManager string, subresource string) (*DeploymentApplyConfiguration, error) {
 	b := &DeploymentApplyConfiguration{}
 	err := managedfields.ExtractInto(deployment, internal.Parser().Type("io.k8s.api.apps.v1.Deployment"), fieldManager, b, subresource)
@@ -79,21 +84,18 @@ func ExtractDeploymentFrom(deployment *appsv1.Deployment, fieldManager string, s
 // ExtractDeployment provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractDeployment(deployment *appsv1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
 	return ExtractDeploymentFrom(deployment, fieldManager, "")
 }
 
 // ExtractDeploymentScale extracts the applied configuration owned by fieldManager from
 // deployment for the scale subresource.
-// Experimental!
 func ExtractDeploymentScale(deployment *appsv1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
 	return ExtractDeploymentFrom(deployment, fieldManager, "scale")
 }
 
 // ExtractDeploymentStatus extracts the applied configuration owned by fieldManager from
 // deployment for the status subresource.
-// Experimental!
 func ExtractDeploymentStatus(deployment *appsv1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
 	return ExtractDeploymentFrom(deployment, fieldManager, "status")
 }

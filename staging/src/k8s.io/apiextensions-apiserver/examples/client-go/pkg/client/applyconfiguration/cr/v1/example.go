@@ -26,6 +26,8 @@ import (
 
 // ExampleApplyConfiguration represents a declarative configuration of the Example type for use
 // with apply.
+//
+// Example is a specification for an Example resource
 type ExampleApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration    `json:",inline"`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`

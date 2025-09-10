@@ -29,11 +29,16 @@ import (
 
 // HorizontalPodAutoscalerApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscaler type for use
 // with apply.
+//
+// configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *HorizontalPodAutoscalerSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *HorizontalPodAutoscalerStatusApplyConfiguration `json:"status,omitempty"`
+	// spec defines the behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+	Spec *HorizontalPodAutoscalerSpecApplyConfiguration `json:"spec,omitempty"`
+	// status is the current information about the autoscaler.
+	Status *HorizontalPodAutoscalerStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // HorizontalPodAutoscaler constructs a declarative configuration of the HorizontalPodAutoscaler type for use with
@@ -54,7 +59,6 @@ func HorizontalPodAutoscaler(name, namespace string) *HorizontalPodAutoscalerApp
 // ExtractHorizontalPodAutoscalerFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractHorizontalPodAutoscalerFrom(horizontalPodAutoscaler *autoscalingv1.HorizontalPodAutoscaler, fieldManager string, subresource string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
 	b := &HorizontalPodAutoscalerApplyConfiguration{}
 	err := managedfields.ExtractInto(horizontalPodAutoscaler, internal.Parser().Type("io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"), fieldManager, b, subresource)
@@ -79,14 +83,12 @@ func ExtractHorizontalPodAutoscalerFrom(horizontalPodAutoscaler *autoscalingv1.H
 // ExtractHorizontalPodAutoscaler provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractHorizontalPodAutoscaler(horizontalPodAutoscaler *autoscalingv1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
 	return ExtractHorizontalPodAutoscalerFrom(horizontalPodAutoscaler, fieldManager, "")
 }
 
 // ExtractHorizontalPodAutoscalerStatus extracts the applied configuration owned by fieldManager from
 // horizontalPodAutoscaler for the status subresource.
-// Experimental!
 func ExtractHorizontalPodAutoscalerStatus(horizontalPodAutoscaler *autoscalingv1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
 	return ExtractHorizontalPodAutoscalerFrom(horizontalPodAutoscaler, fieldManager, "status")
 }

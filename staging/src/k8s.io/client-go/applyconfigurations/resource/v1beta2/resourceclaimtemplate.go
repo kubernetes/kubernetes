@@ -29,10 +29,21 @@ import (
 
 // ResourceClaimTemplateApplyConfiguration represents a declarative configuration of the ResourceClaimTemplate type for use
 // with apply.
+//
+// ResourceClaimTemplate is used to produce ResourceClaim objects.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
 type ResourceClaimTemplateApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ResourceClaimTemplateSpecApplyConfiguration `json:"spec,omitempty"`
+	// Describes the ResourceClaim that is to be generated.
+	//
+	// This field is immutable. A ResourceClaim will get created by the
+	// control plane for a Pod when needed and then not get updated
+	// anymore.
+	Spec *ResourceClaimTemplateSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ResourceClaimTemplate constructs a declarative configuration of the ResourceClaimTemplate type for use with
@@ -53,7 +64,6 @@ func ResourceClaimTemplate(name, namespace string) *ResourceClaimTemplateApplyCo
 // ExtractResourceClaimTemplateFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractResourceClaimTemplateFrom(resourceClaimTemplate *resourcev1beta2.ResourceClaimTemplate, fieldManager string, subresource string) (*ResourceClaimTemplateApplyConfiguration, error) {
 	b := &ResourceClaimTemplateApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceClaimTemplate, internal.Parser().Type("io.k8s.api.resource.v1beta2.ResourceClaimTemplate"), fieldManager, b, subresource)
@@ -78,7 +88,6 @@ func ExtractResourceClaimTemplateFrom(resourceClaimTemplate *resourcev1beta2.Res
 // ExtractResourceClaimTemplate provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractResourceClaimTemplate(resourceClaimTemplate *resourcev1beta2.ResourceClaimTemplate, fieldManager string) (*ResourceClaimTemplateApplyConfiguration, error) {
 	return ExtractResourceClaimTemplateFrom(resourceClaimTemplate, fieldManager, "")
 }

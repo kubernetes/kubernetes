@@ -29,10 +29,16 @@ import (
 
 // LeaseCandidateApplyConfiguration represents a declarative configuration of the LeaseCandidate type for use
 // with apply.
+//
+// LeaseCandidate defines a candidate for a Lease object.
+// Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.
 type LeaseCandidateApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *LeaseCandidateSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec contains the specification of the Lease.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *LeaseCandidateSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // LeaseCandidate constructs a declarative configuration of the LeaseCandidate type for use with
@@ -53,7 +59,6 @@ func LeaseCandidate(name, namespace string) *LeaseCandidateApplyConfiguration {
 // ExtractLeaseCandidateFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractLeaseCandidateFrom(leaseCandidate *coordinationv1beta1.LeaseCandidate, fieldManager string, subresource string) (*LeaseCandidateApplyConfiguration, error) {
 	b := &LeaseCandidateApplyConfiguration{}
 	err := managedfields.ExtractInto(leaseCandidate, internal.Parser().Type("io.k8s.api.coordination.v1beta1.LeaseCandidate"), fieldManager, b, subresource)
@@ -78,7 +83,6 @@ func ExtractLeaseCandidateFrom(leaseCandidate *coordinationv1beta1.LeaseCandidat
 // ExtractLeaseCandidate provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractLeaseCandidate(leaseCandidate *coordinationv1beta1.LeaseCandidate, fieldManager string) (*LeaseCandidateApplyConfiguration, error) {
 	return ExtractLeaseCandidateFrom(leaseCandidate, fieldManager, "")
 }
