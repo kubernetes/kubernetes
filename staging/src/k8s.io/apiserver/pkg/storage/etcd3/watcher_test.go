@@ -108,7 +108,7 @@ func TestProgressNotify(t *testing.T) {
 	clusterConfig.WatchProgressNotifyInterval = time.Second
 	ctx, store, client := testSetup(t, withClientConfig(clusterConfig))
 
-	storagetesting.RunOptionalTestProgressNotify(ctx, t, store, increaseRV(client.Client))
+	storagetesting.RunOptionalTestProgressNotify(ctx, t, store, increaseRVFunc(client.Client))
 }
 
 func TestWatchWithUnsafeDelete(t *testing.T) {

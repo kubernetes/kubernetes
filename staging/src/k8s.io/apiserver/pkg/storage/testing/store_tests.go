@@ -2519,7 +2519,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 }
 
 type Compaction func(ctx context.Context, t *testing.T, resourceVersion string)
-type IncreaseRVFunc func(ctx context.Context, t *testing.T)
+type IncreaseRVFunc func(ctx context.Context, t *testing.T) (revision int64)
 
 func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction) {
 	// Setup storage with the following structure:

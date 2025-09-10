@@ -177,7 +177,7 @@ func TestListPaging(t *testing.T) {
 
 func TestGetListNonRecursive(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRV(client.Client), store)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRVFunc(client.Client), store)
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {
@@ -259,14 +259,14 @@ func TestList(t *testing.T) {
 
 func TestConsistentList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestConsistentList(ctx, t, store, increaseRV(client.Client), false, true, false)
+	storagetesting.RunTestConsistentList(ctx, t, store, increaseRVFunc(client.Client), false, true, false)
 }
 
 func TestCompactRevision(t *testing.T) {
 	// Test requires store to observe extenal changes to compaction revision, requiring dedicated watch on compact key which is enabled by ListFromCacheSnapshot.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestCompactRevision(ctx, t, store, increaseRV(client.Client), compactStorage(store, client.Client))
+	storagetesting.RunTestCompactRevision(ctx, t, store, increaseRVFunc(client.Client), compactStorage(store, client.Client))
 }
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *storagetesting.KVRecorder) storagetesting.CallsValidation {
@@ -360,11 +360,13 @@ func compactStorage(s *store, client *clientv3.Client) storagetesting.Compaction
 	}
 }
 
-func increaseRV(client *clientv3.Client) storagetesting.IncreaseRVFunc {
-	return func(ctx context.Context, t *testing.T) {
-		if _, err := client.KV.Put(ctx, "increaseRV", "ok"); err != nil {
+func increaseRVFunc(client *clientv3.Client) storagetesting.IncreaseRVFunc {
+	return func(ctx context.Context, t *testing.T) int64 {
+		resp, err := client.KV.Put(ctx, "increaseRV", "ok")
+		if err != nil {
 			t.Fatalf("Could not update increaseRV: %v", err)
 		}
+		return resp.Header.Revision
 	}
 }
 
