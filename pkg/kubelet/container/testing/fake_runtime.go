@@ -71,8 +71,12 @@ type FakeRuntime struct {
 	// from container runtime.
 	BlockImagePulls      bool
 	imagePullTokenBucket chan bool
-	SwapBehavior         map[string]kubetypes.SwapBehavior
-	T                    TB
+	// imagePullErrBucket sends an error to a PullImage() call
+	// blocked by BlockImagePulls. This is used to simulate
+	// a failure in some of the parallel pull image calls.
+	imagePullErrBucket chan error
+	SwapBehavior       map[string]kubetypes.SwapBehavior
+	T                  TB
 }
 
 const FakeHost = "localhost:12345"
@@ -318,6 +322,30 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, creds []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
 	f.Lock()
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
+
+	if f.imagePullTokenBucket == nil {
+		f.imagePullTokenBucket = make(chan bool, 1)
+	}
+	if f.imagePullErrBucket == nil {
+		f.imagePullErrBucket = make(chan error, 1)
+	}
+
+	blockImagePulls := f.BlockImagePulls
+	f.Unlock()
+
+	if blockImagePulls {
+		// Block the function before adding the image to f.ImageList
+		select {
+		case <-ctx.Done():
+		case <-f.imagePullTokenBucket:
+		case pullImageErr := <-f.imagePullErrBucket:
+			return "", nil, pullImageErr
+		}
+	}
+
+	f.Lock()
+	defer f.Unlock()
+
 	if f.Err == nil {
 		i := kubecontainer.Image{
 			ID:   image.Image,
@@ -332,23 +360,7 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 		retCreds = &creds[0]
 	}
 
-	if !f.BlockImagePulls {
-		f.Unlock()
-		return image.Image, retCreds, f.Err
-	}
-
-	retErr := f.Err
-	if f.imagePullTokenBucket == nil {
-		f.imagePullTokenBucket = make(chan bool, 1)
-	}
-	// Unlock before waiting for UnblockImagePulls calls, to avoid deadlock.
-	f.Unlock()
-	select {
-	case <-ctx.Done():
-	case <-f.imagePullTokenBucket:
-	}
-
-	return image.Image, retCreds, retErr
+	return image.Image, retCreds, f.Err
 }
 
 // UnblockImagePulls unblocks a certain number of image pulls, if BlockImagePulls is true.
@@ -359,6 +371,17 @@ func (f *FakeRuntime) UnblockImagePulls(count int) {
 			case f.imagePullTokenBucket <- true:
 			default:
 			}
+		}
+	}
+}
+
+// SendImagePullError sends an error to a PullImage() call blocked by BlockImagePulls.
+// PullImage() immediately returns after receiving the error.
+func (f *FakeRuntime) SendImagePullError(err error) {
+	if f.imagePullErrBucket != nil {
+		select {
+		case f.imagePullErrBucket <- err:
+		default:
 		}
 	}
 }
