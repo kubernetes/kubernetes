@@ -151,8 +151,10 @@ The test cases labeled as `short` are executed in pull-kubernetes-integration jo
 | ci-kubernetes-integration-master | integration-test       |
 | pull-kubernetes-integration      | integration-test,short |
 | ci-benchmark-scheduler-perf      | performance            |
+| pull-kubernetes-scheduler-perf   | performance            |
 
 See the comment on [./misc/performance-config.yaml](./misc/performance-config.yaml) for the details.
+Workloads without any labels are good for local usage, because they run faster than performance ones.
 
 ## Scheduling throughput thresholds
 
