@@ -123,7 +123,7 @@ func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 }
 
 // getOrCreateHealthClient lazily initializes and returns the health client.
-// This allows the health client to be created on-demand when needed.
+// This allows the health client to be created on demand. 
 func (p *DRAPlugin) getOrCreateHealthClient() (drahealthv1alpha1.DRAResourceHealthClient, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
