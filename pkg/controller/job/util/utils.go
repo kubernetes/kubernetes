@@ -48,3 +48,13 @@ func IsJobSucceeded(j *batch.Job) bool {
 	}
 	return false
 }
+
+// IsJobFailed returns whether a job has completed with failure.
+func IsJobFailed(j *batch.Job) bool {
+	for _, c := range j.Status.Conditions {
+		if c.Type == batch.JobFailed && c.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
