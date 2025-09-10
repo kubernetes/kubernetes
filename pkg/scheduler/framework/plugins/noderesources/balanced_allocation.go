@@ -135,6 +135,7 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 			Name:                            BalancedAllocationName,
 			enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
 			enablePodLevelResources:         fts.EnablePodLevelResources,
+			enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
 			scorer:                          balancedResourceScorer,
 			useRequested:                    true,
 			resources:                       args.Resources,
