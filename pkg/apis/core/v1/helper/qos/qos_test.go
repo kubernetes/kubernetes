@@ -317,6 +317,14 @@ func TestCollectPodLevelResources(t *testing.T) {
 			expectedLims:       getResourceList("", ""),
 			expectedGuaranteed: false,
 		},
+		{
+			name:               "no requests and limits -> not Guaranteed",
+			reqs:               getResourceList("", ""),
+			lims:               getResourceList("", ""),
+			expectedReqs:       getResourceList("", ""),
+			expectedLims:       getResourceList("", ""),
+			expectedGuaranteed: false,
+		},
 	}
 
 	for _, testCase := range testCases {
