@@ -31,6 +31,11 @@ const (
 	itemTagName = "k8s:item"
 )
 
+func init() {
+	// Processing item tags requires the list metadata.
+	RegisterTagValidator(&itemTagValidator{listByPath: globalListMeta})
+}
+
 type keyValuePair struct {
 	key       string
 	value     any
@@ -94,8 +99,9 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 
 	// Fields inherit list metadata from typedefs, but not vice-versa.
 	// If we find no listMetadata then something is wrong.
-	if !ok || !listMeta.declaredAsMap || len(listMeta.keyFields) == 0 {
-		return Validations{}, fmt.Errorf("found items with no list metadata")
+	// The item tag requires map semantics, which can come from either listType=map or unique=map
+	if !ok || listMeta.semantic != semanticMap || len(listMeta.keyFields) == 0 {
+		return Validations{}, fmt.Errorf("found items with no list metadata - item tags require listType=map or unique=map with listMapKey")
 	}
 
 	// Parse key-value pairs from named args.

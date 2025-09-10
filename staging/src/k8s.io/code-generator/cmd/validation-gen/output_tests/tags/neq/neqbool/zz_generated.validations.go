@@ -80,6 +80,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.ValidatedTypedefField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *ValidatedBoolType) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ValidatedBoolType(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -91,11 +95,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 // Validate_ValidatedBoolType validates an instance of ValidatedBoolType according
 // to declarative validation rules in the API schema.
 func Validate_ValidatedBoolType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ValidatedBoolType) (errs field.ErrorList) {
-	// type ValidatedBoolType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, true)...)
 
 	return errs

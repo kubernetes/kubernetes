@@ -57,6 +57,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Tasks
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj TaskList) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_TaskList(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -70,11 +74,6 @@ var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tag
 // Validate_TaskList validates an instance of TaskList according
 // to declarative validation rules in the API schema.
 func Validate_TaskList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj TaskList) (errs field.ErrorList) {
-	// type TaskList
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_union_typedef_TaskList_, func(list TaskList) bool {
 		for i := range list {
 			if list[i].Name == "failed" {

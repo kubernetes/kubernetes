@@ -68,6 +68,10 @@ func Validate_CertificateSigningRequest(ctx context.Context, op operation.Operat
 	// field certificatesv1beta1.CertificateSigningRequest.Status
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *certificatesv1beta1.CertificateSigningRequestStatus) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_CertificateSigningRequestStatus(ctx, op, fldPath, obj, oldObj)...)
 			return

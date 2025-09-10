@@ -52,11 +52,6 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_ListType validates an instance of ListType according
 // to declarative validation rules in the API schema.
 func Validate_ListType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ListType) (errs field.ErrorList) {
-	// type ListType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type ListType[*]")
 	})...)
@@ -67,11 +62,6 @@ func Validate_ListType(ctx context.Context, op operation.Operation, fldPath *fie
 // Validate_ListTypedefType validates an instance of ListTypedefType according
 // to declarative validation rules in the API schema.
 func Validate_ListTypedefType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ListTypedefType) (errs field.ErrorList) {
-	// type ListTypedefType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StringType) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type ListTypedefType[*]")
 	})...)

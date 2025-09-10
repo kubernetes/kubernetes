@@ -87,6 +87,10 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T1.T2
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *T2) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_T2(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -168,11 +172,6 @@ func Validate_T2(ctx context.Context, op operation.Operation, fldPath *field.Pat
 // Validate_T3 validates an instance of T3 according
 // to declarative validation rules in the API schema.
 func Validate_T3(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T3) (errs field.ErrorList) {
-	// type T3
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T3")...)
 
 	// field T3.I has no validation

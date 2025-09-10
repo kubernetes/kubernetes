@@ -51,11 +51,6 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_ShortNameStringType validates an instance of ShortNameStringType according
 // to declarative validation rules in the API schema.
 func Validate_ShortNameStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ShortNameStringType) (errs field.ErrorList) {
-	// type ShortNameStringType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
 
 	return errs
@@ -93,6 +88,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.ShortNameTypedefField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *ShortNameStringType) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ShortNameStringType(ctx, op, fldPath, obj, oldObj)...)
 			return

@@ -1006,9 +1006,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 		default:
 			panic(fmt.Sprintf("unexpected type-validations on type %v, kind %s", thisNode.valueType, thisNode.valueType.Kind))
 		}
-		sw.Do("// type $.inType|raw$\n", targs)
 		emitComments(validations.Comments, sw)
-		emitRatchetingCheck(c, thisNode.valueType, sw)
 		emitCallsToValidators(c, validations.Functions, sw)
 		if thisNode.valueType.Kind == types.Alias {
 			underlyingNode := thisNode.underlying.node
@@ -1060,14 +1058,57 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			buf := bytes.NewBuffer(nil)
 			bufsw := sw.Dup(buf)
 
+			// On ratcheting checks:
+			//
+			// We emit ratcheting checks ONLY for struct fields and ONLY when
+			// that field has some validations to call.
+			//
+			// We DO NOT emit ratchet checks inside type-specific validation
+			// functions, because that leads to repeated ratchet checking which
+			// is almost never useful work (keep reading).
+			//
+			// The consequence of this is that a caller of a type's validation
+			// function is assumed to have already done a ratchet check (which
+			// is true for all generated code (except root types, keep
+			// reading)). For struct types (our most common case), the type's
+			// function will do ratchet checks on each sub-field anyway.
+			//
+			// This leaves one case where validation is executed unilaterally:
+			// non-pre-checked calls of validation functions for types which have
+			// type-attached validations.  This can happen in two cases:
+			//   1. an external caller of a type's validation function
+			//   2. the generated register function for a package which calls a
+			//      root-type's validation function
+			//
+			// TODO: We are leaving this as a problem for the future. If we
+			// find that we have a root type which has type-attached validation
+			// AND that validation is being ratcheted, then we will need to
+			// address this. Some options:
+			//   1. emit a ratchet check in the package's register function
+			//   2. emit a ratchet check in the type's validation function
+			//      (IFF it has type-attached validation, perhaps only for root
+			//      types)
+			//   3. emit both "safe" (ratchet check the whole object) and
+			//      "fast" (assume the object was already ratchet checked)
+			//      forms of each type's validation function, so that the
+			//      generated code can call the "fast" form while external code
+			//      calls the "safe" form.
+			//   4. implement depth-first traversal of validation, where each
+			//      function returns an additional bool indicating "something
+			//      changed", which gets propagated up the caller to decide if
+			//      it needs to do higher-level validations (e.g. if any field
+			//      in a struct changes, the struct's type-attached validations
+			//      need to be executed, but if no fields changed they can be
+			//      skipped).
+
 			validations := fld.fieldValidations
 			fldRatchetingChecked := false
 			if !validations.Empty() {
 				emitComments(validations.Comments, bufsw)
 				emitRatchetingCheck(c, fld.childType, bufsw)
+				fldRatchetingChecked = true
 				bufsw.Do("// call field-attached validations\n", nil)
 				emitCallsToValidators(c, validations.Functions, bufsw)
-				fldRatchetingChecked = true
 			}
 
 			// If the node is nil, this must be a type in a package we are not
@@ -1076,8 +1117,16 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				// Get to the real type.
 				switch fld.node.valueType.Kind {
 				case types.Alias, types.Struct:
-					// If this field is another type, call its validation function.
-					g.emitCallToOtherTypeFunc(c, fld.node, bufsw)
+					// If this field is another type, we may need to call its
+					// validation function. If it has no validations
+					// (transitively) then we don't need to do anything.
+					if g.hasValidations(fld.node) {
+						if !fldRatchetingChecked {
+							emitRatchetingCheck(c, fld.childType, bufsw)
+							fldRatchetingChecked = true
+						}
+						g.emitCallToOtherTypeFunc(c, fld.node, bufsw)
+					}
 				case types.Slice:
 					// If this field is a list and the value-type has
 					// validations, call its validation function.
@@ -1175,12 +1224,6 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 // variables named "obj" and "oldObj", and the field path to this value is
 // named "fldPath".
 func (g *genValidations) emitCallToOtherTypeFunc(c *generator.Context, node *typeNode, sw *generator.SnippetWriter) {
-	// If this type has no validations (transitively) then we don't need to do
-	// anything.
-	if !g.hasValidations(node) {
-		return
-	}
-
 	targs := generator.Args{
 		"funcName": c.Universe.Type(node.funcName),
 	}

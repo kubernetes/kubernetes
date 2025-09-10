@@ -80,11 +80,6 @@ var symbolsForConditionalEnum = sets.New(ConditionalA, ConditionalB, Conditional
 // Validate_ConditionalEnum validates an instance of ConditionalEnum according
 // to declarative validation rules in the API schema.
 func Validate_ConditionalEnum(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ConditionalEnum) (errs field.ErrorList) {
-	// type ConditionalEnum
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForConditionalEnum, exclusionsForConditionalEnum)...)
 
 	return errs
@@ -98,6 +93,10 @@ func Validate_ConditionalStruct(ctx context.Context, op operation.Operation, fld
 	// field ConditionalStruct.ConditionalEnumField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *ConditionalEnum) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ConditionalEnum(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -106,6 +105,10 @@ func Validate_ConditionalStruct(ctx context.Context, op operation.Operation, fld
 	// field ConditionalStruct.ConditionalEnumPtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *ConditionalEnum) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ConditionalEnum(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -119,11 +122,6 @@ var symbolsForEnum0 = sets.New[Enum0]()
 // Validate_Enum0 validates an instance of Enum0 according
 // to declarative validation rules in the API schema.
 func Validate_Enum0(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Enum0) (errs field.ErrorList) {
-	// type Enum0
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum0, nil)...)
 
 	return errs
@@ -134,11 +132,6 @@ var symbolsForEnum1 = sets.New(E1V1)
 // Validate_Enum1 validates an instance of Enum1 according
 // to declarative validation rules in the API schema.
 func Validate_Enum1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Enum1) (errs field.ErrorList) {
-	// type Enum1
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum1, nil)...)
 
 	return errs
@@ -149,11 +142,6 @@ var symbolsForEnum2 = sets.New(E2V1, E2V2)
 // Validate_Enum2 validates an instance of Enum2 according
 // to declarative validation rules in the API schema.
 func Validate_Enum2(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Enum2) (errs field.ErrorList) {
-	// type Enum2
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum2, nil)...)
 
 	return errs
@@ -164,11 +152,6 @@ var symbolsForEnumWithExclude = sets.New(EnumWithExclude1)
 // Validate_EnumWithExclude validates an instance of EnumWithExclude according
 // to declarative validation rules in the API schema.
 func Validate_EnumWithExclude(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *EnumWithExclude) (errs field.ErrorList) {
-	// type EnumWithExclude
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnumWithExclude, nil)...)
 
 	return errs
@@ -182,6 +165,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum0Field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum0) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum0(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -190,6 +177,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum0PtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum0) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum0(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -198,6 +189,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum1Field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum1) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum1(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -206,6 +201,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum1PtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum1) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum1(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -214,6 +213,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum2Field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum2) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum2(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -222,6 +225,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum2PtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum2) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum2(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -233,6 +240,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.EnumWithExcludeField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *EnumWithExclude) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_EnumWithExclude(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -241,6 +252,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.EnumWithExcludePtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *EnumWithExclude) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_EnumWithExclude(ctx, op, fldPath, obj, oldObj)...)
 			return

@@ -62,7 +62,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *InnerStruct) *string { return &o.StringField }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *InnerStruct) *string { return &o.StringField }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-subfield")
 			})...)
 			return
@@ -79,7 +79,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
-			errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *InnerStruct) *string { return &o.StringField }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *InnerStruct) *string { return &o.StringField }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-subfield-ptr")
 			})...)
 			return
@@ -130,6 +130,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.ValidatedSliceField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj ValidatedStringSlice) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ValidatedStringSlice(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -138,6 +142,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.ValidatedStructField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *ValidatedInnerStruct) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ValidatedInnerStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -149,12 +157,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 // Validate_ValidatedInnerStruct validates an instance of ValidatedInnerStruct according
 // to declarative validation rules in the API schema.
 func Validate_ValidatedInnerStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ValidatedInnerStruct) (errs field.ErrorList) {
-	// type ValidatedInnerStruct
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
-	errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *ValidatedInnerStruct) *string { return &o.StringField }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+	errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *ValidatedInnerStruct) *string { return &o.StringField }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 		return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-typedef-struct")
 	})...)
 
@@ -165,11 +168,6 @@ func Validate_ValidatedInnerStruct(ctx context.Context, op operation.Operation, 
 // Validate_ValidatedStringSlice validates an instance of ValidatedStringSlice according
 // to declarative validation rules in the API schema.
 func Validate_ValidatedStringSlice(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ValidatedStringSlice) (errs field.ErrorList) {
-	// type ValidatedStringSlice
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 		return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-typedef")
 	})...)

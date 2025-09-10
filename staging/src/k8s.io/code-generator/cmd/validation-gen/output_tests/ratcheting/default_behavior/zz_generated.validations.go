@@ -84,11 +84,6 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_AliasMapKeyType validates an instance of AliasMapKeyType according
 // to declarative validation rules in the API schema.
 func Validate_AliasMapKeyType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj AliasMapKeyType) (errs field.ErrorList) {
-	// type AliasMapKeyType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type MapKeyType")...)
 	// iterate the map and call the key type's validation function
 	errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, Validate_S)...)
@@ -99,11 +94,6 @@ func Validate_AliasMapKeyType(ctx context.Context, op operation.Operation, fldPa
 // Validate_AliasMapValueType validates an instance of AliasMapValueType according
 // to declarative validation rules in the API schema.
 func Validate_AliasMapValueType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj AliasMapValueType) (errs field.ErrorList) {
-	// type AliasMapValueType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type MapValueType")...)
 	// iterate the map and call the value type's validation function
 	errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_S)...)
@@ -114,11 +104,6 @@ func Validate_AliasMapValueType(ctx context.Context, op operation.Operation, fld
 // Validate_DirectComparableStruct validates an instance of DirectComparableStruct according
 // to declarative validation rules in the API schema.
 func Validate_DirectComparableStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DirectComparableStruct) (errs field.ErrorList) {
-	// type DirectComparableStruct
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type DirectComparableStruct")...)
 
 	// field DirectComparableStruct.IntField
@@ -139,11 +124,6 @@ func Validate_DirectComparableStruct(ctx context.Context, op operation.Operation
 // Validate_MySlice validates an instance of MySlice according
 // to declarative validation rules in the API schema.
 func Validate_MySlice(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj MySlice) (errs field.ErrorList) {
-	// type MySlice
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type MySlice")...)
 
 	return errs
@@ -152,11 +132,6 @@ func Validate_MySlice(ctx context.Context, op operation.Operation, fldPath *fiel
 // Validate_NestedDirectComparableStruct validates an instance of NestedDirectComparableStruct according
 // to declarative validation rules in the API schema.
 func Validate_NestedDirectComparableStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NestedDirectComparableStruct) (errs field.ErrorList) {
-	// type NestedDirectComparableStruct
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type NestedDirectComparableStruct")...)
 
 	// field NestedDirectComparableStruct.DirectComparableStructField
@@ -181,11 +156,6 @@ func Validate_NestedDirectComparableStruct(ctx context.Context, op operation.Ope
 // Validate_NestedNonDirectComparableStruct validates an instance of NestedNonDirectComparableStruct according
 // to declarative validation rules in the API schema.
 func Validate_NestedNonDirectComparableStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NestedNonDirectComparableStruct) (errs field.ErrorList) {
-	// type NestedNonDirectComparableStruct
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type NestedNonDirectComparableStruct")...)
 
 	// field NestedNonDirectComparableStruct.NonDirectComparableStructField
@@ -210,11 +180,6 @@ func Validate_NestedNonDirectComparableStruct(ctx context.Context, op operation.
 // Validate_NonDirectComparableStruct validates an instance of NonDirectComparableStruct according
 // to declarative validation rules in the API schema.
 func Validate_NonDirectComparableStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonDirectComparableStruct) (errs field.ErrorList) {
-	// type NonDirectComparableStruct
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type NonDirectComparableStruct")...)
 
 	// field NonDirectComparableStruct.IntPtrField
@@ -235,11 +200,6 @@ func Validate_NonDirectComparableStruct(ctx context.Context, op operation.Operat
 // Validate_S validates an instance of S according
 // to declarative validation rules in the API schema.
 func Validate_S(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *S) (errs field.ErrorList) {
-	// type S
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type S")...)
 
 	return errs

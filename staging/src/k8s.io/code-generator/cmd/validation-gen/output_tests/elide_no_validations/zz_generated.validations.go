@@ -69,11 +69,6 @@ func Validate_HasFieldVal(ctx context.Context, op operation.Operation, fldPath *
 // Validate_HasTypeVal validates an instance of HasTypeVal according
 // to declarative validation rules in the API schema.
 func Validate_HasTypeVal(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *HasTypeVal) (errs field.ErrorList) {
-	// type HasTypeVal
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type HasTypeVal")...)
 
 	// field HasTypeVal.S has no validation
@@ -88,6 +83,10 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T1.HasTypeVal
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *HasTypeVal) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_HasTypeVal(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -96,6 +95,10 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T1.HasFieldVal
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *HasFieldVal) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_HasFieldVal(ctx, op, fldPath, obj, oldObj)...)
 			return

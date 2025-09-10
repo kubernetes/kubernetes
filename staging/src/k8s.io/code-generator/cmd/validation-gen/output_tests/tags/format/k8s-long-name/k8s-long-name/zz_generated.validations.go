@@ -51,11 +51,6 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_LongNameStringType validates an instance of LongNameStringType according
 // to declarative validation rules in the API schema.
 func Validate_LongNameStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *LongNameStringType) (errs field.ErrorList) {
-	// type LongNameStringType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
 
 	return errs
@@ -93,6 +88,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.LongNameTypedefField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *LongNameStringType) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_LongNameStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
