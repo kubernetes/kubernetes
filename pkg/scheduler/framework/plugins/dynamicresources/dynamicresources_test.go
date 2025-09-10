@@ -3809,7 +3809,7 @@ func TestAllocatorSelection(t *testing.T) {
 			featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
 			tCtx.ExpectNoError(featureGate.Set(tc.features), "set features")
 			fts := feature.NewSchedulerFeaturesFromGates(featureGate)
-			features := allocatorFeatures(fts)
+			features := AllocatorFeatures(fts)
 
 			// Slightly hacky: most arguments are not valid and the constructor
 			// is expected to not use them yet.
