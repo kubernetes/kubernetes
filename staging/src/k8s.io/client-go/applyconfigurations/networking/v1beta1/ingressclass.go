@@ -29,10 +29,20 @@ import (
 
 // IngressClassApplyConfiguration represents a declarative configuration of the IngressClass type for use
 // with apply.
+//
+// IngressClass represents the class of the Ingress, referenced by the Ingress
+// Spec. The `ingressclass.kubernetes.io/is-default-class` annotation can be
+// used to indicate that an IngressClass should be considered default. When a
+// single IngressClass resource has this annotation set to true, new Ingress
+// resources without a class specified will be assigned this default class.
 type IngressClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *IngressClassSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec is the desired state of the IngressClass.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *IngressClassSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // IngressClass constructs a declarative configuration of the IngressClass type for use with
@@ -52,7 +62,6 @@ func IngressClass(name string) *IngressClassApplyConfiguration {
 // ExtractIngressClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractIngressClassFrom(ingressClass *networkingv1beta1.IngressClass, fieldManager string, subresource string) (*IngressClassApplyConfiguration, error) {
 	b := &IngressClassApplyConfiguration{}
 	err := managedfields.ExtractInto(ingressClass, internal.Parser().Type("io.k8s.api.networking.v1beta1.IngressClass"), fieldManager, b, subresource)
@@ -76,7 +85,6 @@ func ExtractIngressClassFrom(ingressClass *networkingv1beta1.IngressClass, field
 // ExtractIngressClass provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractIngressClass(ingressClass *networkingv1beta1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
 	return ExtractIngressClassFrom(ingressClass, fieldManager, "")
 }

@@ -29,10 +29,14 @@ import (
 
 // MutatingAdmissionPolicyApplyConfiguration represents a declarative configuration of the MutatingAdmissionPolicy type for use
 // with apply.
+//
+// MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
 type MutatingAdmissionPolicyApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *MutatingAdmissionPolicySpecApplyConfiguration `json:"spec,omitempty"`
+	// Specification of the desired behavior of the MutatingAdmissionPolicy.
+	Spec *MutatingAdmissionPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // MutatingAdmissionPolicy constructs a declarative configuration of the MutatingAdmissionPolicy type for use with
@@ -52,7 +56,6 @@ func MutatingAdmissionPolicy(name string) *MutatingAdmissionPolicyApplyConfigura
 // ExtractMutatingAdmissionPolicyFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractMutatingAdmissionPolicyFrom(mutatingAdmissionPolicy *admissionregistrationv1beta1.MutatingAdmissionPolicy, fieldManager string, subresource string) (*MutatingAdmissionPolicyApplyConfiguration, error) {
 	b := &MutatingAdmissionPolicyApplyConfiguration{}
 	err := managedfields.ExtractInto(mutatingAdmissionPolicy, internal.Parser().Type("io.k8s.api.admissionregistration.v1beta1.MutatingAdmissionPolicy"), fieldManager, b, subresource)
@@ -76,7 +79,6 @@ func ExtractMutatingAdmissionPolicyFrom(mutatingAdmissionPolicy *admissionregist
 // ExtractMutatingAdmissionPolicy provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractMutatingAdmissionPolicy(mutatingAdmissionPolicy *admissionregistrationv1beta1.MutatingAdmissionPolicy, fieldManager string) (*MutatingAdmissionPolicyApplyConfiguration, error) {
 	return ExtractMutatingAdmissionPolicyFrom(mutatingAdmissionPolicy, fieldManager, "")
 }

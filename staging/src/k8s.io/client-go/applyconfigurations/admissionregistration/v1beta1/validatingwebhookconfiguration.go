@@ -29,10 +29,15 @@ import (
 
 // ValidatingWebhookConfigurationApplyConfiguration represents a declarative configuration of the ValidatingWebhookConfiguration type for use
 // with apply.
+//
+// ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
+// Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 ValidatingWebhookConfiguration instead.
 type ValidatingWebhookConfigurationApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Webhooks                         []ValidatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
+	// Webhooks is a list of webhooks and the affected resources and operations.
+	Webhooks []ValidatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
 }
 
 // ValidatingWebhookConfiguration constructs a declarative configuration of the ValidatingWebhookConfiguration type for use with
@@ -52,7 +57,6 @@ func ValidatingWebhookConfiguration(name string) *ValidatingWebhookConfiguration
 // ExtractValidatingWebhookConfigurationFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractValidatingWebhookConfigurationFrom(validatingWebhookConfiguration *admissionregistrationv1beta1.ValidatingWebhookConfiguration, fieldManager string, subresource string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
 	b := &ValidatingWebhookConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1beta1.ValidatingWebhookConfiguration"), fieldManager, b, subresource)
@@ -76,7 +80,6 @@ func ExtractValidatingWebhookConfigurationFrom(validatingWebhookConfiguration *a
 // ExtractValidatingWebhookConfiguration provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractValidatingWebhookConfiguration(validatingWebhookConfiguration *admissionregistrationv1beta1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
 	return ExtractValidatingWebhookConfigurationFrom(validatingWebhookConfiguration, fieldManager, "")
 }

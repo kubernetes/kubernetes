@@ -29,11 +29,22 @@ import (
 
 // NodeApplyConfiguration represents a declarative configuration of the Node type for use
 // with apply.
+//
+// Node is a worker node in Kubernetes.
+// Each node will have a unique identifier in the cache (i.e. in etcd).
 type NodeApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *NodeSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *NodeStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the behavior of a node.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *NodeSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the node.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *NodeStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Node constructs a declarative configuration of the Node type for use with
@@ -53,7 +64,6 @@ func Node(name string) *NodeApplyConfiguration {
 // ExtractNodeFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractNodeFrom(node *corev1.Node, fieldManager string, subresource string) (*NodeApplyConfiguration, error) {
 	b := &NodeApplyConfiguration{}
 	err := managedfields.ExtractInto(node, internal.Parser().Type("io.k8s.api.core.v1.Node"), fieldManager, b, subresource)
@@ -77,14 +87,12 @@ func ExtractNodeFrom(node *corev1.Node, fieldManager string, subresource string)
 // ExtractNode provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractNode(node *corev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
 	return ExtractNodeFrom(node, fieldManager, "")
 }
 
 // ExtractNodeStatus extracts the applied configuration owned by fieldManager from
 // node for the status subresource.
-// Experimental!
 func ExtractNodeStatus(node *corev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
 	return ExtractNodeFrom(node, fieldManager, "status")
 }

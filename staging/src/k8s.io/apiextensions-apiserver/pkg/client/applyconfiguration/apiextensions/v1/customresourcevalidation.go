@@ -20,7 +20,10 @@ package v1
 
 // CustomResourceValidationApplyConfiguration represents a declarative configuration of the CustomResourceValidation type for use
 // with apply.
+//
+// CustomResourceValidation is a list of validation methods for CustomResources.
 type CustomResourceValidationApplyConfiguration struct {
+	// openAPIV3Schema is the OpenAPI v3 schema to use for validation and pruning.
 	OpenAPIV3Schema *JSONSchemaPropsApplyConfiguration `json:"openAPIV3Schema,omitempty"`
 }
 
