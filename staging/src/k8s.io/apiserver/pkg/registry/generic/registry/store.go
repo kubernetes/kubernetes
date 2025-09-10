@@ -1129,8 +1129,10 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 
 // Delete removes the item from storage.
 func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, originalOptions *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	attempt := 0
 	var handleNotFoundErr func() (runtime.Object, bool, error)
 	for {
+		attempt++
 		key, err := e.KeyFunc(ctx, name)
 		if err != nil {
 			return nil, false, err
@@ -1140,7 +1142,13 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 		qualifiedResource := e.qualifiedResourceFromContext(ctx)
 		if err = e.Storage.Get(ctx, key, storage.GetOptions{}, obj); err != nil {
 			if handleNotFoundErr != nil && storage.IsNotFound(err) {
-				return handleNotFoundErr()
+				retObj, retDeleted, retErr := handleNotFoundErr()
+				if qualifiedResource.Resource == "pods" {
+					fmt.Printf("JTL: e.Storage.Get error; attempt=%d, err=%v, qualifiedResource=%#v, name=%v, NotFound=true, handleNotFoundErr=true, retDeleted=%v, retErr=%v\n", attempt, err, qualifiedResource, name, retDeleted, retErr)
+				}
+				return retObj, retDeleted, retErr
+			} else {
+				fmt.Printf("JTL: e.Storage.Get error; attempt=%d, err=%v, qualifiedResource=%#v, name=%v, NotFound=%v\n", attempt, err, qualifiedResource, name, storage.IsNotFound(err))
 			}
 			return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 		}
@@ -1242,6 +1250,9 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 
 			if retryOnRVConflict && storage.IsPreconditionErrorForField(err, storage.PreconditionResourceVersion) {
 				// retry from the top if the delete failed due to a resource version precondition we added internally
+				if qualifiedResource.Resource == "pods" {
+					fmt.Printf("JTL: e.Storage.Delete error, will retry; handleNotFoundErr=%v, err=%v\n", handleNotFoundErr != nil, err)
+				}
 				continue
 			}
 
