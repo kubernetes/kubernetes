@@ -42,7 +42,7 @@ import (
 )
 
 // NewCmdCertificate returns `certificate` Cobra command
-func NewCmdCertificate(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCertificate(f genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 
 	validArgs := []string{"certificatesigningrequests"}
 
@@ -88,7 +88,7 @@ func NewCertificateOptions(ioStreams genericiooptions.IOStreams, operation strin
 }
 
 // Complete loads data from the command environment
-func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *CertificateOptions) Complete(f genericclioptions.RESTClientGetter, cmd *cobra.Command, args []string) error {
 	o.csrNames = args
 	o.outputStyle = cmdutil.GetFlagString(cmd, "output")
 
@@ -125,7 +125,7 @@ func (o *CertificateOptions) Validate() error {
 }
 
 // NewCmdCertificateApprove returns the `certificate approve` Cobra command
-func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCertificateApprove(f genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCertificateOptions(ioStreams, "approved")
 
 	cmd := &cobra.Command{
@@ -174,7 +174,7 @@ func (o *CertificateOptions) RunCertificateApprove(force bool) error {
 }
 
 // NewCmdCertificateDeny returns the `certificate deny` Cobra command
-func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdCertificateDeny(f genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCertificateOptions(ioStreams, "denied")
 
 	cmd := &cobra.Command{
