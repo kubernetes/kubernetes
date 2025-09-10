@@ -137,6 +137,17 @@ func (sc *stateCheckpoint) SetContainerResources(podUID types.UID, containerName
 	return sc.storeState()
 }
 
+// SetContainerResoruces sets resources information for a pod's container
+func (sc *stateCheckpoint) SetContainerCPUResources(podUID types.UID, containerName string, request int64) error {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	err := sc.cache.SetContainerCPUResources(podUID, containerName, request)
+	if err != nil {
+		return err
+	}
+	return sc.storeState()
+}
+
 // SetPodResourceInfo sets pod resource information
 func (sc *stateCheckpoint) SetPodResourceInfo(podUID types.UID, resourceInfo PodResourceInfo) error {
 	sc.mux.Lock()
@@ -184,6 +195,10 @@ func (sc *noopStateCheckpoint) GetPodResourceInfo(_ types.UID) (PodResourceInfo,
 }
 
 func (sc *noopStateCheckpoint) SetContainerResources(_ types.UID, _ string, _ v1.ResourceRequirements) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) SetContainerCPUResources(_ types.UID, _ string, _ int64) error {
 	return nil
 }
 
