@@ -20,7 +20,10 @@ package v1beta2
 
 // DeviceSelectorApplyConfiguration represents a declarative configuration of the DeviceSelector type for use
 // with apply.
+//
+// DeviceSelector must have exactly one field set.
 type DeviceSelectorApplyConfiguration struct {
+	// CEL contains a CEL expression for selecting a device.
 	CEL *CELDeviceSelectorApplyConfiguration `json:"cel,omitempty"`
 }
 

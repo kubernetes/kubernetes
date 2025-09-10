@@ -20,15 +20,43 @@ package v1
 
 // RBDPersistentVolumeSourceApplyConfiguration represents a declarative configuration of the RBDPersistentVolumeSource type for use
 // with apply.
+//
+// Represents a Rados Block Device mount that lasts the lifetime of a pod.
+// RBD volumes support ownership management and SELinux relabeling.
 type RBDPersistentVolumeSourceApplyConfiguration struct {
-	CephMonitors []string                           `json:"monitors,omitempty"`
-	RBDImage     *string                            `json:"image,omitempty"`
-	FSType       *string                            `json:"fsType,omitempty"`
-	RBDPool      *string                            `json:"pool,omitempty"`
-	RadosUser    *string                            `json:"user,omitempty"`
-	Keyring      *string                            `json:"keyring,omitempty"`
-	SecretRef    *SecretReferenceApplyConfiguration `json:"secretRef,omitempty"`
-	ReadOnly     *bool                              `json:"readOnly,omitempty"`
+	// monitors is a collection of Ceph monitors.
+	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+	CephMonitors []string `json:"monitors,omitempty"`
+	// image is the rados image name.
+	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+	RBDImage *string `json:"image,omitempty"`
+	// fsType is the filesystem type of the volume that you want to mount.
+	// Tip: Ensure that the filesystem type is supported by the host operating system.
+	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType *string `json:"fsType,omitempty"`
+	// pool is the rados pool name.
+	// Default is rbd.
+	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+	RBDPool *string `json:"pool,omitempty"`
+	// user is the rados user name.
+	// Default is admin.
+	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+	RadosUser *string `json:"user,omitempty"`
+	// keyring is the path to key ring for RBDUser.
+	// Default is /etc/ceph/keyring.
+	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+	Keyring *string `json:"keyring,omitempty"`
+	// secretRef is name of the authentication secret for RBDUser. If provided
+	// overrides keyring.
+	// Default is nil.
+	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+	SecretRef *SecretReferenceApplyConfiguration `json:"secretRef,omitempty"`
+	// readOnly here will force the ReadOnly setting in VolumeMounts.
+	// Defaults to false.
+	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // RBDPersistentVolumeSourceApplyConfiguration constructs a declarative configuration of the RBDPersistentVolumeSource type for use with

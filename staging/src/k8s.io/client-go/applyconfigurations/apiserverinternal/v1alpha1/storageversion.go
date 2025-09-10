@@ -29,11 +29,17 @@ import (
 
 // StorageVersionApplyConfiguration represents a declarative configuration of the StorageVersion type for use
 // with apply.
+//
+// Storage version of a specific resource.
 type StorageVersionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// The name is <group>.<resource>.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *apiserverinternalv1alpha1.StorageVersionSpec `json:"spec,omitempty"`
-	Status                           *StorageVersionStatusApplyConfiguration       `json:"status,omitempty"`
+	// Spec is an empty spec. It is here to comply with Kubernetes API style.
+	Spec *apiserverinternalv1alpha1.StorageVersionSpec `json:"spec,omitempty"`
+	// API server instances report the version they can decode and the version they
+	// encode objects to when persisting objects in the backend.
+	Status *StorageVersionStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // StorageVersion constructs a declarative configuration of the StorageVersion type for use with
@@ -53,7 +59,6 @@ func StorageVersion(name string) *StorageVersionApplyConfiguration {
 // ExtractStorageVersionFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractStorageVersionFrom(storageVersion *apiserverinternalv1alpha1.StorageVersion, fieldManager string, subresource string) (*StorageVersionApplyConfiguration, error) {
 	b := &StorageVersionApplyConfiguration{}
 	err := managedfields.ExtractInto(storageVersion, internal.Parser().Type("io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"), fieldManager, b, subresource)
@@ -77,14 +82,12 @@ func ExtractStorageVersionFrom(storageVersion *apiserverinternalv1alpha1.Storage
 // ExtractStorageVersion provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractStorageVersion(storageVersion *apiserverinternalv1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
 	return ExtractStorageVersionFrom(storageVersion, fieldManager, "")
 }
 
 // ExtractStorageVersionStatus extracts the applied configuration owned by fieldManager from
 // storageVersion for the status subresource.
-// Experimental!
 func ExtractStorageVersionStatus(storageVersion *apiserverinternalv1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
 	return ExtractStorageVersionFrom(storageVersion, fieldManager, "status")
 }

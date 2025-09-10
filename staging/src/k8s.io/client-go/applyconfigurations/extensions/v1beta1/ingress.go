@@ -29,11 +29,23 @@ import (
 
 // IngressApplyConfiguration represents a declarative configuration of the Ingress type for use
 // with apply.
+//
+// Ingress is a collection of rules that allow inbound connections to reach the
+// endpoints defined by a backend. An Ingress can be configured to give services
+// externally-reachable urls, load balance traffic, terminate SSL, offer name
+// based virtual hosting etc.
+// DEPRECATED - This group version of Ingress is deprecated by networking.k8s.io/v1beta1 Ingress. See the release notes for more information.
 type IngressApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *IngressSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *IngressStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec is the desired state of the Ingress.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *IngressSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is the current state of the Ingress.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *IngressStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Ingress constructs a declarative configuration of the Ingress type for use with
@@ -54,7 +66,6 @@ func Ingress(name, namespace string) *IngressApplyConfiguration {
 // ExtractIngressFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractIngressFrom(ingress *extensionsv1beta1.Ingress, fieldManager string, subresource string) (*IngressApplyConfiguration, error) {
 	b := &IngressApplyConfiguration{}
 	err := managedfields.ExtractInto(ingress, internal.Parser().Type("io.k8s.api.extensions.v1beta1.Ingress"), fieldManager, b, subresource)
@@ -79,14 +90,12 @@ func ExtractIngressFrom(ingress *extensionsv1beta1.Ingress, fieldManager string,
 // ExtractIngress provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractIngress(ingress *extensionsv1beta1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
 	return ExtractIngressFrom(ingress, fieldManager, "")
 }
 
 // ExtractIngressStatus extracts the applied configuration owned by fieldManager from
 // ingress for the status subresource.
-// Experimental!
 func ExtractIngressStatus(ingress *extensionsv1beta1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
 	return ExtractIngressFrom(ingress, fieldManager, "status")
 }

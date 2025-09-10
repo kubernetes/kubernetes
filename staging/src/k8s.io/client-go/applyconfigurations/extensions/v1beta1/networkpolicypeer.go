@@ -24,10 +24,26 @@ import (
 
 // NetworkPolicyPeerApplyConfiguration represents a declarative configuration of the NetworkPolicyPeer type for use
 // with apply.
+//
+// DEPRECATED 1.9 - This group version of NetworkPolicyPeer is deprecated by networking/v1/NetworkPolicyPeer.
 type NetworkPolicyPeerApplyConfiguration struct {
-	PodSelector       *v1.LabelSelectorApplyConfiguration `json:"podSelector,omitempty"`
+	// This is a label selector which selects Pods. This field follows standard label
+	// selector semantics; if present but empty, it selects all pods.
+	//
+	// If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+	// the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
+	// Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
+	PodSelector *v1.LabelSelectorApplyConfiguration `json:"podSelector,omitempty"`
+	// Selects Namespaces using cluster-scoped labels. This field follows standard label
+	// selector semantics; if present but empty, it selects all namespaces.
+	//
+	// If PodSelector is also set, then the NetworkPolicyPeer as a whole selects
+	// the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
+	// Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
 	NamespaceSelector *v1.LabelSelectorApplyConfiguration `json:"namespaceSelector,omitempty"`
-	IPBlock           *IPBlockApplyConfiguration          `json:"ipBlock,omitempty"`
+	// IPBlock defines policy on a particular IPBlock. If this field is set then
+	// neither of the other fields can be.
+	IPBlock *IPBlockApplyConfiguration `json:"ipBlock,omitempty"`
 }
 
 // NetworkPolicyPeerApplyConfiguration constructs a declarative configuration of the NetworkPolicyPeer type for use with

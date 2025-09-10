@@ -29,11 +29,19 @@ import (
 
 // ClusterRoleBindingApplyConfiguration represents a declarative configuration of the ClusterRoleBinding type for use
 // with apply.
+//
+// ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,
+// and adds who information via Subject.
 type ClusterRoleBindingApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Subjects                             []SubjectApplyConfiguration `json:"subjects,omitempty"`
-	RoleRef                              *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`
+	// Subjects holds references to the objects the role applies to.
+	Subjects []SubjectApplyConfiguration `json:"subjects,omitempty"`
+	// RoleRef can only reference a ClusterRole in the global namespace.
+	// If the RoleRef cannot be resolved, the Authorizer must return an error.
+	// This field is immutable.
+	RoleRef *RoleRefApplyConfiguration `json:"roleRef,omitempty"`
 }
 
 // ClusterRoleBinding constructs a declarative configuration of the ClusterRoleBinding type for use with
@@ -53,7 +61,6 @@ func ClusterRoleBinding(name string) *ClusterRoleBindingApplyConfiguration {
 // ExtractClusterRoleBindingFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractClusterRoleBindingFrom(clusterRoleBinding *rbacv1.ClusterRoleBinding, fieldManager string, subresource string) (*ClusterRoleBindingApplyConfiguration, error) {
 	b := &ClusterRoleBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(clusterRoleBinding, internal.Parser().Type("io.k8s.api.rbac.v1.ClusterRoleBinding"), fieldManager, b, subresource)
@@ -77,7 +84,6 @@ func ExtractClusterRoleBindingFrom(clusterRoleBinding *rbacv1.ClusterRoleBinding
 // ExtractClusterRoleBinding provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractClusterRoleBinding(clusterRoleBinding *rbacv1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
 	return ExtractClusterRoleBindingFrom(clusterRoleBinding, fieldManager, "")
 }

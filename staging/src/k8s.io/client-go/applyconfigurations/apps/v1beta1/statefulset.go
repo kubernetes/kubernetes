@@ -29,11 +29,24 @@ import (
 
 // StatefulSetApplyConfiguration represents a declarative configuration of the StatefulSet type for use
 // with apply.
+//
+// DEPRECATED - This group version of StatefulSet is deprecated by apps/v1beta2/StatefulSet. See the release notes for
+// more information.
+// StatefulSet represents a set of pods with consistent identities.
+// Identities are defined as:
+// - Network: A single stable DNS and hostname.
+// - Storage: As many VolumeClaims as requested.
+//
+// The StatefulSet guarantees that a given network identity will always
+// map to the same storage identity.
 type StatefulSetApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *StatefulSetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *StatefulSetStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the desired identities of pods in this set.
+	Spec *StatefulSetSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is the current status of Pods in this StatefulSet. This data
+	// may be out of date by some window of time.
+	Status *StatefulSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // StatefulSet constructs a declarative configuration of the StatefulSet type for use with
@@ -54,7 +67,6 @@ func StatefulSet(name, namespace string) *StatefulSetApplyConfiguration {
 // ExtractStatefulSetFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractStatefulSetFrom(statefulSet *appsv1beta1.StatefulSet, fieldManager string, subresource string) (*StatefulSetApplyConfiguration, error) {
 	b := &StatefulSetApplyConfiguration{}
 	err := managedfields.ExtractInto(statefulSet, internal.Parser().Type("io.k8s.api.apps.v1beta1.StatefulSet"), fieldManager, b, subresource)
@@ -79,14 +91,12 @@ func ExtractStatefulSetFrom(statefulSet *appsv1beta1.StatefulSet, fieldManager s
 // ExtractStatefulSet provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractStatefulSet(statefulSet *appsv1beta1.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
 	return ExtractStatefulSetFrom(statefulSet, fieldManager, "")
 }
 
 // ExtractStatefulSetStatus extracts the applied configuration owned by fieldManager from
 // statefulSet for the status subresource.
-// Experimental!
 func ExtractStatefulSetStatus(statefulSet *appsv1beta1.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
 	return ExtractStatefulSetFrom(statefulSet, fieldManager, "status")
 }
