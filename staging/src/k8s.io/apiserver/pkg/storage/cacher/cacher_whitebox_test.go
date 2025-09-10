@@ -3227,21 +3227,9 @@ func TestWatchStreamSeparation(t *testing.T) {
 			defer cancel()
 			waitForEtcdBookmark := watchAndWaitForBookmark(t, waitContext, cacher.storage)
 
-			var out example.Pod
-			err = cacher.storage.Create(context.Background(), "foo", &example.Pod{}, &out, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = cacher.storage.Delete(context.Background(), "foo", &out, nil, storage.ValidateAllObjectFunc, &example.Pod{}, storage.DeleteOptions{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			versioner := storage.APIObjectVersioner{}
-			var lastResourceVersion uint64
-			lastResourceVersion, err = versioner.ObjectResourceVersion(&out)
-			if err != nil {
-				t.Fatal(err)
-			}
+			increaseRV := increaseRVFunc(server.V3Client.Client)
+			increaseRV(context.Background(), t)
+			lastResourceVersion := uint64(increaseRV(context.Background(), t))
 
 			var contextMetadata metadata.MD
 			if tc.useWatchCacheContextMetadata {
