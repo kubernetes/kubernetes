@@ -812,7 +812,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		return nil
 	}
 
-	for getResp, err := range s.iterativeGetList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
+	for getResp, err := range s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
 		Revision: withRev,
 		Limit:    limit,
 		Continue: continueKey,
@@ -882,7 +882,7 @@ type IterativeListResponse struct {
 	RemainingItems int64
 }
 
-func (s *store) iterativeList(ctx context.Context, keyPrefix string, options kubernetes.ListOptions) iter.Seq2[IterativeListResponse, error] {
+func (s *store) list(ctx context.Context, keyPrefix string, options kubernetes.ListOptions) iter.Seq2[IterativeListResponse, error] {
 	return func(yield func(IterativeListResponse, error) bool) {
 		for {
 			startTime := time.Now()
@@ -927,7 +927,7 @@ func (s *store) iterativeList(ctx context.Context, keyPrefix string, options kub
 	}
 }
 
-func (s *store) iterativeGet(ctx context.Context, keyPrefix string, options kubernetes.GetOptions) iter.Seq2[IterativeListResponse, error] {
+func (s *store) get(ctx context.Context, keyPrefix string, options kubernetes.GetOptions) iter.Seq2[IterativeListResponse, error] {
 	return func(yield func(IterativeListResponse, error) bool) {
 		startTime := time.Now()
 		getResp, err := s.client.Kubernetes.Get(ctx, keyPrefix, options)
@@ -942,43 +942,13 @@ func (s *store) iterativeGet(ctx context.Context, keyPrefix string, options kube
 	}
 }
 
-func (s *store) iterativeGetList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) iter.Seq2[IterativeListResponse, error] {
+func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) iter.Seq2[IterativeListResponse, error] {
 	if recursive {
-		return s.iterativeList(ctx, keyPrefix, options)
+		return s.list(ctx, keyPrefix, options)
 	}
-	return s.iterativeGet(ctx, keyPrefix, kubernetes.GetOptions{
+	return s.get(ctx, keyPrefix, kubernetes.GetOptions{
 		Revision: options.Revision,
 	})
-}
-
-func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (kubernetes.ListResponse, error) {
-	startTime := time.Now()
-	if recursive {
-		resp, err := s.client.Kubernetes.List(ctx, keyPrefix, options)
-		metrics.RecordEtcdRequest("list", s.groupResource, err, startTime)
-		if err != nil && len(resp.Kvs) > 0 && s.stats != nil {
-			s.stats.Update(resp.Kvs)
-		}
-		return resp, err
-	}
-	getResp, err := s.client.Kubernetes.Get(ctx, keyPrefix, kubernetes.GetOptions{
-		Revision: options.Revision,
-	})
-	metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
-	if err != nil && getResp.KV != nil && s.stats != nil {
-		s.stats.UpdateKey(getResp.KV)
-	}
-	var resp kubernetes.ListResponse
-	if getResp.KV != nil {
-		resp.Kvs = []*mvccpb.KeyValue{getResp.KV}
-		resp.Count = 1
-		resp.Revision = getResp.Revision
-	} else {
-		resp.Kvs = []*mvccpb.KeyValue{}
-		resp.Count = 0
-		resp.Revision = getResp.Revision
-	}
-	return resp, err
 }
 
 // growSlice takes a slice value and grows its capacity up
