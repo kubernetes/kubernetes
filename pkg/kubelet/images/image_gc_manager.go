@@ -328,7 +328,7 @@ func (im *realImageGCManager) handleImageVolumes(ctx context.Context, imagesInUs
 		return nil
 	}
 
-	status, err := im.runtime.GetContainerStatus(ctx, container.ID)
+	status, err := im.runtime.GetContainerStatus(ctx, pod.ID, container.ID)
 	if err != nil {
 		return fmt.Errorf("get container status: %w", err)
 	}
