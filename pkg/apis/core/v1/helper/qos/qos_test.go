@@ -370,55 +370,7 @@ func TestCollectContainerLevelResources(t *testing.T) {
 			expectedGuaranteed: true,
 		},
 		{
-			name: "multiple containers + init: one container missing CPU limit -> NotGuaranteed (sums include init)",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						newContainer(
-							"c1",
-							getResourceList("100m", "100Mi"),
-							getResourceList("200m", "300Mi"),
-						),
-						newContainer(
-							"c2",
-							getResourceList("300m", "100Mi"),
-							getResourceList("", "300Mi"), // missing CPU limit
-						),
-					},
-					InitContainers: []v1.Container{
-						newContainer(
-							"init1",
-							getResourceList("50m", "50Mi"),
-							getResourceList("50m", "50Mi"),
-						),
-					},
-				},
-			},
-			// Requests sum : CPU 100m+300m+50m=450m, Mem 100Mi+100Mi+50Mi=250Mi
-			expectedReq: getResourceList("450m", "250Mi"),
-			// Limits sum : CPU 200m+0+50m=250m,    Mem 300Mi+300Mi+50Mi=650Mi
-			expectedLim:        getResourceList("250m", "650Mi"),
-			expectedGuaranteed: false,
-		},
-		{
-			name: "only CPU limit (Mem limit absent/zero) -> NotGuaranteed",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						newContainer(
-							"c1",
-							getResourceList("0", "0"),   // ignoring zero req
-							getResourceList("100m", ""), // missing memory limit, ignoring absent
-						),
-					},
-				},
-			},
-			expectedReq:        v1.ResourceList{},
-			expectedLim:        getResourceList("100m", ""),
-			expectedGuaranteed: false,
-		},
-		{
-			name: "two containers both with CPU+Mem limits -> Guaranteed; sums across both",
+			name: "two containers and init container with CPU+Mem limits -> Guaranteed",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -430,19 +382,74 @@ func TestCollectContainerLevelResources(t *testing.T) {
 						newContainer(
 							"c2",
 							getResourceList("300m", "400Mi"),
-							getResourceList("800m", "1Gi"),
+							getResourceList("800m", "1000Mi"),
+						),
+					},
+					InitContainers: []v1.Container{
+						newContainer(
+							"init",
+							getResourceList("50m", "50Mi"),
+							getResourceList("100m", "100Mi"),
 						),
 					},
 				},
 			},
-			// Requests sum : CPU 400m, Mem 500Mi
-			expectedReq: getResourceList("400m", "500Mi"),
-			// Limits sum : CPU 1000m, Mem 200Mi + 1Gi = 1224Mi
-			expectedLim:        getResourceList("1000m", "1224Mi"),
+			// Requests sum : CPU 100m+300m+50m=450m, Mem 100Mi+400Mi+50Mi=550Mi
+			expectedReq: getResourceList("450m", "550Mi"),
+			// Limits sum : CPU 200m+800m+100m=1100m, Mem 200Mi+1000Mi+100Mi=1300Mi
+			expectedLim: getResourceList("1100m", "1300Mi"),
 			expectedGuaranteed: true,
 		},
 		{
-			name: "ephemeral-container ignored for QoS; Guaranteed if CPU+Mem limits exist",
+			name: "only CPU limit (Mem limit absent/zero) -> NotGuaranteed",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							getResourceList("0", "0"),   // ignoring zero request
+							getResourceList("100m", ""), // missing memory limit, ignoring absent
+						),
+					},
+				},
+			},
+			expectedReq:        v1.ResourceList{},
+			expectedLim:        getResourceList("100m", ""),
+			expectedGuaranteed: false,
+		},
+		{
+			name: "two containers + init: one container missing CPU limit -> NotGuaranteed",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							getResourceList("100m", "100Mi"),
+							getResourceList("200m", "300Mi"),
+						),
+						newContainer(
+							"c2",
+							getResourceList("300m", "100Mi"),
+							getResourceList("50m", "300Mi"),
+						),
+					},
+					InitContainers: []v1.Container{
+						newContainer(
+							"init1",
+							getResourceList("50m", "50Mi"),
+							getResourceList("", "50Mi"), // missing CPU limit
+						),
+					},
+				},
+			},
+			// Requests sum : CPU 100m+300m+50m=450m, Mem 100Mi+100Mi+50Mi=250Mi
+			expectedReq: getResourceList("450m", "250Mi"),
+			// Limits sum : CPU 200m+0+50m=250m,  Mem 300Mi+300Mi+50Mi=650Mi
+			expectedLim: getResourceList("250m", "650Mi"),
+			expectedGuaranteed: false,
+		},
+		{
+			name: "ephemeral-container ignored for QoS; CPU+Mem limits exist -> Guaranteed",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
