@@ -245,7 +245,7 @@ func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
 
 // NodeWatchResources establishes a stream to receive health updates from the DRA plugin.
 func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, error) {
-	// Lazily initialize the health client when needed
+	// Lazily initialize the health client.
 	healthClient, err := p.getOrCreateHealthClient()
 	if err != nil {
 		klog.FromContext(p.backgroundCtx).Error(err, "Failed to get health client")
