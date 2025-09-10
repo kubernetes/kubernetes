@@ -38,7 +38,6 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -1080,8 +1079,6 @@ func TestInterPodAffinity(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
 			}
-			_, ctx := ktesting.NewTestContext(t)
-
 			testCtx := initTest(t, "")
 			cs := testCtx.ClientSet
 
@@ -1113,11 +1110,11 @@ func TestInterPodAffinity(t *testing.T) {
 				if pod.Namespace == "" {
 					pod.Namespace = defaultNS
 				}
-				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error while creating pod: %v", err)
 				}
-				err = wait.PollUntilContextTimeout(ctx, pollInterval, wait.ForeverTestTimeout, false,
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
 					testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 				if err != nil {
 					t.Errorf("Error while creating pod: %v", err)
@@ -1127,7 +1124,7 @@ func TestInterPodAffinity(t *testing.T) {
 				test.pod.Namespace = defaultNS
 			}
 
-			testPod, err := cs.CoreV1().Pods(test.pod.Namespace).Create(ctx, test.pod, metav1.CreateOptions{})
+			testPod, err := cs.CoreV1().Pods(test.pod.Namespace).Create(testCtx.Ctx, test.pod, metav1.CreateOptions{})
 			if err != nil {
 				if !(test.errorType == "invalidPod" && apierrors.IsInvalid(err)) {
 					t.Fatalf("Error while creating pod: %v", err)
@@ -1135,10 +1132,10 @@ func TestInterPodAffinity(t *testing.T) {
 			}
 
 			if test.fits {
-				err = wait.PollUntilContextTimeout(ctx, pollInterval, wait.ForeverTestTimeout, false,
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
 					testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
 			} else {
-				err = wait.PollUntilContextTimeout(ctx, pollInterval, wait.ForeverTestTimeout, false,
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
 					podUnschedulable(cs, testPod.Namespace, testPod.Name))
 			}
 			if err != nil {
@@ -1146,22 +1143,22 @@ func TestInterPodAffinity(t *testing.T) {
 				return
 			}
 
-			err = cs.CoreV1().Pods(test.pod.Namespace).Delete(ctx, test.pod.Name, *metav1.NewDeleteOptions(0))
+			err = cs.CoreV1().Pods(test.pod.Namespace).Delete(testCtx.Ctx, test.pod.Name, *metav1.NewDeleteOptions(0))
 			if err != nil {
 				t.Errorf("Error while deleting pod: %v", err)
 			}
-			err = wait.PollUntilContextTimeout(ctx, pollInterval, wait.ForeverTestTimeout, true,
-				testutils.PodDeleted(ctx, cs, testCtx.NS.Name, test.pod.Name))
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
+				testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, test.pod.Name))
 			if err != nil {
 				t.Errorf("Error while waiting for pod to get deleted: %v", err)
 			}
 			for _, pod := range test.pods {
-				err = cs.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
+				err = cs.CoreV1().Pods(pod.Namespace).Delete(testCtx.Ctx, pod.Name, *metav1.NewDeleteOptions(0))
 				if err != nil {
 					t.Errorf("Error while deleting pod: %v", err)
 				}
-				err = wait.PollUntilContextTimeout(ctx, pollInterval, wait.ForeverTestTimeout, true,
-					testutils.PodDeleted(ctx, cs, pod.Namespace, pod.Name))
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
+					testutils.PodDeleted(testCtx.Ctx, cs, pod.Namespace, pod.Name))
 				if err != nil {
 					t.Errorf("Error while waiting for pod to get deleted: %v", err)
 				}

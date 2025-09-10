@@ -115,7 +115,7 @@ func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		}
 	}
 
-	logger.V(5).Info("The deleted pod does not impact the scheduling of the unscheduled pod", "deletedPod", klog.KObj(pod), "pod", klog.KObj(deletedPod))
+	logger.V(5).Info("The deleted pod does not impact the scheduling of the unscheduled pod", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 	return fwk.QueueSkip, nil
 }
 

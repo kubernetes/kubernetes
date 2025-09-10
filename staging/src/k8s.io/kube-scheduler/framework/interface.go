@@ -367,13 +367,13 @@ type Plugin interface {
 }
 
 // PreEnqueuePlugin is an interface that must be implemented by "PreEnqueue" plugins.
-// These plugins are called prior to adding Pods to activeQ.
+// These plugins are called prior to adding Pods to activeQ or backoffQ.
 // Note: an preEnqueue plugin is expected to be lightweight and efficient, so it's not expected to
 // involve expensive calls like accessing external endpoints; otherwise it'd block other
 // Pods' enqueuing in event handlers.
 type PreEnqueuePlugin interface {
 	Plugin
-	// PreEnqueue is called prior to adding Pods to activeQ.
+	// PreEnqueue is called prior to adding Pods to activeQ or backoffQ.
 	PreEnqueue(ctx context.Context, p *v1.Pod) *Status
 }
 
