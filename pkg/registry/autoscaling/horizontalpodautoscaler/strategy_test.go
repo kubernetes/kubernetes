@@ -32,18 +32,21 @@ import (
 )
 
 type toleranceSet bool
+type selectionStrategySet bool
 type zeroMinReplicasSet bool
 
 const (
-	withTolerance    toleranceSet       = true
-	withoutTolerance                    = false
-	zeroMinReplicas  zeroMinReplicasSet = true
-	oneMinReplicas                      = false
+	withTolerance            toleranceSet         = true
+	withoutTolerance                              = false
+	withSelectionStrategy    selectionStrategySet = true
+	withoutSelectionStrategy                      = false
+	zeroMinReplicas          zeroMinReplicasSet   = true
+	oneMinReplicas                                = false
 )
 
 func TestPrepareForCreateConfigurableToleranceEnabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)
-	hpa := prepareHPA(oneMinReplicas, withTolerance)
+	hpa := prepareHPA(oneMinReplicas, withTolerance, withoutSelectionStrategy)
 
 	Strategy.PrepareForCreate(context.Background(), &hpa)
 	if hpa.Spec.Behavior.ScaleUp.Tolerance == nil {
@@ -53,7 +56,7 @@ func TestPrepareForCreateConfigurableToleranceEnabled(t *testing.T) {
 
 func TestPrepareForCreateConfigurableToleranceDisabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
-	hpa := prepareHPA(oneMinReplicas, withTolerance)
+	hpa := prepareHPA(oneMinReplicas, withTolerance, withoutSelectionStrategy)
 
 	Strategy.PrepareForCreate(context.Background(), &hpa)
 	if hpa.Spec.Behavior.ScaleUp.Tolerance != nil {
@@ -63,8 +66,8 @@ func TestPrepareForCreateConfigurableToleranceDisabled(t *testing.T) {
 
 func TestPrepareForUpdateConfigurableToleranceEnabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)
-	newHPA := prepareHPA(oneMinReplicas, withTolerance)
-	oldHPA := prepareHPA(oneMinReplicas, withTolerance)
+	newHPA := prepareHPA(oneMinReplicas, withTolerance, withoutSelectionStrategy)
+	oldHPA := prepareHPA(oneMinReplicas, withTolerance, withoutSelectionStrategy)
 
 	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
 	if newHPA.Spec.Behavior.ScaleUp.Tolerance == nil {
@@ -74,16 +77,16 @@ func TestPrepareForUpdateConfigurableToleranceEnabled(t *testing.T) {
 
 func TestPrepareForUpdateConfigurableToleranceDisabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
-	newHPA := prepareHPA(oneMinReplicas, withTolerance)
-	oldHPA := prepareHPA(oneMinReplicas, withoutTolerance)
+	newHPA := prepareHPA(oneMinReplicas, withTolerance, withoutSelectionStrategy)
+	oldHPA := prepareHPA(oneMinReplicas, withoutTolerance, withoutSelectionStrategy)
 
 	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
 	if newHPA.Spec.Behavior.ScaleUp.Tolerance != nil {
 		t.Errorf("Expected tolerance field wiped out, got %v", newHPA.Spec.Behavior.ScaleUp.Tolerance)
 	}
 
-	newHPA = prepareHPA(oneMinReplicas, withTolerance)
-	oldHPA = prepareHPA(oneMinReplicas, withTolerance)
+	newHPA = prepareHPA(oneMinReplicas, withTolerance, withoutSelectionStrategy)
+	oldHPA = prepareHPA(oneMinReplicas, withTolerance, withoutSelectionStrategy)
 	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
 	if newHPA.Spec.Behavior.ScaleUp.Tolerance == nil {
 		t.Errorf("Expected tolerance field not wiped out, got nil")
@@ -92,7 +95,7 @@ func TestPrepareForUpdateConfigurableToleranceDisabled(t *testing.T) {
 
 func TestValidateOptionsScaleToZeroEnabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, true)
-	oneReplicasHPA := prepareHPA(oneMinReplicas, withoutTolerance)
+	oneReplicasHPA := prepareHPA(oneMinReplicas, withoutTolerance, withoutSelectionStrategy)
 
 	opts := validationOptionsForHorizontalPodAutoscaler(&oneReplicasHPA, &oneReplicasHPA)
 	if opts.MinReplicasLowerBound != 0 {
@@ -102,8 +105,8 @@ func TestValidateOptionsScaleToZeroEnabled(t *testing.T) {
 
 func TestValidateOptionsScaleToZeroDisabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, false)
-	zeroReplicasHPA := prepareHPA(zeroMinReplicas, withoutTolerance)
-	oneReplicasHPA := prepareHPA(oneMinReplicas, withoutTolerance)
+	zeroReplicasHPA := prepareHPA(zeroMinReplicas, withoutTolerance, withoutSelectionStrategy)
+	oneReplicasHPA := prepareHPA(oneMinReplicas, withoutTolerance, withoutSelectionStrategy)
 
 	// MinReplicas should be 0 despite the gate being disabled since the old HPA
 	// had MinReplicas set to 0 already.
@@ -115,6 +118,69 @@ func TestValidateOptionsScaleToZeroDisabled(t *testing.T) {
 	opts = validationOptionsForHorizontalPodAutoscaler(&zeroReplicasHPA, &oneReplicasHPA)
 	if opts.MinReplicasLowerBound == 0 {
 		t.Errorf("Expected non-zero minReplicasLowerBound, got 0")
+	}
+}
+
+func TestPrepareForCreateSelectionStrategyEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPASelectionStrategy, true)
+	hpa := prepareHPA(oneMinReplicas, withoutTolerance, withSelectionStrategy)
+
+	Strategy.PrepareForCreate(context.Background(), &hpa)
+	if hpa.Spec.SelectionStrategy == nil {
+		t.Error("Expected SelectionStrategy field, got none")
+	}
+}
+
+func TestPrepareForCreateSelectionStrategyDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPASelectionStrategy, false)
+	hpa := prepareHPA(oneMinReplicas, withoutTolerance, withSelectionStrategy)
+
+	Strategy.PrepareForCreate(context.Background(), &hpa)
+	if hpa.Spec.SelectionStrategy != nil {
+		t.Errorf("Expected SelectionStrategy field wiped out, got %v", hpa.Spec.SelectionStrategy)
+	}
+}
+
+func TestPrepareForUpdateSelectionStrategyEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPASelectionStrategy, true)
+	newHPA := prepareHPA(oneMinReplicas, withoutTolerance, withSelectionStrategy)
+	oldHPA := prepareHPA(oneMinReplicas, withoutTolerance, withSelectionStrategy)
+
+	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
+	if newHPA.Spec.SelectionStrategy == nil {
+		t.Error("Expected SelectionStrategy field, got none")
+	}
+
+	newHPA = prepareHPA(oneMinReplicas, withoutTolerance, withoutSelectionStrategy)
+	oldHPA = prepareHPA(oneMinReplicas, withoutTolerance, withSelectionStrategy)
+	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
+	if newHPA.Spec.SelectionStrategy != nil {
+		t.Errorf("Expected SelectionStrategy field wiped out, got %v", newHPA.Spec.SelectionStrategy)
+	}
+
+	newHPA = prepareHPA(oneMinReplicas, withoutTolerance, withSelectionStrategy)
+	oldHPA = prepareHPA(oneMinReplicas, withoutTolerance, withoutSelectionStrategy)
+	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
+	if newHPA.Spec.SelectionStrategy == nil {
+		t.Error("Expected SelectionStrategy field, got none")
+	}
+}
+
+func TestPrepareForUpdateSelectionStrategyDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPASelectionStrategy, false)
+	newHPA := prepareHPA(oneMinReplicas, withoutTolerance, withSelectionStrategy)
+	oldHPA := prepareHPA(oneMinReplicas, withoutTolerance, withoutSelectionStrategy)
+
+	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
+	if newHPA.Spec.SelectionStrategy != nil {
+		t.Errorf("Expected SelectionStrategy field wiped out, got %v", newHPA.Spec.SelectionStrategy)
+	}
+
+	newHPA = prepareHPA(oneMinReplicas, withoutTolerance, withSelectionStrategy)
+	oldHPA = prepareHPA(oneMinReplicas, withoutTolerance, withSelectionStrategy)
+	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
+	if newHPA.Spec.SelectionStrategy == nil {
+		t.Errorf("Expected SelectionStrategy field not wiped out, got nil")
 	}
 }
 
@@ -389,7 +455,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 	}
 }
 
-func prepareHPA(hasZeroMinReplicas zeroMinReplicasSet, hasTolerance toleranceSet) autoscaling.HorizontalPodAutoscaler {
+func prepareHPA(hasZeroMinReplicas zeroMinReplicasSet, hasTolerance toleranceSet, hasSelectionStrategy selectionStrategySet) autoscaling.HorizontalPodAutoscaler {
 	tolerance := ptr.To(resource.MustParse("0.1"))
 	if !hasTolerance {
 		tolerance = nil
@@ -400,6 +466,10 @@ func prepareHPA(hasZeroMinReplicas zeroMinReplicasSet, hasTolerance toleranceSet
 		minReplicas = 1
 	}
 
+	selectionStrategy := ptr.To(autoscaling.LabelSelector)
+	if !hasSelectionStrategy {
+		selectionStrategy = nil
+	}
 	return autoscaling.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "myautoscaler",
@@ -428,6 +498,7 @@ func prepareHPA(hasZeroMinReplicas zeroMinReplicasSet, hasTolerance toleranceSet
 					Tolerance: tolerance,
 				},
 			},
+			SelectionStrategy: selectionStrategy,
 		},
 	}
 }
