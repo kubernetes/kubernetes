@@ -778,22 +778,15 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		metrics.RecordStorageListMetrics(s.groupResource, numFetched, numEvald, numReturn)
 	}()
 
-	metricsOp := "get"
-	if opts.Recursive {
-		metricsOp = "list"
-	}
-
 	stats := s.getResourceSizeEstimator()
 
 	aggregator := s.listErrAggrFactory()
 	for {
-		startTime := time.Now()
 		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
 			Revision: withRev,
 			Limit:    limit,
 			Continue: continueKey,
 		})
-		metrics.RecordEtcdRequest(metricsOp, s.groupResource, err, startTime)
 		if err != nil {
 			if errors.Is(err, etcdrpc.ErrFutureRev) {
 				currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
@@ -911,12 +904,16 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 }
 
 func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (kubernetes.ListResponse, error) {
+	startTime := time.Now()
 	if recursive {
-		return s.client.Kubernetes.List(ctx, keyPrefix, options)
+		resp, err := s.client.Kubernetes.List(ctx, keyPrefix, options)
+		metrics.RecordEtcdRequest("list", s.groupResource, err, startTime)
+		return resp, err
 	}
 	getResp, err := s.client.Kubernetes.Get(ctx, keyPrefix, kubernetes.GetOptions{
 		Revision: options.Revision,
 	})
+	metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
 	var resp kubernetes.ListResponse
 	if getResp.KV != nil {
 		resp.Kvs = []*mvccpb.KeyValue{getResp.KV}
