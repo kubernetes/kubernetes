@@ -215,3 +215,104 @@ func TestK8sUUID(t *testing.T) {
 		})
 	}
 }
+
+func TestLabelValue(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "valid value",
+		input:    "valid-value",
+		wantErrs: nil,
+	}, {
+		name:     "valid value with dots",
+		input:    "valid.value",
+		wantErrs: nil,
+	}, {
+		name:     "valid value with underscores",
+		input:    "valid_value",
+		wantErrs: nil,
+	}, {
+		name:     "valid single character value",
+		input:    "a",
+		wantErrs: nil,
+	}, {
+		name:     "valid value with numbers",
+		input:    "123-abc",
+		wantErrs: nil,
+	}, {
+		name:     "valid uppercase characters",
+		input:    "Valid-Value",
+		wantErrs: nil,
+	}, {
+		name:  "invalid: starts with dash",
+		input: "-invalid-value",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: ends with dash",
+		input: "invalid-value-",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: starts with dot",
+		input: ".invalid.value",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: ends with dot",
+		input: "invalid.value.",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: starts with underscore",
+		input: "_invalid_value",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: ends with underscore",
+		input: "invalid_value_",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: contains special characters",
+		input: "invalid@value",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: too long",
+		input: "a" + strings.Repeat("b", 62) + "c", // 64 characters
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:     "valid: max length",
+		input:    "a" + strings.Repeat("b", 61) + "c", // 63 characters
+		wantErrs: nil,
+	}, {
+		name:     "valid: empty string",
+		input:    "",
+		wantErrs: nil,
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := LabelValue(ctx, operation.Operation{}, fldPath, &value, nil)
+
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
