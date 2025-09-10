@@ -199,14 +199,14 @@ func TestLists(t *testing.T) {
 					t.Parallel()
 					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 					t.Cleanup(terminate)
-					storagetesting.RunTestConsistentList(ctx, t, cacher, increaseRV(server.V3Client.Client), true, consistentRead, listFromCacheSnapshot)
+					storagetesting.RunTestConsistentList(ctx, t, cacher, increaseRVFunc(server.V3Client.Client), true, consistentRead, listFromCacheSnapshot)
 				})
 
 				t.Run("GetListNonRecursive", func(t *testing.T) {
 					t.Parallel()
 					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 					t.Cleanup(terminate)
-					storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRV(server.V3Client.Client), cacher)
+					storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRVFunc(server.V3Client.Client), cacher)
 				})
 			})
 		}
@@ -218,7 +218,7 @@ func TestCompactRevision(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestCompactRevision(ctx, t, cacher, increaseRV(server.V3Client.Client), compactStore(cacher, server.V3Client.Client))
+	storagetesting.RunTestCompactRevision(ctx, t, cacher, increaseRVFunc(server.V3Client.Client), compactStore(cacher, server.V3Client.Client))
 }
 
 func TestMarkConsistent(t *testing.T) {
