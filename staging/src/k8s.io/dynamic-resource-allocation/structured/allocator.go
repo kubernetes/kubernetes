@@ -140,18 +140,18 @@ func NewAllocator(ctx context.Context,
 	// file name!) into "stable", or individual chunks can be copied over.
 	//
 	// Unit tests are shared between all implementations.
-	var enabledAllocators []string
-	for _, allocator := range availableAllocators {
+	enabledAllocators := []string{}
+	for _, api := range availableAPIs {
 		// Disabled?
-		if !allocatorEnabled(allocator.name) {
+		if !allocatorEnabled(api.name) {
 			continue
 		}
-		enabledAllocators = append(enabledAllocators, allocator.name)
+		enabledAllocators = append(enabledAllocators, api.name)
 
 		// All required features supported?
-		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
+		if api.supportedFeatures.Set().IsSuperset(features.Set()) {
 			// Use it!
-			return allocator.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
+			return api.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		}
 	}
 	return nil, fmt.Errorf("internal error: no allocator available for feature set %+v, enabled allocators: %s", features, strings.Join(enabledAllocators, ", "))
@@ -172,7 +172,7 @@ func allocatorEnabled(name string) bool {
 	return len(explicitlyEnabledAllocators) == 0 || explicitlyEnabledAllocators.Has(name)
 }
 
-var availableAllocators = []struct {
+var availableAPIs = []struct {
 	name              string
 	supportedFeatures Features
 	newAllocator      func(ctx context.Context,
@@ -182,6 +182,11 @@ var availableAllocators = []struct {
 		slices []*resourceapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)
+	nodeMatches func(node *v1.Node,
+		nodeNameToMatch string,
+		allNodesMatch bool,
+		nodeSelector *v1.NodeSelector,
+	) (bool, error)
 }{
 	// Most stable first.
 	{
@@ -196,6 +201,7 @@ var availableAllocators = []struct {
 		) (Allocator, error) {
 			return stable.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
+		nodeMatches: stable.NodeMatches,
 	},
 	{
 		name:              "incubating",
@@ -209,6 +215,7 @@ var availableAllocators = []struct {
 		) (Allocator, error) {
 			return incubating.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
+		nodeMatches: incubating.NodeMatches,
 	},
 	{
 		name:              "experimental",
@@ -222,5 +229,49 @@ var availableAllocators = []struct {
 		) (Allocator, error) {
 			return experimental.NewAllocator(ctx, features, allocateState, classLister, slices, celCache)
 		},
+		nodeMatches: experimental.NodeMatches,
 	},
+}
+
+// NodeMatches determines whether a given Kubernetes node matches the specified criteria.
+// It calls one of the available implementations(stable, incubating, experimental) based
+// on the provided DRA features.
+func NodeMatches(features Features, node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
+	for _, api := range availableAPIs {
+		if api.supportedFeatures.Set().IsSuperset(features.Set()) {
+			return api.nodeMatches(node, nodeNameToMatch, allNodesMatch, nodeSelector)
+		}
+	}
+
+	return false, fmt.Errorf("internal error: no NodeMatches API available for feature set %v", features)
+}
+
+// IsDeviceAllocated checks if a device is allocated, considering both fully allocated devices
+// and partially consumed devices when consumable capacity is enabled.
+func IsDeviceAllocated(deviceID DeviceID, allocatedState *AllocatedState) bool {
+	// Check if device is fully allocated (traditional case)
+	if allocatedState.AllocatedDevices.Has(deviceID) {
+		return true
+	}
+
+	// Check if device is partially consumed via shared allocations (consumable capacity case)
+	// We need to check if any shared device ID corresponds to our device
+	for sharedDeviceID := range allocatedState.AllocatedSharedDeviceIDs {
+		// Extract the base device ID from the shared device ID by recreating it
+		baseDeviceID := MakeDeviceID(
+			sharedDeviceID.Driver.String(),
+			sharedDeviceID.Pool.String(),
+			sharedDeviceID.Device.String(),
+		)
+		if baseDeviceID == deviceID {
+			return true
+		}
+	}
+
+	// Check if device has consumed capacity tracked (consumable capacity case)
+	if _, hasConsumedCapacity := allocatedState.AggregatedCapacity[deviceID]; hasConsumedCapacity {
+		return true
+	}
+
+	return false
 }
