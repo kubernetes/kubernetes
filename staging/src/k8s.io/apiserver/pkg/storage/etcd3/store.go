@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
@@ -90,8 +91,10 @@ type store struct {
 
 	resourcePrefix string
 	newListFunc    func() runtime.Object
-	stats          *statsCache
 	compactor      Compactor
+
+	collectorMux          sync.RWMutex
+	resourceSizeEstimator *resourceSizeEstimator
 }
 
 var _ storage.Interface = (*store)(nil)
@@ -189,13 +192,8 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 		newListFunc:    newListFunc,
 		compactor:      compactor,
 	}
-	// Collecting stats requires properly set resourcePrefix to call getKeys.
-	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		stats := newStatsCache(pathPrefix, nil)
-		s.stats = stats
-		w.stats = stats
-	}
 
+	w.getResourceSizeEstimator = s.getResourceSizeEstimator
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
 		return s.GetCurrentResourceVersion(ctx)
 	}
@@ -218,9 +216,16 @@ func (s *store) Versioner() storage.Versioner {
 }
 
 func (s *store) Close() {
-	if s.stats != nil {
-		s.stats.Close()
+	stats := s.getResourceSizeEstimator()
+	if stats != nil {
+		stats.Close()
 	}
+}
+
+func (s *store) getResourceSizeEstimator() *resourceSizeEstimator {
+	s.collectorMux.RLock()
+	defer s.collectorMux.RUnlock()
+	return s.resourceSizeEstimator
 }
 
 // Get implements storage.Interface.Get.
@@ -633,13 +638,12 @@ func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Obje
 	}
 }
 
-func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
-	if s.stats != nil {
-		stats, err := s.stats.Stats(ctx)
-		if !errors.Is(err, errStatsDisabled) {
-			return stats, err
-		}
+func (s *store) Stats(ctx context.Context) (storage.Stats, error) {
+	if collector := s.getResourceSizeEstimator(); collector != nil {
+		return collector.Stats(ctx)
 	}
+	// returning stats without resource size
+
 	startTime := time.Now()
 	prefix, err := s.prepareKey(s.resourcePrefix)
 	if err != nil {
@@ -658,10 +662,17 @@ func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
 	}, nil
 }
 
-func (s *store) SetKeysFunc(keys storage.KeysFunc) {
-	if s.stats != nil {
-		s.stats.SetKeysFunc(keys)
+func (s *store) EnableResourceSizeEstimation(getKeys storage.KeysFunc) error {
+	if getKeys == nil {
+		return errors.New("KeysFunc cannot be nil")
 	}
+	s.collectorMux.Lock()
+	defer s.collectorMux.Unlock()
+	if s.resourceSizeEstimator != nil {
+		return errors.New("resourceSizeEstimator already enabled")
+	}
+	s.resourceSizeEstimator = newResourceSizeEstimator(s.pathPrefix, getKeys)
+	return nil
 }
 
 func (s *store) getKeys(ctx context.Context) ([]string, error) {
@@ -780,6 +791,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		metricsOp = "list"
 	}
 
+	stats := s.getResourceSizeEstimator()
+
 	aggregator := s.listErrAggrFactory()
 	for {
 		startTime := time.Now()
@@ -821,8 +834,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		} else {
 			growSlice(v, 2048, len(getResp.Kvs))
 		}
-		if s.stats != nil {
-			s.stats.Update(getResp.Kvs)
+		if stats != nil {
+			stats.Update(getResp.Kvs)
 		}
 
 		// take items from the response until the bucket is full, filtering as we go
