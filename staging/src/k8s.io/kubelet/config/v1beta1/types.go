@@ -506,7 +506,7 @@ type KubeletConfiguration struct {
 	CPUCFSQuota *bool `json:"cpuCFSQuota,omitempty"`
 	// cpuCFSQuotaPeriod is the CPU CFS quota period value, `cpu.cfs_period_us`.
 	// The value must be between 1 ms and 1 second, inclusive.
-	// Requires the CustomCPUCFSQuotaPeriod feature gate to be enabled.
+	// Requires enabling the CustomCPUCFSQuotaPeriod feature gate.
 	// Default: "100ms"
 	// +optional
 	CPUCFSQuotaPeriod *metav1.Duration `json:"cpuCFSQuotaPeriod,omitempty"`
