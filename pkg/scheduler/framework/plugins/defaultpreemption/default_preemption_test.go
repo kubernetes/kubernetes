@@ -1843,7 +1843,6 @@ func TestCustomOrdering(t *testing.T) {
 func TestPodEligibleToPreemptOthers(t *testing.T) {
 	tests := []struct {
 		name                string
-		fts                 feature.Features
 		pod                 *v1.Pod
 		pods                []*v1.Pod
 		nodes               []string
