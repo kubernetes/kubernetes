@@ -135,17 +135,17 @@ func NewAllocator(ctx context.Context,
 	// file name!) into "stable", or individual chunks can be copied over.
 	//
 	// Unit tests are shared between all implementations.
-	for _, allocator := range availableAllocators {
+	for _, api := range availableAPIs {
 		// All required features supported?
-		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
+		if api.supportedFeatures.Set().IsSuperset(features.Set()) {
 			// Use it!
-			return allocator.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
+			return api.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		}
 	}
 	return nil, fmt.Errorf("internal error: no allocator available for feature set %v", features)
 }
 
-var availableAllocators = []struct {
+var availableAPIs = []struct {
 	supportedFeatures Features
 	newAllocator      func(ctx context.Context,
 		features Features,
@@ -154,6 +154,11 @@ var availableAllocators = []struct {
 		slices []*resourceapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)
+	nodeMatches func(node *v1.Node,
+		nodeNameToMatch string,
+		allNodesMatch bool,
+		nodeSelector *v1.NodeSelector,
+	) (bool, error)
 }{
 	// Most stable first.
 	{
@@ -167,6 +172,7 @@ var availableAllocators = []struct {
 		) (Allocator, error) {
 			return stable.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
+		nodeMatches: stable.NodeMatches,
 	},
 	{
 		supportedFeatures: incubating.SupportedFeatures,
@@ -179,6 +185,7 @@ var availableAllocators = []struct {
 		) (Allocator, error) {
 			return incubating.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
+		nodeMatches: incubating.NodeMatches,
 	},
 	{
 		supportedFeatures: experimental.SupportedFeatures,
@@ -191,5 +198,19 @@ var availableAllocators = []struct {
 		) (Allocator, error) {
 			return experimental.NewAllocator(ctx, features, allocateState, classLister, slices, celCache)
 		},
+		nodeMatches: experimental.NodeMatches,
 	},
+}
+
+// NodeMatches determines whether a given Kubernetes node matches the specified criteria.
+// It calls one of the available implementations(stable, incubating, experimental) based
+// on the provided DRA features.
+func NodeMatches(features Features, node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
+	for _, api := range availableAPIs {
+		if api.supportedFeatures.Set().IsSuperset(features.Set()) {
+			return api.nodeMatches(node, nodeNameToMatch, allNodesMatch, nodeSelector)
+		}
+	}
+
+	return false, fmt.Errorf("internal error: no NodeMatches API available for feature set %v", features)
 }
