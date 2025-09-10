@@ -202,7 +202,7 @@ func (nm *NamespaceController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting namespace controller")
 	defer logger.Info("Shutting down namespace controller")
 
-	if !cache.WaitForNamedCacheSync("namespace", ctx.Done(), nm.listerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, nm.listerSynced) {
 		return
 	}
 

@@ -403,7 +403,7 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
 	defer eventBroadcaster.Shutdown()
 
-	if !cache.WaitForNamedCacheSync("resource_claim", ctx.Done(), ec.podSynced, ec.claimsSynced, ec.templatesSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, ec.podSynced, ec.claimsSynced, ec.templatesSynced) {
 		return
 	}
 

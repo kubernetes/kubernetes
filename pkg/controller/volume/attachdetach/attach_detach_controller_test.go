@@ -344,7 +344,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	informerFactory.Start(tCtx.Done())
 
-	if !kcache.WaitForNamedCacheSync("attach detach", tCtx.Done(),
+	if !kcache.WaitForNamedCacheSyncWithContext(tCtx,
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
 		informerFactory.Core().V1().Nodes().Informer().HasSynced,
 		informerFactory.Storage().V1().CSINodes().Informer().HasSynced) {
@@ -622,7 +622,7 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	// Makesure the informer cache is synced
 	informerFactory.Start(tCtx.Done())
 
-	if !kcache.WaitForNamedCacheSync("attach detach", tCtx.Done(),
+	if !kcache.WaitForNamedCacheSyncWithContext(tCtx,
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
 		informerFactory.Core().V1().Nodes().Informer().HasSynced,
 		informerFactory.Core().V1().PersistentVolumes().Informer().HasSynced,

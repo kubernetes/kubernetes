@@ -352,7 +352,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.kubeClient.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
 
-	if !cache.WaitForNamedCacheSync("selinux_warning", ctx.Done(), c.podsSynced, c.pvcsSynced, c.pvsSynced, c.csiDriversSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.podsSynced, c.pvcsSynced, c.pvsSynced, c.csiDriversSynced) {
 		return
 	}
 

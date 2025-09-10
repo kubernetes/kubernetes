@@ -132,7 +132,7 @@ func (svmc *SVMController) Run(ctx context.Context) {
 	logger.Info("Starting", "controller", svmc.controllerName)
 	defer logger.Info("Shutting down", "controller", svmc.controllerName)
 
-	if !cache.WaitForNamedCacheSync(svmc.controllerName, ctx.Done(), svmc.svmSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, svmc.svmSynced) {
 		return
 	}
 

@@ -100,7 +100,7 @@ func (gcc *PodGCController) Run(ctx context.Context) {
 	defer gcc.nodeQueue.ShutDown()
 	defer logger.Info("Shutting down GC controller")
 
-	if !cache.WaitForNamedCacheSync("GC", ctx.Done(), gcc.podListerSynced, gcc.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, gcc.podListerSynced, gcc.nodeListerSynced) {
 		return
 	}
 

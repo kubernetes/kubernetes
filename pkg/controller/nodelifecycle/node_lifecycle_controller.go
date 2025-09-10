@@ -464,7 +464,7 @@ func (nc *Controller) Run(ctx context.Context) {
 	logger.Info("Starting node controller")
 	defer logger.Info("Shutting down node controller")
 
-	if !cache.WaitForNamedCacheSync("taint", ctx.Done(), nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
 	}
 
