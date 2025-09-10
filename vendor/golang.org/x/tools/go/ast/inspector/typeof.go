@@ -12,8 +12,6 @@ package inspector
 import (
 	"go/ast"
 	"math"
-
-	_ "unsafe"
 )
 
 const (
