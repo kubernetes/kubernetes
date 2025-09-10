@@ -397,7 +397,7 @@ func TestCollectContainerLevelResources(t *testing.T) {
 			// Requests sum : CPU 100m+300m+50m=450m, Mem 100Mi+400Mi+50Mi=550Mi
 			expectedReq: getResourceList("450m", "550Mi"),
 			// Limits sum : CPU 200m+800m+100m=1100m, Mem 200Mi+1000Mi+100Mi=1300Mi
-			expectedLim: getResourceList("1100m", "1300Mi"),
+			expectedLim:        getResourceList("1100m", "1300Mi"),
 			expectedGuaranteed: true,
 		},
 		{
@@ -445,7 +445,7 @@ func TestCollectContainerLevelResources(t *testing.T) {
 			// Requests sum : CPU 100m+300m+50m=450m, Mem 100Mi+100Mi+50Mi=250Mi
 			expectedReq: getResourceList("450m", "250Mi"),
 			// Limits sum : CPU 200m+0+50m=250m,  Mem 300Mi+300Mi+50Mi=650Mi
-			expectedLim: getResourceList("250m", "650Mi"),
+			expectedLim:        getResourceList("250m", "650Mi"),
 			expectedGuaranteed: false,
 		},
 		{
