@@ -1843,6 +1843,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
+- name: WatchFromStorageWithoutPrevKV
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.35"
 - name: WatchFromStorageWithoutResourceVersion
   versionedSpecs:
   - default: false
