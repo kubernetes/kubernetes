@@ -253,7 +253,7 @@ func (jm *ControllerV2) sync(ctx context.Context, cronJobKey string) (*time.Dura
 }
 
 func (jm *ControllerV2) getCronJobJobsByIndexer(cronJob *batchv1.CronJob) ([]*batchv1.Job, error) {
-	jobsForCronJob := []*batchv1.Job{}
+	var jobsForCronJob []*batchv1.Job
 	jobs, err := jm.jobIndexer.ByIndex(jobControllerUIDIndex, string(cronJob.UID)) // なぜ cronjob の uid と job を検索できているのか
 	if err != nil {
 		return nil, err
