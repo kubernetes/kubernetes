@@ -3386,10 +3386,6 @@ func TestEnableEmulationVersion(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
-			expectedStatusCode: 200,
-		},
-		{
 			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
 			expectedStatusCode: 200,
 		},
@@ -3445,10 +3441,6 @@ func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
 		},
 		{
 			path:               "/apis/flowcontrol.apiserver.k8s.io/v1/flowschemas",
-			expectedStatusCode: 200,
-		},
-		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
 			expectedStatusCode: 200,
 		},
 		{
@@ -3510,10 +3502,6 @@ func TestEnableRuntimeConfigEmulationVersionForwardCompatible(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
-			expectedStatusCode: 200,
-		},
-		{
 			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
 			expectedStatusCode: 200,
 		},
@@ -3544,9 +3532,9 @@ func TestEnableRuntimeConfigEmulationVersionForwardCompatible(t *testing.T) {
 }
 
 func TestDisableEmulationVersion(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.32"},
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.34"},
 		[]string{}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -3568,11 +3556,11 @@ func TestDisableEmulationVersion(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1/flowschemas",
+			path:               "/apis/networking.k8s.io/v1/servicecidrs",
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
+			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
 			expectedStatusCode: 404,
 		},
 	}
