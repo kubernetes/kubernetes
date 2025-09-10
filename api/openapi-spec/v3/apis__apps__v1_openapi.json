@@ -1114,6 +1114,11 @@
             "description": "podManagementPolicy controls how pods are created during initial scale up, when replacing pods on nodes, or when scaling down. The default policy is `OrderedReady`, where pods are created in increasing order (pod-0, then pod-1, etc) and the controller will wait until each pod is ready before continuing. When scaling down, the pods are removed in the opposite order. The alternative policy is `Parallel` which will create pods in parallel to match the desired scale without waiting, and on scale down will delete all pods at once.",
             "type": "string"
           },
+          "progressDeadlineSeconds": {
+            "description": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The StatefulSet controller will continue to process failed StatefulSets and a condition with a ProgressDeadlineExceeded reason will be surfaced in the StatefulSet status. Note that progress will not be estimated during the time a StatefulSet is paused. This field defaults to 600s.",
+            "format": "int32",
+            "type": "integer"
+          },
           "replicas": {
             "description": "replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
             "format": "int32",

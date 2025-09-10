@@ -17,10 +17,13 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -37,6 +40,178 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/features"
 )
+
+const (
+	// Reasons for StatefulSet conditions
+	//
+	// Progressing:
+
+	// PodUpdatedReason is added when the StatefulSet's pod template changes and pods are being updated.
+	PodUpdatedReason = "PodUpdated"
+
+	// ScalingUpReason is added when the StatefulSet is scaling up.
+	ScalingUpReason = "ScalingUp"
+
+	// ScalingDownReason is added when the StatefulSet is scaling down.
+	ScalingDownReason = "ScalingDown"
+
+	// TimedOutReason is added in a StatefulSet when its newest replica fails to show any progress
+	// within the given deadline (progressDeadlineSeconds).
+	TimedOutReason = "ProgressDeadlineExceeded"
+
+	// Available:
+
+	// MinimumReplicasAvailable is added in a StatefulSet when it has its minimum replicas required available.
+	MinimumReplicasAvailable = "MinimumReplicasAvailable"
+
+	// MinimumReplicasUnavailable is added in a StatefulSet when it doesn't have the minimum required replicas
+	// available.
+	MinimumReplicasUnavailable = "MinimumReplicasUnavailable"
+)
+
+// NewStatefulSetCondition creates a new StatefulSet condition.
+func NewStatefulSetCondition(condType apps.StatefulSetConditionType, status v1.ConditionStatus, reason, message string) *apps.StatefulSetCondition {
+	return &apps.StatefulSetCondition{
+		Type:               condType,
+		Status:             status,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+}
+
+// GetStatefulSetCondition returns the condition with the provided type.
+func GetStatefulSetCondition(status apps.StatefulSetStatus, condType apps.StatefulSetConditionType) *apps.StatefulSetCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
+}
+
+// SetStatefulSetCondition updates the StatefulSet to include the provided condition. If the condition that
+// we are about to add already exists and has the same status and reason then we are not going to update.
+func SetStatefulSetCondition(status *apps.StatefulSetStatus, condition apps.StatefulSetCondition) {
+	currentCond := GetStatefulSetCondition(*status, condition.Type)
+	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
+		return
+	}
+	// Do not update lastTransitionTime if the status of the condition doesn't change.
+	if currentCond != nil && currentCond.Status == condition.Status {
+		condition.LastTransitionTime = currentCond.LastTransitionTime
+	}
+	status.Conditions = append(filterOutStatefulSetCondition(status.Conditions, condition.Type), condition)
+}
+
+// RemoveStatefulSetCondition removes the StatefulSet condition with the provided type.
+func RemoveStatefulSetCondition(status *apps.StatefulSetStatus, condType apps.StatefulSetConditionType) {
+	status.Conditions = filterOutStatefulSetCondition(status.Conditions, condType)
+}
+
+// filterOutStatefulSetCondition returns a new slice of StatefulSet conditions without conditions with the provided type.
+func filterOutStatefulSetCondition(conditions []apps.StatefulSetCondition, condType apps.StatefulSetConditionType) []apps.StatefulSetCondition {
+	var newConditions []apps.StatefulSetCondition
+	for _, c := range conditions {
+		if c.Type == condType {
+			continue
+		}
+		newConditions = append(newConditions, c)
+	}
+	return newConditions
+}
+
+// HasProgressDeadline checks if the StatefulSet is expected to surface the reason
+// "ProgressDeadlineExceeded" when the StatefulSet progress takes longer than expected time.
+func HasProgressDeadline(set *apps.StatefulSet) bool {
+	return set.Spec.ProgressDeadlineSeconds != nil && *set.Spec.ProgressDeadlineSeconds != math.MaxInt32
+}
+
+// StatefulSetTimedOut considers a StatefulSet to have timed out once its condition that reports progress
+// is older than progressDeadlineSeconds or a Progressing condition with a TimedOutReason reason already
+// exists.
+func StatefulSetTimedOut(ctx context.Context, set *apps.StatefulSet, newStatus *apps.StatefulSetStatus) bool {
+	if !HasProgressDeadline(set) {
+		return false
+	}
+
+	// Look for the Progressing condition. If it doesn't exist, we have no base to estimate progress.
+	// If it's already set with a TimedOutReason reason, we have already timed out, no need to check
+	// again.
+	condition := GetStatefulSetCondition(*newStatus, apps.StatefulSetProgressing)
+	if condition == nil {
+		return false
+	}
+
+	// If the previous condition has been a successful rollout then we shouldn't try to
+	// estimate any progress. Scenario:
+	//
+	// * progressDeadlineSeconds is smaller than the difference between now and the time
+	//   the last rollout finished in the past.
+	// * the creation of a new Pod triggers a resync of the StatefulSet prior to the
+	//   cached copy of the StatefulSet getting updated with the status.condition that indicates
+	//   the creation of the new Pod.
+	//
+	// The StatefulSet will be resynced and eventually its Progressing condition will catch
+	// up with the state of the world.
+	if condition.Reason == MinimumReplicasAvailable {
+		return false
+	}
+	if condition.Reason == TimedOutReason {
+		return true
+	}
+
+	logger := klog.FromContext(ctx)
+	// Look at the difference in seconds between now and the last time we reported any
+	// progress or tried to create a pod, or resumed a paused StatefulSet and
+	// compare against progressDeadlineSeconds.
+	from := condition.LastTransitionTime
+	now := metav1.Now()
+	delta := time.Duration(*set.Spec.ProgressDeadlineSeconds) * time.Second
+	timedOut := from.Add(delta).Before(now.Time)
+
+	logger.V(4).Info("StatefulSet timed out", "statefulset", klog.KObj(set), "timeout", timedOut, "from", from, "now", now)
+	return timedOut
+}
+
+// StatefulSetComplete considers a StatefulSet to be complete once its target scale is satisfied
+// and all of its pods are in the Ready state.
+func StatefulSetComplete(set *apps.StatefulSet, newStatus *apps.StatefulSetStatus) bool {
+	return newStatus.UpdatedReplicas == *(set.Spec.Replicas) &&
+		newStatus.Replicas == *(set.Spec.Replicas) &&
+		newStatus.AvailableReplicas == *(set.Spec.Replicas) &&
+		newStatus.ObservedGeneration >= set.Generation
+}
+
+// StatefulSetProgressing returns whether the StatefulSet is progressing. Progress is estimated by comparing the
+// current state with the new status that the controller is observing. More specifically,
+// when pods are scaled up or down, become ready or available, then we consider the StatefulSet is progressing.
+func StatefulSetProgressing(set *apps.StatefulSet, newStatus *apps.StatefulSetStatus) bool {
+	oldStatus := set.Status
+
+	// Increasing the number of replicas indicates progress
+	if newStatus.Replicas > oldStatus.Replicas {
+		return true
+	}
+
+	// More ready pods than before indicates progress
+	if newStatus.ReadyReplicas > oldStatus.ReadyReplicas {
+		return true
+	}
+
+	// More current replicas indicates progress when updating
+	if newStatus.CurrentReplicas > oldStatus.CurrentReplicas {
+		return true
+	}
+
+	// Fewer replicas when scaling down indicates progress
+	if newStatus.Replicas < oldStatus.Replicas {
+		return true
+	}
+
+	return false
+}
 
 var patchCodec = scheme.Codecs.LegacyCodec(apps.SchemeGroupVersion)
 
