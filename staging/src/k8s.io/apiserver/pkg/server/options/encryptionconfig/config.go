@@ -395,7 +395,7 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	// allow writes indefinitely as long as there is no error
 	// allow writes for only up to kmsv2PluginWriteDEKSourceMaxTTL from now when there are errors
 	// we start the timer before we make the network call because kmsv2PluginWriteDEKSourceMaxTTL is meant to be the upper bound
-	expirationTimestamp := envelopekmsv2.NowFunc().Add(kmsv2PluginWriteDEKSourceMaxTTL)
+	expirationTimestamp := envelopekmsv2.GetNowFunc(h.name)().Add(kmsv2PluginWriteDEKSourceMaxTTL)
 
 	// dynamically check if we want to use KDF seed to derive DEKs or just a single DEK
 	// this gate can only change during tests, but the check is cheap enough to always make
@@ -431,6 +431,7 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 			UID:                                   uid,
 			ExpirationTimestamp:                   expirationTimestamp,
 			CacheKey:                              cacheKey,
+			KMSProviderName:                       h.name,
 		})
 
 		// it should be logically impossible for the new state to be invalid but check just in case
@@ -792,7 +793,9 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserver.KMSConfiguratio
 			apiServerID:  apiServerID,
 		}
 		// initialize state so that Load always works
-		probe.state.Store(&envelopekmsv2.State{})
+		probe.state.Store(&envelopekmsv2.State{
+			KMSProviderName: kmsName,
+		})
 
 		primeAndProbeKMSv2(ctx, probe, kmsName)
 		transformer := storagevalue.PrefixTransformer{
