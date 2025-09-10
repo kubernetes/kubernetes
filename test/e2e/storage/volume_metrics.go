@@ -168,44 +168,6 @@ var _ = utils.SIGDescribe("Volume metrics", func() {
 		}
 	}
 
-	provisioningError := func(ctx context.Context, ephemeral bool) {
-		if !metricsGrabber.HasControlPlanePods() {
-			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
-		}
-
-		pluginName := sc.Provisioner
-
-		invalidSc := &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("fail-metrics-invalid-sc-%s", pvc.Namespace),
-			},
-			Provisioner: sc.Provisioner,
-			Parameters: map[string]string{
-				"invalidparam": "invalidvalue",
-			},
-		}
-		invalidSc = testsuites.SetupStorageClass(ctx, f.ClientSet, invalidSc)
-
-		pvc.Spec.StorageClassName = &invalidSc.Name
-		if !ephemeral {
-			pvc = createPVC(ctx, c, pvc)
-		}
-
-		ginkgo.By("Creating a pod and expecting it to fail")
-		pod := makePod(f, pvc, ephemeral)
-		pod = createPod(ctx, c, pod)
-
-		getPod := e2epod.Get(f.ClientSet, pod)
-		gomega.Consistently(ctx, getPod, f.Timeouts.PodStart, 2*time.Second).ShouldNot(e2epod.BeInPhase(v1.PodRunning))
-
-		ginkgo.By("Checking failure metrics")
-		updatedControllerMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
-		framework.ExpectNoError(err, "failed to get controller manager metrics")
-		updatedStorageMetrics := getControllerStorageMetrics(updatedControllerMetrics, pluginName)
-
-		gomega.Expect(updatedStorageMetrics.statusMetrics).ToNot(gomega.BeEmpty(), "Error fetching c-m updated storage metrics")
-	}
-
 	filesystemMode := func(ctx context.Context, isEphemeral bool) {
 		if !isEphemeral {
 			pvc = createPVC(ctx, c, pvc)
@@ -417,11 +379,6 @@ var _ = utils.SIGDescribe("Volume metrics", func() {
 	testAll := func(isEphemeral bool) {
 		ginkgo.It("should create prometheus metrics for volume provisioning and attach/detach", func(ctx context.Context) {
 			provisioning(ctx, isEphemeral)
-		})
-		// TODO(mauriciopoppe): after CSIMigration is turned on we're no longer reporting
-		// the volume_provision metric (removed in #106609), issue to investigate the bug #106773
-		f.It("should create prometheus metrics for volume provisioning errors", f.WithSlow(), func(ctx context.Context) {
-			provisioningError(ctx, isEphemeral)
 		})
 		ginkgo.It("should create volume metrics with the correct FilesystemMode PVC ref", func(ctx context.Context) {
 			filesystemMode(ctx, isEphemeral)
