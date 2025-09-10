@@ -252,15 +252,14 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 		framework.Failf("Failed to start port-forward command: %v", err)
 	}
 
-	var buf []byte
-
 	framework.Logf("reading from `kubectl port-forward` command's stdout")
-	if buf, err = io.ReadAll(portOutput); err != nil {
+	buf := make([]byte, 128)
+	var n int
+	if n, err = portOutput.Read(buf); err != nil {
 		framework.Failf("Failed to read from kubectl port-forward stdout: %v", err)
 	}
-	framework.Logf("stdout: %s", string(buf))
 
-	portForwardOutput := string(buf)
+	portForwardOutput := string(buf[:n])
 	match := portForwardRegexp.FindStringSubmatch(portForwardOutput)
 	if len(match) != 3 {
 		framework.Failf("Failed to parse kubectl port-forward output: %s", portForwardOutput)
@@ -272,11 +271,19 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 	}
 
 	go func() {
+		var buf []byte
+		if buf, err = io.ReadAll(portOutput); err != nil {
+			framework.Logf("Failed to read from kubectl port-forward stdout: %v", err)
+		}
+		framework.Logf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\nstdout: %s\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++", string(buf))
+
+	}()
+	go func() {
 		stderrBuf, stderrErr := io.ReadAll(portStderr)
 		if stderrErr != nil {
-			framework.Failf("Failed to read from kubectl port-forward stderr: %v", stderrErr)
+			framework.Logf("Failed to read from kubectl port-forward stderr: %v", stderrErr)
 		}
-		framework.Logf("stderr: %s", string(stderrBuf))
+		framework.Logf("------------------------------------------------------------\nstderr: %s\n------------------------------------------------------------", string(stderrBuf))
 	}()
 
 	return &portForwardCommand{
@@ -646,6 +653,7 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 
 			ginkgo.By("Running 'kubectl port-forward'")
 			cmd := runPortForward(f.Namespace.Name, pod.Name, 80)
+			// TODO: use ginkgo.DeferCleanup(cmd.Stop)
 			defer cmd.Stop()
 
 			ginkgo.By("Send a http request to verify port-forward working")
@@ -678,6 +686,12 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 
 			ginkgo.By("Send another http request through port-forward again")
 			resp, err = client.Get(fmt.Sprintf("http://127.0.0.1:%d/", cmd.port))
+			if err != nil {
+				body, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pod.Name, &v1.PodLogOptions{}).Do(ctx).Raw()
+				if err == nil {
+					framework.Logf("pod logs for webserver pods: %s", body)
+				}
+			}
 			framework.ExpectNoError(err, "couldn't get http response from port-forward")
 			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK), "unexpected status code")
 		})

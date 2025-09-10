@@ -311,10 +311,15 @@ func (noSuppressPanicError) Write(p []byte) (n int, err error) {
 
 // tryUpgrade returns true if the request was handled.
 func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Request) bool {
+	opTrace := utiltrace.New("UpgradeAwareHandler.tryUpgrade")
+	defer opTrace.Log()
+
 	if !httpstream.IsUpgradeRequest(req) {
 		klog.V(6).Infof("Request was not an upgrade")
 		return false
 	}
+
+	opTrace.Step("Detected upgrade request...")
 
 	var (
 		backendConn net.Conn
@@ -328,7 +333,11 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		location.Scheme = h.Location.Scheme
 		location.Host = h.Location.Host
 		if h.AppendLocationPath {
+			oldPath := location.Path
 			location.Path = singleJoiningSlash(h.Location.Path, location.Path)
+			opTrace.Step("Appended location path",
+				utiltrace.Field{Key: "old path", Value: oldPath},
+				utiltrace.Field{Key: "new path", Value: location.Path})
 		}
 	}
 
@@ -342,35 +351,57 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	}
 	clone.URL = &location
 	klog.V(6).Infof("UpgradeAwareProxy: dialing for SPDY upgrade with headers: %v", clone.Header)
+
+	opTrace.Step("Dialing for SPDY upgrade",
+		utiltrace.Field{Key: "Headers", Value: clone.Header},
+		utiltrace.Field{Key: "Host", Value: clone.Host})
+
 	backendConn, err = h.DialForUpgrade(clone)
 	if err != nil {
 		klog.V(6).Infof("Proxy connection error: %v", err)
 		h.Responder.Error(w, req, err)
 		return true
 	}
-	defer backendConn.Close()
+	defer func(opTrace *utiltrace.Trace) {
+		opTrace.Step("Closing connection to backend proxy")
+		backendConn.Close()
+	}(opTrace)
+
+	opTrace.Step("Reading HTTP response from proxy backend")
 
 	// determine the http response code from the backend by reading from rawResponse+backendConn
-	backendHTTPResponse, headerBytes, err := getResponse(io.MultiReader(bytes.NewReader(rawResponse), backendConn))
+
+	// the request here is the one given to ServeHTTP, so it's the client's request.
+	// the DialForUpgrade(req) is just proxying through the client request to
+	// whatever target server is in the other end of the port-forward. What backend that is
+	// depends on who is running this code (?)... could be apiserver, or kubelet
+
+	rawResponseReader := bytes.NewReader(rawResponse)
+	multiReader := io.MultiReader(rawResponseReader, backendConn)
+	backendHTTPResponse, headerBytes, err := getResponse(multiReader)
 	if err != nil {
 		klog.V(6).Infof("Proxy connection error: %v", err)
 		h.Responder.Error(w, req, err)
 		return true
 	}
 	if len(headerBytes) > len(rawResponse) {
-		// we read beyond the bytes stored in rawResponse, update rawResponse to the full set of bytes read from the backend
+		// we read beyond the bytes stored in rawResponse, update rawResponse to the full
+		// set of bytes read from the backend
 		rawResponse = headerBytes
 	}
 
-	// If the backend did not upgrade the request, return an error to the client. If the response was
-	// an error, the error is forwarded directly after the connection is hijacked. Otherwise, just
-	// return a generic error here.
+	// If the backend did not upgrade the request, return an error to the client.
+	// If the response was an error, the error is forwarded directly after the connection
+	// is hijacked. Otherwise, just return a generic error here.
 	if backendHTTPResponse.StatusCode != http.StatusSwitchingProtocols && backendHTTPResponse.StatusCode < 400 {
-		err := fmt.Errorf("invalid upgrade response: status code %d", backendHTTPResponse.StatusCode)
+		err := fmt.Errorf("invalid upgrade response: status code %d",
+			backendHTTPResponse.StatusCode)
 		klog.Errorf("Proxy upgrade error: %v", err)
 		h.Responder.Error(w, req, err)
 		return true
 	}
+
+	opTrace.Step("Hijacking the connection")
 
 	// Once the connection is hijacked, the ErrorResponder will no longer work, so
 	// hijacking should be the last step in the upgrade.
@@ -380,34 +411,46 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		h.Responder.Error(w, req, fmt.Errorf("request connection cannot be hijacked: %T", w))
 		return true
 	}
-	requestHijackedConn, _, err := requestHijacker.Hijack()
+	hijackedClientConn, _, err := requestHijacker.Hijack()
 	if err != nil {
 		klog.Errorf("Unable to hijack response: %v", err)
 		h.Responder.Error(w, req, fmt.Errorf("error hijacking connection: %v", err))
 		return true
 	}
-	defer requestHijackedConn.Close()
+	defer hijackedClientConn.Close()
 
 	if backendHTTPResponse.StatusCode != http.StatusSwitchingProtocols {
 		// If the backend did not upgrade the request, echo the response from the backend to the client and return, closing the connection.
 		klog.V(6).Infof("Proxy upgrade error, status code %d", backendHTTPResponse.StatusCode)
+		opTrace.Step("backend did not upgrade the request, writing back to client and bailing")
 		// set read/write deadlines
 		deadline := time.Now().Add(10 * time.Second)
 		backendConn.SetReadDeadline(deadline)
-		requestHijackedConn.SetWriteDeadline(deadline)
+		hijackedClientConn.SetWriteDeadline(deadline)
 		// write the response to the client
-		err := backendHTTPResponse.Write(requestHijackedConn)
+		err := backendHTTPResponse.Write(hijackedClientConn)
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			klog.Errorf("Error proxying data from backend to client: %v", err)
 		}
+		if err != nil {
+			opTrace.Step("got error writing response to client",
+				utiltrace.Field{Key: "error", Value: err.Error()},
+			)
+		}
 		// Indicate we handled the request
+		opTrace.Step("backend didn't upgrade the request, bailing...",
+			utiltrace.Field{Key: "backend status code", Value: backendHTTPResponse.StatusCode},
+		)
 		return true
 	}
 
 	// Forward raw response bytes back to client.
 	if len(rawResponse) > 0 {
+		opTrace.Step("Writing bytes to client (hijacked) connection",
+			utiltrace.Field{Key: "rawResponse", Value: string(rawResponse)},
+		)
 		klog.V(6).Infof("Writing %d bytes to hijacked connection", len(rawResponse))
-		if _, err = requestHijackedConn.Write(rawResponse); err != nil {
+		if _, err = hijackedClientConn.Write(rawResponse); err != nil {
 			utilruntime.HandleError(fmt.Errorf("Error proxying response from backend to client: %v", err))
 		}
 	}
@@ -416,44 +459,68 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	// to copy in each direction. Once one side of the connection exits, we
 	// exit the function which performs cleanup and in the process closes
 	// the other half of the connection in the defer.
-	writerComplete := make(chan struct{})
-	readerComplete := make(chan struct{})
+	backendWriterComplete := make(chan struct{})
+	backendReaderComplete := make(chan struct{})
 
 	go func() {
-		var writer io.WriteCloser
+		var backendWriter io.WriteCloser
+		opTrace.Step("Sending from client to backend...")
 		if h.MaxBytesPerSec > 0 {
-			writer = flowrate.NewWriter(backendConn, h.MaxBytesPerSec)
+			backendWriter = flowrate.NewWriter(backendConn, h.MaxBytesPerSec)
+			opTrace.Step("Rating the write to",
+				utiltrace.Field{Key: "h.MaxBytesPerSec", Value: h.MaxBytesPerSec},
+			)
 		} else {
-			writer = backendConn
+			backendWriter = backendConn
+			opTrace.Step("Using non-rated backendWriter")
 		}
-		_, err := io.Copy(writer, requestHijackedConn)
+		_, err := io.Copy(backendWriter, hijackedClientConn)
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			klog.Errorf("Error proxying data from client to backend: %v", err)
 		}
-		close(writerComplete)
+		if err != nil {
+			opTrace.Step("Got error writing to backend",
+				utiltrace.Field{Key: "error", Value: err.Error()},
+			)
+		}
+		close(backendWriterComplete)
 	}()
 
 	go func() {
-		var reader io.ReadCloser
+		var backendReader io.ReadCloser
+		opTrace.Step("Reading from backend...")
 		if h.MaxBytesPerSec > 0 {
-			reader = flowrate.NewReader(backendConn, h.MaxBytesPerSec)
+			backendReader = flowrate.NewReader(backendConn, h.MaxBytesPerSec)
+			opTrace.Step("Rating the read to",
+				utiltrace.Field{Key: "h.MaxBytesPerSec", Value: h.MaxBytesPerSec},
+			)
 		} else {
-			reader = backendConn
+			backendReader = backendConn
+			opTrace.Step("Using non-rated backendReader")
 		}
-		_, err := io.Copy(requestHijackedConn, reader)
+		_, err := io.Copy(hijackedClientConn, backendReader)
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			klog.Errorf("Error proxying data from backend to client: %v", err)
 		}
-		close(readerComplete)
+		if err != nil {
+			opTrace.Step("Got error writing to backend",
+				utiltrace.Field{Key: "error", Value: err.Error()},
+			)
+		}
+		close(backendReaderComplete)
 	}()
 
 	// Wait for one half the connection to exit. Once it does the defer will
 	// clean up the other half of the connection.
 	select {
-	case <-writerComplete:
-	case <-readerComplete:
+	case <-backendWriterComplete:
+	case <-backendReaderComplete:
 	}
 	klog.V(6).Infof("Disconnecting from backend proxy %s\n  Headers: %v", &location, clone.Header)
+	opTrace.Step("Disconnecting from backend proxy",
+		utiltrace.Field{Key: "location", Value: &location},
+		utiltrace.Field{Key: "headers", Value: clone.Header},
+	)
 
 	return true
 }
@@ -483,7 +550,7 @@ func (h *UpgradeAwareHandler) DialForUpgrade(req *http.Request) (net.Conn, error
 	return dial(updatedReq, h.UpgradeTransport)
 }
 
-// getResponseCode reads a http response from the given reader, returns the response,
+// getResponse reads an http response from the given reader, returns the response,
 // the bytes read from the reader, and any error encountered
 func getResponse(r io.Reader) (*http.Response, []byte, error) {
 	rawResponse := bytes.NewBuffer(make([]byte, 0, 256))
