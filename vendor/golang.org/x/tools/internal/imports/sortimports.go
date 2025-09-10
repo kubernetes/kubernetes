@@ -11,6 +11,7 @@ import (
 	"go/ast"
 	"go/token"
 	"log"
+	"slices"
 	"sort"
 	"strconv"
 )
@@ -30,7 +31,7 @@ func sortImports(localPrefix string, tokFile *token.File, f *ast.File) {
 
 		if len(d.Specs) == 0 {
 			// Empty import block, remove it.
-			f.Decls = append(f.Decls[:i], f.Decls[i+1:]...)
+			f.Decls = slices.Delete(f.Decls, i, i+1)
 		}
 
 		if !d.Lparen.IsValid() {
@@ -91,7 +92,7 @@ func mergeImports(f *ast.File) {
 			spec.(*ast.ImportSpec).Path.ValuePos = first.Pos()
 			first.Specs = append(first.Specs, spec)
 		}
-		f.Decls = append(f.Decls[:i], f.Decls[i+1:]...)
+		f.Decls = slices.Delete(f.Decls, i, i+1)
 		i--
 	}
 }

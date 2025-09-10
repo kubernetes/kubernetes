@@ -1,3 +1,4 @@
+// Package md2man aims in converting markdown into roff (man pages).
 package md2man
 
 import (

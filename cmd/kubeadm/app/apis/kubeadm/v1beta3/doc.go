@@ -35,7 +35,7 @@ limitations under the License.
 //   - Add "InitConfiguration.SkipPhases", "JoinConfiguration.SkipPhases" to allow skipping
 //     a list of phases during kubeadm init/join command execution.
 //   - Add "InitConfiguration.NodeRegistration.ImagePullPolicy" and "JoinConfiguration.NodeRegistration.ImagePullPolicy"
-//     to allow specifying the images pull policy during kubeadm "init" and "join". The value must be one of "Always", "Never" or
+//     to allow specifying the images pull policy during kubeadm "init" and "join". The value must be one of "Always", "Never", "IfNewerNotPresent" or
 //     "IfNotPresent". "IfNotPresent" is the default, which has been the existing behavior prior to this addition.
 //   - Add "InitConfiguration.Patches.Directory", "JoinConfiguration.Patches.Directory" to allow
 //     the user to configure a directory from which to take patches for components deployed by kubeadm.

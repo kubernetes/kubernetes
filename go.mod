@@ -22,7 +22,7 @@ require (
 	github.com/coredns/corefile-migration v1.0.27
 	github.com/coreos/go-oidc v2.3.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/cpuguy83/go-md2man/v2 v2.0.6
+	github.com/cpuguy83/go-md2man/v2 v2.0.7
 	github.com/cyphar/filepath-securejoin v0.4.1
 	github.com/distribution/reference v0.6.0
 	github.com/docker/go-units v0.5.0
@@ -159,6 +159,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
+	github.com/google/go-containerregistry v0.20.6 // indirect
 	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect

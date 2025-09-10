@@ -29,7 +29,7 @@ import (
 	v10 "k8s.io/api/core/v1"
 	types0 "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/cri-api/pkg/apis/runtime/v1"
+	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -558,6 +558,40 @@ func (_c *MockRuntime_GetContainerSwapBehavior_Call) RunAndReturn(run func(pod *
 	_c.Call.Return(run)
 	return _c
 }
+
+// GetRemoteImageRef provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) GetRemoteImageRef(ctx context.Context, imageRef string, pullSecrets []v10.Secret) (string, error) {
+	ret := _mock.Called(ctx, imageRef, pullSecrets)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRemoteImageRef")
+	}
+
+	var r0 string
+	var r1 error
+
+	// Check if the first return is a function
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []v10.Secret) (string, error)); ok {
+		return returnFunc(ctx, imageRef, pullSecrets)
+	}
+
+	// If not, assign manually
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []v10.Secret) string); ok {
+		r0 = returnFunc(ctx, imageRef, pullSecrets)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	// Check second return
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, []v10.Secret) error); ok {
+		r1 = returnFunc(ctx, imageRef, pullSecrets)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 
 // GetImageRef provides a mock function for the type MockRuntime
 func (_mock *MockRuntime) GetImageRef(ctx context.Context, image container.ImageSpec) (string, error) {
