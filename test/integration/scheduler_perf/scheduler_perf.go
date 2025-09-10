@@ -672,6 +672,8 @@ type createPodsOp struct {
 	// the namespace, so use different namespaces for pods that
 	// are supposed to be kept running.
 	SteadyState bool
+	// Template parameter for SteadyState.
+	SteadyStateParam string
 	// How long to keep the cluster in a steady state.
 	Duration metav1.Duration
 	// Template parameter for Duration.
@@ -711,6 +713,9 @@ func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 	if cpo.SkipWaitToCompletion && cpo.SteadyState {
 		return errors.New("skipWaitToCompletion and steadyState cannot be true at the same time")
 	}
+	if cpo.SteadyState && !allowParameterization && cpo.Duration.Duration <= 0 {
+		return errors.New("when creating pods in a steady state, the test duration must be > 0")
+	}
 	return nil
 }
 
@@ -733,6 +738,13 @@ func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
 		}
 		if cpo.Duration.Duration, err = time.ParseDuration(durationStr); err != nil {
 			return nil, fmt.Errorf("parsing duration parameter %s: %w", cpo.DurationParam, err)
+		}
+	}
+	if cpo.SteadyStateParam != "" {
+		var err error
+		cpo.SteadyState, err = getParam[bool](w.Params, cpo.SteadyStateParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cpo, (&cpo).isValid(false)
@@ -2103,6 +2115,23 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 		select {
 		case <-tCtx.Done():
 			tCtx.Logf("Completed after seeing %d scheduled pod: %v", countScheduledPods, context.Cause(tCtx))
+
+			// Sanity check: at least one pod should have been scheduled,
+			// giving us a non-zero average.
+			//
+			// This is important because otherwise "no pods scheduled because of constant
+			// failure" would not get detected in unit tests. For benchmarks
+			// it's less important, but indicates that the time period
+			// might have been too small.
+			//
+			// The collector logs "Failed to measure SchedulingThroughput ... Increase pods and/or nodes to make scheduling take longer"
+			// but that is hard to spot.
+			//
+			// The non-steady case blocks until all pods have been scheduled
+			// and doesn't need this check.
+			if countScheduledPods == 0 {
+				return errors.New("no pod at all got scheduled, either because of a problem or because the test interval was too small")
+			}
 			return nil
 		case <-scheduledPods:
 			countScheduledPods++
