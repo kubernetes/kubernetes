@@ -480,6 +480,30 @@ func TestCollectContainerLevelResources(t *testing.T) {
 			expectedLim:        getResourceList("500m", "512Mi"),
 			expectedGuaranteed: true,
 		},
+		{
+			name: "non-QoS resources (hugepages) not considered; CPU+Mem limits exist -> Guaranteed",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						newContainer(
+							"c1",
+							addResource("hugepages-2Mi", "4Mi", getResourceList("250m", "256Mi")),
+							addResource("hugepages-2Mi", "4Mi", getResourceList("500m", "512Mi")),
+						),
+						newContainer(
+							"c2",
+							addResource("hugepages-1Gi", "2Gi", getResourceList("250m", "256Mi")),
+							addResource("hugepages-1Gi", "2Gi", getResourceList("500m", "512Mi")),
+						),
+					},
+				},
+			},
+			// requests sum: CPU 250m+250m=500m, Mem 256Mi+256Mi=512Mi
+			expectedReq: getResourceList("500m", "512Mi"),
+			// limits sum: CPU 500m+500m=1000m, Mem 512Mi+512Mi=1024Mi
+			expectedLim:        getResourceList("1000m", "1024Mi"),
+			expectedGuaranteed: true,
+		},
 	}
 
 	for _, tc := range tests {
