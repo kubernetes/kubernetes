@@ -6,12 +6,10 @@ package modindex
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/csv"
-	"errors"
 	"fmt"
-	"hash/crc64"
 	"io"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,7 +20,7 @@ import (
 )
 
 /*
-The on-disk index is a text file.
+The on-disk index ("payload") is a text file.
 The first 3 lines are header information containing CurrentVersion,
 the value of GOMODCACHE, and the validity date of the index.
 (This is when the code started building the index.)
@@ -68,34 +66,45 @@ whose types are []byte and interface{}.
 // CurrentVersion tells readers about the format of the index.
 const CurrentVersion int = 0
 
-// Index is returned by ReadIndex().
+// Index is returned by [Read].
 type Index struct {
-	Version  int
-	Cachedir Abspath   // The directory containing the module cache
-	Changed  time.Time // The index is up to date as of Changed
-	Entries  []Entry
+	Version    int
+	GOMODCACHE string    // absolute path of Go module cache dir
+	ValidAt    time.Time // moment at which the index was up to date
+	Entries    []Entry
+}
+
+func (ix *Index) String() string {
+	return fmt.Sprintf("Index(%s v%d has %d entries at %v)",
+		ix.GOMODCACHE, ix.Version, len(ix.Entries), ix.ValidAt)
 }
 
 // An Entry contains information for an import path.
 type Entry struct {
-	Dir        Relpath // directory in modcache
+	Dir        string // package directory relative to GOMODCACHE; uses OS path separator
 	ImportPath string
 	PkgName    string
 	Version    string
-	//ModTime    STime    // is this useful?
-	Names []string // exported names and information
+	Names      []string // exported names and information
 }
 
 // IndexDir is where the module index is stored.
-var IndexDir string
-
-// Set IndexDir
-func init() {
+// Each logical index entry consists of a pair of files:
+//
+//   - the "payload" (index-VERSION-XXX), whose name is
+//     randomized, holds the actual index; and
+//   - the "link" (index-name-VERSION-HASH),
+//     whose name is predictable, contains the
+//     name of the payload file.
+//
+// Since the link file is small (<512B),
+// reads and writes to it may be assumed atomic.
+var IndexDir string = func() string {
 	var dir string
-	var err error
 	if testing.Testing() {
 		dir = os.TempDir()
 	} else {
+		var err error
 		dir, err = os.UserCacheDir()
 		// shouldn't happen, but TempDir is better than
 		// creating ./go/imports
@@ -103,81 +112,83 @@ func init() {
 			dir = os.TempDir()
 		}
 	}
-	dir = filepath.Join(dir, "go", "imports")
-	os.MkdirAll(dir, 0777)
-	IndexDir = dir
+	dir = filepath.Join(dir, "goimports")
+	if err := os.MkdirAll(dir, 0777); err != nil {
+		log.Printf("failed to create modcache index dir: %v", err)
+	}
+	return dir
+}()
+
+// Read reads the latest version of the on-disk index
+// for the specified Go module cache directory.
+// If there is no index, it returns a nil Index and an fs.ErrNotExist error.
+func Read(gomodcache string) (*Index, error) {
+	gomodcache, err := filepath.Abs(gomodcache)
+	if err != nil {
+		return nil, err
+	}
+
+	// Read the "link" file for the specified gomodcache directory.
+	// It names the payload file.
+	content, err := os.ReadFile(filepath.Join(IndexDir, linkFileBasename(gomodcache)))
+	if err != nil {
+		return nil, err
+	}
+	payloadFile := filepath.Join(IndexDir, string(content))
+
+	// Read the index out of the payload file.
+	f, err := os.Open(payloadFile)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return readIndexFrom(gomodcache, bufio.NewReader(f))
 }
 
-// ReadIndex reads the latest version of the on-disk index
-// for the cache directory cd.
-// It returns (nil, nil) if there is no index, but returns
-// a non-nil error if the index exists but could not be read.
-func ReadIndex(cachedir string) (*Index, error) {
-	cachedir, err := filepath.Abs(cachedir)
-	if err != nil {
-		return nil, err
-	}
-	cd := Abspath(cachedir)
-	dir := IndexDir
-	base := indexNameBase(cd)
-	iname := filepath.Join(dir, base)
-	buf, err := os.ReadFile(iname)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("cannot read %s: %w", iname, err)
-	}
-	fname := filepath.Join(dir, string(buf))
-	fd, err := os.Open(fname)
-	if err != nil {
-		return nil, err
-	}
-	defer fd.Close()
-	r := bufio.NewReader(fd)
-	ix, err := readIndexFrom(cd, r)
-	if err != nil {
-		return nil, err
-	}
-	return ix, nil
-}
+func readIndexFrom(gomodcache string, r io.Reader) (*Index, error) {
+	scan := bufio.NewScanner(r)
 
-func readIndexFrom(cd Abspath, bx io.Reader) (*Index, error) {
-	b := bufio.NewScanner(bx)
-	var ans Index
-	// header
-	ok := b.Scan()
-	if !ok {
-		return nil, fmt.Errorf("unexpected scan error")
+	// version
+	if !scan.Scan() {
+		return nil, fmt.Errorf("unexpected scan error: %v", scan.Err())
 	}
-	l := b.Text()
-	var err error
-	ans.Version, err = strconv.Atoi(l)
+	version, err := strconv.Atoi(scan.Text())
 	if err != nil {
 		return nil, err
 	}
-	if ans.Version != CurrentVersion {
-		return nil, fmt.Errorf("got version %d, expected %d", ans.Version, CurrentVersion)
+	if version != CurrentVersion {
+		return nil, fmt.Errorf("got version %d, expected %d", version, CurrentVersion)
 	}
-	if ok := b.Scan(); !ok {
-		return nil, fmt.Errorf("scanner error reading cachedir")
+
+	// gomodcache
+	if !scan.Scan() {
+		return nil, fmt.Errorf("scanner error reading module cache dir: %v", scan.Err())
 	}
-	ans.Cachedir = Abspath(b.Text())
-	if ok := b.Scan(); !ok {
-		return nil, fmt.Errorf("scanner error reading index creation time")
-	}
-	// TODO(pjw): need to check that this is the expected cachedir
+	// TODO(pjw): need to check that this is the expected cache dir
 	// so the tag should be passed in to this function
-	ans.Changed, err = time.ParseInLocation(time.DateTime, b.Text(), time.Local)
+	if dir := string(scan.Text()); dir != gomodcache {
+		return nil, fmt.Errorf("index file GOMODCACHE mismatch: got %q, want %q", dir, gomodcache)
+	}
+
+	// changed
+	if !scan.Scan() {
+		return nil, fmt.Errorf("scanner error reading index creation time: %v", scan.Err())
+	}
+	changed, err := time.ParseInLocation(time.DateTime, scan.Text(), time.Local)
 	if err != nil {
 		return nil, err
 	}
-	var curEntry *Entry
-	for b.Scan() {
-		v := b.Text()
+
+	// entries
+	var (
+		curEntry *Entry
+		entries  []Entry
+	)
+	for scan.Scan() {
+		v := scan.Text()
 		if v[0] == ':' {
 			if curEntry != nil {
-				ans.Entries = append(ans.Entries, *curEntry)
+				entries = append(entries, *curEntry)
 			}
 			// as directories may contain commas and quotes, they need to be read as csv.
 			rdr := strings.NewReader(v[1:])
@@ -189,49 +200,56 @@ func readIndexFrom(cd Abspath, bx io.Reader) (*Index, error) {
 			if len(flds) != 4 {
 				return nil, fmt.Errorf("header contains %d fields, not 4: %q", len(v), v)
 			}
-			curEntry = &Entry{PkgName: flds[0], ImportPath: flds[1], Dir: toRelpath(cd, flds[2]), Version: flds[3]}
+			curEntry = &Entry{
+				PkgName:    flds[0],
+				ImportPath: flds[1],
+				Dir:        relative(gomodcache, flds[2]),
+				Version:    flds[3],
+			}
 			continue
 		}
 		curEntry.Names = append(curEntry.Names, v)
 	}
+	if err := scan.Err(); err != nil {
+		return nil, fmt.Errorf("scanner failed while reading modindex entry: %v", err)
+	}
 	if curEntry != nil {
-		ans.Entries = append(ans.Entries, *curEntry)
+		entries = append(entries, *curEntry)
 	}
-	if err := b.Err(); err != nil {
-		return nil, fmt.Errorf("scanner failed %v", err)
-	}
-	return &ans, nil
+
+	return &Index{
+		Version:    version,
+		GOMODCACHE: gomodcache,
+		ValidAt:    changed,
+		Entries:    entries,
+	}, nil
 }
 
-// write the index as a text file
-func writeIndex(cachedir Abspath, ix *Index) error {
-	ipat := fmt.Sprintf("index-%d-*", CurrentVersion)
-	fd, err := os.CreateTemp(IndexDir, ipat)
+// write writes the index file and updates the index directory to refer to it.
+func write(gomodcache string, ix *Index) error {
+	// Write the index into a payload file with a fresh name.
+	f, err := os.CreateTemp(IndexDir, fmt.Sprintf("index-%d-*", CurrentVersion))
 	if err != nil {
-		return err // can this happen?
+		return err // e.g. disk full, or index dir deleted
 	}
-	defer fd.Close()
-	if err := writeIndexToFile(ix, fd); err != nil {
+	if err := writeIndexToFile(ix, bufio.NewWriter(f)); err != nil {
+		_ = f.Close() // ignore error
 		return err
 	}
-	content := fd.Name()
-	content = filepath.Base(content)
-	base := indexNameBase(cachedir)
-	nm := filepath.Join(IndexDir, base)
-	err = os.WriteFile(nm, []byte(content), 0666)
-	if err != nil {
+	if err := f.Close(); err != nil {
 		return err
 	}
-	return nil
+
+	// Write the name of the payload file into a link file.
+	indexDirFile := filepath.Join(IndexDir, linkFileBasename(gomodcache))
+	content := []byte(filepath.Base(f.Name()))
+	return os.WriteFile(indexDirFile, content, 0666)
 }
 
-func writeIndexToFile(x *Index, fd *os.File) error {
-	cnt := 0
-	w := bufio.NewWriter(fd)
+func writeIndexToFile(x *Index, w *bufio.Writer) error {
 	fmt.Fprintf(w, "%d\n", x.Version)
-	fmt.Fprintf(w, "%s\n", x.Cachedir)
-	// round the time down
-	tm := x.Changed.Add(-time.Second / 2)
+	fmt.Fprintf(w, "%s\n", x.GOMODCACHE)
+	tm := x.ValidAt.Truncate(time.Second) // round the time down
 	fmt.Fprintf(w, "%s\n", tm.Format(time.DateTime))
 	for _, e := range x.Entries {
 		if e.ImportPath == "" {
@@ -239,7 +257,6 @@ func writeIndexToFile(x *Index, fd *os.File) error {
 		}
 		// PJW: maybe always write these headers as csv?
 		if strings.ContainsAny(string(e.Dir), ",\"") {
-			log.Printf("DIR: %s", e.Dir)
 			cw := csv.NewWriter(w)
 			cw.Write([]string{":" + e.PkgName, e.ImportPath, string(e.Dir), e.Version})
 			cw.Flush()
@@ -248,19 +265,23 @@ func writeIndexToFile(x *Index, fd *os.File) error {
 		}
 		for _, x := range e.Names {
 			fmt.Fprintf(w, "%s\n", x)
-			cnt++
 		}
 	}
-	if err := w.Flush(); err != nil {
-		return err
-	}
-	return nil
+	return w.Flush()
 }
 
-// return the base name of the file containing the name of the current index
-func indexNameBase(cachedir Abspath) string {
-	// crc64 is a way to convert path names into 16 hex digits.
-	h := crc64.Checksum([]byte(cachedir), crc64.MakeTable(crc64.ECMA))
-	fname := fmt.Sprintf("index-name-%d-%016x", CurrentVersion, h)
-	return fname
+// linkFileBasename returns the base name of the link file in the
+// index directory that holds the name of the payload file for the
+// specified (absolute) Go module cache dir.
+func linkFileBasename(gomodcache string) string {
+	// Note: coupled to logic in ./gomodindex/cmd.go. TODO: factor.
+	h := sha256.Sum256([]byte(gomodcache)) // collision-resistant hash
+	return fmt.Sprintf("index-name-%d-%032x", CurrentVersion, h)
+}
+
+func relative(base, file string) string {
+	if rel, err := filepath.Rel(base, file); err == nil {
+		return rel
+	}
+	return file
 }
