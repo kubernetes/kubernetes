@@ -304,7 +304,7 @@ func (rq *Controller) Run(ctx context.Context, workers int) {
 		go rq.quotaMonitor.Run(ctx)
 	}
 
-	if !cache.WaitForNamedCacheSync("resource quota", ctx.Done(), rq.informerSyncedFuncs...) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, rq.informerSyncedFuncs...) {
 		return
 	}
 

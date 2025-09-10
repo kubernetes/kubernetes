@@ -169,7 +169,7 @@ func (ssc *StatefulSetController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting stateful set controller")
 	defer logger.Info("Shutting down statefulset controller")
 
-	if !cache.WaitForNamedCacheSync("stateful set", ctx.Done(), ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
 	}
 
