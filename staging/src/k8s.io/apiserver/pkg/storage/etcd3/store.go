@@ -850,9 +850,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		} else {
 			growSlice(v, 2048, len(getResp.Kvs))
 		}
-		if s.stats != nil {
-			s.stats.Update(getResp.Kvs)
-		}
 
 		// take items from the response until the bucket is full, filtering as we go
 		for i, kv := range getResp.Kvs {
@@ -911,12 +908,18 @@ func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, o
 	if recursive {
 		resp, err := s.client.Kubernetes.List(ctx, keyPrefix, options)
 		metrics.RecordEtcdRequest("list", s.groupResource, err, startTime)
+		if err != nil && len(resp.Kvs) > 0 && s.stats != nil {
+			s.stats.Update(resp.Kvs)
+		}
 		return resp, err
 	}
 	getResp, err := s.client.Kubernetes.Get(ctx, keyPrefix, kubernetes.GetOptions{
 		Revision: options.Revision,
 	})
 	metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
+	if err != nil && getResp.KV != nil && s.stats != nil {
+		s.stats.UpdateKey(getResp.KV)
+	}
 	var resp kubernetes.ListResponse
 	if getResp.KV != nil {
 		resp.Kvs = []*mvccpb.KeyValue{getResp.KV}
