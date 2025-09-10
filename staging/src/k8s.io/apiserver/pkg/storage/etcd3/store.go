@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"path"
 	"reflect"
 	"strconv"
@@ -764,8 +765,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	// loop until we have filled the requested limit from etcd or there are no more results
 	var lastKey []byte
-	var hasMore bool
-	var getResp kubernetes.ListResponse
+	var remainingItems int64
 	var numFetched int
 	var numEvald int
 	// Because these metrics are for understanding the costs of handling LIST requests,
@@ -775,20 +775,48 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		metrics.RecordStorageListMetrics(s.groupResource, numFetched, numEvald, numReturn)
 	}()
 
-	metricsOp := "get"
-	if opts.Recursive {
-		metricsOp = "list"
+	aggregator := s.listErrAggrFactory()
+
+	processKV := func(kv *mvccpb.KeyValue) error {
+		data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
+		if err != nil {
+			if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
+				return aggregator.Err()
+			}
+			return nil
+		}
+
+		// Check if the request has already timed out before decode object
+		select {
+		case <-ctx.Done():
+			// parent context is canceled or timed out, no point in continuing
+			return storage.NewTimeoutError(string(kv.Key), "request did not complete within requested timeout")
+		default:
+		}
+
+		obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
+		if err != nil {
+			recordDecodeError(s.groupResource, string(kv.Key))
+			if done := aggregator.Aggregate(string(kv.Key), err); done {
+				return aggregator.Err()
+			}
+			return nil
+		}
+
+		// being unable to set the version does not prevent the object from being extracted
+		if matched, err := opts.Predicate.Matches(obj); err == nil && matched {
+			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
+		}
+
+		numEvald++
+		return nil
 	}
 
-	aggregator := s.listErrAggrFactory()
-	for {
-		startTime := time.Now()
-		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
-			Revision: withRev,
-			Limit:    limit,
-			Continue: continueKey,
-		})
-		metrics.RecordEtcdRequest(metricsOp, s.groupResource, err, startTime)
+	for getResp, err := range s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
+		Revision: withRev,
+		Limit:    limit,
+		Continue: continueKey,
+	}) {
 		if err != nil {
 			if errors.Is(err, etcdrpc.ErrFutureRev) {
 				currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
@@ -800,92 +828,36 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			}
 			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 		}
-		numFetched += len(getResp.Kvs)
+		numFetched++
 		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
 			return err
-		}
-		hasMore = int64(len(getResp.Kvs)) < getResp.Count
-
-		if len(getResp.Kvs) == 0 && hasMore {
-			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 		// indicate to the client which resource version was returned, and use the same resource version for subsequent requests.
 		if withRev == 0 {
 			withRev = getResp.Revision
 		}
+		remainingItems = getResp.RemainingItems
+		if getResp.KV == nil {
+			break
+		}
+		kv := getResp.KV
+		lastKey = kv.Key
 
 		// avoid small allocations for the result slice, since this can be called in many
 		// different contexts and we don't know how significantly the result will be filtered
 		if opts.Predicate.Empty() {
-			growSlice(v, len(getResp.Kvs))
+			growSlice(v, int(min(limit, getResp.RemainingItems)))
 		} else {
-			growSlice(v, 2048, len(getResp.Kvs))
-		}
-		if s.stats != nil {
-			s.stats.Update(getResp.Kvs)
+			growSlice(v, 2048, int(min(limit, getResp.RemainingItems)))
 		}
 
-		// take items from the response until the bucket is full, filtering as we go
-		for i, kv := range getResp.Kvs {
-			if paging && int64(v.Len()) >= opts.Predicate.Limit {
-				hasMore = true
-				break
-			}
-			lastKey = kv.Key
-
-			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
-			if err != nil {
-				if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
-					return aggregator.Err()
-				}
-				continue
-			}
-
-			// Check if the request has already timed out before decode object
-			select {
-			case <-ctx.Done():
-				// parent context is canceled or timed out, no point in continuing
-				return storage.NewTimeoutError(string(kv.Key), "request did not complete within requested timeout")
-			default:
-			}
-
-			obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
-			if err != nil {
-				recordDecodeError(s.groupResource, string(kv.Key))
-				if done := aggregator.Aggregate(string(kv.Key), err); done {
-					return aggregator.Err()
-				}
-				continue
-			}
-
-			// being unable to set the version does not prevent the object from being extracted
-			if matched, err := opts.Predicate.Matches(obj); err == nil && matched {
-				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
-			}
-
-			numEvald++
-
-			// free kv early. Long lists can take O(seconds) to decode.
-			getResp.Kvs[i] = nil
+		if err := processKV(kv); err != nil {
+			return err
 		}
-		continueKey = string(lastKey) + "\x00"
 
-		// no more results remain or we didn't request paging
-		if !hasMore || !paging {
-			break
-		}
 		// we're paging but we have filled our bucket
-		if int64(v.Len()) >= opts.Predicate.Limit {
+		if paging && int64(v.Len()) >= opts.Predicate.Limit {
 			break
-		}
-
-		if limit < maxLimit {
-			// We got incomplete result due to field/label selector dropping the object.
-			// Double page size to reduce total number of calls to etcd.
-			limit *= 2
-			if limit > maxLimit {
-				limit = maxLimit
-			}
 		}
 	}
 
@@ -898,31 +870,85 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
 	}
 
-	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, getResp.Count, hasMore, opts)
+	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, remainingItems+int64(v.Len()), remainingItems > 0, opts)
 	if err != nil {
 		return err
 	}
 	return s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount)
 }
 
-func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (kubernetes.ListResponse, error) {
-	if recursive {
-		return s.client.Kubernetes.List(ctx, keyPrefix, options)
+type IterativeListResponse struct {
+	kubernetes.GetResponse
+	RemainingItems int64
+}
+
+func (s *store) list(ctx context.Context, keyPrefix string, options kubernetes.ListOptions) iter.Seq2[IterativeListResponse, error] {
+	return func(yield func(IterativeListResponse, error) bool) {
+		for {
+			startTime := time.Now()
+			listResp, err := s.client.Kubernetes.List(ctx, keyPrefix, options)
+			metrics.RecordEtcdRequest("list", s.groupResource, err, startTime)
+			var resp IterativeListResponse
+			resp.Revision = listResp.Revision
+			resp.RemainingItems = listResp.Count
+			if err != nil || len(listResp.Kvs) == 0 {
+				yield(resp, err)
+				return
+			}
+			if s.stats != nil {
+				s.stats.Update(listResp.Kvs)
+			}
+			var lastKey []byte
+			for i, kv := range listResp.Kvs {
+				resp.KV = kv
+				resp.RemainingItems--
+				if !yield(resp, nil) {
+					return
+				}
+				lastKey = kv.Key
+				listResp.Kvs[i] = nil
+			}
+			if resp.RemainingItems <= 0 {
+				return
+			}
+			if len(listResp.Kvs) == 0 {
+				err = fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+				yield(resp, err)
+				return
+			}
+			if options.Revision == 0 {
+				options.Revision = listResp.Revision
+			}
+			// We got incomplete result due to field/label selector dropping the object.
+			// Double page size to reduce total number of calls to etcd.
+			options.Limit = min(options.Limit*2, maxLimit)
+			options.Continue = string(lastKey) + "\x00"
+		}
 	}
-	getResp, err := s.client.Kubernetes.Get(ctx, keyPrefix, kubernetes.GetOptions{
+}
+
+func (s *store) get(ctx context.Context, keyPrefix string, options kubernetes.GetOptions) iter.Seq2[IterativeListResponse, error] {
+	return func(yield func(IterativeListResponse, error) bool) {
+		startTime := time.Now()
+		getResp, err := s.client.Kubernetes.Get(ctx, keyPrefix, options)
+		metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
+		if getResp.KV != nil && s.stats != nil {
+			s.stats.UpdateKey(getResp.KV)
+		}
+		resp := IterativeListResponse{
+			GetResponse: getResp,
+		}
+		yield(resp, err)
+	}
+}
+
+func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) iter.Seq2[IterativeListResponse, error] {
+	if recursive {
+		return s.list(ctx, keyPrefix, options)
+	}
+	return s.get(ctx, keyPrefix, kubernetes.GetOptions{
 		Revision: options.Revision,
 	})
-	var resp kubernetes.ListResponse
-	if getResp.KV != nil {
-		resp.Kvs = []*mvccpb.KeyValue{getResp.KV}
-		resp.Count = 1
-		resp.Revision = getResp.Revision
-	} else {
-		resp.Kvs = []*mvccpb.KeyValue{}
-		resp.Count = 0
-		resp.Revision = getResp.Revision
-	}
-	return resp, err
 }
 
 // growSlice takes a slice value and grows its capacity up
