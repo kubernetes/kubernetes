@@ -138,10 +138,11 @@ func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryP
 // If "only_cpu_and_memory" GET param is true then only cpu and memory is returned in response.
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
 	ctx := request.Request.Context()
+	logger := klog.FromContext(ctx)
 	onlyCPUAndMemory := false
 	err := request.Request.ParseForm()
 	if err != nil {
-		handleError(response, "/stats/summary", fmt.Errorf("parse form failed: %w", err))
+		handleError(logger, response, "/stats/summary", fmt.Errorf("parse form failed: %w", err))
 		return
 	}
 	if onlyCluAndMemoryParam, found := request.Request.Form["only_cpu_and_memory"]; found &&
@@ -157,27 +158,27 @@ func (h *handler) handleSummary(request *restful.Request, response *restful.Resp
 		summary, err = h.summaryProvider.Get(ctx, forceStatsUpdate)
 	}
 	if err != nil {
-		handleError(response, "/stats/summary", err)
+		handleError(logger, response, "/stats/summary", err)
 	} else {
-		writeResponse(response, summary)
+		writeResponse(logger, response, summary)
 	}
 }
 
-func writeResponse(response *restful.Response, stats interface{}) {
+func writeResponse(logger klog.Logger, response *restful.Response, stats interface{}) {
 	if err := response.WriteAsJson(stats); err != nil {
-		klog.ErrorS(err, "Error writing response")
+		logger.Error(err, "Error writing response")
 	}
 }
 
 // handleError serializes an error object into an HTTP response.
 // request is provided for logging.
-func handleError(response *restful.Response, request string, err error) {
+func handleError(logger klog.Logger, response *restful.Response, request string, err error) {
 	switch err {
 	case kubecontainer.ErrContainerNotFound:
 		response.WriteError(http.StatusNotFound, err)
 	default:
 		msg := fmt.Sprintf("Internal Error: %v", err)
-		klog.ErrorS(err, "HTTP InternalServerError serving", "request", request)
+		logger.Error(err, "HTTP InternalServerError serving", "request", request)
 		response.WriteErrorString(http.StatusInternalServerError, msg)
 	}
 }
