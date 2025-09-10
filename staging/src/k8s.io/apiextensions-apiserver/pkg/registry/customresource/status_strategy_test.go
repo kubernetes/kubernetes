@@ -244,3 +244,74 @@ func TestStatusStrategyValidateUpdate(t *testing.T) {
 		}
 	}
 }
+
+const listTypeResourceSchemaForLegacyV1beta1 = `
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: foos.test
+spec:
+  group: test
+  names:
+    kind: Foo
+    listKind: FooList
+    plural: foos
+    singular: foo
+  scope: Cluster
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+`
+
+// TestStatusStrategyValidateUpdateForLegacyV1beta1 legacy test the crd with subresource and without .Schema.OpenAPIV3Schema,
+func TestStatusStrategyValidateUpdateForLegacyV1beta1(t *testing.T) {
+	crdV1 := &apiextensionsv1.CustomResourceDefinition{}
+	err := yaml.Unmarshal([]byte(listTypeResourceSchemaForLegacyV1beta1), &crdV1)
+	if err != nil {
+		t.Fatalf("unexpected decoding error: %v", err)
+	}
+	t.Logf("crd v1 details: %v", crdV1)
+	crd := &apiextensions.CustomResourceDefinition{}
+	if err = apiextensionsv1.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crdV1, crd, nil); err != nil {
+		t.Fatalf("unexpected convert error: %v", err)
+	}
+	t.Logf("crd details: %v", crd)
+
+	strategy := statusStrategy{}
+	kind := schema.GroupVersionKind{
+		Version: crd.Spec.Versions[0].Name,
+		Kind:    crd.Spec.Names.Kind,
+		Group:   crd.Spec.Group,
+	}
+	strategy.customResourceStrategy.validator.kind = kind
+	strategy.structuralSchema = nil
+
+	ctx := context.TODO()
+
+	tcs := []struct {
+		name    string
+		old     *unstructured.Unstructured
+		obj     *unstructured.Unstructured
+		isValid bool
+	}{
+		{
+			name:    "test the legacy v1beta1 version of crd without openAPIV3Schema",
+			old:     &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v1", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			obj:     &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v1", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{"phase": "ready"}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			isValid: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		errs := strategy.ValidateUpdate(ctx, tc.obj, tc.old)
+		if tc.isValid && len(errs) > 0 {
+			t.Errorf("%v: unexpected error: %v", tc.name, errs)
+		}
+		if !tc.isValid && len(errs) == 0 {
+			t.Errorf("%v: unexpected non-error", tc.name)
+		}
+	}
+}
