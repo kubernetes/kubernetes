@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -49,12 +50,13 @@ type fakeFlag[T supportedTypes] struct {
 }
 
 type testApplyOverride[T supportedTypes] struct {
-	name               string
-	nestedCmds         []fakeCmds[T]
-	args               []string
-	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
-	expectedFlags      []fakeFlag[T]
-	expectedErr        error
+	name                    string
+	nestedCmds              []fakeCmds[T]
+	args                    []string
+	getPreferencesFunc      func(kuberc string, errOut io.Writer) (*config.Preference, error)
+	expectedOriginalCommand []string
+	expectedFlags           []fakeFlag[T]
+	expectedErr             error
 }
 
 type testApplyAlias[T supportedTypes] struct {
@@ -915,8 +917,6 @@ func TestApplyOverride(t *testing.T) {
 			pref.getPreferencesFunc = test.getPreferencesFunc
 			errWriter := &bytes.Buffer{}
 
-			testKuberc, _ := getExplicitKuberc(test.args)
-			testPreference, _ := pref.getPreferencesFunc(testKuberc, errWriter)
 			_, err := pref.Apply(rootCmd, test.args, errWriter)
 			if test.expectedErr == nil && err != nil {
 				t.Fatalf("unexpected error %v\n", err)
@@ -944,27 +944,17 @@ func TestApplyOverride(t *testing.T) {
 			}
 			// Verify annotation and the original command
 			var originalCommand string
-			if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok {
-				t.Fatalf("unable to find the KubeRCOriginalCommandAnnotation")
+			if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok || !strings.Contains(originalCommand, actualCmd.Name()) {
+				t.Fatalf("missing command '%s' in original command '%s'", originalCommand, actualCmd.Name())
 			}
-
-			// If an alias is detected, take its command
-			for _, alias := range testPreference.Aliases {
-				if actualCmd.Name() == alias.Name {
-					actualCmd, _, err = rootCmd.Find([]string{alias.Command})
-					if err != nil {
-						t.Fatalf("unexpected alias command found %s", actualCmd.Name())
-					}
-					break
-				}
-			}
-			require.Containsf(t, originalCommand, actualCmd.Name(), "missing command '%s' in original command '%s'", actualCmd.Name(), originalCommand)
 			for _, expectedFlag := range test.expectedFlags {
 				actualFlag := actualCmd.Flag(expectedFlag.name)
 				if actualFlag.Value.String() != expectedFlag.value {
 					t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
-				require.Containsf(t, originalCommand, expectedFlag.value, "missing flag '%s' in original command '%s'", expectedFlag.value, originalCommand)
+				if !strings.Contains(originalCommand, expectedFlag.value) {
+					t.Fatalf("missing flag '%s' in original command '%s'", expectedFlag.value, originalCommand)
+				}
 			}
 		})
 	}
@@ -1191,11 +1181,9 @@ func TestApplyOverrideBool(t *testing.T) {
 				t.Fatalf("unexpected error message %s\n", errWriter.String())
 			}
 			var originalCommand string
-			if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok {
-				t.Fatalf("unable to find the KubeRCOriginalCommandAnnotation")
+			if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok || !strings.Contains(originalCommand, actualCmd.Name()) {
+				t.Fatalf("missing command '%s' in original command '%s'", actualCmd.Name(), originalCommand)
 			}
-			require.Containsf(t, originalCommand, actualCmd.Name(), "missing command '%s' in original command '%s'", actualCmd.Name(), originalCommand)
-
 			for _, expectedFlag := range test.expectedFlags {
 				actualFlag := actualCmd.Flag(expectedFlag.name)
 				actualValue, err := strconv.ParseBool(actualFlag.Value.String())
@@ -1205,7 +1193,9 @@ func TestApplyOverrideBool(t *testing.T) {
 				if actualValue != expectedFlag.value {
 					t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
-				require.Containsf(t, originalCommand, actualFlag.Shorthand, "missing flag '%s' in original command '%s'", actualFlag.Name, originalCommand)
+				if !strings.Contains(originalCommand, actualFlag.Shorthand) {
+					t.Fatalf("missing flag '%s' in original command '%s'", actualFlag.Name, originalCommand)
+				}
 			}
 		})
 	}
@@ -1493,9 +1483,6 @@ func TestApplyAliasBool(t *testing.T) {
 				t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
 			}
 			var originalCommand string
-			if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok {
-				t.Fatalf("unable to find the KubeRCOriginalCommandAnnotation")
-			}
 			for _, expectedFlag := range test.expectedFlags {
 				actualFlag := actualCmd.Flag(expectedFlag.name)
 				actualValue, err := strconv.ParseBool(actualFlag.Value.String())
@@ -1505,7 +1492,9 @@ func TestApplyAliasBool(t *testing.T) {
 				if actualValue != expectedFlag.value {
 					t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
-				require.Containsf(t, originalCommand, expectedFlag.shorthand, "missing command '%s' in original command '%s'", expectedFlag.shorthand, originalCommand)
+				if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok || !strings.Contains(originalCommand, expectedFlag.shorthand) {
+					t.Fatalf("missing command '%s' in original command '%s'", expectedFlag.shorthand, originalCommand)
+				}
 			}
 
 			for _, expectedArg := range test.expectedArgs {
@@ -1519,7 +1508,9 @@ func TestApplyAliasBool(t *testing.T) {
 				if !found {
 					t.Fatalf("expected arg %s can not be found", expectedArg)
 				}
-				require.Containsf(t, originalCommand, expectedArg, "missing command '%s' in original command '%s'", expectedArg, originalCommand)
+				if !strings.Contains(originalCommand, expectedArg) {
+					t.Fatalf("missing command '%s' in original command '%s'", expectedArg, originalCommand)
+				}
 			}
 		})
 	}
@@ -2641,16 +2632,14 @@ func TestApplyAlias(t *testing.T) {
 				t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
 			}
 			var originalCommand string
-			if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok {
-				t.Fatalf("unable to find the KubeRCOriginalCommandAnnotation")
-			}
-
 			for _, expectedFlag := range test.expectedFlags {
 				actualFlag := actualCmd.Flag(expectedFlag.name)
 				if actualFlag.Value.String() != expectedFlag.value {
 					t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
-				require.Containsf(t, originalCommand, actualFlag.Value.String(), "missing flag '%s' in original command '%s'", actualFlag.Value.String(), originalCommand)
+				if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok || !strings.Contains(originalCommand, actualFlag.Value.String()) {
+					t.Fatalf("missing flag '%s' in original command '%s'", actualFlag.Value.String(), originalCommand)
+				}
 			}
 
 			for _, expectedArg := range test.expectedArgs {
@@ -2664,7 +2653,9 @@ func TestApplyAlias(t *testing.T) {
 				if !found {
 					t.Fatalf("expected arg %s can not be found", expectedArg)
 				}
-				require.Containsf(t, originalCommand, expectedArg, "missing command '%s' in original command '%s'", expectedArg, originalCommand)
+				if !strings.Contains(originalCommand, expectedArg) {
+					t.Fatalf("missing command '%s' in original command '%s'", expectedArg, originalCommand)
+				}
 			}
 		})
 	}
