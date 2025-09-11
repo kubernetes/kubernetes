@@ -392,6 +392,12 @@ func TestStats(t *testing.T) {
 	}
 }
 
+func TestKeyPrefix(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestKeyPrefix(ctx, t, cacher)
+}
+
 func TestWatch(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
