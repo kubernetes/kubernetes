@@ -157,6 +157,12 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	if resourcePrefix == "" {
 		return nil, fmt.Errorf("resourcePrefix cannot be empty")
 	}
+	if resourcePrefix == "/" {
+		return nil, fmt.Errorf("resourcePrefix cannot be /")
+	}
+	if !strings.HasPrefix(resourcePrefix, "/") {
+		return nil, fmt.Errorf("resourcePrefix needs to start from /")
+	}
 
 	listErrAggrFactory := defaultListErrorAggregatorFactory
 	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
@@ -1105,7 +1111,7 @@ func (s *store) validateMinimumResourceVersion(minimumResourceVersion string, ac
 }
 
 func (s *store) prepareKey(key string, recursive bool) (string, error) {
-	key, err := storage.PrepareKey(key, recursive)
+	key, err := storage.PrepareKey(s.resourcePrefix, key, recursive)
 	if err != nil {
 		return "", err
 	}
