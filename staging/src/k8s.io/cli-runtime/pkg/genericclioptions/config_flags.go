@@ -178,6 +178,7 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	}
 	if f.BearerToken != nil {
 		overrides.AuthInfo.Token = *f.BearerToken
+		overrides.AuthInfo.TokenFile = ""
 	}
 	if f.Impersonate != nil {
 		overrides.AuthInfo.Impersonate = *f.Impersonate
