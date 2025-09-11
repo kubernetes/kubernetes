@@ -56,6 +56,7 @@ import (
 	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
+	disruptionconfig "k8s.io/kubernetes/pkg/controller/disruption/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
@@ -99,6 +100,8 @@ var args = []string{
 	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
 	"--concurrent-daemonset-syncs=10",
+	"--concurrent-disruption-syncs=1",
+	"--concurrent-disruption-stalepod-syncs=1",
 	"--concurrent-horizontal-pod-autoscaler-syncs=10",
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
@@ -271,6 +274,12 @@ func TestAddFlags(t *testing.T) {
 		DeploymentController: &DeploymentControllerOptions{
 			&deploymentconfig.DeploymentControllerConfiguration{
 				ConcurrentDeploymentSyncs: 10,
+			},
+		},
+		DisruptionController: &DisruptionControllerOptions{
+			&disruptionconfig.DisruptionControllerConfiguration{
+				ConcurrentDisruptionSyncs:         1,
+				ConcurrentDisruptionStalePodSyncs: 1,
 			},
 		},
 		StatefulSetController: &StatefulSetControllerOptions{
@@ -544,6 +553,10 @@ func TestApplyTo(t *testing.T) {
 	fs, s := setupControllerManagerFlagSet(t)
 
 	fs.Parse(args)
+	// Set componentGlobalsRegistry right after parsing flags
+	if err := s.ComponentGlobalsRegistry.Set(); err != nil {
+		t.Fatalf("Failed to set componentGlobalsRegistry: %v", err)
+	}
 	// Sort GCIgnoredResources because it's built from a map, which means the
 	// insertion order is random.
 	sort.Sort(sortedGCIgnoredResources(s.GarbageCollectorController.GCIgnoredResources))
@@ -627,6 +640,10 @@ func TestApplyTo(t *testing.T) {
 				ConcurrentStatefulSetSyncs: 15,
 			},
 			DeprecatedController: kubectrlmgrconfig.DeprecatedControllerConfiguration{},
+			DisruptionController: disruptionconfig.DisruptionControllerConfiguration{
+				ConcurrentDisruptionSyncs:         1,
+				ConcurrentDisruptionStalePodSyncs: 1,
+			},
 			EndpointController: endpointconfig.EndpointControllerConfiguration{
 				ConcurrentEndpointSyncs: 10,
 			},

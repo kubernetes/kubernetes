@@ -123,7 +123,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 	createNs(tCtx, t, nsName, clientSet)
 
 	informers.Start(tCtx.Done())
-	go pdbc.Run(tCtx)
+	go pdbc.Run(tCtx, 5, 5)
 
 	crdDefinition := newCustomResourceDefinition()
 	etcd.CreateTestCRDs(t, apiExtensionClient, true, crdDefinition)
@@ -255,7 +255,7 @@ func TestEmptySelector(t *testing.T) {
 			createNs(tCtx, t, nsName, clientSet)
 
 			informers.Start(tCtx.Done())
-			go pdbc.Run(tCtx)
+			go pdbc.Run(tCtx, 5, 5)
 
 			replicas := 4
 			minAvailable := intstr.FromInt32(2)
@@ -369,7 +369,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 			createNs(tCtx, t, nsName, clientSet)
 
 			informers.Start(tCtx.Done())
-			go pdbc.Run(tCtx)
+			go pdbc.Run(tCtx, 5, 5)
 
 			minAvailable := intstr.FromInt32(1)
 
@@ -541,7 +541,7 @@ func TestPatchCompatibility(t *testing.T) {
 	// We can't cancel immediately but later, because when the context is canceled,
 	// the event broadcaster will be shut down .
 	defer tCtx.Cancel("cleaning up")
-	go pdbc.Run(tCtx)
+	go pdbc.Run(tCtx, 5, 5)
 
 	testcases := []struct {
 		name             string
@@ -646,7 +646,7 @@ func TestStalePodDisruption(t *testing.T) {
 
 	informers.Start(tCtx.Done())
 	informers.WaitForCacheSync(tCtx.Done())
-	go pdbc.Run(tCtx)
+	go pdbc.Run(tCtx, 5, 5)
 
 	cases := map[string]struct {
 		deletePod      bool
