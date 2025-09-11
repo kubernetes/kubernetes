@@ -615,7 +615,7 @@ func withDefaults(options *setupOptions) {
 	options.newFunc = newPod
 	options.newListFunc = newPodList
 	options.prefix = ""
-	options.resourcePrefix = "/pods"
+	options.resourcePrefix = "/pods/"
 	options.groupResource = schema.GroupResource{Resource: "pods"}
 	options.transformer = newTestTransformer()
 	options.leaseConfig = newTestLeaseManagerConfig()
@@ -1065,7 +1065,7 @@ func TestPrefixStats(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods"))
+			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods/"))
 			if tc.estimate {
 				err := store.EnableResourceSizeEstimation(store.getKeys)
 				if err != nil {
@@ -1094,7 +1094,7 @@ func TestPrefixStats(t *testing.T) {
 
 			listOut := &example.PodList{}
 			// Ignore error as decode is expected to fail
-			_ = store.GetList(ctx, "/pods", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, listOut)
+			_ = store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, listOut)
 
 			gotStats, err := store.Stats(ctx)
 			if err != nil {

@@ -33,7 +33,7 @@ import (
 )
 
 func TestCacherListerWatcher(t *testing.T) {
-	prefix := "/pods"
+	prefix := "/pods/"
 	fn := func() runtime.Object { return &example.PodList{} }
 	server, store := newEtcdTestStorage(t, prefix)
 	defer server.Terminate(t)
@@ -67,7 +67,7 @@ func TestCacherListerWatcher(t *testing.T) {
 }
 
 func TestCacherListerWatcherPagination(t *testing.T) {
-	prefix := "/pods"
+	prefix := "/pods/"
 	fn := func() runtime.Object { return &example.PodList{} }
 	server, store := newEtcdTestStorage(t, prefix)
 	defer server.Terminate(t)
@@ -130,7 +130,7 @@ func TestCacherListerWatcherPagination(t *testing.T) {
 func TestCacherListerWatcherListWatch(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 
-	prefix := "/pods"
+	prefix := "/pods/"
 	fn := func() runtime.Object { return &example.PodList{} }
 	server, store := newEtcdTestStorage(t, prefix)
 	defer server.Terminate(t)
@@ -181,7 +181,7 @@ func TestCacherListerWatcherListWatch(t *testing.T) {
 func TestCacherListerWatcherWhenListWatchDisabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, false)
 
-	prefix := "/pods"
+	prefix := "/pods/"
 	fn := func() runtime.Object { return &example.PodList{} }
 	server, store := newEtcdTestStorage(t, prefix)
 	defer server.Terminate(t)

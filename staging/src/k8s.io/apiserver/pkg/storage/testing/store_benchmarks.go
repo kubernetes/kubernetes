@@ -57,7 +57,7 @@ func RunBenchmarkStoreListCreate(ctx context.Context, b *testing.B, store storag
 			panic(fmt.Sprintf("Unexpected error %s", err))
 		}
 		listOut := &example.PodList{}
-		err = store.GetList(ctx, "/pods", storage.ListOptions{
+		err = store.GetList(ctx, "/pods/", storage.ListOptions{
 			Recursive:            true,
 			ResourceVersion:      podOut.ResourceVersion,
 			ResourceVersionMatch: match,
