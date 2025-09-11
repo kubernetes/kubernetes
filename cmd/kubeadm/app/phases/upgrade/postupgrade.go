@@ -108,13 +108,13 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletDir strin
 	dest := filepath.Join(backupDir, kubeadmconstants.KubeletConfigurationFileName)
 
 	if !dryRun {
-		fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
+		_, _ = fmt.Fprintf(out, "[upgrade] Backing up kubelet config file to %s\n", dest)
 		err := kubeadmutil.CopyFile(src, dest)
 		if err != nil {
 			return errors.Wrap(err, "error backing up the kubelet config file")
 		}
 	} else {
-		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
+		_, _ = fmt.Fprintf(out, "[dryrun] Would back up kubelet config file to %s\n", dest)
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
@@ -142,7 +142,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletDir strin
 					}
 				}
 			} else if dryRun {
-				fmt.Fprintf(os.Stdout, "[dryrun] would read the flag --container-runtime-endpoint value from %q, which is missing. "+
+				_, _ = fmt.Fprintf(out, "[dryrun] would read the flag --container-runtime-endpoint value from %q, which is missing. "+
 					"Using default socket %q instead", kubeadmconstants.KubeletEnvFileName, kubeadmconstants.DefaultCRISocket)
 				containerRuntimeEndpoint = kubeadmconstants.DefaultCRISocket
 			} else {
@@ -158,7 +158,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletDir strin
 			}
 
 			if dryRun { // Print what contents would be written
-				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
 				if err != nil {
 					return errors.Wrap(err, "error printing kubelet instance configuration file on dryrun")
 				}
@@ -172,7 +172,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletDir strin
 	}
 
 	if dryRun { // Print what contents would be written
-		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
 		if err != nil {
 			return errors.Wrap(err, "error printing kubelet configuration file on dryrun")
 		}
