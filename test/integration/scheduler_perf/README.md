@@ -33,7 +33,7 @@ Currently the test suite has the following:
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling'
+make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling'
 ```
 
 The output can used for [`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat)
@@ -51,7 +51,7 @@ a comma-separated list of label names. Each label may have a `+` or `-` as prefi
 be set. For example, this runs all performance benchmarks except those that are labeled
 as "integration-test":
 ```shell
-make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling -perf-scheduling-label-filter=performance,-integration-test'
+make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling -perf-scheduling-label-filter=performance,-integration-test'
 ```
 
 Once the benchmark is finished, JSON files with metrics are available in the subdirectories (`test/integration/scheduler_perf/config/<topic>`). 
@@ -65,17 +65,19 @@ Otherwise, the golang benchmark framework will try to run a test more than once 
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling/SchedulingBasic/5000Nodes/5000InitPods/1000PodsToSchedule'
+make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling/SchedulingBasic/5000Nodes/5000InitPods/1000PodsToSchedule'
 ```
 
 To produce a cpu profile:
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling -cpuprofile ~/cpu-profile.out'
+make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling -cpuprofile ~/cpu-profile.out'
 ```
 
 Here some explanations for those parameters:
+- `KUBE_CACHE_MUTATION_DETECTOR=false`: prevents enabling the client-go/tools/cache sanity checking,
+  which can be expensive (uses DeepEqual) and is off in production
 - `KUBE_TIMEOUT=-timeout=1h`: benchmarks may have to run longer than the default 10 minutes
 - `FULL_LOG=y`: ensures that benchmark results are shown
 - `ARTIFACTS=/tmp`: redirects non-test log output, which is lengthy and breaks parsing by `benchstat`
