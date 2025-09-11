@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -47,7 +48,6 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -435,7 +435,7 @@ func hasDeviceClassMappedExtendedResource(reqs v1.ResourceList, deviceClassMappi
 			// We only care about the resources requested by the pod we are trying to schedule.
 			continue
 		}
-		if v1helper.IsExtendedResourceName(rName) {
+		if schedutil.IsDRAExtendedResourceName(rName) {
 			_, ok := deviceClassMapping[rName]
 			if ok {
 				return true
@@ -766,7 +766,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 	extendedResources := make(map[v1.ResourceName]int64)
 	hasExtendedResource := false
 	for rName, rQuant := range state.draExtendedResource.podScalarResources {
-		if !v1helper.IsExtendedResourceName(rName) {
+		if !schedutil.IsDRAExtendedResourceName(rName) {
 			continue
 		}
 		// Skip in case request quantity is zero
@@ -883,6 +883,9 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 				})
 		}
 	}
+	sort.Slice(deviceRequests, func(i, j int) bool {
+		return deviceRequests[i].Name < deviceRequests[j].Name
+	})
 	return deviceRequests
 }
 
