@@ -64,7 +64,7 @@ import (
 )
 
 func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cacher, storage.Versioner, error) {
-	prefix := "/pods"
+	prefix := "/pods/"
 	config := Config{
 		Storage:             s,
 		Versioner:           storage.APIObjectVersioner{},
