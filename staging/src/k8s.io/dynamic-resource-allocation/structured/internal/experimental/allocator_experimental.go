@@ -209,12 +209,6 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				if request.Exactly != nil && request.Exactly.Capacity != nil {
 					containsCapacityRequest = true
 				}
-				for _, request := range request.FirstAvailable {
-					if request.Capacity != nil {
-						containsCapacityRequest = true
-						break
-					}
-				}
 				if containsCapacityRequest {
 					return nil, fmt.Errorf("claim %s, request %s: has capacity requests, but the DRAConsumableCapacity feature is disabled",
 						klog.KObj(claim), request.Name)
@@ -1298,8 +1292,9 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	if alloc.features.ConsumableCapacity {
 		// Validate whether resource request over capacity
 		success, err := alloc.CmpRequestOverCapacity(requestData.request, device.slice, *device.Device)
+		// The error should not occur at this point as it should be detected in the previous step.
 		if err != nil {
-			alloc.logger.V(7).Info("Failed to compare device capacity request",
+			alloc.logger.V(7).Info("Failed to compare device capacity request on allocateDevice",
 				"device", device, "request", requestData.request.name(), "err", err)
 			return false, nil, nil
 		}

@@ -62,7 +62,7 @@ func (m *distinctAttributeConstraint) add(requestName, subRequestName string, de
 	}
 
 	if !m.matchesAttribute(*attribute) {
-		m.logger.V(7).Info("Constraint not satisfied, duplicated attribute")
+		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
 		return false
 	}
 	m.attributes[requestName] = *attribute
@@ -119,9 +119,12 @@ func (m *distinctAttributeConstraint) matchesAttribute(attribute draapi.DeviceAt
 			}
 		default:
 			// Unknown value type, cannot match.
+			// This condition should not be reached
+			// as the unknown value type should be failed on CEL compile (getAttributeValue).
 			m.logger.V(7).Info("Distinct attribute type unknown")
 			return false
 		}
 	}
+	// All distinct
 	return true
 }

@@ -1423,7 +1423,7 @@ func addSpecDeviceRequestWithCapacityRequests(resourceClaim *resource.ResourceCl
 	}
 	distinctConstraint := resource.DeviceConstraint{
 		Requests:          []string{request},
-		DistinctAttribute: ptr.To(resource.FullyQualifiedName("")),
+		DistinctAttribute: ptr.To(resource.FullyQualifiedName("driver-a/attr")),
 	}
 	if prioritizedListFeature {
 		r.FirstAvailable = []resource.DeviceSubRequest{
