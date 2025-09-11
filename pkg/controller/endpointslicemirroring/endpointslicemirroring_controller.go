@@ -227,7 +227,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting EndpointSliceMirroring controller")
 	defer logger.Info("Shutting down EndpointSliceMirroring controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint_slice_mirroring", ctx.Done(), c.endpointsSynced, c.endpointSlicesSynced, c.servicesSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.endpointsSynced, c.endpointSlicesSynced, c.servicesSynced) {
 		return
 	}
 
