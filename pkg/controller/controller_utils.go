@@ -583,6 +583,20 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	if controllerRef != nil {
 		pod.OwnerReferences = append(pod.OwnerReferences, *controllerRef)
 	}
+	// Propagate valid non-controller ownerReferences from PodTemplateSpec into Pod
+	if utilfeature.DefaultFeatureGate.Enabled(features.PropagatePodTemplateOwnerRefs) {
+    	for _, or := range template.OwnerReferences {
+        	if or.Controller != nil && *or.Controller {
+            	// Skip: controllerRef must be set only by owning controller
+            	continue
+        	}
+        	if len(or.UID) == 0 {
+            	// Skip: invalid, would fail validation
+            	continue
+        	}
+        	pod.OwnerReferences = append(pod.OwnerReferences, or)
+    	}
+	}
 	pod.Spec = *template.Spec.DeepCopy()
 	return pod, nil
 }

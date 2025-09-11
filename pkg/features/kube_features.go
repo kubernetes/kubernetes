@@ -1064,6 +1064,10 @@ const (
 	//
 	// Enables support for joining Windows containers to a hosts' network namespace.
 	WindowsHostNetwork featuregate.Feature = "WindowsHostNetwork"
+	// owner: @itzPranshul
+	//
+	// Enables propagation of valid non-controller ownerReferences
+	PropagatePodTemplateOwnerRefs featuregate.Feature = "PropagatePodTemplateOwnerRefs"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
@@ -1077,6 +1081,11 @@ const (
 //
 // Entries are alphabetized.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+
+	PropagatePodTemplateOwnerRefs: {
+        {Version:    version.MustParse("1.35"), Default: false,PreRelease: featuregate.Alpha,},
+    },
+
 	AllowDNSOnlyNodeCSR: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
