@@ -234,75 +234,77 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 			}
 			aliasArgs.originalCommand.WriteString(alias.Command)
 		}
-		break
-	}
+		// break
 
-	if aliasArgs == nil {
-		// pursue with the current behavior.
-		// This might be a built-in command, external plugin, etc.
-		return args, nil
-	}
-
-	rootCmd.AddCommand(aliasArgs.command)
-
-	foundAliasCmd, _, err := rootCmd.Find([]string{commandName})
-	if err != nil {
-		return args, nil
-	}
-
-	// This function triggers merging the persistent flags in the parent commands.
-	_ = foundAliasCmd.InheritedFlags()
-
-	allShorthands := make(map[string]struct{})
-	foundAliasCmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		if flag.Shorthand != "" {
-			allShorthands[flag.Shorthand] = struct{}{}
+		if aliasArgs == nil {
+			// pursue with the current behavior.
+			// This might be a built-in command, external plugin, etc.
+			return args, nil
 		}
-	})
 
-	for _, fl := range aliasArgs.flags {
-		existingFlag := foundAliasCmd.Flag(fl.Name)
-		if existingFlag == nil {
-			return args, fmt.Errorf("invalid alias flag %s in alias %s", fl.Name, args[0])
-		}
-		if searchInArgs(existingFlag.Name, existingFlag.Shorthand, allShorthands, args) {
-			// Don't modify the value implicitly, if it is passed in args explicitly
-			continue
-		}
-		err = foundAliasCmd.Flags().Set(fl.Name, fl.Default)
+		rootCmd.AddCommand(aliasArgs.command)
+
+		foundAliasCmd, _, err := rootCmd.Find([]string{commandName})
 		if err != nil {
-			return args, fmt.Errorf("could not apply value %s to flag %s in alias %s err: %w", fl.Default, fl.Name, args[0], err)
+			return args, nil
 		}
-		aliasArgs.originalCommand.WriteString(fmt.Sprintf(" --%s=%s", fl.Name, fl.Default))
+
+		// This function triggers merging the persistent flags in the parent commands.
+		_ = foundAliasCmd.InheritedFlags()
+
+		allShorthands := make(map[string]struct{})
+		foundAliasCmd.Flags().VisitAll(func(flag *pflag.Flag) {
+			if flag.Shorthand != "" {
+				allShorthands[flag.Shorthand] = struct{}{}
+			}
+		})
+
+		for _, fl := range aliasArgs.flags {
+			existingFlag := foundAliasCmd.Flag(fl.Name)
+			if existingFlag == nil {
+				return args, fmt.Errorf("invalid alias flag %s in alias %s", fl.Name, args[0])
+			}
+			if searchInArgs(existingFlag.Name, existingFlag.Shorthand, allShorthands, args) {
+				// Don't modify the value implicitly, if it is passed in args explicitly
+				continue
+			}
+			err = foundAliasCmd.Flags().Set(fl.Name, fl.Default)
+			if err != nil {
+				return args, fmt.Errorf("could not apply value %s to flag %s in alias %s err: %w", fl.Default, fl.Name, args[0], err)
+			}
+			aliasArgs.originalCommand.WriteString(fmt.Sprintf(" --%s=%s", fl.Name, fl.Default))
+		}
+
+		if len(aliasArgs.prependArgs) > 0 {
+			// prependArgs defined in kuberc should be inserted after the alias name.
+			if commandIndex+1 >= len(args) {
+				// command is the last item, we simply append just like appendArgs
+				args = append(args, aliasArgs.prependArgs...)
+			} else {
+				args = append(args[:commandIndex+1], append(aliasArgs.prependArgs, args[commandIndex+1:]...)...)
+			}
+		}
+		if len(aliasArgs.appendArgs) > 0 {
+			// appendArgs defined in kuberc should be appended to actual args.
+			args = append(args, aliasArgs.appendArgs...)
+		}
+		// Cobra (command.go#L1078) appends only root command's args into the actual args and ignores the others.
+		// We are appending the additional args defined in kuberc in here and
+		// expect that it will be passed along to the actual command.
+		rootCmd.SetArgs(args[1:])
+		// Remove alias arg to add the remaining arguments that are not flags nor part of the preferences
+		sanitizedArgs := strings.ReplaceAll(strings.Join(args[1:], " "), foundAliasCmd.Name(), "")
+		if len(sanitizedArgs) > 0 {
+			aliasArgs.originalCommand.WriteString(fmt.Sprintf(" %s", sanitizedArgs))
+		}
+		// Add annotation to trace back command built without aliases applied
+		if aliasArgs.command.Annotations == nil {
+			aliasArgs.command.Annotations = make(map[string]string, 1)
+		}
+		aliasArgs.command.Annotations[KubeRCOriginalCommandAnnotation] = aliasArgs.originalCommand.String()
+		aliasArgs.originalCommand.Reset()
 	}
 
-	if len(aliasArgs.prependArgs) > 0 {
-		// prependArgs defined in kuberc should be inserted after the alias name.
-		if commandIndex+1 >= len(args) {
-			// command is the last item, we simply append just like appendArgs
-			args = append(args, aliasArgs.prependArgs...)
-		} else {
-			args = append(args[:commandIndex+1], append(aliasArgs.prependArgs, args[commandIndex+1:]...)...)
-		}
-	}
-	if len(aliasArgs.appendArgs) > 0 {
-		// appendArgs defined in kuberc should be appended to actual args.
-		args = append(args, aliasArgs.appendArgs...)
-	}
-	// Cobra (command.go#L1078) appends only root command's args into the actual args and ignores the others.
-	// We are appending the additional args defined in kuberc in here and
-	// expect that it will be passed along to the actual command.
-	rootCmd.SetArgs(args[1:])
-	// Remove alias arg to add the remaining arguments that are not flags nor part of the preferences
-	sanitizedArgs := strings.ReplaceAll(strings.Join(args[1:], " "), foundAliasCmd.Name(), "")
-	if len(sanitizedArgs) > 0 {
-		aliasArgs.originalCommand.WriteString(fmt.Sprintf(" %s", sanitizedArgs))
-	}
-	// Add annotation to trace back command built without aliases applied
-	if aliasArgs.command.Annotations == nil {
-		aliasArgs.command.Annotations = make(map[string]string, 1)
-	}
-	aliasArgs.command.Annotations[KubeRCOriginalCommandAnnotation] = aliasArgs.originalCommand.String()
 	return args, nil
 }
 

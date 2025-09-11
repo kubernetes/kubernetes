@@ -50,13 +50,12 @@ type fakeFlag[T supportedTypes] struct {
 }
 
 type testApplyOverride[T supportedTypes] struct {
-	name                    string
-	nestedCmds              []fakeCmds[T]
-	args                    []string
-	getPreferencesFunc      func(kuberc string, errOut io.Writer) (*config.Preference, error)
-	expectedOriginalCommand []string
-	expectedFlags           []fakeFlag[T]
-	expectedErr             error
+	name               string
+	nestedCmds         []fakeCmds[T]
+	args               []string
+	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
+	expectedFlags      []fakeFlag[T]
+	expectedErr        error
 }
 
 type testApplyAlias[T supportedTypes] struct {
@@ -805,57 +804,7 @@ func TestApplyOverride(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "alias ignores command override",
-			nestedCmds: []fakeCmds[string]{
-				{
-					name: "command1",
-					flags: []fakeFlag[string]{
-						{
-							name:  "firstflag",
-							value: "test",
-						},
-					},
-				},
-			},
-			args: []string{
-				"root",
-				"alias",
-				"--firstflag",
-				"test",
-			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
-				return &config.Preference{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "Preference",
-						APIVersion: "kubectl.config.k8s.io/v1alpha1",
-					},
-					Defaults: []config.CommandDefaults{
-						{
-							Command: "command1",
-							Options: []config.CommandOptionDefault{
-								{
-									Name:    "firstflag",
-									Default: "changed",
-								},
-							},
-						},
-					},
-					Aliases: []config.AliasOverride{
-						{
-							Name:    "alias",
-							Command: "command1",
-						},
-					},
-				}, nil
-			},
-			expectedFlags: []fakeFlag[string]{
-				{
-					name:  "firstflag",
-					value: "test",
-				},
-			},
-		},
+
 		{
 			name: "alias command override",
 			nestedCmds: []fakeCmds[string]{
@@ -944,7 +893,7 @@ func TestApplyOverride(t *testing.T) {
 			}
 			// Verify annotation and the original command
 			var originalCommand string
-			if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok || !strings.Contains(originalCommand, actualCmd.Name()) {
+			if originalCommand = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !strings.Contains(originalCommand, actualCmd.Name()) {
 				t.Fatalf("missing command '%s' in original command '%s'", originalCommand, actualCmd.Name())
 			}
 			for _, expectedFlag := range test.expectedFlags {
@@ -1181,7 +1130,7 @@ func TestApplyOverrideBool(t *testing.T) {
 				t.Fatalf("unexpected error message %s\n", errWriter.String())
 			}
 			var originalCommand string
-			if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok || !strings.Contains(originalCommand, actualCmd.Name()) {
+			if originalCommand = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !strings.Contains(originalCommand, actualCmd.Name()) {
 				t.Fatalf("missing command '%s' in original command '%s'", actualCmd.Name(), originalCommand)
 			}
 			for _, expectedFlag := range test.expectedFlags {
@@ -1492,7 +1441,7 @@ func TestApplyAliasBool(t *testing.T) {
 				if actualValue != expectedFlag.value {
 					t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
-				if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok || !strings.Contains(originalCommand, expectedFlag.shorthand) {
+				if originalCommand = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !strings.Contains(originalCommand, expectedFlag.shorthand) {
 					t.Fatalf("missing command '%s' in original command '%s'", expectedFlag.shorthand, originalCommand)
 				}
 			}
@@ -2587,6 +2536,59 @@ func TestApplyAlias(t *testing.T) {
 				"nodes",
 			},
 		},
+		{
+			name: "alias ignores command override",
+			nestedCmds: []fakeCmds[string]{
+				{
+					name: "command1",
+					flags: []fakeFlag[string]{
+						{
+							name:  "firstflag",
+							value: "test",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"alias",
+				"--firstflag",
+				"test",
+			},
+			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Preference",
+						APIVersion: "kubectl.config.k8s.io/v1alpha1",
+					},
+					Defaults: []config.CommandDefaults{
+						{
+							Command: "command1",
+							Options: []config.CommandOptionDefault{
+								{
+									Name:    "firstflag",
+									Default: "changed",
+								},
+							},
+						},
+					},
+					Aliases: []config.AliasOverride{
+						{
+							Name:    "alias",
+							Command: "command1",
+						},
+					},
+				}, nil
+			},
+			expectedFlags: []fakeFlag[string]{
+				{
+					name:  "firstflag",
+					value: "test",
+				},
+			},
+			expectedCmd:  "alias",
+			expectedArgs: []string{},
+		},
 	}
 
 	for _, test := range tests {
@@ -2637,7 +2639,7 @@ func TestApplyAlias(t *testing.T) {
 				if actualFlag.Value.String() != expectedFlag.value {
 					t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
-				if originalCommand, ok = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !ok || !strings.Contains(originalCommand, actualFlag.Value.String()) {
+				if originalCommand = actualCmd.Annotations[KubeRCOriginalCommandAnnotation]; !strings.Contains(originalCommand, actualFlag.Value.String()) {
 					t.Fatalf("missing flag '%s' in original command '%s'", actualFlag.Value.String(), originalCommand)
 				}
 			}
@@ -2883,19 +2885,19 @@ unknownField: value`,
 			RecommendedKubeRCFile = ""
 			if len(tc.defaultKubercFile) != 0 {
 				RecommendedKubeRCFile = filepath.Join(t.TempDir(), "kuberc")
-				require.NoError(t, os.WriteFile(RecommendedKubeRCFile, []byte(tc.defaultKubercFile), 0o644))
+				require.NoError(t, os.WriteFile(RecommendedKubeRCFile, []byte(tc.defaultKubercFile), 0644))
 			}
 
 			kubercFlag := tc.kubercFlag
 			if len(tc.kubercFlagFile) != 0 {
 				kubercFlag = filepath.Join(t.TempDir(), "kuberc")
-				require.NoError(t, os.WriteFile(kubercFlag, []byte(tc.kubercFlagFile), 0o644))
+				require.NoError(t, os.WriteFile(kubercFlag, []byte(tc.kubercFlagFile), 0644))
 			}
 
 			kubercEnv := tc.kubercEnv
 			if len(tc.kubercEnvFile) != 0 {
 				kubercEnv = filepath.Join(t.TempDir(), "kuberc")
-				require.NoError(t, os.WriteFile(kubercEnv, []byte(tc.kubercEnvFile), 0o644))
+				require.NoError(t, os.WriteFile(kubercEnv, []byte(tc.kubercEnvFile), 0644))
 			}
 			t.Setenv("KUBERC", kubercEnv)
 
