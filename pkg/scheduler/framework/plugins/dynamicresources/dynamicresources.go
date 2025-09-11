@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -882,6 +883,9 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 				})
 		}
 	}
+	sort.Slice(deviceRequests, func(i, j int) bool {
+		return deviceRequests[i].Name < deviceRequests[j].Name
+	})
 	return deviceRequests
 }
 

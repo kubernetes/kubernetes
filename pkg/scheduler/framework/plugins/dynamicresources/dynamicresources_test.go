@@ -2175,27 +2175,12 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	}
 }
 
-// sortClaim sorts given claim's Requests in spec, and Results in status
-func sortClaim(claim *resourceapi.ResourceClaim) {
-	requests := claim.Spec.Devices.Requests
-	sort.Slice(requests, func(i, j int) bool {
-		return requests[i].Name < requests[j].Name
-	})
-	if claim.Status.Allocation != nil {
-		results := claim.Status.Allocation.Devices.Results
-		sort.Slice(results, func(i, j int) bool {
-			return results[i].Request < results[j].Request
-		})
-	}
-}
-
 func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	t.Helper()
 	claims, err := tc.client.ResourceV1().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
 	require.NoError(t, err, "list claims")
 	for _, claim := range claims.Items {
 		claim := claim
-		sortClaim(&claim)
 		objects = append(objects, &claim)
 	}
 	sortObjects(objects)
@@ -2207,7 +2192,6 @@ func (tc *testContext) listAssumedClaims() ([]metav1.Object, []metav1.Object) {
 	var sameClaims []metav1.Object
 	for _, obj := range tc.draManager.resourceClaimTracker.cache.List(nil) {
 		claim := obj.(*resourceapi.ResourceClaim)
-		sortClaim(claim)
 		obj, _ := tc.draManager.resourceClaimTracker.cache.Get(claim.Namespace + "/" + claim.Name)
 		apiObj, _ := tc.draManager.resourceClaimTracker.cache.GetAPIObj(claim.Namespace + "/" + claim.Name)
 		if obj != apiObj {
@@ -2224,9 +2208,7 @@ func (tc *testContext) listAssumedClaims() ([]metav1.Object, []metav1.Object) {
 func (tc *testContext) listInFlightClaims() []metav1.Object {
 	var inFlightClaims []metav1.Object
 	tc.draManager.resourceClaimTracker.inFlightAllocations.Range(func(key, value any) bool {
-		claim := value.(*resourceapi.ResourceClaim)
-		sortClaim(claim)
-		inFlightClaims = append(inFlightClaims, claim)
+		inFlightClaims = append(inFlightClaims, value.(*resourceapi.ResourceClaim))
 		return true
 	})
 	sortObjects(inFlightClaims)
