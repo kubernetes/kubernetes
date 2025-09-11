@@ -113,7 +113,7 @@ func PathEnclosingInterval(root *ast.File, start, end token.Pos) (path []ast.Nod
 				// childrenOf elides the FuncType node beneath FuncDecl.
 				// Add it back here for TypeParams, Params, Results,
 				// all FieldLists). But we don't add it back for the "func" token
-				// even though it is is the tree at FuncDecl.Type.Func.
+				// even though it is the tree at FuncDecl.Type.Func.
 				if decl, ok := node.(*ast.FuncDecl); ok {
 					if fields, ok := child.(*ast.FieldList); ok && fields != decl.Recv {
 						path = append(path, decl.Type)
