@@ -524,15 +524,15 @@ func TestLeaseMaxObjectCount(t *testing.T) {
 		expectAttachedCount int64
 	}{
 		{
-			key:                 "testkey1",
+			key:                 "/pods/testkey1",
 			expectAttachedCount: 1,
 		},
 		{
-			key:                 "testkey2",
+			key:                 "/pods/testkey2",
 			expectAttachedCount: 2,
 		},
 		{
-			key: "testkey3",
+			key: "/pods/testkey3",
 			// We assume each time has 1 object attached to the lease
 			// so after granting a new lease, the recorded count is set to 1
 			expectAttachedCount: 1,
@@ -925,14 +925,14 @@ func TestGetCurrentResourceVersion(t *testing.T) {
 		}
 	}
 	createPod := func(obj *example.Pod) *example.Pod {
-		key := "pods/" + obj.Namespace + "/" + obj.Name
+		key := "/pods/" + obj.Namespace + "/" + obj.Name
 		out := &example.Pod{}
 		err := store.Create(context.TODO(), key, obj, out, 0)
 		require.NoError(t, err)
 		return out
 	}
 	getPod := func(name, ns string) *example.Pod {
-		key := "pods/" + ns + "/" + name
+		key := "/pods/" + ns + "/" + name
 		out := &example.Pod{}
 		err := store.Get(context.TODO(), key, storage.GetOptions{}, out)
 		require.NoError(t, err)
@@ -1014,7 +1014,7 @@ func BenchmarkStatsCacheCleanKeys(b *testing.B) {
 }
 
 func TestPrefixGetKeys(t *testing.T) {
-	ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("pods"))
+	ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods"))
 	_, err := c.KV.Put(ctx, "key", "a")
 	if err != nil {
 		t.Fatal(err)
@@ -1065,7 +1065,7 @@ func TestPrefixStats(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("pods"))
+			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods"))
 			if tc.estimate {
 				err := store.EnableResourceSizeEstimation(store.getKeys)
 				if err != nil {
@@ -1094,7 +1094,7 @@ func TestPrefixStats(t *testing.T) {
 
 			listOut := &example.PodList{}
 			// Ignore error as decode is expected to fail
-			_ = store.GetList(ctx, "pods", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, listOut)
+			_ = store.GetList(ctx, "/pods", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, listOut)
 
 			gotStats, err := store.Stats(ctx)
 			if err != nil {
