@@ -93,10 +93,11 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 		)
 
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(features.GracefulNodeShutdown):                   true,
-				string(features.GracefulNodeShutdownBasedOnPodPriority): false,
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
 			}
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdown)] = true
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdownBasedOnPodPriority)] = false
 			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
 		})
 
@@ -195,11 +196,13 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 		)
 
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(features.GracefulNodeShutdown):                   true,
-				string(features.GracefulNodeShutdownBasedOnPodPriority): false,
-				string(features.PodReadyToStartContainersCondition):     true,
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
 			}
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdown)] = true
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdownBasedOnPodPriority)] = false
+			initialConfig.FeatureGates[string(features.PodReadyToStartContainersCondition)] = true
+
 			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
 			initialConfig.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: nodeShutdownGracePeriodCriticalPods}
 		})
@@ -390,10 +393,12 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 		)
 
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(features.GracefulNodeShutdown):                   true,
-				string(features.GracefulNodeShutdownBasedOnPodPriority): true,
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
 			}
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdown)] = true
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdownBasedOnPodPriority)] = true
+
 			initialConfig.ShutdownGracePeriodByPodPriority = []kubeletconfig.ShutdownGracePeriodByPodPriority{
 				{
 					Priority:                   scheduling.SystemCriticalPriority,

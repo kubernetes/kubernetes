@@ -20,6 +20,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -28,6 +29,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/utils/cpuset"
 )
 
 var _ = SIGDescribe("Kubelet Config", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.KubeletConfigDropInDir, func() {
@@ -137,6 +139,12 @@ featureGates:
 			initialConfig.ReadOnlyPort = int32(10257) // overridden by second file.
 			if initialConfig.SystemReserved == nil {
 				initialConfig.SystemReserved = map[string]string{}
+			}
+			if initialConfig.ReservedSystemCPUs != "" {
+				reservedCPUSet, err := cpuset.Parse(initialConfig.ReservedSystemCPUs)
+				if err == nil {
+					initialConfig.SystemReserved["cpu"] = strconv.Itoa(reservedCPUSet.Size())
+				}
 			}
 			initialConfig.SystemReserved["memory"] = "2Gi"
 			initialConfig.ClusterDNS = []string{"192.168.1.1", "192.168.1.5", "192.168.1.8"} // overridden by slice in second file.
