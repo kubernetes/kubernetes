@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	resourceclaimspec "k8s.io/kubernetes/pkg/api/resourceclaimspec"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -179,18 +180,14 @@ var testCapacity = map[resource.QualifiedName]apiresource.Quantity{
 
 var objWithCapacityRequests = func() *resource.ResourceClaimTemplate {
 	obj := obj.DeepCopy()
-	addSpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
+	addSpecDeviceRequestWithCapacityRequests(obj, testCapacity, false, true)
 	return obj
 }()
 
 func addSpecDeviceRequestWithCapacityRequests(resourceClaimTemplate *resource.ResourceClaimTemplate,
-	capacity map[resource.QualifiedName]apiresource.Quantity, prioritizedListFeature bool) {
+	capacity map[resource.QualifiedName]apiresource.Quantity, prioritizedListFeature, withDistinctAttribute bool) {
 	r := resource.DeviceRequest{
-		Name: "req-0",
-		Exactly: &resource.ExactDeviceRequest{
-			DeviceClassName: "class",
-			AllocationMode:  resource.DeviceAllocationModeAll,
-		},
+		Name: "cap-req-0",
 	}
 	if prioritizedListFeature {
 		r.FirstAvailable = []resource.DeviceSubRequest{
@@ -201,18 +198,31 @@ func addSpecDeviceRequestWithCapacityRequests(resourceClaimTemplate *resource.Re
 				Count:           1,
 			},
 		}
+	} else {
+		r.Exactly = &resource.ExactDeviceRequest{
+			DeviceClassName: "class",
+			AllocationMode:  resource.DeviceAllocationModeAll,
+		}
 	}
 	if capacity != nil {
-		r.Exactly.Capacity = &resource.CapacityRequirements{
-			Requests: capacity,
-		}
 		if prioritizedListFeature {
 			r.FirstAvailable[0].Capacity = &resource.CapacityRequirements{
+				Requests: capacity,
+			}
+		} else {
+			r.Exactly.Capacity = &resource.CapacityRequirements{
 				Requests: capacity,
 			}
 		}
 	}
 	resourceClaimTemplate.Spec.Spec.Devices.Requests = append(resourceClaimTemplate.Spec.Spec.Devices.Requests, r)
+	if withDistinctAttribute {
+		distinctConstraint := resource.DeviceConstraint{
+			Requests:          []string{"cap-req-0"},
+			DistinctAttribute: ptr.To(resource.FullyQualifiedName("driver-a/attr")),
+		}
+		resourceClaimTemplate.Spec.Spec.Devices.Constraints = append(resourceClaimTemplate.Spec.Spec.Devices.Constraints, distinctConstraint)
+	}
 }
 
 var objWithDeviceTaintsInPrioritizedList = &resource.ResourceClaimTemplate{
@@ -440,7 +450,7 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 			consumableCapacity: false,
 			expectObj: func() *resource.ResourceClaimTemplate {
 				obj := obj.DeepCopy()
-				addSpecDeviceRequestWithCapacityRequests(obj, nil, false)
+				addSpecDeviceRequestWithCapacityRequests(obj, nil, false, false)
 				return obj
 			}(),
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -452,14 +462,14 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 		"drop-consumable-capacity-fields-disabled-feature-with-prioritized-list": {
 			obj: func() *resource.ResourceClaimTemplate {
 				obj := obj.DeepCopy()
-				addSpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
+				addSpecDeviceRequestWithCapacityRequests(obj, testCapacity, true, true)
 				return obj
 			}(),
 			consumableCapacity: false,
 			prioritizedList:    true,
 			expectObj: func() *resource.ResourceClaimTemplate {
 				obj := obj.DeepCopy()
-				addSpecDeviceRequestWithCapacityRequests(obj, nil, true)
+				addSpecDeviceRequestWithCapacityRequests(obj, nil, true, false)
 				return obj
 			}(),
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -475,15 +485,19 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAAdminAccess:     tc.adminAccess,
-				features.DRADeviceTaints:    tc.deviceTaints,
-				features.DRAPrioritizedList: tc.prioritizedList,
+				features.DRAAdminAccess:        tc.adminAccess,
+				features.DRADeviceTaints:       tc.deviceTaints,
+				features.DRAPrioritizedList:    tc.prioritizedList,
+				features.DRAConsumableCapacity: tc.consumableCapacity,
 			})
 			strategy := NewStrategy(mockNSClient)
 
 			obj := tc.obj.DeepCopy()
 			strategy.PrepareForCreate(ctx, obj)
 			if errs := strategy.Validate(ctx, obj); len(errs) != 0 {
+				if tc.expectValidationError == "" {
+					t.Fatalf("unexpected error: %v", errs[0])
+				}
 				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
 				return
 			}
@@ -561,6 +575,34 @@ func TestClaimTemplateStrategyUpdate(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("expected a validation error")
 		}
+		if len(fakeClient.Actions()) != 0 {
+			t.Errorf("expected no action to be taken")
+		}
+	})
+
+	t.Run("keep-existing-fields-consumable-capacity-disabled-feature", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, false)
+		ctx := genericapirequest.NewDefaultContext()
+		oldObj := obj.DeepCopy()
+		addSpecDeviceRequestWithCapacityRequests(oldObj, testCapacity, false, true)
+		newObj := obj.DeepCopy()
+		newObj.ResourceVersion = "4"
+		addSpecDeviceRequestWithCapacityRequests(newObj, testCapacity, false, true)
+		expectObj := obj.DeepCopy()
+		expectObj.ResourceVersion = "4"
+		addSpecDeviceRequestWithCapacityRequests(expectObj, testCapacity, false, true)
+		fakeClient := fake.NewClientset(ns1, ns2)
+		mockNSClient := fakeClient.CoreV1().Namespaces()
+		strategy := NewStrategy(mockNSClient)
+		spec := &oldObj.Spec.Spec
+		inuse := resourceclaimspec.DRAConsumableCapacityFeatureInUse(spec)
+		assert.True(t, inuse)
+		strategy.PrepareForUpdate(ctx, newObj, oldObj)
+		errs := strategy.ValidateUpdate(ctx, newObj, oldObj)
+		assert.Empty(t, errs)
+		warnings := strategy.WarningsOnUpdate(ctx, newObj, oldObj)
+		assert.Empty(t, warnings)
+		assert.Equal(t, expectObj, newObj)
 		if len(fakeClient.Actions()) != 0 {
 			t.Errorf("expected no action to be taken")
 		}
@@ -816,6 +858,9 @@ func TestStrategyUpdate(t *testing.T) {
 
 			strategy.PrepareForUpdate(ctx, newObj, oldObj)
 			if errs := strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+				if tc.expectValidationError == "" {
+					t.Fatalf("unexpected error: %v", errs[0])
+				}
 				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
 				return
 			}
@@ -830,6 +875,60 @@ func TestStrategyUpdate(t *testing.T) {
 			expectObj.ResourceVersion = "4"
 			assert.Equal(t, expectObj, newObj)
 			tc.verify(t, fakeClient.Actions())
+		})
+	}
+}
+
+func TestFeatureInUse(t *testing.T) {
+	testcases := map[string]struct {
+		obj       *resource.ResourceClaimTemplate
+		inUseFunc func(spec *resource.ResourceClaimSpec) bool
+		expect    bool
+	}{
+		"consumable-capacity-empty": {
+			obj:       nil,
+			inUseFunc: resourceclaimspec.DRAConsumableCapacityFeatureInUse,
+			expect:    false,
+		},
+		"consumable-capacity-no-inuse": {
+			obj: func() *resource.ResourceClaimTemplate {
+				obj := obj.DeepCopy()
+				return obj
+			}(),
+			inUseFunc: resourceclaimspec.DRAConsumableCapacityFeatureInUse,
+			expect:    false,
+		},
+		"consumable-capacity-with-inuse-fields": {
+			obj:       objWithCapacityRequests,
+			inUseFunc: resourceclaimspec.DRAConsumableCapacityFeatureInUse,
+			expect:    true,
+		},
+		"consumable-capacity--with-inuse-fields-except-distinct-attribute": {
+			obj: func() *resource.ResourceClaimTemplate {
+				obj := obj.DeepCopy()
+				addSpecDeviceRequestWithCapacityRequests(obj, testCapacity, false, false)
+				return obj
+			}(),
+			inUseFunc: resourceclaimspec.DRAConsumableCapacityFeatureInUse,
+			expect:    true,
+		},
+		"consumable-capacity--with-inuse-fields-in-subrequests": {
+			obj: func() *resource.ResourceClaimTemplate {
+				obj := obj.DeepCopy()
+				addSpecDeviceRequestWithCapacityRequests(obj, testCapacity, true, false)
+				return obj
+			}(),
+			inUseFunc: resourceclaimspec.DRAConsumableCapacityFeatureInUse,
+			expect:    true,
+		},
+	}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			var spec *resource.ResourceClaimSpec
+			if tc.obj != nil {
+				spec = &tc.obj.Spec.Spec
+			}
+			assert.Equal(t, tc.inUseFunc(spec), tc.expect)
 		})
 	}
 }

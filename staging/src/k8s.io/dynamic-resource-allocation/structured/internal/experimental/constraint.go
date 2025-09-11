@@ -63,7 +63,7 @@ func (m *distinctAttributeConstraint) add(requestName, subRequestName string, de
 	}
 
 	if !m.matchesAttribute(*attribute) {
-		m.logger.V(7).Info("Constraint not satisfied, duplicated attribute")
+		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
 		return false
 	}
 	m.attributes[requestName] = *attribute
@@ -96,17 +96,17 @@ func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.Dev
 	for _, attr := range m.attributes {
 		switch {
 		case attribute.StringValue != nil:
-			if attr.StringValue != nil && attribute.StringValue == attr.StringValue {
+			if attr.StringValue != nil && *attribute.StringValue == *attr.StringValue {
 				m.logger.V(7).Info("String values duplicated")
 				return false
 			}
 		case attribute.IntValue != nil:
-			if attr.IntValue != nil && attribute.IntValue == attr.IntValue {
+			if attr.IntValue != nil && *attribute.IntValue == *attr.IntValue {
 				m.logger.V(7).Info("Int values duplicated")
 				return false
 			}
 		case attribute.BoolValue != nil:
-			if attr.BoolValue != nil && attribute.BoolValue == attr.BoolValue {
+			if attr.BoolValue != nil && *attribute.BoolValue == *attr.BoolValue {
 				m.logger.V(7).Info("Bool values duplicated")
 				return false
 			}
@@ -114,15 +114,18 @@ func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.Dev
 			// semver 2.0.0 requires that version strings are in their
 			// minimal form (in particular, no leading zeros). Therefore a
 			// strict "exact equal" check can do a string comparison.
-			if attr.VersionValue != nil && attribute.VersionValue == attr.VersionValue {
+			if attr.VersionValue != nil && *attribute.VersionValue == *attr.VersionValue {
 				m.logger.V(7).Info("Version values duplicated")
 				return false
 			}
 		default:
 			// Unknown value type, cannot match.
+			// This condition should not be reached
+			// as the unknown value type should be failed on CEL compile (getAttributeValue).
 			m.logger.V(7).Info("Distinct attribute type unknown")
 			return false
 		}
 	}
+	// All distinct
 	return true
 }
