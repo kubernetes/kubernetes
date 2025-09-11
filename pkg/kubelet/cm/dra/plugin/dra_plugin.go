@@ -76,10 +76,6 @@ func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 
 	// If connection exists and is ready, return it.
 	if p.conn != nil && p.conn.GetState() != connectivity.Shutdown {
-		// Ensure health client exists
-		if p.healthClient == nil {
-			p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
-		}
 		return p.conn, nil
 	}
 
@@ -172,21 +168,17 @@ func (p *DRAPlugin) NodeUnprepareResources(
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 	ctx = klog.NewContext(ctx, logger)
 
-	conn, err := p.getOrCreateGRPCConn()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get gRPC connection: %w", err)
-	}
-
 	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
 	defer cancel()
 
+	var err error
 	var response *drapbv1.NodeUnprepareResourcesResponse
 	switch p.chosenService {
 	case drapbv1beta1.DRAPluginService:
-		client := drapbv1beta1.NewDRAPluginClient(conn)
+		client := drapbv1beta1.NewDRAPluginClient(p.conn)
 		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodeUnprepareResources(ctx, req)
 	case drapbv1.DRAPluginService:
-		client := drapbv1.NewDRAPluginClient(conn)
+		client := drapbv1.NewDRAPluginClient(p.conn)
 		response, err = client.NodeUnprepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
