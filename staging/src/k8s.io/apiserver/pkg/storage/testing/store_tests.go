@@ -681,14 +681,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 	}{
 		{
 			name:        "rejects invalid resource version",
-			prefix:      "/pods",
+			prefix:      "/pods/",
 			pred:        storage.Everything,
 			rv:          "abc",
 			expectError: true,
 		},
 		{
 			name:   "rejects resource version and continue token",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Label:    labels.Everything(),
 				Field:    fields.Everything(),
@@ -700,7 +700,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:             "rejects resource version set too high",
-			prefix:           "/pods",
+			prefix:           "/pods/",
 			pred:             storage.Everything,
 			rv:               strconv.FormatInt(math.MaxInt64, 10),
 			expectRVTooLarge: true,
@@ -1012,7 +1012,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "test List with filter returning only one item, ensure only a single page returned",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1023,7 +1023,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "test List with filter returning only one item, ensure only a single page returned with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1037,7 +1037,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1048,7 +1048,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1062,7 +1062,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list, with resource version 0",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1074,7 +1074,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "test List with filter returning two items, more pages possible",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label: labels.Everything(),
@@ -1085,7 +1085,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "test List with filter returning two items, more pages possible with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label: labels.Everything(),
@@ -1098,7 +1098,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns two items split across multiple pages",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label: labels.Everything(),
@@ -1108,7 +1108,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns two items split across multiple pages with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label: labels.Everything(),
@@ -1120,7 +1120,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns one item for last page, ends on last item, not full",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label:    labels.Everything(),
@@ -1131,7 +1131,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, full",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label:    labels.Everything(),
@@ -1142,7 +1142,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, partial page",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label:    labels.Everything(),
@@ -1153,7 +1153,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns two items, page size equal to total list size",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label: labels.Everything(),
@@ -1163,7 +1163,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns two items, page size equal to total list size with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label: labels.Everything(),
@@ -1175,7 +1175,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns one item, page size equal to total list size",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1185,7 +1185,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "filter returns one item, page size equal to total list size with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -1197,13 +1197,13 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:        "list all items",
-			prefix:      "/pods",
+			prefix:      "/pods/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
 		},
 		{
 			name:        "list all items with current resource version and match=NotOlderThan",
-			prefix:      "/pods",
+			prefix:      "/pods/",
 			pred:        storage.Everything,
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
@@ -1211,7 +1211,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "verify list returns updated version of object; filter returns one item, page size equal to total list size with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("spec.nodeName", "fakeNode"),
 				Label: labels.Everything(),
@@ -1223,7 +1223,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 		{
 			name:   "verify list does not return deleted object; filter for deleted object, page size equal to total list size with current resource version and match=NotOlderThan",
-			prefix: "/pods",
+			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "baz"),
 				Label: labels.Everything(),
@@ -1909,7 +1909,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 
 	// we want to figure out the resourceVersion before we create anything
 	initialList := &example.PodList{}
-	if err := store.GetList(ctx, "/pods", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
 		return "", nil, nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
 	}
 	initialRV = initialList.ResourceVersion
@@ -2283,7 +2283,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(1, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2307,13 +2307,13 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/pods")
+	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/pods/")
 	t.Logf("continue token was %d %s %v", rv, key, err)
 	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
 	if out.ResourceVersion != currentRV {
@@ -2331,7 +2331,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(1, continueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2354,7 +2354,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(1, continueFromThirdItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -2396,7 +2396,7 @@ func RunTestListPaginationRareObject(ctx context.Context, t *testing.T, store st
 		},
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -2472,7 +2472,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		Predicate:       pred(2, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Errorf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2503,7 +2503,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		Predicate:       pred(2, cont),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Errorf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -2578,7 +2578,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(1, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2615,7 +2615,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
-	err := store.GetList(ctx, "/pods", options, out)
+	err := store.GetList(ctx, "/pods/", options, out)
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}
@@ -2637,7 +2637,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(1, inconsistentContinueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2656,7 +2656,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(1, continueFromThirdItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -2730,7 +2730,7 @@ func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store In
 		Predicate: predicate,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/pods", options, &result1); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, &result1); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2743,7 +2743,7 @@ func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store In
 	}
 
 	result2 := example.PodList{}
-	if err := store.GetList(ctx, "/pods", options, &result2); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, &result2); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2753,7 +2753,7 @@ func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store In
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
 
 	result3 := example.PodList{}
-	if err := store.GetList(ctx, "/pods", options, &result3); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, &result3); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2761,7 +2761,7 @@ func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store In
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchExact
 
 	result4 := example.PodList{}
-	if err := store.GetList(ctx, "/pods", options, &result4); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, &result4); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -3175,7 +3175,7 @@ func RunTestTransformationFailure(ctx context.Context, t *testing.T, store Inter
 		Predicate: storage.Everything,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/pods", storageOpts, &got); !storage.IsInternalError(err) {
+	if err := store.GetList(ctx, "/pods/", storageOpts, &got); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error %v", err)
 	}
 
@@ -3256,7 +3256,7 @@ func RunTestStats(ctx context.Context, t *testing.T, store storage.Interface, co
 func assertStats(t *testing.T, store storage.Interface, sizeEnabled bool, expectStats storage.Stats) {
 	t.Helper()
 	// Execute consistent LIST to refresh state of cache.
-	err := store.GetList(t.Context(), "/pods", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, &example.PodList{})
+	err := store.GetList(t.Context(), "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, &example.PodList{})
 	if err != nil {
 		t.Fatalf("GetList failed: %v", err)
 	}
@@ -3309,7 +3309,7 @@ func RunTestListPaging(ctx context.Context, t *testing.T, store storage.Interfac
 	for {
 		calls++
 		listOut := &example.PodList{}
-		err := store.GetList(ctx, "/pods", opts, listOut)
+		err := store.GetList(ctx, "/pods/", opts, listOut)
 		if err != nil {
 			t.Fatalf("Unexpected error %s", err)
 		}
@@ -3739,7 +3739,7 @@ func RunTestNamespaceScopedList(ctx context.Context, t *testing.T, store storage
 
 func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, compact Compaction) {
 	listOut := &example.PodList{}
-	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
 		Predicate: storage.Everything,
 		Recursive: true,
 	}, listOut); err != nil {
@@ -3753,7 +3753,7 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 	if compactedRV >= int64(currentRV) {
 		t.Fatalf("Expected current RV not be compacted, current: %d, compacted: %d", currentRV, compactedRV)
 	}
-	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
 		Predicate:            storage.Everything,
 		Recursive:            true,
 		ResourceVersion:      listOut.ResourceVersion,
@@ -3764,7 +3764,7 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 	increaseRV(ctx, t)
 	expectCompactedRV := currentRV + 1
 	compact(ctx, t, fmt.Sprintf("%d", expectCompactedRV))
-	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
 		Predicate:            storage.Everything,
 		Recursive:            true,
 		ResourceVersion:      listOut.ResourceVersion,

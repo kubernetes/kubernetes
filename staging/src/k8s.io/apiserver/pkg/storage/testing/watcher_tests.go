@@ -383,7 +383,7 @@ func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPre
 		Predicate:       storage.Everything,
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", storageOpts, list); err != nil {
+	if err := store.GetList(ctx, "/pods/", storageOpts, list); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -424,7 +424,7 @@ func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store Inter
 		Predicate:       storage.Everything,
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", storageOpts, list); err != nil {
+	if err := store.GetList(ctx, "/pods/", storageOpts, list); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -493,7 +493,7 @@ func RunTestWatcherTimeout(ctx context.Context, t *testing.T, store storage.Inte
 		Predicate: storage.Everything,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/pods", options, &podList); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, &podList); err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
 	initialRV := podList.ResourceVersion
@@ -734,9 +734,9 @@ func RunTestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.
 			ctx = genericapirequest.WithRequestInfo(ctx, requestInfo)
 			ctx = genericapirequest.WithNamespace(ctx, "")
 
-			watchKey := "/pods"
+			watchKey := "/pods/"
 			if tt.requestedName != "" {
-				watchKey += "/" + tt.requestedName
+				watchKey += tt.requestedName
 			}
 
 			predicate := CreatePodPredicate(tt.fieldSelector, false, tt.indexFields)
@@ -747,7 +747,7 @@ func RunTestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.
 				Predicate:       predicate,
 				Recursive:       true,
 			}
-			if err := store.GetList(ctx, "/pods", opts, list); err != nil {
+			if err := store.GetList(ctx, "/pods/", opts, list); err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
 
@@ -1045,11 +1045,11 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 			ctx = genericapirequest.WithRequestInfo(ctx, requestInfo)
 			ctx = genericapirequest.WithNamespace(ctx, tt.requestedNamespace)
 
-			watchKey := "/pods"
+			watchKey := "/pods/"
 			if tt.requestedNamespace != "" {
-				watchKey += "/" + tt.requestedNamespace
+				watchKey += tt.requestedNamespace + "/"
 				if tt.requestedName != "" {
-					watchKey += "/" + tt.requestedName
+					watchKey += tt.requestedName
 				}
 			}
 
@@ -1061,7 +1061,7 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 				Predicate:       predicate,
 				Recursive:       true,
 			}
-			if err := store.GetList(ctx, "/pods", opts, list); err != nil {
+			if err := store.GetList(ctx, "/pods/", opts, list); err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
 
@@ -1189,7 +1189,7 @@ func RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx context.Context
 		Predicate: storage.Everything,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/pods", storageOpts, list); err != nil {
+	if err := store.GetList(ctx, "/pods/", storageOpts, list); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	startRV := list.ResourceVersion
@@ -1283,7 +1283,7 @@ func RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx context.Context
 func RunSendInitialEventsBackwardCompatibility(ctx context.Context, t *testing.T, store storage.Interface) {
 	opts := storage.ListOptions{Predicate: storage.Everything}
 	opts.SendInitialEvents = ptr.To(true)
-	w, err := store.Watch(ctx, "/pods", opts)
+	w, err := store.Watch(ctx, "/pods/", opts)
 	require.NoError(t, err)
 	w.Stop()
 }
@@ -1697,7 +1697,7 @@ func RunWatchListMatchSingle(ctx context.Context, t *testing.T, store storage.In
 	opts.SendInitialEvents = &trueVal
 	opts.Predicate.AllowWatchBookmarks = true
 
-	w, err := store.Watch(context.Background(), "/pods", opts)
+	w, err := store.Watch(context.Background(), "/pods/", opts)
 	require.NoError(t, err, "failed to create watch: %v")
 	defer w.Stop()
 
@@ -1750,7 +1750,7 @@ func RunWatchErrorIsBlockingFurtherEvents(ctx context.Context, t *testing.T, sto
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			w, err := store.Watch(ctx, "/pods", opts)
+			w, err := store.Watch(ctx, "/pods/", opts)
 			if err != nil {
 				t.Errorf("failed to create watch: %v", err)
 				return

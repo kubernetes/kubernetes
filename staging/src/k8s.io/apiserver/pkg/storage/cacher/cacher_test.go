@@ -303,7 +303,7 @@ func etcdListRequests(t *testing.T, ctx context.Context, store storage.Interface
 	key := rand.String(10)
 	listCtx := context.WithValue(ctx, storagetesting.RecorderContextKey, key)
 	listOut := &example.PodList{}
-	if err := store.GetList(listCtx, "/pods", opts, listOut); err != nil {
+	if err := store.GetList(listCtx, "/pods/", opts, listOut); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	return recorder.ListRequestForKey(key)
