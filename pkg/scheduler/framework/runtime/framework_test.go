@@ -3375,7 +3375,7 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 					r := make(Registry)
 					if err := r.Register(testPlugin,
-						func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+						func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 							return plugin, nil
 						}); err != nil {
 						t.Fatalf("Failed to register plugin %s: %v", testPlugin, err)
