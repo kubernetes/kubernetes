@@ -1,0 +1,28 @@
+name: CI
+on: [pull_request]
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+  pull-requests: 'read'
+
+jobs:
+  lint:
+    name: make lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make lint
+
+  tests:
+    name: make test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make test
