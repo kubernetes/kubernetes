@@ -336,7 +336,7 @@ func (env *testEnv) updateVolumes(ctx context.Context, pvs []*v1.PersistentVolum
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, pv := range pvs {
-			pvInCache, err := env.internalBinder.pvCache.GetAPIPV(pv.Name)
+			pvInCache, err := env.internalBinder.pvCache.GetAPIObj(pv.Name)
 			if pvInCache == nil || err != nil {
 				return false, nil
 			}
@@ -358,7 +358,7 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, pvc := range pvcs {
-			pvcInCache, err := env.internalBinder.pvcCache.GetAPIPVC(getPVCName(pvc))
+			pvcInCache, err := env.internalBinder.pvcCache.GetAPIObj(getPVCName(pvc))
 			if pvcInCache == nil || err != nil {
 				return false, nil
 			}
@@ -454,9 +454,9 @@ func (env *testEnv) validateAssume(t *testing.T, pod *v1.Pod, bindings []*Bindin
 	// Check pv cache
 	pvCache := env.internalBinder.pvCache
 	for _, b := range bindings {
-		pv, err := pvCache.GetPV(b.pv.Name)
+		pv, err := pvCache.Get(b.pv.Name)
 		if err != nil {
-			t.Errorf("GetPV %q returned error: %v", b.pv.Name, err)
+			t.Errorf("Get PV %q returned error: %v", b.pv.Name, err)
 			continue
 		}
 		if pv.Spec.ClaimRef == nil {
@@ -475,9 +475,9 @@ func (env *testEnv) validateAssume(t *testing.T, pod *v1.Pod, bindings []*Bindin
 	pvcCache := env.internalBinder.pvcCache
 	for _, p := range provisionings {
 		pvcKey := getPVCName(p)
-		pvc, err := pvcCache.GetPVC(pvcKey)
+		pvc, err := pvcCache.Get(pvcKey)
 		if err != nil {
-			t.Errorf("GetPVC %q returned error: %v", pvcKey, err)
+			t.Errorf("Get PVC %q returned error: %v", pvcKey, err)
 			continue
 		}
 		if pvc.Annotations[volume.AnnSelectedNode] != nodeLabelValue {
@@ -502,9 +502,9 @@ func (env *testEnv) validateCacheRestored(t *testing.T, pod *v1.Pod, bindings []
 	pvcCache := env.internalBinder.pvcCache
 	for _, p := range provisionings {
 		pvcKey := getPVCName(p)
-		pvc, err := pvcCache.GetPVC(pvcKey)
+		pvc, err := pvcCache.Get(pvcKey)
 		if err != nil {
-			t.Errorf("GetPVC %q returned error: %v", pvcKey, err)
+			t.Errorf("Get PVC %q returned error: %v", pvcKey, err)
 			continue
 		}
 		if pvc.Annotations[volume.AnnSelectedNode] != "" {
@@ -522,9 +522,9 @@ func (env *testEnv) validateBind(
 	// Check pv cache
 	pvCache := env.internalBinder.pvCache
 	for _, pv := range expectedPVs {
-		cachedPV, err := pvCache.GetPV(pv.Name)
+		cachedPV, err := pvCache.Get(pv.Name)
 		if err != nil {
-			t.Errorf("GetPV %q returned error: %v", pv.Name, err)
+			t.Errorf("Get PV %q returned error: %v", pv.Name, err)
 		}
 		// Cache may be overridden by API object with higher version, compare but ignore resource version.
 		newCachedPV := cachedPV.DeepCopy()
@@ -549,9 +549,9 @@ func (env *testEnv) validateProvision(
 	// Check pvc cache
 	pvcCache := env.internalBinder.pvcCache
 	for _, pvc := range expectedPVCs {
-		cachedPVC, err := pvcCache.GetPVC(getPVCName(pvc))
+		cachedPVC, err := pvcCache.Get(getPVCName(pvc))
 		if err != nil {
-			t.Errorf("GetPVC %q returned error: %v", getPVCName(pvc), err)
+			t.Errorf("Get PVC %q returned error: %v", getPVCName(pvc), err)
 		}
 		// Cache may be overridden by API object with higher version, compare but ignore resource version.
 		newCachedPVC := cachedPVC.DeepCopy()
