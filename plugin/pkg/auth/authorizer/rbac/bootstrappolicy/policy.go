@@ -229,9 +229,10 @@ func NodeRules() []rbacv1.PolicyRule {
 		// Use the Node authorization mode to limit a node to get pv/pvc objects referenced by pods bound to itself.
 		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
 
-		// TODO: add to the Node authorizer and restrict to endpoints referenced by pods or PVs bound to the node
 		// Needed for glusterfs volumes
 		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+		// Required since endpoints is deprecated
+		rbacv1helpers.NewRule("get").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 		// Used to create a certificatesigningrequest for a node-specific client certificate, and watch
 		// for it to be signed. This allows the kubelet to rotate it's own certificate.
 		rbacv1helpers.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),

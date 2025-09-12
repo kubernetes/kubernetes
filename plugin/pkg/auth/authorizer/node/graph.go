@@ -23,6 +23,7 @@ import (
 
 	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
@@ -127,6 +128,8 @@ const (
 	vaVertexType
 	serviceAccountVertexType
 	pcrVertexType
+	endpointsVertexType
+	endpointsliceVertexType
 )
 
 var vertexTypes = map[vertexType]string{
@@ -141,6 +144,8 @@ var vertexTypes = map[vertexType]string{
 	vaVertexType:             "volumeattachment",
 	serviceAccountVertexType: "serviceAccount",
 	pcrVertexType:            "podcertificaterequest",
+	endpointsVertexType:      "endpoints",
+	endpointsliceVertexType:  "endpointslice",
 }
 
 // vertexTypeWithAuthoritativeIndex indicates which types of vertices can hold
@@ -609,4 +614,80 @@ func (g *Graph) DeleteResourceSlice(sliceName string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertexLocked(sliceVertexType, "", sliceName)
+}
+
+func (g *Graph) AddEndpoint(ep *corev1.Endpoints) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("AddEndpoints").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	g.deleteVertexLocked(endpointsVertexType, ep.Namespace, ep.Name)
+	epVertex := g.getOrCreateVertexLocked(endpointsVertexType, ep.Namespace, ep.Name)
+	for _, subset := range ep.Subsets {
+		for _, addr := range subset.Addresses {
+			if addr.NodeName == nil || *addr.NodeName == "" {
+				continue
+			}
+
+			nodeVertex := g.getOrCreateVertexLocked(nodeVertexType, "", *addr.NodeName)
+			// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
+			g.addEdgeLocked(epVertex, nodeVertex, nil)
+
+			if addr.TargetRef != nil && addr.TargetRef.Kind == "Pod" {
+				podVertex := g.getOrCreateVertexLocked(podVertexType, addr.TargetRef.Namespace, addr.TargetRef.Name)
+				// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
+				g.addEdgeLocked(epVertex, podVertex, nil)
+			}
+		}
+	}
+}
+
+func (g *Graph) DeleteEndpoint(name, namespace string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("DeleteEndpoints").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.deleteVertexLocked(endpointsVertexType, namespace, name)
+}
+
+func (g *Graph) AddEndpointslice(epSlice *discoveryv1.EndpointSlice) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("AddEndpointslice").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	g.deleteVertexLocked(endpointsliceVertexType, epSlice.Namespace, epSlice.Name)
+	epSliceVertex := g.getOrCreateVertexLocked(endpointsliceVertexType, epSlice.Namespace, epSlice.Name)
+	for _, ep := range epSlice.Endpoints {
+		if ep.NodeName == nil || *ep.NodeName == "" {
+			continue
+		}
+
+		nodeVertex := g.getOrCreateVertexLocked(nodeVertexType, "", *ep.NodeName)
+		// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
+		g.addEdgeLocked(epSliceVertex, nodeVertex, nil)
+
+		if ep.TargetRef != nil && ep.TargetRef.Kind == "Pod" {
+			podVertex := g.getOrCreateVertexLocked(podVertexType, ep.TargetRef.Namespace, ep.TargetRef.Name)
+			// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
+			g.addEdgeLocked(epSliceVertex, podVertex, nil)
+		}
+	}
+}
+
+func (g *Graph) DeleteEndpointslice(name, namespace string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("DeleteEndpointslice").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.deleteVertexLocked(endpointsliceVertexType, namespace, name)
 }

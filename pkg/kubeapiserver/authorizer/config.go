@@ -35,7 +35,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
 	certinformersv1alpha1 "k8s.io/client-go/informers/certificates/v1alpha1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	discoveryinformers "k8s.io/client-go/informers/discovery/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
+
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -110,6 +113,14 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 			if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
 				podCertificateRequestInformer = config.VersionedInformerFactory.Certificates().V1alpha1().PodCertificateRequests()
 			}
+			var endpointsInformer coreinformers.EndpointsInformer
+			if utilfeature.DefaultFeatureGate.Enabled(features.EndpointsAuthorization) {
+				endpointsInformer = config.VersionedInformerFactory.Core().V1().Endpoints()
+			}
+			var endpointsliceInformer discoveryinformers.EndpointSliceInformer
+			if utilfeature.DefaultFeatureGate.Enabled(features.EndpointsliceAuthorization) {
+				endpointsliceInformer = config.VersionedInformerFactory.Discovery().V1().EndpointSlices()
+			}
 			node.RegisterMetrics()
 			graph := node.NewGraph()
 			node.AddGraphEventHandlers(
@@ -120,6 +131,8 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
 				slices, // Nil check in AddGraphEventHandlers can be removed when always creating this.
 				podCertificateRequestInformer,
+				endpointsInformer,
+				endpointsliceInformer,
 			)
 			r.nodeAuthorizer = node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 

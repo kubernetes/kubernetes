@@ -23,11 +23,13 @@ import (
 
 	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	certsv1alpha1informers "k8s.io/client-go/informers/certificates/v1alpha1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
+	discoveryv1informers "k8s.io/client-go/informers/discovery/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
@@ -47,6 +49,8 @@ func AddGraphEventHandlers(
 	attachments storageinformers.VolumeAttachmentInformer,
 	slices resourceinformers.ResourceSliceInformer,
 	pcrs certsv1alpha1informers.PodCertificateRequestInformer,
+	endpoints corev1informers.EndpointsInformer,
+	endpointslices discoveryv1informers.EndpointSliceInformer,
 ) {
 	g := &graphPopulator{
 		graph: graph,
@@ -90,6 +94,24 @@ func AddGraphEventHandlers(
 			DeleteFunc: g.deletePCR,
 		})
 		synced = append(synced, pcrHandler.HasSynced)
+	}
+
+	if endpoints != nil {
+		endpointsHandler, _ := endpoints.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    g.addEndpoint,
+			UpdateFunc: g.updateEndpoint,
+			DeleteFunc: g.deleteEndpoint,
+		})
+		synced = append(synced, endpointsHandler.HasSynced)
+	}
+
+	if endpointslices != nil {
+		endpointslicesHandler, _ := endpointslices.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    g.addEndpointslice,
+			UpdateFunc: g.updateEndpointslice,
+			DeleteFunc: g.deleteEndpointslice,
+		})
+		synced = append(synced, endpointslicesHandler.HasSynced)
 	}
 
 	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop, synced...)
@@ -234,4 +256,133 @@ func (g *graphPopulator) deletePCR(obj any) {
 		return
 	}
 	g.graph.DeletePodCertificateRequest(pcr)
+}
+
+func (g *graphPopulator) addEndpoint(obj any) {
+	g.updateEndpoint(nil, obj)
+}
+
+func (g *graphPopulator) updateEndpoint(oldObj, obj any) {
+	ep := obj.(*corev1.Endpoints)
+
+	if oldEp, ok := oldObj.(*corev1.Endpoints); ok && oldEp != nil {
+		hasNewAddresses := false
+		epAddrsMap := make(map[string]struct{}, len(ep.Subsets))
+		oldEpAddrsMap := make(map[string]struct{}, len(oldEp.Subsets))
+		for _, subset := range ep.Subsets {
+			for _, addr := range subset.Addresses {
+				epAddrsMap[addr.IP] = struct{}{}
+			}
+		}
+		for _, subset := range oldEp.Subsets {
+			for _, addr := range subset.Addresses {
+				oldEpAddrsMap[addr.IP] = struct{}{}
+			}
+		}
+		if len(epAddrsMap) != len(oldEpAddrsMap) {
+			hasNewAddresses = true
+		} else {
+			for addr := range epAddrsMap {
+				if _, exists := oldEpAddrsMap[addr]; !exists {
+					hasNewAddresses = true
+					break
+				}
+			}
+		}
+		if !hasNewAddresses {
+			klog.V(5).Infof("updateEndpoint %s/%s, endpoints addresses unchanged", ep.Namespace, ep.Name)
+			return
+		}
+	}
+
+	klog.V(4).Infof("updateEndpoint %s/%s", ep.Namespace, ep.Name)
+	startTime := time.Now()
+	g.graph.AddEndpoint(ep)
+	klog.V(5).Infof("updateEndpoint %s/%s completed in %v", ep.Namespace, ep.Name, time.Since(startTime))
+}
+
+func (g *graphPopulator) deleteEndpoint(obj any) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	ep, ok := obj.(*corev1.Endpoints)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	if len(ep.Subsets) == 0 {
+		klog.V(5).Infof("deleteEndpoint %s/%s, no subsets", ep.Namespace, ep.Name)
+		return
+	}
+
+	klog.V(4).Infof("deleteEndpoint %s/%s", ep.Namespace, ep.Name)
+	startTime := time.Now()
+	g.graph.DeleteEndpoint(ep.Name, ep.Namespace)
+	klog.V(5).Infof("deleteEndpoint %s/%s completed in %v", ep.Namespace, ep.Name, time.Since(startTime))
+}
+
+func (g *graphPopulator) addEndpointslice(obj any) {
+	g.updateEndpointslice(nil, obj)
+}
+
+func (g *graphPopulator) updateEndpointslice(oldObj, obj any) {
+	epSlice := obj.(*discoveryv1.EndpointSlice)
+	if len(epSlice.Endpoints) == 0 {
+		klog.V(5).Infof("updateEndpointslice %s/%s, no endpoints", epSlice.Namespace, epSlice.Name)
+		return
+	}
+	if oldEpSlice, ok := oldObj.(*discoveryv1.EndpointSlice); ok && oldEpSlice != nil {
+		hasNewAddresses := false
+		epSliceAddrsMap := make(map[string]struct{}, len(epSlice.Endpoints))
+		oldEpSliceAddrsMap := make(map[string]struct{}, len(oldEpSlice.Endpoints))
+		for _, ep := range epSlice.Endpoints {
+			for _, addr := range ep.Addresses {
+				epSliceAddrsMap[addr] = struct{}{}
+			}
+		}
+		for _, ep := range oldEpSlice.Endpoints {
+			for _, addr := range ep.Addresses {
+				oldEpSliceAddrsMap[addr] = struct{}{}
+			}
+		}
+		if len(epSliceAddrsMap) != len(oldEpSliceAddrsMap) {
+			hasNewAddresses = true
+		} else {
+			for addr := range epSliceAddrsMap {
+				if _, exists := oldEpSliceAddrsMap[addr]; !exists {
+					hasNewAddresses = true
+					break
+				}
+			}
+		}
+		if !hasNewAddresses {
+			klog.V(5).Infof("updateEndpointslice %s/%s, endpoints addresses unchanged", epSlice.Namespace, epSlice.Name)
+			return
+		}
+	}
+
+	klog.V(4).Infof("updateEndpointslice %s/%s", epSlice.Namespace, epSlice.Name)
+	startTime := time.Now()
+	g.graph.AddEndpointslice(epSlice)
+	klog.V(5).Infof("updateEndpointslice %s/%s completed in %v", epSlice.Namespace, epSlice.Name, time.Since(startTime))
+}
+
+func (g *graphPopulator) deleteEndpointslice(obj any) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	epSlice, ok := obj.(*discoveryv1.EndpointSlice)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	if len(epSlice.Endpoints) == 0 {
+		klog.V(5).Infof("deleteEndpointslice %s/%s, no endpoints", epSlice.Namespace, epSlice.Name)
+		return
+	}
+
+	klog.V(4).Infof("deleteEndpointslice %s/%s", epSlice.Namespace, epSlice.Name)
+	startTime := time.Now()
+	g.graph.DeleteEndpointslice(epSlice.Name, epSlice.Namespace)
+	klog.V(5).Infof("deleteEndpointslice %s/%s completed in %v", epSlice.Namespace, epSlice.Name, time.Since(startTime))
 }

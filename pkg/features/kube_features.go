@@ -1064,6 +1064,18 @@ const (
 	//
 	// Enables support for joining Windows containers to a hosts' network namespace.
 	WindowsHostNetwork featuregate.Feature = "WindowsHostNetwork"
+
+	// owner: @HomayoonAlimohammadi
+	// kep: https://kep.k8s.io/TODO
+	//
+	// Enable node authorization for the Endpoints resource.
+	EndpointsAuthorization featuregate.Feature = "EndpointsAuthorization"
+
+	// owner: @HomayoonAlimohammadi
+	// kep: https://kep.k8s.io/TODO
+	//
+	// Enable node authorization for the EndpointSlice resource.
+	EndpointsliceAuthorization featuregate.Feature = "EndpointsliceAuthorization"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
@@ -1829,6 +1841,14 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	WindowsHostNetwork: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	EndpointsAuthorization: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	EndpointsliceAuthorization: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	apiextensionsfeatures.CRDValidationRatcheting: {

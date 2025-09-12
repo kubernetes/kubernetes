@@ -32,6 +32,7 @@ import (
 	certsapi "k8s.io/kubernetes/pkg/apis/certificates"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	discoveryapi "k8s.io/kubernetes/pkg/apis/discovery"
 	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
@@ -82,6 +83,10 @@ func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules
 	}
 }
 
+const (
+	kubernetesEp = "kubernetes"
+)
+
 var (
 	configMapResource     = api.Resource("configmaps")
 	secretResource        = api.Resource("secrets")
@@ -96,6 +101,8 @@ var (
 	leaseResource         = coordapi.Resource("leases")
 	csiNodeResource       = storageapi.Resource("csinodes")
 	pcrResource           = certsapi.Resource("podcertificaterequests")
+	endpointsResource     = api.Resource("endpoints")
+	endpointsliceResource = discoveryapi.Resource("endpointslices")
 )
 
 func (r *NodeAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
@@ -157,6 +164,18 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 			if r.features.Enabled(features.PodCertificateRequest) && r.features.Enabled(features.AuthorizeNodeWithSelectors) {
 				return r.authorizePodCertificateRequest(nodeName, attrs)
 			}
+		case endpointsResource:
+			// Allow read access to the "kubernetes" endpoint in the default namespace for all nodes.
+			if attrs.GetName() == kubernetesEp && attrs.GetNamespace() == api.NamespaceDefault {
+				return authorizer.DecisionAllow, "", nil
+			}
+			return r.authorizeReadNamespacedObject(nodeName, secretVertexType, attrs)
+		case endpointsliceResource:
+			// Allow read access to the "kubernetes" endpointslice in the default namespace for all nodes.
+			if attrs.GetName() == kubernetesEp && attrs.GetNamespace() == api.NamespaceDefault {
+				return authorizer.DecisionAllow, "", nil
+			}
+			return r.authorizeReadNamespacedObject(nodeName, secretVertexType, attrs)
 		}
 	}
 
