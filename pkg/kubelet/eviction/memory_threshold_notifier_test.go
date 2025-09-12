@@ -144,7 +144,7 @@ func TestUpdateThreshold(t *testing.T) {
 			m := newTestMemoryThresholdNotifier(tc.evictionThreshold, notifierFactory, nil)
 			notifierFactory.EXPECT().NewCgroupNotifier(logger, testCgroupPath, memoryUsageAttribute, tc.expectedThreshold.Value()).Return(notifier, tc.updateThresholdErr).Times(1)
 			var events chan<- struct{} = m.events
-			notifier.EXPECT().Start(logger, events).Return().Maybe()
+			notifier.EXPECT().Start(tCtx, events).Return().Maybe()
 			err := m.UpdateThreshold(tCtx, nodeSummary(tc.available, tc.workingSet, tc.usage, isAllocatableEvictionThreshold(tc.evictionThreshold)))
 			if err != nil && !tc.expectErr {
 				t.Errorf("Unexpected error updating threshold: %v", err)

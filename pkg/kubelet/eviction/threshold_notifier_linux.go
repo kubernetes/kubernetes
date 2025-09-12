@@ -199,4 +199,4 @@ func (n *linuxCgroupNotifier) Stop() {
 type disabledThresholdNotifier struct{}
 
 func (*disabledThresholdNotifier) Start(context.Context, chan<- struct{}) {}
-func (*disabledThresholdNotifier) Stop()                              {}
+func (*disabledThresholdNotifier) Stop()                                  {}
