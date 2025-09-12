@@ -33,7 +33,7 @@ import (
 var cfgScheme = runtime.NewScheme()
 
 // validEgressSelectorNames contains the set of valid egress selector names.
-var validEgressSelectorNames = sets.NewString("controlplane", "cluster", "etcd")
+var validEgressSelectorNames = sets.New[string]("controlplane", "cluster", "etcd")
 
 func init() {
 	install.Install(cfgScheme)
@@ -95,7 +95,7 @@ func ValidateEgressSelectorConfiguration(config *apiserver.EgressSelectorConfigu
 		}
 	}
 
-	seen := sets.String{}
+	seen := sets.Set[string]{}
 	for i, service := range config.EgressSelections {
 		canonicalName := strings.ToLower(service.Name)
 		fldPath := field.NewPath("service", "connection")
@@ -107,7 +107,7 @@ func ValidateEgressSelectorConfiguration(config *apiserver.EgressSelectorConfigu
 		seen.Insert(canonicalName)
 
 		if !validEgressSelectorNames.Has(canonicalName) {
-			allErrs = append(allErrs, field.NotSupported(fldPath, canonicalName, validEgressSelectorNames.List()))
+			allErrs = append(allErrs, field.NotSupported(fldPath, canonicalName, sets.List(validEgressSelectorNames)))
 			continue
 		}
 	}

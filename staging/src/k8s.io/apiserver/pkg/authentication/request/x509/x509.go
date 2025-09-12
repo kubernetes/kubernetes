@@ -217,8 +217,8 @@ type Verifier struct {
 }
 
 // NewVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
-func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCommonNames sets.String) authenticator.Request {
-	return NewDynamicCAVerifier(StaticVerifierFn(opts), auth, StaticStringSlice(allowedCommonNames.List()))
+func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCommonNames sets.Set[string]) authenticator.Request {
+	return NewDynamicCAVerifier(StaticVerifierFn(opts), auth, StaticStringSlice(sets.List(allowedCommonNames)))
 }
 
 // NewDynamicCAVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth

@@ -250,8 +250,8 @@ func IsNegative(a corev1.ResourceList) []corev1.ResourceName {
 }
 
 // ToSet takes a list of resource names and converts to a string set
-func ToSet(resourceNames []corev1.ResourceName) sets.String {
-	result := sets.NewString()
+func ToSet(resourceNames []corev1.ResourceName) sets.Set[string] {
+	result := sets.New[string]()
 	for _, resourceName := range resourceNames {
 		result.Insert(string(resourceName))
 	}

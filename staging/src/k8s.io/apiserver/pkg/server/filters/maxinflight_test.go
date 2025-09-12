@@ -34,9 +34,9 @@ import (
 
 func createMaxInflightServer(t *testing.T, callsWg, blockWg *sync.WaitGroup, disableCallsWg *bool, disableCallsWgMutex *sync.Mutex, nonMutating, mutating int) *httptest.Server {
 	fcmetrics.Register()
-	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
+	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.New[string]("watch"), sets.New[string]("proxy"))
 
-	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
+	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.New[string]("apis", "api"), GrouplessAPIPrefixes: sets.New[string]("api")}
 	handler := WithMaxInFlightLimit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// A short, accounted request that does not wait for block WaitGroup.

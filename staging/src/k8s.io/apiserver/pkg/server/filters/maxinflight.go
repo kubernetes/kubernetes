@@ -43,8 +43,8 @@ const (
 )
 
 var (
-	nonMutatingRequestVerbs = sets.NewString("get", "list", "watch")
-	watchVerbs              = sets.NewString("watch")
+	nonMutatingRequestVerbs = sets.New[string]("get", "list", "watch")
+	watchVerbs              = sets.New[string]("watch")
 )
 
 func handleError(w http.ResponseWriter, r *http.Request, err error) {

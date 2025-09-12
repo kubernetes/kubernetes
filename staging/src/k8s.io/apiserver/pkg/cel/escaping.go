@@ -25,7 +25,7 @@ import (
 // celReservedSymbols is a list of RESERVED symbols defined in the CEL lexer.
 // No identifiers are allowed to collide with these symbols.
 // https://github.com/google/cel-spec/blob/master/doc/langdef.md#syntax
-var celReservedSymbols = sets.NewString(
+var celReservedSymbols = sets.New[string](
 	"true", "false", "null", "in",
 	"as", "break", "const", "continue", "else",
 	"for", "function", "if", "import", "let",

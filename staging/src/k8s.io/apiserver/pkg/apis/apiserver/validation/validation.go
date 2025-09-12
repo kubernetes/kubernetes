@@ -195,7 +195,7 @@ func validateAudiences(audiences []string, audienceMatchPolicy api.AudienceMatch
 		allErrs = append(allErrs, field.Invalid(fldPath, audiences, "multiple audiences are not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
 	}
 
-	seenAudiences := sets.NewString()
+	seenAudiences := sets.New[string]()
 	for i, audience := range audiences {
 		fldPath := fldPath.Index(i)
 		if len(audience) == 0 {
@@ -259,8 +259,8 @@ func validateEgressSelector(selectorType api.EgressSelectorType, fldPath *field.
 func validateClaimValidationRules(compiler authenticationcel.Compiler, state *validationState, rules []api.ClaimValidationRule, fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
 	var allErrs field.ErrorList
 
-	seenClaims := sets.NewString()
-	seenExpressions := sets.NewString()
+	seenClaims := sets.New[string]()
+	seenExpressions := sets.New[string]()
 	var compilationResults []authenticationcel.CompilationResult
 
 	for i, rule := range rules {
@@ -366,7 +366,7 @@ func validateClaimMappings(compiler authenticationcel.Compiler, state *validatio
 	}
 
 	var extraCompilationResults []authenticationcel.CompilationResult
-	seenExtraKeys := sets.NewString()
+	seenExtraKeys := sets.New[string]()
 
 	for i, mapping := range m.Extra {
 		fldPath := fldPath.Child("extra").Index(i)
@@ -585,7 +585,7 @@ func validateUserValidationRules(compiler authenticationcel.Compiler, state *val
 		allErrs = append(allErrs, field.Invalid(fldPath, "", "user validation rules are not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
 	}
 
-	seenExpressions := sets.NewString()
+	seenExpressions := sets.New[string]()
 	for i, rule := range rules {
 		fldPath := fldPath.Index(i)
 
@@ -646,8 +646,8 @@ func ValidateAuthorizationConfiguration(compiler authorizationcel.Compiler, fldP
 		allErrs = append(allErrs, field.Required(fldPath.Child("authorizers"), "at least one authorization mode must be defined"))
 	}
 
-	seenAuthorizerTypes := sets.NewString()
-	seenAuthorizerNames := sets.NewString()
+	seenAuthorizerTypes := sets.New[string]()
+	seenAuthorizerNames := sets.New[string]()
 	for i, a := range c.Authorizers {
 		fldPath := fldPath.Child("authorizers").Index(i)
 		aType := string(a.Type)
@@ -786,7 +786,7 @@ func compileMatchConditions(compiler authorizationcel.Compiler, matchConditions 
 		return nil, allErrs
 	}
 
-	seenExpressions := sets.NewString()
+	seenExpressions := sets.New[string]()
 	var compilationResults []authorizationcel.CompilationResult
 	var usesFieldSelector, usesLabelSelector bool
 

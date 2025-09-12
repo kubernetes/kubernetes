@@ -186,7 +186,7 @@ func (a *AdmissionOptions) Validate() []error {
 
 	errs := []error{}
 
-	registeredPlugins := sets.NewString(a.Plugins.Registered()...)
+	registeredPlugins := sets.New[string](a.Plugins.Registered()...)
 	for _, name := range a.EnablePlugins {
 		if !registeredPlugins.Has(name) {
 			errs = append(errs, fmt.Errorf("enable-admission-plugins plugin %q is unknown", name))
@@ -199,25 +199,25 @@ func (a *AdmissionOptions) Validate() []error {
 		}
 	}
 
-	enablePlugins := sets.NewString(a.EnablePlugins...)
-	disablePlugins := sets.NewString(a.DisablePlugins...)
-	if len(enablePlugins.Intersection(disablePlugins).List()) > 0 {
+	enablePlugins := sets.New[string](a.EnablePlugins...)
+	disablePlugins := sets.New[string](a.DisablePlugins...)
+	if len(sets.List(enablePlugins.Intersection(disablePlugins))) > 0 {
 		errs = append(errs, fmt.Errorf("%v in enable-admission-plugins and disable-admission-plugins "+
-			"overlapped", enablePlugins.Intersection(disablePlugins).List()))
+			"overlapped", sets.List(enablePlugins.Intersection(disablePlugins))))
 	}
 
 	// Verify RecommendedPluginOrder.
-	recommendPlugins := sets.NewString(a.RecommendedPluginOrder...)
+	recommendPlugins := sets.New[string](a.RecommendedPluginOrder...)
 	intersections := registeredPlugins.Intersection(recommendPlugins)
 	if !intersections.Equal(recommendPlugins) {
 		// Developer error, this should never run in.
 		errs = append(errs, fmt.Errorf("plugins %v in RecommendedPluginOrder are not registered",
-			recommendPlugins.Difference(intersections).List()))
+			sets.List(recommendPlugins.Difference(intersections))))
 	}
 	if !intersections.Equal(registeredPlugins) {
 		// Developer error, this should never run in.
 		errs = append(errs, fmt.Errorf("plugins %v registered are not in RecommendedPluginOrder",
-			registeredPlugins.Difference(intersections).List()))
+			sets.List(registeredPlugins.Difference(intersections))))
 	}
 
 	return errs
@@ -228,8 +228,8 @@ func (a *AdmissionOptions) Validate() []error {
 // to prepare a list of ordered plugin names that are enabled.
 func (a *AdmissionOptions) enabledPluginNames() []string {
 	allOffPlugins := append(sets.List[string](a.DefaultOffPlugins), a.DisablePlugins...)
-	disabledPlugins := sets.NewString(allOffPlugins...)
-	enabledPlugins := sets.NewString(a.EnablePlugins...)
+	disabledPlugins := sets.New[string](allOffPlugins...)
+	enabledPlugins := sets.New[string](a.EnablePlugins...)
 	disabledPlugins = disabledPlugins.Difference(enabledPlugins)
 
 	orderedPlugins := []string{}

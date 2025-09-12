@@ -2105,7 +2105,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 				t.Errorf("log mismatch (-want +got):\n%s", diff)
 			}
 
-			ignoredFields := sets.NewString("Transformer", "EncryptedObjectEncryptedDEKSource", "UID", "CacheKey")
+			ignoredFields := sets.New[string]("Transformer", "EncryptedObjectEncryptedDEKSource", "UID", "CacheKey")
 
 			gotState := *h.state.Load()
 			gotState.KMSProviderName = kmsName
