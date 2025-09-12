@@ -57,14 +57,6 @@ func NewPVAssumeCache(logger klog.Logger, informer informer) (PVAssumeCache, err
 	return PVAssumeCache{cache}, err
 }
 
-func (c PVAssumeCache) GetPV(pvName string) (*v1.PersistentVolume, error) {
-	return c.Get(pvName)
-}
-
-func (c PVAssumeCache) GetAPIPV(pvName string) (*v1.PersistentVolume, error) {
-	return c.GetAPIObj(pvName)
-}
-
 func (c PVAssumeCache) ListPVs(storageClassName string) ([]*v1.PersistentVolume, error) {
 	// This works because we will never change the storage class in scheduler
 	// Assumed PVs needs to be included here to ensure the same PVC will not be bound to another PV in the next scheduling cycle.
@@ -81,12 +73,4 @@ func NewPVCAssumeCache(logger klog.Logger, informer informer) (PVCAssumeCache, e
 	logger = klog.LoggerWithName(logger, "pvc-cache")
 	cache, err := newAssumeCache[*v1.PersistentVolumeClaim](logger, informer, schema.GroupResource{Resource: "persistentvolumeclaims"})
 	return PVCAssumeCache{cache}, err
-}
-
-func (c PVCAssumeCache) GetPVC(pvName string) (*v1.PersistentVolumeClaim, error) {
-	return c.Get(pvName)
-}
-
-func (c PVCAssumeCache) GetAPIPVC(pvName string) (*v1.PersistentVolumeClaim, error) {
-	return c.GetAPIObj(pvName)
 }
