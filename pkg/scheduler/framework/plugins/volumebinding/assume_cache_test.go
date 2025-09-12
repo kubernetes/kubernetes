@@ -99,32 +99,33 @@ func TestAssumePV(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		cache := NewPVAssumeCache(logger, nil)
+		t.Run(name, func(t *testing.T) {
+			cache := NewPVAssumeCache(logger, nil)
 
-		// Add oldPV to cache
-		assumecache.AddTestObject(cache.AssumeCache, scenario.oldPV)
-		if err := verifyPV(cache, scenario.oldPV.Name, scenario.oldPV); err != nil {
-			t.Errorf("Failed to GetPV() after initial update: %v", err)
-			continue
-		}
+			// Add oldPV to cache
+			assumecache.AddTestObject(cache.AssumeCache, scenario.oldPV)
+			if err := verifyPV(cache, scenario.oldPV.Name, scenario.oldPV); err != nil {
+				t.Fatalf("Failed to Get() after initial update: %v", err)
+			}
 
-		// Assume newPV
-		err := cache.Assume(scenario.newPV)
-		if scenario.shouldSucceed && err != nil {
-			t.Errorf("Test %q failed: Assume() returned error %v", name, err)
-		}
-		if !scenario.shouldSucceed && err == nil {
-			t.Errorf("Test %q failed: Assume() returned success but expected error", name)
-		}
+			// Assume newPV
+			err := cache.Assume(scenario.newPV)
+			if scenario.shouldSucceed && err != nil {
+				t.Errorf("Test %q failed: Assume() returned error %v", name, err)
+			}
+			if !scenario.shouldSucceed && err == nil {
+				t.Errorf("Test %q failed: Assume() returned success but expected error", name)
+			}
 
-		// Check that GetPV returns correct PV
-		expectedPV := scenario.newPV
-		if !scenario.shouldSucceed {
-			expectedPV = scenario.oldPV
-		}
-		if err := verifyPV(cache, scenario.oldPV.Name, expectedPV); err != nil {
-			t.Errorf("Failed to GetPV() after initial update: %v", err)
-		}
+			// Check that GetPV returns correct PV
+			expectedPV := scenario.newPV
+			if !scenario.shouldSucceed {
+				expectedPV = scenario.oldPV
+			}
+			if err := verifyPV(cache, scenario.oldPV.Name, expectedPV); err != nil {
+				t.Errorf("Failed to Get() after initial update: %v", err)
+			}
+		})
 	}
 }
 
@@ -341,32 +342,33 @@ func TestAssumePVC(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		cache := NewPVCAssumeCache(logger, nil)
+		t.Run(name, func(t *testing.T) {
+			cache := NewPVCAssumeCache(logger, nil)
 
-		// Add oldPVC to cache
-		assumecache.AddTestObject(cache.AssumeCache, scenario.oldPVC)
-		if err := verifyPVC(cache, getPVCName(scenario.oldPVC), scenario.oldPVC); err != nil {
-			t.Errorf("Failed to GetPVC() after initial update: %v", err)
-			continue
-		}
+			// Add oldPVC to cache
+			assumecache.AddTestObject(cache.AssumeCache, scenario.oldPVC)
+			if err := verifyPVC(cache, getPVCName(scenario.oldPVC), scenario.oldPVC); err != nil {
+				t.Fatalf("Failed to GetPVC() after initial update: %v", err)
+			}
 
-		// Assume newPVC
-		err := cache.Assume(scenario.newPVC)
-		if scenario.shouldSucceed && err != nil {
-			t.Errorf("Test %q failed: Assume() returned error %v", name, err)
-		}
-		if !scenario.shouldSucceed && err == nil {
-			t.Errorf("Test %q failed: Assume() returned success but expected error", name)
-		}
+			// Assume newPVC
+			err := cache.Assume(scenario.newPVC)
+			if scenario.shouldSucceed && err != nil {
+				t.Errorf("Test %q failed: Assume() returned error %v", name, err)
+			}
+			if !scenario.shouldSucceed && err == nil {
+				t.Errorf("Test %q failed: Assume() returned success but expected error", name)
+			}
 
-		// Check that GetPVC returns correct PVC
-		expectedPV := scenario.newPVC
-		if !scenario.shouldSucceed {
-			expectedPV = scenario.oldPVC
-		}
-		if err := verifyPVC(cache, getPVCName(scenario.oldPVC), expectedPV); err != nil {
-			t.Errorf("Failed to GetPVC() after initial update: %v", err)
-		}
+			// Check that GetPVC returns correct PVC
+			expectedPV := scenario.newPVC
+			if !scenario.shouldSucceed {
+				expectedPV = scenario.oldPVC
+			}
+			if err := verifyPVC(cache, getPVCName(scenario.oldPVC), expectedPV); err != nil {
+				t.Errorf("Failed to GetPVC() after initial update: %v", err)
+			}
+		})
 	}
 }
 
