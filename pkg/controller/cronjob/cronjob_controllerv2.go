@@ -132,7 +132,7 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 		},
 	})
 
-	err := jm.jobIndexer.AddIndexers(cache.Indexers{
+	err := jobInformer.Informer().AddIndexers(cache.Indexers{
 		jobControllerUIDIndex: func(obj interface{}) ([]string, error) {
 			job, ok := obj.(*batchv1.Job)
 			if !ok {
