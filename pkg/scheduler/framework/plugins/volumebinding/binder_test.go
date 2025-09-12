@@ -296,7 +296,7 @@ func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1.CSIStorageCa
 	}
 }
 
-func (env *testEnv) initClaims(cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs []*v1.PersistentVolumeClaim) {
+func (env *testEnv) initClaims(t *testing.T, cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range cachedPVCs {
 		assumecache.AddTestObject(env.internalBinder.pvcCache.AssumeCache, pvc)
 		if apiPVCs == nil {
@@ -308,7 +308,7 @@ func (env *testEnv) initClaims(cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs [
 	}
 }
 
-func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.PersistentVolume) {
+func (env *testEnv) initVolumes(t *testing.T, cachedPVs []*v1.PersistentVolume, apiPVs []*v1.PersistentVolume) {
 	for _, pv := range cachedPVs {
 		assumecache.AddTestObject(env.internalBinder.pvCache.AssumeCache, pv)
 		if apiPVs == nil {
@@ -373,13 +373,13 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 	})
 }
 
-func (env *testEnv) deleteVolumes(pvs []*v1.PersistentVolume) {
+func (env *testEnv) deleteVolumes(t *testing.T, pvs []*v1.PersistentVolume) {
 	for _, pv := range pvs {
 		assumecache.DeleteTestObject(env.internalBinder.pvCache.AssumeCache, pv)
 	}
 }
 
-func (env *testEnv) deleteClaims(pvcs []*v1.PersistentVolumeClaim) {
+func (env *testEnv) deleteClaims(t *testing.T, pvcs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range pvcs {
 		assumecache.DeleteTestObject(env.internalBinder.pvcCache.AssumeCache, pvc)
 	}
@@ -986,7 +986,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 
 		// Setup
 		testEnv := newTestBinder(t, ctx)
-		testEnv.initVolumes(scenario.pvs, scenario.pvs)
+		testEnv.initVolumes(t, scenario.pvs, scenario.pvs)
 		if csiDriver != nil {
 			testEnv.addCSIDriver(csiDriver)
 		}
@@ -995,7 +995,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		if scenario.cachePVCs == nil {
 			scenario.cachePVCs = scenario.podPVCs
 		}
-		testEnv.initClaims(scenario.cachePVCs, scenario.cachePVCs)
+		testEnv.initClaims(t, scenario.cachePVCs, scenario.cachePVCs)
 
 		// b. Generate pod with given claims
 		if scenario.pod == nil {
@@ -1114,7 +1114,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 
 		// Setup
 		testEnv := newTestBinder(t, ctx)
-		testEnv.initVolumes(scenario.pvs, scenario.pvs)
+		testEnv.initVolumes(t, scenario.pvs, scenario.pvs)
 		if csiDriver != nil {
 			testEnv.addCSIDriver(csiDriver)
 		}
@@ -1123,7 +1123,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		if scenario.cachePVCs == nil {
 			scenario.cachePVCs = scenario.podPVCs
 		}
-		testEnv.initClaims(scenario.cachePVCs, scenario.cachePVCs)
+		testEnv.initClaims(t, scenario.cachePVCs, scenario.cachePVCs)
 
 		// b. Generate pod with given claims
 		if scenario.pod == nil {
@@ -1222,7 +1222,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 
 		// Setup
 		testEnv := newTestBinder(t, ctx)
-		testEnv.initVolumes(scenario.pvs, scenario.pvs)
+		testEnv.initVolumes(t, scenario.pvs, scenario.pvs)
 
 		var node *v1.Node
 		if len(scenario.initNodes) > 0 {
@@ -1240,7 +1240,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		if scenario.cachePVCs == nil {
 			scenario.cachePVCs = scenario.podPVCs
 		}
-		testEnv.initClaims(scenario.cachePVCs, scenario.cachePVCs)
+		testEnv.initClaims(t, scenario.cachePVCs, scenario.cachePVCs)
 
 		// b. Generate pod with given claims
 		if scenario.pod == nil {
@@ -1340,7 +1340,7 @@ func TestAssumePodVolumes(t *testing.T) {
 
 		// Setup
 		testEnv := newTestBinder(t, ctx)
-		testEnv.initClaims(scenario.podPVCs, scenario.podPVCs)
+		testEnv.initClaims(t, scenario.podPVCs, scenario.podPVCs)
 		pod := makePod("test-pod").
 			withNamespace("testns").
 			withNodeName("node1").
@@ -1349,7 +1349,7 @@ func TestAssumePodVolumes(t *testing.T) {
 			StaticBindings:    scenario.bindings,
 			DynamicProvisions: scenario.dynamicProvisions,
 		}
-		testEnv.initVolumes(scenario.pvs, scenario.pvs)
+		testEnv.initVolumes(t, scenario.pvs, scenario.pvs)
 
 		// Execute
 		allBound, err := testEnv.binder.AssumePodVolumes(logger, pod, "node1", podVolumes)
@@ -1399,7 +1399,7 @@ func TestRevertAssumedPodVolumes(t *testing.T) {
 
 	// Setup
 	testEnv := newTestBinder(t, ctx)
-	testEnv.initClaims(podPVCs, podPVCs)
+	testEnv.initClaims(t, podPVCs, podPVCs)
 	pod := makePod("test-pod").
 		withNamespace("testns").
 		withNodeName("node1").
@@ -1408,7 +1408,7 @@ func TestRevertAssumedPodVolumes(t *testing.T) {
 		StaticBindings:    bindings,
 		DynamicProvisions: dynamicProvisions,
 	}
-	testEnv.initVolumes(pvs, pvs)
+	testEnv.initVolumes(t, pvs, pvs)
 
 	allbound, err := testEnv.binder.AssumePodVolumes(logger, pod, "node1", podVolumes)
 	if allbound || err != nil {
@@ -1531,8 +1531,8 @@ func TestBindAPIUpdate(t *testing.T) {
 		if scenario.apiPVCs == nil {
 			scenario.apiPVCs = scenario.cachedPVCs
 		}
-		testEnv.initVolumes(scenario.cachedPVs, scenario.apiPVs)
-		testEnv.initClaims(scenario.cachedPVCs, scenario.apiPVCs)
+		testEnv.initVolumes(t, scenario.cachedPVs, scenario.apiPVs)
+		testEnv.initClaims(t, scenario.cachedPVCs, scenario.apiPVCs)
 		testEnv.assumeVolumes(t, "node1", pod, scenario.bindings, scenario.provisionedPVCs)
 
 		// Execute
@@ -1725,20 +1725,20 @@ func TestCheckBindings(t *testing.T) {
 		testEnv := newTestBinder(t, ctx)
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		testEnv.initNodes([]*v1.Node{node1})
-		testEnv.initVolumes(scenario.initPVs, nil)
-		testEnv.initClaims(scenario.initPVCs, nil)
+		testEnv.initVolumes(t, scenario.initPVs, nil)
+		testEnv.initClaims(t, scenario.initPVCs, nil)
 		testEnv.assumeVolumes(t, "node1", pod, scenario.bindings, scenario.provisionedPVCs)
 
 		// Before execute
 		if scenario.deletePVs {
-			testEnv.deleteVolumes(scenario.initPVs)
+			testEnv.deleteVolumes(t, scenario.initPVs)
 		} else {
 			if err := testEnv.updateVolumes(ctx, scenario.apiPVs); err != nil {
 				t.Errorf("Failed to update PVs: %v", err)
 			}
 		}
 		if scenario.deletePVCs {
-			testEnv.deleteClaims(scenario.initPVCs)
+			testEnv.deleteClaims(t, scenario.initPVCs)
 		} else {
 			if err := testEnv.updateClaims(ctx, scenario.apiPVCs); err != nil {
 				t.Errorf("Failed to update PVCs: %v", err)
@@ -1853,8 +1853,8 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		testEnv.initNodes(scenario.initNodes)
 		testEnv.initCSINodes(scenario.initCSINodes)
-		testEnv.initVolumes(scenario.initPVs, nil)
-		testEnv.initClaims(scenario.initPVCs, nil)
+		testEnv.initVolumes(t, scenario.initPVs, nil)
+		testEnv.initClaims(t, scenario.initPVCs, nil)
 		testEnv.assumeVolumes(t, "node1", pod, scenario.bindings, scenario.provisionedPVCs)
 
 		// Before execute
@@ -2054,8 +2054,8 @@ func TestBindPodVolumes(t *testing.T) {
 				claimsToProvision = []*v1.PersistentVolumeClaim{scenario.claimToProvision}
 			}
 			testEnv.initNodes(scenario.nodes)
-			testEnv.initVolumes(scenario.initPVs, scenario.initPVs)
-			testEnv.initClaims(scenario.initPVCs, scenario.initPVCs)
+			testEnv.initVolumes(t, scenario.initPVs, scenario.initPVs)
+			testEnv.initClaims(t, scenario.initPVCs, scenario.initPVCs)
 			testEnv.assumeVolumes(t, "node1", pod, bindings, claimsToProvision)
 		}
 
@@ -2121,8 +2121,8 @@ func TestFindAssumeVolumes(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	testEnv := newTestBinder(t, ctx)
-	testEnv.initVolumes(pvs, pvs)
-	testEnv.initClaims(podPVCs, podPVCs)
+	testEnv.initVolumes(t, pvs, pvs)
+	testEnv.initClaims(t, podPVCs, podPVCs)
 	pod := makePod("test-pod").
 		withNamespace("testns").
 		withNodeName("node1").
@@ -2297,7 +2297,7 @@ func TestCapacity(t *testing.T) {
 		testEnv.addCSIStorageCapacities(scenario.capacities)
 
 		// a. Init pvc cache
-		testEnv.initClaims(scenario.pvcs, scenario.pvcs)
+		testEnv.initClaims(t, scenario.pvcs, scenario.pvcs)
 
 		// b. Generate pod with given claims
 		pod := makePod("test-pod").
