@@ -30,6 +30,8 @@ import (
 // sufficient for one assume cache.
 type testInformer struct {
 	handler cache.ResourceEventHandler
+	indexer cache.Indexer
+	t       *testing.T
 }
 
 func (i *testInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
@@ -37,27 +39,49 @@ func (i *testInformer) AddEventHandler(handler cache.ResourceEventHandler) (cach
 	return nil, nil
 }
 
+func (i *testInformer) GetIndexer() cache.Indexer {
+	return i.indexer
+}
+
 func (i *testInformer) add(obj interface{}) {
+	if err := i.indexer.Add(obj); err != nil {
+		i.t.Fatalf("failed to add object into indexer: %v", err)
+	}
 	i.handler.OnAdd(obj, false)
 }
 
 func (i *testInformer) update(oldObj, obj interface{}) {
+	if err := i.indexer.Update(obj); err != nil {
+		i.t.Fatalf("failed to update object to indexer: %v", err)
+	}
 	i.handler.OnUpdate(oldObj, obj)
 }
 
 func (i *testInformer) delete(obj interface{}) {
+	if err := i.indexer.Delete(obj); err != nil {
+		i.t.Fatalf("failed to delete object from indexer: %v", err)
+	}
 	i.handler.OnDelete(obj)
 }
 
-func newTestPVCache(t *testing.T) (*testInformer, *PVAssumeCache) {
+func newTestPVCache(t *testing.T) (*testInformer, PVAssumeCache) {
 	logger, _ := ktesting.NewTestContext(t)
-	informer := &testInformer{}
-	cache := NewPVAssumeCache(logger, informer)
+	informer := &testInformer{
+		indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{}),
+		t:       t,
+	}
+	cache, err := NewPVAssumeCache(logger, informer)
+	if err != nil {
+		t.Fatalf("NewPVAssumeCache() failed: %v", err)
+	}
 	return informer, cache
 }
 
-func verifyListPVs(t *testing.T, cache *PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {
-	pvList := cache.ListPVs(storageClassName)
+func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {
+	pvList, err := cache.ListPVs(storageClassName)
+	if err != nil {
+		t.Errorf("ListPVs() failed: %v", err)
+	}
 	if len(pvList) != len(expectedPVs) {
 		t.Errorf("ListPVs() returned %v PVs, expected %v", len(pvList), len(expectedPVs))
 	}
@@ -72,7 +96,7 @@ func verifyListPVs(t *testing.T, cache *PVAssumeCache, expectedPVs map[string]*v
 	}
 }
 
-func verifyPV(cache *PVAssumeCache, name string, expectedPV *v1.PersistentVolume) error {
+func verifyPV(cache PVAssumeCache, name string, expectedPV *v1.PersistentVolume) error {
 	pv, err := cache.GetPV(name)
 	if err != nil {
 		return err
@@ -99,10 +123,10 @@ func TestAssumePV(t *testing.T) {
 			newPV:         makePV("pv1", "class1").withVersion("5").PersistentVolume,
 			shouldSucceed: true,
 		},
-		"success-new-higher-version": {
+		"fail-new-higher-version": {
 			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
 			newPV:         makePV("pv1", "").withVersion("6").PersistentVolume,
-			shouldSucceed: true,
+			shouldSucceed: false,
 		},
 		"fail-old-not-found": {
 			oldPV:         makePV("pv2", "").withVersion("5").PersistentVolume,
@@ -163,7 +187,7 @@ func TestRestorePV(t *testing.T) {
 	newPV := makePV("pv1", "").withVersion("5").PersistentVolume
 
 	// Restore PV that doesn't exist
-	cache.Restore("nothing")
+	cache.Restore(&v1.PersistentVolume{})
 
 	// Add oldPV to cache
 	informer.add(oldPV)
@@ -172,7 +196,7 @@ func TestRestorePV(t *testing.T) {
 	}
 
 	// Restore PV
-	cache.Restore(oldPV.Name)
+	cache.Restore(oldPV)
 	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
 		t.Fatalf("Failed to GetPV() after initial restore: %v", err)
 	}
@@ -186,7 +210,7 @@ func TestRestorePV(t *testing.T) {
 	}
 
 	// Restore PV
-	cache.Restore(oldPV.Name)
+	cache.Restore(newPV)
 	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
 		t.Fatalf("Failed to GetPV() after restore: %v", err)
 	}
@@ -314,7 +338,7 @@ func makeClaim(name, version, namespace string) *v1.PersistentVolumeClaim {
 	}
 }
 
-func verifyPVC(cache *PVCAssumeCache, pvcKey string, expectedPVC *v1.PersistentVolumeClaim) error {
+func verifyPVC(cache PVCAssumeCache, pvcKey string, expectedPVC *v1.PersistentVolumeClaim) error {
 	pvc, err := cache.GetPVC(pvcKey)
 	if err != nil {
 		return err
@@ -325,10 +349,16 @@ func verifyPVC(cache *PVCAssumeCache, pvcKey string, expectedPVC *v1.PersistentV
 	return nil
 }
 
-func newTestPVCCache(t *testing.T) (*testInformer, *PVCAssumeCache) {
+func newTestPVCCache(t *testing.T) (*testInformer, PVCAssumeCache) {
 	logger, _ := ktesting.NewTestContext(t)
-	informer := &testInformer{}
-	cache := NewPVCAssumeCache(logger, informer)
+	informer := &testInformer{
+		indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{}),
+		t:       t,
+	}
+	cache, err := NewPVCAssumeCache(logger, informer)
+	if err != nil {
+		t.Fatalf("NewPVCAssumeCache() failed: %v", err)
+	}
 	return informer, cache
 }
 
@@ -343,10 +373,10 @@ func TestAssumePVC(t *testing.T) {
 			newPVC:        makeClaim("pvc1", "5", "ns1"),
 			shouldSucceed: true,
 		},
-		"success-new-higher-version": {
+		"fail-new-higher-version": {
 			oldPVC:        makeClaim("pvc1", "5", "ns1"),
 			newPVC:        makeClaim("pvc1", "6", "ns1"),
-			shouldSucceed: true,
+			shouldSucceed: false,
 		},
 		"fail-old-not-found": {
 			oldPVC:        makeClaim("pvc2", "5", "ns1"),
@@ -408,7 +438,7 @@ func TestRestorePVC(t *testing.T) {
 	newPVC := makeClaim("pvc1", "5", "ns1")
 
 	// Restore PVC that doesn't exist
-	cache.Restore("nothing")
+	cache.Restore(&v1.PersistentVolumeClaim{})
 
 	// Add oldPVC to cache
 	informer.add(oldPVC)
@@ -417,7 +447,7 @@ func TestRestorePVC(t *testing.T) {
 	}
 
 	// Restore PVC
-	cache.Restore(getPVCName(oldPVC))
+	cache.Restore(oldPVC)
 	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
 		t.Fatalf("Failed to GetPVC() after initial restore: %v", err)
 	}
@@ -431,8 +461,41 @@ func TestRestorePVC(t *testing.T) {
 	}
 
 	// Restore PVC
-	cache.Restore(getPVCName(oldPVC))
+	cache.Restore(newPVC)
 	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
+		t.Fatalf("Failed to GetPVC() after restore: %v", err)
+	}
+}
+
+func TestConcurrentAssumePVC(t *testing.T) {
+	informer, cache := newTestPVCCache(t)
+
+	pvc1 := makeClaim("pvc1", "5", "ns1")
+	pvc1Update := makeClaim("pvc1", "5", "ns1")
+	// Add PVC to cache
+	informer.add(pvc1)
+
+	// Update PVC 1
+	if err := cache.Assume(pvc1Update); err != nil {
+		t.Fatalf("Assume() returned error %v", err)
+	}
+	if err := verifyPVC(cache, getPVCName(pvc1Update), pvc1Update); err != nil {
+		t.Fatalf("Failed to GetPVC() after Assume: %v", err)
+	}
+
+	pvc2 := makeClaim("pvc1", "7", "ns1")
+	pvc2Update := makeClaim("pvc1", "7", "ns1")
+	// PVC updated externally
+	informer.add(pvc2)
+
+	// Update PVC 2
+	if err := cache.Assume(pvc2Update); err != nil {
+		t.Fatalf("Assume() returned error %v", err)
+	}
+	// PVC 1 failed with conflict
+	cache.Restore(pvc1Update)
+	// Should still have pvc 2 in cache
+	if err := verifyPVC(cache, getPVCName(pvc2Update), pvc2Update); err != nil {
 		t.Fatalf("Failed to GetPVC() after restore: %v", err)
 	}
 }
@@ -464,5 +527,34 @@ func TestAssumeUpdatePVCCache(t *testing.T) {
 	informer.add(pvc)
 	if err := verifyPVC(cache, getPVCName(pvc), newPVC); err != nil {
 		t.Fatalf("failed to get PVC after old PVC added: %v", err)
+	}
+}
+
+func TestDelayedInformerEvent(t *testing.T) {
+	informer, cache := newTestPVCCache(t)
+
+	pvcName := "test-pvc0"
+	pvcNamespace := "test-ns"
+
+	pvc1 := makeClaim(pvcName, "1", pvcNamespace)
+	pvc2 := makeClaim(pvcName, "2", pvcNamespace)
+	// Only add indexer, simulating delayed informer event
+	if err := informer.indexer.Add(pvc2); err != nil {
+		t.Fatalf("failed to add PVC: %v", err)
+	}
+
+	newPVC := pvc2.DeepCopy()
+	newPVC.Annotations[volume.AnnSelectedNode] = "test-node"
+	if err := cache.Assume(newPVC); err != nil {
+		t.Fatalf("failed to assume PVC: %v", err)
+	}
+
+	// Send the delayed event
+	informer.handler.OnAdd(pvc1, false)
+	informer.handler.OnDelete(pvc1)
+	informer.handler.OnAdd(pvc2, false)
+	// Expect assumed version not overwritten
+	if err := verifyPVC(cache, getPVCName(newPVC), newPVC); err != nil {
+		t.Fatalf("failed to get PVC after assume: %v", err)
 	}
 }

@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
-	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 var (
@@ -170,7 +169,7 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 		CSIDriverInformer:          csiDriverInformer,
 		CSIStorageCapacityInformer: csiStorageCapacityInformer,
 	}
-	binder := NewVolumeBinder(
+	binder, err := NewVolumeBinder(
 		logger,
 		client,
 		feature.Features{},
@@ -182,6 +181,9 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 		classInformer,
 		capacityCheck,
 		10*time.Second)
+	if err != nil {
+		t.Fatalf("Failed to create VolumeBinder: %v", err)
+	}
 
 	// Wait for informers cache sync
 	informerFactory.Start(ctx.Done())
@@ -298,7 +300,9 @@ func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1.CSIStorageCa
 
 func (env *testEnv) initClaims(t *testing.T, cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range cachedPVCs {
-		assumecache.AddTestObject(env.internalBinder.pvcCache.AssumeCache, pvc)
+		if err := env.internalBinder.pvcCache.store.Add(pvc); err != nil {
+			t.Fatalf("error adding PVC %s/%s to cache: %v", pvc.Namespace, pvc.Name, err)
+		}
 		if apiPVCs == nil {
 			env.reactor.AddClaim(pvc)
 		}
@@ -310,7 +314,9 @@ func (env *testEnv) initClaims(t *testing.T, cachedPVCs []*v1.PersistentVolumeCl
 
 func (env *testEnv) initVolumes(t *testing.T, cachedPVs []*v1.PersistentVolume, apiPVs []*v1.PersistentVolume) {
 	for _, pv := range cachedPVs {
-		assumecache.AddTestObject(env.internalBinder.pvCache.AssumeCache, pv)
+		if err := env.internalBinder.pvCache.store.Add(pv); err != nil {
+			t.Fatalf("error adding PV %s to cache: %v", pv.Name, err)
+		}
 		if apiPVs == nil {
 			env.reactor.AddVolume(pv)
 		}
@@ -318,7 +324,6 @@ func (env *testEnv) initVolumes(t *testing.T, cachedPVs []*v1.PersistentVolume, 
 	for _, pv := range apiPVs {
 		env.reactor.AddVolume(pv)
 	}
-
 }
 
 func (env *testEnv) updateVolumes(ctx context.Context, pvs []*v1.PersistentVolume) error {
@@ -331,13 +336,9 @@ func (env *testEnv) updateVolumes(ctx context.Context, pvs []*v1.PersistentVolum
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, pv := range pvs {
-			obj, err := env.internalBinder.pvCache.GetAPIObj(pv.Name)
-			if obj == nil || err != nil {
+			pvInCache, err := env.internalBinder.pvCache.GetAPIPV(pv.Name)
+			if pvInCache == nil || err != nil {
 				return false, nil
-			}
-			pvInCache, ok := obj.(*v1.PersistentVolume)
-			if !ok {
-				return false, fmt.Errorf("PV %s invalid object", pvInCache.Name)
 			}
 			if versioner.CompareResourceVersion(pvInCache, pv) != 0 {
 				return false, nil
@@ -357,13 +358,9 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, pvc := range pvcs {
-			obj, err := env.internalBinder.pvcCache.GetAPIObj(getPVCName(pvc))
-			if obj == nil || err != nil {
+			pvcInCache, err := env.internalBinder.pvcCache.GetAPIPVC(getPVCName(pvc))
+			if pvcInCache == nil || err != nil {
 				return false, nil
-			}
-			pvcInCache, ok := obj.(*v1.PersistentVolumeClaim)
-			if !ok {
-				return false, fmt.Errorf("PVC %s invalid object", pvcInCache.Name)
 			}
 			if versioner.CompareResourceVersion(pvcInCache, pvc) != 0 {
 				return false, nil
@@ -375,13 +372,17 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 
 func (env *testEnv) deleteVolumes(t *testing.T, pvs []*v1.PersistentVolume) {
 	for _, pv := range pvs {
-		assumecache.DeleteTestObject(env.internalBinder.pvCache.AssumeCache, pv)
+		if err := env.internalBinder.pvCache.store.Delete(pv); err != nil {
+			t.Fatalf("Error deleting PV %s: %v", pv.Name, err)
+		}
 	}
 }
 
 func (env *testEnv) deleteClaims(t *testing.T, pvcs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range pvcs {
-		assumecache.DeleteTestObject(env.internalBinder.pvcCache.AssumeCache, pvc)
+		if err := env.internalBinder.pvcCache.store.Delete(pvc); err != nil {
+			t.Fatalf("Error deleting PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
+		}
 	}
 }
 
@@ -489,8 +490,8 @@ func (env *testEnv) validateCacheRestored(t *testing.T, pod *v1.Pod, bindings []
 	// All PVs have been unmodified in cache
 	pvCache := env.internalBinder.pvCache
 	for _, b := range bindings {
-		pv, _ := pvCache.GetPV(b.pv.Name)
-		apiPV, _ := pvCache.GetAPIPV(b.pv.Name)
+		pv, _ := pvCache.Get(b.pv.Name)
+		apiPV, _ := pvCache.GetAPIObj(b.pv.Name)
 		// PV could be nil if it's missing from cache
 		if pv != nil && pv != apiPV {
 			t.Errorf("PV %q was modified in cache", b.pv.Name)
@@ -2141,20 +2142,20 @@ func TestFindAssumeVolumes(t *testing.T) {
 	// 1. Find matching PVs
 	podVolumes, reasons, err := findPodVolumes(logger, testEnv.binder, pod, testNode)
 	if err != nil {
-		t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
+		t.Fatalf("Test failed: FindPodVolumes returned error: %v", err)
 	}
 	if len(reasons) > 0 {
-		t.Errorf("Test failed: couldn't find PVs for all PVCs: %v", reasons)
+		t.Fatalf("Test failed: couldn't find PVs for all PVCs: %v", reasons)
 	}
 	expectedBindings := podVolumes.StaticBindings
 
 	// 2. Assume matches
 	allBound, err := testEnv.binder.AssumePodVolumes(logger, pod, testNode.Name, podVolumes)
 	if err != nil {
-		t.Errorf("Test failed: AssumePodVolumes returned error: %v", err)
+		t.Fatalf("Test failed: AssumePodVolumes returned error: %v", err)
 	}
 	if allBound {
-		t.Errorf("Test failed: detected unbound volumes as bound")
+		t.Fatalf("Test failed: detected unbound volumes as bound")
 	}
 	testEnv.validateAssume(t, pod, expectedBindings, nil)
 
@@ -2167,10 +2168,10 @@ func TestFindAssumeVolumes(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		podVolumes, reasons, err := findPodVolumes(logger, testEnv.binder, pod, testNode)
 		if err != nil {
-			t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
+			t.Fatalf("Test failed: FindPodVolumes returned error: %v", err)
 		}
 		if len(reasons) > 0 {
-			t.Errorf("Test failed: couldn't find PVs for all PVCs: %v", reasons)
+			t.Fatalf("Test failed: couldn't find PVs for all PVCs: %v", reasons)
 		}
 		testEnv.validatePodCache(t, testNode.Name, pod, podVolumes, expectedBindings, nil)
 	}
