@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
@@ -106,7 +107,7 @@ func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *
 
 	c.MergedResourceConfig = mergedResourceConfig
 
-	if binVersion, emulatedVersion := c.EffectiveVersion.BinaryVersion(), c.EffectiveVersion.EmulationVersion(); !binVersion.EqualTo(emulatedVersion) {
+	if binVersion, emulatedVersion := c.EffectiveVersion.BinaryVersion(), c.EffectiveVersion.EmulationVersion(); !version.MajorMinor(binVersion.Major(), binVersion.Minor()).EqualTo(version.MajorMinor(emulatedVersion.Major(), emulatedVersion.Minor())) {
 		for _, version := range registry.PrioritizedVersionsAllGroups() {
 			if strings.Contains(version.Version, "alpha") {
 				klog.Warningf("alpha api enabled with emulated version %s instead of the binary's version %s, this is unsupported, proceed at your own risk: api=%s", emulatedVersion, binVersion, version.String())
