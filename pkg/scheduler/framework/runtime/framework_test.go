@@ -3371,8 +3371,6 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					// Create a fake metrics recorder to verify calls
 					mockRecorder := NewMockMetricsRecorder()
 
-					// If metrics are disabled, we don't expect any calls
-
 					// Create registry with test plugin
 					plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 					r := make(Registry)
@@ -3425,7 +3423,7 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					// Run the action
 					tt.action(ctx, f)
 
-					// Verify the mock recorder captured the expected calls
+					// If metrics are enabled, verify the mock recorder captured the expected calls
 					if metricsEnabled {
 						// Verify call count
 						expectedCalls := 1
@@ -3456,7 +3454,7 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 							}
 						}
 					} else {
-						// Metrics disabled - no calls expected
+						// Metrics disabled, we don't expect any calls
 						if got := mockRecorder.PluginDurationCallCount(); got != 0 {
 							t.Errorf("expected no plugin duration calls when metrics disabled, got %d", got)
 						}
