@@ -113,7 +113,7 @@ type FeatureGate interface {
 	Enabled(key Feature) bool
 	// KnownFeatures returns a slice of strings describing the FeatureGate's known features.
 	KnownFeatures() []string
-	// Dependencies returns ap copy of the known feature dependencies.
+	// Dependencies returns a copy of the known feature dependencies.
 	Dependencies() map[Feature][]Feature
 	// DeepCopy returns a deep copy of the FeatureGate object, such that gates can be
 	// set on the copy without mutating the original. This is useful for validating
@@ -318,27 +318,7 @@ func (f *featureGate) Validate() []error {
 		return []error{fmt.Errorf("cannot cast enabledRaw to map[string]bool")}
 	}
 	enabled := map[Feature]bool{}
-	errs := f.unsafeSetFromMap(enabled, m, f.EmulationVersion())
-
-	dependencies := *f.dependencies.Load()
-	known := f.known.Load().(map[Feature]VersionedSpecs)
-	for feature, deps := range dependencies {
-		if !featureEnabled(feature, enabled, known, f.EmulationVersion()) {
-			continue
-		}
-
-		var disabledDeps []Feature
-		for _, dep := range deps {
-			if !featureEnabled(dep, enabled, known, f.EmulationVersion()) {
-				disabledDeps = append(disabledDeps, dep)
-			}
-		}
-		if len(disabledDeps) > 0 {
-			errs = append(errs, fmt.Errorf("cannot enable %s since it depends on disabled features: %v", feature, disabledDeps))
-		}
-	}
-
-	return errs
+	return f.unsafeSetFromMap(enabled, m, f.EmulationVersion())
 }
 
 // unsafeSetFromMap stores flag gates for known features from a map[string]bool into an enabled map.
@@ -381,6 +361,29 @@ func (f *featureGate) unsafeSetFromMap(enabled map[Feature]bool, m map[string]bo
 			klog.Warningf("Setting GA feature gate %s=%t. It will be removed in a future release.", k, v)
 		}
 	}
+
+	if len(errs) > 0 {
+		return errs
+	}
+
+	// If enabled features were set successfully, validate them against the dependencies.
+	dependencies := *f.dependencies.Load()
+	for feature, deps := range dependencies {
+		if !featureEnabled(feature, enabled, known, f.EmulationVersion()) {
+			continue
+		}
+
+		var disabledDeps []Feature
+		for _, dep := range deps {
+			if !featureEnabled(dep, enabled, known, f.EmulationVersion()) {
+				disabledDeps = append(disabledDeps, dep)
+			}
+		}
+		if len(disabledDeps) > 0 {
+			errs = append(errs, fmt.Errorf("%s is enabled, but depends on features that are disabled: %v", feature, disabledDeps))
+		}
+	}
+
 	return errs
 }
 
@@ -527,23 +530,6 @@ func (f *featureGate) AddDependencies(dependencies map[Feature][]Feature) error 
 		dependencies[k] = slices.Compact(v)
 	}
 
-	// Features cannot depend on features with a lower prerelease level.
-	// This function converts prereleases to a numerical value for comparison.
-	stabilityOrder := func(p prerelease) int {
-		switch p {
-		case Deprecated:
-			return 0 // Non-deprecated features cannot depend on deprecated features.
-		case PreAlpha, Alpha: // Alpha features are allowed to depend on pre-alpha features.
-			return 1
-		case Beta:
-			return 2
-		case GA:
-			return 3
-		default:
-			return -1 // Unknown prerelease
-		}
-	}
-
 	// Validate dependencies for each emulated version:
 	// 1. Features & dependencies must be known
 	// 2. Features cannot depend on features with a lower prerelease level
@@ -609,6 +595,23 @@ func (f *featureGate) AddDependencies(dependencies map[Feature][]Feature) error 
 	f.dependencies.Store(&dependencies)
 
 	return nil
+}
+
+// stabilityOrder converts prereleases to a numerical value for dependency comparison.
+// Features cannot depend on features with a lower prerelease level.
+func stabilityOrder(p prerelease) int {
+	switch p {
+	case Deprecated:
+		return 0 // Non-deprecated features cannot depend on deprecated features.
+	case PreAlpha, Alpha: // Alpha features are allowed to depend on pre-alpha features.
+		return 1
+	case Beta:
+		return 2
+	case GA:
+		return 3
+	default:
+		return -1 // Unknown prerelease
+	}
 }
 
 func (f *featureGate) Dependencies() map[Feature][]Feature {

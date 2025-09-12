@@ -2181,22 +2181,22 @@ func TestValidateDependencies(t *testing.T) {
 		{
 			name:        "one dependency disabled",
 			set:         "FeatureA=true,FeatureB=false,FeatureC=true,FeatureD=true",
-			expectedErr: "cannot enable FeatureA since it depends on disabled features: [FeatureB]",
+			expectedErr: "FeatureA is enabled, but depends on features that are disabled: [FeatureB]",
 		},
 		{
 			name:        "another dependency disabled",
 			set:         "FeatureA=true,FeatureB=true,FeatureC=false,FeatureD=true",
-			expectedErr: "cannot enable FeatureA since it depends on disabled features: [FeatureC]",
+			expectedErr: "FeatureA is enabled, but depends on features that are disabled: [FeatureC]",
 		},
 		{
 			name:        "multiple dependencies disabled",
 			set:         "FeatureA=true,FeatureB=false,FeatureC=false,FeatureD=true",
-			expectedErr: "cannot enable FeatureA since it depends on disabled features: [FeatureB FeatureC]",
+			expectedErr: "FeatureA is enabled, but depends on features that are disabled: [FeatureB FeatureC]",
 		},
 		{
 			name:        "transitive dependency disabled",
 			set:         "FeatureA=true,FeatureB=true,FeatureC=true,FeatureD=false",
-			expectedErr: "cannot enable FeatureB since it depends on disabled features: [FeatureD]",
+			expectedErr: "FeatureB is enabled, but depends on features that are disabled: [FeatureD]",
 		},
 		{
 			name: "feature disabled",
@@ -2213,14 +2213,12 @@ func TestValidateDependencies(t *testing.T) {
 			f := NewFeatureGate()
 			require.NoError(t, f.Add(features))
 			require.NoError(t, f.AddDependencies(dependencies))
-			require.NoError(t, f.Set(tc.set))
 
-			errs := f.Validate()
+			err := f.Set(tc.set)
 			if tc.expectedErr == "" {
-				assert.Empty(t, errs)
+				require.NoError(t, err)
 			} else {
-				require.NotEmpty(t, errs)
-				assert.EqualError(t, errs[0], tc.expectedErr)
+				assert.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
