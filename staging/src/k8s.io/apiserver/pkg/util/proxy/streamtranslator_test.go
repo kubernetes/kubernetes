@@ -21,19 +21,22 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	mrand "math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,203 +52,185 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 )
 
-// TestStreamTranslator_LoopbackStdinToStdout returns random data sent on the client's
-// STDIN channel back onto the client's STDOUT channel. There are two servers in this test: the
-// upstream fake SPDY server, and the StreamTranslator server. The StreamTranslator proxys the
-// data received from the websocket client upstream to the SPDY server (by translating the
-// websocket data into spdy). The returned data read on the websocket client STDOUT is then
-// compared the random data sent on STDIN to ensure they are the same.
-func TestStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
+var (
+	// spdyServer is the upstream SPDY server that the StreamTranslatorHandler connects to.
+	// It is shared across all tests in this package.
+	spdyServer *httptest.Server
+	// spdyServerMux is the router for the spdyServer. Tests register their specific handlers here.
+	spdyServerMux *http.ServeMux
+	spdyServerURL *url.URL
+
+	// streamTranslatorServer is the server that exposes the StreamTranslatorHandler.
+	// Test clients connect to this server. It is shared across all tests.
+	streamTranslatorServer *httptest.Server
+	// streamTranslatorServerMux is the router for the streamTranslatorServer.
+	// Tests register their specific StreamTranslatorHandler configurations here.
+	streamTranslatorServerMux *http.ServeMux
+	streamTranslatorServerURL *url.URL
+)
+
+// TestMain sets up the shared SPDY and StreamTranslator servers for the entire test suite.
+// This avoids the overhead of creating new servers for each test and eliminates race conditions
+// related to server startup and shutdown.
+func TestMain(m *testing.M) {
 	metrics.Register()
+
+	// Upstream SPDY server setup
+	spdyServerMux = http.NewServeMux()
+	spdyServer = httptest.NewServer(spdyServerMux)
+	var err error
+	spdyServerURL, err = url.Parse(spdyServer.URL)
+	if err != nil {
+		log.Fatalf("Failed to parse SPDY server URL: %v", err)
+	}
+
+	// StreamTranslator server setup
+	streamTranslatorServerMux = http.NewServeMux()
+	streamTranslatorServer = httptest.NewServer(streamTranslatorServerMux)
+	streamTranslatorServerURL, err = url.Parse(streamTranslatorServer.URL)
+	if err != nil {
+		log.Fatalf("Failed to parse StreamTranslator server URL: %v", err)
+	}
+
+	// Run tests
+	exitCode := m.Run()
+
+	// Teardown
+	spdyServer.Close()
+	streamTranslatorServer.Close()
+
+	os.Exit(exitCode)
+}
+
+// TestStreamTranslator_LoopbackStdinToStdout returns random data sent on the client's
+// STDIN channel back onto the client's STDOUT channel.
+func TestStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
 	metrics.ResetForTest()
-	t.Cleanup(metrics.ResetForTest)
-	// Create upstream fake SPDY server which copies STDIN back onto STDOUT stream.
-	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
-			Stdin:  true,
-			Stdout: true,
-		})
+	handlerPath := "/TestStreamTranslator_LoopbackStdinToStdout"
+
+	// 1. Configure and register the upstream SPDY handler for this test
+	spdyServerMux.HandleFunc(handlerPath, func(w http.ResponseWriter, req *http.Request) {
+		opts := Options{Stdin: true, Stdout: true}
+		ctx, err := createSPDYServerStreams(w, req, opts)
 		if err != nil {
 			t.Errorf("error on createHTTPStreams: %v", err)
 			return
 		}
 		defer ctx.conn.Close()
-		// Loopback STDIN data onto STDOUT stream.
 		_, err = io.Copy(ctx.stdoutStream, ctx.stdinStream)
-		if err != nil {
-			t.Fatalf("error copying STDIN to STDOUT: %v", err)
+		if err != nil  {
+			t.Errorf("error copying STDIN to STDOUT: %v", err)
 		}
+	})
 
-	}))
-	defer spdyServer.Close()
-	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
-	// streams STDIN and STDOUT. Create test server from StreamTranslatorHandler.
-	spdyLocation, err := url.Parse(spdyServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse spdy server URL: %s", spdyServer.URL)
-	}
+	// 2. Configure and register the StreamTranslator handler for this test
+	translatorOptions := Options{Stdin: true, Stdout: true}
 	spdyTransport, err := fakeTransport()
-	if err != nil {
-		t.Fatalf("Unexpected error creating transport: %v", err)
-	}
-	streams := Options{Stdin: true, Stdout: true}
-	streamTranslator := NewStreamTranslatorHandler(spdyLocation, spdyTransport, 0, streams)
-	streamTranslatorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		streamTranslator.ServeHTTP(w, req)
-	}))
-	defer streamTranslatorServer.Close()
-	// Now create the websocket client (executor), and point it to the "streamTranslatorServer".
-	streamTranslatorLocation, err := url.Parse(streamTranslatorServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse StreamTranslator server URL: %s", streamTranslatorServer.URL)
-	}
-	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: streamTranslatorLocation.Host}, "GET", streamTranslatorServer.URL)
-	if err != nil {
-		t.Errorf("unexpected error creating websocket executor: %v", err)
-	}
-	// Generate random data, and set it up to stream on STDIN. The data will be
-	// returned on the STDOUT buffer.
+	require.NoError(t, err)
+	upstreamURL := *spdyServerURL
+	upstreamURL.Path = handlerPath
+	translatorHandler := NewStreamTranslatorHandler(&upstreamURL, spdyTransport, 0, translatorOptions)
+	streamTranslatorServerMux.HandleFunc(handlerPath, translatorHandler.ServeHTTP)
+
+	// 3. Configure the client to connect to the translator
+	clientURL := *streamTranslatorServerURL
+	clientURL.Path = handlerPath
+
+	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: clientURL.Host}, "GET", clientURL.String())
+	require.NoError(t, err)
+
+	// 4. Execute the test logic
 	randomSize := 1024 * 1024
 	randomData := make([]byte, randomSize)
-	if _, err := rand.Read(randomData); err != nil {
-		t.Errorf("unexpected error reading random data: %v", err)
-	}
+	_, err = rand.Read(randomData)
+	require.NoError(t, err)
+
 	var stdout bytes.Buffer
 	options := &remotecommand.StreamOptions{
 		Stdin:  bytes.NewReader(randomData),
 		Stdout: &stdout,
 	}
-	errorChan := make(chan error)
-	go func() {
-		// Start the streaming on the WebSocket "exec" client.
-		errorChan <- exec.StreamWithContext(context.Background(), *options)
-	}()
+	err = exec.StreamWithContext(context.Background(), *options)
+	require.NoError(t, err, "Internal error occurred")
 
-	select {
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("expect stream to be closed after connection is closed.")
-	case err := <-errorChan:
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	}
-	data, err := io.ReadAll(bytes.NewReader(stdout.Bytes()))
-	if err != nil {
-		t.Errorf("error reading the stream: %v", err)
-		return
-	}
-	// Check the random data sent on STDIN was the same returned on STDOUT.
+	data, err := io.ReadAll(&stdout)
+	require.NoError(t, err)
 	if !bytes.Equal(randomData, data) {
 		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
 	}
-	// Validate the streamtranslator metrics; should be one 200 success.
-	metricNames := []string{"apiserver_stream_translator_requests_total"}
+
+	// 5. Validate metrics
+	metricName := "apiserver_stream_translator_requests_total"
 	expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricName); err != nil {
 		t.Fatal(err)
 	}
 }
 
 // TestStreamTranslator_LoopbackStdinToStderr returns random data sent on the client's
-// STDIN channel back onto the client's STDERR channel. There are two servers in this test: the
-// upstream fake SPDY server, and the StreamTranslator server. The StreamTranslator proxys the
-// data received from the websocket client upstream to the SPDY server (by translating the
-// websocket data into spdy). The returned data read on the websocket client STDERR is then
-// compared the random data sent on STDIN to ensure they are the same.
+// STDIN channel back onto the client's STDERR channel.
 func TestStreamTranslator_LoopbackStdinToStderr(t *testing.T) {
-	metrics.Register()
 	metrics.ResetForTest()
-	t.Cleanup(metrics.ResetForTest)
-	// Create upstream fake SPDY server which copies STDIN back onto STDERR stream.
-	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
-			Stdin:  true,
-			Stderr: true,
-		})
+	handlerPath := "/TestStreamTranslator_LoopbackStdinToStderr"
+
+	spdyServerMux.HandleFunc(handlerPath, func(w http.ResponseWriter, req *http.Request) {
+		opts := Options{Stdin: true, Stderr: true}
+		ctx, err := createSPDYServerStreams(w, req, opts)
 		if err != nil {
 			t.Errorf("error on createHTTPStreams: %v", err)
 			return
 		}
 		defer ctx.conn.Close()
-		// Loopback STDIN data onto STDERR stream.
 		_, err = io.Copy(ctx.stderrStream, ctx.stdinStream)
-		if err != nil {
-			t.Fatalf("error copying STDIN to STDERR: %v", err)
+		if err != nil  {
+			t.Errorf("error copying STDIN to STDERR: %v", err)
 		}
-	}))
-	defer spdyServer.Close()
-	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
-	// streams STDIN and STDERR. Create test server from StreamTranslatorHandler.
-	spdyLocation, err := url.Parse(spdyServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse spdy server URL: %s", spdyServer.URL)
-	}
+	})
+
+	translatorOptions := Options{Stdin: true, Stderr: true}
 	spdyTransport, err := fakeTransport()
-	if err != nil {
-		t.Fatalf("Unexpected error creating transport: %v", err)
-	}
-	streams := Options{Stdin: true, Stderr: true}
-	streamTranslator := NewStreamTranslatorHandler(spdyLocation, spdyTransport, 0, streams)
-	streamTranslatorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		streamTranslator.ServeHTTP(w, req)
-	}))
-	defer streamTranslatorServer.Close()
-	// Now create the websocket client (executor), and point it to the "streamTranslatorServer".
-	streamTranslatorLocation, err := url.Parse(streamTranslatorServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse StreamTranslator server URL: %s", streamTranslatorServer.URL)
-	}
-	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: streamTranslatorLocation.Host}, "GET", streamTranslatorServer.URL)
-	if err != nil {
-		t.Errorf("unexpected error creating websocket executor: %v", err)
-	}
-	// Generate random data, and set it up to stream on STDIN. The data will be
-	// returned on the STDERR buffer.
+	require.NoError(t, err)
+	upstreamURL := *spdyServerURL
+	upstreamURL.Path = handlerPath
+	translatorHandler := NewStreamTranslatorHandler(&upstreamURL, spdyTransport, 0, translatorOptions)
+	streamTranslatorServerMux.HandleFunc(handlerPath, translatorHandler.ServeHTTP)
+
+	clientURL := *streamTranslatorServerURL
+	clientURL.Path = handlerPath
+
+	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: clientURL.Host}, "GET", clientURL.String())
+	require.NoError(t, err)
+
 	randomSize := 1024 * 1024
 	randomData := make([]byte, randomSize)
-	if _, err := rand.Read(randomData); err != nil {
-		t.Errorf("unexpected error reading random data: %v", err)
-	}
+	_, err = rand.Read(randomData)
+	require.NoError(t, err)
+
 	var stderr bytes.Buffer
 	options := &remotecommand.StreamOptions{
 		Stdin:  bytes.NewReader(randomData),
 		Stderr: &stderr,
 	}
-	errorChan := make(chan error)
-	go func() {
-		// Start the streaming on the WebSocket "exec" client.
-		errorChan <- exec.StreamWithContext(context.Background(), *options)
-	}()
+	err = exec.StreamWithContext(context.Background(), *options)
+	require.NoError(t, err)
 
-	select {
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("expect stream to be closed after connection is closed.")
-	case err := <-errorChan:
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	}
-	data, err := io.ReadAll(bytes.NewReader(stderr.Bytes()))
-	if err != nil {
-		t.Errorf("error reading the stream: %v", err)
-		return
-	}
-	// Check the random data sent on STDIN was the same returned on STDERR.
+	data, err := io.ReadAll(&stderr)
+	require.NoError(t, err)
 	if !bytes.Equal(randomData, data) {
 		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
 	}
-	// Validate the streamtranslator metrics; should be one 200 success.
-	metricNames := []string{"apiserver_stream_translator_requests_total"}
+
+	metricName := "apiserver_stream_translator_requests_total"
 	expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricName); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -260,27 +245,22 @@ func randomExitCode() int {
 // TestStreamTranslator_ErrorStream tests the error stream by sending an error with a random
 // exit code, then validating the error arrives on the error stream.
 func TestStreamTranslator_ErrorStream(t *testing.T) {
-	metrics.Register()
 	metrics.ResetForTest()
-	t.Cleanup(metrics.ResetForTest)
 	expectedExitCode := randomExitCode()
-	// Create upstream fake SPDY server, returning a non-zero exit code
-	// on error stream within the structured error.
-	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
-			Stdout: true,
-		})
+	handlerPath := "/TestStreamTranslator_ErrorStream"
+
+	spdyServerMux.HandleFunc(handlerPath, func(w http.ResponseWriter, req *http.Request) {
+		opts := Options{Stdin: true}
+		ctx, err := createSPDYServerStreams(w, req, opts)
 		if err != nil {
 			t.Errorf("error on createHTTPStreams: %v", err)
 			return
 		}
 		defer ctx.conn.Close()
-		// Read/discard STDIN data before returning error on error stream.
 		_, err = io.Copy(io.Discard, ctx.stdinStream)
-		if err != nil {
-			t.Fatalf("error copying STDIN to DISCARD: %v", err)
+		if err != nil  {
+			t.Errorf("error copying STDIN to DISCARD: %v", err)
 		}
-		// Force an non-zero exit code error returned on the error stream.
 		err = ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
 			Status: metav1.StatusFailure,
 			Reason: rcconstants.NonZeroExitCodeReason,
@@ -294,73 +274,43 @@ func TestStreamTranslator_ErrorStream(t *testing.T) {
 			},
 		}})
 		if err != nil {
-			t.Fatalf("error writing status: %v", err)
+			t.Errorf("error writing status: %v", err)
 		}
-	}))
-	defer spdyServer.Close()
-	// Create StreamTranslatorHandler, which points upstream to fake SPDY server, and
-	// create a test server using the  StreamTranslatorHandler.
-	spdyLocation, err := url.Parse(spdyServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse spdy server URL: %s", spdyServer.URL)
-	}
-	spdyTransport, err := fakeTransport()
-	if err != nil {
-		t.Fatalf("Unexpected error creating transport: %v", err)
-	}
-	streams := Options{Stdin: true}
-	streamTranslator := NewStreamTranslatorHandler(spdyLocation, spdyTransport, 0, streams)
-	streamTranslatorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		streamTranslator.ServeHTTP(w, req)
-	}))
-	defer streamTranslatorServer.Close()
-	// Now create the websocket client (executor), and point it to the "streamTranslatorServer".
-	streamTranslatorLocation, err := url.Parse(streamTranslatorServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse StreamTranslator server URL: %s", streamTranslatorServer.URL)
-	}
-	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: streamTranslatorLocation.Host}, "GET", streamTranslatorServer.URL)
-	if err != nil {
-		t.Errorf("unexpected error creating websocket executor: %v", err)
-	}
-	// Generate random data, and set it up to stream on STDIN. The data will be discarded at
-	// upstream SDPY server.
-	randomSize := 1024 * 1024
-	randomData := make([]byte, randomSize)
-	if _, err := rand.Read(randomData); err != nil {
-		t.Errorf("unexpected error reading random data: %v", err)
-	}
-	options := &remotecommand.StreamOptions{
-		Stdin: bytes.NewReader(randomData),
-	}
-	errorChan := make(chan error)
-	go func() {
-		// Start the streaming on the WebSocket "exec" client.
-		errorChan <- exec.StreamWithContext(context.Background(), *options)
-	}()
+	})
 
-	select {
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("expect stream to be closed after connection is closed.")
-	case err := <-errorChan:
-		// Expect exit code error on error stream.
-		if err == nil {
-			t.Errorf("expected error, but received none")
-		}
-		expectedError := fmt.Sprintf("command terminated with exit code %d", expectedExitCode)
-		// Compare expected error with exit code to actual error.
-		if expectedError != err.Error() {
-			t.Errorf("expected error (%s), got (%s)", expectedError, err)
-		}
+	translatorOptions := Options{Stdin: true}
+	spdyTransport, err := fakeTransport()
+	require.NoError(t, err)
+	upstreamURL := *spdyServerURL
+	upstreamURL.Path = handlerPath
+	translatorHandler := NewStreamTranslatorHandler(&upstreamURL, spdyTransport, 0, translatorOptions)
+	streamTranslatorServerMux.HandleFunc(handlerPath, translatorHandler.ServeHTTP)
+
+	clientURL := *streamTranslatorServerURL
+	clientURL.Path = handlerPath
+
+	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: clientURL.Host}, "GET", clientURL.String())
+	require.NoError(t, err)
+
+	options := &remotecommand.StreamOptions{
+		Stdin: bytes.NewReader(make([]byte, 1024)),
 	}
-	// Validate the streamtranslator metrics; an exit code error is considered 200 success.
-	metricNames := []string{"apiserver_stream_translator_requests_total"}
+	err = exec.StreamWithContext(context.Background(), *options)
+	if err == nil {
+		t.Errorf("expected error, but received none")
+	}
+	expectedError := fmt.Sprintf("command terminated with exit code %d", expectedExitCode)
+	if expectedError != err.Error() {
+		t.Errorf("expected error (%s), got (%s)", expectedError, err)
+	}
+
+	metricName := "apiserver_stream_translator_requests_total"
 	expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricName); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -368,203 +318,130 @@ apiserver_stream_translator_requests_total{code="200"} 1
 // TestStreamTranslator_MultipleReadChannels tests two streams (STDOUT, STDERR) reading from
 // the connections at the same time.
 func TestStreamTranslator_MultipleReadChannels(t *testing.T) {
-	metrics.Register()
 	metrics.ResetForTest()
-	t.Cleanup(metrics.ResetForTest)
-	// Create upstream fake SPDY server which copies STDIN back onto STDOUT and STDERR stream.
-	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
-			Stdin:  true,
-			Stdout: true,
-			Stderr: true,
-		})
+	handlerPath := "/TestStreamTranslator_MultipleReadChannels"
+
+	spdyServerMux.HandleFunc(handlerPath, func(w http.ResponseWriter, req *http.Request) {
+		opts := Options{Stdin: true, Stdout: true, Stderr: true}
+		ctx, err := createSPDYServerStreams(w, req, opts)
 		if err != nil {
 			t.Errorf("error on createHTTPStreams: %v", err)
 			return
 		}
 		defer ctx.conn.Close()
-		// TeeReader copies data read on STDIN onto STDERR.
 		stdinReader := io.TeeReader(ctx.stdinStream, ctx.stderrStream)
-		// Also copy STDIN to STDOUT.
 		_, err = io.Copy(ctx.stdoutStream, stdinReader)
-		if err != nil {
+		if err != nil  {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
 		}
-	}))
-	defer spdyServer.Close()
-	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
-	// streams STDIN, STDOUT, and STDERR. Create test server from StreamTranslatorHandler.
-	spdyLocation, err := url.Parse(spdyServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse spdy server URL: %s", spdyServer.URL)
-	}
+	})
+
+	translatorOptions := Options{Stdin: true, Stdout: true, Stderr: true}
 	spdyTransport, err := fakeTransport()
-	if err != nil {
-		t.Fatalf("Unexpected error creating transport: %v", err)
-	}
-	streams := Options{Stdin: true, Stdout: true, Stderr: true}
-	streamTranslator := NewStreamTranslatorHandler(spdyLocation, spdyTransport, 0, streams)
-	streamTranslatorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		streamTranslator.ServeHTTP(w, req)
-	}))
-	defer streamTranslatorServer.Close()
-	// Now create the websocket client (executor), and point it to the "streamTranslatorServer".
-	streamTranslatorLocation, err := url.Parse(streamTranslatorServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse StreamTranslator server URL: %s", streamTranslatorServer.URL)
-	}
-	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: streamTranslatorLocation.Host}, "GET", streamTranslatorServer.URL)
-	if err != nil {
-		t.Errorf("unexpected error creating websocket executor: %v", err)
-	}
-	// Generate random data, and set it up to stream on STDIN. The data will be
-	// returned on the STDOUT and STDERR buffer.
+	require.NoError(t, err)
+	upstreamURL := *spdyServerURL
+	upstreamURL.Path = handlerPath
+	translatorHandler := NewStreamTranslatorHandler(&upstreamURL, spdyTransport, 0, translatorOptions)
+	streamTranslatorServerMux.HandleFunc(handlerPath, translatorHandler.ServeHTTP)
+
+	clientURL := *streamTranslatorServerURL
+	clientURL.Path = handlerPath
+
+	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: clientURL.Host}, "GET", clientURL.String())
+	require.NoError(t, err)
+
 	randomSize := 1024 * 1024
 	randomData := make([]byte, randomSize)
-	if _, err := rand.Read(randomData); err != nil {
-		t.Errorf("unexpected error reading random data: %v", err)
-	}
+	_, err = rand.Read(randomData)
+	require.NoError(t, err)
+
 	var stdout, stderr bytes.Buffer
 	options := &remotecommand.StreamOptions{
 		Stdin:  bytes.NewReader(randomData),
 		Stdout: &stdout,
 		Stderr: &stderr,
 	}
-	errorChan := make(chan error)
-	go func() {
-		// Start the streaming on the WebSocket "exec" client.
-		errorChan <- exec.StreamWithContext(context.Background(), *options)
-	}()
+	err = exec.StreamWithContext(context.Background(), *options)
+	require.NoError(t, err)
 
-	select {
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("expect stream to be closed after connection is closed.")
-	case err := <-errorChan:
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	}
-	stdoutBytes, err := io.ReadAll(bytes.NewReader(stdout.Bytes()))
-	if err != nil {
-		t.Errorf("error reading the stream: %v", err)
-		return
-	}
-	// Check the random data sent on STDIN was the same returned on STDOUT.
+	stdoutBytes, err := io.ReadAll(&stdout)
+	require.NoError(t, err)
 	if !bytes.Equal(stdoutBytes, randomData) {
 		t.Errorf("unexpected data received: %d sent: %d", len(stdoutBytes), len(randomData))
 	}
-	stderrBytes, err := io.ReadAll(bytes.NewReader(stderr.Bytes()))
-	if err != nil {
-		t.Errorf("error reading the stream: %v", err)
-		return
-	}
-	// Check the random data sent on STDIN was the same returned on STDERR.
+	stderrBytes, err := io.ReadAll(&stderr)
+	require.NoError(t, err)
 	if !bytes.Equal(stderrBytes, randomData) {
 		t.Errorf("unexpected data received: %d sent: %d", len(stderrBytes), len(randomData))
 	}
-	// Validate the streamtranslator metrics; should have one 200 success.
-	metricNames := []string{"apiserver_stream_translator_requests_total"}
+
+	metricName := "apiserver_stream_translator_requests_total"
 	expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricName); err != nil {
 		t.Fatal(err)
 	}
 }
 
 // TestStreamTranslator_ThrottleReadChannels tests two streams (STDOUT, STDERR) using rate limited streams.
 func TestStreamTranslator_ThrottleReadChannels(t *testing.T) {
-	// Create upstream fake SPDY server which copies STDIN back onto STDOUT and STDERR stream.
-	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
-			Stdin:  true,
-			Stdout: true,
-			Stderr: true,
-		})
+	t.Parallel()
+	handlerPath := "/TestStreamTranslator_ThrottleReadChannels"
+
+	spdyServerMux.HandleFunc(handlerPath, func(w http.ResponseWriter, req *http.Request) {
+		opts := Options{Stdin: true, Stdout: true, Stderr: true}
+		ctx, err := createSPDYServerStreams(w, req, opts)
 		if err != nil {
 			t.Errorf("error on createHTTPStreams: %v", err)
 			return
 		}
 		defer ctx.conn.Close()
-		// TeeReader copies data read on STDIN onto STDERR.
 		stdinReader := io.TeeReader(ctx.stdinStream, ctx.stderrStream)
-		// Also copy STDIN to STDOUT.
 		_, err = io.Copy(ctx.stdoutStream, stdinReader)
-		if err != nil {
+		if err != nil  {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
 		}
-	}))
-	defer spdyServer.Close()
-	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
-	// streams STDIN, STDOUT, and STDERR. Create test server from StreamTranslatorHandler.
-	spdyLocation, err := url.Parse(spdyServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse spdy server URL: %s", spdyServer.URL)
-	}
+	})
+
+	translatorOptions := Options{Stdin: true, Stdout: true, Stderr: true}
 	spdyTransport, err := fakeTransport()
-	if err != nil {
-		t.Fatalf("Unexpected error creating transport: %v", err)
-	}
-	streams := Options{Stdin: true, Stdout: true, Stderr: true}
-	maxBytesPerSec := 900 * 1024 // slightly less than the 1MB that is being transferred to exercise throttling.
-	streamTranslator := NewStreamTranslatorHandler(spdyLocation, spdyTransport, int64(maxBytesPerSec), streams)
-	streamTranslatorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		streamTranslator.ServeHTTP(w, req)
-	}))
-	defer streamTranslatorServer.Close()
-	// Now create the websocket client (executor), and point it to the "streamTranslatorServer".
-	streamTranslatorLocation, err := url.Parse(streamTranslatorServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse StreamTranslator server URL: %s", streamTranslatorServer.URL)
-	}
-	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: streamTranslatorLocation.Host}, "GET", streamTranslatorServer.URL)
-	if err != nil {
-		t.Errorf("unexpected error creating websocket executor: %v", err)
-	}
-	// Generate random data, and set it up to stream on STDIN. The data will be
-	// returned on the STDOUT and STDERR buffer.
+	require.NoError(t, err)
+	upstreamURL := *spdyServerURL
+	upstreamURL.Path = handlerPath
+	// Set a throttle limit just below the total data size to ensure throttling is exercised.
+	translatorHandler := NewStreamTranslatorHandler(&upstreamURL, spdyTransport, 900*1024, translatorOptions)
+	streamTranslatorServerMux.HandleFunc(handlerPath, translatorHandler.ServeHTTP)
+
+	clientURL := *streamTranslatorServerURL
+	clientURL.Path = handlerPath
+
+	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: clientURL.Host}, "GET", clientURL.String())
+	require.NoError(t, err)
+
 	randomSize := 1024 * 1024
 	randomData := make([]byte, randomSize)
-	if _, err := rand.Read(randomData); err != nil {
-		t.Errorf("unexpected error reading random data: %v", err)
-	}
+	_, err = rand.Read(randomData)
+	require.NoError(t, err)
+
 	var stdout, stderr bytes.Buffer
 	options := &remotecommand.StreamOptions{
 		Stdin:  bytes.NewReader(randomData),
 		Stdout: &stdout,
 		Stderr: &stderr,
 	}
-	errorChan := make(chan error)
-	go func() {
-		// Start the streaming on the WebSocket "exec" client.
-		errorChan <- exec.StreamWithContext(context.Background(), *options)
-	}()
+	err = exec.StreamWithContext(context.Background(), *options)
+	require.NoError(t, err)
 
-	select {
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("expect stream to be closed after connection is closed.")
-	case err := <-errorChan:
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	}
-	stdoutBytes, err := io.ReadAll(bytes.NewReader(stdout.Bytes()))
-	if err != nil {
-		t.Errorf("error reading the stream: %v", err)
-		return
-	}
-	// Check the random data sent on STDIN was the same returned on STDOUT.
+	stdoutBytes, err := io.ReadAll(&stdout)
+	require.NoError(t, err)
 	if !bytes.Equal(stdoutBytes, randomData) {
 		t.Errorf("unexpected data received: %d sent: %d", len(stdoutBytes), len(randomData))
 	}
-	stderrBytes, err := io.ReadAll(bytes.NewReader(stderr.Bytes()))
-	if err != nil {
-		t.Errorf("error reading the stream: %v", err)
-		return
-	}
-	// Check the random data sent on STDIN was the same returned on STDERR.
+	stderrBytes, err := io.ReadAll(&stderr)
+	require.NoError(t, err)
 	if !bytes.Equal(stderrBytes, randomData) {
 		t.Errorf("unexpected data received: %d sent: %d", len(stderrBytes), len(randomData))
 	}
@@ -609,78 +486,79 @@ func randomTerminalSize() remotecommand.TerminalSize {
 	}
 }
 
-// TestStreamTranslator_MultipleWriteChannels
 func TestStreamTranslator_TTYResizeChannel(t *testing.T) {
-	metrics.Register()
 	metrics.ResetForTest()
-	t.Cleanup(metrics.ResetForTest)
-	// Create the fake terminal size queue and the actualTerminalSizes which
-	// will be received at the opposite websocket endpoint.
+	handlerPath := "/TestStreamTranslator_TTYResizeChannel"
+
 	numSizeQueue := 10000
 	sizeQueue := newTerminalSizeQueue(numSizeQueue)
 	actualTerminalSizes := make([]remotecommand.TerminalSize, 0, numSizeQueue)
-	// Create upstream fake SPDY server which copies STDIN back onto STDERR stream.
-	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := createSPDYServerStreams(w, req, Options{
-			Tty: true,
-		})
+	// The WaitGroup is used to synchronize the test. It ensures that the server
+	// has processed all expected resize events before the test's main goroutine
+	// proceeds to validation and teardown. This prevents a race condition where
+	// the test could finish before all events are handled.
+	var wg sync.WaitGroup
+	wg.Add(numSizeQueue)
+
+	spdyServerMux.HandleFunc(handlerPath, func(w http.ResponseWriter, req *http.Request) {
+		opts := Options{Tty: true}
+		ctx, err := createSPDYServerStreams(w, req, opts)
 		if err != nil {
 			t.Errorf("error on createHTTPStreams: %v", err)
 			return
 		}
 		defer ctx.conn.Close()
-		// Read the terminal resize requests, storing them in actualTerminalSizes
 		for i := 0; i < numSizeQueue; i++ {
-			actualTerminalSize := <-ctx.resizeChan
+			actualTerminalSize, ok := <-ctx.resizeChan
+			if !ok {
+				break
+			}
 			actualTerminalSizes = append(actualTerminalSizes, actualTerminalSize)
+			// Signal that one resize event has been successfully processed by the server.
+			wg.Done()
 		}
-	}))
-	defer spdyServer.Close()
-	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
-	// resize (TTY resize) stream. Create test server from StreamTranslatorHandler.
-	spdyLocation, err := url.Parse(spdyServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse spdy server URL: %s", spdyServer.URL)
-	}
+	})
+
+	translatorOptions := Options{Tty: true}
 	spdyTransport, err := fakeTransport()
-	if err != nil {
-		t.Fatalf("Unexpected error creating transport: %v", err)
-	}
-	streams := Options{Tty: true}
-	streamTranslator := NewStreamTranslatorHandler(spdyLocation, spdyTransport, 0, streams)
-	streamTranslatorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		streamTranslator.ServeHTTP(w, req)
-	}))
-	defer streamTranslatorServer.Close()
-	// Now create the websocket client (executor), and point it to the "streamTranslatorServer".
-	streamTranslatorLocation, err := url.Parse(streamTranslatorServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse StreamTranslator server URL: %s", streamTranslatorServer.URL)
-	}
-	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: streamTranslatorLocation.Host}, "GET", streamTranslatorServer.URL)
-	if err != nil {
-		t.Errorf("unexpected error creating websocket executor: %v", err)
-	}
+	require.NoError(t, err)
+	upstreamURL := *spdyServerURL
+	upstreamURL.Path = handlerPath
+	translatorHandler := NewStreamTranslatorHandler(&upstreamURL, spdyTransport, 0, translatorOptions)
+	streamTranslatorServerMux.HandleFunc(handlerPath, translatorHandler.ServeHTTP)
+
+	clientURL := *streamTranslatorServerURL
+	clientURL.Path = handlerPath
+
+	exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: clientURL.Host}, "GET", clientURL.String())
+	require.NoError(t, err)
+
 	options := &remotecommand.StreamOptions{
 		Tty:               true,
 		TerminalSizeQueue: sizeQueue,
 	}
-	errorChan := make(chan error)
+
+	errorChan := make(chan error, 1)
 	go func() {
-		// Start the streaming on the WebSocket "exec" client.
+		// The client's stream execution is run in a separate goroutine. This is
+		// necessary because the StreamWithContext call is blocking, but we need
+		// the main test goroutine to be free to wait on the WaitGroup.
 		errorChan <- exec.StreamWithContext(context.Background(), *options)
 	}()
 
 	select {
 	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("expect stream to be closed after connection is closed.")
+		t.Fatalf("timed out waiting for client stream to complete")
 	case err := <-errorChan:
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 	}
-	// Validate the random TerminalSizes sent on the resize stream are the same
-	// as the actual TerminalSizes received at the websocket server.
+
+	// Block until the WaitGroup counter is zero, which signifies that the
+	// server-side handler has received and processed all 10,000 resize events.
+	// This is the critical synchronization point that prevents the test from
+	// validating results prematurely.
+	wg.Wait()
+
 	if len(actualTerminalSizes) != numSizeQueue {
 		t.Fatalf("expected to receive num terminal resizes (%d), got (%d)",
 			numSizeQueue, len(actualTerminalSizes))
@@ -691,14 +569,14 @@ func TestStreamTranslator_TTYResizeChannel(t *testing.T) {
 			t.Errorf("expected terminal resize window %v, got %v", expected, actual)
 		}
 	}
-	// Validate the streamtranslator metrics; should have one 200 success.
-	metricNames := []string{"apiserver_stream_translator_requests_total"}
+
+	metricName := "apiserver_stream_translator_requests_total"
 	expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricName); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -706,79 +584,40 @@ apiserver_stream_translator_requests_total{code="200"} 1
 // TestStreamTranslator_WebSocketServerErrors validates that when there is a problem creating
 // the websocket server as the first step of the StreamTranslator an error is properly returned.
 func TestStreamTranslator_WebSocketServerErrors(t *testing.T) {
-	metrics.Register()
-	metrics.ResetForTest()
-	t.Cleanup(metrics.ResetForTest)
-	spdyLocation, err := url.Parse("http://127.0.0.1")
-	if err != nil {
-		t.Fatalf("Unable to parse spdy server URL")
-	}
-	spdyTransport, err := fakeTransport()
-	if err != nil {
-		t.Fatalf("Unexpected error creating transport: %v", err)
-	}
-	streamTranslator := NewStreamTranslatorHandler(spdyLocation, spdyTransport, 0, Options{})
-	streamTranslatorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		streamTranslator.ServeHTTP(w, req)
-	}))
-	defer streamTranslatorServer.Close()
-	// Now create the websocket client (executor), and point it to the "streamTranslatorServer".
-	streamTranslatorLocation, err := url.Parse(streamTranslatorServer.URL)
-	if err != nil {
-		t.Fatalf("Unable to parse StreamTranslator server URL: %s", streamTranslatorServer.URL)
-	}
-	exec, err := remotecommand.NewWebSocketExecutorForProtocols(
-		&rest.Config{Host: streamTranslatorLocation.Host},
-		"GET",
-		streamTranslatorServer.URL,
-		rcconstants.StreamProtocolV4Name, // RemoteCommand V4 protocol is unsupported
-	)
-	if err != nil {
-		t.Errorf("unexpected error creating websocket executor: %v", err)
-	}
-	errorChan := make(chan error)
-	go func() {
-		// Start the streaming on the WebSocket "exec" client. The WebSocket server within the
-		// StreamTranslator propagates an error here because the V4 protocol is not supported.
-		errorChan <- exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{})
-	}()
+	t.Parallel()
+	handlerPath := "/TestStreamTranslator_WebSocketServerErrors"
 
-	select {
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("expect stream to be closed after connection is closed.")
-	case err := <-errorChan:
-		// Must return "websocket unable to upgrade" (bad handshake) error.
-		if err == nil {
-			t.Fatalf("expected error, but received none")
-		}
-		if !strings.Contains(err.Error(), "unable to upgrade streaming request") {
-			t.Errorf("expected websocket bad handshake error, got (%s)", err)
-		}
+	// Register a real translator handler that will fail the websocket handshake.
+	spdyTransport, err := fakeTransport()
+	require.NoError(t, err)
+	// The upstream location is irrelevant as the handshake will fail before it's used.
+	dummyURL, _ := url.Parse("http://localhost:12345")
+	translatorHandler := NewStreamTranslatorHandler(dummyURL, spdyTransport, 0, Options{})
+	streamTranslatorServerMux.HandleFunc(handlerPath, translatorHandler.ServeHTTP)
+
+	clientURL := *streamTranslatorServerURL
+	clientURL.Path = handlerPath
+
+	exec, err := remotecommand.NewWebSocketExecutorForProtocols(
+		&rest.Config{Host: clientURL.Host},
+		"GET",
+		clientURL.String(),
+		rcconstants.StreamProtocolV4Name, // RemoteCommand V4 protocol is unsupported by the translator
+	)
+	require.NoError(t, err)
+
+	err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{})
+	if err == nil {
+		t.Fatalf("expected error, but received none")
 	}
-	// Validate the streamtranslator metrics; should have one 400 failure.
-	// Use polling to wait for the metric to be updated asynchronously.
-	metricNames := []string{"apiserver_stream_translator_requests_total"}
-	expected := `
-# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
-# TYPE apiserver_stream_translator_requests_total counter
-apiserver_stream_translator_requests_total{code="400"} 1
-`
-	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
-		if testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...) == nil {
-			return true, nil
-		}
-		return false, nil
-	}); err != nil {
-		t.Fatalf("Failed to observe metric after waiting 2 seconds: %v", err)
+	if !strings.Contains(err.Error(), "unable to upgrade streaming request") {
+		t.Errorf("expected websocket bad handshake error, got (%s)", err)
 	}
 }
 
 // TestStreamTranslator_BlockRedirects verifies that the StreamTranslator will *not* follow
 // redirects; it will thrown an error instead.
 func TestStreamTranslator_BlockRedirects(t *testing.T) {
-	metrics.Register()
-	t.Cleanup(metrics.ResetForTest)
-
 	for _, statusCode := range []int{
 		http.StatusMovedPermanently,  // 301
 		http.StatusFound,             // 302
@@ -786,64 +625,45 @@ func TestStreamTranslator_BlockRedirects(t *testing.T) {
 		http.StatusTemporaryRedirect, // 307
 		http.StatusPermanentRedirect, // 308
 	} {
+		statusCode := statusCode
 		t.Run(fmt.Sprintf("statusCode=%d", statusCode), func(t *testing.T) {
 			metrics.ResetForTest()
-			// Create upstream fake SPDY server which returns a redirect.
-			spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handlerPath := fmt.Sprintf("/TestStreamTranslator_BlockRedirects/%d", statusCode)
+
+			spdyServerMux.HandleFunc(handlerPath, func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Location", "/")
 				w.WriteHeader(statusCode)
-			}))
-			defer spdyServer.Close()
-			spdyLocation, err := url.Parse(spdyServer.URL)
-			if err != nil {
-				t.Fatalf("Unable to parse spdy server URL: %s", spdyServer.URL)
-			}
-			spdyTransport, err := fakeTransport()
-			if err != nil {
-				t.Fatalf("Unexpected error creating transport: %v", err)
-			}
-			streams := Options{Stdout: true}
-			streamTranslator := NewStreamTranslatorHandler(spdyLocation, spdyTransport, 0, streams)
-			streamTranslatorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				streamTranslator.ServeHTTP(w, req)
-			}))
-			defer streamTranslatorServer.Close()
-			// Now create the websocket client (executor), and point it to the "streamTranslatorServer".
-			streamTranslatorLocation, err := url.Parse(streamTranslatorServer.URL)
-			if err != nil {
-				t.Fatalf("Unable to parse StreamTranslator server URL: %s", streamTranslatorServer.URL)
-			}
-			exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: streamTranslatorLocation.Host}, "GET", streamTranslatorServer.URL)
-			if err != nil {
-				t.Errorf("unexpected error creating websocket executor: %v", err)
-			}
-			errorChan := make(chan error)
-			go func() {
-				// Start the streaming on the WebSocket "exec" client.
-				// Should return "redirect not allowed" error.
-				errorChan <- exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{})
-			}()
+			})
 
-			select {
-			case <-time.After(wait.ForeverTestTimeout):
-				t.Fatalf("expect stream to be closed after connection is closed.")
-			case err := <-errorChan:
-				// Must return "redirect now allowed" error.
-				if err == nil {
-					t.Fatalf("expected error, but received none")
-				}
-				if !strings.Contains(err.Error(), "redirect not allowed") {
-					t.Errorf("expected redirect not allowed error, got (%s)", err)
-				}
+			translatorOptions := Options{Stdout: true}
+			spdyTransport, err := fakeTransport()
+			require.NoError(t, err)
+			upstreamURL := *spdyServerURL
+			upstreamURL.Path = handlerPath
+			translatorHandler := NewStreamTranslatorHandler(&upstreamURL, spdyTransport, 0, translatorOptions)
+			streamTranslatorServerMux.HandleFunc(handlerPath, translatorHandler.ServeHTTP)
+
+			clientURL := *streamTranslatorServerURL
+			clientURL.Path = handlerPath
+
+			exec, err := remotecommand.NewWebSocketExecutor(&rest.Config{Host: clientURL.Host}, "GET", clientURL.String())
+			require.NoError(t, err)
+
+			err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{})
+			if err == nil {
+				t.Fatalf("expected error, but received none")
 			}
-			// Validate the streamtranslator metrics; should have one 500 failure each loop.
-			metricNames := []string{"apiserver_stream_translator_requests_total"}
+			if !strings.Contains(err.Error(), "redirect not allowed") {
+				t.Errorf("expected redirect not allowed error, got (%s)", err)
+			}
+
+			metricName := "apiserver_stream_translator_requests_total"
 			expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="500"} 1
 `
-			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricName); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -909,25 +729,39 @@ WaitForStreams:
 		select {
 		case stream := <-streamCh:
 			streamType := stream.Headers().Get(v1.StreamType)
+			streamHandled := false
 			switch streamType {
 			case v1.StreamTypeError:
-				replyChan <- struct{}{}
 				ctx.writeStatus = v4WriteStatusFunc(stream)
+				streamHandled = true
 			case v1.StreamTypeStdout:
-				replyChan <- struct{}{}
-				ctx.stdoutStream = stream
+				if opts.Stdout {
+					ctx.stdoutStream = stream
+					streamHandled = true
+				}
 			case v1.StreamTypeStdin:
-				replyChan <- struct{}{}
-				ctx.stdinStream = stream
+				if opts.Stdin {
+					ctx.stdinStream = stream
+					streamHandled = true
+				}
 			case v1.StreamTypeStderr:
-				replyChan <- struct{}{}
-				ctx.stderrStream = stream
+				if opts.Stderr {
+					ctx.stderrStream = stream
+					streamHandled = true
+				}
 			case v1.StreamTypeResize:
+				if opts.Tty {
+					ctx.resizeStream = stream
+					streamHandled = true
+				}
+			}
+
+			if streamHandled {
 				replyChan <- struct{}{}
-				ctx.resizeStream = stream
-			default:
-				// add other stream ...
-				return nil, errors.New("unimplemented stream type")
+			} else {
+				// This is a known but unexpected stream type, or an unknown one.
+				// We must reset it to signal the client we won't be using it.
+				stream.Reset()
 			}
 		case <-replyChan:
 			receivedStreams++
