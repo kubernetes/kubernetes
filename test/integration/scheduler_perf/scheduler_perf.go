@@ -29,6 +29,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	rt "runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -122,6 +123,8 @@ const DefaultLoggingVerbosity = 2
 
 var LoggingFeatureGate FeatureGateFlag
 var LoggingConfig *logsapi.LoggingConfiguration
+var wgGOMAXPROCS *sync.WaitGroup
+var defaultGOMAXPROCS int
 
 type FeatureGateFlag interface {
 	featuregate.FeatureGate
@@ -135,6 +138,9 @@ func init() {
 
 	LoggingConfig = logsapi.NewLoggingConfiguration()
 	LoggingConfig.Verbosity = DefaultLoggingVerbosity
+
+	wgGOMAXPROCS = &sync.WaitGroup{}
+	defaultGOMAXPROCS = rt.GOMAXPROCS(-1)
 }
 
 var (
@@ -1306,6 +1312,16 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 
 // RunIntegrationPerfScheduling runs the scheduler performance integration tests.
 func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
+	wgGOMAXPROCS.Add(1)
+	defer wgGOMAXPROCS.Done()
+	go func() {
+		wgGOMAXPROCS.Wait()
+		rt.GOMAXPROCS(defaultGOMAXPROCS)
+	}()
+	runIntegrationPerfScheduling(t, configFile)
+}
+
+func runIntegrationPerfScheduling(t *testing.T, configFile string) {
 	testCases, err := getTestCases(configFile)
 	if err != nil {
 		t.Fatal(err)
