@@ -628,7 +628,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 		nodes                     []*v1.Node
 		failedNodes               []*v1.Node // nodes + failedNodes = all nodes
 		objs                      []runtime.Object
-		want                      framework.NodeScoreList
+		want                      fwk.NodeScoreList
 		enableNodeInclusionPolicy bool
 		enableMatchLabelKeys      bool
 	}{
@@ -647,7 +647,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 100},
 				{Name: "node-b", Score: 100},
 			},
@@ -669,7 +669,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			failedNodes: []*v1.Node{
 				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 100},
 			},
 		},
@@ -686,7 +686,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 100},
 				{Name: "node-b", Score: 100},
 			},
@@ -712,7 +712,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
 			},
 			failedNodes: []*v1.Node{},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 20},
 				{Name: "node-b", Score: 60},
 				{Name: "node-c", Score: 100},
@@ -738,7 +738,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-c").Label(v1.LabelHostname, "node-c").Obj(),
 				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 100},
 				{Name: "node-b", Score: 100},
 				{Name: "node-c", Score: 100},
@@ -766,7 +766,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
 			},
 			failedNodes: []*v1.Node{},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 33}, // +13, compared to maxSkew=1
 				{Name: "node-b", Score: 66}, // +6, compared to maxSkew=1
 				{Name: "node-c", Score: 100},
@@ -798,7 +798,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
 			},
 			failedNodes: []*v1.Node{},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 44}, // +16 compared to maxSkew=1
 				{Name: "node-b", Score: 66}, // +9 compared to maxSkew=1
 				{Name: "node-c", Score: 77}, // +6 compared to maxSkew=1
@@ -831,7 +831,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			objs: []runtime.Object{
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				// Same scores as if we were using one spreading constraint.
 				{Name: "node-a", Score: 44},
 				{Name: "node-b", Score: 66},
@@ -865,7 +865,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			failedNodes: []*v1.Node{
 				st.MakeNode().Name("node-y").Label(v1.LabelHostname, "node-y").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 33},
 				{Name: "node-b", Score: 83},
 				{Name: "node-x", Score: 100},
@@ -897,7 +897,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			failedNodes: []*v1.Node{
 				st.MakeNode().Name("node-y").Label(v1.LabelHostname, "node-y").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 16},
 				{Name: "node-b", Score: 0},
 				{Name: "node-x", Score: 100},
@@ -929,7 +929,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			failedNodes: []*v1.Node{
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label(v1.LabelHostname, "node-y").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 75},
 				{Name: "node-b", Score: 75},
 				{Name: "node-x", Score: 100},
@@ -961,7 +961,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label(v1.LabelHostname, "node-b").Obj(),
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label(v1.LabelHostname, "node-y").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 100},
 				{Name: "node-x", Score: 63},
 			},
@@ -988,7 +988,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Obj(),
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 85},
 				{Name: "node-x", Score: 100},
 			},
@@ -1022,7 +1022,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label(v1.LabelHostname, "node-y").Obj(),
 			},
 			failedNodes: []*v1.Node{},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 60},
 				{Name: "node-b", Score: 20},
 				{Name: "node-x", Score: 100},
@@ -1049,7 +1049,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label(v1.LabelHostname, "node-y").Obj(),
 			},
 			failedNodes: []*v1.Node{},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 100},
 				{Name: "node-b", Score: 60},
 				{Name: "node-x", Score: 40},
@@ -1078,7 +1078,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			failedNodes: []*v1.Node{
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label(v1.LabelHostname, "node-y").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 50},
 				{Name: "node-b", Score: 25},
 				{Name: "node-x", Score: 100},
@@ -1099,7 +1099,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 100},
 				{Name: "node-b", Score: 33},
 			},
@@ -1117,7 +1117,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Terminating().Obj(),
 				st.MakePod().Name("p-b").Node("node-b").Label("foo", "").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 100},
 				{Name: "node-b", Score: 0},
 			},
@@ -1148,7 +1148,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 75},
 				{Name: "node-b", Score: 75},
 				{Name: "node-c", Score: 100},
@@ -1171,7 +1171,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 0},
 				{Name: "node-b", Score: 33},
 				{Name: "node-c", Score: 100},
@@ -1195,7 +1195,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 66},
 				{Name: "node-b", Score: 100},
 				{Name: "node-c", Score: 100},
@@ -1219,7 +1219,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 0},
 				{Name: "node-b", Score: 33},
 				{Name: "node-c", Score: 100},
@@ -1243,7 +1243,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 66},
 				{Name: "node-b", Score: 100},
 				{Name: "node-c", Score: 100},
@@ -1266,7 +1266,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 0},
 				{Name: "node-b", Score: 33},
 				{Name: "node-c", Score: 100},
@@ -1289,7 +1289,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 66},
 				{Name: "node-b", Score: 100},
 				{Name: "node-c", Score: 100},
@@ -1314,7 +1314,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-c").Label("zone", "zone2").Label(v1.LabelHostname, "node-c").Obj(),
 				st.MakeNode().Name("node-d").Label("zone", "zone2").Label(v1.LabelHostname, "node-d").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 60},
 				{Name: "node-b", Score: 20},
 				{Name: "node-c", Score: 60},
@@ -1340,7 +1340,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-c").Label("zone", "zone2").Label(v1.LabelHostname, "node-c").Obj(),
 				st.MakeNode().Name("node-d").Label("zone", "zone2").Label(v1.LabelHostname, "node-d").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 60},
 				{Name: "node-b", Score: 20},
 				{Name: "node-c", Score: 60},
@@ -1367,7 +1367,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-c").Label("zone", "zone2").Label(v1.LabelHostname, "node-c").Obj(),
 				st.MakeNode().Name("node-d").Label("zone", "zone2").Label(v1.LabelHostname, "node-d").Obj(),
 			},
-			want: []framework.NodeScore{
+			want: []fwk.NodeScore{
 				{Name: "node-a", Score: 60},
 				{Name: "node-b", Score: 20},
 				{Name: "node-c", Score: 60},
@@ -1394,7 +1394,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				t.Errorf("unexpected error: %v", status)
 			}
 
-			var gotList framework.NodeScoreList
+			var gotList fwk.NodeScoreList
 			for _, n := range tt.nodes {
 				nodeName := n.Name
 				nodeInfo, err := p.sharedLister.NodeInfos().Get(n.Name)
@@ -1405,7 +1405,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
-				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
+				gotList = append(gotList, fwk.NodeScore{Name: nodeName, Score: score})
 			}
 
 			status = p.NormalizeScore(ctx, state, tt.pod, gotList)
@@ -1479,14 +1479,14 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
-				var gotList framework.NodeScoreList
+				var gotList fwk.NodeScoreList
 				for _, nodeInfo := range nodeInfos {
 					nodeName := nodeInfo.Node().Name
 					score, status := p.Score(ctx, state, tt.pod, nodeInfo)
 					if !status.IsSuccess() {
 						b.Fatalf("unexpected error: %v", status)
 					}
-					gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
+					gotList = append(gotList, fwk.NodeScore{Name: nodeName, Score: score})
 				}
 
 				status = p.NormalizeScore(ctx, state, tt.pod, gotList)

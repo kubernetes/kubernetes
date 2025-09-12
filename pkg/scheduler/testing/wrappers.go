@@ -1173,6 +1173,21 @@ func (wrapper *ResourceClaimWrapper) RequestWithName(name, deviceClassName strin
 	return wrapper
 }
 
+// RequestWithNameCount adds one device request for the given device class with given request name and count.
+func (wrapper *ResourceClaimWrapper) RequestWithNameCount(name, deviceClassName string, count int64) *ResourceClaimWrapper {
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name: name,
+			Exactly: &resourceapi.ExactDeviceRequest{
+				// Cannot rely on defaulting here, this is used in unit tests.
+				AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+				Count:           count,
+				DeviceClassName: deviceClassName,
+			},
+		})
+	return wrapper
+}
+
 // RequestWithPrioritizedList adds one device request with one subrequest
 // per provided deviceClassName.
 func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(deviceClassNames ...string) *ResourceClaimWrapper {

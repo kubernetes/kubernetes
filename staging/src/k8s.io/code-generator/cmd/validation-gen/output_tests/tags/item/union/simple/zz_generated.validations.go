@@ -38,6 +38,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type Struct
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -48,18 +49,22 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_union_simple_Struct_Tasks_ = validate.NewUnionMembership([2]string{"Tasks[{\"name\": \"succeeded\"}]", ""}, [2]string{"Tasks[{\"name\": \"failed\"}]", ""})
+var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_union_simple_Struct_tasks_ = validate.NewUnionMembership(validate.NewUnionMember("tasks[{\"name\": \"succeeded\"}]"), validate.NewUnionMember("tasks[{\"name\": \"failed\"}]"))
 
+// Validate_Struct validates an instance of Struct according
+// to declarative validation rules in the API schema.
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// field Struct.TypeMeta has no validation
 
 	// field Struct.Tasks
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []Task) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
-			errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_union_simple_Struct_Tasks_, func(list []Task) bool {
+			// call field-attached validations
+			errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_union_simple_Struct_tasks_, func(list []Task) bool {
 				for i := range list {
 					if list[i].Name == "failed" {
 						return true

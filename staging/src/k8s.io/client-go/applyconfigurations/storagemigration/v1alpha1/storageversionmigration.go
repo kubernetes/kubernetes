@@ -29,11 +29,18 @@ import (
 
 // StorageVersionMigrationApplyConfiguration represents a declarative configuration of the StorageVersionMigration type for use
 // with apply.
+//
+// StorageVersionMigration represents a migration of stored data to the latest
+// storage version.
 type StorageVersionMigrationApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *StorageVersionMigrationSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *StorageVersionMigrationStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the migration.
+	Spec *StorageVersionMigrationSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status of the migration.
+	Status *StorageVersionMigrationStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // StorageVersionMigration constructs a declarative configuration of the StorageVersionMigration type for use with
@@ -53,7 +60,6 @@ func StorageVersionMigration(name string) *StorageVersionMigrationApplyConfigura
 // ExtractStorageVersionMigrationFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractStorageVersionMigrationFrom(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string, subresource string) (*StorageVersionMigrationApplyConfiguration, error) {
 	b := &StorageVersionMigrationApplyConfiguration{}
 	err := managedfields.ExtractInto(storageVersionMigration, internal.Parser().Type("io.k8s.api.storagemigration.v1alpha1.StorageVersionMigration"), fieldManager, b, subresource)
@@ -77,14 +83,12 @@ func ExtractStorageVersionMigrationFrom(storageVersionMigration *storagemigratio
 // ExtractStorageVersionMigration provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractStorageVersionMigration(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string) (*StorageVersionMigrationApplyConfiguration, error) {
 	return ExtractStorageVersionMigrationFrom(storageVersionMigration, fieldManager, "")
 }
 
 // ExtractStorageVersionMigrationStatus extracts the applied configuration owned by fieldManager from
 // storageVersionMigration for the status subresource.
-// Experimental!
 func ExtractStorageVersionMigrationStatus(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string) (*StorageVersionMigrationApplyConfiguration, error) {
 	return ExtractStorageVersionMigrationFrom(storageVersionMigration, fieldManager, "status")
 }

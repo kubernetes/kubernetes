@@ -29,11 +29,19 @@ import (
 
 // ValidatingAdmissionPolicyApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicy type for use
 // with apply.
+//
+// ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 type ValidatingAdmissionPolicyApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ValidatingAdmissionPolicySpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ValidatingAdmissionPolicyStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the ValidatingAdmissionPolicy.
+	Spec *ValidatingAdmissionPolicySpecApplyConfiguration `json:"spec,omitempty"`
+	// The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+	// behaves in the expected way.
+	// Populated by the system.
+	// Read-only.
+	Status *ValidatingAdmissionPolicyStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ValidatingAdmissionPolicy constructs a declarative configuration of the ValidatingAdmissionPolicy type for use with
@@ -53,7 +61,6 @@ func ValidatingAdmissionPolicy(name string) *ValidatingAdmissionPolicyApplyConfi
 // ExtractValidatingAdmissionPolicyFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractValidatingAdmissionPolicyFrom(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string, subresource string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
 	b := &ValidatingAdmissionPolicyApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingAdmissionPolicy, internal.Parser().Type("io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"), fieldManager, b, subresource)
@@ -77,14 +84,12 @@ func ExtractValidatingAdmissionPolicyFrom(validatingAdmissionPolicy *admissionre
 // ExtractValidatingAdmissionPolicy provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
 	return ExtractValidatingAdmissionPolicyFrom(validatingAdmissionPolicy, fieldManager, "")
 }
 
 // ExtractValidatingAdmissionPolicyStatus extracts the applied configuration owned by fieldManager from
 // validatingAdmissionPolicy for the status subresource.
-// Experimental!
 func ExtractValidatingAdmissionPolicyStatus(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
 	return ExtractValidatingAdmissionPolicyFrom(validatingAdmissionPolicy, fieldManager, "status")
 }

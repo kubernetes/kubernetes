@@ -169,6 +169,15 @@ func ReserveStaticNodePort(port int32) bool {
 // ReleaseStaticNodePort releases the specified port.
 // The corresponding service should have already been deleted, to ensure that the
 // port allocator doesn't try to reuse it before the apiserver considers it available.
+// The caller should do it like below:
+//
+//	ginkgo.DeferCleanup(func(ctx context.Context) {
+//		err := cs.CoreV1().Services(ns).Delete(ctx, serviceName, metav1.DeleteOptions{})
+//		if err != nil && !apierrors.IsNotFound(err) {
+//			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
+//		}
+//		e2eservice.ReleaseStaticNodePort(nodePort)
+//	})
 func ReleaseStaticNodePort(port int32) {
 	staticPortAllocator.releasePort(port)
 }

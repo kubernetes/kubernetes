@@ -451,7 +451,8 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 						// Note: the first argument to Function() is really
 						// only for debugging.
 						v, err := validators.ForEachVal(fldPath, thisNode.valueType,
-							validators.Function("iterateListValues", validators.DefaultFlags, funcName))
+							validators.Function("iterateListValues", validators.DefaultFlags, funcName).
+								WithComment("iterate the list and call the type's validation function"))
 						if err != nil {
 							return nil, fmt.Errorf("generating list iteration: %w", err)
 						} else {
@@ -482,7 +483,8 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 						// Note: the first argument to Function() is really
 						// only for debugging.
 						v, err := validators.ForEachKey(fldPath, underlying.childType,
-							validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
+							validators.Function("iterateMapKeys", validators.DefaultFlags, funcName).
+								WithComment("iterate the map and call the key type's validation function"))
 						if err != nil {
 							return nil, fmt.Errorf("generating map key iteration: %w", err)
 						} else {
@@ -512,7 +514,8 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 						// Note: the first argument to Function() is really
 						// only for debugging.
 						v, err := validators.ForEachVal(fldPath, underlying.childType,
-							validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
+							validators.Function("iterateMapValues", validators.DefaultFlags, funcName).
+								WithComment("iterate the map and call the value type's validation function"))
 						if err != nil {
 							return nil, fmt.Errorf("generating map value iteration: %w", err)
 						} else {
@@ -604,8 +607,14 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			jsonName = commentTags.Name
 		}
 
+		var childPath *field.Path
+		if jsonName != "" {
+			childPath = fldPath.Child(jsonName)
+		} else {
+			childPath = fldPath.Child(name)
+		}
+
 		// Discover the field type.
-		childPath := fldPath.Child(name)
 		klog.V(5).InfoS("field", "name", name, "jsonName", jsonName, "type", memb.Type, "path", childPath)
 		childType := memb.Type
 		var child *childNode
@@ -624,9 +633,9 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		context := validators.Context{
 			Scope:      validators.ScopeField,
 			Type:       childType,
-			ParentPath: fldPath,
-			Member:     &memb,
 			Path:       childPath,
+			Member:     &memb,
+			ParentPath: fldPath,
 		}
 
 		tags, err := td.validator.ExtractTags(context, memb.CommentLines)
@@ -695,7 +704,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 					// Note: the first argument to Function() is really
 					// only for debugging.
 					v, err := validators.ForEachVal(childPath, childType,
-						validators.Function("iterateListValues", validators.DefaultFlags, funcName))
+						validators.Function("iterateListValues", validators.DefaultFlags, funcName).
+							WithComment("iterate the list and call the type's validation function"))
 					if err != nil {
 						return fmt.Errorf("generating list iteration: %w", err)
 					} else {
@@ -726,7 +736,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 					// Note: the first argument to Function() is really
 					// only for debugging.
 					v, err := validators.ForEachKey(childPath, childType,
-						validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
+						validators.Function("iterateMapKeys", validators.DefaultFlags, funcName).
+							WithComment("iterate the map and call the key type's validation function"))
 					if err != nil {
 						return fmt.Errorf("generating map key iteration: %w", err)
 					} else {
@@ -756,7 +767,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 					// Note: the first argument to Function() is really
 					// only for debugging.
 					v, err := validators.ForEachVal(childPath, childType,
-						validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
+						validators.Function("iterateMapValues", validators.DefaultFlags, funcName).
+							WithComment("iterate the map and call the value type's validation function"))
 					if err != nil {
 						return fmt.Errorf("generating map value iteration: %w", err)
 					} else {
@@ -879,6 +891,7 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 
 		// This uses a typed nil pointer, rather than a real instance because
 		// we need the type information, but not an instance of the type.
+		sw.Do("// type $.rootType|name$\n", targs)
 		sw.Do("scheme.AddValidationFunc(", targs)
 		sw.Do("    ($.typePfx$$.rootType|raw$)(nil), ", targs)
 		sw.Do("    func(ctx $.context.Context$, op $.operation.Operation|raw$, obj, oldObj interface{}) $.field.ErrorList|raw$ {\n", targs)
@@ -948,6 +961,8 @@ func (g *genValidations) emitValidationFunction(c *generator.Context, t *types.T
 	if node == nil {
 		panic(fmt.Sprintf("found nil node for root-type %v", t))
 	}
+	sw.Do("// $.inType|objectvalidationfn$ validates an instance of $.inType|name$ according\n", targs)
+	sw.Do("// to declarative validation rules in the API schema.\n", targs)
 	sw.Do("func $.inType|objectvalidationfn$(", targs)
 	sw.Do("    ctx $.context.Context|raw$, ", targs)
 	sw.Do("    op $.operation.Operation|raw$, ", targs)
@@ -991,9 +1006,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 		default:
 			panic(fmt.Sprintf("unexpected type-validations on type %v, kind %s", thisNode.valueType, thisNode.valueType.Kind))
 		}
-		sw.Do("// type $.inType|raw$\n", targs)
 		emitComments(validations.Comments, sw)
-		emitRatchetingCheck(c, thisNode.valueType, sw)
 		emitCallsToValidators(c, validations.Functions, sw)
 		if thisNode.valueType.Kind == types.Alias {
 			underlyingNode := thisNode.underlying.node
@@ -1045,13 +1058,57 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			buf := bytes.NewBuffer(nil)
 			bufsw := sw.Dup(buf)
 
+			// On ratcheting checks:
+			//
+			// We emit ratcheting checks ONLY for struct fields and ONLY when
+			// that field has some validations to call.
+			//
+			// We DO NOT emit ratchet checks inside type-specific validation
+			// functions, because that leads to repeated ratchet checking which
+			// is almost never useful work (keep reading).
+			//
+			// The consequence of this is that a caller of a type's validation
+			// function is assumed to have already done a ratchet check (which
+			// is true for all generated code (except root types, keep
+			// reading)). For struct types (our most common case), the type's
+			// function will do ratchet checks on each sub-field anyway.
+			//
+			// This leaves one case where validation is executed unilaterally:
+			// non-pre-checked calls of validation functions for types which have
+			// type-attached validations.  This can happen in two cases:
+			//   1. an external caller of a type's validation function
+			//   2. the generated register function for a package which calls a
+			//      root-type's validation function
+			//
+			// TODO: We are leaving this as a problem for the future. If we
+			// find that we have a root type which has type-attached validation
+			// AND that validation is being ratcheted, then we will need to
+			// address this. Some options:
+			//   1. emit a ratchet check in the package's register function
+			//   2. emit a ratchet check in the type's validation function
+			//      (IFF it has type-attached validation, perhaps only for root
+			//      types)
+			//   3. emit both "safe" (ratchet check the whole object) and
+			//      "fast" (assume the object was already ratchet checked)
+			//      forms of each type's validation function, so that the
+			//      generated code can call the "fast" form while external code
+			//      calls the "safe" form.
+			//   4. implement depth-first traversal of validation, where each
+			//      function returns an additional bool indicating "something
+			//      changed", which gets propagated up the caller to decide if
+			//      it needs to do higher-level validations (e.g. if any field
+			//      in a struct changes, the struct's type-attached validations
+			//      need to be executed, but if no fields changed they can be
+			//      skipped).
+
 			validations := fld.fieldValidations
 			fldRatchetingChecked := false
 			if !validations.Empty() {
 				emitComments(validations.Comments, bufsw)
 				emitRatchetingCheck(c, fld.childType, bufsw)
-				emitCallsToValidators(c, validations.Functions, bufsw)
 				fldRatchetingChecked = true
+				bufsw.Do("// call field-attached validations\n", nil)
+				emitCallsToValidators(c, validations.Functions, bufsw)
 			}
 
 			// If the node is nil, this must be a type in a package we are not
@@ -1060,8 +1117,16 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				// Get to the real type.
 				switch fld.node.valueType.Kind {
 				case types.Alias, types.Struct:
-					// If this field is another type, call its validation function.
-					g.emitCallToOtherTypeFunc(c, fld.node, bufsw)
+					// If this field is another type, we may need to call its
+					// validation function. If it has no validations
+					// (transitively) then we don't need to do anything.
+					if g.hasValidations(fld.node) {
+						if !fldRatchetingChecked {
+							emitRatchetingCheck(c, fld.childType, bufsw)
+							fldRatchetingChecked = true
+						}
+						g.emitCallToOtherTypeFunc(c, fld.node, bufsw)
+					}
 				case types.Slice:
 					// If this field is a list and the value-type has
 					// validations, call its validation function.
@@ -1159,15 +1224,10 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 // variables named "obj" and "oldObj", and the field path to this value is
 // named "fldPath".
 func (g *genValidations) emitCallToOtherTypeFunc(c *generator.Context, node *typeNode, sw *generator.SnippetWriter) {
-	// If this type has no validations (transitively) then we don't need to do
-	// anything.
-	if !g.hasValidations(node) {
-		return
-	}
-
 	targs := generator.Args{
 		"funcName": c.Universe.Type(node.funcName),
 	}
+	sw.Do("// call the type's validation function\n", nil)
 	sw.Do("errs = append(errs, $.funcName|raw$(ctx, op, fldPath, obj, oldObj)...)\n", targs)
 }
 
@@ -1177,6 +1237,7 @@ func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.Snip
 	targs := generator.Args{
 		"operation": mkSymbolArgs(c, operationPkgSymbols),
 	}
+	sw.Do("// don't revalidate unchanged data\n", nil)
 	// If the type is a builtin, we can use a simpler equality check when they are not nil.
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(t))) {
 		// We should never get anything but pointers here, since every other
@@ -1192,7 +1253,7 @@ func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.Snip
 		targs["equality"] = mkSymbolArgs(c, equalityPkgSymbols)
 		sw.Do("if op.Type == $.operation.Update|raw$ && $.equality.Semantic|raw$.DeepEqual(obj, oldObj) {\n", targs)
 	}
-	sw.Do("   return nil // no changes\n", nil)
+	sw.Do("   return nil\n", nil)
 	sw.Do("}\n", nil)
 }
 

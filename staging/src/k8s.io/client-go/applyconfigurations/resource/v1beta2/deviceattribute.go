@@ -20,10 +20,17 @@ package v1beta2
 
 // DeviceAttributeApplyConfiguration represents a declarative configuration of the DeviceAttribute type for use
 // with apply.
+//
+// DeviceAttribute must have exactly one field set.
 type DeviceAttributeApplyConfiguration struct {
-	IntValue     *int64  `json:"int,omitempty"`
-	BoolValue    *bool   `json:"bool,omitempty"`
-	StringValue  *string `json:"string,omitempty"`
+	// IntValue is a number.
+	IntValue *int64 `json:"int,omitempty"`
+	// BoolValue is a true/false value.
+	BoolValue *bool `json:"bool,omitempty"`
+	// StringValue is a string. Must not be longer than 64 characters.
+	StringValue *string `json:"string,omitempty"`
+	// VersionValue is a semantic version according to semver.org spec 2.0.0.
+	// Must not be longer than 64 characters.
 	VersionValue *string `json:"version,omitempty"`
 }
 

@@ -606,17 +606,17 @@ func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.
 }
 
 func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) (err error) {
+	logger := klog.FromContext(ctx)
 	if utilfeature.DefaultFeatureGate.Enabled(features.SystemdWatchdog) {
 		// NewHealthChecker returns an error indicating that the watchdog is configured but the configuration is incorrect,
 		// the kubelet will not be started.
-		healthChecker, err := watchdog.NewHealthChecker()
+		healthChecker, err := watchdog.NewHealthChecker(logger)
 		if err != nil {
 			return fmt.Errorf("create health checker: %w", err)
 		}
 		kubeDeps.HealthChecker = healthChecker
 		healthChecker.Start(ctx)
 	}
-	logger := klog.FromContext(ctx)
 	// Set global feature gates based on the value on the initial KubeletServer
 	err = utilfeature.DefaultMutableFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
@@ -1270,10 +1270,10 @@ func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodCo
 
 	// start the kubelet server
 	if enableServer {
-		go k.ListenAndServe(kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
+		go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
-		go k.ListenAndServeReadOnly(netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)
+		go k.ListenAndServeReadOnly(ctx, netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)
 	}
 	go k.ListenAndServePodResources(ctx)
 }

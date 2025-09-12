@@ -19,19 +19,15 @@ import (
 	"golang.org/x/crypto/curve25519"
 )
 
-const (
-	kexAlgoMLKEM768xCurve25519SHA256 = "mlkem768x25519-sha256"
-)
-
 func init() {
 	// After Go 1.24rc1 mlkem swapped the order of return values of Encapsulate.
 	// See #70950.
 	if runtime.Version() == "go1.24rc1" {
 		return
 	}
-	supportedKexAlgos = slices.Insert(supportedKexAlgos, 0, kexAlgoMLKEM768xCurve25519SHA256)
-	preferredKexAlgos = slices.Insert(preferredKexAlgos, 0, kexAlgoMLKEM768xCurve25519SHA256)
-	kexAlgoMap[kexAlgoMLKEM768xCurve25519SHA256] = &mlkem768WithCurve25519sha256{}
+	supportedKexAlgos = slices.Insert(supportedKexAlgos, 0, KeyExchangeMLKEM768X25519)
+	defaultKexAlgos = slices.Insert(defaultKexAlgos, 0, KeyExchangeMLKEM768X25519)
+	kexAlgoMap[KeyExchangeMLKEM768X25519] = &mlkem768WithCurve25519sha256{}
 }
 
 // mlkem768WithCurve25519sha256 implements the hybrid ML-KEM768 with

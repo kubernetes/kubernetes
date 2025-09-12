@@ -29,11 +29,17 @@ import (
 
 // ImageReviewApplyConfiguration represents a declarative configuration of the ImageReview type for use
 // with apply.
+//
+// ImageReview checks if the set of images in a pod are allowed.
 type ImageReviewApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ImageReviewSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ImageReviewStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec holds information about the pod being evaluated
+	Spec *ImageReviewSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is filled in by the backend and indicates whether the pod should be allowed.
+	Status *ImageReviewStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ImageReview constructs a declarative configuration of the ImageReview type for use with
@@ -53,7 +59,6 @@ func ImageReview(name string) *ImageReviewApplyConfiguration {
 // ExtractImageReviewFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractImageReviewFrom(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string, subresource string) (*ImageReviewApplyConfiguration, error) {
 	b := &ImageReviewApplyConfiguration{}
 	err := managedfields.ExtractInto(imageReview, internal.Parser().Type("io.k8s.api.imagepolicy.v1alpha1.ImageReview"), fieldManager, b, subresource)
@@ -77,14 +82,12 @@ func ExtractImageReviewFrom(imageReview *imagepolicyv1alpha1.ImageReview, fieldM
 // ExtractImageReview provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
 	return ExtractImageReviewFrom(imageReview, fieldManager, "")
 }
 
 // ExtractImageReviewStatus extracts the applied configuration owned by fieldManager from
 // imageReview for the status subresource.
-// Experimental!
 func ExtractImageReviewStatus(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
 	return ExtractImageReviewFrom(imageReview, fieldManager, "status")
 }

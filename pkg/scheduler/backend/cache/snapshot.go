@@ -43,7 +43,7 @@ type Snapshot struct {
 	generation int64
 }
 
-var _ framework.SharedLister = &Snapshot{}
+var _ fwk.SharedLister = &Snapshot{}
 
 // NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
@@ -156,12 +156,12 @@ func createImageExistenceMap(nodes []*v1.Node) map[string]sets.Set[string] {
 }
 
 // NodeInfos returns a NodeInfoLister.
-func (s *Snapshot) NodeInfos() framework.NodeInfoLister {
+func (s *Snapshot) NodeInfos() fwk.NodeInfoLister {
 	return s
 }
 
 // StorageInfos returns a StorageInfoLister.
-func (s *Snapshot) StorageInfos() framework.StorageInfoLister {
+func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 	return s
 }
 

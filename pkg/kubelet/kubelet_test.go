@@ -206,7 +206,7 @@ func newTestKubeletWithImageList(
 	excludeAdmitHandlers bool,
 	enableResizing bool,
 ) *TestKubelet {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	fakeRuntime := &containertest.FakeRuntime{
 		ImageList: imageList,
@@ -336,7 +336,7 @@ func newTestKubeletWithImageList(
 	)
 	kubelet.allocationManager.SetContainerRuntime(fakeRuntime)
 	volumeStatsAggPeriod := time.Second * 10
-	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.recorder)
+	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(tCtx, kubelet, volumeStatsAggPeriod, kubelet.recorder)
 
 	fakeHostStatsProvider := stats.NewFakeHostStatsProvider(&containertest.FakeOS{})
 
@@ -3437,7 +3437,6 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.containerManager,
 		kubelet.containerLogManager,
 		kubelet.runtimeClassManager,
-		kubelet.allocationManager,
 		false,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubelet.containerManager.GetNodeAllocatableAbsolute,

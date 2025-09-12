@@ -29,11 +29,23 @@ import (
 
 // ServiceApplyConfiguration represents a declarative configuration of the Service type for use
 // with apply.
+//
+// Service is a named abstraction of software service (for example, mysql) consisting of local port
+// (for example 3306) that the proxy listens on, and the selector that determines which pods
+// will answer requests sent through the proxy.
 type ServiceApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ServiceSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *ServiceStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the behavior of a service.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *ServiceSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the service.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *ServiceStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Service constructs a declarative configuration of the Service type for use with
@@ -54,7 +66,6 @@ func Service(name, namespace string) *ServiceApplyConfiguration {
 // ExtractServiceFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractServiceFrom(service *corev1.Service, fieldManager string, subresource string) (*ServiceApplyConfiguration, error) {
 	b := &ServiceApplyConfiguration{}
 	err := managedfields.ExtractInto(service, internal.Parser().Type("io.k8s.api.core.v1.Service"), fieldManager, b, subresource)
@@ -79,14 +90,12 @@ func ExtractServiceFrom(service *corev1.Service, fieldManager string, subresourc
 // ExtractService provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractService(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
 	return ExtractServiceFrom(service, fieldManager, "")
 }
 
 // ExtractServiceStatus extracts the applied configuration owned by fieldManager from
 // service for the status subresource.
-// Experimental!
 func ExtractServiceStatus(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
 	return ExtractServiceFrom(service, fieldManager, "status")
 }

@@ -489,10 +489,15 @@ func (fg FunctionGen) WithConditions(conditions Conditions) FunctionGen {
 	return fg
 }
 
+// WithComments returns a new FunctionGen with a comment.
+func (fg FunctionGen) WithComments(comments ...string) FunctionGen {
+	fg.Comments = append(fg.Comments, comments...)
+	return fg
+}
+
 // WithComment returns a new FunctionGen with a comment.
 func (fg FunctionGen) WithComment(comment string) FunctionGen {
-	fg.Comments = append(fg.Comments, comment)
-	return fg
+	return fg.WithComments(comment)
 }
 
 // Variable creates a VariableGen for a given variable name and init value.

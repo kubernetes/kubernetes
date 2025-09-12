@@ -50,6 +50,7 @@ const (
 // NodePrePullImageList is a list of images used in node e2e test. These images will be prepulled
 // before test running so that the image pulling won't fail in actual test.
 var NodePrePullImageList = sets.NewString(
+	imageutils.GetE2EImage(imageutils.AgnhostPrev),
 	imageutils.GetE2EImage(imageutils.Agnhost),
 	"gcr.io/cadvisor/cadvisor:v0.47.2",
 	busyboxImage,

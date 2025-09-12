@@ -59,12 +59,13 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	args := tag.Args
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	t := util.NonPointer(util.NativeType(context.Type))
-	if t.Kind != types.Struct {
-		return Validations{}, fmt.Errorf("can only be used on struct types")
+	t := context.Type
+	nt := util.NonPointer(util.NativeType(t))
+	if nt.Kind != types.Struct {
+		return Validations{}, fmt.Errorf("can only be used on struct types: %v", nt.Kind)
 	}
 	subname := args[0].Value
-	submemb := util.GetMemberByJSON(t, subname)
+	submemb := util.GetMemberByJSON(nt, subname)
 	if submemb == nil {
 		return Validations{}, fmt.Errorf("no field for json name %q", subname)
 	}
@@ -72,9 +73,9 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	subContext := Context{
 		Scope:      ScopeField,
 		Type:       submemb.Type,
-		ParentPath: context.Path,
-		Member:     submemb,
 		Path:       context.Path.Child(subname),
+		Member:     submemb,
+		ParentPath: context.Path,
 	}
 	if validations, err := stv.validator.ExtractValidations(subContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
@@ -83,26 +84,47 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 			return Validations{}, fmt.Errorf("variable generation is not supported")
 		}
 
-		for _, vfn := range validations.Functions {
-			nilableStructType := context.Type
-			if !util.IsNilableType(nilableStructType) {
-				nilableStructType = types.PointerTo(nilableStructType)
-			}
-			nilableFieldType := submemb.Type
-			fieldExprPrefix := ""
-			if !util.IsNilableType(nilableFieldType) {
-				nilableFieldType = types.PointerTo(nilableFieldType)
-				fieldExprPrefix = "&"
-			}
+		result.Variables = append(result.Variables, validations.Variables...)
 
-			getFn := FunctionLiteral{
-				Parameters: []ParamResult{{"o", nilableStructType}},
-				Results:    []ParamResult{{"", nilableFieldType}},
-			}
-			getFn.Body = fmt.Sprintf("return %so.%s", fieldExprPrefix, submemb.Name)
-			f := Function(subfieldTagName, vfn.Flags, validateSubfield, subname, getFn, WrapperFunction{vfn, submemb.Type})
-			result.Functions = append(result.Functions, f)
-			result.Variables = append(result.Variables, validations.Variables...)
+		nilableStructType := context.Type
+		if !util.IsNilableType(nilableStructType) {
+			nilableStructType = types.PointerTo(nilableStructType)
+		}
+
+		nilableFieldType := submemb.Type
+		fieldExprPrefix := ""
+		if !util.IsNilableType(nilableFieldType) {
+			nilableFieldType = types.PointerTo(nilableFieldType)
+			fieldExprPrefix = "&"
+		}
+
+		// getFn is the function that retrieves the subfield value from the
+		// struct.
+		getFn := FunctionLiteral{
+			Parameters: []ParamResult{{"o", nilableStructType}},
+			Results:    []ParamResult{{"", nilableFieldType}},
+		}
+		getFn.Body = fmt.Sprintf("return %so.%s", fieldExprPrefix, submemb.Name)
+
+		// equivArg is the function that is used to compare the correlated
+		// elements in the old and new lists, for ratcheting.
+		var equivArg any
+
+		// directComparable is used to determine whether we can use the direct
+		// comparison operator "==" or need to use the semantic DeepEqual when
+		// looking up and comparing correlated list elements for validation ratcheting.
+		directComparable := util.IsDirectComparable(util.NonPointer(util.NativeType(submemb.Type)))
+		if directComparable {
+			// It must be a pointer, since other nilable types are not directly
+			// comparable.
+			equivArg = Identifier(validateDirectEqualPtr)
+		} else {
+			equivArg = Identifier(validateSemanticDeepEqual)
+		}
+
+		for _, vfn := range validations.Functions {
+			f := Function(subfieldTagName, vfn.Flags, validateSubfield, subname, getFn, equivArg, WrapperFunction{vfn, submemb.Type})
+			result.AddFunction(f)
 		}
 	}
 	return result, nil

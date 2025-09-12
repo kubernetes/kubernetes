@@ -1496,9 +1496,9 @@
 - testname: Kubectl, diff Deployment
   codename: '[sig-cli] Kubectl client Kubectl diff should check if kubectl diff finds
     a difference for Deployments [Conformance]'
-  description: Create a Deployment with httpd image. Declare the same Deployment with
-    a different image, busybox. Diff of live Deployment with declared Deployment MUST
-    include the difference between live and declared image.
+  description: Create a Deployment with agnhost image. Declare the same Deployment
+    with a different image, busybox. Diff of live Deployment with declared Deployment
+    MUST include the difference between live and declared image.
   release: v1.19
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, create service, replication controller

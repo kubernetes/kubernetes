@@ -76,6 +76,8 @@ uninterpreted to Load, so that it can interpret them
 according to the conventions of the underlying build system.
 
 See the Example function for typical usage.
+See also [golang.org/x/tools/go/packages/internal/linecount]
+for an example application.
 
 # The driver protocol
 

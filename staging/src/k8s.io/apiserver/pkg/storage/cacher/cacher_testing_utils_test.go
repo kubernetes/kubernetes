@@ -165,10 +165,12 @@ func compactStore(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 	}
 }
 
-func increaseRV(client *clientv3.Client) storagetesting.IncreaseRVFunc {
-	return func(ctx context.Context, t *testing.T) {
-		if _, err := client.KV.Put(ctx, "increaseRV", "ok"); err != nil {
+func increaseRVFunc(client *clientv3.Client) storagetesting.IncreaseRVFunc {
+	return func(ctx context.Context, t *testing.T) int64 {
+		resp, err := client.KV.Put(ctx, "increaseRV", "ok")
+		if err != nil {
 			t.Fatalf("Could not update increaseRV: %v", err)
 		}
+		return resp.Header.Revision
 	}
 }

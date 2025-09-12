@@ -29,11 +29,19 @@ import (
 
 // PriorityLevelConfigurationApplyConfiguration represents a declarative configuration of the PriorityLevelConfiguration type for use
 // with apply.
+//
+// PriorityLevelConfiguration represents the configuration of a priority level.
 type PriorityLevelConfigurationApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// `metadata` is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PriorityLevelConfigurationSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *PriorityLevelConfigurationStatusApplyConfiguration `json:"status,omitempty"`
+	// `spec` is the specification of the desired behavior of a "request-priority".
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *PriorityLevelConfigurationSpecApplyConfiguration `json:"spec,omitempty"`
+	// `status` is the current status of a "request-priority".
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *PriorityLevelConfigurationStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PriorityLevelConfiguration constructs a declarative configuration of the PriorityLevelConfiguration type for use with
@@ -53,7 +61,6 @@ func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyCon
 // ExtractPriorityLevelConfigurationFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPriorityLevelConfigurationFrom(priorityLevelConfiguration *flowcontrolv1beta2.PriorityLevelConfiguration, fieldManager string, subresource string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	b := &PriorityLevelConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(priorityLevelConfiguration, internal.Parser().Type("io.k8s.api.flowcontrol.v1beta2.PriorityLevelConfiguration"), fieldManager, b, subresource)
@@ -77,14 +84,12 @@ func ExtractPriorityLevelConfigurationFrom(priorityLevelConfiguration *flowcontr
 // ExtractPriorityLevelConfiguration provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1beta2.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	return ExtractPriorityLevelConfigurationFrom(priorityLevelConfiguration, fieldManager, "")
 }
 
 // ExtractPriorityLevelConfigurationStatus extracts the applied configuration owned by fieldManager from
 // priorityLevelConfiguration for the status subresource.
-// Experimental!
 func ExtractPriorityLevelConfigurationStatus(priorityLevelConfiguration *flowcontrolv1beta2.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	return ExtractPriorityLevelConfigurationFrom(priorityLevelConfiguration, fieldManager, "status")
 }

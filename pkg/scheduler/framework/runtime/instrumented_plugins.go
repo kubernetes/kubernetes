@@ -22,16 +22,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	compbasemetrics "k8s.io/component-base/metrics"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 type instrumentedFilterPlugin struct {
-	framework.FilterPlugin
+	fwk.FilterPlugin
 
 	metric compbasemetrics.CounterMetric
 }
 
-var _ framework.FilterPlugin = &instrumentedFilterPlugin{}
+var _ fwk.FilterPlugin = &instrumentedFilterPlugin{}
 
 func (p *instrumentedFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	p.metric.Inc()
@@ -39,14 +38,14 @@ func (p *instrumentedFilterPlugin) Filter(ctx context.Context, state fwk.CycleSt
 }
 
 type instrumentedPreFilterPlugin struct {
-	framework.PreFilterPlugin
+	fwk.PreFilterPlugin
 
 	metric compbasemetrics.CounterMetric
 }
 
-var _ framework.PreFilterPlugin = &instrumentedPreFilterPlugin{}
+var _ fwk.PreFilterPlugin = &instrumentedPreFilterPlugin{}
 
-func (p *instrumentedPreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (p *instrumentedPreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	result, status := p.PreFilterPlugin.PreFilter(ctx, state, pod, nodes)
 	if !status.IsSkip() {
 		p.metric.Inc()
@@ -55,12 +54,12 @@ func (p *instrumentedPreFilterPlugin) PreFilter(ctx context.Context, state fwk.C
 }
 
 type instrumentedPreScorePlugin struct {
-	framework.PreScorePlugin
+	fwk.PreScorePlugin
 
 	metric compbasemetrics.CounterMetric
 }
 
-var _ framework.PreScorePlugin = &instrumentedPreScorePlugin{}
+var _ fwk.PreScorePlugin = &instrumentedPreScorePlugin{}
 
 func (p *instrumentedPreScorePlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	status := p.PreScorePlugin.PreScore(ctx, state, pod, nodes)
@@ -71,12 +70,12 @@ func (p *instrumentedPreScorePlugin) PreScore(ctx context.Context, state fwk.Cyc
 }
 
 type instrumentedScorePlugin struct {
-	framework.ScorePlugin
+	fwk.ScorePlugin
 
 	metric compbasemetrics.CounterMetric
 }
 
-var _ framework.ScorePlugin = &instrumentedScorePlugin{}
+var _ fwk.ScorePlugin = &instrumentedScorePlugin{}
 
 func (p *instrumentedScorePlugin) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	p.metric.Inc()

@@ -20,10 +20,16 @@ package v1
 
 // ContainerExtendedResourceRequestApplyConfiguration represents a declarative configuration of the ContainerExtendedResourceRequest type for use
 // with apply.
+//
+// ContainerExtendedResourceRequest has the mapping of container name,
+// extended resource name to the device request name.
 type ContainerExtendedResourceRequestApplyConfiguration struct {
+	// The name of the container requesting resources.
 	ContainerName *string `json:"containerName,omitempty"`
-	ResourceName  *string `json:"resourceName,omitempty"`
-	RequestName   *string `json:"requestName,omitempty"`
+	// The name of the extended resource in that container which gets backed by DRA.
+	ResourceName *string `json:"resourceName,omitempty"`
+	// The name of the request in the special ResourceClaim which corresponds to the extended resource.
+	RequestName *string `json:"requestName,omitempty"`
 }
 
 // ContainerExtendedResourceRequestApplyConfiguration constructs a declarative configuration of the ContainerExtendedResourceRequest type for use with

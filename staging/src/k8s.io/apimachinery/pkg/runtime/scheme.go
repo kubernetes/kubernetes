@@ -29,6 +29,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kube-openapi/pkg/util"
 )
 
 // Scheme defines methods for serializing and deserializing API objects, a type
@@ -752,6 +753,9 @@ var internalPackages = []string{"k8s.io/apimachinery/pkg/runtime/scheme.go"}
 // The OpenAPI definition name is the canonical name of the type, with the group and version removed.
 // For example, the OpenAPI definition name of Pod is `io.k8s.api.core.v1.Pod`.
 //
+// This respects the util.OpenAPIModelNamer interface and will return the name returned by
+// OpenAPIModelName() if it is defined on the type.
+//
 // A known type that is registered as an unstructured.Unstructured type is treated as a custom resource and
 // which has an OpenAPI definition name of the form `<reversed-group>.<version.<kind>`.
 // For example, the OpenAPI definition name of `group: stable.example.com, version: v1, kind: Pod` is
@@ -764,6 +768,12 @@ func (s *Scheme) ToOpenAPIDefinitionName(groupVersionKind schema.GroupVersionKin
 	if err != nil {
 		return "", err
 	}
+
+	// Use a namer if provided
+	if namer, ok := example.(util.OpenAPIModelNamer); ok {
+		return namer.OpenAPIModelName(), nil
+	}
+
 	if _, ok := example.(Unstructured); ok {
 		if groupVersionKind.Group == "" || groupVersionKind.Kind == "" {
 			return "", fmt.Errorf("unable to convert GroupVersionKind with empty fields to unstructured type to an OpenAPI definition name: %v", groupVersionKind)

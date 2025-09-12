@@ -17,9 +17,9 @@
 # Combining `performance` and `short` selects suitable workloads for a local
 # before/after comparisons with benchstat.
 
-# SchedulingWithResourceClaimTemplateToleration is a variant of SchedulingWithResourceClaimTemplate
+# DeviceTaintToleration is a variant of SchedulingWithResourceClaimTemplate
 # with a claim template that tolerates the taint defined in a DeviceTaintRule.
-- name: SchedulingWithResourceClaimTemplateToleration
+- name: DeviceTaintToleration
   featureGates:
     DynamicResourceAllocation: true
     DRADeviceTaints: true

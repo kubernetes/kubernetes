@@ -25,14 +25,27 @@ import (
 
 // PodConditionApplyConfiguration represents a declarative configuration of the PodCondition type for use
 // with apply.
+//
+// PodCondition contains details for the current condition of this pod.
 type PodConditionApplyConfiguration struct {
-	Type               *corev1.PodConditionType `json:"type,omitempty"`
-	ObservedGeneration *int64                   `json:"observedGeneration,omitempty"`
-	Status             *corev1.ConditionStatus  `json:"status,omitempty"`
-	LastProbeTime      *metav1.Time             `json:"lastProbeTime,omitempty"`
-	LastTransitionTime *metav1.Time             `json:"lastTransitionTime,omitempty"`
-	Reason             *string                  `json:"reason,omitempty"`
-	Message            *string                  `json:"message,omitempty"`
+	// Type is the type of the condition.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+	Type *corev1.PodConditionType `json:"type,omitempty"`
+	// If set, this represents the .metadata.generation that the pod condition was set based upon.
+	// The PodObservedGenerationTracking feature gate must be enabled to use this field.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// Last time we probed the condition.
+	LastProbeTime *metav1.Time `json:"lastProbeTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// Human-readable message indicating details about last transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // PodConditionApplyConfiguration constructs a declarative configuration of the PodCondition type for use with

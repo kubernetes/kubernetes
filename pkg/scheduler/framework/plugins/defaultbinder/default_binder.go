@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
@@ -33,13 +32,13 @@ const Name = names.DefaultBinder
 
 // DefaultBinder binds pods to nodes using a k8s client.
 type DefaultBinder struct {
-	handle framework.Handle
+	handle fwk.Handle
 }
 
-var _ framework.BindPlugin = &DefaultBinder{}
+var _ fwk.BindPlugin = &DefaultBinder{}
 
 // New creates a DefaultBinder.
-func New(_ context.Context, _ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 	return &DefaultBinder{handle: handle}, nil
 }
 

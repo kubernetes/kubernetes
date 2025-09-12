@@ -43,6 +43,7 @@ import (
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
@@ -91,7 +92,8 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		//ContainerInfo with no CPU/memory usage but has network usage for uncleaned cgroups, should not be filtered out
 		"/pod2-c222-zerocpumem-1": getContainerInfoWithZeroCpuMem(seedPastPod0Container0, pName2, namespace, cName222),
 	}
-	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
+	logger, _ := ktesting.NewTestContext(t)
+	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger, infos)
 	assert.Len(t, filteredInfos, 5)
 	assert.Len(t, allInfos, 11)
 	for _, c := range []string{"/pod0-i", "/pod0-c0"} {
@@ -370,7 +372,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 }
 
 func TestCadvisorPodCPUAndMemoryStats(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	const (
 		namespace = "test0"
 		podName   = "pod0"
@@ -420,7 +422,7 @@ func TestCadvisorPodCPUAndMemoryStats(t *testing.T) {
 
 	p := NewCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, nil, nil, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), mockCM)
 
-	ps, err := p.PodCPUAndMemoryStats(ctx, pod, nil)
+	ps, err := p.PodCPUAndMemoryStats(tCtx, pod, nil)
 	require.NoError(t, err)
 	assert.Equal(t, podName, ps.PodRef.Name)
 	assert.Equal(t, namespace, ps.PodRef.Namespace)
@@ -463,8 +465,8 @@ func TestCadvisorPodCPUAndMemoryStats(t *testing.T) {
 }
 
 func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
+	ctx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
-	ctx := context.Background()
 	const (
 		namespace0 = "test0"
 		namespace2 = "test2"

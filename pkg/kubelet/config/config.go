@@ -99,9 +99,12 @@ func (c *PodConfig) SeenAllSources(seenSources sets.Set[string]) bool {
 	if c.pods == nil {
 		return false
 	}
+	// Use klog.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
 	c.sourcesLock.Lock()
 	defer c.sourcesLock.Unlock()
-	klog.V(5).InfoS("Looking for sources, have seen", "sources", sets.List(c.sources), "seenSources", seenSources)
+	logger.V(5).Info("Looking for sources, have seen", "sources", sets.List(c.sources), "seenSources", seenSources)
 	return seenSources.HasAll(sets.List(c.sources)...) && c.pods.seenSources(sets.List(c.sources)...)
 }
 
@@ -157,12 +160,12 @@ func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificatio
 // Merge normalizes a set of incoming changes from different sources into a map of all Pods
 // and ensures that redundant changes are filtered out, and then pushes zero or more minimal
 // updates onto the update channel.  Ensures that updates are delivered in order.
-func (s *podStorage) Merge(source string, change interface{}) error {
+func (s *podStorage) Merge(ctx context.Context, source string, change interface{}) error {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
 
 	seenBefore := s.sourcesSeen.Has(source)
-	adds, updates, deletes, removes, reconciles := s.merge(source, change)
+	adds, updates, deletes, removes, reconciles := s.merge(ctx, source, change)
 	firstSet := !seenBefore && s.sourcesSeen.Has(source)
 
 	// deliver update notifications
@@ -216,9 +219,10 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	return nil
 }
 
-func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes, removes, reconciles *kubetypes.PodUpdate) {
+func (s *podStorage) merge(ctx context.Context, source string, change interface{}) (adds, updates, deletes, removes, reconciles *kubetypes.PodUpdate) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
+	logger := klog.FromContext(ctx)
 
 	addPods := []*v1.Pod{}
 	updatePods := []*v1.Pod{}
@@ -235,7 +239,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	// After updated, new pod will be stored in the pod cache *pods*.
 	// Notice that *pods* and *oldPods* could be the same cache.
 	updatePodsFunc := func(newPods []*v1.Pod, oldPods, pods map[types.UID]*v1.Pod) {
-		filtered := filterInvalidPods(newPods, source, s.recorder)
+		filtered := filterInvalidPods(logger, newPods, source, s.recorder)
 		for _, ref := range filtered {
 			// Annotate the pod with the source before any comparison.
 			if ref.Annotations == nil {
@@ -258,7 +262,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				}
 				continue
 			}
-			recordFirstSeenTime(ref)
+			recordFirstSeenTime(logger, ref)
 			pods[ref.UID] = ref
 			addPods = append(addPods, ref)
 		}
@@ -268,16 +272,16 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	switch update.Op {
 	case kubetypes.ADD, kubetypes.UPDATE, kubetypes.DELETE:
 		if update.Op == kubetypes.ADD {
-			klog.V(4).InfoS("Adding new pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
+			logger.V(4).Info("Adding new pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		} else if update.Op == kubetypes.DELETE {
-			klog.V(4).InfoS("Gracefully deleting pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
+			logger.V(4).Info("Gracefully deleting pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		} else {
-			klog.V(4).InfoS("Updating pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
+			logger.V(4).Info("Updating pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		}
 		updatePodsFunc(update.Pods, pods, pods)
 
 	case kubetypes.REMOVE:
-		klog.V(4).InfoS("Removing pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
+		logger.V(4).Info("Removing pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		for _, value := range update.Pods {
 			if existing, found := pods[value.UID]; found {
 				// this is a delete
@@ -289,7 +293,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		}
 
 	case kubetypes.SET:
-		klog.V(4).InfoS("Setting pods for source", "source", source)
+		logger.V(4).Info("Setting pods for source", "source", source)
 		s.markSourceSet(source)
 		// Clear the old map entries by just creating a new map
 		oldPods := pods
@@ -303,7 +307,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		}
 
 	default:
-		klog.InfoS("Received invalid update type", "type", update)
+		logger.Info("Received invalid update type", "type", update)
 
 	}
 
@@ -330,14 +334,14 @@ func (s *podStorage) seenSources(sources ...string) bool {
 	return s.sourcesSeen.HasAll(sources...)
 }
 
-func filterInvalidPods(pods []*v1.Pod, source string, recorder record.EventRecorder) (filtered []*v1.Pod) {
+func filterInvalidPods(logger klog.Logger, pods []*v1.Pod, source string, recorder record.EventRecorder) (filtered []*v1.Pod) {
 	names := sets.Set[string]{}
 	for i, pod := range pods {
 		// Pods from each source are assumed to have passed validation individually.
 		// This function only checks if there is any naming conflict.
 		name := kubecontainer.GetPodFullName(pod)
 		if names.Has(name) {
-			klog.InfoS("Pod failed validation due to duplicate pod name, ignoring", "index", i, "pod", klog.KObj(pod), "source", source)
+			logger.Info("Pod failed validation due to duplicate pod name, ignoring", "index", i, "pod", klog.KObj(pod), "source", source)
 			recorder.Eventf(pod, v1.EventTypeWarning, events.FailedValidation, "Error validating pod %s from %s due to duplicate pod name %q, ignoring", format.Pod(pod), source, pod.Name)
 			continue
 		} else {
@@ -393,8 +397,8 @@ func isAnnotationMapEqual(existingMap, candidateMap map[string]string) bool {
 }
 
 // recordFirstSeenTime records the first seen time of this pod.
-func recordFirstSeenTime(pod *v1.Pod) {
-	klog.V(4).InfoS("Receiving a new pod", "pod", klog.KObj(pod))
+func recordFirstSeenTime(logger klog.Logger, pod *v1.Pod) {
+	logger.V(4).Info("Receiving a new pod", "pod", klog.KObj(pod))
 	pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey] = kubetypes.NewTimestamp().GetString()
 }
 
