@@ -220,7 +220,7 @@ func (jm *ControllerV2) sync(ctx context.Context, cronJobKey string) (*time.Dura
 		return nil, err
 	}
 
-	jobs, err := jm.getCronJobJobsByIndexer(cronJob)
+	jobsjobsToBeReconciled, err := jm.getCronJobJobsByIndexer(cronJob)
 	if err != nil {
 		return nil, err
 	}
@@ -229,9 +229,9 @@ func (jm *ControllerV2) sync(ctx context.Context, cronJobKey string) (*time.Dura
 	// CronJob object and perform an actual update only once.
 	cronJobCopy := cronJob.DeepCopy()
 
-	updateStatusAfterCleanup := jm.cleanupFinishedJobs(ctx, cronJobCopy, jobs)
+	updateStatusAfterCleanup := jm.cleanupFinishedJobs(ctx, cronJobCopy, jobsjobsToBeReconciled)
 
-	requeueAfter, updateStatusAfterSync, syncErr := jm.syncCronJob(ctx, cronJobCopy, jobs)
+	requeueAfter, updateStatusAfterSync, syncErr := jm.syncCronJob(ctx, cronJobCopy, jobsjobsToBeReconciled)
 	if syncErr != nil {
 		logger.V(2).Info("Error reconciling cronjob", "cronjob", klog.KObj(cronJob), "err", syncErr)
 	}
