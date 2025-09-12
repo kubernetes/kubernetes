@@ -4248,14 +4248,20 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 				inject             injectedResult
 				wantExtensionPoint string
 				wantStatus         fwk.Code
-				prefilterPlugins   *config.PluginSet
-				prescorePlugins    *config.PluginSet
-				scorePlugins       *config.PluginSet
-				reservePlugins     *config.PluginSet
-				permitPlugins      *config.PluginSet
-				prebindPlugins     *config.PluginSet
-				bindPlugins        *config.PluginSet
-				postbindPlugins    *config.PluginSet
+
+				// Expected metrics fields
+				expectedPluginDurationCallCount int
+				expectedPluginDurationRecords   []PluginDurationRecord
+
+				// Plugin configuration fields
+				prefilterPlugins *config.PluginSet
+				prescorePlugins  *config.PluginSet
+				scorePlugins     *config.PluginSet
+				reservePlugins   *config.PluginSet
+				permitPlugins    *config.PluginSet
+				prebindPlugins   *config.PluginSet
+				bindPlugins      *config.PluginSet
+				postbindPlugins  *config.PluginSet
 			}{
 				{
 					name:               "PreFilter - Success",
@@ -4263,6 +4269,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "PreFilter",
 					wantStatus:         fwk.Success,
 					prefilterPlugins:   &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "PreFilter",
+									PluginName:     testPlugin,
+									Status:         "Success",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name: "Score - Success",
@@ -4272,6 +4296,29 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "Score",
 					wantStatus:         fwk.Success,
 					scorePlugins:       &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 2 // Score runs once per node (2 nodes)
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "Score",
+									PluginName:     testPlugin,
+									Status:         "Success",
+								},
+								{
+									ExtensionPoint: "Score",
+									PluginName:     testPlugin,
+									Status:         "Success",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "Bind - Success",
@@ -4279,6 +4326,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "Bind",
 					wantStatus:         fwk.Success,
 					bindPlugins:        &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "Bind",
+									PluginName:     testPlugin,
+									Status:         "Success",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "PreFilter - Error",
@@ -4287,6 +4352,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "PreFilter",
 					wantStatus:         fwk.Error,
 					prefilterPlugins:   &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "PreFilter",
+									PluginName:     testPlugin,
+									Status:         "Error",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "Bind - Error",
@@ -4295,6 +4378,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "Bind",
 					wantStatus:         fwk.Error,
 					bindPlugins:        &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "Bind",
+									PluginName:     testPlugin,
+									Status:         "Error",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				// Additional test cases from original TestRecordingMetrics
 				{
@@ -4303,6 +4404,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "PreScore",
 					wantStatus:         fwk.Success,
 					prescorePlugins:    &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "PreScore",
+									PluginName:     testPlugin,
+									Status:         "Success",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "PreScore - Error",
@@ -4311,6 +4430,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "PreScore",
 					wantStatus:         fwk.Error,
 					prescorePlugins:    &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "PreScore",
+									PluginName:     testPlugin,
+									Status:         "Error",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name: "Score - Error",
@@ -4321,6 +4458,30 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "Score",
 					wantStatus:         fwk.Error,
 					scorePlugins:       &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							// Score still runs for all nodes even on error
+							return 2
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "Score",
+									PluginName:     testPlugin,
+									Status:         "Error",
+								},
+								{
+									ExtensionPoint: "Score",
+									PluginName:     testPlugin,
+									Status:         "Error",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "Reserve - Success",
@@ -4328,6 +4489,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "Reserve",
 					wantStatus:         fwk.Success,
 					reservePlugins:     &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "Reserve",
+									PluginName:     testPlugin,
+									Status:         "Success",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "Reserve - Error",
@@ -4336,6 +4515,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "Reserve",
 					wantStatus:         fwk.Error,
 					reservePlugins:     &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "Reserve",
+									PluginName:     testPlugin,
+									Status:         "Error",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "Unreserve - Success",
@@ -4343,6 +4540,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "Unreserve",
 					wantStatus:         fwk.Success,
 					reservePlugins:     &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "Unreserve",
+									PluginName:     testPlugin,
+									Status:         "Success",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "PreBind - Success",
@@ -4350,6 +4565,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "PreBind",
 					wantStatus:         fwk.Success,
 					prebindPlugins:     &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "PreBind",
+									PluginName:     testPlugin,
+									Status:         "Success",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "PreBind - Error",
@@ -4358,6 +4591,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "PreBind",
 					wantStatus:         fwk.Error,
 					prebindPlugins:     &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "PreBind",
+									PluginName:     testPlugin,
+									Status:         "Error",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "PostBind - Success",
@@ -4365,6 +4616,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "PostBind",
 					wantStatus:         fwk.Success,
 					postbindPlugins:    &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "PostBind",
+									PluginName:     testPlugin,
+									Status:         "Success",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "Permit - Success",
@@ -4372,6 +4641,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "Permit",
 					wantStatus:         fwk.Success,
 					permitPlugins:      &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "Permit",
+									PluginName:     testPlugin,
+									Status:         "Success",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "Permit - Error",
@@ -4380,6 +4667,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "Permit",
 					wantStatus:         fwk.Error,
 					permitPlugins:      &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "Permit",
+									PluginName:     testPlugin,
+									Status:         "Error",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 				{
 					name:               "Permit - Wait",
@@ -4388,6 +4693,24 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					wantExtensionPoint: "Permit",
 					wantStatus:         fwk.Wait,
 					permitPlugins:      &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+					expectedPluginDurationCallCount: func() int {
+						if metricsEnabled {
+							return 1
+						}
+						return 0
+					}(),
+					expectedPluginDurationRecords: func() []PluginDurationRecord {
+						if metricsEnabled {
+							return []PluginDurationRecord{
+								{
+									ExtensionPoint: "Permit",
+									PluginName:     testPlugin,
+									Status:         "Wait",
+								},
+							}
+						}
+						return []PluginDurationRecord{}
+					}(),
 				},
 			}
 
@@ -4448,51 +4771,33 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 					// Run the action
 					tt.action(ctx, f)
 
-					// If metrics are enabled, verify the mock recorder captured the expected calls
 					if metricsEnabled {
-						// Verify call count
-						expectedCalls := 1
-						if tt.wantExtensionPoint == "Score" {
-							// Score plugins call metrics once per node (2 nodes in test)
-							expectedCalls = 2
+						// Check plugin duration call count
+						if tt.expectedPluginDurationCallCount != mockRecorder.PluginDurationCallCount() {
+							t.Errorf("plugin duration call count mismatch: expected %d, got %d",
+								tt.expectedPluginDurationCallCount,
+								mockRecorder.PluginDurationCallCount())
 						}
 
-						if got := mockRecorder.PluginDurationCallCount(); got != expectedCalls {
-							t.Errorf("expected %d plugin duration calls, got %d", expectedCalls, got)
-						}
-
-						// Verify the recorded parameters
-						records := mockRecorder.GetPluginDurationRecords()
-						if len(records) != expectedCalls {
-							t.Fatalf("expected %d records, got %d", expectedCalls, len(records))
-						}
-
-						for i, record := range records {
-							if record.ExtensionPoint != tt.wantExtensionPoint {
-								t.Errorf("record %d: expected extension point %q, got %q", i, tt.wantExtensionPoint, record.ExtensionPoint)
-							}
-							if record.PluginName != testPlugin {
-								t.Errorf("record %d: expected plugin name %q, got %q", i, testPlugin, record.PluginName)
-							}
-							if record.Status != tt.wantStatus.String() {
-								t.Errorf("record %d: expected status %q, got %q", i, tt.wantStatus.String(), record.Status)
-							}
+						// Check plugin duration records with cmp.Diff
+						// Note: Ignore the Value field as it contains timing information
+						if diff := cmp.Diff(tt.expectedPluginDurationRecords,
+							mockRecorder.GetPluginDurationRecords(),
+							cmpopts.IgnoreFields(PluginDurationRecord{}, "Value")); diff != "" {
+							t.Errorf("plugin duration records mismatch (-want +got):\n%s", diff)
 						}
 					} else {
-						// Metrics disabled, we don't expect any calls
-						if got := mockRecorder.PluginDurationCallCount(); got != 0 {
-							t.Errorf("expected no plugin duration calls when metrics disabled, got %d", got)
+						// When metrics disabled, expect no calls
+						if mockRecorder.PluginDurationCallCount() != 0 {
+							t.Errorf("expected no plugin duration calls when metrics disabled, got %d",
+								mockRecorder.PluginDurationCallCount())
+						}
+
+						// Verify no records were created
+						if records := mockRecorder.GetPluginDurationRecords(); len(records) != 0 {
+							t.Errorf("expected no plugin duration records when metrics disabled, got %v", records)
 						}
 					}
-
-					// This test successfully demonstrates that:
-					// 1. The mock recorder properly captures all metric calls when metrics are enabled
-					// 2. No calls are made when metrics are disabled
-					// 3. We can verify the calls were made with correct parameters
-					// 4. The test runs without sync.Once issues
-					// 5. No real metrics are recorded, avoiding test interference
-					t.Logf("Successfully verified mock recorder pattern for %s operation with status %s (metrics enabled: %v)",
-						tt.wantExtensionPoint, tt.wantStatus.String(), metricsEnabled)
 				})
 			}
 		})
