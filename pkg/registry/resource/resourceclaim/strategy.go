@@ -39,6 +39,7 @@ import (
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/api/resourceclaimspec"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -106,7 +107,7 @@ func (*resourceclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.
 	// Status must not be set by user on create.
 	claim.Status = resource.ResourceClaimStatus{}
 
-	dropDisabledFields(claim, nil)
+	dropDisabledSpecFields(claim, nil)
 }
 
 func (s *resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -133,7 +134,7 @@ func (*resourceclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old run
 	oldClaim := old.(*resource.ResourceClaim)
 	newClaim.Status = oldClaim.Status
 
-	dropDisabledFields(newClaim, oldClaim)
+	dropDisabledSpecFields(newClaim, oldClaim)
 }
 
 func (s *resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -188,8 +189,8 @@ func (*resourceclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, o
 	newClaim.Spec = oldClaim.Spec
 	metav1.ResetObjectMetaForStatus(&newClaim.ObjectMeta, &oldClaim.ObjectMeta)
 
-	dropDeallocatedStatusDevices(newClaim, oldClaim)
-	dropDisabledFields(newClaim, oldClaim)
+	dropDisabledStatusFields(newClaim, oldClaim)
+	dropDeallocatedStatusDevices(newClaim, oldClaim) // NOP if fields got dropped, so do this last.
 }
 
 func (r *resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -236,44 +237,23 @@ func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 	return fields
 }
 
-// dropDisabledFields removes fields which are covered by a feature gate.
-func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
-	dropDisabledDRAPrioritizedListFields(newClaim, oldClaim)
-	dropDisabledDRADeviceTaintsFields(newClaim, oldClaim) // Intentionally after dropDisabledDRAPrioritizedListFields to avoid iterating over FirstAvailable slice which needs to be dropped.
-	dropDisabledDRAAdminAccessFields(newClaim, oldClaim)
+// dropDisabledSpecFields removes fields from the spec which are covered by a feature gate.
+func dropDisabledSpecFields(newClaim, oldClaim *resource.ResourceClaim) {
+	var oldClaimSpec *resource.ResourceClaimSpec
+	if oldClaim != nil {
+		oldClaimSpec = &oldClaim.Spec
+	}
+	resourceclaimspec.DropDisabledFields(&newClaim.Spec, oldClaimSpec)
+}
+
+// dropDisabledStatusFields removes fields from the status which are covered by a feature gate.
+func dropDisabledStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
 	dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim)
-	dropDisabledDRADeviceBindingConditionsFields(newClaim, oldClaim)
-	dropDisabledDRAResourceClaimConsumableCapacityFields(newClaim, oldClaim)
+	dropDisabledDRAAdminAccessStatusFields(newClaim, oldClaim)
+	dropDisabledDRAResourceClaimConsumableCapacityStatusFields(newClaim, oldClaim)
 }
 
-func dropDisabledDRAPrioritizedListFields(newClaim, oldClaim *resource.ResourceClaim) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList) {
-		return
-	}
-	if draPrioritizedListFeatureInUse(oldClaim) {
-		return
-	}
-
-	for i := range newClaim.Spec.Devices.Requests {
-		newClaim.Spec.Devices.Requests[i].FirstAvailable = nil
-	}
-}
-
-func draPrioritizedListFeatureInUse(claim *resource.ResourceClaim) bool {
-	if claim == nil {
-		return false
-	}
-
-	for _, request := range claim.Spec.Devices.Requests {
-		if len(request.FirstAvailable) > 0 {
-			return true
-		}
-	}
-
-	return false
-}
-
-func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim) {
+func dropDisabledDRAAdminAccessStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
 		// No need to drop anything.
 		return
@@ -288,15 +268,10 @@ func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim
 		return
 	}
 
-	for i := range newClaim.Spec.Devices.Requests {
-		if newClaim.Spec.Devices.Requests[i].Exactly != nil {
-			newClaim.Spec.Devices.Requests[i].Exactly.AdminAccess = nil
-		}
-	}
-
 	if newClaim.Status.Allocation == nil {
 		return
 	}
+
 	for i := range newClaim.Status.Allocation.Devices.Results {
 		newClaim.Status.Allocation.Devices.Results[i].AdminAccess = nil
 	}
@@ -307,50 +282,13 @@ func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
 		return false
 	}
 
-	for _, request := range claim.Spec.Devices.Requests {
-		if request.Exactly != nil && request.Exactly.AdminAccess != nil {
-			return true
-		}
+	if resourceclaimspec.DRAAdminAccessFeatureInUse(&claim.Spec) {
+		return true
 	}
 
 	if allocation := claim.Status.Allocation; allocation != nil {
 		for _, result := range allocation.Devices.Results {
 			if result.AdminAccess != nil {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func dropDisabledDRADeviceTaintsFields(newClaim, oldClaim *resource.ResourceClaim) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) ||
-		draDeviceTaintsInUse(oldClaim) {
-		return
-	}
-
-	for i, req := range newClaim.Spec.Devices.Requests {
-		if exactly := req.Exactly; exactly != nil {
-			exactly.Tolerations = nil
-		}
-		for e := range req.FirstAvailable {
-			newClaim.Spec.Devices.Requests[i].FirstAvailable[e].Tolerations = nil
-		}
-	}
-}
-
-func draDeviceTaintsInUse(claim *resource.ResourceClaim) bool {
-	if claim == nil {
-		return false
-	}
-
-	for _, req := range claim.Spec.Devices.Requests {
-		if exactly := req.Exactly; exactly != nil && len(exactly.Tolerations) > 0 {
-			return true
-		}
-		for _, sub := range req.FirstAvailable {
-			if len(sub.Tolerations) > 0 {
 				return true
 			}
 		}
@@ -372,6 +310,10 @@ func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource
 
 // dropDeallocatedStatusDevices removes the status.devices that were allocated
 // in the oldClaim and that have been removed in the newClaim.
+//
+// In other words, it removes stale status entries after deallocation. Doing
+// this in the apiserver avoids having to update clients which might be unaware
+// of the status feature.
 func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse(oldClaim) {
 		return
@@ -418,62 +360,13 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 	}
 }
 
-// dropDisabledDRADeviceBindingConditionsFields removes fields which are covered by a feature gate.
-func dropDisabledDRADeviceBindingConditionsFields(newClaim, oldClaim *resource.ResourceClaim) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) ||
-		draBindingConditionsFeatureInUse(oldClaim) {
-		return
-	}
-
-	if newClaim.Status.Allocation == nil {
-		return
-	}
-	newClaim.Status.Allocation.AllocationTimestamp = nil
-
-	for i := range newClaim.Status.Allocation.Devices.Results {
-		newClaim.Status.Allocation.Devices.Results[i].BindingConditions = nil
-		newClaim.Status.Allocation.Devices.Results[i].BindingFailureConditions = nil
-	}
-}
-
-func draBindingConditionsFeatureInUse(claim *resource.ResourceClaim) bool {
-	if claim == nil || claim.Status.Allocation == nil {
-		return false
-	}
-
-	if claim.Status.Allocation.AllocationTimestamp != nil {
-		return true
-	}
-
-	for _, result := range claim.Status.Allocation.Devices.Results {
-		if len(result.BindingConditions) != 0 || len(result.BindingFailureConditions) != 0 {
-			return true
-		}
-	}
-
-	return false
-}
-
 func draConsumableCapacityFeatureInUse(claim *resource.ResourceClaim) bool {
 	if claim == nil {
 		return false
 	}
 
-	for _, constaint := range claim.Spec.Devices.Constraints {
-		if constaint.DistinctAttribute != nil {
-			return true
-		}
-	}
-
-	for _, request := range claim.Spec.Devices.Requests {
-		if request.Exactly != nil && request.Exactly.Capacity != nil {
-			return true
-		}
-		for _, subRequest := range request.FirstAvailable {
-			if subRequest.Capacity != nil {
-				return true
-			}
-		}
+	if resourceclaimspec.DRAConsumableCapacityFeatureInUse(&claim.Spec) {
+		return true
 	}
 
 	if allocation := claim.Status.Allocation; allocation != nil {
@@ -494,28 +387,13 @@ func draConsumableCapacityFeatureInUse(claim *resource.ResourceClaim) bool {
 	return false
 }
 
-// dropDisabledDRAResourceClaimConsumableCapacityFields drops any new feature fields
-// from the newClaim if they were not used in the oldClaim.
-func dropDisabledDRAResourceClaimConsumableCapacityFields(newClaim, oldClaim *resource.ResourceClaim) {
+// dropDisabledDRAResourceClaimConsumableCapacityStatusFields drops any new feature fields
+// from the newClaim status if they were not used in the oldClaim.
+func dropDisabledDRAResourceClaimConsumableCapacityStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) ||
 		draConsumableCapacityFeatureInUse(oldClaim) {
 		// No need to drop anything.
 		return
-	}
-
-	for _, constaint := range newClaim.Spec.Devices.Constraints {
-		constaint.DistinctAttribute = nil
-	}
-
-	// Drop any CapacityRequests newly added.
-	for i := range newClaim.Spec.Devices.Requests {
-		if newClaim.Spec.Devices.Requests[i].Exactly != nil {
-			newClaim.Spec.Devices.Requests[i].Exactly.Capacity = nil
-		}
-		request := newClaim.Spec.Devices.Requests[i]
-		for j := range request.FirstAvailable {
-			newClaim.Spec.Devices.Requests[i].FirstAvailable[j].Capacity = nil
-		}
 	}
 
 	if allocation := newClaim.Status.Allocation; allocation != nil {
