@@ -625,12 +625,12 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 	}
 
 	for _, binding := range bindings {
-		pv, err := b.pvCache.GetAPIPV(binding.pv.Name)
+		pv, err := b.pvCache.GetAPIObj(binding.pv.Name)
 		if err != nil {
 			return false, fmt.Errorf("failed to check binding: %w", err)
 		}
 
-		pvc, err := b.pvcCache.GetAPIPVC(getPVCName(binding.pvc))
+		pvc, err := b.pvcCache.GetAPIObj(getPVCName(binding.pvc))
 		if err != nil {
 			return false, fmt.Errorf("failed to check binding: %w", err)
 		}
@@ -663,7 +663,7 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 	}
 
 	for _, claim := range claimsToProvision {
-		pvc, err := b.pvcCache.GetAPIPVC(getPVCName(claim))
+		pvc, err := b.pvcCache.GetAPIObj(getPVCName(claim))
 		if err != nil {
 			return false, fmt.Errorf("failed to check provisioning pvc: %w", err)
 		}
@@ -688,7 +688,7 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 
 		// If the PVC is bound to a PV, check its node affinity
 		if pvc.Spec.VolumeName != "" {
-			pv, err := b.pvCache.GetAPIPV(pvc.Spec.VolumeName)
+			pv, err := b.pvCache.GetAPIObj(pvc.Spec.VolumeName)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					// We tolerate NotFound error here, because PV is possibly
@@ -754,7 +754,7 @@ func (b *volumeBinder) isPVCBound(logger klog.Logger, namespace, pvcName string)
 		},
 	}
 	pvcKey := getPVCName(claim)
-	pvc, err := b.pvcCache.GetPVC(pvcKey)
+	pvc, err := b.pvcCache.Get(pvcKey)
 	if err != nil || pvc == nil {
 		return false, nil, fmt.Errorf("error getting PVC %q: %v", pvcKey, err)
 	}
@@ -845,7 +845,7 @@ func (b *volumeBinder) checkBoundClaims(logger klog.Logger, claims []*v1.Persist
 
 	for _, pvc := range claims {
 		pvName := pvc.Spec.VolumeName
-		pv, err := b.pvCache.GetPV(pvName)
+		pv, err := b.pvCache.Get(pvName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				err = nil
