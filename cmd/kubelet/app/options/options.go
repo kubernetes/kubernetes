@@ -34,10 +34,10 @@ import (
 	"k8s.io/kubelet/config/v1beta1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigapi "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
@@ -63,7 +63,7 @@ type KubeletFlags struct {
 	NodeIP string
 
 	// Container-runtime-specific options.
-	config.ContainerRuntimeOptions
+	kubeletconfig.ContainerRuntimeOptions
 
 	// certDirectory is the directory where the TLS certs are located.
 	// If tlsCertFile and tlsPrivateKeyFile are provided, this flag will be ignored.
@@ -134,7 +134,7 @@ type KubeletFlags struct {
 // NewKubeletFlags will create a new KubeletFlags with default values
 func NewKubeletFlags() *KubeletFlags {
 	return &KubeletFlags{
-		ContainerRuntimeOptions: config.ContainerRuntimeOptions{},
+		ContainerRuntimeOptions: kubeletconfig.ContainerRuntimeOptions{},
 		CertDirectory:           "/var/lib/kubelet/pki",
 		RootDirectory:           filepath.Clean(defaultRootDir),
 		MaxContainerCount:       -1,
@@ -192,14 +192,14 @@ func getLabelNamespace(key string) string {
 }
 
 // NewKubeletConfiguration will create a new KubeletConfiguration with default values
-func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
+func NewKubeletConfiguration() (*kubeletconfigapi.KubeletConfiguration, error) {
 	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
 	if err != nil {
 		return nil, err
 	}
 	versioned := &v1beta1.KubeletConfiguration{}
 	scheme.Default(versioned)
-	config := &kubeletconfig.KubeletConfiguration{}
+	config := &kubeletconfigapi.KubeletConfiguration{}
 	if err := scheme.Convert(versioned, config, nil); err != nil {
 		return nil, err
 	}
@@ -210,13 +210,13 @@ func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
 // applyLegacyDefaults applies legacy default values to the KubeletConfiguration in order to
 // preserve the command line API. This is used to construct the baseline default KubeletConfiguration
 // before the first round of flag parsing.
-func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
+func applyLegacyDefaults(kc *kubeletconfigapi.KubeletConfiguration) {
 	// --anonymous-auth
 	kc.Authentication.Anonymous.Enabled = true
 	// --authentication-token-webhook
 	kc.Authentication.Webhook.Enabled = false
 	// --authorization-mode
-	kc.Authorization.Mode = kubeletconfig.KubeletAuthorizationModeAlwaysAllow
+	kc.Authorization.Mode = kubeletconfigapi.KubeletAuthorizationModeAlwaysAllow
 	// --read-only-port
 	kc.ReadOnlyPort = ports.KubeletReadOnlyPort
 }
@@ -225,7 +225,7 @@ func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
 // a kubelet. These can either be set via command line or directly.
 type KubeletServer struct {
 	KubeletFlags
-	kubeletconfig.KubeletConfiguration
+	kubeletconfigapi.KubeletConfiguration
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -273,7 +273,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 		mainfs.AddFlagSet(fs)
 	}()
 
-	f.ContainerRuntimeOptions.AddFlags(fs)
+	addContainerRuntimeFlags(fs, &f.ContainerRuntimeOptions)
 	f.addOSFlags(fs)
 
 	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
@@ -317,8 +317,20 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("experimental-allocatable-ignore-eviction", "will be removed in 1.25 or later.")
 }
 
+// addContainerRuntimeFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
+func addContainerRuntimeFlags(fs *pflag.FlagSet, o *kubeletconfig.ContainerRuntimeOptions) {
+	// General settings.
+	fs.StringVar(&o.RuntimeCgroups, "runtime-cgroups", o.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
+	_ = fs.String("pod-infra-container-image", "", "Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image.")
+	_ = fs.MarkDeprecated("pod-infra-container-image", "will be removed in 1.35. Image garbage collector will get sandbox image information from CRI.")
+
+	// Image credential provider settings.
+	fs.StringVar(&o.ImageCredentialProviderConfigPath, "image-credential-provider-config", o.ImageCredentialProviderConfigPath, "Path to a credential provider plugin config file (JSON/YAML/YML) or a directory of such files (merged in lexicographical order; non-recursive search).")
+	fs.StringVar(&o.ImageCredentialProviderBinDir, "image-credential-provider-bin-dir", o.ImageCredentialProviderBinDir, "The path to the directory where credential provider plugin binaries are located.")
+}
+
 // AddKubeletConfigFlags adds flags for a specific kubeletconfig.KubeletConfiguration to the specified FlagSet
-func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfiguration) {
+func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfigapi.KubeletConfiguration) {
 	fs := pflag.NewFlagSet("", pflag.ExitOnError)
 	defer func() {
 		// All KubeletConfiguration flags are now deprecated, and any new flags that point to
