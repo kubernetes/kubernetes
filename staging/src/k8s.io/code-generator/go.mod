@@ -6,6 +6,19 @@ go 1.24.0
 
 godebug default=go1.24
 
+tool (
+	k8s.io/code-generator/cmd/applyconfiguration-gen
+	k8s.io/code-generator/cmd/client-gen
+	k8s.io/code-generator/cmd/conversion-gen
+	k8s.io/code-generator/cmd/deepcopy-gen
+	k8s.io/code-generator/cmd/defaulter-gen
+	k8s.io/code-generator/cmd/go-to-protobuf
+	k8s.io/code-generator/cmd/informer-gen
+	k8s.io/code-generator/cmd/lister-gen
+	k8s.io/code-generator/cmd/register-gen
+	k8s.io/kube-openapi/cmd/openapi-gen
+)
+
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/gnostic-models v0.7.0
