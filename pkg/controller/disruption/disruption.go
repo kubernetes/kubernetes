@@ -896,7 +896,7 @@ func (dc *DisruptionController) getExpectedScale(ctx context.Context, pdb *polic
 				break
 			}
 		}
-		if !foundController {
+		if !foundController && pod.DeletionTimestamp == nil {
 			err = fmt.Errorf("found no controllers for pod %q", pod.Name)
 			return
 		}
