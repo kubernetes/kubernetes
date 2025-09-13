@@ -121,12 +121,13 @@ func (csrStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+		validationIdentifier := "csr_create"
 
 		// Run declarative validation with panic recovery
-		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, csr, rest.WithTakeover(takeover))
+		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, csr, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
 
 		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover)
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover, validationIdentifier)
 
 		// Only apply declarative errors if takeover is enabled
 		if takeover {
@@ -151,12 +152,12 @@ func (csrStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-
+		validationIdentifier := "csr_update"
 		// Run declarative update validation with panic recovery
-		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover))
+		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
 
 		// Compare imperative and declarative errors and emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier)
 
 		// Only apply declarative errors if takeover is enabled
 		if takeover {
@@ -283,12 +284,13 @@ func (csrStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+		validationIdentifier := "certificate_signing_request_status_update"
 
 		// Run declarative update validation with panic recovery
-		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover))
+		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
 
 		// Compare imperative and declarative errors and emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier)
 
 		// Only apply declarative errors if takeover is enabled
 		if takeover {
@@ -354,11 +356,12 @@ func (csrApprovalStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
+		validationIdentifier := "certificate_signing_request_approval_update"
 		// Run declarative update validation with panic recovery
-		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover))
+		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
 
 		// Compare imperative and declarative errors and emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier)
 
 		// Only apply declarative errors if takeover is enabled
 		if takeover {
