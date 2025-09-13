@@ -70,12 +70,22 @@ type DRAPlugin struct {
 	healthStreamCancel context.CancelFunc
 }
 
-func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
+// getGRPCConnection returns the gRPC connection, creating it if necessary.
+// Renamed from getOrCreateGRPCConn for clarity as suggested in the issue.
+// Ensures health client is always available when connection exists, removing
+// the lazy initialization pattern that could lead to nil health client issues.
+func (p *DRAPlugin) getGRPCConnection() (*grpc.ClientConn, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	// If connection exists and is ready, return it.
+	// If connection exists and is ready, ensure health client also exists
 	if p.conn != nil && p.conn.GetState() != connectivity.Shutdown {
+		// Always ensure health client is created when connection exists
+		// This removes the lazy initialization issue where connection existed
+		// but health client was nil
+		if p.healthClient == nil {
+			p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
+		}
 		return p.conn, nil
 	}
 
@@ -93,6 +103,7 @@ func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 
 	network := "unix"
 	logger.V(4).Info("Creating new gRPC connection", "protocol", network, "endpoint", p.endpoint)
+
 	// grpc.Dial is deprecated. grpc.NewClient should be used instead.
 	// For now this gets ignored because this function is meant to establish
 	// the connection, with the one second timeout below. Perhaps that
@@ -118,6 +129,7 @@ func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	}
 
 	p.conn = conn
+	// Always create health client immediately when connection is created
 	p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
 
 	return p.conn, nil
@@ -214,9 +226,10 @@ func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
 }
 
 // NodeWatchResources establishes a stream to receive health updates from the DRA plugin.
+// Now uses the improved connection management that ensures health client availability.
 func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, error) {
-	// Ensure gRPC connection exists (which also creates health client)
-	_, err := p.getOrCreateGRPCConn()
+	// Get connection and ensure health client exists
+	_, err := p.getGRPCConnection()
 	if err != nil {
 		klog.FromContext(p.backgroundCtx).Error(err, "Failed to get gRPC connection for health client")
 		return nil, err
