@@ -17,6 +17,7 @@ limitations under the License.
 package aggregated
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -85,7 +86,19 @@ type ResourceManager interface {
 	// The group from the least-numbered source is used
 	WithSource(source Source) ResourceManager
 
+	// SetPeerDiscoveryProvider sets the peer discovery provider for merged discovery.
+	SetPeerDiscoveryProvider(provider PeerDiscoveryProvider)
+
+	// InvalidateMergedDiscoveryCache invalidates the merged discovery caches
+	// This should be called when peer discovery data changes.
+	InvalidateMergedDiscoveryCache()
+
 	http.Handler
+}
+
+// PeerDiscoveryProvider defines methods for providing peer discovery information
+type PeerDiscoveryProvider interface {
+	GetPeerResources() map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery
 }
 
 type resourceManager struct {
@@ -131,16 +144,18 @@ type groupVersionKey struct {
 
 type resourceDiscoveryManager struct {
 	serializer runtime.NegotiatedSerializer
-	// cache is an atomic pointer to avoid the use of locks
-	cache atomic.Pointer[cachedGroupList]
+	// unmergedcache is an atomic pointer to avoid the use of locks
+	unmergedcache atomic.Pointer[cachedGroupList]
+	mergedCache   atomic.Pointer[cachedGroupList]
 
 	serveHTTPFunc http.HandlerFunc
 
 	// Writes protected by the lock.
 	// List of all apigroups & resources indexed by the resource manager
-	lock              sync.RWMutex
-	apiGroups         map[groupKey]*apidiscoveryv2.APIGroupDiscovery
-	versionPriorities map[groupVersionKey]priorityInfo
+	lock                  sync.RWMutex
+	apiGroups             map[groupKey]*apidiscoveryv2.APIGroupDiscovery
+	versionPriorities     map[groupVersionKey]priorityInfo
+	peerDiscoveryProvider PeerDiscoveryProvider
 }
 
 type priorityInfo struct {
@@ -188,7 +203,8 @@ func (rdm *resourceDiscoveryManager) SetGroupVersionPriority(source Source, gv m
 		GroupPriorityMinimum: groupPriorityMinimum,
 		VersionPriority:      versionPriority,
 	}
-	rdm.cache.Store(nil)
+	rdm.unmergedcache.Store(nil)
+	rdm.mergedCache.Store(nil)
 }
 
 func (rdm *resourceDiscoveryManager) SetGroups(source Source, groups []apidiscoveryv2.APIGroupDiscovery) {
@@ -196,7 +212,8 @@ func (rdm *resourceDiscoveryManager) SetGroups(source Source, groups []apidiscov
 	defer rdm.lock.Unlock()
 
 	rdm.apiGroups = nil
-	rdm.cache.Store(nil)
+	rdm.unmergedcache.Store(nil)
+	rdm.mergedCache.Store(nil)
 
 	for _, group := range groups {
 		for _, version := range group.Versions {
@@ -297,7 +314,8 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(source Source, groupN
 	}
 
 	// Reset response document so it is recreated lazily
-	rdm.cache.Store(nil)
+	rdm.unmergedcache.Store(nil)
+	rdm.mergedCache.Store(nil)
 }
 
 func (rdm *resourceDiscoveryManager) RemoveGroupVersion(source Source, apiGroup metav1.GroupVersion) {
@@ -338,7 +356,8 @@ func (rdm *resourceDiscoveryManager) RemoveGroupVersion(source Source, apiGroup 
 	}
 
 	// Reset response document so it is recreated lazily
-	rdm.cache.Store(nil)
+	rdm.unmergedcache.Store(nil)
+	rdm.mergedCache.Store(nil)
 }
 
 func (rdm *resourceDiscoveryManager) RemoveGroup(source Source, groupName string) {
@@ -359,7 +378,16 @@ func (rdm *resourceDiscoveryManager) RemoveGroup(source Source, groupName string
 	}
 
 	// Reset response document so it is recreated lazily
-	rdm.cache.Store(nil)
+	rdm.unmergedcache.Store(nil)
+	rdm.mergedCache.Store(nil)
+}
+
+func (rdm *resourceDiscoveryManager) SetPeerDiscoveryProvider(provider PeerDiscoveryProvider) {
+	rdm.peerDiscoveryProvider = provider
+}
+
+func (rdm *resourceDiscoveryManager) InvalidateMergedDiscoveryCache() {
+	rdm.mergedCache.Store(nil)
 }
 
 // Prepares the api group list for serving by converting them from map into
@@ -476,12 +504,12 @@ func (rdm *resourceDiscoveryManager) calculateAPIGroupsLocked() []apidiscoveryv2
 	return groups
 }
 
-// Fetches from cache if it exists. If cache is empty, create it.
-func (rdm *resourceDiscoveryManager) fetchFromCache() *cachedGroupList {
+// Fetches from unmerged cache if it exists. If cache is empty, create it.
+func (rdm *resourceDiscoveryManager) fetchFromUnmergedCache() *cachedGroupList {
 	rdm.lock.RLock()
 	defer rdm.lock.RUnlock()
 
-	cacheLoad := rdm.cache.Load()
+	cacheLoad := rdm.unmergedcache.Load()
 	if cacheLoad != nil {
 		return cacheLoad
 	}
@@ -490,14 +518,51 @@ func (rdm *resourceDiscoveryManager) fetchFromCache() *cachedGroupList {
 	}
 	etag, err := calculateETag(response)
 	if err != nil {
-		klog.Errorf("failed to calculate etag for discovery document: %s", etag)
+		klog.Errorf("failed to calculate etag for discovery document: %v", err)
 		etag = ""
 	}
 	cached := &cachedGroupList{
 		cachedResponse:     response,
 		cachedResponseETag: etag,
 	}
-	rdm.cache.Store(cached)
+	rdm.unmergedcache.Store(cached)
+	return cached
+}
+
+func (rdm *resourceDiscoveryManager) fetchFromMergedCache() *cachedGroupList {
+	rdm.lock.RLock()
+	defer rdm.lock.RUnlock()
+
+	cacheLoad := rdm.mergedCache.Load()
+	if cacheLoad != nil {
+		return cacheLoad
+	}
+
+	// Get local groups.
+	localGroups := rdm.calculateAPIGroupsLocked()
+
+	// Get peer resources if provider is set.
+	var mergedGroups []apidiscoveryv2.APIGroupDiscovery
+	if rdm.peerDiscoveryProvider != nil {
+		peerResources := rdm.peerDiscoveryProvider.GetPeerResources()
+		mergedGroups = mergeResources(localGroups, peerResources)
+	} else {
+		mergedGroups = localGroups
+	}
+
+	response := apidiscoveryv2.APIGroupDiscoveryList{
+		Items: mergedGroups,
+	}
+	etag, err := calculateETag(response)
+	if err != nil {
+		klog.Errorf("failed to calculate etag for merged discovery document: %v", err)
+		etag = ""
+	}
+	cached := &cachedGroupList{
+		cachedResponse:     response,
+		cachedResponseETag: etag,
+	}
+	rdm.mergedCache.Store(cached)
 	return cached
 }
 
@@ -517,16 +582,46 @@ func (rdm *resourceDiscoveryManager) ServeHTTP(resp http.ResponseWriter, req *ht
 }
 
 func (rdm *resourceDiscoveryManager) serveHTTP(resp http.ResponseWriter, req *http.Request) {
-	cache := rdm.fetchFromCache()
+	var cache *cachedGroupList
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
+		profile := getDiscoveryProfileFromContext(req.Context())
+		switch profile {
+		case "unmerged":
+			cache = rdm.fetchFromUnmergedCache()
+		default:
+			cache = rdm.fetchFromMergedCache()
+		}
+	} else {
+		cache = rdm.fetchFromUnmergedCache()
+	}
+
 	response := cache.cachedResponse
 	etag := cache.cachedResponseETag
 
-	mediaType, _, err := negotiation.NegotiateOutputMediaType(req, rdm.serializer, DiscoveryEndpointRestrictions)
+	writeDiscoveryResponse(&response, etag, rdm.serializer, resp, req)
+}
+
+func getDiscoveryProfileFromContext(ctx context.Context) string {
+	val := ctx.Value(discoveryProfileKey{})
+	if profile, ok := val.(string); ok {
+		return profile
+	}
+	return ""
+}
+
+func writeDiscoveryResponse(
+	resp *apidiscoveryv2.APIGroupDiscoveryList,
+	etag string,
+	serializer runtime.NegotiatedSerializer,
+	w http.ResponseWriter,
+	req *http.Request,
+) {
+	mediaType, _, err := negotiation.NegotiateOutputMediaType(req, serializer, DiscoveryEndpointRestrictions)
 	if err != nil {
 		// Should never happen. wrapper.go will only proxy requests to this
 		// handler if the media type passes DiscoveryEndpointRestrictions
 		utilruntime.HandleError(err)
-		resp.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	var targetGV schema.GroupVersion
@@ -534,41 +629,122 @@ func (rdm *resourceDiscoveryManager) serveHTTP(resp http.ResponseWriter, req *ht
 		(mediaType.Convert.GroupVersion() != apidiscoveryv2.SchemeGroupVersion &&
 			mediaType.Convert.GroupVersion() != apidiscoveryv2beta1.SchemeGroupVersion) {
 		utilruntime.HandleError(fmt.Errorf("expected aggregated discovery group version, got group: %s, version %s", mediaType.Convert.Group, mediaType.Convert.Version))
-		resp.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	if mediaType.Convert.GroupVersion() == apidiscoveryv2beta1.SchemeGroupVersion &&
-		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryRemoveBetaType) {
-		klog.Errorf("aggregated discovery version v2beta1 is removed. Please update to use v2")
-		resp.WriteHeader(http.StatusNotFound)
-		return
-	}
-
 	targetGV = mediaType.Convert.GroupVersion()
 
 	if len(etag) > 0 {
 		// Use proper e-tag headers if one is available
 		ServeHTTPWithETag(
-			&response,
+			resp,
 			etag,
 			targetGV,
-			rdm.serializer,
-			resp,
+			serializer,
+			w,
 			req,
 		)
 	} else {
 		// Default to normal response in rare case etag is
 		// not cached with the object for some reason.
 		responsewriters.WriteObjectNegotiated(
-			rdm.serializer,
+			serializer,
 			DiscoveryEndpointRestrictions,
 			targetGV,
-			resp,
+			w,
 			req,
 			http.StatusOK,
-			&response,
+			resp,
 			true,
 		)
 	}
+}
+
+func mergeResources(
+	localGroups []apidiscoveryv2.APIGroupDiscovery,
+	peerResources map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery,
+) []apidiscoveryv2.APIGroupDiscovery {
+
+	groupMap := make(map[string]*apidiscoveryv2.APIGroupDiscovery)
+	localResourceSet := make(map[schema.GroupVersionResource]bool)
+
+	// Process local groups first.
+	for _, group := range localGroups {
+		groupCopy := group.DeepCopy()
+		for i := range groupCopy.Versions {
+			for j := range groupCopy.Versions[i].Resources {
+				gvr := schema.GroupVersionResource{
+					Group:    group.Name,
+					Version:  groupCopy.Versions[i].Version,
+					Resource: groupCopy.Versions[i].Resources[j].Resource,
+				}
+				localResourceSet[gvr] = true
+			}
+		}
+		groupMap[group.Name] = groupCopy
+	}
+
+	// Add peer resources, skip duplicates.
+	for _, resources := range peerResources {
+		for gvr, resource := range resources {
+			if localResourceSet[gvr] {
+				continue
+			}
+
+			addPeerResource(groupMap, gvr, resource)
+		}
+	}
+
+	mergedRequestCounter.Inc()
+	// Convert to sorted slice.
+	return convertToSortedSlice(groupMap)
+}
+
+func addPeerResource(
+	groupMap map[string]*apidiscoveryv2.APIGroupDiscovery,
+	gvr schema.GroupVersionResource,
+	resource *apidiscoveryv2.APIResourceDiscovery,
+) {
+	groupName := gvr.Group
+	group, exists := groupMap[groupName]
+	if !exists {
+		group = &apidiscoveryv2.APIGroupDiscovery{
+			ObjectMeta: metav1.ObjectMeta{Name: groupName},
+			Versions:   []apidiscoveryv2.APIVersionDiscovery{},
+		}
+		groupMap[groupName] = group
+	}
+
+	versionIndex := -1
+	for i, version := range group.Versions {
+		if version.Version == gvr.Version {
+			versionIndex = i
+			break
+		}
+	}
+
+	if versionIndex == -1 {
+		group.Versions = append(group.Versions, apidiscoveryv2.APIVersionDiscovery{
+			Version:   gvr.Version,
+			Resources: []apidiscoveryv2.APIResourceDiscovery{},
+		})
+		versionIndex = len(group.Versions) - 1
+	}
+
+	resourceCopy := resource.DeepCopy()
+	group.Versions[versionIndex].Resources = append(group.Versions[versionIndex].Resources, *resourceCopy)
+}
+
+func convertToSortedSlice(groupMap map[string]*apidiscoveryv2.APIGroupDiscovery) []apidiscoveryv2.APIGroupDiscovery {
+	result := make([]apidiscoveryv2.APIGroupDiscovery, 0, len(groupMap))
+	for _, group := range groupMap {
+		result = append(result, *group)
+	}
+
+	// TODO: is this right?
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+
+	return result
 }
