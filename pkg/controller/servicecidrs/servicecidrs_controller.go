@@ -137,7 +137,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting", "controller", controllerName)
 	defer logger.Info("Shutting down", "controller", controllerName)
 
-	if !cache.WaitForNamedCacheSync(controllerName, ctx.Done(), c.serviceCIDRsSynced, c.ipAddressSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.serviceCIDRsSynced, c.ipAddressSynced) {
 		return
 	}
 

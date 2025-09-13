@@ -168,7 +168,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting PVC protection controller")
 	defer logger.Info("Shutting down PVC protection controller")
 
-	if !cache.WaitForNamedCacheSync("PVC protection", ctx.Done(), c.pvcListerSynced, c.podListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.pvcListerSynced, c.podListerSynced) {
 		return
 	}
 
