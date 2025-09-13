@@ -149,12 +149,15 @@ type ResourceSliceSpec struct {
 
 	// Devices lists some or all of the devices in this pool.
 	//
-	// Must not have more than 128 entries. If any device uses taints the limit is 64.
+	// Must not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.
+	//
+	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
 	//
 	// +optional
 	// +listType=atomic
 	// +k8s:optional
-	Devices []Device `json:"devices" protobuf:"bytes,6,name=devices"`
+	// +zeroOrOneOf=ResourceSliceType
+	Devices []Device `json:"devices,omitempty" protobuf:"bytes,6,name=devices"`
 
 	// PerDeviceNodeSelection defines whether the access from nodes to
 	// resources in the pool is set on the ResourceSlice level or on each
@@ -171,19 +174,27 @@ type ResourceSliceSpec struct {
 	// SharedCounters defines a list of counter sets, each of which
 	// has a name and a list of counters available.
 	//
-	// The names of the SharedCounters must be unique in the ResourceSlice.
+	// The names of the counter sets must be unique in the ResourcePool.
 	//
-	// The maximum number of counters in all sets is 32.
+	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	//
+	// The maximum number of counter sets is 8.
 	//
 	// +optional
+	// +k8s:optional
 	// +listType=atomic
+	// +k8s:listType=atomic
+	// +k8s:unique=map
+	// +k8s:listMapKey=name
 	// +featureGate=DRAPartitionableDevices
+	// +zeroOrOneOf=ResourceSliceType
+	// +k8s:maxItems=8
 	SharedCounters []CounterSet `json:"sharedCounters,omitempty" protobuf:"bytes,8,name=sharedCounters"`
 }
 
 // CounterSet defines a named set of counters
 // that are available to be used by devices defined in the
-// ResourceSlice.
+// ResourcePool.
 //
 // The counters are not allocatable by themselves, but
 // can be referenced by devices. When a device is allocated,
@@ -194,12 +205,14 @@ type CounterSet struct {
 	// It must be a DNS label.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-short-name
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
 	// Counters defines the set of counters for this CounterSet
 	// The name of each counter must be unique in that set and must be a DNS label.
 	//
-	// The maximum number of counters in all sets is 32.
+	// The maximum number of counters is 32.
 	//
 	// +required
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
@@ -257,6 +270,28 @@ const BindingFailureConditionsMaxSize = 4
 // in a ResourceSlice. The number is summed up across all sets.
 const ResourceSliceMaxSharedCounters = 32
 
+// Defines the maximum number of counter sets (through the
+// SharedCounters field) that can be defined in a ResourceSlice.
+const ResourceSliceMaxCounterSets = 8
+
+// Defines the maximum number of counters that can be defined
+// in a counter set.
+const ResourceSliceMaxCountersPerCounterSet = 32
+
+// Defines the maximum number of device counter consumptions
+// (through the ConsumesCounters field) that can be defined per
+// device.
+const ResourceSliceMaxDeviceCounterConsumptionsPerDevice = 2
+
+// Defines the maximum number of counters that can be defined
+// per device counter consumption.
+const ResourceSliceMaxCountersPerDeviceCounterConsumption = 32
+
+// Defines the maximum number of counters that can be defined
+// in device counter consumptions across all devices in a
+// ResourceSlice.
+const ResourceSliceMaxConsumedCountersPerResourceSlice = 2048
+
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 type Device struct {
@@ -288,14 +323,17 @@ type Device struct {
 	//
 	// There can only be a single entry per counterSet.
 	//
-	// The total number of device counter consumption entries
-	// must be <= 32. In addition, the total number in the
-	// entire ResourceSlice must be <= 1024 (for example,
-	// 64 devices with 16 counters each).
+	// The maximum number of device counter consumptions per
+	// device is 2.
 	//
 	// +optional
+	// +k8s:optional
 	// +listType=atomic
+	// +k8s:listType=atomic
+	// +k8s:unique=map
+	// +k8s:listMapKey=counterSet
 	// +featureGate=DRAPartitionableDevices
+	// +k8s:maxItems=2
 	ConsumesCounters []DeviceCounterConsumption `json:"consumesCounters,omitempty" protobuf:"bytes,4,rep,name=consumesCounters"`
 
 	// NodeName identifies the node where the device is available.
@@ -410,14 +448,13 @@ type DeviceCounterConsumption struct {
 	// counters defined will be consumed.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-short-name
 	CounterSet string `json:"counterSet" protobuf:"bytes,1,opt,name=counterSet"`
 
 	// Counters defines the counters that will be consumed by the device.
 	//
-	// The maximum number counters in a device is 32.
-	// In addition, the maximum number of all counters
-	// in all devices is 1024 (for example, 64 devices with
-	// 16 counters each).
+	// The maximum number of counters is 32.
 	//
 	// +required
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
