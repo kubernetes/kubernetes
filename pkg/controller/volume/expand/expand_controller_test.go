@@ -94,7 +94,7 @@ func TestSyncHandler(t *testing.T) {
 	for _, tc := range tests {
 		tCtx := ktesting.Init(t)
 		test := tc
-		fakeKubeClient := controllervolumetesting.CreateTestClient()
+		fakeKubeClient := controllervolumetesting.CreateTestClient(tCtx.Logger())
 		informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 		pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 

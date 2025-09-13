@@ -280,8 +280,9 @@ func (m *FakeNodeHandler) PatchStatus(ctx context.Context, nodeName string, data
 }
 
 // Watch watches Nodes in a fake store.
-func (m *FakeNodeHandler) Watch(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return watch.NewFake(), nil
+func (m *FakeNodeHandler) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	logger := klog.FromContext(ctx)
+	return watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil
 }
 
 // Patch patches a Node in the fake store.
