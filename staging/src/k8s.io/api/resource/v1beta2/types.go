@@ -151,6 +151,8 @@ type ResourceSliceSpec struct {
 	//
 	// Must not have more than 128 entries.
 	//
+	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	//
 	// +optional
 	// +listType=atomic
 	Devices []Device `json:"devices" protobuf:"bytes,6,name=devices"`
@@ -170,9 +172,11 @@ type ResourceSliceSpec struct {
 	// SharedCounters defines a list of counter sets, each of which
 	// has a name and a list of counters available.
 	//
-	// The names of the SharedCounters must be unique in the ResourceSlice.
+	// The names of the counter sets must be unique in the ResourcePool.
 	//
-	// The maximum number of counters in all sets is 32.
+	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	//
+	// The maximum number of counter sets is 8.
 	//
 	// +optional
 	// +listType=atomic
@@ -182,7 +186,7 @@ type ResourceSliceSpec struct {
 
 // CounterSet defines a named set of counters
 // that are available to be used by devices defined in the
-// ResourceSlice.
+// ResourcePool.
 //
 // The counters are not allocatable by themselves, but
 // can be referenced by devices. When a device is allocated,
@@ -198,7 +202,7 @@ type CounterSet struct {
 	// Counters defines the set of counters for this CounterSet
 	// The name of each counter must be unique in that set and must be a DNS label.
 	//
-	// The maximum number of counters in all sets is 32.
+	// The maximum number of counters is 32.
 	//
 	// +required
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
@@ -255,6 +259,28 @@ const BindingFailureConditionsMaxSize = 4
 // in a ResourceSlice. The number is summed up across all sets.
 const ResourceSliceMaxSharedCounters = 32
 
+// Defines the maximum number of counter sets (through the
+// SharedCounters field) that can be defined in a ResourceSlice.
+const ResourceSliceMaxCounterSets = 8
+
+// Defines the maximum number of counters that can be defined
+// in a counter set.
+const ResourceSliceMaxCountersPerCounterSet = 32
+
+// Defines the maximum number of device counter consumptions
+// (through the ConsumesCounters field) that can be defined per
+// device.
+const ResourceSliceMaxDeviceCounterConsumptionsPerDevice = 2
+
+// Defines the maximum number of counters that can be defined
+// per device counter consumption.
+const ResourceSliceMaxCountersPerDeviceCounterConsumption = 32
+
+// Defines the maximum number of counters that can be defined
+// in device counter consumptions across all devices in a
+// ResourceSlice.
+const ResourceSliceMaxConsumedCountersPerResourceSlice = 2048
+
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 type Device struct {
@@ -286,10 +312,9 @@ type Device struct {
 	//
 	// There can only be a single entry per counterSet.
 	//
-	// The total number of device counter consumption entries
-	// must be <= 32. In addition, the total number in the
-	// entire ResourceSlice must be <= 1024 (for example,
-	// 64 devices with 16 counters each).
+	// The maximum number of device counter consumptions per
+	// device is 2. The maximum total number of consumed counters across
+	// devices in a ResourceSlice is 2048.
 	//
 	// +optional
 	// +listType=atomic
@@ -406,10 +431,8 @@ type DeviceCounterConsumption struct {
 
 	// Counters defines the counters that will be consumed by the device.
 	//
-	// The maximum number counters in a device is 32.
-	// In addition, the maximum number of all counters
-	// in all devices is 1024 (for example, 64 devices with
-	// 16 counters each).
+	// The maximum number of counters is 32. The maximum total number of
+	// consumed counters across devices in a ResourceSlice is 2048.
 	//
 	// +required
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
