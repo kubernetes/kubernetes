@@ -736,12 +736,6 @@ const (
 	// Denies pod admission if static pods reference other API objects.
 	PreventStaticPodAPIReferences featuregate.Feature = "PreventStaticPodAPIReferences"
 
-	// owner: @tssurya
-	// kep: https://kep.k8s.io/4559
-	//
-	// Enables probe host enforcement for Pod Security Standards.
-	ProbeHostPodSecurityStandards featuregate.Feature = "ProbeHostPodSecurityStandards"
-
 	// owner: @jessfraz
 	//
 	// Enables control over ProcMountType for containers.
@@ -1564,11 +1558,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	PreventStaticPodAPIReferences: {
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	// Policy is GA in first release, this gate only exists to disable the enforcement when emulating older minors
-	ProbeHostPodSecurityStandards: {
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	ProcMountType: {
