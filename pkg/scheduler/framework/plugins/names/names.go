@@ -24,6 +24,7 @@ const (
 	ImageLocality                   = "ImageLocality"
 	InterPodAffinity                = "InterPodAffinity"
 	NodeAffinity                    = "NodeAffinity"
+	NodeCapability                  = "NodeCapability"
 	NodeName                        = "NodeName"
 	NodePorts                       = "NodePorts"
 	NodeResourcesBalancedAllocation = "NodeResourcesBalancedAllocation"

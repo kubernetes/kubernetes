@@ -50,6 +50,7 @@ const (
 	UpdateNodeTaint
 	UpdateNodeCondition
 	UpdateNodeAnnotation
+	UpdateNodeCapability
 
 	// UpdatePodXYZ is only applicable for Pod events.
 	// If you use UpdatePodXYZ,
@@ -68,10 +69,13 @@ const (
 	// Depends on the DynamicResourceAllocation feature gate.
 	UpdatePodGeneratedResourceClaim
 
+	// UpdatePodCapabilityRequirement is an update for a pod's requirement.
+	UpdatePodCapabilityRequirement
+
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeCapability | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim | UpdatePodCapabilityRequirement
 
 	// None is a special ActionType that is only used internally.
 	None ActionType = 0
@@ -93,6 +97,8 @@ func (a ActionType) String() string {
 		return "UpdateNodeCondition"
 	case UpdateNodeAnnotation:
 		return "UpdateNodeAnnotation"
+	case UpdateNodeCapability:
+		return "UpdateNodeCapability"
 	case UpdatePodLabel:
 		return "UpdatePodLabel"
 	case UpdatePodScaleDown:
@@ -103,6 +109,8 @@ func (a ActionType) String() string {
 		return "UpdatePodSchedulingGatesEliminated"
 	case UpdatePodGeneratedResourceClaim:
 		return "UpdatePodGeneratedResourceClaim"
+	case UpdatePodCapabilityRequirement:
+		return "UpdatePodCapabilityRequirement"
 	case All:
 		return "All"
 	case Update:
