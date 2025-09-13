@@ -9,6 +9,7 @@ godebug default=go1.24
 require (
 	github.com/gogo/protobuf v1.3.2
 	k8s.io/apimachinery v0.0.0
+	sigs.k8s.io/randfill v1.0.0
 )
 
 require (
@@ -31,7 +32,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
-	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
