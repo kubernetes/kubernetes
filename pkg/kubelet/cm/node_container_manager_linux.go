@@ -195,10 +195,12 @@ func (cm *containerManagerImpl) getCgroupConfig(rl v1.ResourceList, compressible
 	// doesn't know about it and deletes it, and then kubelet doesn't continue because the cgroup isn't configured as expected).
 	// An alternative is to delegate the `cpuset` cgroup to the kubelet, but that would require some plumbing in libcontainer,
 	// and this is sufficient.
-	// Only do so on None policy, as Static policy will do its own updating of the cpuset.
-	// Please see the comment on policy none's GetAllocatableCPUs
-	if cm.cpuManager.GetAllocatableCPUs().IsEmpty() {
-		rc.CPUSet = cm.cpuManager.GetAllCPUs()
+	rc.CPUSet = cm.cpuManager.GetAllCPUs()
+	// However, set CPUSet even if it's the static policy, so systemd never sees a request that isn't populated with a cpuset,
+	// and thus doesn't create a cpuset cgroup, causing the kubelet to crash with the error
+	// "failed to initialize top level QOS containers: error validating root container [kubepods] : cgroup [\"kubepods\"] has some missing controllers: cpuset"
+	if allocCPUs := cm.cpuManager.GetAllocatableCPUs(); !allocCPUs.IsEmpty() {
+		rc.CPUSet = allocCPUs
 	}
 
 	return rc
