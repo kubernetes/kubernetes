@@ -83,6 +83,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 }
 
 func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	// Arrange
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
@@ -271,6 +272,7 @@ func Test_AttachDetachControllerRecovery(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
+			t.Fatalf("broken watchlist")
 			t.Parallel()
 			attachDetachRecoveryTestCase(t, tc.extraPods1, tc.extraPods2)
 		})
@@ -520,6 +522,7 @@ func Test_ADC_VolumeAttachmentRecovery(t *testing.T) {
 		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
+			t.Fatalf("broken watchlist")
 			volumeAttachmentRecoveryTestCase(t, tc)
 		})
 	}
