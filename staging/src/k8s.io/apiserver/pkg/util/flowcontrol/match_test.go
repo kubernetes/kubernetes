@@ -33,8 +33,8 @@ func TestMatching(t *testing.T) {
 	checkFTR(t, mandFTRExempt)
 	checkFTR(t, mandFTRCatchAll)
 	rngOuter := rand.New(rand.NewSource(42))
-	goodPLNames := sets.NewString("pl1", "pl2", "pl3", "pl4", "pl5")
-	badPLNames := sets.NewString("ql1", "ql2", "ql3", "ql4", "ql5")
+	goodPLNames := sets.New[string]("pl1", "pl2", "pl3", "pl4", "pl5")
+	badPLNames := sets.New[string]("ql1", "ql2", "ql3", "ql4", "ql5")
 	for i := 0; i < 300; i++ {
 		rng := rand.New(rand.NewSource(int64(rngOuter.Uint64())))
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {

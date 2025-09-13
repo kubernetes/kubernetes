@@ -266,7 +266,7 @@ func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handl
 	handler = withFakeUser(handler)
 
 	// Add requestInfo handler
-	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
+	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.New[string]("apis", "api"), GrouplessAPIPrefixes: sets.New[string]("api")}
 	handler = apifilters.WithRequestInfo(handler, requestInfoFactory)
 	return handler
 }

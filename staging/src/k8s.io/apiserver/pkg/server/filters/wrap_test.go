@@ -40,8 +40,8 @@ func TestPropogatingPanic(t *testing.T) {
 		panic(panicMsg)
 	})
 	resolver := &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
+		APIPrefixes:          sets.New[string]("api", "apis"),
+		GrouplessAPIPrefixes: sets.New[string]("api"),
 	}
 	ts := httptest.NewServer(routine.WithRoutine(WithPanicRecovery(handler, resolver), func(_ *http.Request, _ *request.RequestInfo) bool { return true }))
 	defer ts.Close()

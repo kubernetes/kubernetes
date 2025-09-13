@@ -182,10 +182,10 @@ type introducedInterface interface {
 // removeDeletedKinds inspects the storage map and modifies it in place by removing storage for kinds that have been deleted.
 // versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
 func (e *resourceExpirationEvaluator) removeDeletedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
-	versionsToRemove := sets.NewString()
-	for apiVersion := range sets.StringKeySet(versionedResourcesStorageMap) {
+	versionsToRemove := sets.New[string]()
+	for apiVersion := range sets.KeySet(versionedResourcesStorageMap) {
 		versionToResource := versionedResourcesStorageMap[apiVersion]
-		resourcesToRemove := sets.NewString()
+		resourcesToRemove := sets.New[string]()
 		for resourceName, resourceServingInfo := range versionToResource {
 			if !e.isNotRemoved(schema.GroupVersion{Group: groupName, Version: apiVersion}, versioner, resourceServingInfo) {
 				resourcesToRemove.Insert(resourceName)
@@ -209,7 +209,7 @@ func (e *resourceExpirationEvaluator) removeDeletedKinds(groupName string, versi
 		}
 	}
 
-	for _, apiVersion := range versionsToRemove.List() {
+	for _, apiVersion := range sets.List(versionsToRemove) {
 		klog.V(1).Infof("Removing version %v.%v because it is time to stop serving it because it has no resources per APILifecycle.", apiVersion, groupName)
 		delete(versionedResourcesStorageMap, apiVersion)
 	}
@@ -223,12 +223,12 @@ func (e *resourceExpirationEvaluator) RemoveUnavailableKinds(groupName string, v
 // removeUnintroducedKinds inspects the storage map and modifies it in place by removing storage for kinds that are introduced after the current version.
 // versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
 func (e *resourceExpirationEvaluator) removeUnintroducedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage, apiResourceConfigSource serverstorage.APIResourceConfigSource) error {
-	versionsToRemove := sets.NewString()
+	versionsToRemove := sets.New[string]()
 	prioritizedVersions := versioner.PrioritizedVersionsForGroup(groupName)
 	sort.Slice(prioritizedVersions, func(i, j int) bool {
 		return version.CompareKubeAwareVersionStrings(prioritizedVersions[i].Version, prioritizedVersions[j].Version) > 0
 	})
-	enabledResources := sets.NewString()
+	enabledResources := sets.New[string]()
 
 	// iterate from the end to the front, so that we remove the lower priority versions first.
 	for i := len(prioritizedVersions) - 1; i >= 0; i-- {
@@ -237,7 +237,7 @@ func (e *resourceExpirationEvaluator) removeUnintroducedKinds(groupName string, 
 		if len(versionToResource) == 0 {
 			continue
 		}
-		resourcesToRemove := sets.NewString()
+		resourcesToRemove := sets.New[string]()
 		for resourceName, resourceServingInfo := range versionToResource {
 			// we check the resource enablement from low priority to high priority.
 			// If the same resource with a different version that we have checked so far is already enabled, that means some resource with the same resourceName and a lower priority version has been enabled.
@@ -274,7 +274,7 @@ func (e *resourceExpirationEvaluator) removeUnintroducedKinds(groupName string, 
 		}
 	}
 
-	for _, apiVersion := range versionsToRemove.List() {
+	for _, apiVersion := range sets.List(versionsToRemove) {
 		gv := schema.GroupVersion{Group: groupName, Version: apiVersion}
 		if apiResourceConfigSource != nil && apiResourceConfigSource.VersionExplicitlyEnabled(gv) {
 			return fmt.Errorf(
@@ -335,8 +335,8 @@ func (e *resourceExpirationEvaluator) shouldServeBasedOnVersionIntroduced(gvr sc
 	return false, nil
 }
 
-func shouldRemoveResourceAndSubresources(resourcesToRemove sets.String, resourceName string) bool {
-	for _, resourceToRemove := range resourcesToRemove.List() {
+func shouldRemoveResourceAndSubresources(resourcesToRemove sets.Set[string], resourceName string) bool {
+	for _, resourceToRemove := range sets.List(resourcesToRemove) {
 		if resourceName == resourceToRemove {
 			return true
 		}

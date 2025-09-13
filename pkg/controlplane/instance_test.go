@@ -123,7 +123,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	config.ControlPlane.StorageFactory = storageFactory
 	config.ControlPlane.Generic.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 	config.ControlPlane.Generic.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
-	config.ControlPlane.Generic.LegacyAPIGroupPrefixes = sets.NewString("/api")
+	config.ControlPlane.Generic.LegacyAPIGroupPrefixes = sets.New[string]("/api")
 	config.Extra.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
 	config.ControlPlane.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
 		DialContext:     func(ctx context.Context, network, addr string) (net.Conn, error) { return nil, nil },
@@ -361,7 +361,7 @@ func TestStorageVersionHashes(t *testing.T) {
 		t.Error(err)
 	}
 	var count int
-	apiResources := sets.NewString()
+	apiResources := sets.New[string]()
 	for _, g := range all {
 		for _, r := range g.APIResources {
 			apiResources.Insert(g.GroupVersion + "/" + r.Name)
@@ -386,8 +386,8 @@ func TestStorageVersionHashes(t *testing.T) {
 		}
 	}
 	if count != len(storageversionhashdata.GVRToStorageVersionHash) {
-		knownResources := sets.StringKeySet(storageversionhashdata.GVRToStorageVersionHash)
-		t.Errorf("please remove the redundant entries from GVRToStorageVersionHash: %v", knownResources.Difference(apiResources).List())
+		knownResources := sets.KeySet(storageversionhashdata.GVRToStorageVersionHash)
+		t.Errorf("please remove the redundant entries from GVRToStorageVersionHash: %v", sets.List(knownResources.Difference(apiResources)))
 	}
 }
 

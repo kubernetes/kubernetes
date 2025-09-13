@@ -71,7 +71,7 @@ type EtcdOptions struct {
 	SkipHealthEndpoints bool
 }
 
-var storageTypes = sets.NewString(
+var storageTypes = sets.New[string](
 	storagebackend.StorageTypeETCD3,
 )
 
@@ -105,7 +105,7 @@ func (s *EtcdOptions) Validate() []error {
 	}
 
 	if s.StorageConfig.Type != storagebackend.StorageTypeUnset && !storageTypes.Has(s.StorageConfig.Type) {
-		allErrors = append(allErrors, fmt.Errorf("--storage-backend invalid, allowed values: %s. If not specified, it will default to 'etcd3'", strings.Join(storageTypes.List(), ", ")))
+		allErrors = append(allErrors, fmt.Errorf("--storage-backend invalid, allowed values: %s. If not specified, it will default to 'etcd3'", strings.Join(sets.List(storageTypes), ", ")))
 	}
 
 	if _, err := ParseEtcdServersOverrides(s.EtcdServersOverrides); err != nil {
@@ -377,7 +377,7 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 		}
 		// multi overrides may point to the same servers
 		// example: ["apps/deployments#s1.example.com;s2.example.com","apps/replicasets#s1.example.com;s2.example.com"]
-		serversSets := sets.NewString()
+		serversSets := sets.New[string]()
 		for _, override := range overrides {
 			sortedServers := make([]string, len(override.Servers))
 			// use a copied slice to avoid modifying the original slice for client in SetEtcdLocation

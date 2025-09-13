@@ -1003,7 +1003,7 @@ func TestX509Verifier(t *testing.T) {
 
 		Opts x509.VerifyOptions
 
-		AllowedCNs sets.String
+		AllowedCNs sets.Set[string]
 
 		ExpectOK  bool
 		ExpectErr bool
@@ -1050,7 +1050,7 @@ func TestX509Verifier(t *testing.T) {
 		},
 		"valid client cert with wrong CN": {
 			Opts:       getDefaultVerifyOptions(t),
-			AllowedCNs: sets.NewString("foo", "bar"),
+			AllowedCNs: sets.New[string]("foo", "bar"),
 			Certs:      getCerts(t, clientCNCert),
 
 			ExpectOK:  false,
@@ -1058,7 +1058,7 @@ func TestX509Verifier(t *testing.T) {
 		},
 		"valid client cert with right CN": {
 			Opts:       getDefaultVerifyOptions(t),
-			AllowedCNs: sets.NewString("client_cn"),
+			AllowedCNs: sets.New[string]("client_cn"),
 			Certs:      getCerts(t, clientCNCert),
 
 			ExpectOK:  true,

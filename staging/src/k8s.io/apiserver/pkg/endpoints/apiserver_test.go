@@ -296,8 +296,8 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 func testRequestInfoResolver() *request.RequestInfoFactory {
 	return &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
+		APIPrefixes:          sets.New[string]("api", "apis"),
+		GrouplessAPIPrefixes: sets.New[string]("api"),
 	}
 }
 
@@ -4609,8 +4609,8 @@ func newTestServer(handler http.Handler) *httptest.Server {
 
 func newTestRequestInfoResolver() *request.RequestInfoFactory {
 	return &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
+		APIPrefixes:          sets.New[string]("api", "apis"),
+		GrouplessAPIPrefixes: sets.New[string]("api"),
 	}
 }
 

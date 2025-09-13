@@ -181,8 +181,8 @@ func BuildGenericConfig(
 	genericConfig.OpenAPIV3Config.Info.Title = "Kubernetes"
 
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
-		sets.NewString("watch", "proxy"),
-		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
+		sets.New[string]("watch", "proxy"),
+		sets.New[string]("attach", "exec", "proxy", "log", "portforward"),
 	)
 
 	if genericConfig.EgressSelector != nil {

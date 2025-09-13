@@ -128,7 +128,7 @@ func (m *PathRecorderMux) refreshMuxLocked() {
 		newMux.pathToHandler[path] = handler
 	}
 
-	keys := sets.StringKeySet(m.prefixToHandler).List()
+	keys := sets.List(sets.KeySet(m.prefixToHandler))
 	sort.Sort(sort.Reverse(byPrefixPriority(keys)))
 	for _, prefix := range keys {
 		newMux.prefixHandlers = append(newMux.prefixHandlers, prefixHandler{

@@ -90,7 +90,7 @@ func isExtendedResourceNameForQuota(name corev1.ResourceName) bool {
 // the incoming pod is required to have those values set.  we should not repeat
 // this mistake for other future resources (gpus, ephemeral-storage,etc).
 // do not add more resources to this list!
-var validationSet = sets.NewString(
+var validationSet = sets.New[string](
 	string(corev1.ResourceCPU),
 	string(corev1.ResourceMemory),
 	string(corev1.ResourceRequestsCPU),
@@ -139,7 +139,7 @@ func (p *podEvaluator) Constraints(required []corev1.ResourceName, item runtime.
 	// validation with resource counting, but we did this before QoS was even defined.
 	// let's not make that mistake again with other resources now that QoS is defined.
 	requiredSet := quota.ToSet(required).Intersection(validationSet)
-	missingSetResourceToContainerNames := make(map[string]sets.String)
+	missingSetResourceToContainerNames := make(map[string]sets.Set[string])
 	for i := range pod.Spec.Containers {
 		enforcePodContainerConstraints(&pod.Spec.Containers[i], requiredSet, missingSetResourceToContainerNames)
 	}
@@ -149,13 +149,13 @@ func (p *podEvaluator) Constraints(required []corev1.ResourceName, item runtime.
 	if len(missingSetResourceToContainerNames) == 0 {
 		return nil
 	}
-	var resources = sets.NewString()
+	var resources = sets.New[string]()
 	for resource := range missingSetResourceToContainerNames {
 		resources.Insert(resource)
 	}
 	var errorMessages = make([]string, 0, len(missingSetResourceToContainerNames))
-	for _, resource := range resources.List() {
-		errorMessages = append(errorMessages, fmt.Sprintf("%s for: %s", resource, strings.Join(missingSetResourceToContainerNames[resource].List(), ",")))
+	for _, resource := range sets.List(resources) {
+		errorMessages = append(errorMessages, fmt.Sprintf("%s for: %s", resource, strings.Join(sets.List(missingSetResourceToContainerNames[resource]), ",")))
 	}
 	return fmt.Errorf("must specify %s", strings.Join(errorMessages, "; "))
 }
@@ -262,16 +262,16 @@ var _ quota.Evaluator = &podEvaluator{}
 
 // enforcePodContainerConstraints checks for required resources that are not set on this container and
 // adds them to missingSet.
-func enforcePodContainerConstraints(container *corev1.Container, requiredSet sets.String, missingSetResourceToContainerNames map[string]sets.String) {
+func enforcePodContainerConstraints(container *corev1.Container, requiredSet sets.Set[string], missingSetResourceToContainerNames map[string]sets.Set[string]) {
 	requests := container.Resources.Requests
 	limits := container.Resources.Limits
 	containerUsage := podComputeUsageHelper(requests, limits)
 	containerSet := quota.ToSet(quota.ResourceNames(containerUsage))
 	if !containerSet.Equal(requiredSet) {
 		if difference := requiredSet.Difference(containerSet); difference.Len() != 0 {
-			for _, diff := range difference.List() {
+			for _, diff := range sets.List(difference) {
 				if _, ok := missingSetResourceToContainerNames[diff]; !ok {
-					missingSetResourceToContainerNames[diff] = sets.NewString(container.Name)
+					missingSetResourceToContainerNames[diff] = sets.New[string](container.Name)
 				} else {
 					missingSetResourceToContainerNames[diff].Insert(container.Name)
 				}
