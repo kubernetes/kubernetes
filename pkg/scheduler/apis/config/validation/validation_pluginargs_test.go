@@ -686,7 +686,7 @@ func TestValidateFitArgs(t *testing.T) {
 				IgnoredResources: []string{fmt.Sprintf("longvalue%s", strings.Repeat("a", 64))},
 				ScoringStrategy:  defaultScoringStrategy,
 			},
-			expect: "name part must be no more than 63 characters",
+			expect: "name part must be no more than 63 bytes",
 		},
 		{
 			name: "IgnoredResources: name is empty",
@@ -702,7 +702,7 @@ func TestValidateFitArgs(t *testing.T) {
 				IgnoredResources: []string{"example.com/aaa/bbb"},
 				ScoringStrategy:  defaultScoringStrategy,
 			},
-			expect: "a qualified name must consist of alphanumeric characters",
+			expect: "a valid label key must consist of",
 		},
 		{
 			name: "IgnoredResources: valid args",
@@ -732,7 +732,7 @@ func TestValidateFitArgs(t *testing.T) {
 				IgnoredResourceGroups: []string{strings.Repeat("a", 64)},
 				ScoringStrategy:       defaultScoringStrategy,
 			},
-			expect: "name part must be no more than 63 characters",
+			expect: "name part must be no more than 63 bytes",
 		},
 		{
 			name: "IgnoredResourceGroups: name cannot be contain slash",

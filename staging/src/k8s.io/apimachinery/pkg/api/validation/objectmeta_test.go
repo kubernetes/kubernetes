@@ -30,7 +30,7 @@ import (
 const (
 	maxLengthErrMsg = "must be no more than"
 	namePartErrMsg  = "name part must consist of"
-	nameErrMsg      = "a qualified name must consist of"
+	nameErrMsg      = "a valid label key must consist of"
 )
 
 // Ensure custom name functions are allowed

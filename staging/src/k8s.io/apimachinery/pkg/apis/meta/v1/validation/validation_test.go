@@ -55,7 +55,7 @@ func TestValidateLabels(t *testing.T) {
 	}
 
 	namePartErrMsg := "name part must consist of"
-	nameErrMsg := "a qualified name must consist of"
+	nameErrMsg := "a valid label key must consist of"
 	labelErrMsg := "a valid label must be an empty string or consist of"
 	maxLengthErrMsg := "must be no more than"
 
