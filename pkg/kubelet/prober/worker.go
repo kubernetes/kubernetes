@@ -237,8 +237,22 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
+
+		// On kubelet restart, we don't want to immediately set the probe result to Failure,
+		// as this could cause a container that was Ready to become NotReady.
+		isRestart := false
+		if c.State.Running != nil {
+			containerStartTime := c.State.Running.StartedAt.Time
+			if w.containerID.IsEmpty() && !containerStartTime.IsZero() && containerStartTime.Before(w.probeManager.start) {
+				isRestart = true
+			}
+		}
+
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
-		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		// If the container is restarting and ready, skip setting initial values.
+		if !isRestart || !c.Ready {
+			w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		}
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}
