@@ -23,8 +23,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -47,15 +45,16 @@ import (
 )
 
 func TestTunnelingHandler_UpgradeStreamingAndTunneling(t *testing.T) {
-	metrics.Register()
 	metrics.ResetForTest()
 	t.Cleanup(metrics.ResetForTest)
-	// Create fake upstream SPDY server, with channel receiving SPDY streams.
+	handlerPath := "/TestTunnelingHandler_UpgradeStreamingAndTunneling"
+
+	// 1. Configure and register the upstream SPDY handler for this test.
 	streamChan := make(chan httpstream.Stream)
 	defer close(streamChan)
-	stopServerChan := make(chan struct{})
-	defer close(stopServerChan)
-	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	stopSPDYServerChan := make(chan struct{})
+	defer close(stopSPDYServerChan)
+	spdyServerMux.HandleFunc(handlerPath, func(w http.ResponseWriter, req *http.Request) {
 		_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
@@ -68,34 +67,32 @@ func TestTunnelingHandler_UpgradeStreamingAndTunneling(t *testing.T) {
 			return
 		}
 		defer conn.Close() //nolint:errcheck
-		<-stopServerChan
-	}))
-	defer spdyServer.Close()
-	// Create UpgradeAwareProxy handler, with url/transport pointing to upstream SPDY. Then
-	// create TunnelingHandler by injecting upgrade handler. Create TunnelingServer.
-	url, err := url.Parse(spdyServer.URL)
-	require.NoError(t, err)
+		<-stopSPDYServerChan
+	})
+
+	// 2. Configure and register the TunnelingHandler for this test.
+	upstreamURL := *spdyServerURL
+	upstreamURL.Path = handlerPath
 	transport, err := fakeTransport()
 	require.NoError(t, err)
-	upgradeHandler := proxy.NewUpgradeAwareHandler(url, transport, false, true, proxy.NewErrorResponder(&fakeResponder{}))
+	upgradeHandler := proxy.NewUpgradeAwareHandler(&upstreamURL, transport, false, true, proxy.NewErrorResponder(&fakeResponder{}))
 	tunnelingHandler := NewTunnelingHandler(upgradeHandler)
-	tunnelingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		tunnelingHandler.ServeHTTP(w, req)
-	}))
-	defer tunnelingServer.Close()
-	// Create SPDY client connection containing a TunnelingConnection by upgrading
-	// a request to TunnelingHandler using new portforward version 2.
-	tunnelingURL, err := url.Parse(tunnelingServer.URL)
-	require.NoError(t, err)
-	dialer, err := portforward.NewSPDYOverWebsocketDialer(tunnelingURL, &restconfig.Config{Host: tunnelingURL.Host})
+	tunnelingServerMux.HandleFunc(handlerPath, tunnelingHandler.ServeHTTP)
+
+	// 3. Configure the client to connect to the tunneling server.
+	clientURL := *tunnelingServerURL
+	clientURL.Path = handlerPath
+	dialer, err := portforward.NewSPDYOverWebsocketDialer(&clientURL, &restconfig.Config{Host: clientURL.Host})
 	require.NoError(t, err)
 	spdyClient, protocol, err := dialer.Dial(constants.PortForwardV1Name)
 	require.NoError(t, err)
 	assert.Equal(t, constants.PortForwardV1Name, protocol)
 	defer spdyClient.Close() //nolint:errcheck
+
+	// 4. Execute the test logic:
 	// Create a SPDY client stream, which will queue a SPDY server stream
-	// on the stream creation channel. Send random data on the client stream
-	// reading off the SPDY server stream, and validating it was tunneled.
+	// on the stream creation channel. Send random data on the client stream,
+	// reading it off the SPDY server stream, and validating it was tunneled correctly.
 	randomSize := 1024 * 1024
 	randomData := make([]byte, randomSize)
 	_, err = rand.Read(randomData)
@@ -124,7 +121,7 @@ func TestTunnelingHandler_UpgradeStreamingAndTunneling(t *testing.T) {
 	}
 	assert.Equal(t, randomData, actual, "error validating tunneled random data")
 
-	// Validate the streamtunnel metrics; should be one 101 Switching Protocols.
+	// 5. Validate metrics.
 	metricNames := []string{"apiserver_stream_tunnel_requests_total"}
 	expected := `
 # HELP apiserver_stream_tunnel_requests_total [ALPHA] Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2
@@ -137,26 +134,24 @@ apiserver_stream_tunnel_requests_total{code="101"} 1
 }
 
 func TestTunnelingHandler_BadRequestWithoutProtcols(t *testing.T) {
-	metrics.Register()
 	metrics.ResetForTest()
 	t.Cleanup(metrics.ResetForTest)
-	// Create TunnelingHandler with empty upstream URL and fake transport. An error should
-	// be returned before the upstream proxying to SPDY occurs, so a test SPDY server is not needed.
+	handlerPath := "/TestTunnelingHandler_BadRequestWithoutProtcols"
+
+	// An error should be returned before proxying to an upstream SPDY server,
+	// so a test SPDY server is not needed for this test.
 	transport, err := fakeTransport()
 	require.NoError(t, err)
-	upgradeHandler := proxy.NewUpgradeAwareHandler(&url.URL{}, transport, false, true, proxy.NewErrorResponder(&fakeResponder{}))
+	upgradeHandler := proxy.NewUpgradeAwareHandler(spdyServerURL, transport, false, true, proxy.NewErrorResponder(&fakeResponder{}))
 	tunnelingHandler := NewTunnelingHandler(upgradeHandler)
-	tunnelingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		tunnelingHandler.ServeHTTP(w, req)
-	}))
-	defer tunnelingServer.Close()
-	// Create SPDY client connection containing a TunnelingConnection by upgrading
-	// a request to TunnelingHandler using new portforward version 2.
-	tunnelingURL, err := url.Parse(tunnelingServer.URL)
+	tunnelingServerMux.HandleFunc(handlerPath, tunnelingHandler.ServeHTTP)
+
+	clientURL := *tunnelingServerURL
+	clientURL.Path = handlerPath
+	dialer, err := portforward.NewSPDYOverWebsocketDialer(&clientURL, &restconfig.Config{Host: clientURL.Host})
 	require.NoError(t, err)
-	dialer, err := portforward.NewSPDYOverWebsocketDialer(tunnelingURL, &restconfig.Config{Host: tunnelingURL.Host})
-	require.NoError(t, err)
-	// Request without subprotocols--causing a bad request to be returned.
+
+	// Request without subprotocols, causing a bad request to be returned.
 	_, protocol, err := dialer.Dial("")
 	require.Error(t, err)
 	assert.Equal(t, "", protocol)
@@ -174,12 +169,12 @@ apiserver_stream_tunnel_requests_total{code="400"} 1
 }
 
 func TestTunnelingHandler_BadHandshakeError(t *testing.T) {
-	metrics.Register()
 	metrics.ResetForTest()
 	t.Cleanup(metrics.ResetForTest)
-	// Create fake upstream SPDY server, returning forbidden for bad handshake.
-	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// Handshake fails.
+	handlerPath := "/TestTunnelingHandler_BadHandshakeError"
+
+	// Create fake upstream SPDY server that returns a forbidden error for a bad handshake.
+	spdyServerMux.HandleFunc(handlerPath, func(w http.ResponseWriter, req *http.Request) {
 		_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
 		if err == nil {
 			t.Errorf("handshake should have returned an error %v", err)
@@ -187,26 +182,21 @@ func TestTunnelingHandler_BadHandshakeError(t *testing.T) {
 		}
 		assert.ErrorContains(t, err, "unable to negotiate protocol")
 		w.WriteHeader(http.StatusForbidden)
-	}))
-	defer spdyServer.Close()
-	// Create UpgradeAwareProxy handler, with url/transport pointing to upstream SPDY. Then
-	// create TunnelingHandler by injecting upgrade handler. Create TunnelingServer.
-	url, err := url.Parse(spdyServer.URL)
-	require.NoError(t, err)
+	})
+
+	upstreamURL := *spdyServerURL
+	upstreamURL.Path = handlerPath
 	transport, err := fakeTransport()
 	require.NoError(t, err)
-	upgradeHandler := proxy.NewUpgradeAwareHandler(url, transport, false, true, proxy.NewErrorResponder(&fakeResponder{}))
+	upgradeHandler := proxy.NewUpgradeAwareHandler(&upstreamURL, transport, false, true, proxy.NewErrorResponder(&fakeResponder{}))
 	tunnelingHandler := NewTunnelingHandler(upgradeHandler)
-	tunnelingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		tunnelingHandler.ServeHTTP(w, req)
-	}))
-	defer tunnelingServer.Close()
-	// Create SPDY client connection containing a TunnelingConnection by upgrading
-	// a request to TunnelingHandler using new portforward version 2.
-	tunnelingURL, err := url.Parse(tunnelingServer.URL)
+	tunnelingServerMux.HandleFunc(handlerPath, tunnelingHandler.ServeHTTP)
+
+	clientURL := *tunnelingServerURL
+	clientURL.Path = handlerPath
+	dialer, err := portforward.NewSPDYOverWebsocketDialer(&clientURL, &restconfig.Config{Host: clientURL.Host})
 	require.NoError(t, err)
-	dialer, err := portforward.NewSPDYOverWebsocketDialer(tunnelingURL, &restconfig.Config{Host: tunnelingURL.Host})
-	require.NoError(t, err)
+
 	// Handshake will fail, returning a 400-level response.
 	_, protocol, err := dialer.Dial("UNKNOWN_SUBPROTOCOL")
 	require.Error(t, err)
@@ -225,7 +215,6 @@ apiserver_stream_tunnel_requests_total{code="400"} 1
 }
 
 func TestTunnelingHandler_UpstreamSPDYServerErrorPropagated(t *testing.T) {
-	metrics.Register()
 	metrics.ResetForTest()
 	t.Cleanup(metrics.ResetForTest)
 
@@ -235,54 +224,53 @@ func TestTunnelingHandler_UpstreamSPDYServerErrorPropagated(t *testing.T) {
 		http.StatusBadGateway:          "502",
 		http.StatusServiceUnavailable:  "503",
 	} {
-		// Create fake upstream SPDY server, which returns a 500-level error.
-		spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
-			if err != nil {
-				t.Errorf("handshake should have succeeded %v", err)
-				return
-			}
-			// Returned status code should be incremented in metrics.
-			w.WriteHeader(statusCode)
-		}))
-		defer spdyServer.Close()
-		// Create UpgradeAwareProxy handler, with url/transport pointing to upstream SPDY. Then
-		// create TunnelingHandler by injecting upgrade handler. Create TunnelingServer.
-		url, err := url.Parse(spdyServer.URL)
-		require.NoError(t, err)
-		transport, err := fakeTransport()
-		require.NoError(t, err)
-		upgradeHandler := proxy.NewUpgradeAwareHandler(url, transport, false, true, proxy.NewErrorResponder(&fakeResponder{}))
-		tunnelingHandler := NewTunnelingHandler(upgradeHandler)
-		tunnelingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			tunnelingHandler.ServeHTTP(w, req)
-		}))
-		defer tunnelingServer.Close()
-		// Create SPDY client connection containing a TunnelingConnection by upgrading
-		// a request to TunnelingHandler using new portforward version 2.
-		tunnelingURL, err := url.Parse(tunnelingServer.URL)
-		require.NoError(t, err)
-		dialer, err := portforward.NewSPDYOverWebsocketDialer(tunnelingURL, &restconfig.Config{Host: tunnelingURL.Host})
-		require.NoError(t, err)
-		_, protocol, err := dialer.Dial(constants.PortForwardV1Name)
-		require.Error(t, err)
-		assert.Equal(t, "", protocol)
+		t.Run(fmt.Sprintf("statusCode=%d", statusCode), func(t *testing.T) {
+			handlerPath := fmt.Sprintf("/TestTunnelingHandler_UpstreamSPDYServerErrorPropagated/%d", statusCode)
 
-		// Validate the streamtunnel metrics are incrementing 500-level status codes.
-		metricNames := []string{"apiserver_stream_tunnel_requests_total"}
-		expected := `
+			// Create fake upstream SPDY server, which returns a 500-level error.
+			spdyServerMux.HandleFunc(handlerPath, func(w http.ResponseWriter, req *http.Request) {
+				_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
+				if err != nil {
+					t.Errorf("handshake should have succeeded %v", err)
+					return
+				}
+				// Returned status code should be incremented in metrics.
+				w.WriteHeader(statusCode)
+			})
+
+			upstreamURL := *spdyServerURL
+			upstreamURL.Path = handlerPath
+			transport, err := fakeTransport()
+			require.NoError(t, err)
+			upgradeHandler := proxy.NewUpgradeAwareHandler(&upstreamURL, transport, false, true, proxy.NewErrorResponder(&fakeResponder{}))
+			tunnelingHandler := NewTunnelingHandler(upgradeHandler)
+			tunnelingServerMux.HandleFunc(handlerPath, tunnelingHandler.ServeHTTP)
+
+			clientURL := *tunnelingServerURL
+			clientURL.Path = handlerPath
+			dialer, err := portforward.NewSPDYOverWebsocketDialer(&clientURL, &restconfig.Config{Host: clientURL.Host})
+			require.NoError(t, err)
+			_, protocol, err := dialer.Dial(constants.PortForwardV1Name)
+			require.Error(t, err)
+			assert.Equal(t, "", protocol)
+
+			// Validate the streamtunnel metrics are incrementing 500-level status codes.
+			metricNames := []string{"apiserver_stream_tunnel_requests_total"}
+			expected := `
 # HELP apiserver_stream_tunnel_requests_total [ALPHA] Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2
 # TYPE apiserver_stream_tunnel_requests_total counter
 apiserver_stream_tunnel_requests_total{code="` + codeStr + `"} 1
 `
-		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
-			t.Fatal(err)
-		}
-		metrics.ResetForTest()
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+				t.Fatal(err)
+			}
+			metrics.ResetForTest()
+		})
 	}
 }
 
 func TestTunnelingResponseWriter_Hijack(t *testing.T) {
+	t.Parallel()
 	// Regular hijack returns connection, nil bufio, and no error.
 	trw := &tunnelingResponseWriter{conn: &mockConn{}}
 	assert.False(t, trw.hijacked, "hijacked field starts false before Hijack()")
@@ -306,6 +294,7 @@ func TestTunnelingResponseWriter_Hijack(t *testing.T) {
 }
 
 func TestTunnelingResponseWriter_DelegateResponseWriter(t *testing.T) {
+	t.Parallel()
 	// Validate Header() for delegate response writer.
 	expectedHeader := http.Header{}
 	expectedHeader.Set("foo", "bar")
@@ -347,6 +336,7 @@ func TestTunnelingResponseWriter_DelegateResponseWriter(t *testing.T) {
 }
 
 func TestTunnelingWebsocketUpgraderConn_LocalRemoteAddress(t *testing.T) {
+	t.Parallel()
 	expectedLocalAddr := &net.TCPAddr{
 		IP:   net.IPv4(127, 0, 0, 1),
 		Port: 80,
@@ -373,6 +363,7 @@ func TestTunnelingWebsocketUpgraderConn_LocalRemoteAddress(t *testing.T) {
 }
 
 func TestTunnelingWebsocketUpgraderConn_SetDeadline(t *testing.T) {
+	t.Parallel()
 	tc := &tunnelingWebsocketUpgraderConn{conn: &mockConn{}}
 	expected := time.Now()
 	assert.NoError(t, tc.SetDeadline(expected), "SetDeadline does not return error")
@@ -437,6 +428,7 @@ const invalidResponseData = "INVALID/1.1 101 Switching Protocols\r\n" +
 	"\r\n"
 
 func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
+	t.Parallel()
 	// Basic http response is intercepted correctly; no extra data sent to net.Conn.
 	t.Run("simple-no-body", func(t *testing.T) {
 		testConnConstructor := &mockConnInitializer{mockConn: &mockConn{}, initializeWriteConn: &mockConn{}}

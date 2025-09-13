@@ -29,29 +29,37 @@ import (
 
 // Shared test servers for the proxy package.
 var (
-	// spdyServer is the upstream SPDY server that the StreamTranslatorHandler connects to.
-	// It is shared across all tests in this package.
+	// spdyServer is the upstream SPDY server that both the StreamTranslatorHandler
+	// and TunnelingHandler connect to. It is shared across all tests in this package.
 	spdyServer *httptest.Server
 	// spdyServerMux is the router for the spdyServer. Tests register their specific handlers here.
 	spdyServerMux *http.ServeMux
 	spdyServerURL *url.URL
 
 	// streamTranslatorServer is the server that exposes the StreamTranslatorHandler.
-	// Test clients connect to this server. It is shared across all tests.
+	// Test clients connect to this server. It is shared across all translator tests.
 	streamTranslatorServer *httptest.Server
 	// streamTranslatorServerMux is the router for the streamTranslatorServer.
 	// Tests register their specific StreamTranslatorHandler configurations here.
 	streamTranslatorServerMux *http.ServeMux
 	streamTranslatorServerURL *url.URL
+
+	// tunnelingServer is the server that exposes the TunnelingHandler.
+	// Test clients connect to this server. It is shared across all tunneling tests.
+	tunnelingServer *httptest.Server
+	// tunnelingServerMux is the router for the tunnelingServer.
+	// Tests register their specific TunnelingHandler configurations here.
+	tunnelingServerMux *http.ServeMux
+	tunnelingServerURL *url.URL
 )
 
-// TestMain sets up the shared SPDY and StreamTranslator servers for the entire test suite.
+// TestMain sets up the shared SPDY, StreamTranslator, and Tunneling servers for the entire test suite.
 // This avoids the overhead of creating new servers for each test and eliminates race conditions
 // related to server startup and shutdown.
 func TestMain(m *testing.M) {
 	metrics.Register()
 
-	// Upstream SPDY server setup
+	// Upstream SPDY server setup (used by both translator and tunneling tests)
 	spdyServerMux = http.NewServeMux()
 	spdyServer = httptest.NewServer(spdyServerMux)
 	var err error
@@ -68,12 +76,21 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Failed to parse StreamTranslator server URL: %v", err)
 	}
 
+	// Tunneling server setup
+	tunnelingServerMux = http.NewServeMux()
+	tunnelingServer = httptest.NewServer(tunnelingServerMux)
+	tunnelingServerURL, err = url.Parse(tunnelingServer.URL)
+	if err != nil {
+		log.Fatalf("Failed to parse Tunneling server URL: %v", err)
+	}
+
 	// Run tests
 	exitCode := m.Run()
 
 	// Teardown
 	spdyServer.Close()
 	streamTranslatorServer.Close()
+	tunnelingServer.Close()
 
 	os.Exit(exitCode)
 }
