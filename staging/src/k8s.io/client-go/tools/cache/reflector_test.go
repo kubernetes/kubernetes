@@ -784,7 +784,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 					store:             NewFIFO(MetaNamespaceKeyFunc),
 					backoffManager:    bm,
 					clock:             fakeClock,
-					watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+					watchErrorHandler: DefaultTypedWatchErrorHandler[any],
 				}
 				start := fakeClock.Now()
 				err := r.ListAndWatchWithContext(ctx)
@@ -845,7 +845,7 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 		store:             NewFIFO(MetaNamespaceKeyFunc),
 		backoffManager:    bm,
 		clock:             clock,
-		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+		watchErrorHandler: DefaultTypedWatchErrorHandler[any],
 	}
 
 	stopCh := make(chan struct{})
@@ -886,7 +886,7 @@ func TestNoRelistOnTooManyRequests(t *testing.T) {
 		store:             NewFIFO(MetaNamespaceKeyFunc),
 		backoffManager:    bm,
 		clock:             clock,
-		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+		watchErrorHandler: DefaultTypedWatchErrorHandler[any],
 	}
 
 	_, ctx := ktesting.NewTestContext(t)
@@ -961,7 +961,7 @@ func TestRetryInternalError(t *testing.T) {
 			store:             NewFIFO(MetaNamespaceKeyFunc),
 			backoffManager:    bm,
 			clock:             fakeClock,
-			watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+			watchErrorHandler: DefaultTypedWatchErrorHandler[any],
 		}
 
 		r.MaxInternalErrorRetryDuration = tc.maxInternalDuration
