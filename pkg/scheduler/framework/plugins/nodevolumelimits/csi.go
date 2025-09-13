@@ -23,11 +23,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/client-go/tools/cache"
 	ephemeral "k8s.io/component-helpers/storage/ephemeral"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
@@ -61,7 +61,7 @@ type CSILimits struct {
 	pvLister      corelisters.PersistentVolumeLister
 	pvcLister     corelisters.PersistentVolumeClaimLister
 	scLister      storagelisters.StorageClassLister
-	vaLister      storagelisters.VolumeAttachmentLister
+	vaindexer     cache.Indexer
 
 	enableCSIMigrationPortworx bool
 	randomVolumeIDPrefix       string
@@ -552,7 +552,16 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	csiNodesLister := informerFactory.Storage().V1().CSINodes().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
-	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
+	vaindexer := informerFactory.Storage().V1().VolumeAttachments().Informer().GetIndexer()
+	if err := informerFactory.Storage().V1().VolumeAttachments().Informer().AddIndexers(cache.Indexers{"nodename": func(obj interface{}) ([]string, error) {
+		va, ok := obj.(*storagev1.VolumeAttachment)
+		if !ok {
+			return []string{}, nil
+		}
+		return []string{va.Spec.NodeName}, nil
+	}}); err != nil {
+		return nil, fmt.Errorf("failed to add index to VA informer: %w", err)
+	}
 	csiTranslator := csitrans.New()
 
 	return &CSILimits{
@@ -560,10 +569,10 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 		pvLister:                   pvLister,
 		pvcLister:                  pvcLister,
 		scLister:                   scLister,
-		vaLister:                   vaLister,
 		enableCSIMigrationPortworx: fts.EnableCSIMigrationPortworx,
 		randomVolumeIDPrefix:       rand.String(32),
 		translator:                 csiTranslator,
+		vaindexer:                  vaindexer,
 	}, nil
 }
 
@@ -586,11 +595,15 @@ func getVolumeLimits(csiNode *storagev1.CSINode) map[string]int64 {
 // getNodeVolumeAttachmentInfo returns a map of volumeID to driver name for the given node.
 func (pl *CSILimits) getNodeVolumeAttachmentInfo(logger klog.Logger, nodeName string) (map[string]string, error) {
 	volumeAttachments := make(map[string]string)
-	vas, err := pl.vaLister.List(labels.Everything())
+	vas, err := pl.vaindexer.ByIndex("nodename", nodeName)
 	if err != nil {
 		return nil, err
 	}
-	for _, va := range vas {
+	for _, vao := range vas {
+		va, ok := vao.(*storagev1.VolumeAttachment)
+		if !ok {
+			continue
+		}
 		if va.Spec.NodeName == nodeName {
 			if va.Spec.Attacher == "" {
 				logger.V(5).Info("VolumeAttachment has no attacher", "VolumeAttachment", klog.KObj(va))
