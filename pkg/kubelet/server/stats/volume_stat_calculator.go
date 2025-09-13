@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -40,7 +41,7 @@ type volumeStatCalculator struct {
 	statsProvider Provider
 	jitterPeriod  time.Duration
 	pod           *v1.Pod
-	stopChannel   chan struct{}
+	cancel        context.CancelFunc
 	startO        sync.Once
 	stopO         sync.Once
 	latest        atomic.Value
@@ -60,17 +61,19 @@ func newVolumeStatCalculator(statsProvider Provider, jitterPeriod time.Duration,
 		statsProvider: statsProvider,
 		jitterPeriod:  jitterPeriod,
 		pod:           pod,
-		stopChannel:   make(chan struct{}),
 		eventRecorder: eventRecorder,
 	}
 }
 
 // StartOnce starts pod volume calc that will occur periodically in the background until s.StopOnce is called
-func (s *volumeStatCalculator) StartOnce(logger klog.Logger) *volumeStatCalculator {
+func (s *volumeStatCalculator) StartOnce(ctx context.Context) *volumeStatCalculator {
 	s.startO.Do(func() {
-		go wait.JitterUntil(func() {
+		var cctx context.Context
+		cctx, s.cancel = context.WithCancel(ctx)
+		go wait.JitterUntilWithContext(cctx, func(ctx context.Context) {
+			logger := klog.FromContext(ctx)
 			s.calcAndStoreStats(logger)
-		}, s.jitterPeriod, 1.0, true, s.stopChannel)
+		}, s.jitterPeriod, 1.0, true)
 	})
 	return s
 }
@@ -79,7 +82,9 @@ func (s *volumeStatCalculator) StartOnce(logger klog.Logger) *volumeStatCalculat
 // they complete their current iteration.
 func (s *volumeStatCalculator) StopOnce() *volumeStatCalculator {
 	s.stopO.Do(func() {
-		close(s.stopChannel)
+		if s.cancel != nil {
+			s.cancel()
+		}
 	})
 	return s
 }
