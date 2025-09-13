@@ -206,7 +206,7 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 				}
 			})
 		}
-		for unexpectedType := range gotKeys.Difference(expectedKeys) {
+		for unexpectedType := range gotKeys.DifferenceSeq(expectedKeys) {
 			s.T.Run(unexpectedType, func(t *testing.T) {
 				t.Helper()
 
@@ -492,7 +492,7 @@ func (v *ValidationTester) expectInvalid(matcher matcher, errs ...*field.Error) 
 		if !got.Equal(want) {
 			t.Errorf("validation errors differed from expected:\n%v\n", cmp.Diff(want, got, cmpopts.SortMaps(stdcmp.Less[string])))
 
-			for x := range got.Difference(want) {
+			for x := range got.DifferenceSeq(want) {
 				fmt.Printf("%q,\n", strings.TrimPrefix(x, "forced failure: "))
 			}
 		}
