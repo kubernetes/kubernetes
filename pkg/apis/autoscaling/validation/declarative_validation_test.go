@@ -17,19 +17,17 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestValidateScaleForDeclarative(t *testing.T) {
@@ -58,37 +56,9 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			var declarativeTakeoverErrs field.ErrorList
-			var imperativeErrs field.ErrorList
-			for _, gateVal := range []bool{true, false} {
-				t.Run(fmt.Sprintf("gates=%v", gateVal), func(t *testing.T) {
-					// We only need to test both gate enabled and disabled together, because
-					// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
-					// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
-
-					errs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, &tc.input)
-					if gateVal {
-						declarativeTakeoverErrs = errs
-					} else {
-						imperativeErrs = errs
-					}
-					// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
-					errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-					if len(tc.expectedErrs) > 0 {
-						errOutputMatcher.Test(t, tc.expectedErrs, errs)
-					} else if len(errs) != 0 {
-						t.Errorf("expected no errors, but got: %v", errs)
-					}
-				})
-			}
-			// The equivalenceMatcher is used to verify the output errors from handwritten imperative validation
-			// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
-			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
-
-			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil, "scale")
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, func(ctx context.Context, obj runtime.Object) field.ErrorList {
+				return rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, obj)
+			}, tc.expectedErrs, "scale")
 		})
 	}
 }
