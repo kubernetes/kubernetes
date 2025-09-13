@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/util/proxy/metrics"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/klog/v2"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // TunnelingHandler is a handler which tunnels SPDY through WebSockets.
@@ -60,6 +61,9 @@ func NewTunnelingHandler(upgradeHandler http.Handler) *TunnelingHandler {
 // case the upstream upgrade fails, we delegate communication to the passed
 // in "w" ResponseWriter.
 func (h *TunnelingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	opTrace := utiltrace.New("TunnelingHandler.ServeHTTP")
+	defer opTrace.Log()
+
 	klog.V(4).Infoln("TunnelingHandler ServeHTTP")
 
 	spdyProtocols := spdyProtocolsFromWebsocketProtocols(req)

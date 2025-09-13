@@ -54,6 +54,7 @@ import (
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // podStrategy implements behavior for Pods
@@ -790,6 +791,10 @@ func PortForwardLocation(
 	name string,
 	opts *api.PodPortForwardOptions,
 ) (*url.URL, http.RoundTripper, error) {
+	opTrace := utiltrace.FromContext(ctx).Nest("PortForwardLocation")
+	defer opTrace.Log()
+
+	opTrace.Step("getPod", utiltrace.Field{Key: "name", Value: name})
 	pod, err := getPod(ctx, getter, name)
 	if err != nil {
 		return nil, nil, err
@@ -800,6 +805,7 @@ func PortForwardLocation(
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
+	opTrace.Step("connInfo.GetConnectionInfo", utiltrace.Field{Key: "nodeName", Value: nodeName})
 	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
 	if err != nil {
 		return nil, nil, err
