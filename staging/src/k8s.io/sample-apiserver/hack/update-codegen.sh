@@ -20,7 +20,7 @@ set -o pipefail
 
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
-
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../../../..
 source "${CODEGEN_PKG}/kube_codegen.sh"
 
 THIS_PKG="k8s.io/sample-apiserver"
@@ -29,11 +29,19 @@ kube::codegen::gen_helpers \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
     "${SCRIPT_ROOT}/pkg/apis"
 
-if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
-    report_filename="${API_KNOWN_VIOLATIONS_DIR}/sample_apiserver_violation_exceptions.list"
-    if [[ "${UPDATE_API_KNOWN_VIOLATIONS:-}" == "true" ]]; then
-        update_report="--update-report"
+if [[ -z "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
+    if [[ -e "${KUBE_ROOT}/api/api-rules/sample_apiserver_violation_exceptions.list" ]]; then
+        report_filename="${KUBE_ROOT}/api/api-rules/sample_apiserver_violation_exceptions.list"
+    else
+        echo "Error: API_KNOWN_VIOLATIONS_DIR is not set and default file ${KUBE_ROOT}/api/api-rules/sample_apiserver_violation_exceptions.list not found."
+        exit 1
     fi
+else
+    report_filename="${API_KNOWN_VIOLATIONS_DIR}/sample_apiserver_violation_exceptions.list"
+fi
+
+if [[ "${UPDATE_API_KNOWN_VIOLATIONS:-}" == "true" ]]; then
+    update_report="--update-report"
 fi
 
 kube::codegen::gen_openapi \
