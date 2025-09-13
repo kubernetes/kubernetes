@@ -356,6 +356,17 @@ func TestNew(t *testing.T) {
 	}
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
+			// the Close method of httptest Server mutates the
+			// `http.DefaultTransport` object, the 'TLSClientConfig'
+			// field mutates from nil to a non nil instance. To work
+			// around it we reset the TLSClientConfig field.
+			// See: https://github.com/golang/go/issues/65796
+			//
+			// This implies that running tests in this package in
+			// parallel will introduce flake and data race.
+			if testCase.Default {
+				http.DefaultTransport.(*http.Transport).TLSClientConfig = nil
+			}
 			rt, err := New(testCase.Config)
 			switch {
 			case testCase.Err && err == nil:
@@ -380,7 +391,10 @@ func TestNew(t *testing.T) {
 			case testCase.TLS && transport.TLSClientConfig == nil:
 				t.Fatalf("got %#v, expected TLSClientConfig", transport)
 			case !testCase.TLS && transport.TLSClientConfig != nil:
-				t.Fatalf("got %#v, expected no TLSClientConfig", transport)
+				if rt == http.DefaultTransport {
+					t.Log("returned default transport.")
+				}
+				t.Fatalf("got transport %#v\n, tlsClientConfig: %#v\n, expected no TLSClientConfig", transport, transport.TLSClientConfig)
 			}
 			if !testCase.TLS {
 				return
