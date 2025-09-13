@@ -17,22 +17,51 @@ limitations under the License.
 package extended
 
 import (
+	"context"
+	"sort"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
+// DeviceClassMapping creates the mapping of extended resource name to device class name.
+// It always includes the implicit extended resource name for each device class.
 func DeviceClassMapping(draManager fwk.SharedDRAManager) (map[v1.ResourceName]string, error) {
 	classes, err := draManager.DeviceClasses().List()
-	extendedResources := make(map[v1.ResourceName]string, len(classes))
 	if err != nil {
 		return nil, err
 	}
+	resClasses := make(map[v1.ResourceName][]*resourceapi.DeviceClass, len(classes))
 	for _, c := range classes {
+		// implicit extended resource name
+		name := v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + c.Name)
+		cls := resClasses[name]
+		cls = append(cls, c)
+		resClasses[name] = cls
+
 		if c.Spec.ExtendedResourceName != nil {
-			extendedResources[v1.ResourceName(*c.Spec.ExtendedResourceName)] = c.Name
+			name = v1.ResourceName(*c.Spec.ExtendedResourceName)
+			cls := resClasses[name]
+			cls = append(cls, c)
+			resClasses[name] = cls
 		}
-		extendedResources[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+c.Name)] = c.Name
+	}
+	extendedResources := make(map[v1.ResourceName]string, len(resClasses))
+	for name, cls := range resClasses {
+		// Primary sort by creation timestamp, newest first
+		// Secondary sort by class name, ascending order
+		sort.Slice(cls, func(i, j int) bool {
+			if cls[i].CreationTimestamp.Equal(&cls[j].CreationTimestamp) {
+				return cls[i].Name < cls[j].Name
+			}
+			return cls[j].CreationTimestamp.Before(&cls[i].CreationTimestamp)
+		})
+		if len(cls) > 1 {
+			klog.FromContext(context.Background()).V(5).Info("Device classes found", "total", len(cls), "name", cls[0].Name)
+		}
+		extendedResources[name] = cls[0].Name
 	}
 	return extendedResources, nil
 }
