@@ -805,6 +805,7 @@ func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, d
 // TestAllocator runs as many of the shared tests against a specific allocator implementation as possible.
 // Test cases which depend on features that are not supported by the implementation are silently skipped.
 func TestAllocator(t *testing.T,
+	channel internal.AllocatorChannel,
 	supportedFeatures Features,
 	newAllocator func(
 		ctx context.Context,
@@ -845,6 +846,7 @@ func TestAllocator(t *testing.T,
 	}
 
 	testcases := map[string]struct {
+		onlyForChannels          []internal.AllocatorChannel
 		features                 Features
 		claimsToAllocate         []wrapResourceClaim
 		allocatedDevices         []DeviceID
@@ -4904,6 +4906,68 @@ func TestAllocator(t *testing.T,
 				),
 			},
 		},
+		"only-check-combinations-within-single-request": {
+			onlyForChannels: []internal.AllocatorChannel{
+				internal.Experimental,
+			},
+			claimsToAllocate: objects(claimWithRequests(claim0, nil,
+				request(req0, classA, 5),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil),
+				device(device2, nil, nil),
+				device(device3, nil, nil),
+				device(device4, nil, nil),
+			)),
+			node:                            node(node1, region1),
+			expectResults:                   nil,
+			expectNumAllocateOneInvocations: 16,
+		},
+		"only-check-combinations-with-backtracking": {
+			onlyForChannels: []internal.AllocatorChannel{
+				internal.Experimental,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				nil,
+				// req-1 needs two generic devices.
+				request(req1, classA, 2),
+				// req-2 needs a specific device.
+				request(req2, classA, 1, resourceapi.DeviceSelector{
+					CEL: &resourceapi.CELDeviceSelector{
+						Expression: fmt.Sprintf(`device.attributes["%s"].type == "X"`, driverA),
+					},
+				}),
+			)),
+			classes: objects(class(classA, driverA)),
+			// The order of devices is chosen such that the allocator
+			// will initially pick {device1, device2} for req1. This will fail
+			// because req-2 needs device1. The allocator has to
+			// backtrack. The correct solution is {device2, device3} for req-1
+			// and {device1} for req-2. The optimized allocator avoids
+			// testing {device2, device1} for req-1 and thus finds the solution
+			// faster.
+			slices: unwrap(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"type": {StringValue: ptr.To("X")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"type": {StringValue: ptr.To("Y")},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"type": {StringValue: ptr.To("Y")},
+				}),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
+				deviceAllocationResult(req1, driverA, pool1, device3, false),
+				deviceAllocationResult(req2, driverA, pool1, device1, false),
+			)},
+			expectNumAllocateOneInvocations: 12,
+		},
 	}
 
 	for name, tc := range testcases {
@@ -4911,6 +4975,10 @@ func TestAllocator(t *testing.T,
 			_, ctx := ktesting.NewTestContext(t)
 			g := gomega.NewWithT(t)
 
+			// Skip the test if it is not supposed to run for the current channel.
+			if len(tc.onlyForChannels) != 0 && !slices.Contains(tc.onlyForChannels, channel) {
+				t.Skipf("SKIP: test should not run for channel %s", channel)
+			}
 			required := tc.features.Set()
 			supported := supportedFeatures.Set()
 			missing := required.Difference(supported)

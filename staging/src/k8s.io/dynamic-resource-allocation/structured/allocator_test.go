@@ -28,6 +28,7 @@ import (
 
 func TestAllocator(t *testing.T) {
 	allocatortesting.TestAllocator(t,
+		internal.Experimental,
 		internal.FeaturesAll,
 		func(
 			ctx context.Context,
