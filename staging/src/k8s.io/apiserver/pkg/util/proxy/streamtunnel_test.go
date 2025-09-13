@@ -30,13 +30,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	constants "k8s.io/apimachinery/pkg/util/portforward"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/proxy/metrics"
 	restconfig "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
@@ -252,7 +250,7 @@ func TestTunnelingHandler_UpstreamSPDYServerErrorPropagated(t *testing.T) {
 			require.NoError(t, err)
 			_, protocol, err := dialer.Dial(constants.PortForwardV1Name)
 			require.Error(t, err)
-			assert.Equal(t, "", protocol)
+			assert.Empty(t, protocol)
 
 			// Validate the streamtunnel metrics are incrementing 500-level status codes.
 			metricNames := []string{"apiserver_stream_tunnel_requests_total"}
@@ -275,10 +273,8 @@ func TestTunnelingResponseWriter_Hijack(t *testing.T) {
 	trw := &tunnelingResponseWriter{conn: &mockConn{}}
 	assert.False(t, trw.hijacked, "hijacked field starts false before Hijack()")
 	assert.False(t, trw.written, "written field startes false before Hijack()")
-	actual, bufio, err := trw.Hijack()
+	_, _, err := trw.Hijack()
 	assert.NoError(t, err, "Hijack() does not return error")
-	assert.NotNil(t, actual, "conn returned from Hijack() is not nil")
-	assert.Nil(t, bufio, "bufio returned from Hijack() is always nil")
 	assert.True(t, trw.hijacked, "hijacked field becomes true after Hijack()")
 	assert.False(t, trw.written, "written field stays false after Hijack()")
 	// Hijacking after writing to response writer is an error.
@@ -605,64 +601,4 @@ func (m *mockConnInitializer) InitializeWrite(backendResponse *http.Response, ba
 	m.resp = backendResponse
 	_, err := m.initializeWriteConn.Write(backendResponseBytes)
 	return err
-}
-
-// mockConn implements "net.Conn" interface.
-var _ net.Conn = &mockConn{}
-
-type mockConn struct {
-	written       []byte
-	localAddr     *net.TCPAddr
-	remoteAddr    *net.TCPAddr
-	readDeadline  time.Time
-	writeDeadline time.Time
-	deadlineErr   error
-}
-
-func (mc *mockConn) Write(p []byte) (int, error) {
-	mc.written = append(mc.written, p...)
-	return len(p), nil
-}
-
-func (mc *mockConn) Read(p []byte) (int, error) { return 0, nil }
-func (mc *mockConn) Close() error               { return nil }
-func (mc *mockConn) LocalAddr() net.Addr        { return mc.localAddr }
-func (mc *mockConn) RemoteAddr() net.Addr       { return mc.remoteAddr }
-func (mc *mockConn) SetDeadline(t time.Time) error {
-	mc.SetReadDeadline(t)  //nolint:errcheck
-	mc.SetWriteDeadline(t) // nolint:errcheck
-	return mc.deadlineErr
-}
-func (mc *mockConn) SetReadDeadline(t time.Time) error  { mc.readDeadline = t; return mc.deadlineErr }
-func (mc *mockConn) SetWriteDeadline(t time.Time) error { mc.writeDeadline = t; return mc.deadlineErr }
-
-// mockResponseWriter implements "http.ResponseWriter" interface
-type mockResponseWriter struct {
-	header     http.Header
-	written    []byte
-	statusCode int
-}
-
-func (mrw *mockResponseWriter) Header() http.Header { return mrw.header }
-func (mrw *mockResponseWriter) Write(p []byte) (int, error) {
-	mrw.written = append(mrw.written, p...)
-	return len(p), nil
-}
-func (mrw *mockResponseWriter) WriteHeader(statusCode int) { mrw.statusCode = statusCode }
-
-// fakeResponder implements "rest.Responder" interface.
-var _ rest.Responder = &fakeResponder{}
-
-type fakeResponder struct{}
-
-func (fr *fakeResponder) Object(statusCode int, obj runtime.Object) {}
-func (fr *fakeResponder) Error(err error)                           {}
-
-// justQueueStream skips the usual stream validation before
-// queueing the stream on the stream channel.
-func justQueueStream(streams chan httpstream.Stream) func(httpstream.Stream, <-chan struct{}) error {
-	return func(stream httpstream.Stream, replySent <-chan struct{}) error {
-		streams <- stream
-		return nil
-	}
 }

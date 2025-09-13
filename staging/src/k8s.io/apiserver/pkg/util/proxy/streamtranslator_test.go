@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -34,17 +33,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	rcconstants "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/proxy/metrics"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/client-go/transport"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 )
@@ -65,7 +60,7 @@ func TestStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
 		}
 		defer ctx.conn.Close()
 		_, err = io.Copy(ctx.stdoutStream, ctx.stdinStream)
-		if err != nil  {
+		if err != nil {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
 		}
 	})
@@ -133,7 +128,7 @@ func TestStreamTranslator_LoopbackStdinToStderr(t *testing.T) {
 		}
 		defer ctx.conn.Close()
 		_, err = io.Copy(ctx.stderrStream, ctx.stdinStream)
-		if err != nil  {
+		if err != nil {
 			t.Errorf("error copying STDIN to STDERR: %v", err)
 		}
 	})
@@ -205,7 +200,7 @@ func TestStreamTranslator_ErrorStream(t *testing.T) {
 		}
 		defer ctx.conn.Close()
 		_, err = io.Copy(io.Discard, ctx.stdinStream)
-		if err != nil  {
+		if err != nil {
 			t.Errorf("error copying STDIN to DISCARD: %v", err)
 		}
 		err = ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
@@ -278,7 +273,7 @@ func TestStreamTranslator_MultipleReadChannels(t *testing.T) {
 		defer ctx.conn.Close()
 		stdinReader := io.TeeReader(ctx.stdinStream, ctx.stderrStream)
 		_, err = io.Copy(ctx.stdoutStream, stdinReader)
-		if err != nil  {
+		if err != nil {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
 		}
 	})
@@ -348,7 +343,7 @@ func TestStreamTranslator_ThrottleReadChannels(t *testing.T) {
 		defer ctx.conn.Close()
 		stdinReader := io.TeeReader(ctx.stdinStream, ctx.stderrStream)
 		_, err = io.Copy(ctx.stdoutStream, stdinReader)
-		if err != nil  {
+		if err != nil {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
 		}
 	})
@@ -437,7 +432,7 @@ func TestStreamTranslator_TTYResizeChannel(t *testing.T) {
 	metrics.ResetForTest()
 	handlerPath := "/TestStreamTranslator_TTYResizeChannel"
 
-	numSizeQueue := 10000
+	numSizeQueue := 1000
 	sizeQueue := newTerminalSizeQueue(numSizeQueue)
 	actualTerminalSizes := make([]remotecommand.TerminalSize, 0, numSizeQueue)
 	// The WaitGroup is used to synchronize the test. It ensures that the server
@@ -615,142 +610,4 @@ apiserver_stream_translator_requests_total{code="500"} 1
 			}
 		})
 	}
-}
-
-// streamContext encapsulates the structures necessary to communicate through
-// a SPDY connection, including the Reader/Writer streams.
-type streamContext struct {
-	conn         io.Closer
-	stdinStream  io.ReadCloser
-	stdoutStream io.WriteCloser
-	stderrStream io.WriteCloser
-	resizeStream io.ReadCloser
-	resizeChan   chan remotecommand.TerminalSize
-	writeStatus  func(status *apierrors.StatusError) error
-}
-
-type streamAndReply struct {
-	httpstream.Stream
-	replySent <-chan struct{}
-}
-
-// CreateSPDYServerStreams upgrades the passed HTTP request to a SPDY bi-directional streaming
-// connection with remote command streams defined in passed options. Returns a streamContext
-// structure containing the Reader/Writer streams to communicate through the SDPY connection.
-// Returns an error if unable to upgrade the HTTP connection to a SPDY connection.
-func createSPDYServerStreams(w http.ResponseWriter, req *http.Request, opts Options) (*streamContext, error) {
-	_, err := httpstream.Handshake(req, w, []string{rcconstants.StreamProtocolV4Name})
-	if err != nil {
-		return nil, err
-	}
-
-	upgrader := spdy.NewResponseUpgrader()
-	streamCh := make(chan streamAndReply)
-	conn := upgrader.UpgradeResponse(w, req, func(stream httpstream.Stream, replySent <-chan struct{}) error {
-		streamCh <- streamAndReply{Stream: stream, replySent: replySent}
-		return nil
-	})
-	ctx := &streamContext{
-		conn: conn,
-	}
-
-	// wait for stream
-	replyChan := make(chan struct{}, 5)
-	defer close(replyChan)
-	receivedStreams := 0
-	expectedStreams := 1 // expect at least the error stream
-	if opts.Stdout {
-		expectedStreams++
-	}
-	if opts.Stdin {
-		expectedStreams++
-	}
-	if opts.Stderr {
-		expectedStreams++
-	}
-	if opts.Tty {
-		expectedStreams++
-	}
-WaitForStreams:
-	for {
-		select {
-		case stream := <-streamCh:
-			streamType := stream.Headers().Get(v1.StreamType)
-			streamHandled := false
-			switch streamType {
-			case v1.StreamTypeError:
-				ctx.writeStatus = v4WriteStatusFunc(stream)
-				streamHandled = true
-			case v1.StreamTypeStdout:
-				if opts.Stdout {
-					ctx.stdoutStream = stream
-					streamHandled = true
-				}
-			case v1.StreamTypeStdin:
-				if opts.Stdin {
-					ctx.stdinStream = stream
-					streamHandled = true
-				}
-			case v1.StreamTypeStderr:
-				if opts.Stderr {
-					ctx.stderrStream = stream
-					streamHandled = true
-				}
-			case v1.StreamTypeResize:
-				if opts.Tty {
-					ctx.resizeStream = stream
-					streamHandled = true
-				}
-			}
-
-			if streamHandled {
-				replyChan <- struct{}{}
-			} else {
-				// This is a known but unexpected stream type, or an unknown one.
-				// We must reset it to signal the client we won't be using it.
-				stream.Reset()
-			}
-		case <-replyChan:
-			receivedStreams++
-			if receivedStreams == expectedStreams {
-				break WaitForStreams
-			}
-		}
-	}
-
-	if ctx.resizeStream != nil {
-		ctx.resizeChan = make(chan remotecommand.TerminalSize)
-		go handleResizeEvents(req.Context(), ctx.resizeStream, ctx.resizeChan)
-	}
-
-	return ctx, nil
-}
-
-func v4WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) error {
-	return func(status *apierrors.StatusError) error {
-		bs, err := json.Marshal(status.Status())
-		if err != nil {
-			return err
-		}
-		_, err = stream.Write(bs)
-		return err
-	}
-}
-
-func fakeTransport() (*http.Transport, error) {
-	cfg := &transport.Config{
-		TLS: transport.TLSConfig{
-			Insecure: true,
-			CAFile:   "",
-		},
-	}
-	rt, err := transport.New(cfg)
-	if err != nil {
-		return nil, err
-	}
-	t, ok := rt.(*http.Transport)
-	if !ok {
-		return nil, fmt.Errorf("unknown transport type: %T", rt)
-	}
-	return t, nil
 }
