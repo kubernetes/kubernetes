@@ -1476,11 +1476,12 @@ func waitForSomePersistentVolumeClaimPhase(ctx context.Context, testClient clien
 				klog.Info("Recreating a watch for claims and re-checking the count of bound claims")
 				newWatchPVC, err := testClient.CoreV1().PersistentVolumeClaims(namespace).Watch(ctx, metav1.ListOptions{})
 				if err != nil {
+					klog.Errorf("Failed to recreate watch for claims: %v", err)
 					return false, err
 				}
 				watchPVC.Stop()
 				watchPVC = newWatchPVC
-				return false, waitErr
+				return false, nil
 			}
 			klog.V(1).Infof("%d claims bound", i+1)
 		}
