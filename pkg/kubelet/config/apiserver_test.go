@@ -141,7 +141,11 @@ func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/blah"}}}}
 
 	// Setup fake api client.
-	fakeWatch := watch.NewFake()
+	fakeWatch := watch.NewFakeWithChanSize(3, false)
+	fakeWatch.Add(&pod1)
+	fakeWatch.Add(&pod2)
+	fakeWatch.Action(watch.Bookmark, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "q", Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"}}})
+
 	lw := fakePodLW{
 		listResp:  &v1.PodList{Items: []v1.Pod{pod1, pod2}},
 		watchResp: fakeWatch,
