@@ -375,6 +375,9 @@ func NewPriorityQueue(
 		backoffQPopper = backoffQ
 	}
 	pq.activeQ = newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](lessConverted), metrics.NewActivePodsRecorder()), isSchedulingQueueHintEnabled, options.metricsRecorder, backoffQPopper)
+	if bq, ok := pq.backoffQ.(*backoffQueue); ok {
+		bq.setNotifyFunc(func() { pq.activeQ.tryNotify() })
+	}
 	pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
 	pq.nominator = newPodNominator(options.podLister)
 
