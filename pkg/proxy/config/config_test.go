@@ -125,6 +125,7 @@ func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []*
 }
 
 func TestNewServiceAddedAndNotified(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
@@ -150,6 +151,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 }
 
 func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
@@ -187,6 +189,7 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 }
 
 func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
@@ -305,6 +308,7 @@ func (h *EndpointSliceHandlerMock) ValidateEndpointSlices(t *testing.T, expected
 }
 
 func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
@@ -352,6 +356,7 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 }
 
 func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
@@ -508,6 +513,7 @@ func (h *NodeHandlerMock) ValidateNodes(t *testing.T, expectedNodes []*v1.Node) 
 }
 
 func TestNewNodesMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
@@ -657,6 +663,7 @@ func (h *ServiceCIDRHandlerMock) ValidateServiceCIDRs(t *testing.T, expectedServ
 }
 
 func TestNewServiceCIDRsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
@@ -746,6 +753,7 @@ func waitForInvocation(invoked <-chan struct{}) error {
 }
 
 func TestNewNodeTopologyConfig(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewClientset()
 	fakeWatch := watch.NewFake()

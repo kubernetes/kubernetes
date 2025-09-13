@@ -35,6 +35,7 @@ import (
 )
 
 func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	_, ctx := klogtesting.NewTestContext(t)
 	service1v1 := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
@@ -85,6 +86,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 }
 
 func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	_, ctx := klogtesting.NewTestContext(t)
 	endpoints1v1 := &discoveryv1.EndpointSlice{
 		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
