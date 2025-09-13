@@ -70,8 +70,17 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return nil
 			}
 			// call field-attached validations
+<<<<<<< HEAD
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
+=======
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.ImmutableByCompare); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+>>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			return
@@ -85,8 +94,17 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return nil
 			}
 			// call field-attached validations
+<<<<<<< HEAD
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
+=======
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.ImmutableByCompare); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+>>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
@@ -102,8 +120,17 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return nil
 			}
 			// call field-attached validations
+<<<<<<< HEAD
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
+=======
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.ImmutableByReflect); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+>>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			return
@@ -117,8 +144,17 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return nil
 			}
 			// call field-attached validations
+<<<<<<< HEAD
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
+=======
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.ImmutableByReflect); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+>>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
@@ -134,8 +170,17 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return nil
 			}
 			// call field-attached validations
+<<<<<<< HEAD
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
+=======
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.ImmutableByCompare); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+>>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			return
@@ -149,8 +194,17 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return nil
 			}
 			// call field-attached validations
+<<<<<<< HEAD
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
+=======
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.ImmutableByCompare); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+>>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
@@ -166,8 +220,17 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return nil
 			}
 			// call field-attached validations
+<<<<<<< HEAD
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
+=======
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.ImmutableByReflect); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+>>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			// lists with set semantics require unique values

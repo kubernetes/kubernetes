@@ -1288,7 +1288,21 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 		if cohortName != "" {
 			sw.Do("func() { // cohort $.$\n", cohortName)
 		}
-		for _, v := range validations {
+
+		hasShortCircuits := false
+		lastShortCircuitIdx := -1
+		for i, v := range validations {
+			if v.Flags.IsSet(validators.ShortCircuit) {
+				hasShortCircuits = true
+				lastShortCircuitIdx = i
+			}
+		}
+
+		if hasShortCircuits {
+			sw.Do("earlyReturn := false\n", nil)
+		}
+
+		for i, v := range validations {
 			isShortCircuit := v.Flags.IsSet(validators.ShortCircuit)
 			isNonError := v.Flags.IsSet(validators.NonError)
 
@@ -1353,10 +1367,17 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				emitCall()
 				sw.Do("; len(e) != 0 {\n", nil)
 				if !isNonError {
-					sw.Do("errs = append(errs, e...)\n", nil)
+					sw.Do("  errs = append(errs, e...)\n", nil)
 				}
-				sw.Do("    return // do not proceed\n", nil)
+				sw.Do("  earlyReturn = true\n", nil)
 				sw.Do("}\n", nil)
+
+				// Check for early return ONLY after the LAST short-circuit
+				if hasShortCircuits && i == lastShortCircuitIdx {
+					sw.Do("if earlyReturn {\n", nil)
+					sw.Do("  return // do not proceed\n", nil)
+					sw.Do("}\n", nil)
+				}
 			} else {
 				if isNonError {
 					emitCall()
