@@ -355,7 +355,7 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		checkDaemonSetPodsLabels(listDaemonPods(ctx, c, ns, label), firstHash)
 
 		ginkgo.By("Update daemon pods image.")
-		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, AgnhostImage)
+		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, PrevAgnhostImage)
 		ds, err = c.AppsV1().DaemonSets(ns).Patch(ctx, dsName, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 
