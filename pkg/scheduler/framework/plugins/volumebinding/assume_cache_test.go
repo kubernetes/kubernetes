@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2/ktesting"
@@ -64,354 +64,204 @@ func (i *testInformer) delete(obj interface{}) {
 	i.handler.OnDelete(obj)
 }
 
-func newTestPVCache(t *testing.T) (*testInformer, PVAssumeCache) {
-	logger, _ := ktesting.NewTestContext(t)
-	informer := &testInformer{
-		indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{}),
-		t:       t,
-	}
-	cache, err := NewPVAssumeCache(logger, informer)
+func verifyList(t *testing.T, cache testCache, expected map[string]*testObj, indexedValue string) {
+	t.Helper()
+	got, err := cache.ByIndex(testIndex, indexedValue)
 	if err != nil {
-		t.Fatalf("NewPVAssumeCache() failed: %v", err)
+		t.Fatalf("failed to get indexed objects: %v", err)
 	}
-	return informer, cache
-}
-
-func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {
-	pvList, err := cache.ListPVs(storageClassName)
-	if err != nil {
-		t.Errorf("ListPVs() failed: %v", err)
+	if len(got) != len(expected) {
+		t.Errorf("ByIndex() returned %v objects, expected %v", len(got), len(expected))
 	}
-	if len(pvList) != len(expectedPVs) {
-		t.Errorf("ListPVs() returned %v PVs, expected %v", len(pvList), len(expectedPVs))
-	}
-	for _, pv := range pvList {
-		expectedPV, ok := expectedPVs[pv.Name]
+	for _, obj := range got {
+		expected, ok := expected[obj.Name]
 		if !ok {
-			t.Errorf("ListPVs() returned unexpected PV %q", pv.Name)
+			t.Errorf("ByIndex() returned unexpected object %q", obj.Name)
 		}
-		if expectedPV != pv {
-			t.Errorf("ListPVs() returned PV %p, expected %p", pv, expectedPV)
+		if expected != obj {
+			t.Errorf("ByIndex() returned object %p, expected %p", obj, expected)
 		}
 	}
 }
 
-func verifyPV(cache PVAssumeCache, name string, expectedPV *v1.PersistentVolume) error {
-	pv, err := cache.Get(name)
-	if err != nil {
-		return err
-	}
-	if pv != expectedPV {
-		return fmt.Errorf("Get() returned %p, expected %p", pv, expectedPV)
-	}
-	return nil
-}
-
-func TestAssumePV(t *testing.T) {
-	scenarios := map[string]struct {
-		oldPV         *v1.PersistentVolume
-		newPV         *v1.PersistentVolume
-		shouldSucceed bool
-	}{
-		"success-same-version": {
-			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			shouldSucceed: true,
-		},
-		"success-storageclass-same-version": {
-			oldPV:         makePV("pv1", "class1").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "class1").withVersion("5").PersistentVolume,
-			shouldSucceed: true,
-		},
-		"fail-new-higher-version": {
-			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("6").PersistentVolume,
-			shouldSucceed: false,
-		},
-		"fail-old-not-found": {
-			oldPV:         makePV("pv2", "").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			shouldSucceed: false,
-		},
-		"fail-new-lower-version": {
-			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("4").PersistentVolume,
-			shouldSucceed: false,
-		},
-		"fail-new-bad-version": {
-			oldPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("a").PersistentVolume,
-			shouldSucceed: false,
-		},
-		"fail-old-bad-version": {
-			oldPV:         makePV("pv1", "").withVersion("a").PersistentVolume,
-			newPV:         makePV("pv1", "").withVersion("5").PersistentVolume,
-			shouldSucceed: false,
-		},
-	}
-
-	for name, scenario := range scenarios {
-		t.Run(name, func(t *testing.T) {
-			informer, cache := newTestPVCache(t)
-			// Add oldPV to cache
-			informer.add(scenario.oldPV)
-			if err := verifyPV(cache, scenario.oldPV.Name, scenario.oldPV); err != nil {
-				t.Fatalf("Failed to Get() after initial update: %v", err)
-			}
-
-			// Assume newPV
-			err := cache.Assume(scenario.newPV)
-			if scenario.shouldSucceed && err != nil {
-				t.Errorf("Test %q failed: Assume() returned error %v", name, err)
-			}
-			if !scenario.shouldSucceed && err == nil {
-				t.Errorf("Test %q failed: Assume() returned success but expected error", name)
-			}
-
-			// Check that Get returns correct PV
-			expectedPV := scenario.newPV
-			if !scenario.shouldSucceed {
-				expectedPV = scenario.oldPV
-			}
-			if err := verifyPV(cache, scenario.oldPV.Name, expectedPV); err != nil {
-				t.Errorf("Failed to Get() after initial update: %v", err)
-			}
-		})
-	}
-}
-
-func TestRestorePV(t *testing.T) {
-	informer, cache := newTestPVCache(t)
-
-	oldPV := makePV("pv1", "").withVersion("5").PersistentVolume
-	newPV := makePV("pv1", "").withVersion("5").PersistentVolume
-
-	// Restore PV that doesn't exist
-	cache.Restore(&v1.PersistentVolume{})
-
-	// Add oldPV to cache
-	informer.add(oldPV)
-	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
-		t.Fatalf("Failed to Get() after initial update: %v", err)
-	}
-
-	// Restore PV
-	cache.Restore(oldPV)
-	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
-		t.Fatalf("Failed to Get() after initial restore: %v", err)
-	}
-
-	// Assume newPV
-	if err := cache.Assume(newPV); err != nil {
-		t.Fatalf("Assume() returned error %v", err)
-	}
-	if err := verifyPV(cache, oldPV.Name, newPV); err != nil {
-		t.Fatalf("Failed to Get() after Assume: %v", err)
-	}
-
-	// Restore PV
-	cache.Restore(newPV)
-	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
-		t.Fatalf("Failed to Get() after restore: %v", err)
-	}
-}
-
-func TestBasicPVCache(t *testing.T) {
-	informer, cache := newTestPVCache(t)
+func TestBasicCache(t *testing.T) {
+	informer, cache := newTestCache(t)
 
 	// Get object that doesn't exist
-	pv, err := cache.Get("nothere")
+	obj, err := cache.Get("nothere")
 	if err == nil {
 		t.Errorf("Get() returned unexpected success")
 	}
-	if pv != nil {
-		t.Errorf("Get() returned unexpected PV %q", pv.Name)
+	if obj != nil {
+		t.Errorf("Get() returned unexpected PV %q", obj.Name)
 	}
 
-	// Add a bunch of PVs
-	pvs := map[string]*v1.PersistentVolume{}
-	for i := 0; i < 10; i++ {
-		pv := makePV(fmt.Sprintf("test-pv%v", i), "").withVersion("1").PersistentVolume
-		pvs[pv.Name] = pv
-		informer.add(pv)
+	// Add a bunch of objects
+	objects := map[string]*testObj{}
+	for i := range 10 {
+		obj := makeObj(fmt.Sprintf("test-%v", i), "1", "")
+		objects[obj.Name] = obj
+		informer.add(obj)
 	}
 
 	// List them
-	verifyListPVs(t, cache, pvs, "")
+	verifyList(t, cache, objects, "")
 
-	// Update a PV
-	updatedPV := makePV("test-pv3", "").withVersion("2").PersistentVolume
-	informer.update(pvs["test-pv3"], updatedPV)
-	pvs[updatedPV.Name] = updatedPV
+	// Update an object
+	updated := makeObj("test-3", "1", "")
+	informer.update(objects["test-3"], updated)
+	objects[updated.Name] = updated
 
 	// List them
-	verifyListPVs(t, cache, pvs, "")
+	verifyList(t, cache, objects, "")
 
-	// Delete a PV
-	deletedPV := pvs["test-pv7"]
-	delete(pvs, deletedPV.Name)
+	// Delete an object
+	deleted := objects["test-7"]
+	delete(objects, deleted.Name)
+	informer.delete(deleted)
+
+	// List them
+	verifyList(t, cache, objects, "")
+}
+
+func TestPVCacheWithIndex(t *testing.T) {
+	informer, cache := newTestCache(t)
+
+	// Add a bunch of objects
+	objects1 := map[string]*testObj{}
+	for i := range 10 {
+		obj := makeObj(fmt.Sprintf("test-%v", i), "1", "")
+		obj.Annotations["test"] = "test1"
+		objects1[obj.Name] = obj
+		informer.add(obj)
+	}
+
+	// Add a bunch of objects
+	objects2 := map[string]*testObj{}
+	for i := range 10 {
+		obj := makeObj(fmt.Sprintf("test2-%v", i), "1", "")
+		obj.Annotations["test"] = "test2"
+		objects2[obj.Name] = obj
+		informer.add(obj)
+	}
+
+	// List them
+	verifyList(t, cache, objects1, "test1")
+	verifyList(t, cache, objects2, "test2")
+
+	// Update an object
+	updated := makeObj("test-3", "2", "")
+	updated.Annotations["test"] = "test1"
+	informer.update(objects1[updated.Name], updated)
+	objects1[updated.Name] = updated
+
+	// List them
+	verifyList(t, cache, objects1, "test1")
+	verifyList(t, cache, objects2, "test2")
+
+	// Delete an object
+	deletedPV := objects1["test-7"]
+	delete(objects1, deletedPV.Name)
 	informer.delete(deletedPV)
 
 	// List them
-	verifyListPVs(t, cache, pvs, "")
+	verifyList(t, cache, objects1, "test1")
+	verifyList(t, cache, objects2, "test2")
 }
 
-func TestPVCacheWithStorageClasses(t *testing.T) {
-	informer, cache := newTestPVCache(t)
+type testObj = metav1.ObjectMeta
 
-	// Add a bunch of PVs
-	pvs1 := map[string]*v1.PersistentVolume{}
-	for i := 0; i < 10; i++ {
-		pv := makePV(fmt.Sprintf("test-pv%v", i), "class1").withVersion("1").PersistentVolume
-		pvs1[pv.Name] = pv
-		informer.add(pv)
-	}
-
-	// Add a bunch of PVs
-	pvs2 := map[string]*v1.PersistentVolume{}
-	for i := 0; i < 10; i++ {
-		pv := makePV(fmt.Sprintf("test2-pv%v", i), "class2").withVersion("1").PersistentVolume
-		pvs2[pv.Name] = pv
-		informer.add(pv)
-	}
-
-	// List them
-	verifyListPVs(t, cache, pvs1, "class1")
-	verifyListPVs(t, cache, pvs2, "class2")
-
-	// Update a PV
-	updatedPV := makePV("test-pv3", "class1").withVersion("2").PersistentVolume
-	informer.update(pvs1[updatedPV.Name], updatedPV)
-	pvs1[updatedPV.Name] = updatedPV
-
-	// List them
-	verifyListPVs(t, cache, pvs1, "class1")
-	verifyListPVs(t, cache, pvs2, "class2")
-
-	// Delete a PV
-	deletedPV := pvs1["test-pv7"]
-	delete(pvs1, deletedPV.Name)
-	informer.delete(deletedPV)
-
-	// List them
-	verifyListPVs(t, cache, pvs1, "class1")
-	verifyListPVs(t, cache, pvs2, "class2")
-}
-
-func TestAssumeUpdatePVCache(t *testing.T) {
-	informer, cache := newTestPVCache(t)
-
-	pvName := "test-pv0"
-
-	// Add a PV
-	pv := makePV(pvName, "").withVersion("1").PersistentVolume
-	informer.add(pv)
-	if err := verifyPV(cache, pvName, pv); err != nil {
-		t.Fatalf("failed to get PV: %v", err)
-	}
-
-	// Assume PV
-	newPV := pv.DeepCopy()
-	newPV.Spec.ClaimRef = &v1.ObjectReference{Name: "test-claim"}
-	if err := cache.Assume(newPV); err != nil {
-		t.Fatalf("failed to assume PV: %v", err)
-	}
-	if err := verifyPV(cache, pvName, newPV); err != nil {
-		t.Fatalf("failed to get PV after assume: %v", err)
-	}
-
-	// Add old PV (resync)
-	informer.add(pv)
-	if err := verifyPV(cache, pvName, newPV); err != nil {
-		t.Fatalf("failed to get PV after old PV added: %v", err)
+func makeObj(name, version, namespace string) *testObj {
+	return &testObj{
+		Name:            name,
+		Namespace:       namespace,
+		ResourceVersion: version,
+		Annotations:     map[string]string{},
 	}
 }
 
-func makeClaim(name, version, namespace string) *v1.PersistentVolumeClaim {
-	return &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
-			Namespace:       namespace,
-			ResourceVersion: version,
-			Annotations:     map[string]string{},
-		},
-	}
-}
+type testCache = *passiveAssumeCache[*testObj]
 
-func verifyPVC(cache PVCAssumeCache, pvcKey string, expectedPVC *v1.PersistentVolumeClaim) error {
-	pvc, err := cache.Get(pvcKey)
+func verifyObj(cache testCache, key string, expected *testObj) error {
+	obj, err := cache.Get(key)
 	if err != nil {
 		return err
 	}
-	if pvc != expectedPVC {
-		return fmt.Errorf("Get() returned %p, expected %p", pvc, expectedPVC)
+	if obj != expected {
+		return fmt.Errorf("Get() returned %p, expected %p", obj, expected)
 	}
 	return nil
 }
 
-func newTestPVCCache(t *testing.T) (*testInformer, PVCAssumeCache) {
+const testIndex = "testIndex"
+
+func newTestCache(t *testing.T) (*testInformer, testCache) {
 	logger, _ := ktesting.NewTestContext(t)
 	informer := &testInformer{
-		indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{}),
-		t:       t,
+		indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+			testIndex: func(obj interface{}) ([]string, error) {
+				return []string{obj.(*testObj).Annotations["test"]}, nil
+			},
+		}),
+		t: t,
 	}
-	cache, err := NewPVCAssumeCache(logger, informer)
+	cache, err := newAssumeCache[*testObj](logger, informer, schema.GroupResource{Resource: "tests"})
 	if err != nil {
-		t.Fatalf("NewPVCAssumeCache() failed: %v", err)
+		t.Fatalf("newAssumeCache() failed: %v", err)
 	}
 	return informer, cache
 }
 
-func TestAssumePVC(t *testing.T) {
+func TestAssume(t *testing.T) {
 	scenarios := map[string]struct {
-		oldPVC        *v1.PersistentVolumeClaim
-		newPVC        *v1.PersistentVolumeClaim
+		old           *testObj
+		new           *testObj
 		shouldSucceed bool
 	}{
 		"success-same-version": {
-			oldPVC:        makeClaim("pvc1", "5", "ns1"),
-			newPVC:        makeClaim("pvc1", "5", "ns1"),
+			old:           makeObj("pvc1", "5", "ns1"),
+			new:           makeObj("pvc1", "5", "ns1"),
 			shouldSucceed: true,
 		},
 		"fail-new-higher-version": {
-			oldPVC:        makeClaim("pvc1", "5", "ns1"),
-			newPVC:        makeClaim("pvc1", "6", "ns1"),
+			old:           makeObj("pvc1", "5", "ns1"),
+			new:           makeObj("pvc1", "6", "ns1"),
 			shouldSucceed: false,
 		},
 		"fail-old-not-found": {
-			oldPVC:        makeClaim("pvc2", "5", "ns1"),
-			newPVC:        makeClaim("pvc1", "5", "ns1"),
+			old:           makeObj("pvc2", "5", "ns1"),
+			new:           makeObj("pvc1", "5", "ns1"),
 			shouldSucceed: false,
 		},
 		"fail-new-lower-version": {
-			oldPVC:        makeClaim("pvc1", "5", "ns1"),
-			newPVC:        makeClaim("pvc1", "4", "ns1"),
+			old:           makeObj("pvc1", "5", "ns1"),
+			new:           makeObj("pvc1", "4", "ns1"),
 			shouldSucceed: false,
 		},
 		"fail-new-bad-version": {
-			oldPVC:        makeClaim("pvc1", "5", "ns1"),
-			newPVC:        makeClaim("pvc1", "a", "ns1"),
+			old:           makeObj("pvc1", "5", "ns1"),
+			new:           makeObj("pvc1", "a", "ns1"),
 			shouldSucceed: false,
 		},
 		"fail-old-bad-version": {
-			oldPVC:        makeClaim("pvc1", "a", "ns1"),
-			newPVC:        makeClaim("pvc1", "5", "ns1"),
+			old:           makeObj("pvc1", "a", "ns1"),
+			new:           makeObj("pvc1", "5", "ns1"),
 			shouldSucceed: false,
 		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			informer, cache := newTestPVCCache(t)
+			informer, cache := newTestCache(t)
 
-			// Add oldPVC to cache
-			informer.add(scenario.oldPVC)
-			if err := verifyPVC(cache, getPVCName(scenario.oldPVC), scenario.oldPVC); err != nil {
+			// Add old to cache
+			informer.add(scenario.old)
+			if err := verifyObj(cache, keyOf(scenario.old), scenario.old); err != nil {
 				t.Fatalf("Failed to Get() after initial update: %v", err)
 			}
 
-			// Assume newPVC
-			err := cache.Assume(scenario.newPVC)
+			// Assume new
+			err := cache.Assume(scenario.new)
 			if scenario.shouldSucceed && err != nil {
 				t.Errorf("Test %q failed: Assume() returned error %v", name, err)
 			}
@@ -419,142 +269,136 @@ func TestAssumePVC(t *testing.T) {
 				t.Errorf("Test %q failed: Assume() returned success but expected error", name)
 			}
 
-			// Check that Get returns correct PVC
-			expectedPV := scenario.newPVC
+			// Check that Get returns correct version
+			expectedPV := scenario.new
 			if !scenario.shouldSucceed {
-				expectedPV = scenario.oldPVC
+				expectedPV = scenario.old
 			}
-			if err := verifyPVC(cache, getPVCName(scenario.oldPVC), expectedPV); err != nil {
+			if err := verifyObj(cache, keyOf(scenario.old), expectedPV); err != nil {
 				t.Errorf("Failed to Get() after initial update: %v", err)
 			}
 		})
 	}
 }
 
-func TestRestorePVC(t *testing.T) {
-	informer, cache := newTestPVCCache(t)
+func TestRestore(t *testing.T) {
+	informer, cache := newTestCache(t)
 
-	oldPVC := makeClaim("pvc1", "5", "ns1")
-	newPVC := makeClaim("pvc1", "5", "ns1")
+	old := makeObj("pvc1", "5", "ns1")
+	new := makeObj("pvc1", "5", "ns1")
 
-	// Restore PVC that doesn't exist
-	cache.Restore(&v1.PersistentVolumeClaim{})
+	// Restore object that doesn't exist
+	cache.Restore(&testObj{})
 
-	// Add oldPVC to cache
-	informer.add(oldPVC)
-	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
+	// Add old to cache
+	informer.add(old)
+	if err := verifyObj(cache, keyOf(old), old); err != nil {
 		t.Fatalf("Failed to Get() after initial update: %v", err)
 	}
 
-	// Restore PVC
-	cache.Restore(oldPVC)
-	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
+	// Restore
+	cache.Restore(old)
+	if err := verifyObj(cache, keyOf(old), old); err != nil {
 		t.Fatalf("Failed to Get() after initial restore: %v", err)
 	}
 
-	// Assume newPVC
-	if err := cache.Assume(newPVC); err != nil {
+	// Assume new
+	if err := cache.Assume(new); err != nil {
 		t.Fatalf("Assume() returned error %v", err)
 	}
-	if err := verifyPVC(cache, getPVCName(oldPVC), newPVC); err != nil {
+	if err := verifyObj(cache, keyOf(old), new); err != nil {
 		t.Fatalf("Failed to Get() after Assume: %v", err)
 	}
 
-	// Restore PVC
-	cache.Restore(newPVC)
-	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
+	// Restore
+	cache.Restore(new)
+	if err := verifyObj(cache, keyOf(old), old); err != nil {
 		t.Fatalf("Failed to Get() after restore: %v", err)
 	}
 }
 
-func TestConcurrentAssumePVC(t *testing.T) {
-	informer, cache := newTestPVCCache(t)
+func TestConcurrentAssume(t *testing.T) {
+	informer, cache := newTestCache(t)
 
-	pvc1 := makeClaim("pvc1", "5", "ns1")
-	pvc1Update := makeClaim("pvc1", "5", "ns1")
-	// Add PVC to cache
-	informer.add(pvc1)
+	obj1 := makeObj("pvc1", "5", "ns1")
+	obj1Update := makeObj("pvc1", "5", "ns1")
+	// Add object to cache
+	informer.add(obj1)
 
-	// Update PVC 1
-	if err := cache.Assume(pvc1Update); err != nil {
+	// Update obj 1
+	if err := cache.Assume(obj1Update); err != nil {
 		t.Fatalf("Assume() returned error %v", err)
 	}
-	if err := verifyPVC(cache, getPVCName(pvc1Update), pvc1Update); err != nil {
+	if err := verifyObj(cache, keyOf(obj1Update), obj1Update); err != nil {
 		t.Fatalf("Failed to Get() after Assume: %v", err)
 	}
 
-	pvc2 := makeClaim("pvc1", "7", "ns1")
-	pvc2Update := makeClaim("pvc1", "7", "ns1")
-	// PVC updated externally
-	informer.add(pvc2)
+	obj2 := makeObj("pvc1", "7", "ns1")
+	obj2Update := makeObj("pvc1", "7", "ns1")
+	// obj updated externally
+	informer.add(obj2)
 
-	// Update PVC 2
-	if err := cache.Assume(pvc2Update); err != nil {
+	// Update obj 2
+	if err := cache.Assume(obj2Update); err != nil {
 		t.Fatalf("Assume() returned error %v", err)
 	}
-	// PVC 1 failed with conflict
-	cache.Restore(pvc1Update)
-	// Should still have pvc 2 in cache
-	if err := verifyPVC(cache, getPVCName(pvc2Update), pvc2Update); err != nil {
+	// obj 1 failed with conflict
+	cache.Restore(obj1Update)
+	// Should still have obj 2 in cache
+	if err := verifyObj(cache, keyOf(obj2Update), obj2Update); err != nil {
 		t.Fatalf("Failed to Get() after restore: %v", err)
 	}
 }
 
-func TestAssumeUpdatePVCCache(t *testing.T) {
-	informer, cache := newTestPVCCache(t)
+func TestAssumeUpdateCache(t *testing.T) {
+	informer, cache := newTestCache(t)
 
-	pvcName := "test-pvc0"
-	pvcNamespace := "test-ns"
-
-	// Add a PVC
-	pvc := makeClaim(pvcName, "1", pvcNamespace)
-	informer.add(pvc)
-	if err := verifyPVC(cache, getPVCName(pvc), pvc); err != nil {
-		t.Fatalf("failed to get PVC: %v", err)
+	// Add a object
+	obj := makeObj("test-pvc0", "1", "test-ns")
+	informer.add(obj)
+	if err := verifyObj(cache, keyOf(obj), obj); err != nil {
+		t.Fatalf("failed to get: %v", err)
 	}
 
-	// Assume PVC
-	newPVC := pvc.DeepCopy()
-	newPVC.Annotations[volume.AnnSelectedNode] = "test-node"
-	if err := cache.Assume(newPVC); err != nil {
-		t.Fatalf("failed to assume PVC: %v", err)
+	// Assume
+	newObj := obj.DeepCopy()
+	newObj.Annotations[volume.AnnSelectedNode] = "test-node"
+	if err := cache.Assume(newObj); err != nil {
+		t.Fatalf("failed to assume: %v", err)
 	}
-	if err := verifyPVC(cache, getPVCName(pvc), newPVC); err != nil {
-		t.Fatalf("failed to get PVC after assume: %v", err)
+	if err := verifyObj(cache, keyOf(obj), newObj); err != nil {
+		t.Fatalf("failed to get after assume: %v", err)
 	}
 
-	// Add old PVC
-	informer.add(pvc)
-	if err := verifyPVC(cache, getPVCName(pvc), newPVC); err != nil {
-		t.Fatalf("failed to get PVC after old PVC added: %v", err)
+	// Add old
+	informer.add(obj)
+	if err := verifyObj(cache, keyOf(obj), newObj); err != nil {
+		t.Fatalf("failed to get after old added: %v", err)
 	}
 }
 
 func TestDelayedInformerEvent(t *testing.T) {
-	informer, cache := newTestPVCCache(t)
+	informer, cache := newTestCache(t)
 
-	pvcName := "test-pvc0"
-	pvcNamespace := "test-ns"
-
-	pvc1 := makeClaim(pvcName, "1", pvcNamespace)
-	pvc2 := makeClaim(pvcName, "2", pvcNamespace)
+	obj1 := makeObj("test-pvc0", "1", "test-ns")
+	obj2 := makeObj("test-pvc0", "2", "test-ns")
 	// Only add indexer, simulating delayed informer event
-	if err := informer.indexer.Add(pvc2); err != nil {
-		t.Fatalf("failed to add PVC: %v", err)
+	if err := informer.indexer.Add(obj2); err != nil {
+		t.Fatalf("failed to add: %v", err)
 	}
 
-	newPVC := pvc2.DeepCopy()
-	newPVC.Annotations[volume.AnnSelectedNode] = "test-node"
-	if err := cache.Assume(newPVC); err != nil {
-		t.Fatalf("failed to assume PVC: %v", err)
+	newObj := obj2.DeepCopy()
+	newObj.Annotations[volume.AnnSelectedNode] = "test-node"
+	if err := cache.Assume(newObj); err != nil {
+		t.Fatalf("failed to assume: %v", err)
 	}
 
 	// Send the delayed event
-	informer.handler.OnAdd(pvc1, false)
-	informer.handler.OnDelete(pvc1)
-	informer.handler.OnAdd(pvc2, false)
+	informer.handler.OnAdd(obj1, false)
+	informer.handler.OnDelete(obj1)
+	informer.handler.OnAdd(obj2, false)
 	// Expect assumed version not overwritten
-	if err := verifyPVC(cache, getPVCName(newPVC), newPVC); err != nil {
-		t.Fatalf("failed to get PVC after assume: %v", err)
+	if err := verifyObj(cache, keyOf(newObj), newObj); err != nil {
+		t.Fatalf("failed to get after assume: %v", err)
 	}
 }
