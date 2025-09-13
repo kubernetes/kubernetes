@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	testutils "k8s.io/kubernetes/test/utils"
 	ktesting "k8s.io/kubernetes/test/utils/ktesting"
@@ -208,6 +209,120 @@ func TestRunOp(t *testing.T) {
 			},
 			expectedFailure: true,
 		},
+		{
+			name: "Create Single Pod",
+			op: &createPodsOp{
+				Opcode: createPodsOpcode,
+				Count:  1,
+				// SkipWaitToCompletion is required as there's no scheduler in unit tests
+				SkipWaitToCompletion: true,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyNamespaceCreated("namespace-0"),
+				verifyCount(1),
+				verifyObj(
+					&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							GenerateName: "test-pod-",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "pause",
+									Image: "k8s.gcr.io/pause:3.9",
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("10m"),
+											v1.ResourceMemory: resource.MustParse("10Mi"),
+										},
+									},
+								},
+							},
+						},
+					}),
+			},
+		},
+		{
+			name: "Create Pods with Custom Namespace",
+			op: &createPodsOp{
+				Opcode:               createPodsOpcode,
+				Count:                1,
+				Namespace:            ptr.To("test-namespace"),
+				SkipWaitToCompletion: true,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyNamespaceCreated("test-namespace"),
+				verifyCount(1),
+			},
+		},
+		{
+			name: "Create Pods with Custom Template",
+			op: &createPodsOp{
+				Opcode:               createPodsOpcode,
+				Count:                1,
+				SkipWaitToCompletion: true,
+				PodTemplatePath: createObjTemplateFile(t,
+					&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							GenerateName: "custom-pod-",
+							Labels: map[string]string{
+								"test": "custom",
+							},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "custom",
+									Image: "k8s.gcr.io/pause:3.9",
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("20m"),
+											v1.ResourceMemory: resource.MustParse("20Mi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				),
+			},
+			verifyFuncs: []verifyFunc{
+				verifyNamespaceCreated("namespace-0"),
+				verifyCount(1),
+				verifyObj(
+					&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							GenerateName: "custom-pod-",
+							Labels: map[string]string{
+								"test": "custom",
+							},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "custom",
+									Image: "k8s.gcr.io/pause:3.9",
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("20m"),
+											v1.ResourceMemory: resource.MustParse("20Mi"),
+										},
+									},
+								},
+							},
+						},
+					}),
+			},
+		},
+		{
+			name: "Invalid Pod Template Path",
+			op: &createPodsOp{
+				Opcode:          createPodsOpcode,
+				Count:           1,
+				PodTemplatePath: ptr.To("non-existent-pod-template.json"),
+			},
+			expectedFailure: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -216,10 +331,50 @@ func TestRunOp(t *testing.T) {
 			client := fake.NewSimpleClientset()
 			tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
 
+			// Create a default Pod template for tests
+			defaultPodTemplate := createObjTemplateFile(t,
+				&v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: "test-pod-",
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "pause",
+								Image: "k8s.gcr.io/pause:3.9",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse("10m"),
+										v1.ResourceMemory: resource.MustParse("10Mi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			)
+
+			// Create testCase with default pod template
+			tc := &testCase{
+				DefaultPodTemplatePath: defaultPodTemplate,
+			}
+
+			// Create pod informer
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			podInformer := informerFactory.Core().V1().Pods()
+
+			// Start informer
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			informerFactory.Start(stopCh)
+			informerFactory.WaitForCacheSync(stopCh)
+
 			exec := &WorkloadExecutor{
 				tCtx:                         tCtx,
 				numPodsScheduledPerNamespace: make(map[string]int),
 				nextNodeIndex:                0,
+				testCase:                     tc,
+				podInformer:                  podInformer,
 			}
 
 			err := exec.runOp(tt.op, 0)
@@ -250,7 +405,7 @@ func TestRunOp(t *testing.T) {
 // matches the expected count based on the operation type.
 func verifyCount(expectedCount int) verifyFunc {
 	return func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
-		switch op.(type) {
+		switch opType := op.(type) {
 		case *createNodesOp:
 			nodes, err := tCtx.Client().CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			if err != nil {
@@ -258,6 +413,18 @@ func verifyCount(expectedCount int) verifyFunc {
 			}
 			if got := len(nodes.Items); got != expectedCount {
 				return fmt.Errorf("unexpected node count: got %d, want %d", got, expectedCount)
+			}
+		case *createPodsOp:
+			namespace := fmt.Sprintf("namespace-%d", 0) // default namespace pattern
+			if opType.Namespace != nil {
+				namespace = *opType.Namespace
+			}
+			pods, err := tCtx.Client().CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to list pods: %w", err)
+			}
+			if got := len(pods.Items); got != expectedCount {
+				return fmt.Errorf("unexpected pod count: got %d, want %d", got, expectedCount)
 			}
 		default:
 			return fmt.Errorf("verifyCount doesn't support this operation type: %T", op)
@@ -370,6 +537,40 @@ func verifyObj(expectedObj any) verifyFunc {
 			}
 			got = gotNodes
 			want = wantNodes
+		case *createPodsOp:
+			namespace := fmt.Sprintf("namespace-%d", 0) // default namespace pattern
+			if opDetails.Namespace != nil {
+				namespace = *opDetails.Namespace
+			}
+			podsList, listErr := tCtx.Client().CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{})
+			if listErr != nil {
+				return fmt.Errorf("failed to list pods: %w", listErr)
+			}
+			gotPods := podsList.Items
+
+			expectedPodTemplate, ok := expectedObj.(*v1.Pod)
+			if !ok {
+				return fmt.Errorf("expectedObj must be *v1.Pod when op is *createPodsOp, got %T", expectedObj)
+			}
+
+			wantPods := make([]v1.Pod, len(gotPods))
+			for i := range gotPods {
+				wantPods[i] = *expectedPodTemplate
+			}
+
+			cmpOpts = []cmp.Option{
+				cmpopts.EquateEmpty(),
+				cmpopts.IgnoreFields(metav1.ObjectMeta{},
+					"UID", "ResourceVersion", "Generation", "CreationTimestamp", "ManagedFields", "SelfLink", "Name",
+					"Labels", "Namespace",
+				),
+				cmpopts.IgnoreFields(v1.PodStatus{}, // This test isn't interested in these fields.
+					"Phase", "Conditions", "Message", "Reason", "NominatedNodeName",
+					"HostIP", "HostIPs", "PodIP", "PodIPs", "StartTime", "QOSClass", "ContainerStatuses",
+				),
+			}
+			got = gotPods
+			want = wantPods
 		default:
 			return fmt.Errorf("verifyObj doesn't support this operation type for cmp.Diff: %T", opDetails)
 		}
@@ -411,8 +612,23 @@ func createObjTemplateFile(t *testing.T, obj any) *string {
 		if err := json.NewEncoder(f).Encode(obj); err != nil {
 			t.Fatalf("Failed to encode the template to %s: %v", templateFile, err)
 		}
+	case *v1.Pod:
+		if err := json.NewEncoder(f).Encode(obj); err != nil {
+			t.Fatalf("Failed to encode the template to %s: %v", templateFile, err)
+		}
 	default:
 		t.Fatalf("Unsupported object type for template file: %T", obj)
 	}
 	return &templateFile
+}
+
+// verifyNamespaceCreated returns a verification function that checks if a namespace was created.
+func verifyNamespaceCreated(expectedNamespace string) verifyFunc {
+	return func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
+		_, err := tCtx.Client().CoreV1().Namespaces().Get(context.Background(), expectedNamespace, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("namespace %s was not created: %w", expectedNamespace, err)
+		}
+		return nil
+	}
 }
