@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -61,6 +62,7 @@ import (
 	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	token "k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
 )
@@ -101,6 +103,38 @@ type legacyProvider struct {
 	serviceNodePortAllocator         *portallocator.PortAllocator
 
 	startServiceNodePortsRepair, startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
+
+	saOnce sync.Once
+	saREST *serviceaccountstore.REST
+	saErr  error
+}
+
+// getServiceAccountREST initializes and returns a singleton ServiceAccount REST storage
+// for this kube-apiserver instance. It ensures that the storage is only created once
+// per instance
+func (p *legacyProvider) getServiceAccountREST(
+	optsGetter generic.RESTOptionsGetter,
+	issuer token.TokenGenerator,
+	auds authenticator.Audiences,
+	max time.Duration,
+	podStorage, secretStorage, nodeStorage rest.Getter,
+	extendExpiration bool,
+	maxExtendedExpiration time.Duration,
+) (*serviceaccountstore.REST, error) {
+	p.saOnce.Do(func() {
+		p.saREST, p.saErr = serviceaccountstore.NewREST(
+			optsGetter,
+			issuer,
+			auds,
+			max,
+			podStorage,
+			secretStorage,
+			nodeStorage,
+			extendExpiration,
+			maxExtendedExpiration,
+		)
+	})
+	return p.saREST, p.saErr
 }
 
 func New(c Config) (*legacyProvider, error) {
@@ -223,7 +257,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 			utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 			nodeGetter = nodeStorage.Node.Store
 		}
-		serviceAccountStorage, err = serviceaccountstore.GetOrCreateREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration, p.MaxExtendedExpiration)
+		serviceAccountStorage, err = p.getServiceAccountREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration, p.MaxExtendedExpiration)
 		if err != nil {
 			return genericapiserver.APIGroupInfo{}, err
 		}
