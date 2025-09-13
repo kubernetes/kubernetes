@@ -38,4 +38,6 @@ type Data interface {
 	IgnorePreflightErrors() sets.Set[string]
 	PatchesDir() string
 	OutputWriter() io.Writer
+	KubeConfigDir() string
+	KubeletDir() string
 }

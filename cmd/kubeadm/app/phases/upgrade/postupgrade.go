@@ -95,21 +95,9 @@ func UnupgradedControlPlaneInstances(client clientset.Interface, nodeName string
 }
 
 // WriteKubeletConfigFiles writes the kubelet config file to disk, but first creates a backup of any existing one.
-func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir string, patchesDir string, dryRun bool, out io.Writer) error {
-	var (
-		err        error
-		kubeletDir = kubeadmconstants.KubeletRunDirectory
-	)
-	// If dry-running, this will return a directory under /etc/kubernetes/tmp or kubeletConfigDir.
-	if dryRun {
-		kubeletDir, err = kubeadmconstants.CreateTempDir(kubeletConfigDir, "kubeadm-upgrade-dryrun")
-	}
-	if err != nil {
-		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
-		return err
-	}
-	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp or kubeletConfigDir.
-	backupDir, err := kubeadmconstants.CreateTempDir(kubeletConfigDir, "kubeadm-kubelet-config")
+func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletDir string, kubeConfigDir string, patchesDir string, dryRun bool, out io.Writer) error {
+	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp or kubeConfigDir.
+	backupDir, err := kubeadmconstants.CreateTimestampDir(kubeConfigDir, "kubeadm-kubelet-config")
 	if err != nil {
 		return err
 	}
@@ -120,13 +108,13 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 	dest := filepath.Join(backupDir, kubeadmconstants.KubeletConfigurationFileName)
 
 	if !dryRun {
-		fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
+		_, _ = fmt.Fprintf(out, "[upgrade] Backing up kubelet config file to %s\n", dest)
 		err := kubeadmutil.CopyFile(src, dest)
 		if err != nil {
 			return errors.Wrap(err, "error backing up the kubelet config file")
 		}
 	} else {
-		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
+		_, _ = fmt.Fprintf(out, "[dryrun] Would back up kubelet config file to %s\n", dest)
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
@@ -154,7 +142,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 					}
 				}
 			} else if dryRun {
-				fmt.Fprintf(os.Stdout, "[dryrun] would read the flag --container-runtime-endpoint value from %q, which is missing. "+
+				_, _ = fmt.Fprintf(out, "[dryrun] would read the flag --container-runtime-endpoint value from %q, which is missing. "+
 					"Using default socket %q instead", kubeadmconstants.KubeletEnvFileName, kubeadmconstants.DefaultCRISocket)
 				containerRuntimeEndpoint = kubeadmconstants.DefaultCRISocket
 			} else {
@@ -170,7 +158,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 			}
 
 			if dryRun { // Print what contents would be written
-				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
 				if err != nil {
 					return errors.Wrap(err, "error printing kubelet instance configuration file on dryrun")
 				}
@@ -184,7 +172,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 	}
 
 	if dryRun { // Print what contents would be written
-		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
 		if err != nil {
 			return errors.Wrap(err, "error printing kubelet configuration file on dryrun")
 		}
