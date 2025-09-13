@@ -153,6 +153,8 @@ func TestSecretCache(t *testing.T) {
 
 func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	t.Fatalf("broken watchlist")
+
 	fakeClient := &fake.Clientset{}
 
 	listReactor := func(a core.Action) (bool, runtime.Object, error) {
