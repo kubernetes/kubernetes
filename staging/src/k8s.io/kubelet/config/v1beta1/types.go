@@ -926,6 +926,15 @@ type KubeletConfiguration struct {
 	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *UserNamespaces `json:"userNamespaces,omitempty"`
+
+	// PodHousekeepingPeriod is the interval to specify the frequency for
+	// performing global pod cleanup tasks. Specifying a high value for this
+	// will result in low frequency for lower performance overhead but may
+	// result in high latency to remove orphaned resources and remove
+	// unwanted pods.
+	// Default: 2s
+	// +optional
+	PodHousekeepingPeriod *metav1.Duration `json:"podHousekeepingPeriod,omitempty"`
 }
 
 type KubeletAuthorizationMode string
