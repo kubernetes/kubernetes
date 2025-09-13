@@ -1228,21 +1228,15 @@ func checkDaemonSetPodsLabels(podList *v1.PodList, hash string) {
 }
 
 func waitForHistoryCreated(ctx context.Context, c clientset.Interface, ns string, label map[string]string, numHistory int) {
-	listHistoryFn := func(ctx context.Context) (bool, error) {
+	gomega.Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (int, error) {
 		selector := labels.Set(label).AsSelector()
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		historyList, err := c.AppsV1().ControllerRevisions(ns).List(ctx, options)
 		if err != nil {
-			return false, err
+			return 0, err
 		}
-		if len(historyList.Items) == numHistory {
-			return true, nil
-		}
-		framework.Logf("%d/%d controllerrevisions created.", len(historyList.Items), numHistory)
-		return false, nil
-	}
-	err := wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, listHistoryFn)
-	framework.ExpectNoError(err, "error waiting for controllerrevisions to be created")
+		return len(historyList.Items), nil
+	}), dsRetryPeriod, dsRetryTimeout).Should(gomega.Equal(numHistory))
 }
 
 func listDaemonHistories(ctx context.Context, c clientset.Interface, ns string, label map[string]string) *appsv1.ControllerRevisionList {
