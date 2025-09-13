@@ -639,6 +639,11 @@ const (
 	// resume work after restarts.
 	NominatedNodeNameForExpectation featuregate.Feature = "NominatedNodeNameForExpectation"
 
+	// owner: @HirazawaUi
+	//
+	// Kubelet will not evict pods due to node affinity after a restart.
+	NotEvictPodOnKubeletRestart featuregate.Feature = "NotEvictPodOnKubeletRestart"
+
 	// owner: @cici37
 	// kep: https://kep.k8s.io/5080
 	//
@@ -1490,6 +1495,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	NominatedNodeNameForExpectation: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	NotEvictPodOnKubeletRestart: {
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	OrderedNamespaceDeletion: {

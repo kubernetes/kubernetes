@@ -411,7 +411,7 @@ func newTestKubeletWithImageList(
 	handlers = append(handlers, shutdownManager)
 
 	// Add this as cleanup predicate pod admitter
-	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
+	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources, kubelet.containerRuntime.GetPodStatus))
 
 	if !excludeAdmitHandlers {
 		kubelet.allocationManager.AddPodAdmitHandlers(handlers)
@@ -1229,7 +1229,7 @@ func TestHandlePluginResources(t *testing.T) {
 	}
 
 	// add updatePluginResourcesFunc to admission handler, to test it's behavior.
-	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{lifecycle.NewPredicateAdmitHandler(kl.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc)})
+	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{lifecycle.NewPredicateAdmitHandler(kl.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc, kl.containerRuntime.GetPodStatus)})
 
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
