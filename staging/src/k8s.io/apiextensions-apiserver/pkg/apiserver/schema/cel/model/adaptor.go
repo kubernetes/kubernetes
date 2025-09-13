@@ -69,7 +69,7 @@ func (s *Structural) Items() common.Schema {
 }
 
 func (s *Structural) Properties() map[string]common.Schema {
-	if s.Structural.Properties == nil {
+	if s.Structural == nil || s.Structural.Properties == nil {
 		return nil
 	}
 	res := make(map[string]common.Schema, len(s.Structural.Properties))
@@ -81,7 +81,7 @@ func (s *Structural) Properties() map[string]common.Schema {
 }
 
 func (s *Structural) AdditionalProperties() common.SchemaOrBool {
-	if s.Structural.AdditionalProperties == nil {
+	if s.Structural == nil || s.Structural.AdditionalProperties == nil {
 		return nil
 	}
 	return &StructuralOrBool{StructuralOrBool: s.Structural.AdditionalProperties}
