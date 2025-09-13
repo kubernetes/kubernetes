@@ -73,7 +73,11 @@ func Validate_ReplicationController(ctx context.Context, op operation.Operation,
 			}
 			// call field-attached validations
 			func() { // cohort name
+				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
 					return // do not proceed
 				}
 				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName)...)
@@ -129,9 +133,13 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			// optional fields with default values are effectively required
 			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
