@@ -19,7 +19,9 @@ package apiserver
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync/atomic"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -104,15 +106,27 @@ func proxyError(w http.ResponseWriter, req *http.Request, error string, code int
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	httpStatus := 0
+	resourceName := ""
+	extensionApiserverStart := time.Now()
+	ctx := req.Context()
+	defer func() {
+		if httpStatus == 0 {
+			httpStatus, _ = strconv.Atoi(w.Header().Get("Status"))
+		}
+		recordExtensionApiserverMetrics(ctx, httpStatus, extensionApiserverStart, resourceName)
+	}()
 	value := r.handlingInfo.Load()
 	if value == nil {
 		r.localDelegate.ServeHTTP(w, req)
 		return
 	}
 	handlingInfo := value.(proxyHandlingInfo)
+	resourceName = handlingInfo.serviceNamespace + "/" + handlingInfo.serviceName
 	if handlingInfo.local {
 		if r.localDelegate == nil {
 			http.Error(w, "", http.StatusNotFound)
+			httpStatus = http.StatusNotFound
 			return
 		}
 		r.localDelegate.ServeHTTP(w, req)
@@ -121,17 +135,20 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	if !handlingInfo.serviceAvailable {
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
+		httpStatus = http.StatusServiceUnavailable
 		return
 	}
 
 	if handlingInfo.transportBuildingError != nil {
 		proxyError(w, req, handlingInfo.transportBuildingError.Error(), http.StatusInternalServerError)
+		httpStatus = http.StatusInternalServerError
 		return
 	}
 
 	user, ok := genericapirequest.UserFrom(req.Context())
 	if !ok {
 		proxyError(w, req, "missing user", http.StatusInternalServerError)
+		httpStatus = http.StatusInternalServerError
 		return
 	}
 
@@ -142,6 +159,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
+		httpStatus = http.StatusServiceUnavailable
 		return
 	}
 	location.Host = rloc.Host
@@ -153,6 +171,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	if handlingInfo.proxyRoundTripper == nil {
 		proxyError(w, req, "", http.StatusNotFound)
+		httpStatus = http.StatusNotFound
 		return
 	}
 
