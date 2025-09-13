@@ -32,6 +32,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -262,6 +265,309 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 
 })
 
+var _ = SIGDescribe("Allow cancel pull image", framework.WithSerial(), framework.WithFeatureGate(features.CancelPullImage), func() {
+	f := framework.NewDefaultFramework("pull-image-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	var is internalapi.ImageManagerService
+
+	ginkgo.BeforeEach(func() {
+		var err error
+		_, is, err = getCRIClient()
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.Context("with parallel image pull", func() {
+		// Configure kubelet to use parallel image pulls
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.SerializeImagePulls = false
+			initialConfig.MaxParallelImagePulls = ptr.To[int32](5)
+		})
+
+		ginkgo.It("Should not pull image after pod deletion with parallel pull", func(ctx context.Context) {
+			// Get a test image
+			image := imageutils.GetE2EImage(imageutils.Agnhost)
+
+			// 1. Remove the image before creating the pod
+			ginkgo.By("Removing the image before creating the pod")
+			err := removeImageWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+
+			// Verify image is removed
+			exists, err := isImageExistWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+			gomega.Expect(exists).To(gomega.BeFalseBecause("Image should not exist before test"))
+
+			// 2. Create a pod with the image
+			ginkgo.By("Creating a pod with the image")
+			testpod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "image-pull-deletion-parallel-test",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "test-container",
+						Image:           image,
+						ImagePullPolicy: v1.PullAlways,
+					}},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+
+			pod := e2epod.NewPodClient(f).Create(context.Background(), testpod)
+
+			// 3. Waiting for the pod to be scheduled
+			ginkgo.By("Waiting for the pod to be scheduled so that kubelet owns it")
+			err = e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name)
+			framework.ExpectNoError(err, "Failed to await for the pod to be scheduled: %q", pod.Name)
+
+			// 4. Delete the pod after 200ms
+			ginkgo.By("Deleting the pod after 200ms")
+			time.Sleep(200 * time.Millisecond)
+			err = e2epod.NewPodClient(f).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			// 5. Wait for 10 seconds and check if the image is pulled
+			ginkgo.By("Waiting for 10 seconds")
+			time.Sleep(10 * time.Second)
+
+			ginkgo.By("Checking if the image is pulled")
+			exists, err = isImageExistWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+
+			// With parallel pull, the image might still be pulled even after pod deletion
+			// If image is pulled, test should fail
+			gomega.Expect(exists).To(gomega.BeFalseBecause("Image should not be pulled after pod deletion with parallel pull"))
+
+			// 6. Ensure the image is available after the test
+			ginkgo.DeferCleanup(func() error {
+				ginkgo.By("Pulling the image back after test")
+				return pullImageWithCRI(context.Background(), is, image)
+			})
+		})
+	})
+
+	ginkgo.Context("with serialized image pull", func() {
+		// Configure kubelet to use serialized image pulls
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.SerializeImagePulls = true
+			initialConfig.MaxParallelImagePulls = ptr.To[int32](1)
+		})
+		ginkgo.It("Should not pull image after pod deletion with serialized pull", func(ctx context.Context) {
+			// Get a test image
+			image := imageutils.GetE2EImage(imageutils.Agnhost)
+
+			// 1. Remove the image before creating the pod
+			ginkgo.By("Removing the image before creating the pod")
+			err := removeImageWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+
+			// Verify image is removed
+			exists, err := isImageExistWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+			gomega.Expect(exists).To(gomega.BeFalseBecause("Image should not exist before test"))
+
+			// 2. Create a pod with the image
+			ginkgo.By("Creating a pod with the image")
+			testpod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "image-pull-deletion-serial-test",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "test-container",
+						Image:           image,
+						ImagePullPolicy: v1.PullAlways,
+					}},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+
+			pod := e2epod.NewPodClient(f).Create(context.Background(), testpod)
+
+			// 3. Waiting for the pod to be scheduled
+			ginkgo.By("Waiting for the pod to be scheduled so that kubelet owns it")
+			err = e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name)
+			framework.ExpectNoError(err, "Failed to await for the pod to be scheduled: %q", pod.Name)
+
+			// 4. Delete the pod after 200ms
+			ginkgo.By("Deleting the pod after 200ms")
+			time.Sleep(200 * time.Millisecond)
+			err = e2epod.NewPodClient(f).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			// 5. Wait for 10 seconds and check if the image is pulled
+			ginkgo.By("Waiting for 10 seconds")
+			time.Sleep(10 * time.Second)
+
+			ginkgo.By("Checking if the image is pulled")
+			exists, err = isImageExistWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+
+			// With serialized pull, the image should be pulled after pod deletion
+			gomega.Expect(exists).To(gomega.BeFalseBecause("Image should not be pulled after pod deletion with serialized pull"))
+
+			// 6. Ensure the image is available after the test
+			ginkgo.DeferCleanup(func() error {
+				ginkgo.By("Pulling the image back after test")
+				return pullImageWithCRI(context.Background(), is, image)
+			})
+		})
+	})
+})
+
+var _ = SIGDescribe("Disallow cancel pull image", framework.WithSerial(), func() {
+	f := framework.NewDefaultFramework("pull-image-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	var is internalapi.ImageManagerService
+
+	ginkgo.BeforeEach(func() {
+		var err error
+		_, is, err = getCRIClient()
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.Context("with parallel image pull", func() {
+		// Configure kubelet to use parallel image pulls
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.SerializeImagePulls = false
+			initialConfig.MaxParallelImagePulls = ptr.To[int32](5)
+		})
+
+		ginkgo.It("Should pull image after pod deletion with parallel pull", func(ctx context.Context) {
+			// Get a test image
+			image := imageutils.GetE2EImage(imageutils.Agnhost)
+
+			// 1. Remove the image before creating the pod
+			ginkgo.By("Removing the image before creating the pod")
+			err := removeImageWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+
+			// Verify image is removed
+			exists, err := isImageExistWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+			gomega.Expect(exists).To(gomega.BeFalseBecause("Image should not exist before test"))
+
+			// 2. Create a pod with the image
+			ginkgo.By("Creating a pod with the image")
+			testpod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "image-pull-deletion-parallel-test",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "test-container",
+						Image:           image,
+						ImagePullPolicy: v1.PullAlways,
+					}},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+
+			pod := e2epod.NewPodClient(f).Create(context.Background(), testpod)
+
+			// 3. Waiting for the pod to be scheduled
+			ginkgo.By("Waiting for the pod to be scheduled so that kubelet owns it")
+			err = e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name)
+			framework.ExpectNoError(err, "Failed to await for the pod to be scheduled: %q", pod.Name)
+
+			// 4. Delete the pod after 200ms
+			ginkgo.By("Deleting the pod after 200ms")
+			time.Sleep(200 * time.Millisecond)
+			err = e2epod.NewPodClient(f).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			// 5. Wait for 10 seconds and check if the image is pulled
+			ginkgo.By("Waiting for 10 seconds")
+			time.Sleep(10 * time.Second)
+
+			ginkgo.By("Checking if the image is pulled")
+			exists, err = isImageExistWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+
+			// With parallel pull, the image should be pulled after pod deletion
+			gomega.Expect(exists).To(gomega.BeTrueBecause("Image should be pulled after pod deletion with parallel pull"))
+
+			// 6. Ensure the image is available after the test
+			ginkgo.DeferCleanup(func() error {
+				ginkgo.By("Pulling the image back after test")
+				return pullImageWithCRI(context.Background(), is, image)
+			})
+		})
+	})
+
+	ginkgo.Context("with serialized image pull", func() {
+		// Configure kubelet to use serialized image pulls
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.SerializeImagePulls = true
+			initialConfig.MaxParallelImagePulls = ptr.To[int32](1)
+		})
+		ginkgo.It("Should pull image after pod deletion with serialized pull", func(ctx context.Context) {
+			// Get a test image
+			image := imageutils.GetE2EImage(imageutils.Agnhost)
+
+			// 1. Remove the image before creating the pod
+			ginkgo.By("Removing the image before creating the pod")
+			err := removeImageWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+
+			// Verify image is removed
+			exists, err := isImageExistWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+			gomega.Expect(exists).To(gomega.BeFalseBecause("Image should not exist before test"))
+
+			// 2. Create a pod with the image
+			ginkgo.By("Creating a pod with the image")
+			testpod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "image-pull-deletion-serial-test",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "test-container",
+						Image:           image,
+						ImagePullPolicy: v1.PullAlways,
+					}},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+
+			pod := e2epod.NewPodClient(f).Create(context.Background(), testpod)
+
+			// 3. Waiting for the pod to be scheduled
+			ginkgo.By("Waiting for the pod to be scheduled so that kubelet owns it")
+			err = e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name)
+			framework.ExpectNoError(err, "Failed to await for the pod to be scheduled: %q", pod.Name)
+
+			// 4. Delete the pod after 200ms
+			ginkgo.By("Deleting the pod after 200ms")
+			time.Sleep(200 * time.Millisecond)
+			err = e2epod.NewPodClient(f).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			// 5. Wait for 10 seconds and check if the image is pulled
+			ginkgo.By("Waiting for 10 seconds")
+			time.Sleep(10 * time.Second)
+
+			ginkgo.By("Checking if the image is pulled")
+			exists, err = isImageExistWithCRI(context.Background(), is, image)
+			framework.ExpectNoError(err)
+
+			// With serialized pull, the image should not be pulled after pod deletion
+			gomega.Expect(exists).To(gomega.BeTrueBecause("Image should be pulled after pod deletion with serialized pull"))
+
+			// 6. Ensure the image is available after the test
+			ginkgo.DeferCleanup(func() error {
+				ginkgo.By("Pulling the image back after test")
+				return pullImageWithCRI(context.Background(), is, image)
+			})
+		})
+	})
+})
+
 func getPodImagePullDurations(ctx context.Context, f *framework.Framework, testpods []*v1.Pod) (map[string]*pulledStruct, map[string]metav1.Time, map[string]metav1.Time, error) {
 	events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -387,4 +693,54 @@ func getImagePullAttempts(ctx context.Context, f *framework.Framework, podName s
 		}
 	}
 	return event, nil
+}
+
+// isImageExistWithCRI checks if the image exists using CRI client
+// Returns true if the image exists, false otherwise
+func isImageExistWithCRI(ctx context.Context, is internalapi.ImageManagerService, image string) (bool, error) {
+	// List all images using CRI client
+	resp, err := is.ListImages(ctx, &runtimeapi.ImageFilter{})
+	if err != nil {
+		return false, fmt.Errorf("failed to list images: %w", err)
+	}
+
+	// Check if the image exists in the list
+	for _, img := range resp {
+		for _, tag := range img.RepoTags {
+			if tag == image {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// removeImageWithCRI removes the specified image using CRI client
+// If the image doesn't exist, it returns nil
+func removeImageWithCRI(ctx context.Context, is internalapi.ImageManagerService, image string) error {
+	// First check if the image exists
+	exists, err := isImageExistWithCRI(ctx, is, image)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil // Image already doesn't exist
+	}
+
+	// Remove the image using CRI client
+	err = is.RemoveImage(ctx, &runtimeapi.ImageSpec{Image: image})
+	if err != nil {
+		return fmt.Errorf("failed to remove image: %w", err)
+	}
+	return nil
+}
+
+// pullImageWithCRI pulls the specified image using CRI client
+func pullImageWithCRI(ctx context.Context, is internalapi.ImageManagerService, image string) error {
+	// Pull the image using CRI client
+	_, err := is.PullImage(ctx, &runtimeapi.ImageSpec{Image: image}, nil, nil)
+	if err != nil {
+		return fmt.Errorf("failed to pull image: %w", err)
+	}
+	return nil
 }
