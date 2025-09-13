@@ -55,7 +55,10 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/blah"}}}}
 
 	// Setup fake api client.
-	fakeWatch := watch.NewFake()
+	fakeWatch := watch.NewFakeWithChanSize(2, false)
+	fakeWatch.Add(pod1v1)
+	fakeWatch.Action(watch.Bookmark, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "q", Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"}}})
+
 	lw := fakePodLW{
 		listResp:  &v1.PodList{Items: []v1.Pod{*pod1v1}},
 		watchResp: fakeWatch,
