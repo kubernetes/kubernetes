@@ -18,7 +18,8 @@ package config
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -75,11 +76,7 @@ func (o *GetUsersOptions) Run() error {
 		return err
 	}
 
-	users := make([]string, 0, len(config.AuthInfos))
-	for user := range config.AuthInfos {
-		users = append(users, user)
-	}
-	sort.Strings(users)
+	users := slices.Sorted(maps.Keys(config.AuthInfos))
 
 	fmt.Fprintf(o.Out, "NAME\n")
 	for _, user := range users {

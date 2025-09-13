@@ -19,7 +19,8 @@ package plugins
 import (
 	"errors"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -123,12 +124,7 @@ func getTopologyValues(pv *v1.PersistentVolume, key string) []string {
 		}
 	}
 	// remove duplication and sort them in order for better usage
-	var re []string
-	for k := range values {
-		re = append(re, k)
-	}
-	sort.Strings(re)
-	return re
+	return slices.Sorted(maps.Keys(values))
 }
 
 // addTopology appends the topology to the given PV to all Terms.
