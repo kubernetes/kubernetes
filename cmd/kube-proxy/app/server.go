@@ -440,7 +440,7 @@ func serveHealthz(ctx context.Context, hz *healthcheck.ProxyHealthServer, errCh 
 		return
 	}
 
-	fn := func() {
+	fn := func(ctx context.Context) {
 		err := hz.Run(ctx)
 		if err != nil {
 			logger.Error(err, "Healthz server failed")
@@ -454,7 +454,7 @@ func serveHealthz(ctx context.Context, hz *healthcheck.ProxyHealthServer, errCh 
 			logger.Error(nil, "Healthz server returned without error")
 		}
 	}
-	go wait.Until(fn, 5*time.Second, ctx.Done())
+	go wait.UntilWithContext(ctx, fn, 5*time.Second)
 }
 
 func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, flagzReader flagz.Reader, errCh chan error) {
@@ -489,7 +489,7 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 		statusz.Install(proxyMux, kubeProxy, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
 	}
 
-	fn := func() {
+	fn := func(ctx context.Context) {
 		var err error
 		defer func() {
 			if err != nil {
@@ -516,7 +516,7 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 		}
 
 	}
-	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+	go wait.UntilWithContext(ctx, fn, 5*time.Second)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
