@@ -281,7 +281,9 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				if err = e2edeployment.WaitForDeploymentComplete(c, deploy); err != nil {
 					framework.Failf("Failed to wait for Deployment to complete: %v", err)
 				}
-
+				// All the agnhost containers runs with "--run-duration 3s".
+				// So this is safe to wait 3 seconds to complete the log generation for all the containers.
+				time.Sleep(3 * time.Second)
 			})
 
 			ginkgo.AfterEach(func() {
