@@ -72,9 +72,10 @@ var (
 	)
 	objectCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_storage_objects",
-			Help:           "[DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.",
-			StabilityLevel: compbasemetrics.STABLE,
+			Name:              "apiserver_storage_objects",
+			Help:              "[DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.",
+			StabilityLevel:    compbasemetrics.STABLE,
+			DeprecatedVersion: "1.34.0",
 		},
 		[]string{"resource"},
 	)
