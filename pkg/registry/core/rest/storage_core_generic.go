@@ -87,7 +87,7 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 		apiGroupInfo.NegotiatedSerializer = serializer.NewCodecFactory(legacyscheme.Scheme, opts...)
 	}
 
-	eventStorage, err := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
+	eventStorage, err := eventstore.GetOrCreateREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}

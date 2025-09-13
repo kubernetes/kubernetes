@@ -52,7 +52,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 
 	// events
 	if resource := "events"; apiResourceConfigSource.ResourceEnabled(eventsapiv1.SchemeGroupVersion.WithResource(resource)) {
-		eventsStorage, err := eventstore.NewREST(restOptionsGetter, uint64(p.TTL.Seconds()))
+		eventsStorage, err := eventstore.GetOrCreateREST(restOptionsGetter, uint64(p.TTL.Seconds()))
 		if err != nil {
 			return storage, err
 		}
