@@ -19,6 +19,7 @@ package nodeports
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,9 +47,6 @@ const (
 	// preFilterStateKey is the key in CycleState to NodePorts pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
 	preFilterStateKey = "PreFilter" + Name
-
-	// ErrReason when node ports aren't available.
-	ErrReason = "node(s) didn't have free ports for the requested pod ports"
 )
 
 type preFilterState []v1.ContainerPort
@@ -149,12 +147,13 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	for _, p := range ports {
 		portsInUse.Add(p.HostIP, string(p.Protocol), p.HostPort)
 	}
-	if fitsPorts(util.GetHostPorts(pod), portsInUse) {
+	portFits, portNotFittingMessage := fitsPorts(util.GetHostPorts(pod), portsInUse)
+	if portFits {
 		logger.V(4).Info("the deleted pod and the target pod don't have any common port(s), returning QueueSkip as deleting this Pod won't make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 		return fwk.QueueSkip, nil
 	}
 
-	logger.V(4).Info("the deleted pod and the target pod have any common port(s), returning Queue as deleting this Pod may make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	logger.V(4).Info("the deleted pod and the target pod have common port(s), returning Queue as deleting this Pod may make the Pod schedulable", "port(s)", portNotFittingMessage, "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 	return fwk.Queue, nil
 }
 
@@ -165,28 +164,31 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod 
 		return fwk.AsStatus(err)
 	}
 
-	fits := fitsPorts(wantPorts, nodeInfo.GetUsedPorts())
-	if !fits {
-		return fwk.NewStatus(fwk.Unschedulable, ErrReason)
+	portFits, portConflictErrMessage := fitsPorts(wantPorts, nodeInfo.GetUsedPorts())
+	if !portFits {
+		return fwk.NewStatus(fwk.Unschedulable, portConflictErrMessage)
 	}
 
 	return nil
 }
 
 // Fits checks if the pod has any ports conflicting with nodeInfo's ports.
-// It returns true if there are no conflicts (which means that pod fits the node), otherwise false.
-func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
-	return fitsPorts(util.GetHostPorts(pod), nodeInfo.GetUsedPorts())
+// It returns true if there are no conflicts (which means that pod fits the node), otherwise false with the errMessage.
+func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) (fits bool, errMessage string) {
+	portFits, portConflictErrMessage := fitsPorts(util.GetHostPorts(pod), nodeInfo.GetUsedPorts())
+	return portFits, portConflictErrMessage
 }
 
-func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) bool {
+func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) (fits bool, errMessage string) {
 	// try to see whether portsInUse and wantPorts will conflict or not
 	for _, cp := range wantPorts {
 		if portsInUse.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
-			return false
+			portNotFittingMessage := fmt.Sprintf("%s/%s:%s", string(cp.Protocol), cp.HostIP, strconv.Itoa(int(cp.HostPort)))
+			errReason := fmt.Sprintf("node(s) port conflict for the requested pod ports (%s)", portNotFittingMessage)
+			return false, errReason
 		}
 	}
-	return true
+	return true, ""
 }
 
 // New initializes a new plugin and returns it.

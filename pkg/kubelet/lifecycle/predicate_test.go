@@ -252,7 +252,7 @@ func TestGeneralPredicates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
-			reasons: []PredicateFailureReason{&PredicateFailureError{nodeports.Name, nodeports.ErrReason}},
+			reasons: []PredicateFailureReason{&PredicateFailureError{nodeports.Name, "node(s) port conflict for the requested pod ports (/:123)"}},
 			name:    "hostport conflict",
 		},
 		{

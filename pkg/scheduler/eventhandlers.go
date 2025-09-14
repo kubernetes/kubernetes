@@ -778,8 +778,9 @@ func AdmissionCheck(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailure
 			return admissionResults
 		}
 	}
-	if !nodeports.Fits(pod, nodeInfo) {
-		admissionResults = append(admissionResults, AdmissionResult{Name: nodeports.Name, Reason: nodeports.ErrReason})
+	fits, portNotFittingMessage := nodeports.Fits(pod, nodeInfo)
+	if !fits {
+		admissionResults = append(admissionResults, AdmissionResult{Name: nodeports.Name, Reason: portNotFittingMessage})
 		if !includeAllFailures {
 			return admissionResults
 		}
