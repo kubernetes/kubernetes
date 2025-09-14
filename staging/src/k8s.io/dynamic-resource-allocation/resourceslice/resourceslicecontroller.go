@@ -27,7 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -283,6 +283,24 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 	if ptr.Deref(err.DesiredSlice.Spec.PerDeviceNodeSelection, false) && !ptr.Deref(err.ActualSlice.Spec.PerDeviceNodeSelection, false) ||
 		len(err.DesiredSlice.Spec.SharedCounters) > len(err.ActualSlice.Spec.SharedCounters) {
 		disabled = append(disabled, "DRAPartitionableDevices")
+	}
+
+	// The number of binding conditions for both slices should be the same. If they differ,
+	// it indicates that the DRADeviceBindingConditions feature is disabled.
+	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
+		if len(err.DesiredSlice.Spec.Devices[i].BindingConditions) != len(err.ActualSlice.Spec.Devices[i].BindingConditions) ||
+			len(err.DesiredSlice.Spec.Devices[i].BindingFailureConditions) != len(err.ActualSlice.Spec.Devices[i].BindingFailureConditions) {
+			disabled = append(disabled, "DRADeviceBindingConditions")
+			break
+		}
+	}
+
+	// Dropped fields for consumable capacity can be detected with allowMultipleAllocations flag without looking at individual device capacity.
+	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
+		if err.DesiredSlice.Spec.Devices[i].AllowMultipleAllocations != nil && err.ActualSlice.Spec.Devices[i].AllowMultipleAllocations == nil {
+			disabled = append(disabled, "DRAConsumableCapacity")
+			break
+		}
 	}
 
 	return disabled

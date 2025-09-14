@@ -24,9 +24,28 @@ import (
 
 // EphemeralContainerApplyConfiguration represents a declarative configuration of the EphemeralContainer type for use
 // with apply.
+//
+// An EphemeralContainer is a temporary container that you may add to an existing Pod for
+// user-initiated activities such as debugging. Ephemeral containers have no resource or
+// scheduling guarantees, and they will not be restarted when they exit or when a Pod is
+// removed or restarted. The kubelet may evict a Pod if an ephemeral container causes the
+// Pod to exceed its resource allocation.
+//
+// To add an ephemeral container, use the ephemeralcontainers subresource of an existing
+// Pod. Ephemeral containers may not be removed or restarted.
 type EphemeralContainerApplyConfiguration struct {
+	// Ephemeral containers have all of the fields of Container, plus additional fields
+	// specific to ephemeral containers. Fields in common with Container are in the
+	// following inlined struct so than an EphemeralContainer may easily be converted
+	// to a Container.
 	EphemeralContainerCommonApplyConfiguration `json:",inline"`
-	TargetContainerName                        *string `json:"targetContainerName,omitempty"`
+	// If set, the name of the container from PodSpec that this ephemeral container targets.
+	// The ephemeral container will be run in the namespaces (IPC, PID, etc) of this container.
+	// If not set then the ephemeral container uses the namespaces configured in the Pod spec.
+	//
+	// The container runtime must implement support for this feature. If the runtime does not
+	// support namespace targeting then the result of setting this field is undefined.
+	TargetContainerName *string `json:"targetContainerName,omitempty"`
 }
 
 // EphemeralContainerApplyConfiguration constructs a declarative configuration of the EphemeralContainer type for use with
@@ -144,6 +163,19 @@ func (b *EphemeralContainerApplyConfiguration) WithResizePolicy(values ...*Conta
 // If called multiple times, the RestartPolicy field is set to the value of the last call.
 func (b *EphemeralContainerApplyConfiguration) WithRestartPolicy(value corev1.ContainerRestartPolicy) *EphemeralContainerApplyConfiguration {
 	b.EphemeralContainerCommonApplyConfiguration.RestartPolicy = &value
+	return b
+}
+
+// WithRestartPolicyRules adds the given value to the RestartPolicyRules field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the RestartPolicyRules field.
+func (b *EphemeralContainerApplyConfiguration) WithRestartPolicyRules(values ...*ContainerRestartRuleApplyConfiguration) *EphemeralContainerApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithRestartPolicyRules")
+		}
+		b.EphemeralContainerCommonApplyConfiguration.RestartPolicyRules = append(b.EphemeralContainerCommonApplyConfiguration.RestartPolicyRules, *values[i])
+	}
 	return b
 }
 

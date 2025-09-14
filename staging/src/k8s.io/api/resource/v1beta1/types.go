@@ -31,6 +31,17 @@ const (
 	// Reserved for use by Kubernetes, DRA driver controllers must
 	// use their own finalizer.
 	Finalizer = "resource.kubernetes.io/delete-protection"
+	// ExtendedResourceClaimAnnotation is the annotation applied on the generated
+	// special ResourceClaim. Its single valid value is "true".
+	// This is used only inside the scheduler.
+	ExtendedResourceClaimAnnotation = "resource.kubernetes.io/extended-resource-claim"
+	// Resource device class prefix is for generating implicit extended resource
+	// name for a device class when its ExtendedResourceName field is not
+	// specified. The generated name is this prefix + the device class name.
+	// The generated name may not be a valid extended resource name for use
+	// in pod.Spec.Resources.Requests, in that case, a valid name has to be specified
+	// explicitly in device class.
+	ResourceDeviceClassPrefix string = "deviceclass.resource.kubernetes.io/"
 )
 
 // +genclient
@@ -244,6 +255,8 @@ type ResourcePool struct {
 const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
+const BindingConditionsMaxSize = 4
+const BindingFailureConditionsMaxSize = 4
 
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
@@ -337,6 +350,60 @@ type BasicDevice struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Taints []DeviceTaint `json:"taints,omitempty" protobuf:"bytes,7,rep,name=taints"`
+
+	// BindsToNode indicates if the usage of an allocation involving this device
+	// has to be limited to exactly the node that was chosen when allocating the claim.
+	// If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
+	// to match the node where the allocation was made.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	//
+	// +optional
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	BindsToNode *bool `json:"bindsToNode,omitempty" protobuf:"varint,8,opt,name=bindsToNode"`
+
+	// BindingConditions defines the conditions for proceeding with binding.
+	// All of these conditions must be set in the per-device status
+	// conditions with a value of True to proceed with binding the pod to the node
+	// while scheduling the pod.
+	//
+	// The maximum number of binding conditions is 4.
+	//
+	// The conditions must be a valid condition type string.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,9,rep,name=bindingConditions"`
+
+	// BindingFailureConditions defines the conditions for binding failure.
+	// They may be set in the per-device status conditions.
+	// If any is true, a binding failure occurred.
+	//
+	// The maximum number of binding failure conditions is 4.
+	//
+	// The conditions must be a valid condition type string.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,10,rep,name=bindingFailureConditions"`
+
+	// AllowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
+	//
+	// If AllowMultipleAllocations is set to true, the device can be allocated more than once,
+	// and all of its capacity is consumable, regardless of whether the requestPolicy is defined or not.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	AllowMultipleAllocations *bool `json:"allowMultipleAllocations,omitempty" protobuf:"bytes,11,opt,name=allowMultipleAllocations"`
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -361,13 +428,108 @@ type DeviceCounterConsumption struct {
 
 // DeviceCapacity describes a quantity associated with a device.
 type DeviceCapacity struct {
-	// Value defines how much of a certain device capacity is available.
+	// Value defines how much of a certain capacity that device has.
+	//
+	// This field reflects the fixed total capacity and does not change.
+	// The consumed amount is tracked separately by scheduler
+	// and does not affect this value.
 	//
 	// +required
 	Value resource.Quantity `json:"value" protobuf:"bytes,1,rep,name=value"`
 
-	// potential future addition: fields which define how to "consume"
-	// capacity (= share a single device between different consumers).
+	// RequestPolicy defines how this DeviceCapacity must be consumed
+	// when the device is allowed to be shared by multiple allocations.
+	//
+	// The Device must have allowMultipleAllocations set to true in order to set a requestPolicy.
+	//
+	// If unset, capacity requests are unconstrained:
+	// requests can consume any amount of capacity, as long as the total consumed
+	// across all allocations does not exceed the device's defined capacity.
+	// If request is also unset, default is the full capacity value.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	RequestPolicy *CapacityRequestPolicy `json:"requestPolicy,omitempty" protobuf:"bytes,2,opt,name=requestPolicy"`
+}
+
+// CapacityRequestPolicy defines how requests consume device capacity.
+//
+// Must not set more than one ValidRequestValues.
+type CapacityRequestPolicy struct {
+	// Default specifies how much of this capacity is consumed by a request
+	// that does not contain an entry for it in DeviceRequest's Capacity.
+	//
+	// +optional
+	Default *resource.Quantity `json:"default" protobuf:"bytes,1,opt,name=default"`
+
+	// ValidValues defines a set of acceptable quantity values in consuming requests.
+	//
+	// Must not contain more than 10 entries.
+	// Must be sorted in ascending order.
+	//
+	// If this field is set,
+	// Default must be defined and it must be included in ValidValues list.
+	//
+	// If the requested amount does not match any valid value but smaller than some valid values,
+	// the scheduler calculates the smallest valid value that is greater than or equal to the request.
+	// That is: min(ceil(requestedValue) ∈ validValues), where requestedValue ≤ max(validValues).
+	//
+	// If the requested amount exceeds all valid values, the request violates the policy,
+	// and this device cannot be allocated.
+	//
+	// +optional
+	// +listType=atomic
+	// +oneOf=ValidRequestValues
+	ValidValues []resource.Quantity `json:"validValues,omitempty" protobuf:"bytes,3,opt,name=validValues"`
+
+	// ValidRange defines an acceptable quantity value range in consuming requests.
+	//
+	// If this field is set,
+	// Default must be defined and it must fall within the defined ValidRange.
+	//
+	// If the requested amount does not fall within the defined range, the request violates the policy,
+	// and this device cannot be allocated.
+	//
+	// If the request doesn't contain this capacity entry, Default value is used.
+	//
+	// +optional
+	// +oneOf=ValidRequestValues
+	ValidRange *CapacityRequestPolicyRange `json:"validRange,omitempty" protobuf:"bytes,4,opt,name=validRange"`
+}
+
+// CapacityRequestPolicyRange defines a valid range for consumable capacity values.
+//
+//   - If the requested amount is less than Min, it is rounded up to the Min value.
+//   - If Step is set and the requested amount is between Min and Max but not aligned with Step,
+//     it will be rounded up to the next value equal to Min + (n * Step).
+//   - If Step is not set, the requested amount is used as-is if it falls within the range Min to Max (if set).
+//   - If the requested or rounded amount exceeds Max (if set), the request does not satisfy the policy,
+//     and the device cannot be allocated.
+type CapacityRequestPolicyRange struct {
+	// Min specifies the minimum capacity allowed for a consumption request.
+	//
+	// Min must be greater than or equal to zero,
+	// and less than or equal to the capacity value.
+	// requestPolicy.default must be more than or equal to the minimum.
+	//
+	// +required
+	Min *resource.Quantity `json:"min,omitempty" protobuf:"bytes,1,opt,name=min"`
+
+	// Max defines the upper limit for capacity that can be requested.
+	//
+	// Max must be less than or equal to the capacity value.
+	// Min and requestPolicy.default must be less than or equal to the maximum.
+	//
+	// +optional
+	Max *resource.Quantity `json:"max,omitempty" protobuf:"bytes,2,opt,name=max"`
+
+	// Step defines the step size between valid capacity amounts within the range.
+	//
+	// Max (if set) and requestPolicy.default must be a multiple of Step.
+	// Min + Step must be less than or equal to the capacity value.
+	//
+	// +optional
+	Step *resource.Quantity `json:"step,omitempty" protobuf:"bytes,3,opt,name=step"`
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
@@ -746,6 +908,23 @@ type DeviceRequest struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,8,opt,name=tolerations"`
+
+	// Capacity define resource requirements against each capacity.
+	//
+	// If this field is unset and the device supports multiple allocations,
+	// the default value will be applied to each capacity according to requestPolicy.
+	// For the capacity that has no requestPolicy, default is the full capacity value.
+	//
+	// Applies to each device allocation.
+	// If Count > 1,
+	// the request fails if there aren't enough devices that meet the requirements.
+	// If AllocationMode is set to All,
+	// the request fails if there are devices that otherwise match the request,
+	// and have this capacity, with a value >= the requested amount, but which cannot be allocated to this request.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	Capacity *CapacityRequirements `json:"capacity,omitempty" protobuf:"bytes,9,opt,name=capacity"`
 }
 
 // DeviceSubRequest describes a request for device provided in the
@@ -841,6 +1020,52 @@ type DeviceSubRequest struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,7,opt,name=tolerations"`
+
+	// Capacity define resource requirements against each capacity.
+	//
+	// If this field is unset and the device supports multiple allocations,
+	// the default value will be applied to each capacity according to requestPolicy.
+	// For the capacity that has no requestPolicy, default is the full capacity value.
+	//
+	// Applies to each device allocation.
+	// If Count > 1,
+	// the request fails if there aren't enough devices that meet the requirements.
+	// If AllocationMode is set to All,
+	// the request fails if there are devices that otherwise match the request,
+	// and have this capacity, with a value >= the requested amount, but which cannot be allocated to this request.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	Capacity *CapacityRequirements `json:"capacity,omitempty" protobuf:"bytes,8,opt,name=capacity"`
+}
+
+// CapacityRequirements defines the capacity requirements for a specific device request.
+type CapacityRequirements struct {
+	// Requests represent individual device resource requests for distinct resources,
+	// all of which must be provided by the device.
+	//
+	// This value is used as an additional filtering condition against the available capacity on the device.
+	// This is semantically equivalent to a CEL selector with
+	// `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`.
+	// For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.
+	//
+	// When a requestPolicy is defined, the requested amount is adjusted upward
+	// to the nearest valid value based on the policy.
+	// If the requested amount cannot be adjusted to a valid value—because it exceeds what the requestPolicy allows—
+	// the device is considered ineligible for allocation.
+	//
+	// For any capacity that is not explicitly requested:
+	// - If no requestPolicy is set, the default consumed capacity is equal to the full device capacity
+	//   (i.e., the whole device is claimed).
+	// - If a requestPolicy is set, the default consumed capacity is determined according to that policy.
+	//
+	// If the device allows multiple allocation,
+	// the aggregated amount across all requests must not exceed the capacity value.
+	// The consumed capacity, which may be adjusted based on the requestPolicy if defined,
+	// is recorded in the resource claim’s status.devices[*].consumedCapacity field.
+	//
+	// +optional
+	Requests map[QualifiedName]resource.Quantity `json:"requests,omitempty" protobuf:"bytes,1,rep,name=requests,castkey=QualifiedName"`
 }
 
 const (
@@ -880,6 +1105,8 @@ type CELDeviceSelector struct {
 	//    (e.g. device.attributes["dra.example.com"] evaluates to an object with all
 	//    of the attributes which were prefixed by "dra.example.com".
 	//  - capacity (map[string]object): the device's capacities, grouped by prefix.
+	//  - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device
+	//    (v1.34+ with the DRAConsumableCapacity feature enabled).
 	//
 	// Example: Consider a device with driver="dra.example.com", which exposes
 	// two attributes named "model" and "ext.example.com/family" and which
@@ -993,6 +1220,22 @@ type DeviceConstraint struct {
 	// criteria.
 	//
 	// MatchExpression string
+
+	// DistinctAttribute requires that all devices in question have this
+	// attribute and that its type and value are unique across those devices.
+	//
+	// This acts as the inverse of MatchAttribute.
+	//
+	// This constraint is used to avoid allocating multiple requests to the same device
+	// by ensuring attribute-level differentiation.
+	//
+	// This is useful for scenarios where resource requests must be fulfilled by separate physical devices.
+	// For example, a container requests two network interfaces that must be allocated from two different physical NICs.
+	//
+	// +optional
+	// +oneOf=ConstraintType
+	// +featureGate=DRAConsumableCapacity
+	DistinctAttribute *FullyQualifiedName `json:"distinctAttribute,omitempty" protobuf:"bytes,3,opt,name=distinctAttribute"`
 }
 
 // DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.
@@ -1154,6 +1397,7 @@ type ResourceClaimStatus struct {
 	// +listMapKey=driver
 	// +listMapKey=device
 	// +listMapKey=pool
+	// +listMapKey=shareID
 	// +featureGate=DRAResourceClaimDeviceStatus
 	Devices []AllocatedDeviceStatus `json:"devices,omitempty" protobuf:"bytes,4,opt,name=devices"`
 }
@@ -1199,6 +1443,16 @@ type AllocationResult struct {
 	// it got removed. May be reused once decoding v1alpha3 is no longer
 	// supported.
 	// Controller string `json:"controller,omitempty" protobuf:"bytes,4,opt,name=controller"`
+
+	// AllocationTimestamp stores the time when the resources were allocated.
+	// This field is not guaranteed to be set, in which case that time is unknown.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gate.
+	//
+	// +optional
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	AllocationTimestamp *metav1.Time `json:"allocationTimestamp,omitempty" protobuf:"bytes,5,opt,name=allocationTimestamp"`
 }
 
 // DeviceAllocationResult is the result of allocating devices.
@@ -1288,6 +1542,50 @@ type DeviceRequestAllocationResult struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,6,opt,name=tolerations"`
+
+	// BindingConditions contains a copy of the BindingConditions
+	// from the corresponding ResourceSlice at the time of allocation.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,7,rep,name=bindingConditions"`
+
+	// BindingFailureConditions contains a copy of the BindingFailureConditions
+	// from the corresponding ResourceSlice at the time of allocation.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,8,rep,name=bindingFailureConditions"`
+
+	// ShareID uniquely identifies an individual allocation share of the device,
+	// used when the device supports multiple simultaneous allocations.
+	// It serves as an additional map key to differentiate concurrent shares
+	// of the same device.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	ShareID *types.UID `json:"shareID,omitempty" protobuf:"bytes,9,opt,name=shareID"`
+
+	// ConsumedCapacity tracks the amount of capacity consumed per device as part of the claim request.
+	// The consumed amount may differ from the requested amount: it is rounded up to the nearest valid
+	// value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).
+	//
+	// The total consumed capacity for each device must not exceed the DeviceCapacity's Value.
+	//
+	// This field is populated only for devices that allow multiple allocations.
+	// All capacity entries are included, even if the consumed amount is zero.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	ConsumedCapacity map[QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty" protobuf:"bytes,10,rep,name=consumedCapacity"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -1387,6 +1685,20 @@ type DeviceClassSpec struct {
 	// it got removed. May be reused once decoding v1alpha3 is no longer
 	// supported.
 	// SuitableNodes *v1.NodeSelector `json:"suitableNodes,omitempty" protobuf:"bytes,3,opt,name=suitableNodes"`
+
+	// ExtendedResourceName is the extended resource name for the devices of this class.
+	// The devices of this class can be used to satisfy a pod's extended resource requests.
+	// It has the same format as the name of a pod's extended resource.
+	// It should be unique among all the device classes in a cluster.
+	// If two device classes have the same name, then the class created later
+	// is picked to satisfy a pod's extended resource requests.
+	// If two classes are created at the same time, then the name of the class
+	// lexicographically sorted first is picked.
+	//
+	// This is an alpha field.
+	// +optional
+	// +featureGate=DRAExtendedResource
+	ExtendedResourceName *string `json:"extendedResourceName,omitempty" protobuf:"bytes,4,opt,name=extendedResourceName"`
 }
 
 // DeviceClassConfiguration is used in DeviceClass.
@@ -1478,6 +1790,9 @@ const (
 
 // AllocatedDeviceStatus contains the status of an allocated device, if the
 // driver chooses to report it. This may include driver-specific information.
+//
+// The combination of Driver, Pool, Device, and ShareID must match the corresponding key
+// in Status.Allocation.Devices.
 type AllocatedDeviceStatus struct {
 	// Driver specifies the name of the DRA driver whose kubelet
 	// plugin should be invoked to process the allocation once the claim is
@@ -1503,6 +1818,12 @@ type AllocatedDeviceStatus struct {
 	//
 	// +required
 	Device string `json:"device" protobuf:"bytes,3,rep,name=device"`
+
+	// ShareID uniquely identifies an individual allocation share of the device.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	ShareID *string `json:"shareID,omitempty" protobuf:"bytes,7,opt,name=shareID"`
 
 	// Conditions contains the latest observation of the device's state.
 	// If the device has been configured according to the class and claim

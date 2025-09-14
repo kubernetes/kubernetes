@@ -45,8 +45,8 @@ const (
 	GoroutineResultError   = "error"
 )
 
-// ExtentionPoints is a list of possible values for the extension_point label.
-var ExtentionPoints = []string{
+// ExtensionPoints is a list of possible values for the extension_point label.
+var ExtensionPoints = []string{
 	PreFilter,
 	Filter,
 	PreFilterExtensionAddPod,
@@ -56,6 +56,7 @@ var ExtentionPoints = []string{
 	Score,
 	ScoreExtensionNormalize,
 	PreBind,
+	PreBindPreFlight,
 	Bind,
 	PostBind,
 	Reserve,
@@ -73,6 +74,7 @@ const (
 	Score                       = "Score"
 	ScoreExtensionNormalize     = "ScoreExtensionNormalize"
 	PreBind                     = "PreBind"
+	PreBindPreFlight            = "PreBindPreFlight"
 	Bind                        = "Bind"
 	PostBind                    = "PostBind"
 	Reserve                     = "Reserve"
@@ -120,6 +122,11 @@ var (
 	PreemptionGoroutinesDuration       *metrics.HistogramVec
 	PreemptionGoroutinesExecutionTotal *metrics.CounterVec
 
+	// The below are only available when the SchedulerAsyncAPICalls feature gate is enabled.
+	AsyncAPICallsTotal   *metrics.CounterVec
+	AsyncAPICallDuration *metrics.HistogramVec
+	AsyncAPIPendingCalls *metrics.GaugeVec
+
 	// metricsList is a list of all metrics that should be registered always, regardless of any feature gate's value.
 	metricsList []metrics.Registerable
 )
@@ -139,6 +146,13 @@ func Register() {
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerAsyncPreemption) {
 			RegisterMetrics(PreemptionGoroutinesDuration, PreemptionGoroutinesExecutionTotal)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerAsyncAPICalls) {
+			RegisterMetrics(
+				AsyncAPICallsTotal,
+				AsyncAPICallDuration,
+				AsyncAPIPendingCalls,
+			)
 		}
 	})
 }
@@ -333,6 +347,35 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"result"})
+
+	// The below (AsyncAPICallsTotal, AsyncAPICallDuration and AsyncAPIPendingCalls) are only available when the SchedulerAsyncAPICalls feature gate is enabled.
+	AsyncAPICallsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "async_api_call_execution_total",
+			Help:           "Total number of API calls executed by the async dispatcher.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"call_type", "result"})
+
+	AsyncAPICallDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "async_api_call_execution_duration_seconds",
+			Help:           "Duration in seconds for executing API call in the async dispatcher.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"call_type", "result"})
+
+	AsyncAPIPendingCalls = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "pending_async_api_calls",
+			Help:           "Number of API calls currently pending in the async queue.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"call_type"})
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,

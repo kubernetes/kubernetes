@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 
 	"golang.org/x/net/websocket"
 
@@ -264,7 +265,7 @@ var _ = SIGDescribe("Pods", func() {
 				return podClient.Watch(ctx, options)
 			},
 		}
-		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.Pod{})
+		_, informer, w, _ := watchtools.NewIndexerInformerWatcherWithLogger(klog.FromContext(ctx), lw, &v1.Pod{})
 		defer w.Stop()
 
 		ctxUntil, cancelCtx := context.WithTimeout(ctx, wait.ForeverTestTimeout)
@@ -901,8 +902,8 @@ var _ = SIGDescribe("Pods", func() {
 		podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		testNamespaceName := f.Namespace.Name
 		testPodName := "pod-test"
-		testPodImage := imageutils.GetE2EImage(imageutils.Agnhost)
-		testPodImage2 := imageutils.GetE2EImage(imageutils.Httpd)
+		testPodImage := imageutils.GetE2EImage(imageutils.AgnhostPrev)
+		testPodImage2 := imageutils.GetE2EImage(imageutils.Agnhost)
 		testPodLabels := map[string]string{"test-pod-static": "true"}
 		testPodLabelsFlat := "test-pod-static=true"
 		one := int64(1)

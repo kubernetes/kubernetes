@@ -95,7 +95,8 @@ func (v2) NewDesc(fqName, help string, variableLabels ConstrainableLabels, const
 		help:           help,
 		variableLabels: variableLabels.compile(),
 	}
-	if !model.IsValidMetricName(model.LabelValue(fqName)) {
+	//nolint:staticcheck // TODO: Don't use deprecated model.NameValidationScheme.
+	if !model.NameValidationScheme.IsValidMetricName(fqName) {
 		d.err = fmt.Errorf("%q is not a valid metric name", fqName)
 		return d
 	}

@@ -22,9 +22,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/prometheus/common/model"
-
 	dto "github.com/prometheus/client_model/go"
+
+	"github.com/prometheus/common/model"
 )
 
 // enhancedWriter has all the enhanced write functions needed here. bufio.Writer
@@ -354,7 +354,7 @@ func writeNameAndLabelPairs(
 	if name != "" {
 		// If the name does not pass the legacy validity check, we must put the
 		// metric name inside the braces.
-		if !model.IsValidLegacyMetricName(name) {
+		if !model.LegacyValidation.IsValidMetricName(name) {
 			metricInsideBraces = true
 			err := w.WriteByte(separator)
 			written++
@@ -498,7 +498,7 @@ func writeInt(w enhancedWriter, i int64) (int, error) {
 // writeName writes a string as-is if it complies with the legacy naming
 // scheme, or escapes it in double quotes if not.
 func writeName(w enhancedWriter, name string) (int, error) {
-	if model.IsValidLegacyMetricName(name) {
+	if model.LegacyValidation.IsValidMetricName(name) {
 		return w.WriteString(name)
 	}
 	var written int

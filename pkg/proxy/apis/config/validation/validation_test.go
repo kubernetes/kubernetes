@@ -56,7 +56,8 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			MasqueradeAll: true,
 		},
 		Logging: logsapi.LoggingConfiguration{
-			Format: "text",
+			Format:         "text",
+			FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: logsapi.LogFlushFreqDefault}},
 		},
 	}
 	newPath := field.NewPath("KubeProxyConfiguration")
@@ -174,7 +175,8 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 		"invalid logging format": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.Logging = logsapi.LoggingConfiguration{
-					Format: "unsupported format",
+					Format:         "unsupported format",
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: logsapi.LogFlushFreqDefault}},
 				}
 			},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("logging.format"), "unsupported format", "Unsupported log format")},

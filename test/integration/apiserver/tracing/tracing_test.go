@@ -88,7 +88,7 @@ resources:
 	defer os.Remove(tracingConfigFile.Name())
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: TracingConfiguration
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
@@ -231,7 +231,7 @@ egressSelections:
 	defer utiltesting.CloseAndRemove(t, tracingConfigFile)
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: TracingConfiguration
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
@@ -273,7 +273,7 @@ func TestUnauthenticatedAPIServerTracing(t *testing.T) {
 	defer os.Remove(tracingConfigFile.Name())
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: TracingConfiguration
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
@@ -342,7 +342,7 @@ func TestAPIServerTracing(t *testing.T) {
 	}()
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: TracingConfiguration
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
@@ -391,10 +391,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "POST"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {
@@ -510,10 +510,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "GET"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {
@@ -617,10 +617,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "GET"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {
@@ -712,10 +712,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "PUT"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {
@@ -856,10 +856,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "PATCH"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {
@@ -977,10 +977,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"user_agent.original": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
-						"http.target": func(v *commonv1.AnyValue) bool {
+						"url.path": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/api/v1/nodes/fake"
 						},
-						"http.method": func(v *commonv1.AnyValue) bool {
+						"http.request.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "DELETE"
 						},
 						"audit-id": func(v *commonv1.AnyValue) bool {

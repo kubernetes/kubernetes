@@ -20,74 +20,47 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // Cache is used for testing
 type Cache struct {
+	internalcache.Cache
 	AssumeFunc       func(*v1.Pod)
 	ForgetFunc       func(*v1.Pod)
 	IsAssumedPodFunc func(*v1.Pod) bool
 	GetPodFunc       func(*v1.Pod) *v1.Pod
 }
 
-// AssumePod is a fake method for testing.
+// AssumePod allows to mock this method for testing.
 func (c *Cache) AssumePod(logger klog.Logger, pod *v1.Pod) error {
-	c.AssumeFunc(pod)
-	return nil
+	if c.AssumeFunc != nil {
+		c.AssumeFunc(pod)
+		return nil
+	}
+	return c.Cache.AssumePod(logger, pod)
 }
 
-// FinishBinding is a fake method for testing.
-func (c *Cache) FinishBinding(logger klog.Logger, pod *v1.Pod) error { return nil }
-
-// ForgetPod is a fake method for testing.
+// ForgetPod allows to mock this method for testing.
 func (c *Cache) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
-	c.ForgetFunc(pod)
-	return nil
+	if c.ForgetFunc != nil {
+		c.ForgetFunc(pod)
+		return nil
+	}
+	return c.Cache.ForgetPod(logger, pod)
 }
 
-// AddPod is a fake method for testing.
-func (c *Cache) AddPod(logger klog.Logger, pod *v1.Pod) error { return nil }
-
-// UpdatePod is a fake method for testing.
-func (c *Cache) UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) error { return nil }
-
-// RemovePod is a fake method for testing.
-func (c *Cache) RemovePod(logger klog.Logger, pod *v1.Pod) error { return nil }
-
-// IsAssumedPod is a fake method for testing.
+// IsAssumedPod allows to mock this method for testing.
 func (c *Cache) IsAssumedPod(pod *v1.Pod) (bool, error) {
-	return c.IsAssumedPodFunc(pod), nil
+	if c.IsAssumedPodFunc != nil {
+		return c.IsAssumedPodFunc(pod), nil
+	}
+	return c.Cache.IsAssumedPod(pod)
 }
 
-// GetPod is a fake method for testing.
+// GetPod allows to mock this method for testing.
 func (c *Cache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
-	return c.GetPodFunc(pod), nil
-}
-
-// AddNode is a fake method for testing.
-func (c *Cache) AddNode(logger klog.Logger, node *v1.Node) *framework.NodeInfo { return nil }
-
-// UpdateNode is a fake method for testing.
-func (c *Cache) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo {
-	return nil
-}
-
-// RemoveNode is a fake method for testing.
-func (c *Cache) RemoveNode(logger klog.Logger, node *v1.Node) error { return nil }
-
-// UpdateSnapshot is a fake method for testing.
-func (c *Cache) UpdateSnapshot(logger klog.Logger, snapshot *internalcache.Snapshot) error {
-	return nil
-}
-
-// NodeCount is a fake method for testing.
-func (c *Cache) NodeCount() int { return 0 }
-
-// PodCount is a fake method for testing.
-func (c *Cache) PodCount() (int, error) { return 0, nil }
-
-// Dump is a fake method for testing.
-func (c *Cache) Dump() *internalcache.Dump {
-	return &internalcache.Dump{}
+	if c.GetPodFunc != nil {
+		return c.GetPodFunc(pod), nil
+	}
+	return c.Cache.GetPod(pod)
 }

@@ -396,6 +396,93 @@ func IsRestartableInitContainer(initContainer *v1.Container) bool {
 	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
 }
 
+// IsContainerRestartable returns true if the container can be restarted. A container can be
+// restarted if it has a pod-level restart policy "Always" or "OnFailure" and not override by
+// container-level restart policy, or a container-level restart policy "Always" or "OnFailure",
+// or a container level restart rule with action "Restart".
+func IsContainerRestartable(pod v1.PodSpec, container v1.Container) bool {
+	if container.RestartPolicy != nil {
+		for _, rule := range container.RestartPolicyRules {
+			if rule.Action == v1.ContainerRestartRuleActionRestart {
+				return true
+			}
+		}
+		return *container.RestartPolicy != v1.ContainerRestartPolicyNever
+	}
+	return pod.RestartPolicy != v1.RestartPolicyNever
+}
+
+// ContainerShouldRestart checks if a container should be restarted by its restart policy.
+// First, the container-level restartPolicyRules are evaluated in order. An action is taken if any
+// rules are matched. Second, the container-level restart policy is used. Lastly, if no container
+// level policy are specified, pod-level restart policy is used.
+func ContainerShouldRestart(container v1.Container, pod v1.PodSpec, exitCode int32) bool {
+	if container.RestartPolicy != nil {
+		rule, ok := findMatchingContainerRestartRule(container, exitCode)
+		if ok {
+			switch rule.Action {
+			case v1.ContainerRestartRuleActionRestart:
+				return true
+			default:
+				// Do nothing, fallback to container-level restart policy.
+			}
+		}
+
+		// Check container-level restart policy if no rules matched.
+		switch *container.RestartPolicy {
+		case v1.ContainerRestartPolicyAlways:
+			return true
+		case v1.ContainerRestartPolicyOnFailure:
+			return exitCode != 0
+		case v1.ContainerRestartPolicyNever:
+			return false
+		default:
+			// Do nothing, fallback to pod-level restart policy.
+		}
+	}
+
+	switch pod.RestartPolicy {
+	case v1.RestartPolicyAlways:
+		return true
+	case v1.RestartPolicyOnFailure:
+		return exitCode != 0
+	case v1.RestartPolicyNever:
+		return false
+	default:
+		// Default policy is Always, so we return true here.
+		return true
+	}
+}
+
+// findMatchingContainerRestartRule returns a rule and true if the exitCode matched
+// one of the restart rules for the given container. Returns and empty rule and
+// false if no rules matched.
+func findMatchingContainerRestartRule(container v1.Container, exitCode int32) (rule v1.ContainerRestartRule, found bool) {
+	for _, rule := range container.RestartPolicyRules {
+		if rule.ExitCodes != nil {
+			exitCodeMatched := false
+			for _, code := range rule.ExitCodes.Values {
+				if code == exitCode {
+					exitCodeMatched = true
+				}
+			}
+			switch rule.ExitCodes.Operator {
+			case v1.ContainerRestartRuleOnExitCodesOpIn:
+				if exitCodeMatched {
+					return rule, true
+				}
+			case v1.ContainerRestartRuleOnExitCodesOpNotIn:
+				if !exitCodeMatched {
+					return rule, true
+				}
+			default:
+				// Do nothing, continue to the next rule.
+			}
+		}
+	}
+	return v1.ContainerRestartRule{}, false
+}
+
 // CalculatePodStatusObservedGeneration calculates the observedGeneration for the pod status.
 // This is used to track the generation of the pod that was observed by the kubelet.
 // The observedGeneration is set to the pod's generation when the feature gate

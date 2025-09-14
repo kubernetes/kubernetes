@@ -636,8 +636,23 @@ func TestSetSelectorParser(t *testing.T) {
 		{"x in (abc,)", internalSelector{
 			getRequirement("x", selection.In, sets.NewString("abc", ""), t),
 		}, true, true},
+		{"x in (abc,abc)", internalSelector{
+			getRequirement("x", selection.In, sets.NewString("abc"), t),
+		}, true, true},
 		{"x in ()", internalSelector{
 			getRequirement("x", selection.In, sets.NewString(""), t),
+		}, true, true},
+		{"x in (a,,)", internalSelector{
+			getRequirement("x", selection.In, sets.NewString("a", ""), t),
+		}, true, true},
+		{"x in (a,,,)", internalSelector{
+			getRequirement("x", selection.In, sets.NewString("a", ""), t),
+		}, true, true},
+		{"x in (a,,,,,,)", internalSelector{
+			getRequirement("x", selection.In, sets.NewString("a", ""), t),
+		}, true, true},
+		{"x in (a,,a,,a,,a,,)", internalSelector{
+			getRequirement("x", selection.In, sets.NewString("a", ""), t),
 		}, true, true},
 		{"x notin (abc,,def),bar,z in (),w", internalSelector{
 			getRequirement("bar", selection.Exists, nil, t),

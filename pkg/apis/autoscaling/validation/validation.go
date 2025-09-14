@@ -21,6 +21,7 @@ import (
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -64,10 +65,10 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 	if autoscaler.MinReplicas != nil && autoscaler.MaxReplicas < *autoscaler.MinReplicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxReplicas"), autoscaler.MaxReplicas, "must be greater than or equal to `minReplicas`"))
 	}
-	if refErrs := ValidateCrossVersionObjectReference(autoscaler.ScaleTargetRef, fldPath.Child("scaleTargetRef")); len(refErrs) > 0 {
+	if refErrs := ValidateCrossVersionObjectReference(autoscaler.ScaleTargetRef, fldPath.Child("scaleTargetRef"), opts.ScaleTargetRefValidationOptions); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
-	if refErrs := validateMetrics(autoscaler.Metrics, fldPath.Child("metrics"), autoscaler.MinReplicas); len(refErrs) > 0 {
+	if refErrs := validateMetrics(autoscaler.Metrics, fldPath.Child("metrics"), autoscaler.MinReplicas, opts.ObjectMetricsValidationOptions); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
 	if refErrs := validateBehavior(autoscaler.Behavior, fldPath.Child("behavior"), opts); len(refErrs) > 0 {
@@ -78,7 +79,7 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 
 // ValidateCrossVersionObjectReference validates a CrossVersionObjectReference and returns an
 // ErrorList with any errors.
-func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectReference, fldPath *field.Path) field.ErrorList {
+func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectReference, fldPath *field.Path, opts CrossVersionObjectReferenceValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(ref.Kind) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
@@ -95,8 +96,23 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
 		}
 	}
-
+	if err := ValidateAPIVersion(ref, opts); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ref.APIVersion, err.Error()))
+	}
 	return allErrs
+}
+
+func ValidateAPIVersion(ref autoscaling.CrossVersionObjectReference, opts CrossVersionObjectReferenceValidationOptions) error {
+	if opts.AllowInvalidAPIVersion {
+		return nil
+	}
+	gv, err := schema.ParseGroupVersion(ref.APIVersion)
+	if err != nil {
+		return err
+	} else if !opts.AllowEmptyAPIGroup && gv.Group == "" {
+		return fmt.Errorf("apiVersion must specify API group")
+	}
+	return nil
 }
 
 // ValidateHorizontalPodAutoscaler validates a HorizontalPodAutoscaler and returns an
@@ -125,21 +141,31 @@ func ValidateHorizontalPodAutoscalerStatusUpdate(newAutoscaler, oldAutoscaler *a
 	return allErrs
 }
 
+// CrossVersionObjectReferenceValidationOptions contains the different setting
+// to validate CrossVersionObjectReference.
+type CrossVersionObjectReferenceValidationOptions struct {
+	// Whether to allow API Version empty
+	AllowEmptyAPIGroup bool
+	// AllowInvalidAPIVersion skips APIVersion validation when true.
+	AllowInvalidAPIVersion bool
+}
+
 // HorizontalPodAutoscalerSpecValidationOptions contains the different settings for
 // HorizontalPodAutoscaler spec validation.
 type HorizontalPodAutoscalerSpecValidationOptions struct {
 	// The minimum value for minReplicas.
-	MinReplicasLowerBound int32
+	MinReplicasLowerBound           int32
+	ScaleTargetRefValidationOptions CrossVersionObjectReferenceValidationOptions
+	ObjectMetricsValidationOptions  CrossVersionObjectReferenceValidationOptions
 }
 
-func validateMetrics(metrics []autoscaling.MetricSpec, fldPath *field.Path, minReplicas *int32) field.ErrorList {
+func validateMetrics(newMetrics []autoscaling.MetricSpec, fldPath *field.Path, minReplicas *int32, opts CrossVersionObjectReferenceValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	hasObjectMetrics := false
 	hasExternalMetrics := false
-
-	for i, metricSpec := range metrics {
+	for i, metricSpec := range newMetrics {
 		idxPath := fldPath.Index(i)
-		if targetErrs := validateMetricSpec(metricSpec, idxPath); len(targetErrs) > 0 {
+		if targetErrs := validateMetricSpec(metricSpec, idxPath, opts); len(targetErrs) > 0 {
 			allErrs = append(allErrs, targetErrs...)
 		}
 		if metricSpec.Type == autoscaling.ObjectMetricSourceType {
@@ -232,7 +258,7 @@ var validMetricSourceTypes = sets.NewString(
 	string(autoscaling.ContainerResourceMetricSourceType))
 var validMetricSourceTypesList = validMetricSourceTypes.List()
 
-func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.ErrorList {
+func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path, opts CrossVersionObjectReferenceValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(string(spec.Type)) == 0 {
@@ -247,7 +273,7 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 	if spec.Object != nil {
 		typesPresent.Insert("object")
 		if typesPresent.Len() == 1 {
-			allErrs = append(allErrs, validateObjectSource(spec.Object, fldPath.Child("object"))...)
+			allErrs = append(allErrs, validateObjectSource(spec.Object, fldPath.Child("object"), opts)...)
 		}
 	}
 
@@ -321,10 +347,9 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 	return allErrs
 }
 
-func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Path) field.ErrorList {
+func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Path, opts CrossVersionObjectReferenceValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	allErrs = append(allErrs, ValidateCrossVersionObjectReference(src.DescribedObject, fldPath.Child("describedObject"))...)
+	allErrs = append(allErrs, ValidateCrossVersionObjectReference(src.DescribedObject, fldPath.Child("describedObject"), opts)...)
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -121,8 +122,11 @@ func (p *Provider) GetCgroupStats(cgroupName string, updateStats bool) (*statsap
 		}
 		return nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
 	}
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a context parameter.
+	logger := klog.TODO()
 	// Rootfs and imagefs doesn't make sense for raw cgroup.
-	s := cadvisorInfoToContainerStats(cgroupName, info, nil, nil)
+	s := cadvisorInfoToContainerStats(logger, cgroupName, info, nil, nil)
 	n := cadvisorInfoToNetworkStats(info)
 	return s, n, nil
 }

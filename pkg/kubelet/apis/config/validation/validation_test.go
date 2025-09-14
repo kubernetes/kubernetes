@@ -76,7 +76,8 @@ var (
 			"KubeletCrashLoopBackOffMax": true,
 		},
 		Logging: logsapi.LoggingConfiguration{
-			Format: "text",
+			Format:         "text",
+			FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: logsapi.LogFlushFreqDefault}},
 		},
 		ContainerRuntimeEndpoint:    "unix:///run/containerd/containerd.sock",
 		ContainerLogMaxWorkers:      1,
@@ -604,7 +605,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.EnableSystemLogQuery = true
 				return conf
 			},
-			errMsg: "invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler",
+			errMsg: "invalid configuration: NodeLogQuery feature gate is required for enableSystemLogQuery",
 		}, {
 			name: "enableSystemLogQuery is enabled without enableSystemLogHandler",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

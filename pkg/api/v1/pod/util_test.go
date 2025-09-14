@@ -1025,6 +1025,9 @@ func TestCalculatePodStatusObservedGeneration(t *testing.T) {
 					Generation: 5,
 				},
 			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: false,
+			},
 			expected: 0,
 		},
 		{
@@ -1048,6 +1051,9 @@ func TestCalculatePodStatusObservedGeneration(t *testing.T) {
 				Status: v1.PodStatus{
 					ObservedGeneration: 5,
 				},
+			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: false,
 			},
 			expected: 5,
 		},
@@ -1097,6 +1103,9 @@ func TestCalculatePodConditionObservedGeneration(t *testing.T) {
 					}},
 				},
 			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: false,
+			},
 			expected: 0,
 		},
 		{
@@ -1129,6 +1138,9 @@ func TestCalculatePodConditionObservedGeneration(t *testing.T) {
 					}},
 				},
 			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: false,
+			},
 			expected: 5,
 		},
 		{
@@ -1157,6 +1169,333 @@ func TestCalculatePodConditionObservedGeneration(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, v)
 			}
 			assert.Equal(t, tc.expected, CalculatePodConditionObservedGeneration(&tc.pod.Status, tc.pod.Generation, v1.PodReady))
+		})
+	}
+}
+
+func TestIsContainerRestartable(t *testing.T) {
+	var (
+		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
+	)
+
+	testCases := []struct {
+		name      string
+		podSpec   v1.PodSpec
+		container v1.Container
+		expected  bool
+	}{
+		{
+			name:    "Container: Rule action 'Restart' should always be true",
+			podSpec: v1.PodSpec{RestartPolicy: v1.RestartPolicyNever},
+			container: v1.Container{
+				RestartPolicy: &containerRestartPolicyNever,
+				RestartPolicyRules: []v1.ContainerRestartRule{
+					{Action: v1.ContainerRestartRuleActionRestart},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:    "Container: Policy 'Always' is restartable",
+			podSpec: v1.PodSpec{RestartPolicy: v1.RestartPolicyNever},
+			container: v1.Container{
+				RestartPolicy: &containerRestartPolicyAlways,
+			},
+			expected: true,
+		},
+		{
+			name:    "Container: Policy 'OnFailure' is restartable",
+			podSpec: v1.PodSpec{RestartPolicy: v1.RestartPolicyNever},
+			container: v1.Container{
+				RestartPolicy: &containerRestartPolicyOnFailure,
+			},
+			expected: true,
+		},
+		{
+			name:    "Container: Policy 'Never' is not restartable",
+			podSpec: v1.PodSpec{RestartPolicy: v1.RestartPolicyAlways},
+			container: v1.Container{
+				RestartPolicy: &containerRestartPolicyNever,
+			},
+			expected: false,
+		},
+		{
+			name:      "Pod Fallback: Policy 'Always' is restartable",
+			podSpec:   v1.PodSpec{RestartPolicy: v1.RestartPolicyAlways},
+			container: v1.Container{},
+			expected:  true,
+		},
+		{
+			name:      "Pod Fallback: Policy 'OnFailure' is restartable",
+			podSpec:   v1.PodSpec{RestartPolicy: v1.RestartPolicyOnFailure},
+			container: v1.Container{},
+			expected:  true,
+		},
+		{
+			name:      "Pod Fallback: Policy 'Never' is not restartable",
+			podSpec:   v1.PodSpec{RestartPolicy: v1.RestartPolicyNever},
+			container: v1.Container{},
+			expected:  false,
+		},
+		{
+			name:      "Pod Fallback: Default empty policy is restartable (since it's not 'Never')",
+			podSpec:   v1.PodSpec{},
+			container: v1.Container{},
+			expected:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := IsContainerRestartable(tc.podSpec, tc.container)
+			if got != tc.expected {
+				t.Errorf("IsContainerRestartable() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestContainerHasRestartablePolicy(t *testing.T) {
+	var (
+		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
+	)
+
+	testCases := []struct {
+		name      string
+		container v1.Container
+		podSpec   v1.PodSpec
+		exitCode  int32
+		expected  bool
+	}{
+		{
+			name: "Rule: 'In' operator matches with 'Restart' action",
+			container: v1.Container{
+				RestartPolicy: &containerRestartPolicyNever,
+				RestartPolicyRules: []v1.ContainerRestartRule{
+					{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{42, 50, 60},
+						},
+					},
+				},
+			},
+			exitCode: 42,
+			expected: true,
+		},
+		{
+			name: "Rule: 'NotIn' operator matches with 'Restart' action",
+			container: v1.Container{
+				RestartPolicy: &containerRestartPolicyNever,
+				RestartPolicyRules: []v1.ContainerRestartRule{
+					{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpNotIn,
+							Values:   []int32{0, 1, 2},
+						},
+					},
+				},
+			},
+			exitCode: 99,
+			expected: true,
+		},
+		{
+			name: "Rule: 'In' operator does not match, should fall back to container policy",
+			container: v1.Container{
+				RestartPolicy: &containerRestartPolicyNever,
+				RestartPolicyRules: []v1.ContainerRestartRule{
+					{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{10, 20},
+						},
+					},
+				},
+			},
+			exitCode: 30,
+			expected: false,
+		},
+		{
+			name: "Rule: 'NotIn' operator does not match, should fall back to container policy",
+			container: v1.Container{
+				RestartPolicy: &containerRestartPolicyNever,
+				RestartPolicyRules: []v1.ContainerRestartRule{
+					{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpNotIn,
+							Values:   []int32{10, 20},
+						},
+					},
+				},
+			},
+			exitCode: 10,
+			expected: false,
+		},
+		{
+			name:      "Container Policy: 'Always'",
+			container: v1.Container{RestartPolicy: &containerRestartPolicyAlways},
+			podSpec:   v1.PodSpec{RestartPolicy: v1.RestartPolicyNever},
+			exitCode:  0,
+			expected:  true,
+		},
+		{
+			name:      "Container Policy: 'OnFailure' with exit code 0",
+			container: v1.Container{RestartPolicy: &containerRestartPolicyOnFailure},
+			podSpec:   v1.PodSpec{RestartPolicy: v1.RestartPolicyNever},
+			exitCode:  0,
+			expected:  false,
+		},
+		{
+			name:      "Container Policy: 'OnFailure' with non-zero exit code",
+			container: v1.Container{RestartPolicy: &containerRestartPolicyOnFailure},
+			podSpec:   v1.PodSpec{RestartPolicy: v1.RestartPolicyNever},
+			exitCode:  1,
+			expected:  true,
+		},
+		{
+			name:      "Container Policy: 'Never' should return false",
+			container: v1.Container{RestartPolicy: &containerRestartPolicyNever},
+			podSpec:   v1.PodSpec{RestartPolicy: v1.RestartPolicyAlways},
+			exitCode:  1,
+			expected:  false,
+		},
+		// --- Scenarios for Pod-Level Restart Policy (Lowest Priority) ---
+		{
+			name:      "Pod Policy: Fallback to pod 'Always'",
+			container: v1.Container{},
+			podSpec:   v1.PodSpec{RestartPolicy: v1.RestartPolicyAlways},
+			exitCode:  0,
+			expected:  true,
+		},
+		{
+			name:      "Pod Policy: Fallback to pod 'OnFailure' with non-zero exit code",
+			container: v1.Container{},
+			podSpec:   v1.PodSpec{RestartPolicy: v1.RestartPolicyOnFailure},
+			exitCode:  1,
+			expected:  true,
+		},
+		{
+			name:      "Pod Policy: Fallback to pod 'Never'",
+			container: v1.Container{},
+			podSpec:   v1.PodSpec{RestartPolicy: v1.RestartPolicyNever},
+			exitCode:  1,
+			expected:  false,
+		},
+		{
+			name:      "Pod Policy: Fallback with no policies specified should return true",
+			container: v1.Container{},
+			podSpec:   v1.PodSpec{},
+			exitCode:  0,
+			expected:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Execute the function under test
+			got := ContainerShouldRestart(tc.container, tc.podSpec, tc.exitCode)
+
+			// Assert the result
+			if got != tc.expected {
+				t.Errorf("ContainerHasRestartablePolicy() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestFindMatchingContainerRestartRule(t *testing.T) {
+	ruleIn := v1.ContainerRestartRule{
+		Action: v1.ContainerRestartRuleActionRestart,
+		ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+			Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+			Values:   []int32{42, 50, 60},
+		},
+	}
+	ruleNotIn := v1.ContainerRestartRule{
+		Action: v1.ContainerRestartRuleActionRestart,
+		ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+			Operator: v1.ContainerRestartRuleOnExitCodesOpNotIn,
+			Values:   []int32{0, 1, 2},
+		},
+	}
+	ruleIn42 := v1.ContainerRestartRule{
+		Action: v1.ContainerRestartRuleActionRestart,
+		ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+			Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+			Values:   []int32{42},
+		},
+	}
+	emptyRule := v1.ContainerRestartRule{}
+
+	testCases := []struct {
+		name          string
+		container     v1.Container
+		exitCode      int32
+		expectedFound bool
+		expectedRule  v1.ContainerRestartRule
+	}{
+		{
+			name: "a rule with op In matches",
+			container: v1.Container{
+				RestartPolicyRules: []v1.ContainerRestartRule{ruleIn},
+			},
+			exitCode:      42,
+			expectedFound: true,
+			expectedRule:  ruleIn,
+		},
+		{
+			name: "a rule with op NotIn matches",
+			container: v1.Container{
+				RestartPolicyRules: []v1.ContainerRestartRule{ruleNotIn},
+			},
+			exitCode:      99,
+			expectedFound: true,
+			expectedRule:  ruleNotIn,
+		},
+		{
+			name: "matches the first rule if two rules both matched",
+			container: v1.Container{
+				RestartPolicyRules: []v1.ContainerRestartRule{ruleIn, ruleIn42},
+			},
+			exitCode:      42,
+			expectedFound: true,
+			expectedRule:  ruleIn,
+		},
+		{
+			name: "no rules matched",
+			container: v1.Container{
+				RestartPolicyRules: []v1.ContainerRestartRule{ruleIn},
+			},
+			exitCode:      100,
+			expectedFound: false,
+			expectedRule:  emptyRule,
+		},
+		{
+			name:          "no rules defined",
+			container:     v1.Container{},
+			exitCode:      0,
+			expectedFound: false,
+			expectedRule:  emptyRule,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			rule, found := findMatchingContainerRestartRule(tc.container, tc.exitCode)
+			if found != tc.expectedFound {
+				t.Errorf("FindMatchingContainerRestartRule() found = %v, want %v", found, tc.expectedFound)
+			}
+			if !reflect.DeepEqual(rule, tc.expectedRule) {
+				t.Errorf("FindMatchingContainerRestartRule() rule = %+v, want %+v", rule, tc.expectedRule)
+			}
 		})
 	}
 }

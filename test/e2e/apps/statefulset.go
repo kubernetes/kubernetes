@@ -66,7 +66,6 @@ import (
 const (
 	zookeeperManifestPath   = "test/e2e/testing-manifests/statefulset/zookeeper"
 	mysqlGaleraManifestPath = "test/e2e/testing-manifests/statefulset/mysql-galera"
-	redisManifestPath       = "test/e2e/testing-manifests/statefulset/redis"
 	cockroachDBManifestPath = "test/e2e/testing-manifests/statefulset/cockroachdb"
 	// We don't restart MySQL cluster regardless of restartCluster, since MySQL doesn't handle restart well
 	restartCluster = true
@@ -87,7 +86,7 @@ const (
 var httpProbe = &v1.Probe{
 	ProbeHandler: v1.ProbeHandler{
 		HTTPGet: &v1.HTTPGetAction{
-			Path: "/index.html",
+			Path: "/localhost.crt",
 			Port: intstr.IntOrString{IntVal: 80},
 		},
 	},
@@ -365,7 +364,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 					currentRevision)
 			}
-			newImage := NewWebserverImage
+			newImage := AgnhostImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
@@ -612,7 +611,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 					currentRevision)
 			}
-			newImage := NewWebserverImage
+			newImage := AgnhostImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
@@ -823,8 +822,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "webserver",
-							Image: imageutils.GetE2EImage(imageutils.Httpd),
+							Name:  "agnhost",
+							Image: imageutils.GetE2EImage(imageutils.Agnhost),
 							Ports: []v1.ContainerPort{conflictingPort},
 						},
 					},
@@ -986,7 +985,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Define StatefulSet Labels
 			ssPodLabels := map[string]string{
 				"name": "sample-pod",
-				"pod":  WebserverImageName,
+				"pod":  AgnhostImageName,
 			}
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
 			setHTTPProbe(ss)
@@ -1197,14 +1196,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working redis cluster", func(ctx context.Context) {
-			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
-			appTester.statefulPod = &redisTester{client: c}
-			appTester.run(ctx)
-		})
-
-		// Do not mark this as Conformance.
-		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working mysql cluster", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 			appTester.statefulPod = &mysqlGaleraTester{client: c}
@@ -1228,7 +1219,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Define StatefulSet Labels
 		ssPodLabels := map[string]string{
 			"name": "sample-pod",
-			"pod":  WebserverImageName,
+			"pod":  AgnhostImageName,
 		}
 		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
 		setHTTPProbe(ss)
@@ -1243,7 +1234,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Define StatefulSet Labels
 		ssPodLabels := map[string]string{
 			"name": "sample-pod",
-			"pod":  WebserverImageName,
+			"pod":  AgnhostImageName,
 		}
 		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, nil, nil, ssPodLabels)
 		ss.Spec.MinReadySeconds = 30
@@ -2090,37 +2081,6 @@ func (m *mysqlGaleraTester) read(statefulPodIndex int, key string) string {
 	return lastLine(m.mysqlExec(fmt.Sprintf("use statefulset; select v from foo where k=\"%v\";", key), m.ss.Namespace, name))
 }
 
-type redisTester struct {
-	ss     *appsv1.StatefulSet
-	client clientset.Interface
-}
-
-func (m *redisTester) name() string {
-	return "redis: master/slave"
-}
-
-func (m *redisTester) redisExec(cmd, ns, podName string) string {
-	cmd = fmt.Sprintf("/opt/redis/redis-cli -h %v %v", podName, cmd)
-	return e2ekubectl.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
-}
-
-func (m *redisTester) deploy(ctx context.Context, ns string) *appsv1.StatefulSet {
-	m.ss = e2estatefulset.CreateStatefulSet(ctx, m.client, redisManifestPath, ns)
-	return m.ss
-}
-
-func (m *redisTester) write(statefulPodIndex int, kv map[string]string) {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	for k, v := range kv {
-		framework.Logf("%s", m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
-	}
-}
-
-func (m *redisTester) read(statefulPodIndex int, key string) string {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	return lastLine(m.redisExec(fmt.Sprintf("GET %v", key), m.ss.Namespace, name))
-}
-
 type cockroachDBTester struct {
 	ss     *appsv1.StatefulSet
 	client clientset.Interface
@@ -2206,7 +2166,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	err = breakPodHTTPProbe(ss, &pods.Items[1])
 	framework.ExpectNoError(err)
 	ss, _ = waitForPodNotReady(ctx, c, ss, pods.Items[1].Name)
-	newImage := NewWebserverImage
+	newImage := AgnhostImage
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 	ginkgo.By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
@@ -2330,7 +2290,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	defer e2epod.NewPodClient(f).RemoveFinalizer(ctx, pod0.Name, testFinalizer)
 
 	ginkgo.By("Updating image on StatefulSet")
-	newImage := NewWebserverImage
+	newImage := AgnhostImage
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
 	ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
 	gomega.Expect(oldImage).ToNot(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
@@ -2471,7 +2431,7 @@ func breakHTTPProbe(ctx context.Context, c clientset.Interface, ss *appsv1.State
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
+	cmd := fmt.Sprintf("mv -v %v /tmp/ || true", path)
 	return e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd)
 }
 
@@ -2481,8 +2441,7 @@ func breakPodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	if path == "" {
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
-	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
+	cmd := fmt.Sprintf("mv -v %v /tmp/ || true", path)
 	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
@@ -2495,7 +2454,7 @@ func restoreHTTPProbe(ctx context.Context, c clientset.Interface, ss *appsv1.Sta
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
+	cmd := fmt.Sprintf("mv -v /tmp%v / || true", path)
 	return e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd)
 }
 
@@ -2506,7 +2465,7 @@ func restorePodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
+	cmd := fmt.Sprintf("mv -v /tmp%v / || true", path)
 	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err

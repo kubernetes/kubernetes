@@ -656,7 +656,7 @@ func TestGetDefinitionRefPrefix(t *testing.T) {
 	// the first call to getDefinition
 
 	// ManagedFieldsEntry's Time field is known to use arefs
-	managedFieldsTypePath := "k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry"
+	managedFieldsTypePath := "io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
 
 	v2Ref := getDefinition(managedFieldsTypePath, true).SchemaProps.Properties["time"].SchemaProps.Ref
 	v3Ref := getDefinition(managedFieldsTypePath, false).SchemaProps.Properties["time"].SchemaProps.Ref

@@ -77,4 +77,17 @@ func Test(t *testing.T) {
 		`dualItems[1]`: {"item DualItems[id=typedef-target] from typedef"},
 		`dualItems[2]`: {"item DualItems[id=field-target] from field"},
 	})
+
+	// Test tag on field and typedef with same key.
+	st.Value(&Struct{
+		ConflictingItems: ConflictingItemList{
+			{ID: "a", Name: "n1"},
+			{ID: "target", Name: "n2"},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		`conflictingItems[1]`: {
+			"item ConflictingItems[id=target] from typedef",
+			"item ConflictingItems[id=target] from field",
+		},
+	})
 }

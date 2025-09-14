@@ -29,5 +29,5 @@ func TestMain(m *testing.M) {
 	}
 	defer os.RemoveAll(tmp)
 	os.Setenv("KUBECONFIG", filepath.Join(tmp, "dummy-nonexistent-kubeconfig"))
-	os.Exit(m.Run())
+	m.Run()
 }

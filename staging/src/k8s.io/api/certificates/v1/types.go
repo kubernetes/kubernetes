@@ -39,6 +39,8 @@ import (
 // This API can be used to request client certificates to authenticate to kube-apiserver
 // (with the "kubernetes.io/kube-apiserver-client" signerName),
 // or to obtain certificates from custom non-Kubernetes signers.
+// +k8s:supportsSubresource=/status
+// +k8s:supportsSubresource=/approval
 type CertificateSigningRequest struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
@@ -178,6 +180,11 @@ type CertificateSigningRequestStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=type
+	// +k8s:optional
+	// +k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
+	// +k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// certificate is populated with an issued certificate by the signer after an Approved condition is present.

@@ -19,6 +19,7 @@ package v1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -551,4 +552,14 @@ type WebhookMatchCondition struct {
 	//
 	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
 	Expression string `json:"expression"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// TracingConfiguration provides versioned configuration for tracing clients.
+type TracingConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Embed the component config tracing configuration struct
+	tracingapi.TracingConfiguration `json:",inline"`
 }

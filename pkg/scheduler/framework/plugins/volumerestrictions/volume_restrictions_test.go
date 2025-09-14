@@ -57,7 +57,7 @@ func TestGCEDiskConflicts(t *testing.T) {
 	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
 		preFilterWantStatus *fwk.Status
 		wantStatus          *fwk.Status
@@ -106,13 +106,13 @@ func TestGCEDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
+			_, preFilterGotStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
 			// If PreFilter fails, then Filter will not run.
 			if test.preFilterWantStatus.IsSuccess() {
-				gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+				gotStatus := p.(fwk.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 					t.Errorf("Unexpected Filter status (-want, +got): %s", diff)
 				}
@@ -139,7 +139,7 @@ func TestAWSDiskConflicts(t *testing.T) {
 	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
 		wantStatus          *fwk.Status
 		preFilterWantStatus *fwk.Status
@@ -181,13 +181,13 @@ func TestAWSDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
+			_, preFilterGotStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
 			// If PreFilter fails, then Filter will not run.
 			if test.preFilterWantStatus.IsSuccess() {
-				gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+				gotStatus := p.(fwk.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 					t.Errorf("Unexpected Filter status (-want, +got): %s", diff)
 				}
@@ -220,7 +220,7 @@ func TestRBDDiskConflicts(t *testing.T) {
 	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
 		wantStatus          *fwk.Status
 		preFilterWantStatus *fwk.Status
@@ -262,13 +262,13 @@ func TestRBDDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
+			_, preFilterGotStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
 			// If PreFilter fails, then Filter will not run.
 			if test.preFilterWantStatus.IsSuccess() {
-				gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+				gotStatus := p.(fwk.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 					t.Errorf("Unexpected Filter status (-want, +got): %s", diff)
 				}
@@ -301,7 +301,7 @@ func TestISCSIDiskConflicts(t *testing.T) {
 	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
 		wantStatus          *fwk.Status
 		preFilterWantStatus *fwk.Status
@@ -343,13 +343,13 @@ func TestISCSIDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
+			_, preFilterGotStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
 			// If PreFilter fails, then Filter will not run.
 			if test.preFilterWantStatus.IsSuccess() {
-				gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+				gotStatus := p.(fwk.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 					t.Errorf("Unexpected Filter status (-want, +got): %s", diff)
 				}
@@ -405,7 +405,7 @@ func TestAccessModeConflicts(t *testing.T) {
 	tests := []struct {
 		name                string
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		existingPods        []*v1.Pod
 		existingNodes       []*v1.Node
 		existingPVCs        []*v1.PersistentVolumeClaim
@@ -471,13 +471,13 @@ func TestAccessModeConflicts(t *testing.T) {
 			defer cancel()
 			p := newPluginWithListers(ctx, t, test.existingPods, test.existingNodes, test.existingPVCs)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
+			_, preFilterGotStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
 			// If PreFilter fails, then Filter will not run.
 			if test.preFilterWantStatus.IsSuccess() {
-				gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+				gotStatus := p.(fwk.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 					t.Errorf("Unexpected Filter status (-want, +got): %s", diff)
 				}
@@ -784,12 +784,12 @@ func Test_isSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 	}
 }
 
-func newPlugin(ctx context.Context, t *testing.T) framework.Plugin {
+func newPlugin(ctx context.Context, t *testing.T) fwk.Plugin {
 	return newPluginWithListers(ctx, t, nil, nil, nil)
 }
 
-func newPluginWithListers(ctx context.Context, t *testing.T, pods []*v1.Pod, nodes []*v1.Node, pvcs []*v1.PersistentVolumeClaim) framework.Plugin {
-	pluginFactory := func(ctx context.Context, plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+func newPluginWithListers(ctx context.Context, t *testing.T, pods []*v1.Pod, nodes []*v1.Node, pvcs []*v1.PersistentVolumeClaim) fwk.Plugin {
+	pluginFactory := func(ctx context.Context, plArgs runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		return New(ctx, plArgs, fh, feature.Features{})
 	}
 	snapshot := cache.NewSnapshot(pods, nodes)

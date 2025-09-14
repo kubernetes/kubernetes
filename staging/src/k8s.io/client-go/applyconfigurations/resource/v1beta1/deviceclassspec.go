@@ -20,9 +20,29 @@ package v1beta1
 
 // DeviceClassSpecApplyConfiguration represents a declarative configuration of the DeviceClassSpec type for use
 // with apply.
+//
+// DeviceClassSpec is used in a [DeviceClass] to define what can be allocated
+// and how to configure it.
 type DeviceClassSpecApplyConfiguration struct {
-	Selectors []DeviceSelectorApplyConfiguration           `json:"selectors,omitempty"`
-	Config    []DeviceClassConfigurationApplyConfiguration `json:"config,omitempty"`
+	// Each selector must be satisfied by a device which is claimed via this class.
+	Selectors []DeviceSelectorApplyConfiguration `json:"selectors,omitempty"`
+	// Config defines configuration parameters that apply to each device that is claimed via this class.
+	// Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor
+	// configuration applies to exactly one driver.
+	//
+	// They are passed to the driver, but are not considered while allocating the claim.
+	Config []DeviceClassConfigurationApplyConfiguration `json:"config,omitempty"`
+	// ExtendedResourceName is the extended resource name for the devices of this class.
+	// The devices of this class can be used to satisfy a pod's extended resource requests.
+	// It has the same format as the name of a pod's extended resource.
+	// It should be unique among all the device classes in a cluster.
+	// If two device classes have the same name, then the class created later
+	// is picked to satisfy a pod's extended resource requests.
+	// If two classes are created at the same time, then the name of the class
+	// lexicographically sorted first is picked.
+	//
+	// This is an alpha field.
+	ExtendedResourceName *string `json:"extendedResourceName,omitempty"`
 }
 
 // DeviceClassSpecApplyConfiguration constructs a declarative configuration of the DeviceClassSpec type for use with
@@ -54,5 +74,13 @@ func (b *DeviceClassSpecApplyConfiguration) WithConfig(values ...*DeviceClassCon
 		}
 		b.Config = append(b.Config, *values[i])
 	}
+	return b
+}
+
+// WithExtendedResourceName sets the ExtendedResourceName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ExtendedResourceName field is set to the value of the last call.
+func (b *DeviceClassSpecApplyConfiguration) WithExtendedResourceName(value string) *DeviceClassSpecApplyConfiguration {
+	b.ExtendedResourceName = &value
 	return b
 }

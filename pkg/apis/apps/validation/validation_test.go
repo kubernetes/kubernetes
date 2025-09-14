@@ -801,8 +801,9 @@ func TestValidateStatefulSet(t *testing.T) {
 		set: mkStatefulSet(&validPodTemplate,
 			tweakVolumeClaimTemplates(invalidVolumeClaimTemplates2),
 		),
-		// volumeAttributesClassName not getting validated properly on create
-		errs: nil,
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates").Index(0).Child("spec", "volumeAttributesClassName"), invalidName, ""),
+		},
 	},
 	}
 

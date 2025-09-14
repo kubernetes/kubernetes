@@ -29,10 +29,15 @@ import (
 
 // NetworkPolicyApplyConfiguration represents a declarative configuration of the NetworkPolicy type for use
 // with apply.
+//
+// NetworkPolicy describes what network traffic is allowed for a set of Pods
 type NetworkPolicyApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *NetworkPolicySpecApplyConfiguration `json:"spec,omitempty"`
+	// spec represents the specification of the desired behavior for this NetworkPolicy.
+	Spec *NetworkPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // NetworkPolicy constructs a declarative configuration of the NetworkPolicy type for use with
@@ -46,29 +51,14 @@ func NetworkPolicy(name, namespace string) *NetworkPolicyApplyConfiguration {
 	return b
 }
 
-// ExtractNetworkPolicy extracts the applied configuration owned by fieldManager from
-// networkPolicy. If no managedFields are found in networkPolicy for fieldManager, a
-// NetworkPolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractNetworkPolicyFrom extracts the applied configuration owned by fieldManager from
+// networkPolicy for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // networkPolicy must be a unmodified NetworkPolicy API object that was retrieved from the Kubernetes API.
-// ExtractNetworkPolicy provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractNetworkPolicyFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractNetworkPolicy(networkPolicy *networkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
-	return extractNetworkPolicy(networkPolicy, fieldManager, "")
-}
-
-// ExtractNetworkPolicyStatus is the same as ExtractNetworkPolicy except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractNetworkPolicyStatus(networkPolicy *networkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
-	return extractNetworkPolicy(networkPolicy, fieldManager, "status")
-}
-
-func extractNetworkPolicy(networkPolicy *networkingv1.NetworkPolicy, fieldManager string, subresource string) (*NetworkPolicyApplyConfiguration, error) {
+func ExtractNetworkPolicyFrom(networkPolicy *networkingv1.NetworkPolicy, fieldManager string, subresource string) (*NetworkPolicyApplyConfiguration, error) {
 	b := &NetworkPolicyApplyConfiguration{}
 	err := managedfields.ExtractInto(networkPolicy, internal.Parser().Type("io.k8s.api.networking.v1.NetworkPolicy"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,6 +71,21 @@ func extractNetworkPolicy(networkPolicy *networkingv1.NetworkPolicy, fieldManage
 	b.WithAPIVersion("networking.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractNetworkPolicy extracts the applied configuration owned by fieldManager from
+// networkPolicy. If no managedFields are found in networkPolicy for fieldManager, a
+// NetworkPolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// networkPolicy must be a unmodified NetworkPolicy API object that was retrieved from the Kubernetes API.
+// ExtractNetworkPolicy provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractNetworkPolicy(networkPolicy *networkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
+	return ExtractNetworkPolicyFrom(networkPolicy, fieldManager, "")
+}
+
 func (b NetworkPolicyApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

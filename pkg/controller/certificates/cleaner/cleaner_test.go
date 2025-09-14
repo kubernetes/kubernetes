@@ -172,6 +172,30 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 			[]string{"delete"},
 		},
 		{
+			"delete approved unissued past deadline",
+			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
+			nil,
+			[]capi.CertificateSigningRequestCondition{
+				{
+					Type:           capi.CertificateApproved,
+					LastUpdateTime: metav1.NewTime(time.Now().Add(-25 * time.Hour)),
+				},
+			},
+			[]string{"delete"},
+		},
+		{
+			"no delete approved unissued not past deadline",
+			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
+			nil,
+			[]capi.CertificateSigningRequestCondition{
+				{
+					Type:           capi.CertificateApproved,
+					LastUpdateTime: metav1.NewTime(time.Now().Add(-5 * time.Hour)),
+				},
+			},
+			[]string{},
+		},
+		{
 			"no delete approved not passed deadline unexpired",
 			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
 			[]byte(unexpiredCert),

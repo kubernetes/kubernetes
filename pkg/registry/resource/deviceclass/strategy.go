@@ -23,9 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // deviceClassStrategy implements behavior for DeviceClass objects
@@ -89,4 +91,27 @@ func (deviceClassStrategy) AllowUnconditionalUpdate() bool {
 
 // dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClass, oldClass *resource.DeviceClass) {
+	dropDisabledDRAExtendedResourceFields(newClass, oldClass)
+}
+
+func dropDisabledDRAExtendedResourceFields(newClass, oldClass *resource.DeviceClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		return
+	}
+	if draExtendedResourceFeatureInUse(oldClass) {
+		return
+	}
+	newClass.Spec.ExtendedResourceName = nil
+}
+
+func draExtendedResourceFeatureInUse(class *resource.DeviceClass) bool {
+	if class == nil {
+		return false
+	}
+
+	if class.Spec.ExtendedResourceName != nil {
+		return true
+	}
+
+	return false
 }

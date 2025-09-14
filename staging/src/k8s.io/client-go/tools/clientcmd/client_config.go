@@ -533,6 +533,21 @@ func (config *DirectClientConfig) getAuthInfo() (clientcmdapi.AuthInfo, error) {
 		if err := merge(mergedAuthInfo, &config.overrides.AuthInfo); err != nil {
 			return clientcmdapi.AuthInfo{}, err
 		}
+
+		// Handle ClientKey/ClientKeyData conflict: if override sets ClientKey, also use override's ClientKeyData
+		// otherwise if original config has ClientKeyData set,
+		// validation returns error "client-key-data and client-key are both specified <user-name>"
+		if len(config.overrides.AuthInfo.ClientKey) > 0 || len(config.overrides.AuthInfo.ClientKeyData) > 0 {
+			mergedAuthInfo.ClientKey = config.overrides.AuthInfo.ClientKey
+			mergedAuthInfo.ClientKeyData = config.overrides.AuthInfo.ClientKeyData
+		}
+		// Handle ClientCertificate/ClientCertificateData conflict, if override sets ClientCertificate, also use override's ClientCertificateData
+		// otherwise if original config has ClientCertificateData set,
+		// validation returns error "client-cert-data and client-cert are both specified <user-name>"
+		if len(config.overrides.AuthInfo.ClientCertificate) > 0 || len(config.overrides.AuthInfo.ClientCertificateData) > 0 {
+			mergedAuthInfo.ClientCertificate = config.overrides.AuthInfo.ClientCertificate
+			mergedAuthInfo.ClientCertificateData = config.overrides.AuthInfo.ClientCertificateData
+		}
 	}
 
 	return *mergedAuthInfo, nil

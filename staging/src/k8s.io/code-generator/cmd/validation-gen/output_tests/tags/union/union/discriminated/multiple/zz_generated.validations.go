@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -38,6 +37,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type Struct
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -48,14 +48,12 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_discriminated_multiple_Struct_union1 = validate.NewDiscriminatedUnionMembership("d1", [2]string{"u1m1", "U1M1"}, [2]string{"u1m2", "U1M2"})
-var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_discriminated_multiple_Struct_union2 = validate.NewDiscriminatedUnionMembership("d2", [2]string{"u2m1", "U2M1"}, [2]string{"u2m2", "U2M2"})
+var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_discriminated_multiple_Struct_union1 = validate.NewDiscriminatedUnionMembership("d1", validate.NewDiscriminatedUnionMember("u1m1", "U1M1"), validate.NewDiscriminatedUnionMember("u1m2", "U1M2"))
+var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_discriminated_multiple_Struct_union2 = validate.NewDiscriminatedUnionMembership("d2", validate.NewDiscriminatedUnionMember("u2m1", "U2M1"), validate.NewDiscriminatedUnionMember("u2m2", "U2M2"))
 
+// Validate_Struct validates an instance of Struct according
+// to declarative validation rules in the API schema.
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
-	// type Struct
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil // no changes
-	}
 	errs = append(errs, validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_discriminated_multiple_Struct_union1, func(obj *Struct) string {
 		if obj == nil {
 			return ""
@@ -95,9 +93,11 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.U1M1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *M1) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
@@ -107,9 +107,11 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.U1M2
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *M2) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
@@ -121,9 +123,11 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.U2M1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *M1) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
@@ -133,9 +137,11 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.U2M2
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *M2) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}

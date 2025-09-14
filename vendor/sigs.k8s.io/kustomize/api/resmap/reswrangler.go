@@ -181,6 +181,10 @@ func (m *resWrangler) GetMatchingResourcesByAnyId(
 	matches IdMatcher) []*resource.Resource {
 	var result []*resource.Resource
 	for _, r := range m.rList {
+		if r.RNode.IsNilOrEmpty() {
+			continue
+		}
+
 		for _, id := range append(r.PrevIds(), r.CurId()) {
 			if matches(id) {
 				result = append(result, r)

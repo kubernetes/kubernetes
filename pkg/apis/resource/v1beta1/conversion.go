@@ -77,6 +77,14 @@ func Convert_v1beta1_DeviceRequest_To_resource_DeviceRequest(in *resourcev1beta1
 			tolerations = append(tolerations, toleration)
 		}
 		exactDeviceRequest.Tolerations = tolerations
+		if in.Capacity != nil {
+			var capacity resource.CapacityRequirements
+			if err := Convert_v1beta1_CapacityRequirements_To_resource_CapacityRequirements(in.Capacity, &capacity, s); err != nil {
+				return err
+			}
+			exactDeviceRequest.Capacity = &capacity
+		}
+
 		out.Exactly = &exactDeviceRequest
 	}
 	return nil
@@ -88,7 +96,8 @@ func hasAnyMainRequestFieldsSet(deviceRequest *resourcev1beta1.DeviceRequest) bo
 		deviceRequest.AllocationMode != "" ||
 		deviceRequest.Count != 0 ||
 		deviceRequest.AdminAccess != nil ||
-		deviceRequest.Tolerations != nil
+		deviceRequest.Tolerations != nil ||
+		deviceRequest.Capacity != nil
 }
 
 func Convert_resource_DeviceRequest_To_v1beta1_DeviceRequest(in *resource.DeviceRequest, out *resourcev1beta1.DeviceRequest, s conversion.Scope) error {
@@ -121,6 +130,13 @@ func Convert_resource_DeviceRequest_To_v1beta1_DeviceRequest(in *resource.Device
 			tolerations = append(tolerations, toleration)
 		}
 		out.Tolerations = tolerations
+		if in.Exactly.Capacity != nil {
+			var capacity resourcev1beta1.CapacityRequirements
+			if err := Convert_resource_CapacityRequirements_To_v1beta1_CapacityRequirements(in.Exactly.Capacity, &capacity, s); err != nil {
+				return err
+			}
+			out.Capacity = &capacity
+		}
 	}
 	return nil
 }
@@ -200,6 +216,10 @@ func Convert_v1beta1_Device_To_resource_Device(in *resourcev1beta1.Device, out *
 			taints = append(taints, taint)
 		}
 		out.Taints = taints
+		out.BindsToNode = basic.BindsToNode
+		out.BindingConditions = basic.BindingConditions
+		out.BindingFailureConditions = basic.BindingFailureConditions
+		out.AllowMultipleAllocations = in.Basic.AllowMultipleAllocations
 	}
 	return nil
 }
@@ -245,6 +265,10 @@ func Convert_resource_Device_To_v1beta1_Device(in *resource.Device, out *resourc
 		taints = append(taints, taint)
 	}
 	out.Basic.Taints = taints
+	out.Basic.BindsToNode = in.BindsToNode
+	out.Basic.BindingConditions = in.BindingConditions
+	out.Basic.BindingFailureConditions = in.BindingFailureConditions
+	out.Basic.AllowMultipleAllocations = in.AllowMultipleAllocations
 	return nil
 }
 

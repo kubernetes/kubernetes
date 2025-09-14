@@ -56,7 +56,7 @@ func doTestStore(t *testing.T, store Store) {
 	store.Add(mkObj("c", "d"))
 	store.Add(mkObj("e", "e"))
 	{
-		found := sets.String{}
+		found := sets.Set[string]{}
 		for _, item := range store.List() {
 			found.Insert(item.(testStoreObject).val)
 		}
@@ -75,7 +75,7 @@ func doTestStore(t *testing.T, store Store) {
 	}, "0")
 
 	{
-		found := sets.String{}
+		found := sets.Set[string]{}
 		for _, item := range store.List() {
 			found.Insert(item.(testStoreObject).val)
 		}
@@ -95,17 +95,17 @@ func doTestIndex(t *testing.T, indexer Indexer) {
 	}
 
 	// Test Index
-	expected := map[string]sets.String{}
-	expected["b"] = sets.NewString("a", "c")
-	expected["f"] = sets.NewString("e")
-	expected["h"] = sets.NewString("g")
+	expected := map[string]sets.Set[string]{}
+	expected["b"] = sets.New("a", "c")
+	expected["f"] = sets.New("e")
+	expected["h"] = sets.New("g")
 	indexer.Add(mkObj("a", "b"))
 	indexer.Add(mkObj("c", "b"))
 	indexer.Add(mkObj("e", "f"))
 	indexer.Add(mkObj("g", "h"))
 	{
 		for k, v := range expected {
-			found := sets.String{}
+			found := sets.Set[string]{}
 			indexResults, err := indexer.Index("by_val", mkObj("", k))
 			if err != nil {
 				t.Errorf("Unexpected error %v", err)
@@ -113,9 +113,9 @@ func doTestIndex(t *testing.T, indexer Indexer) {
 			for _, item := range indexResults {
 				found.Insert(item.(testStoreObject).id)
 			}
-			items := v.List()
+			items := sets.List(v)
 			if !found.HasAll(items...) {
-				t.Errorf("missing items, index %s, expected %v but found %v", k, items, found.List())
+				t.Errorf("missing items, index %s, expected %v but found %v", k, items, sets.List(found))
 			}
 		}
 	}

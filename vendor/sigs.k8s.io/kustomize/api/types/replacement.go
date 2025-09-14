@@ -20,6 +20,9 @@ type Replacement struct {
 
 	// The N fields to write the value to.
 	Targets []*TargetSelector `json:"targets,omitempty" yaml:"targets,omitempty"`
+
+	// Used to define an static value
+	SourceValue *string `json:"sourceValue,omitempty" yaml:"sourceValue,omitempty"`
 }
 
 // SourceSelector is the source of the replacement transformer.

@@ -63,7 +63,7 @@ func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServ
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	compactor := etcd3.NewCompactor(server.V3Client.Client, 0, clock.RealClock{}, nil)
 	t.Cleanup(compactor.Stop)
-	storage := etcd3.New(
+	storage, err := etcd3.New(
 		server.V3Client,
 		compactor,
 		codec,
@@ -76,6 +76,9 @@ func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServ
 		etcd3.NewDefaultLeaseManagerConfig(),
 		etcd3.NewDefaultDecoder(codec, versioner),
 		versioner)
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(storage.Close)
 	return server, storage
 }
@@ -162,10 +165,12 @@ func compactStore(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 	}
 }
 
-func increaseRV(client *clientv3.Client) storagetesting.IncreaseRVFunc {
-	return func(ctx context.Context, t *testing.T) {
-		if _, err := client.KV.Put(ctx, "increaseRV", "ok"); err != nil {
+func increaseRVFunc(client *clientv3.Client) storagetesting.IncreaseRVFunc {
+	return func(ctx context.Context, t *testing.T) int64 {
+		resp, err := client.KV.Put(ctx, "increaseRV", "ok")
+		if err != nil {
 			t.Fatalf("Could not update increaseRV: %v", err)
 		}
+		return resp.Header.Revision
 	}
 }

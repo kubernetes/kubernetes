@@ -20,7 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,49 +28,132 @@ import (
 )
 
 func TestGauge(t *testing.T) {
-	v115 := semver.MustParse("1.15.0")
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*GaugeOpts
-		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			GaugeOpts: &GaugeOpts{
-				Namespace: "namespace",
-				Name:      "metric_test_name",
-				Subsystem: "subsystem",
-				Help:      "gauge help",
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: ALPHA,
+				Help:           "gauge help",
 			},
-			registryVersion:     &v115,
 			expectedMetricCount: 1,
 			expectedHelp:        "[ALPHA] gauge help",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			GaugeOpts: &GaugeOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				Help:           "gauge help",
+				StabilityLevel: BETA,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] gauge help",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			GaugeOpts: &GaugeOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				Help:           "gauge help",
+				StabilityLevel: STABLE,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] gauge help",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
 				Help:              "gauge help",
 				DeprecatedVersion: "1.15.0",
 			},
-			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) gauge help",
+			expectedMetricCount: 0,
+			expectedHelp:        "gauge help",
 		},
 		{
-			desc: "Test hidden",
+			desc: "BETA metric deprecated",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "gauge help",
+				DeprecatedVersion: "1.15.0",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) gauge help",
+		},
+		{
+			desc: "STABLE metric deprecated",
 			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
 				Help:              "gauge help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.15.0",
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.15.0) gauge help",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
+				Help:              "gauge help",
 				DeprecatedVersion: "1.14.0",
 			},
-			registryVersion:     &v115,
+			expectedMetricCount: 0,
+			expectedHelp:        "gauge help",
+		},
+		{
+			desc: "BETA metric hidden",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "gauge help",
+				DeprecatedVersion: "1.14.0",
+			},
+			expectedMetricCount: 0,
+			expectedHelp:        "gauge help",
+		},
+		{
+			desc: "STABLE metric hidden",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.12.0",
+			},
 			expectedMetricCount: 0,
 			expectedHelp:        "gauge help",
 		},
@@ -79,11 +161,7 @@ func TestGauge(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			c := NewGauge(test.GaugeOpts)
 			registry.MustRegister(c)
 
@@ -113,17 +191,22 @@ func TestGauge(t *testing.T) {
 }
 
 func TestGaugeVec(t *testing.T) {
-	v115 := semver.MustParse("1.15.0")
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*GaugeOpts
 		labels              []string
-		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			GaugeOpts: &GaugeOpts{
 				Namespace: "namespace",
 				Name:      "metric_test_name",
@@ -131,12 +214,38 @@ func TestGaugeVec(t *testing.T) {
 				Help:      "gauge help",
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
 			expectedMetricCount: 1,
 			expectedHelp:        "[ALPHA] gauge help",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			GaugeOpts: &GaugeOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				Help:           "gauge help",
+				StabilityLevel: BETA,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] gauge help",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			GaugeOpts: &GaugeOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				Help:           "gauge help",
+				StabilityLevel: STABLE,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] gauge help",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
@@ -145,12 +254,40 @@ func TestGaugeVec(t *testing.T) {
 				DeprecatedVersion: "1.15.0",
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) gauge help",
+			expectedMetricCount: 0,
+			expectedHelp:        "gauge help",
 		},
 		{
-			desc: "Test hidden",
+			desc: "BETA metric deprecated",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) gauge help",
+		},
+		{
+			desc: "STABLE metric deprecated",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.15.0",
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.15.0) gauge help",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
 			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
@@ -159,7 +296,34 @@ func TestGaugeVec(t *testing.T) {
 				DeprecatedVersion: "1.14.0",
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
+			expectedMetricCount: 0,
+			expectedHelp:        "gauge help",
+		},
+		{
+			desc: "BETA metric hidden",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.14.0",
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 0,
+			expectedHelp:        "gauge help",
+		},
+		{
+			desc: "STABLE metric hidden",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "gauge help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.12.0",
+			},
+			labels:              []string{"label_a", "label_b"},
 			expectedMetricCount: 0,
 			expectedHelp:        "gauge help",
 		},
@@ -167,11 +331,7 @@ func TestGaugeVec(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			c := NewGaugeVec(test.GaugeOpts, test.labels)
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Set(1.0)
@@ -196,7 +356,7 @@ func TestGaugeVec(t *testing.T) {
 }
 
 func TestGaugeFunc(t *testing.T) {
-	currentVersion := apimachineryversion.Info{
+	version1_15Alpha1 := apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "17",
 		GitVersion: "v1.17.0-alpha-1.12345",
@@ -211,13 +371,15 @@ func TestGaugeFunc(t *testing.T) {
 		*GaugeOpts
 		expectedMetrics string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			GaugeOpts: &GaugeOpts{
-				Namespace: "namespace",
-				Subsystem: "subsystem",
-				Name:      "metric_non_deprecated",
-				Help:      "gauge help",
+				Namespace:      "namespace",
+				Subsystem:      "subsystem",
+				StabilityLevel: ALPHA,
+				Name:           "metric_non_deprecated",
+				Help:           "gauge help",
 			},
 			expectedMetrics: `
 # HELP namespace_subsystem_metric_non_deprecated [ALPHA] gauge help
@@ -226,28 +388,112 @@ namespace_subsystem_metric_non_deprecated 1
 			`,
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			GaugeOpts: &GaugeOpts{
+				Namespace:      "namespace",
+				Subsystem:      "subsystem",
+				StabilityLevel: BETA,
+				Name:           "metric_non_deprecated",
+				Help:           "gauge help",
+			},
+			expectedMetrics: `
+# HELP namespace_subsystem_metric_non_deprecated [BETA] gauge help
+# TYPE namespace_subsystem_metric_non_deprecated gauge
+namespace_subsystem_metric_non_deprecated 1
+			`,
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			GaugeOpts: &GaugeOpts{
+				Namespace:      "namespace",
+				Subsystem:      "subsystem",
+				StabilityLevel: STABLE,
+				Name:           "metric_non_deprecated",
+				Help:           "gauge help",
+			},
+			expectedMetrics: `
+# HELP namespace_subsystem_metric_non_deprecated [STABLE] gauge help
+# TYPE namespace_subsystem_metric_non_deprecated gauge
+namespace_subsystem_metric_non_deprecated 1
+			`,
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
 				Name:              "metric_deprecated",
 				Help:              "gauge help",
+				StabilityLevel:    ALPHA,
 				DeprecatedVersion: "1.17.0",
 			},
-			expectedMetrics: `
-# HELP namespace_subsystem_metric_deprecated [ALPHA] (Deprecated since 1.17.0) gauge help
-# TYPE namespace_subsystem_metric_deprecated gauge
-namespace_subsystem_metric_deprecated 1
-`,
+			expectedMetrics: "",
 		},
 		{
-			desc: "Test hidden",
+			desc: "BETA metric deprecated",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				Name:              "metric_deprecated",
+				Help:              "gauge help",
+				StabilityLevel:    BETA,
+				DeprecatedVersion: "1.17.0",
+			},
+			expectedMetrics: `# HELP namespace_subsystem_metric_deprecated [BETA] (Deprecated since 1.17.0) gauge help
+# TYPE namespace_subsystem_metric_deprecated gauge
+namespace_subsystem_metric_deprecated 1
+			`,
+		},
+		{
+			desc: "STABLE metric deprecated",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				Name:              "metric_deprecated",
+				Help:              "gauge help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.17.0",
+			},
+			expectedMetrics: `# HELP namespace_subsystem_metric_deprecated [STABLE] (Deprecated since 1.17.0) gauge help
+# TYPE namespace_subsystem_metric_deprecated gauge
+namespace_subsystem_metric_deprecated 1
+			`,
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
 			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
 				Name:              "metric_hidden",
 				Help:              "gauge help",
+				StabilityLevel:    ALPHA,
+				DeprecatedVersion: "1.17.0",
+			},
+			expectedMetrics: "",
+		},
+		{
+			desc: "BETA metric hidden",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				Name:              "metric_hidden",
+				Help:              "gauge help",
+				StabilityLevel:    BETA,
 				DeprecatedVersion: "1.16.0",
+			},
+			expectedMetrics: "",
+		},
+		{
+			desc: "STABLE metric hidden",
+			GaugeOpts: &GaugeOpts{
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				Name:              "metric_hidden",
+				Help:              "gauge help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.14.0",
 			},
 			expectedMetrics: "",
 		},
@@ -256,8 +502,8 @@ namespace_subsystem_metric_deprecated 1
 	for _, test := range tests {
 		tc := test
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(currentVersion)
-			gauge := newGaugeFunc(tc.GaugeOpts, function, parseVersion(currentVersion))
+			registry := newKubeRegistry(version1_15Alpha1)
+			gauge := newGaugeFunc(tc.GaugeOpts, function, parseVersion(version1_15Alpha1))
 			if gauge != nil { // hidden metrics will not be initialize, register is not allowed
 				registry.RawMustRegister(gauge)
 			}

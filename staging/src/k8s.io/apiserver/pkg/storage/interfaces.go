@@ -268,9 +268,8 @@ type Interface interface {
 	// This method issues an empty list request and reads only the ResourceVersion from the object metadata
 	GetCurrentResourceVersion(ctx context.Context) (uint64, error)
 
-	// SetKeysFunc allows to override the function used to get keys from storage.
-	// This allows to replace default function that fetches keys from storage with one using cache.
-	SetKeysFunc(KeysFunc)
+	// EnableResourceSizeEstimation enables estimating resource size by providing function get keys from storage.
+	EnableResourceSizeEstimation(KeysFunc) error
 
 	// CompactRevision returns latest observed revision that was compacted.
 	// Without ListFromCacheSnapshot enabled only locally executed compaction will be observed.

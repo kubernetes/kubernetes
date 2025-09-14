@@ -25,6 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+// IsKubernetesSignerName checks if signerName is one reserved by the Kubernetes project.
+func IsKubernetesSignerName(signerName string) bool {
+	hostName, _, _ := strings.Cut(signerName, "/")
+	return hostName == "kubernetes.io" || strings.HasSuffix(hostName, ".kubernetes.io")
+}
+
 // ValidateSignerName checks that signerName is syntactically valid.
 //
 // ensure signerName is of the form domain.com/something and up to 571 characters.

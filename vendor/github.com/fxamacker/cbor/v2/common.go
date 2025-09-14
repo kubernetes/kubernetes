@@ -5,6 +5,7 @@ package cbor
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 )
 
@@ -179,4 +180,12 @@ func validBuiltinTag(tagNum uint64, contentHead byte) error {
 	}
 
 	return nil
+}
+
+// Transcoder is a scheme for transcoding a single CBOR encoded data item to or from a different
+// data format.
+type Transcoder interface {
+	// Transcode reads the data item in its source format from a Reader and writes a
+	// corresponding representation in its destination format to a Writer.
+	Transcode(dst io.Writer, src io.Reader) error
 }

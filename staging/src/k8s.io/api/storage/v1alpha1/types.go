@@ -261,6 +261,8 @@ type CSIStorageCapacityList struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:prerelease-lifecycle-gen:introduced=1.29
+// +k8s:prerelease-lifecycle-gen:deprecated=1.32
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,VolumeAttributesClass
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // VolumeAttributesClass represents a specification of mutable volume attributes
@@ -295,6 +297,8 @@ type VolumeAttributesClass struct {
 }
 
 // +k8s:prerelease-lifecycle-gen:introduced=1.29
+// +k8s:prerelease-lifecycle-gen:deprecated=1.32
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,VolumeAttributesClassList
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // VolumeAttributesClassList is a collection of VolumeAttributesClass objects.

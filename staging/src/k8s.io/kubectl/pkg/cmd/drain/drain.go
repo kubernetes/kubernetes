@@ -19,6 +19,7 @@ package drain
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -151,10 +152,11 @@ func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericiooptions.IOStreams)
 		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 		drainer: &drain.Helper{
-			GracePeriodSeconds: -1,
-			Out:                ioStreams.Out,
-			ErrOut:             ioStreams.ErrOut,
-			ChunkSize:          cmdutil.DefaultChunkSize,
+			GracePeriodSeconds:   -1,
+			EvictErrorRetryDelay: 5 * time.Second,
+			Out:                  ioStreams.Out,
+			ErrOut:               ioStreams.ErrOut,
+			ChunkSize:            cmdutil.DefaultChunkSize,
 		},
 	}
 	o.drainer.OnPodDeletionOrEvictionFinished = o.onPodDeletionOrEvictionFinished

@@ -106,10 +106,13 @@ func (c *Controller) Start(ctx context.Context) {
 	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 	c.eventBroadcaster.StartStructuredLogging(0)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
-	defer c.eventBroadcaster.Shutdown()
 
 	klog.Infof("Starting %s", controllerName)
-	defer klog.Infof("Shutting down %s", controllerName)
+	go func() {
+		<-ctx.Done()
+		klog.Infof("Shutting down %s", controllerName)
+		c.eventBroadcaster.Shutdown()
+	}()
 
 	go c.serviceCIDRInformer.Run(stopCh)
 	if !cache.WaitForNamedCacheSync(controllerName, stopCh, c.serviceCIDRsSynced) {

@@ -606,17 +606,17 @@ func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.
 }
 
 func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) (err error) {
+	logger := klog.FromContext(ctx)
 	if utilfeature.DefaultFeatureGate.Enabled(features.SystemdWatchdog) {
 		// NewHealthChecker returns an error indicating that the watchdog is configured but the configuration is incorrect,
 		// the kubelet will not be started.
-		healthChecker, err := watchdog.NewHealthChecker()
+		healthChecker, err := watchdog.NewHealthChecker(logger)
 		if err != nil {
 			return fmt.Errorf("create health checker: %w", err)
 		}
 		kubeDeps.HealthChecker = healthChecker
 		healthChecker.Start(ctx)
 	}
-	logger := klog.FromContext(ctx)
 	// Set global feature gates based on the value on the initial KubeletServer
 	err = utilfeature.DefaultMutableFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
@@ -741,10 +741,8 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// Get cgroup driver setting from CRI
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletCgroupDriverFromCRI) {
-		if err := getCgroupDriverFromCRI(ctx, s, kubeDeps); err != nil {
-			return err
-		}
+	if err := getCgroupDriverFromCRI(ctx, s, kubeDeps); err != nil {
+		return err
 	}
 
 	var cgroupRoots []string
@@ -1272,10 +1270,10 @@ func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodCo
 
 	// start the kubelet server
 	if enableServer {
-		go k.ListenAndServe(kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
+		go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
-		go k.ListenAndServeReadOnly(netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)
+		go k.ListenAndServeReadOnly(ctx, netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)
 	}
 	go k.ListenAndServePodResources(ctx)
 }
@@ -1397,7 +1395,9 @@ func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeD
 				continue
 			}
 			// CRI implementation doesn't support RuntimeConfig, fallback
-			logger.Info("CRI implementation should be updated to support RuntimeConfig when KubeletCgroupDriverFromCRI feature gate has been enabled. Falling back to using cgroupDriver from kubelet config.")
+			legacyregistry.MustRegister(kubeletmetrics.CRILosingSupport)
+			kubeletmetrics.CRILosingSupport.WithLabelValues("1.36.0").Inc()
+			logger.Info("CRI implementation should be updated to support RuntimeConfig. Falling back to using cgroupDriver from kubelet config.")
 			return nil
 		}
 	}

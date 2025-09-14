@@ -23,7 +23,37 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func Test(t *testing.T) {
+func TestUniqueness(t *testing.T) {
+	// TODO: enable this once we have a way to either opt-out from this validation
+	// or settle the decision on how to handle the ratcheting cases.
+	/*
+		st := localSchemeBuilder.Test(t)
+
+		st.Value(&Struct{
+			ListField: []OtherStruct{
+				{"key1", "one"},
+				{"key2", "two"},
+				{"key2", "two"},
+			},
+			ListTypedefField: []OtherTypedefStruct{
+				{"key1", "one"},
+				{"key2", "two"},
+				{"key2", "two"},
+			},
+			TypedefField: ListType{
+				{"key1", "one"},
+				{"key2", "two"},
+				{"key2", "two"},
+			},
+		}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+			field.Duplicate(field.NewPath("listField").Index(2), nil),
+			field.Duplicate(field.NewPath("listTypedefField").Index(2), nil),
+			field.Duplicate(field.NewPath("typedefField").Index(2), nil),
+		})
+	*/
+}
+
+func TestUpdateCorrelation(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	structA1 := Struct{
@@ -100,9 +130,12 @@ func Test(t *testing.T) {
 		field.Forbidden(field.NewPath("typedefField").Index(1), "field is immutable"),
 		field.Forbidden(field.NewPath("typedefField").Index(2), "field is immutable"),
 	)
+}
 
-	// Test validation ratcheting.
-	structC := Struct{
+func TestRatcheting(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	struct1 := Struct{
 		ListComparableField: []OtherStruct{
 			{"key1", "one"},
 			{"key2", "two"},
@@ -114,7 +147,7 @@ func Test(t *testing.T) {
 	}
 
 	// Same data, different order.
-	structC2 := Struct{
+	struct2 := Struct{
 		ListComparableField: []OtherStruct{
 			{"key2", "two"},
 			{"key1", "one"},
@@ -124,37 +157,12 @@ func Test(t *testing.T) {
 			{"key1", ptr.To("one")},
 		},
 	}
-	st.Value(&structC2).ExpectValidateFalseByPath(map[string][]string{
+	st.Value(&struct1).ExpectValidateFalseByPath(map[string][]string{
 		"listComparableField[0]":    {"field Struct.ListComparableField[*]"},
 		"listComparableField[1]":    {"field Struct.ListComparableField[*]"},
 		"listNonComparableField[0]": {"field Struct.ListNonComparableField[*]"},
 		"listNonComparableField[1]": {"field Struct.ListNonComparableField[*]"},
 	})
-	st.Value(&structC).OldValue(&structC2).ExpectValid()
+	st.Value(&struct1).OldValue(&struct2).ExpectValid()
+	st.Value(&struct2).OldValue(&struct1).ExpectValid()
 }
-
-// TODO: enable this once we have a way to either opt-out from this validation
-// or settle the decision on how to handle the ratcheting cases.
-// func TestUniqueKey(t *testing.T) {
-// 	st := localSchemeBuilder.Test(t)
-
-// 	structA := Struct{
-// 		ListField: []OtherStruct{
-// 			{"key1", "one"},
-// 			{"key1", "two"},
-// 		},
-// 		ListTypedefField: []OtherTypedefStruct{
-// 			{"key1", "one"},
-// 			{"key1", "two"},
-// 		},
-// 		TypedefField: ListType{
-// 			{"key1", "one"},
-// 			{"key1", "two"},
-// 		},
-// 	}
-// 	st.Value(&structA).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-// 		field.Duplicate(field.NewPath("listField[1]"), nil),
-// 		field.Duplicate(field.NewPath("listTypedefField[1]"), nil),
-// 		field.Duplicate(field.NewPath("typedefField[1]"), nil),
-// 	})
-// }

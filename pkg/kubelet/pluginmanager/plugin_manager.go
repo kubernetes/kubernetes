@@ -17,6 +17,7 @@ limitations under the License.
 package pluginmanager
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -34,7 +35,7 @@ import (
 // need to be registered/deregistered and makes it so.
 type PluginManager interface {
 	// Starts the plugin manager and all the asynchronous loops that it controls
-	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
+	Run(ctx context.Context, sourcesReady config.SourcesReady, stopCh <-chan struct{})
 
 	// AddHandler adds the given plugin handler for a specific plugin type, which
 	// will be added to the actual state of world cache so that it can be passed to
@@ -105,22 +106,24 @@ type pluginManager struct {
 
 var _ PluginManager = &pluginManager{}
 
-func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+func (pm *pluginManager) Run(ctx context.Context, sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
-	if err := pm.desiredStateOfWorldPopulator.Start(stopCh); err != nil {
-		klog.ErrorS(err, "The desired_state_of_world populator (plugin watcher) starts failed!")
+	logger := klog.FromContext(ctx)
+
+	if err := pm.desiredStateOfWorldPopulator.Start(ctx, stopCh); err != nil {
+		logger.Error(err, "The desired_state_of_world populator (plugin watcher) starts failed!")
 		return
 	}
 
-	klog.V(2).InfoS("The desired_state_of_world populator (plugin watcher) starts")
+	logger.V(2).Info("The desired_state_of_world populator (plugin watcher) starts")
 
-	klog.InfoS("Starting Kubelet Plugin Manager")
+	logger.Info("Starting Kubelet Plugin Manager")
 	go pm.reconciler.Run(stopCh)
 
 	metrics.Register(pm.actualStateOfWorld, pm.desiredStateOfWorld)
 	<-stopCh
-	klog.InfoS("Shutting down Kubelet Plugin Manager")
+	logger.Info("Shutting down Kubelet Plugin Manager")
 }
 
 func (pm *pluginManager) AddHandler(pluginType string, handler cache.PluginHandler) {

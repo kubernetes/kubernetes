@@ -1038,6 +1038,109 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 	}
 }
 
+func TestCollectDataWithPodCertificate(t *testing.T) {
+	testCases := []struct {
+		name string
+
+		source  v1.ProjectedVolumeSource
+		bundles []runtime.Object
+
+		fsUser  *int64
+		fsGroup *int64
+
+		wantPayload map[string]util.FileProjection
+		wantErr     error
+	}{
+		{
+			name: "credential bundle",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{},
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data: []byte("key\ncert\n"), // fake kubelet volume host is hardcoded to return this string.
+					Mode: 0644,
+				},
+			},
+		},
+		{
+			name: "key and cert bundle",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{},
+			wantPayload: map[string]util.FileProjection{
+				"key.pem": {
+					Data: []byte("key\n"), // fake kubelet volume host is hardcoded to return this string.
+					Mode: 0644,
+				},
+				"certificates.pem": {
+					Data: []byte("cert\n"), // fake kubelet volume host is hardcoded to return this string.
+					Mode: 0644,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					UID:       types.UID("test_pod_uid"),
+				},
+				Spec: v1.PodSpec{ServiceAccountName: "foo"},
+			}
+
+			client := fake.NewSimpleClientset(tc.bundles...)
+
+			tempDir, host := newTestHost(t, client)
+			defer os.RemoveAll(tempDir)
+
+			var myVolumeMounter = projectedVolumeMounter{
+				projectedVolume: &projectedVolume{
+					sources: tc.source.Sources,
+					podUID:  pod.UID,
+					plugin: &projectedPlugin{
+						host:   host,
+						kvHost: host.(volume.KubeletVolumeHost),
+					},
+				},
+				source: tc.source,
+				pod:    pod,
+			}
+
+			gotPayload, err := myVolumeMounter.collectData(volume.MounterArgs{FsUser: tc.fsUser, FsGroup: tc.fsGroup})
+			if err != nil {
+				t.Fatalf("Unexpected failure making payload: %v", err)
+			}
+			if diff := cmp.Diff(tc.wantPayload, gotPayload); diff != "" {
+				t.Fatalf("Bad payload; diff (-want +got)\n%s", diff)
+			}
+		})
+	}
+}
+
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
 	tempDir, err := os.MkdirTemp("", "projected_volume_test.")
 	if err != nil {

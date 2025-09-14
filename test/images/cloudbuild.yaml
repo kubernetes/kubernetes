@@ -1,7 +1,7 @@
 # See https://cloud.google.com/cloud-build/docs/build-config
 
 # this must be specified in seconds. If omitted, defaults to 600s (10 mins)
-# the timeout was increased because some images might take longer to build (e.g.: sample-apiserver, pets/redis-installer)
+# the timeout was increased because some images might take longer to build (e.g.: sample-apiserver)
 timeout: 5400s
 # this prevents errors if you don't use both _GIT_TAG and _PULL_BASE_REF,
 # or any new substitutions added in the future.

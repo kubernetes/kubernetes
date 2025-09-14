@@ -24,6 +24,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -49,6 +50,29 @@ import (
 func init() {
 	value.RegisterMetrics()
 	metrics.RegisterMetrics()
+}
+
+// nowFuncPerKMS allows us to swap the NowFunc for KMS providers in tests
+// Note: it cannot be set by an end user
+var nowFuncPerKMS sync.Map // map[string]func() time.Time, KMS name -> NowFunc
+
+// SetNowFuncForTests should only be called in tests to swap the NowFunc for KMS providers
+// Caller must guarantee that all KMS providers have distinct names across all tests.
+func SetNowFuncForTests(kmsName string, fn func() time.Time) func() {
+	if len(kmsName) == 0 { // guarantee that GetNowFunc("") returns the default value
+		panic("empty KMS name used in test")
+	}
+	nowFuncPerKMS.Store(kmsName, fn)
+	return func() { nowFuncPerKMS.Delete(kmsName) }
+}
+
+// GetNowFunc returns the time function for the given KMS provider name
+func GetNowFunc(kmsName string) func() time.Time {
+	nowFunc, ok := nowFuncPerKMS.Load(kmsName)
+	if !ok {
+		return time.Now
+	}
+	return nowFunc.(func() time.Time)
 }
 
 const (
@@ -81,9 +105,6 @@ const (
 	errKeyIDTooLongCode ErrCodeKeyID = "too_long"
 )
 
-// NowFunc is exported so tests can override it.
-var NowFunc = time.Now
-
 type StateFunc func() (State, error)
 type ErrCodeKeyID string
 
@@ -101,10 +122,14 @@ type State struct {
 
 	// CacheKey is the key used to cache the DEK/seed in envelopeTransformer.cache.
 	CacheKey []byte
+
+	// KMSProviderName is used to dynamically look up the time function for tests
+	KMSProviderName string
 }
 
 func (s *State) ValidateEncryptCapability() error {
-	if now := NowFunc(); now.After(s.ExpirationTimestamp) {
+	nowFunc := GetNowFunc(s.KMSProviderName)
+	if now := nowFunc(); now.After(s.ExpirationTimestamp) {
 		return fmt.Errorf("encryptedDEKSource with keyID hash %q expired at %s (current time is %s)",
 			GetHashIfNotEmpty(s.EncryptedObjectKeyID), s.ExpirationTimestamp.Format(time.RFC3339), now.Format(time.RFC3339))
 	}

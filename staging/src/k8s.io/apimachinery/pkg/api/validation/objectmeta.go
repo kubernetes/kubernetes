@@ -46,7 +46,7 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	for k := range annotations {
 		// The rule is QualifiedName except that case doesn't matter, so convert to lowercase before checking.
 		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
-			allErrs = append(allErrs, field.Invalid(fldPath, k, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath, k, msg)).WithOrigin("format=k8s-label-key")
 		}
 	}
 	if err := ValidateAnnotationsSize(annotations); err != nil {

@@ -20,6 +20,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,13 +30,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
-func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+func (sp *summaryProviderImpl) GetSystemContainersStats(_ context.Context, nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	stats = append(stats, sp.getSystemPodsCPUAndMemoryStats(nodeConfig, podStats, updateStats))
 	stats = append(stats, sp.getSystemWindowsGlobalmemoryStats())
 	return stats
 }
 
-func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(_ context.Context, nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	stats = append(stats, sp.getSystemPodsCPUAndMemoryStats(nodeConfig, podStats, updateStats))
 	stats = append(stats, sp.getSystemWindowsGlobalmemoryStats())
 	return stats

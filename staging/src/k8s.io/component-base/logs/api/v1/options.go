@@ -138,6 +138,9 @@ func validateAndApply(c *LoggingConfiguration, options *LoggingOptions, featureG
 // can be passed when the struct is not embedded in some larger struct.
 func Validate(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
 	errs := field.ErrorList{}
+	if c.FlushFrequency.Duration.Duration <= 0 {
+		errs = append(errs, field.Invalid(fldPath.Child("flushFrequency"), c.FlushFrequency, "Must be greater than zero"))
+	}
 	if c.Format != DefaultLogFormat {
 		// WordSepNormalizeFunc is just a guess. Commands should use it,
 		// but we cannot know for sure.

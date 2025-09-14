@@ -350,7 +350,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 
 	if kc.EnableSystemLogQuery && !localFeatureGate.Enabled(features.NodeLogQuery) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler"))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLogQuery feature gate is required for enableSystemLogQuery"))
 	}
 	if kc.EnableSystemLogQuery && !kc.EnableSystemLogHandler {
 		allErrors = append(allErrors,

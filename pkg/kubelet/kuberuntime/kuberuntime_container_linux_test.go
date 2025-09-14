@@ -50,7 +50,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func makeExpectedConfig(t *testing.T, tCtx context.Context, m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int, enforceMemoryQoS bool) *runtimeapi.ContainerConfig {
+func makeExpectedConfig(_ *testing.T, tCtx context.Context, m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int, enforceMemoryQoS bool) *runtimeapi.ContainerConfig {
 	container := &pod.Spec.Containers[containerIndex]
 	podIP := ""
 	restartCount := 0
@@ -542,9 +542,11 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		resources v1.ResourceRequirements
-		expected  []*runtimeapi.HugepageLimit
+		name                     string
+		podResources             v1.ResourceRequirements
+		resources                v1.ResourceRequirements
+		expected                 []*runtimeapi.HugepageLimit
+		podLevelResourcesEnabled bool
 	}{
 		{
 			name: "Success2MB",
@@ -606,9 +608,8 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 			name: "Success2MBand1GB",
 			resources: v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU): resource.MustParse("0"),
-					"hugepages-2Mi":                 resource.MustParse("2Mi"),
-					"hugepages-1Gi":                 resource.MustParse("2Gi"),
+					"hugepages-2Mi": resource.MustParse("2Mi"),
+					"hugepages-1Gi": resource.MustParse("2Gi"),
 				},
 			},
 			expected: []*runtimeapi.HugepageLimit{
@@ -626,9 +627,8 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 			name: "Skip2MBand1GB",
 			resources: v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU): resource.MustParse("0"),
-					"hugepages-2MB":                 resource.MustParse("2Mi"),
-					"hugepages-1GB":                 resource.MustParse("2Gi"),
+					"hugepages-2MB": resource.MustParse("2Mi"),
+					"hugepages-1GB": resource.MustParse("2Gi"),
 				},
 			},
 			expected: []*runtimeapi.HugepageLimit{
@@ -641,6 +641,131 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 					Limit:    0,
 				},
 			},
+		},
+		// Pod level hugepage set 2MB, Container level hugepage unset
+		{
+			name: "PodLevel2MB",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-2Mi": resource.MustParse("2Mi"),
+				},
+			},
+			resources: v1.ResourceRequirements{},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "2MB",
+					Limit:    2097152,
+				},
+			},
+			podLevelResourcesEnabled: true,
+		},
+		// Pod level hugepage set 1GB, Container level hugepage unset
+		{
+			name: "PodLevel1GB",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-1Gi": resource.MustParse("2Gi"),
+				},
+			},
+			resources: v1.ResourceRequirements{},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "1GB",
+					Limit:    2147483648,
+				},
+			},
+			podLevelResourcesEnabled: true,
+		},
+		// Pod level hugepage set 2MB 1GB, Container level hugepage unset
+		{
+			name: "PodLevel2MBand1GB",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-2Mi": resource.MustParse("2Mi"),
+					"hugepages-1Gi": resource.MustParse("2Gi"),
+				},
+			},
+			resources: v1.ResourceRequirements{},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "2MB",
+					Limit:    2097152,
+				},
+				{
+					PageSize: "1GB",
+					Limit:    2147483648,
+				},
+			},
+			podLevelResourcesEnabled: true,
+		},
+		// Pod level hugepage set 2MB, Container level hugepage set
+		{
+			name: "PodLevel2MBContainerLevel2MB",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-2Mi": resource.MustParse("4Mi"),
+				},
+			},
+			resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-2Mi": resource.MustParse("2Mi"),
+				},
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "2MB",
+					Limit:    2097152,
+				},
+			},
+			podLevelResourcesEnabled: true,
+		},
+		// Pod level hugepage set 1GB, Container level hugepage set
+		{
+			name: "PodLevel1GBContainerLevel1GB",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-1Gi": resource.MustParse("4Gi"),
+				},
+			},
+			resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-1Gi": resource.MustParse("2Gi"),
+				},
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "1GB",
+					Limit:    2147483648,
+				},
+			},
+			podLevelResourcesEnabled: true,
+		},
+		// Pod level hugepage set 2MB 1GB, Container level hugepage set
+		{
+			name: "PodLevel2MBand1GBContainerLevel2MBand1GB",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-2Mi": resource.MustParse("4Mi"),
+					"hugepages-1Gi": resource.MustParse("4Gi"),
+				},
+			},
+			resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-2Mi": resource.MustParse("2Mi"),
+					"hugepages-1Gi": resource.MustParse("2Gi"),
+				},
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "2MB",
+					Limit:    2097152,
+				},
+				{
+					PageSize: "1GB",
+					Limit:    2147483648,
+				},
+			},
+			podLevelResourcesEnabled: true,
 		},
 	}
 
@@ -676,7 +801,13 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 			}
 		}
 
-		results := GetHugepageLimitsFromResources(tCtx, test.resources)
+		testPod := &v1.Pod{}
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+		if test.podLevelResourcesEnabled {
+			testPod.Spec.Resources = &test.podResources
+		}
+
+		results := GetHugepageLimitsFromResources(tCtx, testPod, test.resources)
 		if !reflect.DeepEqual(expectedHugepages, results) {
 			t.Errorf("%s test failed. Expected %v but got %v", test.name, expectedHugepages, results)
 		}

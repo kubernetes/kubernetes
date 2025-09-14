@@ -495,8 +495,8 @@ func (tx *Tx) write() error {
 		// Write out page in "max allocation" sized chunks.
 		for {
 			sz := rem
-			if sz > maxAllocSize-1 {
-				sz = maxAllocSize - 1
+			if sz > common.MaxAllocSize-1 {
+				sz = common.MaxAllocSize - 1
 			}
 			buf := common.UnsafeByteSlice(unsafe.Pointer(p), written, 0, int(sz))
 
@@ -561,10 +561,13 @@ func (tx *Tx) writeMeta() error {
 	tx.meta.Write(p)
 
 	// Write the meta page to file.
+	tx.db.metalock.Lock()
 	if _, err := tx.db.ops.writeAt(buf, int64(p.Id())*int64(tx.db.pageSize)); err != nil {
+		tx.db.metalock.Unlock()
 		lg.Errorf("writeAt failed, pgid: %d, pageSize: %d, error: %v", p.Id(), tx.db.pageSize, err)
 		return err
 	}
+	tx.db.metalock.Unlock()
 	if !tx.db.NoSync || common.IgnoreNoSync {
 		// gofail: var beforeSyncMetaPage struct{}
 		if err := fdatasync(tx.db); err != nil {

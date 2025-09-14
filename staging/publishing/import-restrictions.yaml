@@ -214,10 +214,12 @@
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/client-go
   - k8s.io/component-base
   - k8s.io/klog
   - k8s.io/kube-scheduler
   - k8s.io/utils
+  - k8s.io/dynamic-resource-allocation/structured 
 
 - baseImportPath: "./staging/src/k8s.io/kubelet"
   allowedImports:

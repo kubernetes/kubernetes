@@ -20,8 +20,13 @@ package v2
 
 // PodsMetricStatusApplyConfiguration represents a declarative configuration of the PodsMetricStatus type for use
 // with apply.
+//
+// PodsMetricStatus indicates the current value of a metric describing each pod in
+// the current scale target (for example, transactions-processed-per-second).
 type PodsMetricStatusApplyConfiguration struct {
-	Metric  *MetricIdentifierApplyConfiguration  `json:"metric,omitempty"`
+	// metric identifies the target metric by name and selector
+	Metric *MetricIdentifierApplyConfiguration `json:"metric,omitempty"`
+	// current contains the current value for the given metric
 	Current *MetricValueStatusApplyConfiguration `json:"current,omitempty"`
 }
 

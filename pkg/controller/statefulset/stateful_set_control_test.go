@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -98,14 +97,7 @@ func setMinReadySeconds(set *apps.StatefulSet, minReadySeconds int32) *apps.Stat
 }
 
 func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(*testing.T, *apps.StatefulSetPersistentVolumeClaimRetentionPolicy)) {
-	subtestName := "StatefulSetAutoDeletePVCDisabled"
-	if testName != "" {
-		subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
-	}
-	t.Run(subtestName, func(t *testing.T) {
-		// TODO: this will be removed in 1.35
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.31"))
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)
+	t.Run(testName, func(t *testing.T) {
 		testFn(t, &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 			WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 			WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -131,7 +123,7 @@ func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(
 		// tests the case when no policy is set.
 		nil,
 	} {
-		subtestName := pvcDeletePolicyString(policy) + "/StatefulSetAutoDeletePVCEnabled"
+		subtestName := pvcDeletePolicyString(policy)
 		if testName != "" {
 			subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
 		}
@@ -168,8 +160,7 @@ func TestStatefulSetControl(t *testing.T) {
 		fn  func(*testing.T, *apps.StatefulSet, invariantFunc)
 		obj func() *apps.StatefulSet
 	}{
-		{CreatesPodsWithPodIndexLabelFeature, simpleSetFn},
-		{CreatesPodsWithoutPodIndexLabelFeature, simpleSetFn},
+		{CreatePods, simpleSetFn},
 		{ScalesUp, simpleSetFn},
 		{ScalesDown, simpleSetFn},
 		{ReplacesPods, largeSetFn},
@@ -212,20 +203,7 @@ func TestStatefulSetControl(t *testing.T) {
 	}
 }
 
-func CreatesPodsWithPodIndexLabelFeature(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
-	createPods(t, set, invariants, true)
-}
-
-func CreatesPodsWithoutPodIndexLabelFeature(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
-	createPods(t, set, invariants, false)
-}
-
-func createPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, isPodIndexLabelEnabled bool) {
-	if !isPodIndexLabelEnabled {
-		// TODO: this will be removed in 1.35
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.31"))
-	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodIndexLabel, isPodIndexLabelEnabled)
+func CreatePods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
@@ -260,22 +238,14 @@ func createPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, i
 		t.Errorf("Expected 3 pods, got %d", len(pods))
 	}
 	for _, pod := range pods {
-		if isPodIndexLabelEnabled {
-			podIndexFromLabel, exists := pod.Labels[apps.PodIndexLabel]
-			if !exists {
-				t.Errorf("Missing pod index label: %s", apps.PodIndexLabel)
-				continue
-			}
-			podIndexFromName := strconv.Itoa(getOrdinal(pod))
-			if podIndexFromLabel != podIndexFromName {
-				t.Errorf("Pod index label value (%s) does not match pod index in pod name (%s)", podIndexFromLabel, podIndexFromName)
-			}
-		} else {
-			_, exists := pod.Labels[apps.PodIndexLabel]
-			if exists {
-				t.Errorf("Pod index label should not exist when feature gate is disabled: %s", apps.PodIndexLabel)
-				continue
-			}
+		podIndexFromLabel, exists := pod.Labels[apps.PodIndexLabel]
+		if !exists {
+			t.Errorf("Missing pod index label: %s", apps.PodIndexLabel)
+			continue
+		}
+		podIndexFromName := strconv.Itoa(getOrdinal(pod))
+		if podIndexFromLabel != podIndexFromName {
+			t.Errorf("Pod index label value (%s) does not match pod index in pod name (%s)", podIndexFromLabel, podIndexFromName)
 		}
 	}
 }
@@ -2929,7 +2899,7 @@ func checkClaimInvarients(set *apps.StatefulSet, pod *v1.Pod, claim *v1.Persiste
 		WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 		WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
 	}
-	if set.Spec.PersistentVolumeClaimRetentionPolicy != nil && utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+	if set.Spec.PersistentVolumeClaimRetentionPolicy != nil {
 		policy = *set.Spec.PersistentVolumeClaimRetentionPolicy
 	}
 	claimShouldBeRetained := policy.WhenScaled == apps.RetainPersistentVolumeClaimRetentionPolicyType

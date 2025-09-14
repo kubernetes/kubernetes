@@ -89,6 +89,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
@@ -205,7 +206,7 @@ func newTestKubeletWithImageList(
 	excludeAdmitHandlers bool,
 	enableResizing bool,
 ) *TestKubelet {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	fakeRuntime := &containertest.FakeRuntime{
 		ImageList: imageList,
@@ -298,6 +299,7 @@ func newTestKubeletWithImageList(
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker)
 	kubelet.nodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker()
+	kubelet.podCertificateManager = &podcertificate.NoOpManager{}
 
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
@@ -324,7 +326,8 @@ func newTestKubeletWithImageList(
 	}
 
 	kubelet.allocationManager = allocation.NewInMemoryManager(
-		kubelet.containerManager,
+		kubelet.containerManager.GetNodeConfig(),
+		kubelet.containerManager.GetNodeAllocatableAbsolute(),
 		kubelet.statusManager,
 		func(pod *v1.Pod) { kubelet.HandlePodSyncs([]*v1.Pod{pod}) },
 		kubelet.GetActivePods,
@@ -333,7 +336,7 @@ func newTestKubeletWithImageList(
 	)
 	kubelet.allocationManager.SetContainerRuntime(fakeRuntime)
 	volumeStatsAggPeriod := time.Second * 10
-	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.recorder)
+	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(tCtx, kubelet, volumeStatsAggPeriod, kubelet.recorder)
 
 	fakeHostStatsProvider := stats.NewFakeHostStatsProvider(&containertest.FakeOS{})
 
@@ -401,7 +404,7 @@ func newTestKubeletWithImageList(
 		ShutdownGracePeriodCriticalPods: 0,
 	})
 	kubelet.shutdownManager = shutdownManager
-	kubelet.usernsManager, err = userns.MakeUserNsManager(kubelet)
+	kubelet.usernsManager, err = userns.MakeUserNsManager(logger, kubelet)
 	if err != nil {
 		t.Fatalf("Failed to create UserNsManager: %v", err)
 	}
@@ -743,6 +746,105 @@ func TestHandlePodCleanups(t *testing.T) {
 		t.Fatalf("expected %v to be deleted, got %v", expected, actual)
 	}
 	fakeRuntime.AssertKilledPods([]string(nil))
+}
+
+func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
+	const podCount = 500
+	tk := newTestKubelet(t, true /* controller-attach-detach enabled */)
+	defer tk.Cleanup()
+	kl := tk.kubelet
+
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{{
+		ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourcePods:   *resource.NewQuantity(1000, resource.DecimalSI),
+				v1.ResourceCPU:    resource.MustParse("10"),
+				v1.ResourceMemory: resource.MustParse("20Gi"),
+			},
+		},
+	}}}
+
+	kl.workQueue = queue.NewBasicWorkQueue(clock.RealClock{})
+	kl.podWorkers = newPodWorkers(
+		kl, kl.recorder, kl.workQueue,
+		kl.resyncInterval, backOffPeriod,
+		kl.podCache, kl.allocationManager,
+	)
+
+	kl.volumeManager = kubeletvolume.NewFakeVolumeManager(nil, 0, nil, true /* volumeAttachLimitExceededError  */)
+
+	pods, _ := newTestPodsWithResources(podCount)
+
+	kl.podManager.SetPods(pods)
+	kl.HandlePodSyncs(pods)
+
+	ctx := context.Background()
+
+	// all pods must reach a terminal, Failed state due to VolumeAttachmentLimitExceeded.
+	if err := wait.PollUntilContextTimeout(
+		ctx, 200*time.Millisecond, 30*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			for _, p := range pods {
+				st, ok := kl.statusManager.GetPodStatus(p.UID)
+				if !ok || st.Phase != v1.PodFailed && st.Reason != "VolumeAttachmentLimitExceeded" {
+					return false, nil
+				}
+			}
+			return true, nil
+		}); err != nil {
+		t.Fatalf("pods did not reach a terminal, Failed state: %v", err)
+	}
+
+	// validate that SyncTerminatedPod completed successfully for each pod.
+	if err := wait.PollUntilContextTimeout(
+		ctx, 200*time.Millisecond, 30*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			for _, p := range pods {
+				if !kl.podWorkers.ShouldPodBeFinished(p.UID) {
+					return false, nil
+				}
+			}
+			return true, nil
+		}); err != nil {
+		t.Fatalf("pod workers did not finish cleanup: %v", err)
+	}
+
+	// validate container-level resource allocations are released.
+	for _, p := range pods {
+		cn := p.Spec.Containers[0].Name
+		if _, still := kl.allocationManager.GetContainerResourceAllocation(p.UID, cn); still {
+			t.Fatalf("allocation for pod %q container %q not released", p.Name, cn)
+		}
+	}
+}
+
+func newTestPodsWithResources(count int) (pods []*v1.Pod, containerNames []string) {
+	pods = make([]*v1.Pod, count)
+	containerNames = make([]string, count)
+	for i := 0; i < count; i++ {
+		containerName := fmt.Sprintf("container%d", i)
+		containerNames[i] = containerName
+		pods[i] = &v1.Pod{
+			Spec: v1.PodSpec{
+				HostNetwork: true,
+				Containers: []v1.Container{{
+					Name: containerName,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1m"),
+							v1.ResourceMemory: resource.MustParse("1Mi"),
+						},
+					},
+				}},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  types.UID(strconv.Itoa(10000 + i)),
+				Name: fmt.Sprintf("pod%d", i),
+			},
+		}
+	}
+	return pods, containerNames
 }
 
 func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
@@ -2369,6 +2471,210 @@ func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 	}
 }
 
+// Test generateAPIPodStatus with different container-level restart policies.
+func TestGenerateAPIPodStatusWithContainerRestartPolicies(t *testing.T) {
+	var (
+		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
+	)
+	testErrorReason := fmt.Errorf("test-error")
+	emptyContainerID := (&kubecontainer.ContainerID{}).String()
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	pod := podWithUIDNameNs("12345678", "foo", "new")
+	podStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name:     "succeed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+			{
+				Name:     "failed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 1,
+			},
+			{
+				Name:     "succeed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 2,
+			},
+			{
+				Name:     "failed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 3,
+			},
+		},
+	}
+	kubelet.reasonCache.add(pod.UID, "succeed", testErrorReason, "")
+	kubelet.reasonCache.add(pod.UID, "failed", testErrorReason, "")
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	for _, test := range []struct {
+		desc                         string
+		containers                   []v1.Container
+		expectedState                map[string]v1.ContainerState
+		expectedLastTerminationState map[string]v1.ContainerState
+	}{
+		{
+			desc: "container restart policy rules match",
+			containers: []v1.Container{
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyNever,
+					RestartPolicyRules: []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{1},
+						},
+					}},
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"failed": {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy rules not match",
+			containers: []v1.Container{
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyNever,
+					RestartPolicyRules: []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{2},
+						},
+					}},
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    3,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy never",
+			containers: []v1.Container{
+				{
+					Name:          "succeed",
+					RestartPolicy: &containerRestartPolicyNever,
+				},
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyNever,
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    2,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    3,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy OnFailure",
+			containers: []v1.Container{
+				{
+					Name:          "succeed",
+					RestartPolicy: &containerRestartPolicyOnFailure,
+				},
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyOnFailure,
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    2,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy Always",
+			containers: []v1.Container{
+				{
+					Name:          "succeed",
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"succeed": {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+				"failed":  {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+	} {
+		pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+		// Test normal containers
+		pod.Spec.Containers = test.containers
+		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false)
+		expectedState, expectedLastTerminationState := test.expectedState, test.expectedLastTerminationState
+		verifyContainerStatuses(t, apiStatus.ContainerStatuses, expectedState, expectedLastTerminationState, test.desc)
+		pod.Spec.Containers = nil
+	}
+}
+
 // testPodAdmitHandler is a lifecycle.PodAdmitHandler for testing.
 type testPodAdmitHandler struct {
 	// list of pods to reject.
@@ -2843,25 +3149,19 @@ func TestSyncLabels(t *testing.T) {
 func waitForVolumeUnmount(
 	volumeManager kubeletvolume.VolumeManager,
 	pod *v1.Pod) error {
-	var podVolumes kubecontainer.VolumeMap
 	err := retryWithExponentialBackOff(
 		time.Duration(50*time.Millisecond),
 		func() (bool, error) {
 			// Verify volumes detached
-			podVolumes = volumeManager.GetMountedVolumesForPod(
+			hasVolumes := volumeManager.HasPossiblyMountedVolumesForPod(
 				util.GetUniquePodName(pod))
-
-			if len(podVolumes) != 0 {
-				return false, nil
-			}
-
-			return true, nil
+			return !hasVolumes, nil
 		},
 	)
 
 	if err != nil {
 		return fmt.Errorf(
-			"Expected volumes to be unmounted. But some volumes are still mounted: %#v", podVolumes)
+			"Expected volumes to be unmounted. But some volumes are still mounted")
 	}
 
 	return nil
@@ -3116,6 +3416,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.podLogsDirectory,
 		kubelet.machineInfo,
 		kubelet.podWorkers,
+		kubeCfg.MaxPods,
 		kubelet.os,
 		kubelet,
 		nil,
@@ -3136,7 +3437,6 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.containerManager,
 		kubelet.containerLogManager,
 		kubelet.runtimeClassManager,
-		kubelet.allocationManager,
 		false,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubelet.containerManager.GetNodeAllocatableAbsolute,
@@ -3215,6 +3515,15 @@ func TestRecordAdmissionRejection(t *testing.T) {
 				# HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
 				# TYPE kubelet_admission_rejections_total counter
 				kubelet_admission_rejections_total{reason="AppArmor"} 1
+			`,
+		},
+		{
+			name:   "VolumeAttachmentLimitExceeded",
+			reason: kubeletvolume.VolumeAttachmentLimitExceededReason,
+			wants: `
+				# HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+				# TYPE kubelet_admission_rejections_total counter
+				kubelet_admission_rejections_total{reason="VolumeAttachmentLimitExceeded"} 1
 			`,
 		},
 		{
@@ -3378,6 +3687,15 @@ func TestRecordAdmissionRejection(t *testing.T) {
                 # TYPE kubelet_admission_rejections_total counter
                 kubelet_admission_rejections_total{reason="OutOfExtendedResources"} 1
             `,
+		},
+		{
+			name:   "PodLevelResources",
+			reason: lifecycle.PodLevelResourcesNotAdmittedReason,
+			wants: `
+				# HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+				# TYPE kubelet_admission_rejections_total counter
+				kubelet_admission_rejections_total{reason="PodLevelResourcesNotSupported"} 1
+			`,
 		},
 		{
 			name:   "OtherReason",

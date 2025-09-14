@@ -33,7 +33,7 @@ func TestCacheSemantic(t *testing.T) {
 	// compilation leads to different pointers, so the entries can be
 	// compared by value to figure out whether an entry was cached or
 	// compiled anew.
-	cache := NewCache(2)
+	cache := NewCache(2, Features{})
 
 	// Successful compilations get cached.
 	resultTrue := cache.GetOrCompile("true")
@@ -90,7 +90,7 @@ func TestCacheConcurrency(t *testing.T) {
 	// without benchmarking.
 	numWorkers := 10
 
-	cache := NewCache(2)
+	cache := NewCache(2, Features{})
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
 	for i := 0; i < numWorkers; i++ {

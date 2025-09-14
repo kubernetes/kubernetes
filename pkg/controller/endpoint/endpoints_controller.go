@@ -188,7 +188,7 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting endpoint controller")
 	defer logger.Info("Shutting down endpoint controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint", ctx.Done(), e.podsSynced, e.servicesSynced, e.endpointsSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, e.podsSynced, e.servicesSynced, e.endpointsSynced) {
 		return
 	}
 

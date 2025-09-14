@@ -836,7 +836,7 @@ kube::golang::build_binaries_for_platform() {
       kube::log::info "    ${binary} (static)"
     else
       nonstatics+=("${binary}")
-      kube::log::info "    ${binary} (non-static)"
+      kube::log::info "    ${binary} (non-static${KUBE_RACE:+, race detection})"
     fi
    done
 
@@ -862,6 +862,9 @@ kube::golang::build_binaries_for_platform() {
       -ldflags="${goldflags}"
       -tags="${gotags:-}"
     )
+    if [[ -n "${KUBE_RACE:-}" ]]; then
+        build_args+=("${KUBE_RACE}")
+    fi
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
 

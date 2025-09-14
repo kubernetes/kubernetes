@@ -41,11 +41,11 @@ var (
 	alphaOptions = sets.New[string](
 		AlignBySocketOption,
 		DistributeCPUsAcrossCoresOption,
-		PreferAlignByUnCoreCacheOption,
 	)
 	betaOptions = sets.New[string](
 		StrictCPUReservationOption,
 		DistributeCPUsAcrossNUMAOption,
+		PreferAlignByUnCoreCacheOption,
 	)
 	stableOptions = sets.New[string](
 		FullPCPUsOnlyOption,

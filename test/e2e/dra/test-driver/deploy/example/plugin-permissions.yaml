@@ -50,7 +50,7 @@ spec:
   matchConstraints:
     resourceRules:
     - apiGroups:   ["resource.k8s.io"]
-      apiVersions: ["v1alpha3", "v1beta1"]
+      apiVersions: ["v1alpha3", "v1beta1", "v1beta2", "v1"]
       operations:  ["CREATE", "UPDATE", "DELETE"]
       resources:   ["resourceslices"]
   matchConditions:

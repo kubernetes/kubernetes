@@ -19,7 +19,6 @@ package metrics
 import (
 	"testing"
 
-	"github.com/blang/semver/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -27,16 +26,21 @@ import (
 )
 
 func TestSummary(t *testing.T) {
-	v115 := semver.MustParse("1.15.0")
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*SummaryOpts
-		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			SummaryOpts: &SummaryOpts{
 				Namespace:      "namespace",
 				Name:           "metric_test_name",
@@ -44,12 +48,36 @@ func TestSummary(t *testing.T) {
 				Help:           "summary help message",
 				StabilityLevel: ALPHA,
 			},
-			registryVersion:     &v115,
 			expectedMetricCount: 1,
 			expectedHelp:        "[ALPHA] summary help message",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			SummaryOpts: &SummaryOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				Help:           "summary help message",
+				StabilityLevel: BETA,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] summary help message",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			SummaryOpts: &SummaryOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				Help:           "summary help message",
+				StabilityLevel: STABLE,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] summary help message",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			SummaryOpts: &SummaryOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
@@ -58,20 +86,72 @@ func TestSummary(t *testing.T) {
 				DeprecatedVersion: "1.15.0",
 				StabilityLevel:    ALPHA,
 			},
-			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) summary help message",
+			expectedMetricCount: 0,
+			expectedHelp:        "summary help message",
 		},
 		{
-			desc: "Test hidden",
+			desc: "BETA metric deprecated",
 			SummaryOpts: &SummaryOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
 				Help:              "summary help message",
+				DeprecatedVersion: "1.15.0",
+				StabilityLevel:    BETA,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) summary help message",
+		},
+		{
+			desc: "STABLE metric deprecated",
+			SummaryOpts: &SummaryOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "summary help message",
+				DeprecatedVersion: "1.15.0",
+				StabilityLevel:    STABLE,
+			},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.15.0) summary help message",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
+			SummaryOpts: &SummaryOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
+				Help:              "summary help message",
 				DeprecatedVersion: "1.14.0",
 			},
-			registryVersion:     &v115,
+			expectedMetricCount: 0,
+			expectedHelp:        "summary help message",
+		},
+		{
+			desc: "BETA metric hidden",
+			SummaryOpts: &SummaryOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "summary help message",
+				DeprecatedVersion: "1.14.0",
+			},
+			expectedMetricCount: 0,
+			expectedHelp:        "summary help message",
+		},
+		{
+			desc: "STABLE metric hidden",
+			SummaryOpts: &SummaryOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "summary help message",
+				DeprecatedVersion: "1.12.0",
+			},
 			expectedMetricCount: 0,
 			expectedHelp:        "summary help message",
 		},
@@ -79,11 +159,7 @@ func TestSummary(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			c := NewSummary(test.SummaryOpts)
 			registry.MustRegister(c)
 
@@ -114,30 +190,62 @@ func TestSummary(t *testing.T) {
 }
 
 func TestSummaryVec(t *testing.T) {
-	v115 := semver.MustParse("1.15.0")
+	version1_15Alpha1 := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	}
+
 	var tests = []struct {
 		desc string
 		*SummaryOpts
 		labels              []string
-		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
+		// Non-deprecated metrics
 		{
-			desc: "Test non deprecated",
+			desc: "ALPHA metric non deprecated",
 			SummaryOpts: &SummaryOpts{
-				Namespace: "namespace",
-				Name:      "metric_test_name",
-				Subsystem: "subsystem",
-				Help:      "summary help message",
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: ALPHA,
+				Help:           "summary help message",
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
 			expectedMetricCount: 1,
 			expectedHelp:        "[ALPHA] summary help message",
 		},
 		{
-			desc: "Test deprecated",
+			desc: "BETA metric non deprecated",
+			SummaryOpts: &SummaryOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: BETA,
+				Help:           "summary help message",
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] summary help message",
+		},
+		{
+			desc: "STABLE metric non deprecated",
+			SummaryOpts: &SummaryOpts{
+				Namespace:      "namespace",
+				Name:           "metric_test_name",
+				Subsystem:      "subsystem",
+				StabilityLevel: STABLE,
+				Help:           "summary help message",
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] summary help message",
+		},
+		// Deprecated metrics
+		{
+			desc: "ALPHA metric deprecated",
 			SummaryOpts: &SummaryOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
@@ -146,21 +254,77 @@ func TestSummaryVec(t *testing.T) {
 				DeprecatedVersion: "1.15.0",
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
-			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) summary help message",
+			expectedMetricCount: 0,
+			expectedHelp:        "summary help message",
 		},
 		{
-			desc: "Test hidden",
+			desc: "BETA metric deprecated",
 			SummaryOpts: &SummaryOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
 				Help:              "summary help message",
+				DeprecatedVersion: "1.15.0",
+				StabilityLevel:    BETA,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[BETA] (Deprecated since 1.15.0) summary help message",
+		},
+		{
+			desc: "STABLE metric deprecated",
+			SummaryOpts: &SummaryOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				Help:              "summary help message",
+				DeprecatedVersion: "1.15.0",
+				StabilityLevel:    STABLE,
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 1,
+			expectedHelp:        "[STABLE] (Deprecated since 1.15.0) summary help message",
+		},
+		// Hidden metrics
+		{
+			desc: "ALPHA metric hidden",
+			SummaryOpts: &SummaryOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    ALPHA,
+				Help:              "summary help message",
 				DeprecatedVersion: "1.14.0",
 			},
 			labels:              []string{"label_a", "label_b"},
-			registryVersion:     &v115,
+			expectedMetricCount: 0,
+			expectedHelp:        "summary help message",
+		},
+		{
+			desc: "BETA metric hidden",
+			SummaryOpts: &SummaryOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    BETA,
+				Help:              "summary help message",
+				DeprecatedVersion: "1.14.0",
+			},
+			labels:              []string{"label_a", "label_b"},
+			expectedMetricCount: 0,
+			expectedHelp:        "summary help message",
+		},
+		{
+			desc: "STABLE metric hidden",
+			SummaryOpts: &SummaryOpts{
+				Namespace:         "namespace",
+				Name:              "metric_test_name",
+				Subsystem:         "subsystem",
+				StabilityLevel:    STABLE,
+				Help:              "summary help message",
+				DeprecatedVersion: "1.12.0",
+			},
+			labels:              []string{"label_a", "label_b"},
 			expectedMetricCount: 0,
 			expectedHelp:        "summary help message",
 		},
@@ -168,11 +332,7 @@ func TestSummaryVec(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			registry := newKubeRegistry(version1_15Alpha1)
 			c := NewSummaryVec(test.SummaryOpts, test.labels)
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Observe(1.0)

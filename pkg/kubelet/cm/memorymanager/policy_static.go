@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corehelper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -108,6 +109,11 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 	}
 
 	podUID := string(pod.UID)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		logger.V(2).Info("Allocation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", podUID)
+		return nil
+	}
+
 	logger.Info("Allocate")
 	// container belongs in an exclusively allocated pool
 	metrics.MemoryManagerPinningRequestTotal.Inc()
@@ -412,6 +418,11 @@ func (p *staticPolicy) GetPodTopologyHints(ctx context.Context, s state.State, p
 		return nil
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		logger.V(3).Info("Topology hints generation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", pod.UID)
+		return nil
+	}
+
 	for _, ctn := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		containerBlocks := s.GetMemoryBlocks(string(pod.UID), ctn.Name)
 		// Short circuit to regenerate the same hints if there are already
@@ -442,6 +453,11 @@ func (p *staticPolicy) GetTopologyHints(ctx context.Context, s state.State, pod 
 		return nil
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		logger.V(3).Info("Topology hints generation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", pod.UID)
+		return nil
+	}
+
 	containerBlocks := s.GetMemoryBlocks(string(pod.UID), container.Name)
 	// Short circuit to regenerate the same hints if there are already
 	// memory allocated for the container. This might happen after a
@@ -455,23 +471,7 @@ func (p *staticPolicy) GetTopologyHints(ctx context.Context, s state.State, pod 
 
 func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.ResourceName]uint64, error) {
 	requestedResources := map[v1.ResourceName]uint64{}
-	resources := container.Resources.Requests
-	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
-	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
-	// We should return this value because this is what kubelet agreed to allocate for the container
-	// and the value configured with runtime.
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		containerStatuses := pod.Status.ContainerStatuses
-		if podutil.IsRestartableInitContainer(container) {
-			if len(pod.Status.InitContainerStatuses) != 0 {
-				containerStatuses = append(containerStatuses, pod.Status.InitContainerStatuses...)
-			}
-		}
-		if cs, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
-			resources = cs.AllocatedResources
-		}
-	}
-	for resourceName, quantity := range resources {
+	for resourceName, quantity := range container.Resources.Requests {
 		if resourceName != v1.ResourceMemory && !corehelper.IsHugePageResourceName(resourceName) {
 			continue
 		}

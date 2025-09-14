@@ -25,6 +25,7 @@ import (
 	"log"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/klog/v2"
@@ -45,15 +46,35 @@ func main() {
 		log.Fatalf("Arguments validation error: %v", err)
 	}
 
-	myTargets := func(context *generator.Context) []generator.Target {
-		return generators.GetTargets(context, args)
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
+	if err != nil {
+		log.Fatalf("Failed loading boilerplate: %v", err)
+	}
+
+	// Generates the code for model name accessors.
+	if len(args.OutputModelNameFile) > 0 {
+		modelNameTargets := func(context *generator.Context) []generator.Target {
+			return generators.GetModelNameTargets(context, args, boilerplate)
+		}
+		if err := gengo.Execute(
+			generators.NameSystems(),
+			generators.DefaultNameSystem(),
+			modelNameTargets,
+			gengo.StdBuildTag,
+			pflag.Args(),
+		); err != nil {
+			log.Fatalf("Model name code generation error: %v", err)
+		}
 	}
 
 	// Generates the code for the OpenAPIDefinitions.
+	openAPITargets := func(context *generator.Context) []generator.Target {
+		return generators.GetOpenAPITargets(context, args, boilerplate)
+	}
 	if err := gengo.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
-		myTargets,
+		openAPITargets,
 		gengo.StdBuildTag,
 		pflag.Args(),
 	); err != nil {

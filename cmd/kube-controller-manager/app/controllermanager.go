@@ -225,7 +225,14 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-			statusz.Install(unsecuredMux, kubeControllerManager, statusz.NewRegistry(c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent)))
+			statusz.Install(
+				unsecuredMux,
+				kubeControllerManager,
+				statusz.NewRegistry(
+					c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent),
+					statusz.WithListedPaths(unsecuredMux.ListedPaths()),
+				),
+			)
 		}
 
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
@@ -565,6 +572,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newCertificateSigningRequestSigningControllerDescriptor())
 	register(newCertificateSigningRequestApprovingControllerDescriptor())
 	register(newCertificateSigningRequestCleanerControllerDescriptor())
+	register(newPodCertificateRequestCleanerControllerDescriptor())
 	register(newTTLControllerDescriptor())
 	register(newBootstrapSignerControllerDescriptor())
 	register(newTokenCleanerControllerDescriptor())

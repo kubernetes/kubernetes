@@ -261,7 +261,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	}
 
 	// When creating a container, mark the resources as actuated.
-	if err := m.allocationManager.SetActuatedResources(pod, container); err != nil {
+	if err := m.actuatedState.SetContainerResources(pod.UID, container.Name, container.Resources); err != nil {
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
 		return err.Error(), ErrCreateContainerConfig
 	}
@@ -285,7 +285,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", s.Message())
 		return s.Message(), ErrPreStartHook
 	}
-	m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Created container: %v", container.Name)
+	m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Container created")
 
 	// Step 3: start the container.
 	err = m.runtimeService.StartContainer(ctx, containerID)
@@ -294,7 +294,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Error: %v", s.Message())
 		return s.Message(), kubecontainer.ErrRunContainer
 	}
-	m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Started container %v", container.Name)
+	m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Container started")
 
 	// Symlink container logs to the legacy container log location for cluster logging
 	// support.
@@ -411,12 +411,9 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context
 	if containerResources == nil {
 		return fmt.Errorf("container %q updateContainerResources failed: cannot generate resources config", containerID.String())
 	}
-	logger := klog.FromContext(ctx)
 	err := m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
 	if err == nil {
-		err = m.allocationManager.SetActuatedResources(pod, container)
-	} else {
-		logger.Error(err, "UpdateContainerResources failed", "container", containerID.String())
+		err = m.actuatedState.SetContainerResources(pod.UID, container.Name, container.Resources)
 	}
 	return err
 }
@@ -590,8 +587,8 @@ func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(ctx context.
 	return buf.String()
 }
 
-func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(ctx context.Context, status *runtimeapi.ContainerStatus) (cStatus *kubecontainer.Status) {
-	cStatus = toKubeContainerStatus(ctx, status, m.runtimeName)
+func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(ctx context.Context, podUID kubetypes.UID, status *runtimeapi.ContainerStatus) (cStatus *kubecontainer.Status) {
+	cStatus = m.toKubeContainerStatus(ctx, podUID, status, m.runtimeName)
 	if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
 		// Populate the termination message if needed.
 		annotatedInfo := getContainerInfoFromAnnotations(ctx, status.Annotations)
@@ -646,7 +643,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 		if status == nil {
 			return nil, nil, remote.ErrContainerStatusNil
 		}
-		cStatus := m.convertToKubeContainerStatus(ctx, status)
+		cStatus := m.convertToKubeContainerStatus(ctx, uid, status)
 		statuses = append(statuses, cStatus)
 		if c.PodSandboxId == activePodSandboxID {
 			activeContainerStatuses = append(activeContainerStatuses, cStatus)
@@ -658,13 +655,31 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 	return statuses, activeContainerStatuses, nil
 }
 
-func toKubeContainerStatus(ctx context.Context, status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
+func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, podUID kubetypes.UID, status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
 	annotatedInfo := getContainerInfoFromAnnotations(ctx, status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(ctx, status.Labels)
 	var cStatusResources *kubecontainer.ContainerResources
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// If runtime reports cpu & memory resources info, add it to container status
 		cStatusResources = toKubeContainerResources(status.Resources)
+
+		// Fill missing resource values from the actuated resources.
+		if cStatusResources == nil || cStatusResources.MemoryRequest == nil {
+			if actuatedResources, ok := m.actuatedState.GetContainerResources(podUID, labeledInfo.ContainerName); ok {
+				if cStatusResources == nil {
+					cStatusResources = &kubecontainer.ContainerResources{
+						CPURequest:    actuatedResources.Requests.Cpu(),
+						CPULimit:      actuatedResources.Limits.Cpu(),
+						MemoryRequest: actuatedResources.Requests.Memory(),
+						MemoryLimit:   actuatedResources.Limits.Memory(),
+					}
+				} else if cStatusResources.MemoryRequest == nil {
+					if memReq := actuatedResources.Requests[v1.ResourceMemory]; !memReq.IsZero() {
+						cStatusResources.MemoryRequest = &memReq
+					}
+				}
+			}
+		}
 	}
 
 	// Keep backwards compatibility to older runtimes, status.ImageId has been added in v1.30
@@ -1053,6 +1068,10 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 	// isPreviouslyInitialized indicates if the current init container is
 	// previously initialized.
 	isPreviouslyInitialized := podHasInitialized
+	// Feature gate ContainerRestartRules makes it possible for individual init
+	// containers to restart even if pod-level restart policy is Never, which is
+	// checked at container-level. This `restartOnFailure` is overridden if feature
+	// gate ContainerRestartRules is enabled.
 	restartOnFailure := shouldRestartOnFailure(pod)
 
 	// Note that we iterate through the init containers in reverse order to find
@@ -1178,6 +1197,10 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 			} else { // init container
 				if isInitContainerFailed(status) {
+					restartOnFailure := restartOnFailure
+					if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+						restartOnFailure = kubecontainer.ShouldContainerBeRestarted(logger, container, pod, podStatus)
+					}
 					if !restartOnFailure {
 						changes.KillPod = true
 						changes.InitContainersToStart = nil
@@ -1212,6 +1235,15 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 					logger.V(4).Info("This should not happen, init container is in unknown state but not failed", "pod", klog.KObj(pod), "containerStatus", status)
 				}
 
+				restartOnFailure := restartOnFailure
+				if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+					// Only container-level restart policy is used. The container-level restart
+					// rules are not evaluated because the container might not have exited, so
+					// there is no exit code on which the rules can be used.
+					if container.RestartPolicy != nil {
+						restartOnFailure = *container.RestartPolicy != v1.ContainerRestartPolicyNever
+					}
+				}
 				if !restartOnFailure {
 					changes.KillPod = true
 					changes.InitContainersToStart = nil

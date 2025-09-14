@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 func TestSetup(t *testing.T) {
@@ -105,6 +104,7 @@ profiles:
       - name: NodePorts
       - name: InterPodAffinity
       - name: TaintToleration
+      - name: DynamicResources
       disabled:
       - name: "*"
     preFilter:
@@ -249,13 +249,18 @@ leaderElection:
 			wantPlugins: map[string]*config.Plugins{
 				"default-scheduler": func() *config.Plugins {
 					plugins := defaults.ExpandedPluginsV1.DeepCopy()
+					// With this (and only this?!) config comes DynamicResources after DefaultPreemption.
+					plugins.PreEnqueue.Enabled[1], plugins.PreEnqueue.Enabled[2] = plugins.PreEnqueue.Enabled[2], plugins.PreEnqueue.Enabled[1]
+					plugins.PostFilter.Enabled[0], plugins.PostFilter.Enabled[1] = plugins.PostFilter.Enabled[1], plugins.PostFilter.Enabled[0]
 					plugins.Filter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
+						{Name: "DynamicResources"},
 					}
 					plugins.PreFilter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
+						{Name: "DynamicResources"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
 						{Name: "VolumeBinding"},
@@ -504,25 +509,25 @@ leaderElection:
 // Simulates an out-of-tree plugin.
 type foo struct{}
 
-var _ framework.PreFilterPlugin = &foo{}
-var _ framework.FilterPlugin = &foo{}
+var _ fwk.PreFilterPlugin = &foo{}
+var _ fwk.FilterPlugin = &foo{}
 
 func (*foo) Name() string {
 	return "Foo"
 }
 
-func newFoo(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newFoo(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 	return &foo{}, nil
 }
 
-func (*foo) PreFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (*foo) PreFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	return nil, nil
 }
 
-func (*foo) PreFilterExtensions() framework.PreFilterExtensions {
+func (*foo) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
-func (*foo) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (*foo) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	return nil
 }

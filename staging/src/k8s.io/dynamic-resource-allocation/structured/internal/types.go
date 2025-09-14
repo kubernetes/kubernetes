@@ -20,9 +20,8 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
 type DeviceClassLister interface {
@@ -58,6 +57,9 @@ type Features struct {
 	// Sorted alphabetically. When adding a new entry, also extend Set and FeaturesAll.
 
 	AdminAccess          bool
+	ConsumableCapacity   bool
+	DeviceBinding        bool
+	DeviceStatus         bool
 	DeviceTaints         bool
 	PartitionableDevices bool
 	PrioritizedList      bool
@@ -74,6 +76,9 @@ func (f Features) Set() sets.Set[string] {
 	if f.AdminAccess {
 		enabled.Insert("DRAAdminAccess")
 	}
+	if f.ConsumableCapacity {
+		enabled.Insert("DRAConsumableCapacity")
+	}
 	if f.DeviceTaints {
 		enabled.Insert("DRADeviceTaints")
 	}
@@ -83,28 +88,21 @@ func (f Features) Set() sets.Set[string] {
 	if f.PrioritizedList {
 		enabled.Insert("DRAPrioritizedList")
 	}
+	if f.DeviceBinding {
+		enabled.Insert("DRADeviceBindingConditions")
+	}
+	if f.DeviceStatus {
+		enabled.Insert("DRAResourceClaimDeviceStatus")
+	}
 	return enabled
 }
 
 var FeaturesAll = Features{
 	AdminAccess:          true,
+	ConsumableCapacity:   true,
+	DeviceBinding:        true,
+	DeviceStatus:         true,
 	DeviceTaints:         true,
 	PartitionableDevices: true,
 	PrioritizedList:      true,
-}
-
-type DeviceID struct {
-	Driver, Pool, Device draapi.UniqueString
-}
-
-func (d DeviceID) String() string {
-	return d.Driver.String() + "/" + d.Pool.String() + "/" + d.Device.String()
-}
-
-func MakeDeviceID(driver, pool, device string) DeviceID {
-	return DeviceID{
-		Driver: draapi.MakeUniqueString(driver),
-		Pool:   draapi.MakeUniqueString(pool),
-		Device: draapi.MakeUniqueString(device),
-	}
 }

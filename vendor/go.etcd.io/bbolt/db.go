@@ -125,7 +125,7 @@ type DB struct {
 	// always fails on Windows platform.
 	//nolint
 	dataref  []byte // mmap'ed readonly, write throws SEGV
-	data     *[maxMapSize]byte
+	data     *[common.MaxMapSize]byte
 	datasz   int
 	meta0    *common.Meta
 	meta1    *common.Meta
@@ -563,7 +563,7 @@ func (db *DB) mmapSize(size int) (int, error) {
 	}
 
 	// Verify the requested size is not above the maximum allowed.
-	if size > maxMapSize {
+	if size > common.MaxMapSize {
 		return 0, errors.New("mmap too large")
 	}
 
@@ -581,8 +581,8 @@ func (db *DB) mmapSize(size int) (int, error) {
 	}
 
 	// If we've exceeded the max size then only grow up to the max size.
-	if sz > maxMapSize {
-		sz = maxMapSize
+	if sz > common.MaxMapSize {
+		sz = common.MaxMapSize
 	}
 
 	return int(sz), nil
@@ -1080,7 +1080,7 @@ func safelyCall(fn func(*Tx) error, tx *Tx) (err error) {
 // then it allows you to force the database file to sync against the disk.
 func (db *DB) Sync() (err error) {
 	if lg := db.Logger(); lg != discardLogger {
-		lg.Debug("Syncing bbolt db (%s)", db.path)
+		lg.Debugf("Syncing bbolt db (%s)", db.path)
 		defer func() {
 			if err != nil {
 				lg.Errorf("[GOOS: %s, GOARCH: %s] syncing bbolt db (%s) failed: %v", runtime.GOOS, runtime.GOARCH, db.path, err)
@@ -1309,6 +1309,12 @@ type Options struct {
 	// If <=0, the initial map size is 0.
 	// If initialMmapSize is smaller than the previous database size,
 	// it takes no effect.
+	//
+	// Note: On Windows, due to platform limitations, the database file size
+	// will be immediately resized to match `InitialMmapSize` (aligned to page size)
+	// when the DB is opened. On non-Windows platforms, the file size will grow
+	// dynamically based on the actual amount of written data, regardless of `InitialMmapSize`.
+	// Refer to https://github.com/etcd-io/bbolt/issues/378#issuecomment-1378121966.
 	InitialMmapSize int
 
 	// PageSize overrides the default OS page size.

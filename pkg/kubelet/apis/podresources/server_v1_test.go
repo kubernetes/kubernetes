@@ -294,6 +294,8 @@ func collectNamespacedNamesFromPodResources(prs []*podresourcesapi.PodResources)
 }
 
 func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
+
 	tCtx := ktesting.Init(t)
 	numaID := int64(1)
 
@@ -385,6 +387,7 @@ func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
 			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return([]int64{}).Maybe()
 			mockDevicesProvider.EXPECT().GetAllocatableDevices().Return([]*podresourcesapi.ContainerDevices{}).Maybe()
 			mockMemoryProvider.EXPECT().GetAllocatableMemory().Return([]*podresourcesapi.ContainerMemory{}).Maybe()
+			mockDynamicResourcesProvider.EXPECT().GetDynamicResources(mock.Anything, mock.Anything).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			providers := PodResourcesProviders{
 				Pods:             mockPodsProvider,

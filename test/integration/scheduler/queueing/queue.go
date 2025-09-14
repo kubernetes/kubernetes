@@ -86,6 +86,9 @@ type CoreResourceEnqueueTestCase struct {
 	// PrioritySort and DefaultPreemption are enabled by default because they are required by the framework.
 	// If empty, all plugins are enabled.
 	EnablePlugins []string
+	// EnabledRAExtendedResource indicates wether the test case should run with feature gate
+	// DRAExtendedResource enabled or not.
+	EnableDRAExtendedResource bool
 }
 
 var (
@@ -359,6 +362,92 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
 		WantRequeuedPods: sets.New("pod1"),
+	},
+	{
+		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node has the extended resource, and DRAExtendedResource is disabled",
+		EnablePlugins: []string{names.NodeResourcesFit},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod1 requests the example.com/gpu extended resource that is unavailable on the node.
+			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "5", "example.com/gpu": "1"}).Container("image").Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Trigger a NodeUpdate event that increases unrelated (not requested) memory capacity of fake-node1, which should not requeue Pod1.
+			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update fake-node: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
+		},
+		WantRequeuedPods:          sets.Set[string]{},
+		EnableSchedulingQueueHint: sets.New(true),
+		EnableDRAExtendedResource: false,
+	},
+	{
+		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node has the extended resource, and DRAExtendedResource is enabled",
+		EnablePlugins: []string{names.NodeResourcesFit},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod1 requests the example.com/gpu extended resource that is unavailable on the node.
+			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "5", "example.com/gpu": "1"}).Container("image").Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Trigger a NodeUpdate event that increases unrelated (not requested) memory capacity of fake-node1, which should not requeue Pod1.
+			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update fake-node: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
+		},
+		WantRequeuedPods:          sets.Set[string]{},
+		EnableSchedulingQueueHint: sets.New(true),
+		EnableDRAExtendedResource: true,
+	},
+	{
+		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node does not have the extended resource, and DRAExtendedResource is disabled",
+		EnablePlugins: []string{names.NodeResourcesFit},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod1 requests the example.com/gpu extended resource that is unavailable on the node.
+			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{"example.com/gpu": "1"}).Container("image").Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Trigger a NodeUpdate event that increases unrelated (not requested) memory capacity of fake-node1, which should not requeue Pod1.
+			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update fake-node: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
+		},
+		WantRequeuedPods:          sets.Set[string]{},
+		EnableSchedulingQueueHint: sets.New(true),
+		EnableDRAExtendedResource: false,
+	},
+	{
+		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Node does not have the extended resource, and DRAExtendedResource is enabled",
+		EnablePlugins: []string{names.NodeResourcesFit, names.NodeAffinity},
+		InitialNodes: []*v1.Node{
+			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+			st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Label("group", "b").Obj(),
+		},
+		Pods: []*v1.Pod{
+			// - Pod1 requests available amount of CPU (in fake-node1), but will be rejected by NodeAffinity plugin. Note that the NodeResourceFit plugin will register for QHints because it rejected fake-node2.
+			st.MakePod().Name("pod1").Res(map[v1.ResourceName]string{v1.ResourceCPU: "4", "example.com/gpu": "1"}).NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
+		},
+		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
+			// Trigger a NodeUpdate event that increases unrelated (not requested) memory capacity of fake-node1, which should not requeue Pod1,
+			// but it requeues, because the DynamicResourceAllocation plugin might handle the extended resource.
+			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4000"}).Obj(), metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update fake-node: %w", err)
+			}
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
+		},
+		WantRequeuedPods:          sets.New("pod1"),
+		EnableSchedulingQueueHint: sets.New(true),
+		EnableDRAExtendedResource: true,
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node is updated without increase in the requested resources",
@@ -2328,6 +2417,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	t.Helper()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	if tt.EnableDRAExtendedResource {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+	}
 	logger, _ := ktesting.NewTestContext(t)
 
 	opts := []scheduler.Option{scheduler.WithPodInitialBackoffSeconds(0), scheduler.WithPodMaxBackoffSeconds(0)}

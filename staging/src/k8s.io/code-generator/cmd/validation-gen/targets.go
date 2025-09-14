@@ -287,6 +287,9 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 
 	// Create a type discoverer for all types of all inputs.
 	td := NewTypeDiscoverer(validator, inputToPkg)
+	if err := td.Init(context); err != nil {
+		klog.Fatalf("Error discovering constants: %v", err)
+	}
 
 	// Create a linter to collect errors as we go.
 	linter := newLinter()

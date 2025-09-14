@@ -288,7 +288,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/kubepods", false).Return(cgroupStatsMap["/pods"].cs, nil)
 
-	provider := NewSummaryProvider(mockStatsProvider)
+	provider := NewSummaryProvider(ctx, mockStatsProvider)
 	summary, err := provider.GetCPUAndMemoryStats(ctx)
 	assert.NoError(err)
 

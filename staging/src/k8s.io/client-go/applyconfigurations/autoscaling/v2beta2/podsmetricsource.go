@@ -20,9 +20,16 @@ package v2beta2
 
 // PodsMetricSourceApplyConfiguration represents a declarative configuration of the PodsMetricSource type for use
 // with apply.
+//
+// PodsMetricSource indicates how to scale on a metric describing each pod in
+// the current scale target (for example, transactions-processed-per-second).
+// The values will be averaged together before being compared to the target
+// value.
 type PodsMetricSourceApplyConfiguration struct {
+	// metric identifies the target metric by name and selector
 	Metric *MetricIdentifierApplyConfiguration `json:"metric,omitempty"`
-	Target *MetricTargetApplyConfiguration     `json:"target,omitempty"`
+	// target specifies the target value for the given metric
+	Target *MetricTargetApplyConfiguration `json:"target,omitempty"`
 }
 
 // PodsMetricSourceApplyConfiguration constructs a declarative configuration of the PodsMetricSource type for use with

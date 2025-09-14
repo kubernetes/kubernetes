@@ -332,7 +332,7 @@ function kube::release::create_docker_images_for_server() {
           docker_file_path="${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile"
       fi
 
-      kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
+      kube::log::status "Starting docker build for image: ${binary_name}-${arch} with base ${base_image}"
       (
         rm -rf "${docker_build_path}"
         mkdir -p "${docker_build_path}"

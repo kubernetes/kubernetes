@@ -260,6 +260,14 @@ func TestPullWithSecrets(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      "testpod",
+			Namespace: "testpod-ns",
+			Uid:       "testpod-uid",
+		},
+	}
+
 	tests := map[string]struct {
 		imageName           string
 		passedSecrets       []v1.Secret
@@ -317,7 +325,15 @@ func TestPullWithSecrets(t *testing.T) {
 			t.Fatal("failed to setup an file pull records accessor")
 		}
 
-		imagePullManager, err := imagepullmanager.NewImagePullManager(tCtx, fsRecordAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
+		const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
+		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
+			fsRecordAccessor,
+			intentsRecordsCacheSize,
+			pulledRecordsCacheSize,
+			stripedLocksSetSize,
+		)
+
+		imagePullManager, err := imagepullmanager.NewImagePullManager(tCtx, memCacheRecordsAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
 		if err != nil {
 			t.Fatal("failed to setup an image pull manager")
 		}
@@ -335,7 +351,7 @@ func TestPullWithSecrets(t *testing.T) {
 			&fakePodPullingTimeRecorder{},
 		)
 
-		_, _, err = fakeManager.imagePuller.EnsureImageExists(tCtx, nil, makeTestPod("testpod", "testpod-ns", "testpod-uid", []v1.Container{}), test.imageName, test.passedSecrets, nil, "", v1.PullAlways)
+		_, _, err = fakeManager.imagePuller.EnsureImageExists(tCtx, nil, makeTestPod("testpod", "testpod-ns", "testpod-uid", []v1.Container{}), test.imageName, test.passedSecrets, podSandboxConfig, "", v1.PullAlways)
 		require.NoError(t, err)
 		fakeImageService.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: test.imageName, Annotations: make(map[string]string)}, test.expectedAuth, description)
 	}
@@ -356,6 +372,14 @@ func TestPullWithSecretsWithError(t *testing.T) {
 	dockerConfigJSON, err := json.Marshal(dockerCfg)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      "testpod",
+			Namespace: "testpod-ns",
+			Uid:       "testpod-uid",
+		},
 	}
 
 	for _, test := range []struct {
@@ -391,7 +415,15 @@ func TestPullWithSecretsWithError(t *testing.T) {
 				t.Fatal("failed to setup an file pull records accessor")
 			}
 
-			imagePullManager, err := imagepullmanager.NewImagePullManager(tCtx, fsRecordAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
+			const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
+			memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
+				fsRecordAccessor,
+				intentsRecordsCacheSize,
+				pulledRecordsCacheSize,
+				stripedLocksSetSize,
+			)
+
+			imagePullManager, err := imagepullmanager.NewImagePullManager(tCtx, memCacheRecordsAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
 			if err != nil {
 				t.Fatal("failed to setup an image pull manager")
 			}
@@ -409,7 +441,7 @@ func TestPullWithSecretsWithError(t *testing.T) {
 				&fakePodPullingTimeRecorder{},
 			)
 
-			imageRef, _, err := fakeManager.imagePuller.EnsureImageExists(tCtx, nil, makeTestPod("testpod", "testpod-ns", "testpod-uid", []v1.Container{}), test.imageName, test.passedSecrets, nil, "", v1.PullAlways)
+			imageRef, _, err := fakeManager.imagePuller.EnsureImageExists(tCtx, nil, makeTestPod("testpod", "testpod-ns", "testpod-uid", []v1.Container{}), test.imageName, test.passedSecrets, podSandboxConfig, "", v1.PullAlways)
 			assert.Error(t, err)
 			assert.Equal(t, "", imageRef)
 

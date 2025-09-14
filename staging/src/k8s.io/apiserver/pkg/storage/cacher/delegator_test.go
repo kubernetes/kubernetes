@@ -287,7 +287,7 @@ func TestConsistencyCheckerDigestMatches(t *testing.T) {
 
 	t.Log("Execute list to ensure cache is up to date")
 	outList := &example.PodList{}
-	err := store.cacher.GetList(ctx, "/pods", storage.ListOptions{ResourceVersion: resourceVersion, Recursive: true, Predicate: storage.Everything, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}, outList)
+	err := store.cacher.GetList(ctx, "/pods/", storage.ListOptions{ResourceVersion: resourceVersion, Recursive: true, Predicate: storage.Everything, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}, outList)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +295,7 @@ func TestConsistencyCheckerDigestMatches(t *testing.T) {
 		t.Errorf("Expect to get %d pods, got %d", storageWatchListPageSize+1, len(outList.Items))
 	}
 
-	checker := newConsistencyChecker("/pods", schema.GroupResource{}, store.cacher.newListFunc, store.cacher, store.storage)
+	checker := newConsistencyChecker("/pods/", schema.GroupResource{}, store.cacher.newListFunc, store.cacher, store.storage)
 	digest, err := checker.calculateDigests(ctx)
 	if err != nil {
 		t.Fatal(err)

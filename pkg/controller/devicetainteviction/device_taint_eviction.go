@@ -28,7 +28,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,9 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
-	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -51,6 +52,7 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
+	"k8s.io/kubernetes/pkg/features"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -165,11 +167,7 @@ func (p pool) getTaintedDevices() []taintedDevice {
 			continue
 		}
 		for _, device := range slice.Spec.Devices {
-			if device.Basic == nil {
-				// Unknown device type, not supported.
-				continue
-			}
-			for _, taint := range device.Basic.Taints {
+			for _, taint := range device.Taints {
 				if taint.Effect != resourceapi.DeviceTaintEffectNoExecute {
 					continue
 				}
@@ -186,18 +184,14 @@ func (p pool) getTaintedDevices() []taintedDevice {
 }
 
 // getDevice looks up one device by name. Out-dated slices are ignored.
-func (p pool) getDevice(deviceName string) *resourceapi.BasicDevice {
+func (p pool) getDevice(deviceName string) *resourceapi.Device {
 	for slice := range p.slices {
 		if slice.Spec.Pool.Generation != p.maxGeneration {
 			continue
 		}
-		for _, device := range slice.Spec.Devices {
-			if device.Basic == nil {
-				// Unknown device type, not supported.
-				continue
-			}
-			if device.Name == deviceName {
-				return device.Basic
+		for i := range slice.Spec.Devices {
+			if slice.Spec.Devices[i].Name == deviceName {
+				return &slice.Spec.Devices[i]
 			}
 		}
 	}
@@ -466,11 +460,12 @@ func (tc *Controller) Run(ctx context.Context) error {
 	tc.haveSynced = append(tc.haveSynced, podHandler.HasSynced)
 
 	opts := resourceslicetracker.Options{
-		EnableDeviceTaints: true,
-		SliceInformer:      tc.sliceInformer,
-		TaintInformer:      tc.taintInformer,
-		ClassInformer:      tc.classInformer,
-		KubeClient:         tc.client,
+		EnableDeviceTaints:       true,
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		SliceInformer:            tc.sliceInformer,
+		TaintInformer:            tc.taintInformer,
+		ClassInformer:            tc.classInformer,
+		KubeClient:               tc.client,
 	}
 	sliceTracker, err := resourceslicetracker.StartTracker(ctx, opts)
 	if err != nil {

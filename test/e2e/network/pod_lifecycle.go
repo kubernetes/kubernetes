@@ -26,12 +26,14 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -162,14 +164,8 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 		}
 
 		// Expect EndpointSlice resource to have the blue pod ready to serve traffic
-		if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
-			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(blueGreenJig.Namespace).List(ctx, metav1.ListOptions{
-				LabelSelector: "kubernetes.io/service-name=" + blueGreenJig.Name,
-			})
-			if err != nil {
-				return false, err
-			}
-			for _, slice := range endpointSliceList.Items {
+		if err := e2eendpointslice.WaitForEndpointSlices(ctx, cs, blueGreenJig.Namespace, blueGreenJig.Name, 2*time.Second, wait.ForeverTestTimeout, func(ctx context.Context, endpointSlices []discoveryv1.EndpointSlice) (bool, error) {
+			for _, slice := range endpointSlices {
 				for _, ep := range slice.Endpoints {
 					if ep.TargetRef != nil &&
 						ep.TargetRef.Name == bluePod.Name &&
@@ -220,14 +216,8 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 		}
 
 		// Expect EndpointSlice resource to have the green pod ready to serve traffic
-		if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
-			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(blueGreenJig.Namespace).List(ctx, metav1.ListOptions{
-				LabelSelector: "kubernetes.io/service-name=" + blueGreenJig.Name,
-			})
-			if err != nil {
-				return false, err
-			}
-			for _, slice := range endpointSliceList.Items {
+		if err := e2eendpointslice.WaitForEndpointSlices(ctx, cs, blueGreenJig.Namespace, blueGreenJig.Name, 2*time.Second, wait.ForeverTestTimeout, func(ctx context.Context, endpointSlices []discoveryv1.EndpointSlice) (bool, error) {
+			for _, slice := range endpointSlices {
 				for _, ep := range slice.Endpoints {
 					if ep.TargetRef != nil &&
 						ep.TargetRef.Name == greenPod.Name &&
@@ -249,14 +239,8 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 		}
 
 		// Expect EndpointSlice resource to have the blue pod NOT ready to serve traffic
-		if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
-			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(blueGreenJig.Namespace).List(ctx, metav1.ListOptions{
-				LabelSelector: "kubernetes.io/service-name=" + blueGreenJig.Name,
-			})
-			if err != nil {
-				return false, err
-			}
-			for _, slice := range endpointSliceList.Items {
+		if err := e2eendpointslice.WaitForEndpointSlices(ctx, cs, blueGreenJig.Namespace, blueGreenJig.Name, 2*time.Second, wait.ForeverTestTimeout, func(ctx context.Context, endpointSlices []discoveryv1.EndpointSlice) (bool, error) {
+			for _, slice := range endpointSlices {
 				for _, ep := range slice.Endpoints {
 					if ep.TargetRef != nil &&
 						ep.TargetRef.Name == bluePod.Name &&

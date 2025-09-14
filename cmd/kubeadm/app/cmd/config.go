@@ -387,6 +387,7 @@ func newCmdConfigImagesPull() *cobra.Command {
 			if err := containerRuntime.Connect(); err != nil {
 				return err
 			}
+			defer containerRuntime.Close()
 			return PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
 		},
 		Args: cobra.NoArgs,

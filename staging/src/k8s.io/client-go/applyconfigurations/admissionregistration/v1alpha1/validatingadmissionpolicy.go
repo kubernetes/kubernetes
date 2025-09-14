@@ -29,11 +29,19 @@ import (
 
 // ValidatingAdmissionPolicyApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicy type for use
 // with apply.
+//
+// ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 type ValidatingAdmissionPolicyApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ValidatingAdmissionPolicySpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ValidatingAdmissionPolicyStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the ValidatingAdmissionPolicy.
+	Spec *ValidatingAdmissionPolicySpecApplyConfiguration `json:"spec,omitempty"`
+	// The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+	// behaves in the expected way.
+	// Populated by the system.
+	// Read-only.
+	Status *ValidatingAdmissionPolicyStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ValidatingAdmissionPolicy constructs a declarative configuration of the ValidatingAdmissionPolicy type for use with
@@ -46,29 +54,14 @@ func ValidatingAdmissionPolicy(name string) *ValidatingAdmissionPolicyApplyConfi
 	return b
 }
 
-// ExtractValidatingAdmissionPolicy extracts the applied configuration owned by fieldManager from
-// validatingAdmissionPolicy. If no managedFields are found in validatingAdmissionPolicy for fieldManager, a
-// ValidatingAdmissionPolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractValidatingAdmissionPolicyFrom extracts the applied configuration owned by fieldManager from
+// validatingAdmissionPolicy for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // validatingAdmissionPolicy must be a unmodified ValidatingAdmissionPolicy API object that was retrieved from the Kubernetes API.
-// ExtractValidatingAdmissionPolicy provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractValidatingAdmissionPolicyFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
-	return extractValidatingAdmissionPolicy(validatingAdmissionPolicy, fieldManager, "")
-}
-
-// ExtractValidatingAdmissionPolicyStatus is the same as ExtractValidatingAdmissionPolicy except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractValidatingAdmissionPolicyStatus(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
-	return extractValidatingAdmissionPolicy(validatingAdmissionPolicy, fieldManager, "status")
-}
-
-func extractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string, subresource string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+func ExtractValidatingAdmissionPolicyFrom(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string, subresource string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
 	b := &ValidatingAdmissionPolicyApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingAdmissionPolicy, internal.Parser().Type("io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"), fieldManager, b, subresource)
 	if err != nil {
@@ -80,6 +73,27 @@ func extractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregist
 	b.WithAPIVersion("admissionregistration.k8s.io/v1alpha1")
 	return b, nil
 }
+
+// ExtractValidatingAdmissionPolicy extracts the applied configuration owned by fieldManager from
+// validatingAdmissionPolicy. If no managedFields are found in validatingAdmissionPolicy for fieldManager, a
+// ValidatingAdmissionPolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// validatingAdmissionPolicy must be a unmodified ValidatingAdmissionPolicy API object that was retrieved from the Kubernetes API.
+// ExtractValidatingAdmissionPolicy provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractValidatingAdmissionPolicy(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+	return ExtractValidatingAdmissionPolicyFrom(validatingAdmissionPolicy, fieldManager, "")
+}
+
+// ExtractValidatingAdmissionPolicyStatus extracts the applied configuration owned by fieldManager from
+// validatingAdmissionPolicy for the status subresource.
+func ExtractValidatingAdmissionPolicyStatus(validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, fieldManager string) (*ValidatingAdmissionPolicyApplyConfiguration, error) {
+	return ExtractValidatingAdmissionPolicyFrom(validatingAdmissionPolicy, fieldManager, "status")
+}
+
 func (b ValidatingAdmissionPolicyApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

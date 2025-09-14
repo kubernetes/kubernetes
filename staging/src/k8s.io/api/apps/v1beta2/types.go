@@ -304,8 +304,12 @@ type StatefulSetSpec struct {
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,9,opt,name=minReadySeconds"`
 
-	// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
-	// the StatefulSet VolumeClaimTemplates.
+	// persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+	// volume claims created from volumeClaimTemplates. By default, all persistent
+	// volume claims are created as needed and retained until manually deleted. This
+	// policy allows the lifecycle to be altered, for example by deleting persistent
+	// volume claims when their stateful set is deleted, or when their pod is scaled
+	// down.
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty" protobuf:"bytes,10,opt,name=persistentVolumeClaimRetentionPolicy"`
 

@@ -103,4 +103,31 @@ func Test(t *testing.T) {
 			{Key: "b", Name: "n2"},
 		},
 	}).ExpectValid()
+
+	// Test atomic + unique=map + item combination
+	st.Value(&Struct{
+		AtomicUniqueMapItems: []Item{
+			{Key: "a", Data: "d1"},
+			{Key: "target", Data: "d2"},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		`atomicUniqueMapItems[1]`: {
+			"item AtomicUniqueMapItems[key=target]",
+		},
+	})
+
+	st.Value(&Struct{
+		AtomicUniqueMapItems: []Item{
+			{Key: "a", Data: "d1"},
+			{Key: "b", Data: "d2"},
+		},
+	}).ExpectValid()
+
+	st.Value(&Struct{
+		AtomicUniqueMapItems: []Item{},
+	}).ExpectValid()
+
+	st.Value(&Struct{
+		AtomicUniqueMapItems: nil,
+	}).ExpectValid()
 }

@@ -19,13 +19,10 @@ package node
 import (
 	"context"
 	"fmt"
-	"os"
 	"path"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -262,7 +259,7 @@ while true; do sleep 1; done
 			// Images used for ConformanceContainer are not added into NodePrePullImageList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
 			// is v1.PullAlways, so it won't be blocked by framework image pre-pull list check.
-			imagePullTest := func(ctx context.Context, image string, hasSecret bool, expectedPhase v1.PodPhase, expectedPullStatus bool, windowsImage bool) {
+			imagePullTest := func(ctx context.Context, image string, expectedPhase v1.PodPhase, expectedPullStatus bool, windowsImage bool) {
 				command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 				if windowsImage {
 					// -t: Ping the specified host until stopped.
@@ -278,34 +275,7 @@ while true; do sleep 1; done
 					},
 					RestartPolicy: v1.RestartPolicyNever,
 				}
-				if hasSecret {
-					// The service account only has pull permission
-					auth := `
-{
-	"auths": {
-		"https://gcr.io": {
-			"auth": "X2pzb25fa2V5OnsKICAidHlwZSI6ICJzZXJ2aWNlX2FjY291bnQiLAogICJwcm9qZWN0X2lkIjogImF1dGhlbnRpY2F0ZWQtaW1hZ2UtcHVsbGluZyIsCiAgInByaXZhdGVfa2V5X2lkIjogImI5ZjJhNjY0YWE5YjIwNDg0Y2MxNTg2MDYzZmVmZGExOTIyNGFjM2IiLAogICJwcml2YXRlX2tleSI6ICItLS0tLUJFR0lOIFBSSVZBVEUgS0VZLS0tLS1cbk1JSUV2UUlCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQktjd2dnU2pBZ0VBQW9JQkFRQzdTSG5LVEVFaVlMamZcbkpmQVBHbUozd3JCY2VJNTBKS0xxS21GWE5RL3REWGJRK2g5YVl4aldJTDhEeDBKZTc0bVovS01uV2dYRjVLWlNcbm9BNktuSU85Yi9SY1NlV2VpSXRSekkzL1lYVitPNkNjcmpKSXl4anFWam5mVzJpM3NhMzd0OUE5VEZkbGZycm5cbjR6UkpiOWl4eU1YNGJMdHFGR3ZCMDNOSWl0QTNzVlo1ODhrb1FBZmgzSmhhQmVnTWorWjRSYko0aGVpQlFUMDNcbnZVbzViRWFQZVQ5RE16bHdzZWFQV2dydDZOME9VRGNBRTl4bGNJek11MjUzUG4vSzgySFpydEx4akd2UkhNVXhcbng0ZjhwSnhmQ3h4QlN3Z1NORit3OWpkbXR2b0wwRmE3ZGducFJlODZWRDY2ejNZenJqNHlLRXRqc2hLZHl5VWRcbkl5cVhoN1JSQWdNQkFBRUNnZ0VBT3pzZHdaeENVVlFUeEFka2wvSTVTRFVidi9NazRwaWZxYjJEa2FnbmhFcG9cbjFJajJsNGlWMTByOS9uenJnY2p5VlBBd3pZWk1JeDFBZVF0RDdoUzRHWmFweXZKWUc3NkZpWFpQUm9DVlB6b3VcbmZyOGRDaWFwbDV0enJDOWx2QXNHd29DTTdJWVRjZmNWdDdjRTEyRDNRS3NGNlo3QjJ6ZmdLS251WVBmK0NFNlRcbmNNMHkwaCtYRS9kMERvSERoVy96YU1yWEhqOFRvd2V1eXRrYmJzNGYvOUZqOVBuU2dET1lQd2xhbFZUcitGUWFcbkpSd1ZqVmxYcEZBUW14M0Jyd25rWnQzQ2lXV2lGM2QrSGk5RXRVYnRWclcxYjZnK1JRT0licWFtcis4YlJuZFhcbjZWZ3FCQWtKWjhSVnlkeFVQMGQxMUdqdU9QRHhCbkhCbmM0UW9rSXJFUUtCZ1FEMUNlaWN1ZGhXdGc0K2dTeGJcbnplanh0VjFONDFtZHVjQnpvMmp5b1dHbzNQVDh3ckJPL3lRRTM0cU9WSi9pZCs4SThoWjRvSWh1K0pBMDBzNmdcblRuSXErdi9kL1RFalk4MW5rWmlDa21SUFdiWHhhWXR4UjIxS1BYckxOTlFKS2ttOHRkeVh5UHFsOE1veUdmQ1dcbjJ2aVBKS05iNkhabnY5Q3lqZEo5ZzJMRG5RS0JnUUREcVN2eURtaGViOTIzSW96NGxlZ01SK205Z2xYVWdTS2dcbkVzZlllbVJmbU5XQitDN3ZhSXlVUm1ZNU55TXhmQlZXc3dXRldLYXhjK0krYnFzZmx6elZZdFpwMThNR2pzTURcbmZlZWZBWDZCWk1zVXQ3Qmw3WjlWSjg1bnRFZHFBQ0xwWitaLzN0SVJWdWdDV1pRMWhrbmxHa0dUMDI0SkVFKytcbk55SDFnM2QzUlFLQmdRQ1J2MXdKWkkwbVBsRklva0tGTkh1YTBUcDNLb1JTU1hzTURTVk9NK2xIckcxWHJtRjZcbkMwNGNTKzQ0N0dMUkxHOFVUaEpKbTRxckh0Ti9aK2dZOTYvMm1xYjRIakpORDM3TVhKQnZFYTN5ZUxTOHEvK1JcbjJGOU1LamRRaU5LWnhQcG84VzhOSlREWTVOa1BaZGh4a2pzSHdVNGRTNjZwMVRESUU0MGd0TFpaRFFLQmdGaldcbktyblFpTnEzOS9iNm5QOFJNVGJDUUFKbmR3anhTUU5kQTVmcW1rQTlhRk9HbCtqamsxQ1BWa0tNSWxLSmdEYkpcbk9heDl2OUc2Ui9NSTFIR1hmV3QxWU56VnRocjRIdHNyQTB0U3BsbWhwZ05XRTZWejZuQURqdGZQSnMyZUdqdlhcbmpQUnArdjhjY21MK3dTZzhQTGprM3ZsN2VlNXJsWWxNQndNdUdjUHhBb0dBZWRueGJXMVJMbVZubEFpSEx1L0xcbmxtZkF3RFdtRWlJMFVnK1BMbm9Pdk81dFE1ZDRXMS94RU44bFA0cWtzcGtmZk1Rbk5oNFNZR0VlQlQzMlpxQ1RcbkpSZ2YwWGpveXZ2dXA5eFhqTWtYcnBZL3ljMXpmcVRaQzBNTzkvMVVjMWJSR2RaMmR5M2xSNU5XYXA3T1h5Zk9cblBQcE5Gb1BUWGd2M3FDcW5sTEhyR3pNPVxuLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLVxuIiwKICAiY2xpZW50X2VtYWlsIjogImltYWdlLXB1bGxpbmdAYXV0aGVudGljYXRlZC1pbWFnZS1wdWxsaW5nLmlhbS5nc2VydmljZWFjY291bnQuY29tIiwKICAiY2xpZW50X2lkIjogIjExMzc5NzkxNDUzMDA3MzI3ODcxMiIsCiAgImF1dGhfdXJpIjogImh0dHBzOi8vYWNjb3VudHMuZ29vZ2xlLmNvbS9vL29hdXRoMi9hdXRoIiwKICAidG9rZW5fdXJpIjogImh0dHBzOi8vYWNjb3VudHMuZ29vZ2xlLmNvbS9vL29hdXRoMi90b2tlbiIsCiAgImF1dGhfcHJvdmlkZXJfeDUwOV9jZXJ0X3VybCI6ICJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9vYXV0aDIvdjEvY2VydHMiLAogICJjbGllbnRfeDUwOV9jZXJ0X3VybCI6ICJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9yb2JvdC92MS9tZXRhZGF0YS94NTA5L2ltYWdlLXB1bGxpbmclNDBhdXRoZW50aWNhdGVkLWltYWdlLXB1bGxpbmcuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20iCn0=",
-			"email": "image-pulling@authenticated-image-pulling.iam.gserviceaccount.com"
-		}
-	}
-}`
-					// we might be told to use a different docker config JSON.
-					if framework.TestContext.DockerConfigFile != "" {
-						contents, err := os.ReadFile(framework.TestContext.DockerConfigFile)
-						framework.ExpectNoError(err)
-						auth = string(contents)
-					}
-					secret := &v1.Secret{
-						Data: map[string][]byte{v1.DockerConfigJsonKey: []byte(auth)},
-						Type: v1.SecretTypeDockerConfigJson,
-					}
-					secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
-					ginkgo.By("create image pull secret")
-					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{})
-					framework.ExpectNoError(err)
-					ginkgo.DeferCleanup(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete, secret.Name, metav1.DeleteOptions{})
-					container.ImagePullSecrets = []string{secret.Name}
-				}
+
 				// checkContainerStatus checks whether the container status matches expectation.
 				checkContainerStatus := func(ctx context.Context) error {
 					status, err := container.GetStatus(ctx)
@@ -370,29 +340,24 @@ while true; do sleep 1; done
 
 			f.It("should not be able to pull image from invalid registry", f.WithNodeConformance(), func(ctx context.Context) {
 				image := imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
-				imagePullTest(ctx, image, false, v1.PodPending, true, false)
+				imagePullTest(ctx, image, v1.PodPending, true, false)
 			})
 
 			f.It("should be able to pull image", f.WithNodeConformance(), func(ctx context.Context) {
 				// NOTE(claudiub): The agnhost image is supposed to work on both Linux and Windows.
 				image := imageutils.GetE2EImage(imageutils.Agnhost)
-				imagePullTest(ctx, image, false, v1.PodRunning, false, false)
+				imagePullTest(ctx, image, v1.PodRunning, false, false)
 			})
 
+			// TODO: https://github.com/kubernetes/kubernetes/issues/130271
+			// Switch this to use a locally hosted private image and not depend on this host
 			f.It("should not be able to pull from private registry without secret", f.WithNodeConformance(), func(ctx context.Context) {
 				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
-				imagePullTest(ctx, image, false, v1.PodPending, true, false)
+				imagePullTest(ctx, image, v1.PodPending, true, false)
 			})
 
-			f.It("should be able to pull from private registry with secret", f.WithNodeConformance(), func(ctx context.Context) {
-				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
-				isWindows := false
-				if framework.NodeOSDistroIs("windows") {
-					image = imageutils.GetE2EImage(imageutils.AuthenticatedWindowsNanoServer)
-					isWindows = true
-				}
-				imagePullTest(ctx, image, true, v1.PodRunning, false, isWindows)
-			})
+			// TODO: https://github.com/kubernetes/kubernetes/issues/130271
+			// Add a sustainable test for pulling with a private registry secret
 		})
 	})
 })

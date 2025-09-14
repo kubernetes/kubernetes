@@ -47,9 +47,16 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
+// Logger allows t.Testing and b.Testing to be passed to PolicyTestContext
+type Logger interface {
+	Helper()
+	Logf(format string, args ...interface{})
+}
+
 // PolicyTestContext is everything you need to unit test a policy plugin
 type PolicyTestContext[P runtime.Object, B runtime.Object, E Evaluator] struct {
 	context.Context
+	Logger Logger
 	Plugin *Plugin[PolicyHook[P, B, E]]
 	Source Source[PolicyHook[P, B, E]]
 	Start  func() error
@@ -68,6 +75,7 @@ type PolicyTestContext[P runtime.Object, B runtime.Object, E Evaluator] struct {
 }
 
 func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
+	logger Logger,
 	newPolicyAccessor func(P) PolicyAccessor,
 	newBindingAccessor func(B) BindingAccessor,
 	compileFunc func(P) E,
@@ -214,6 +222,7 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	}
 
 	res := &PolicyTestContext[P, B, E]{
+		Logger:  logger,
 		Context: testContext,
 		Plugin:  plugin,
 		Source:  source,
@@ -279,7 +288,7 @@ func (p *PolicyTestContext[P, B, E]) update(wait bool, objects ...runtime.Object
 	}
 
 	if wait {
-		timeoutCtx, timeoutCancel := context.WithTimeout(p, 3*time.Second)
+		timeoutCtx, timeoutCancel := context.WithTimeout(p, 5*time.Second)
 		defer timeoutCancel()
 
 		for _, object := range objects {
@@ -383,12 +392,13 @@ func (p *PolicyTestContext[P, B, E]) WaitForReconcile(timeoutCtx context.Context
 func (p *PolicyTestContext[P, B, E]) waitForDelete(ctx context.Context, objectGVK schema.GroupVersionKind, name types.NamespacedName) error {
 	srce := p.Source.(*policySource[P, B, E])
 
-	return wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+	return wait.PollUntilContextCancel(ctx, 50*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
 		switch objectGVK {
 		case p.policyGVK:
 			for _, hook := range p.Source.Hooks() {
 				accessor := srce.newPolicyAccessor(hook.Policy)
 				if accessor.GetName() == name.Name && accessor.GetNamespace() == name.Namespace {
+					p.Logger.Logf("waiting for %s at %v", name.Name, time.Now())
 					return false, nil
 				}
 			}
@@ -399,6 +409,7 @@ func (p *PolicyTestContext[P, B, E]) waitForDelete(ctx context.Context, objectGV
 				for _, binding := range hook.Bindings {
 					accessor := srce.newBindingAccessor(binding)
 					if accessor.GetName() == name.Name && accessor.GetNamespace() == name.Namespace {
+						p.Logger.Logf("waiting for %s at %v", name.Name, time.Now())
 						return false, nil
 					}
 				}
@@ -406,7 +417,7 @@ func (p *PolicyTestContext[P, B, E]) waitForDelete(ctx context.Context, objectGV
 			return true, nil
 		default:
 			// Do nothing, params are visible immediately
-			// Loop until one of the params is visible via get of the param informer
+			// Loop until the param is deleted from the param informer
 			informer, scope := p.Source.(*policySource[P, B, E]).getParamInformer(objectGVK)
 			if informer == nil {
 				return true, nil
@@ -417,13 +428,15 @@ func (p *PolicyTestContext[P, B, E]) waitForDelete(ctx context.Context, objectGV
 				lister = informer.Lister().ByNamespace(name.Namespace)
 			}
 
-			_, err = lister.Get(name.Name)
+			obj, err := lister.Get(name.Name)
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return true, nil
 				}
+				p.Logger.Logf("error on %s: %v", name.Name, err)
 				return false, err
 			}
+			p.Logger.Logf("waiting for %s to be gone at %v, got %#v", name.Name, time.Now(), obj)
 			return false, nil
 		}
 	})
@@ -482,9 +495,10 @@ func (p *PolicyTestContext[P, B, E]) DeleteAndWait(object ...runtime.Object) err
 		}
 	}
 
-	timeoutCtx, timeoutCancel := context.WithTimeout(p, 3*time.Second)
+	timeoutCtx, timeoutCancel := context.WithTimeout(p, 5*time.Second)
 	defer timeoutCancel()
 
+	start := time.Now()
 	for _, object := range object {
 		accessor, err := meta.Accessor(object)
 		if err != nil {
@@ -502,6 +516,7 @@ func (p *PolicyTestContext[P, B, E]) DeleteAndWait(object ...runtime.Object) err
 			types.NamespacedName{Name: accessor.GetName(), Namespace: accessor.GetNamespace()}); err != nil {
 			return err
 		}
+		p.Logger.Logf("after wait on %s: %v", accessor.GetName(), time.Since(start))
 	}
 	return nil
 }

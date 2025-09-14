@@ -29,10 +29,21 @@ import (
 
 // RuntimeClassApplyConfiguration represents a declarative configuration of the RuntimeClass type for use
 // with apply.
+//
+// RuntimeClass defines a class of container runtime supported in the cluster.
+// The RuntimeClass is used to determine which container runtime is used to run
+// all containers in a pod. RuntimeClasses are (currently) manually defined by a
+// user or cluster provisioner, and referenced in the PodSpec. The Kubelet is
+// responsible for resolving the RuntimeClassName reference before running the
+// pod.  For more details, see
+// https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 type RuntimeClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *RuntimeClassSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec represents specification of the RuntimeClass
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *RuntimeClassSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // RuntimeClass constructs a declarative configuration of the RuntimeClass type for use with
@@ -45,29 +56,14 @@ func RuntimeClass(name string) *RuntimeClassApplyConfiguration {
 	return b
 }
 
-// ExtractRuntimeClass extracts the applied configuration owned by fieldManager from
-// runtimeClass. If no managedFields are found in runtimeClass for fieldManager, a
-// RuntimeClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractRuntimeClassFrom extracts the applied configuration owned by fieldManager from
+// runtimeClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // runtimeClass must be a unmodified RuntimeClass API object that was retrieved from the Kubernetes API.
-// ExtractRuntimeClass provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractRuntimeClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractRuntimeClass(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
-	return extractRuntimeClass(runtimeClass, fieldManager, "")
-}
-
-// ExtractRuntimeClassStatus is the same as ExtractRuntimeClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractRuntimeClassStatus(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
-	return extractRuntimeClass(runtimeClass, fieldManager, "status")
-}
-
-func extractRuntimeClass(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string, subresource string) (*RuntimeClassApplyConfiguration, error) {
+func ExtractRuntimeClassFrom(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string, subresource string) (*RuntimeClassApplyConfiguration, error) {
 	b := &RuntimeClassApplyConfiguration{}
 	err := managedfields.ExtractInto(runtimeClass, internal.Parser().Type("io.k8s.api.node.v1alpha1.RuntimeClass"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +75,21 @@ func extractRuntimeClass(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager s
 	b.WithAPIVersion("node.k8s.io/v1alpha1")
 	return b, nil
 }
+
+// ExtractRuntimeClass extracts the applied configuration owned by fieldManager from
+// runtimeClass. If no managedFields are found in runtimeClass for fieldManager, a
+// RuntimeClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// runtimeClass must be a unmodified RuntimeClass API object that was retrieved from the Kubernetes API.
+// ExtractRuntimeClass provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractRuntimeClass(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
+	return ExtractRuntimeClassFrom(runtimeClass, fieldManager, "")
+}
+
 func (b RuntimeClassApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

@@ -28,31 +28,31 @@ import (
 func TestZeroOrOneOfUnion(t *testing.T) {
 	testCases := []struct {
 		name        string
-		fields      [][2]string
+		fields      []string
 		fieldValues []bool
 		expected    field.ErrorList
 	}{
 		{
 			name:        "one member set",
-			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
+			fields:      []string{"a", "b", "c", "d"},
 			fieldValues: []bool{false, false, false, true},
 			expected:    nil,
 		},
 		{
 			name:        "two members set",
-			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
+			fields:      []string{"a", "b", "c", "d"},
 			fieldValues: []bool{false, true, false, true},
 			expected:    field.ErrorList{field.Invalid(nil, "{b, d}", "must specify at most one of: `a`, `b`, `c`, `d`").WithOrigin("zeroOrOneOf")},
 		},
 		{
 			name:        "all members set",
-			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
+			fields:      []string{"a", "b", "c", "d"},
 			fieldValues: []bool{true, true, true, true},
 			expected:    field.ErrorList{field.Invalid(nil, "{a, b, c, d}", "must specify at most one of: `a`, `b`, `c`, `d`").WithOrigin("zeroOrOneOf")},
 		},
 		{
 			name:        "no member set - allowed for ZeroOrOneOf",
-			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
+			fields:      []string{"a", "b", "c", "d"},
 			fieldValues: []bool{false, false, false, false},
 			expected:    nil, // This is the key difference from Union
 		},
@@ -60,6 +60,11 @@ func TestZeroOrOneOfUnion(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			members := []UnionMember{}
+			for _, f := range tc.fields {
+				members = append(members, NewUnionMember(f))
+			}
+
 			// Create mock extractors that return predefined values instead of
 			// actually extracting from the object.
 			extractors := make([]ExtractorFn[*testMember, bool], len(tc.fieldValues))
@@ -67,7 +72,8 @@ func TestZeroOrOneOfUnion(t *testing.T) {
 				extractors[i] = func(_ *testMember) bool { return val }
 			}
 
-			got := ZeroOrOneOfUnion(context.Background(), operation.Operation{}, nil, &testMember{}, nil, NewUnionMembership(tc.fields...), extractors...)
+			got := ZeroOrOneOfUnion(context.Background(), operation.Operation{}, nil, &testMember{}, nil,
+				NewUnionMembership(members...), extractors...)
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got, tc.expected)
 			}
@@ -136,7 +142,9 @@ func TestZeroOrOneOfUnionRatcheting(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := ZeroOrOneOfUnion(context.Background(), operation.Operation{Type: operation.Update}, nil, tc.newStruct, tc.oldStruct, NewUnionMembership([][2]string{{"m1", "m1"}, {"m2", "m2"}}...), extractors...)
+			members := []UnionMember{NewUnionMember("m1"), NewUnionMember("m2")}
+			got := ZeroOrOneOfUnion(context.Background(), operation.Operation{Type: operation.Update}, nil, tc.newStruct, tc.oldStruct,
+				NewUnionMembership(members...), extractors...)
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got, tc.expected)
 			}

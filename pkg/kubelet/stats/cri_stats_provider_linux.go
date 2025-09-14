@@ -28,12 +28,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.PodSandboxStats,
-	ps *statsapi.PodStats, fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
+func (p *criStatsProvider) addCRIPodContainerStats(
+	logger klog.Logger,
+	criSandboxStat *runtimeapi.PodSandboxStats,
+	ps *statsapi.PodStats,
+	fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
 	containerMap map[string]*runtimeapi.Container,
 	podSandbox *runtimeapi.PodSandbox,
 	rootFsInfo *cadvisorapiv2.FsInfo, updateCPUNanoCoreUsage bool) error {
@@ -43,7 +47,7 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 			continue
 		}
 		// Fill available stats for full set of required pod stats
-		cs, err := p.makeContainerStats(criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(),
+		cs, err := p.makeContainerStats(logger, criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(),
 			updateCPUNanoCoreUsage)
 		if err != nil {
 			return fmt.Errorf("make container stats: %w", err)
@@ -124,6 +128,6 @@ func addCRIPodProcessStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSand
 
 // listContainerNetworkStats returns the network stats of all the running containers.
 // It should return (nil, nil) for platforms other than Windows.
-func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.NetworkStats, error) {
+func (p *criStatsProvider) listContainerNetworkStats(klog.Logger) (map[string]*statsapi.NetworkStats, error) {
 	return nil, nil
 }

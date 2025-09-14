@@ -41,6 +41,18 @@ func GetWarningsForService(service, oldService *api.Service) []string {
 		}
 	}
 
+	if isHeadlessService(service) {
+		if service.Spec.LoadBalancerIP != "" {
+			warnings = append(warnings, "spec.loadBalancerIP is ignored for headless services")
+		}
+		if len(service.Spec.ExternalIPs) > 0 {
+			warnings = append(warnings, "spec.externalIPs is ignored for headless services")
+		}
+		if service.Spec.SessionAffinity != "" {
+			warnings = append(warnings, "spec.SessionAffinity is ignored for headless services")
+		}
+	}
+
 	for i, externalIP := range service.Spec.ExternalIPs {
 		warnings = append(warnings, utilvalidation.GetWarningsForIP(field.NewPath("spec").Child("externalIPs").Index(i), externalIP)...)
 	}
@@ -61,4 +73,8 @@ func GetWarningsForService(service, oldService *api.Service) []string {
 	}
 
 	return warnings
+}
+
+func isHeadlessService(service *api.Service) bool {
+	return service != nil && service.Spec.Type == api.ServiceTypeClusterIP && service.Spec.ClusterIP == api.ClusterIPNone
 }

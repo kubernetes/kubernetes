@@ -12,11 +12,11 @@ import (
 	"strconv"
 	"strings"
 
+	yaml "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/sliceutil"
 	"sigs.k8s.io/kustomize/kyaml/utils"
 	"sigs.k8s.io/kustomize/kyaml/yaml/internal/k8sgen/pkg/labels"
-	yaml "sigs.k8s.io/yaml/goyaml.v3"
 )
 
 // MakeNullNode returns an RNode that represents an empty document.

@@ -32,7 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -317,6 +317,44 @@ func TestControllerSyncPool(t *testing.T) {
 					Obj(),
 			},
 			expectedError: `update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceTaints`,
+		},
+		"drop-consumable-capacity-field": {
+			features: features{disableConsumableCapacity: true},
+			nodeUID:  nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{Devices: []resourceapi.Device{
+							newDevice(
+								deviceName,
+								allowMultipleAllocationsField(true),
+							),
+						}}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			expectedError: `update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAConsumableCapacity`,
 		},
 		"remove-pool": {
 			nodeUID:   nodeUID,
@@ -924,8 +962,75 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedError: `create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAPartitionableDevices`,
 		},
+		"create-device-with-binding-condition": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{
+							Devices: func() []resourceapi.Device {
+								d := newDevice(deviceName)
+								d.BindingConditions = []string{"condition1", "condition2"}
+								d.BindingFailureConditions = []string{"failure-condition1"}
+								d.BindsToNode = ptr.To(true)
+								return []resourceapi.Device{d}
+							}(),
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices(func() []resourceapi.Device {
+						d := newDevice(deviceName)
+						d.BindingConditions = []string{"condition1", "condition2"}
+						d.BindingFailureConditions = []string{"failure-condition1"}
+						d.BindsToNode = ptr.To(true)
+						return []resourceapi.Device{d}
+					}()).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+		},
+		"drop-device-with-binding-condition": {
+			features: features{disableBindingConditions: true},
+			nodeUID:  nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{
+							Devices: func() []resourceapi.Device {
+								d := newDevice(deviceName)
+								d.BindingConditions = []string{"condition1", "condition2"}
+								d.BindingFailureConditions = []string{"failure-condition1"}
+								d.BindsToNode = ptr.To(true)
+								return []resourceapi.Device{d}
+							}(),
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			expectedError: `create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceBindingConditions`,
+		},
 	}
-
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
@@ -979,7 +1084,7 @@ func TestControllerSyncPool(t *testing.T) {
 			ctrl.run(ctx)
 
 			// Check ResourceSlices
-			resourceSlices, err := kubeClient.ResourceV1beta2().ResourceSlices().List(ctx, metav1.ListOptions{})
+			resourceSlices, err := kubeClient.ResourceV1().ResourceSlices().List(ctx, metav1.ListOptions{})
 			require.NoError(t, err, "list resource slices")
 
 			sortResourceSlices(test.expectedResourceSlices)
@@ -1050,8 +1155,10 @@ func sortResourceSlices(slices []resourceapi.ResourceSlice) {
 }
 
 type features struct {
+	disableBindingConditions    bool
 	disableDeviceTaints         bool
 	disablePartitionableDevices bool
+	disableConsumableCapacity   bool
 }
 
 func createTestClient(features features, timeAdded metav1.Time, objects ...runtime.Object) *fake.Clientset {
@@ -1114,6 +1221,18 @@ func dropDisabledFields(features features, resourceslice *resourceapi.ResourceSl
 			resourceslice.Spec.Devices[i].NodeName = nil
 			resourceslice.Spec.Devices[i].NodeSelector = nil
 			resourceslice.Spec.Devices[i].ConsumesCounters = nil
+		}
+	}
+	if features.disableBindingConditions {
+		for i := range resourceslice.Spec.Devices {
+			resourceslice.Spec.Devices[i].BindingConditions = nil
+			resourceslice.Spec.Devices[i].BindingFailureConditions = nil
+			resourceslice.Spec.Devices[i].BindsToNode = nil
+		}
+	}
+	if features.disableConsumableCapacity {
+		for i := range resourceslice.Spec.Devices {
+			resourceslice.Spec.Devices[i].AllowMultipleAllocations = nil
 		}
 	}
 }
@@ -1258,6 +1377,7 @@ func (r *ResourceSliceWrapper) SharedCounters(counters []resourceapi.CounterSet)
 }
 
 type nodeNameField string
+type allowMultipleAllocationsField bool
 
 func newDevice(name string, fields ...any) resourceapi.Device {
 	device := resourceapi.Device{
@@ -1277,6 +1397,8 @@ func newDevice(name string, fields ...any) resourceapi.Device {
 			device.ConsumesCounters = append(device.ConsumesCounters, f...)
 		case nodeNameField:
 			device.NodeName = ptr.To(string(f))
+		case allowMultipleAllocationsField:
+			device.AllowMultipleAllocations = ptr.To(bool(f))
 		default:
 			panic(fmt.Sprintf("unsupported resourceapi.Device field type %T", field))
 		}

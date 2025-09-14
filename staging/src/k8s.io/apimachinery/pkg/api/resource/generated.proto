@@ -93,6 +93,7 @@ option go_package = "k8s.io/apimachinery/pkg/api/resource";
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:deepcopy-gen=true
 // +k8s:openapi-gen=true
+// +k8s:openapi-model-package=io.k8s.apimachinery.pkg.api.resource
 message Quantity {
   optional string string = 1;
 }
@@ -105,6 +106,7 @@ message Quantity {
 // +protobuf.options.marshal=false
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:deepcopy-gen=true
+// +k8s:openapi-model-package=io.k8s.apimachinery.pkg.api.resource
 message QuantityValue {
   optional string string = 1;
 }

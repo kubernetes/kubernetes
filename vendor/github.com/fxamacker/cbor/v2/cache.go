@@ -37,6 +37,7 @@ const (
 	specialTypeIface
 	specialTypeTag
 	specialTypeTime
+	specialTypeJSONUnmarshalerIface
 )
 
 type typeInfo struct {
@@ -75,6 +76,8 @@ func newTypeInfo(t reflect.Type) *typeInfo {
 		tInfo.spclType = specialTypeUnexportedUnmarshalerIface
 	} else if reflect.PointerTo(t).Implements(typeUnmarshaler) {
 		tInfo.spclType = specialTypeUnmarshalerIface
+	} else if reflect.PointerTo(t).Implements(typeJSONUnmarshaler) {
+		tInfo.spclType = specialTypeJSONUnmarshalerIface
 	}
 
 	switch k {

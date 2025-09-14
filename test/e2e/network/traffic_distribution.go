@@ -31,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -276,7 +277,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		e2epod.NewPodClient(f).CreateBatch(ctx, podsToCreate)
 
 		ginkgo.By("waiting for EndpointSlices to be created")
-		err := framework.WaitForServiceEndpointsNum(ctx, c, svc.Namespace, svc.Name, len(serverPods), 1*time.Second, e2eservice.ServiceEndpointsTimeout)
+		err := e2eendpointslice.WaitForEndpointCount(ctx, c, svc.Namespace, svc.Name, len(serverPods))
 		framework.ExpectNoError(err)
 		slices := endpointSlicesForService(svc.Name)
 		framework.Logf("got slices:\n%v", format.Object(slices, 1))
@@ -458,7 +459,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		ginkgo.By("killing the server pod on the first node and waiting for the EndpointSlices to be updated")
 		err = c.CoreV1().Pods(f.Namespace.Name).Delete(ctx, serverPods[0].pod.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
-		err = framework.WaitForServiceEndpointsNum(ctx, c, svc.Namespace, svc.Name, 1, 1*time.Second, e2eservice.ServiceEndpointsTimeout)
+		err = e2eendpointslice.WaitForEndpointCount(ctx, c, svc.Namespace, svc.Name, 1)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("ensuring that both clients talk to the remaining endpoint when only one endpoint exists")
@@ -475,7 +476,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 		pod.Labels = svc.Spec.Selector
 		serverPods[0].pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-		err = framework.WaitForServiceEndpointsNum(ctx, c, svc.Namespace, svc.Name, 2, 1*time.Second, e2eservice.ServiceEndpointsTimeout)
+		err = e2eendpointslice.WaitForEndpointCount(ctx, c, svc.Namespace, svc.Name, 2)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("ensuring that each client talks only to its same-node endpoint again")

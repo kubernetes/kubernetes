@@ -26,11 +26,16 @@ import (
 
 // ScaleApplyConfiguration represents a declarative configuration of the Scale type for use
 // with apply.
+//
+// Scale represents a scaling request for a resource.
 type ScaleApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ScaleSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *ScaleStatusApplyConfiguration `json:"status,omitempty"`
+	// spec defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+	Spec *ScaleSpecApplyConfiguration `json:"spec,omitempty"`
+	// status is the current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
+	Status *ScaleStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ScaleApplyConfiguration constructs a declarative configuration of the Scale type for use with
@@ -41,6 +46,7 @@ func Scale() *ScaleApplyConfiguration {
 	b.WithAPIVersion("autoscaling/v1")
 	return b
 }
+
 func (b ScaleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

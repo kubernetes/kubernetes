@@ -56,6 +56,40 @@ func TestGetWarningsForService(t *testing.T) {
 			s.Spec.ExternalName = "example.com"
 		},
 		numWarnings: 1,
+	}, {
+		name: "LoadBalancerIP set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.LoadBalancerIP = "1.2.3.4"
+		},
+		numWarnings: 1,
+	}, {
+		name: "ExternalIPs set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.ExternalIPs = []string{"1.2.3.4"}
+		},
+		numWarnings: 1,
+	}, {
+		name: "SessionAffinity set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.SessionAffinity = api.ServiceAffinityClientIP
+		},
+		numWarnings: 1,
+	}, {
+		name: "ExternalIPs, LoadBalancerIP and SessionAffinity set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.ExternalIPs = []string{"1.2.3.4"}
+			s.Spec.LoadBalancerIP = "1.2.3.4"
+			s.Spec.SessionAffinity = api.ServiceAffinityClientIP
+		},
+		numWarnings: 3,
 	}}
 
 	for _, tc := range testCases {

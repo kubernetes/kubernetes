@@ -133,7 +133,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: registry.k8s.io/coredns/coredns:v1.12.1
+        image: registry.k8s.io/coredns/coredns:v1.12.3
         imagePullPolicy: IfNotPresent
         resources:
           limits:
