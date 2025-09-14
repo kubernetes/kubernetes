@@ -464,6 +464,8 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 
 	proxyMux := mux.NewPathRecorderMux(kubeProxy)
 	healthz.InstallHandler(proxyMux)
+	healthz.InstallReadyzHandler(proxyMux)
+	healthz.InstallLivezHandler(proxyMux)
 	slis.SLIMetricsWithReset{}.Install(proxyMux)
 
 	proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
@@ -486,7 +488,7 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(proxyMux, kubeProxy, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
+		statusz.Install(proxyMux, kubeProxy, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), statusz.WithListedPaths(proxyMux.ListedPaths())))
 	}
 
 	fn := func() {
