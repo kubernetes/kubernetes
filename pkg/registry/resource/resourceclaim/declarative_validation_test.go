@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-	http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package resourceclaim
 
 import (
@@ -42,7 +43,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		APIVersion: apiVersion,
 		Resource:   "resourceclaims",
 	})
-	fakeClient := fake.NewSimpleClientset()
+	fakeClient := fake.NewClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()
 	Strategy := NewStrategy(mockNSClient)
 	testCases := map[string]struct {
@@ -75,7 +76,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		APIVersion: apiVersion,
 		Resource:   "resourceclaims",
 	})
-	fakeClient := fake.NewSimpleClientset()
+	fakeClient := fake.NewClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()
 	Strategy := NewStrategy(mockNSClient)
 	validClaim := mkValidResourceClaim()
@@ -92,6 +93,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
 	}
