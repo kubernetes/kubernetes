@@ -106,5 +106,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("atomicListUniqueMap"), obj.AtomicListUniqueMap, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.AtomicListUniqueMap }))...)
 
+	// field Struct.CustomUniqueListWithTypeSet has no validation
+	// field Struct.CustomUniqueListWithTypeMap has no validation
 	return errs
 }
