@@ -2853,6 +2853,31 @@
     lifecycle of a container.
   release: v1.19
   file: test/e2e/common/node/expansion.go
+- testname: CRUD operations for deviceclasses
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 DeviceClass [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 DeviceClass.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resourceclaims
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceClaim [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceClaim.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resourceclaimtemplates
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceClaimTemplate
+    [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceClaimTemplate.
+  release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for resoureslices
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceSlice [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 ResourceSlice.
+  release: v1.35
+  file: test/e2e/dra/dra.go
 - testname: LimitRange, resources
   codename: '[sig-scheduling] LimitRange should create a LimitRange with defaults
     and ensure pod has those defaults applied. [Conformance]'
