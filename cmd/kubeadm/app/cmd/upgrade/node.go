@@ -196,7 +196,7 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 	dryRunDir := ""
 	if *dryRun {
 		if dryRunDir, err = constants.GetDryRunDir(constants.EnvVarUpgradeDryRunDir, "kubeadm-upgrade-node-dryrun", klog.Warningf); err != nil {
-			return nil, errors.Wrap(err, "couldn't create a temporary directory on dryrun")
+			return nil, errors.Wrap(err, "could not create a temporary directory on dryrun")
 		}
 	}
 
