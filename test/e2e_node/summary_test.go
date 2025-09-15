@@ -381,7 +381,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 		ginkgo.It("should report CPU pressure in PSI metrics", func(ctx context.Context) {
 			podName := "cpu-pressure-pod"
 			ginkgo.By("Creating a pod to generate CPU pressure")
-			podSpec := getStressTestPod(podName, "cpu-stress", []string{"stress", "--cpus", "1"})
+			podSpec := getStressTestPod(podName, "cpu-stress", []string{"stress", "--cpus", "2"})
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
 					v1.ResourceCPU: resource.MustParse("500m"),
