@@ -304,6 +304,26 @@ func TestErrorMatcher_Matches(t *testing.T) {
 		actualErr: &Error{Type: ErrorTypeRequired, Field: "field", BadValue: "value", Detail: "detail", Origin: "origin"},
 		matches:   false,
 	}, {
+		name:    "ByDeclarativeOnly: match",
+		matcher: ErrorMatcher{}.ByDeclarativeOnly(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.DeclarativeOnly = true
+			return e
+		},
+		actualErr: &Error{DeclarativeOnly: true},
+		matches:   true,
+	}, {
+		name:    "ByDeclarativeOnly: no match",
+		matcher: ErrorMatcher{}.ByDeclarativeOnly(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.DeclarativeOnly = true
+			return e
+		},
+		actualErr: &Error{DeclarativeOnly: false},
+		matches:   false,
+	}, {
 		name:      "RequireOriginWhenInvalid: match",
 		matcher:   ErrorMatcher{}.ByOrigin().RequireOriginWhenInvalid(),
 		wantedErr: baseErr,

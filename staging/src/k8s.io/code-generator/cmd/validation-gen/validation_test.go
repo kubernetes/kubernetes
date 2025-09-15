@@ -17,10 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"k8s.io/code-generator/cmd/validation-gen/validators"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 )
 

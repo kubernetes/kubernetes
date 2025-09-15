@@ -192,7 +192,6 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		}
 	}
 
-	nt = util.NativeType(t)
 	for _, vfn := range validations.Functions {
 		comm := vfn.Comments
 		vfn.Comments = nil

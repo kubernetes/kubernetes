@@ -57,7 +57,7 @@ func Test(t *testing.T) {
 		Enum2PtrField:   ptr.To(Enum2("x")),
 		NotEnumField:    "x",
 		NotEnumPtrField: ptr.To(NotEnum("x")),
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDeclarativeOnly(), field.ErrorList{
 		field.NotSupported(field.NewPath("enum0Field"), Enum0("x"), []Enum0{}).WithOrigin("enum"),
 		field.NotSupported(field.NewPath("enum0PtrField"), Enum0("x"), []Enum0{}).WithOrigin("enum"),
 		field.NotSupported(field.NewPath("enum1Field"), Enum1("x"), []Enum1{E1V1}).WithOrigin("enum"),

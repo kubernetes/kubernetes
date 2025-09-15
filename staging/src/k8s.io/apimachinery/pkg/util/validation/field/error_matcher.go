@@ -86,6 +86,7 @@ func (m ErrorMatcher) Matches(want, got *Error) bool {
 	if m.matchDetail != nil && !m.matchDetail(want.Detail, got.Detail) {
 		return false
 	}
+
 	return true
 }
 
@@ -223,6 +224,8 @@ func (m ErrorMatcher) RequireOriginWhenInvalid() ErrorMatcher {
 	m.requireOriginWhenInvalid = true
 	return m
 }
+
+
 
 // ByDetailExact returns a derived ErrorMatcher which also matches errors by
 // the exact detail string.

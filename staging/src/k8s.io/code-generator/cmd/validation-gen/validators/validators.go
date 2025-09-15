@@ -259,6 +259,29 @@ const (
 	Alpha StabilityLevel = "Alpha"
 )
 
+var stabilityOrder = map[StabilityLevel]int{
+	Alpha:  0,
+	Stable: 1,
+}
+
+// Min returns the minimum of two stability levels, or an error if either
+// stability level is unknown.
+func (s StabilityLevel) Min(other StabilityLevel) (StabilityLevel, error) {
+	sOrder, okS := stabilityOrder[s]
+	if !okS {
+		return "", fmt.Errorf("unknown stability level %q", s)
+	}
+	otherOrder, okOther := stabilityOrder[other]
+	if !okOther {
+		return "", fmt.Errorf("unknown stability level %q", other)
+	}
+
+	if sOrder < otherOrder {
+		return s, nil
+	}
+	return other, nil
+}
+
 // TagDoc describes a comment-tag and its usage.
 type TagDoc struct {
 	// Tag is the tag name, without the leading '+'.

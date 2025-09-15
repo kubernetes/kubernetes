@@ -311,6 +311,7 @@ func (utv uniqueTagValidator) Docs() TagDoc {
 			Docs:        "map | set",
 		}},
 		PayloadsType:     codetags.ValueTypeString,
+		StabilityLevel:   Alpha,
 		PayloadsRequired: true,
 	}
 	return doc
@@ -352,10 +353,11 @@ func (cutv customUniqueTagValidator) GetValidations(context Context, tag codetag
 
 func (cutv customUniqueTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:         cutv.TagName(),
-		Scopes:      cutv.ValidScopes().UnsortedList(),
-		Description: "Indicates that uniqueness validation for this list is implemented via custom, handwritten validation. This disables generation of uniqueness validation for this list.",
-		Payloads:    nil,
+		Tag:            cutv.TagName(),
+		Scopes:         cutv.ValidScopes().UnsortedList(),
+		Description:    "Indicates that uniqueness validation for this list is implemented via custom, handwritten validation. This disables generation of uniqueness validation for this list.",
+		Payloads:       nil,
+		StabilityLevel: Alpha,
 	}
 	return doc
 }
