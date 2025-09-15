@@ -57,7 +57,7 @@ readonly KUBE_BUILD_IMAGE_VERSION_BASE
 readonly KUBE_BUILD_IMAGE_VERSION="${KUBE_BUILD_IMAGE_VERSION_BASE}-${KUBE_BUILD_IMAGE_CROSS_TAG}"
 
 # Make it possible to override the `kube-cross` image, and tag independent of `KUBE_BASE_IMAGE_REGISTRY`
-KUBE_CROSS_IMAGE="${KUBE_CROSS_IMAGE:-"${KUBE_BASE_IMAGE_REGISTRY}/kube-cross"}"
+KUBE_CROSS_IMAGE="gcr.io/k8s-staging-releng-test/kube-cross"
 readonly KUBE_CROSS_IMAGE
 KUBE_CROSS_VERSION="${KUBE_CROSS_VERSION:-"${KUBE_BUILD_IMAGE_CROSS_TAG}"}"
 readonly KUBE_CROSS_VERSION
