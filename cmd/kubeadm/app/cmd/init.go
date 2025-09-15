@@ -355,7 +355,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 	dryRunDir := ""
 	if initOptions.dryRun || cfg.DryRun {
 		if dryRunDir, err = kubeadmconstants.GetDryRunDir(kubeadmconstants.EnvVarInitDryRunDir, "kubeadm-init-dryrun", klog.Warningf); err != nil {
-			return nil, errors.Wrap(err, "could not create a temporary directory")
+			return nil, errors.Wrap(err, "could not create a temporary directory on dryrun")
 		}
 	}
 

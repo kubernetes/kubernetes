@@ -200,7 +200,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 	dryRunDir := ""
 	if *dryRun {
 		if dryRunDir, err = constants.GetDryRunDir(constants.EnvVarUpgradeDryRunDir, "kubeadm-upgrade-apply-dryrun", klog.Warningf); err != nil {
-			return nil, errors.Wrap(err, "could not create a temporary directory")
+			return nil, errors.Wrap(err, "could not create a temporary directory on dryrun")
 		}
 	}
 

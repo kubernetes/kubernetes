@@ -467,7 +467,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 	dryRunDir := ""
 	if opt.dryRun || cfg.DryRun {
 		if dryRunDir, err = kubeadmconstants.GetDryRunDir(kubeadmconstants.EnvVarJoinDryRunDir, "kubeadm-join-dryrun", klog.Warningf); err != nil {
-			return nil, errors.Wrap(err, "could not create a temporary directory")
+			return nil, errors.Wrap(err, "could not create a temporary directory on dryrun")
 		}
 	}
 
