@@ -224,6 +224,7 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 						// Handle SchedulerAsyncAPICalls feature only in 1.34+.
 						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
 					}
+					// Don't call SetFeatureGateEmulationVersionDuringTest again. SchedulerPopFromBackoffQ will be parsed both in 1.33 and 1.34+ (up to a point).
 					// Set the SchedulerPopFromBackoffQ feature to false, because when it's enabled, we can't be sure the pod won't be popped from the backoffQ.
 					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, false)
 
