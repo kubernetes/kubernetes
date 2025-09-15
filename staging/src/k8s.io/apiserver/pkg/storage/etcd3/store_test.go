@@ -185,6 +185,11 @@ func TestGetListRecursivePrefix(t *testing.T) {
 	storagetesting.RunTestGetListRecursivePrefix(ctx, t, store)
 }
 
+func TestKeySchema(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestKeySchema(ctx, t, store)
+}
+
 type storeWithPrefixTransformer struct {
 	*store
 }
