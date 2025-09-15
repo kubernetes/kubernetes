@@ -227,7 +227,7 @@ func TestTooLargeResourceVersionErrorForWatchList(t *testing.T) {
 		t.Fatalf("Unable to convert NewTooLargeResourceVersionError to apierrors.StatusError")
 	}
 
-	w, err := store.watcher.Watch(ctx, "/abc", int64(102), requestOpts)
+	w, err := store.watcher.Watch(ctx, "/abc/", int64(102), requestOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
