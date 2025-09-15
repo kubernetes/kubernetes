@@ -437,11 +437,7 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 			WithComment(comment)
 		result.AddFunction(f)
 	}
-	// TODO: Replace with the following once we have a way to either opt-out from
-	// uniqueness validation of list-maps or settle the decision on how to handle
-	// the ratcheting cases of it.
-	// if lm.semantic == semanticMap {
-	if lm.semantic == semanticMap && lm.ownership == ownershipSingle {
+	if lm.semantic == semanticMap {
 		// TODO: There are some fields which are declared as maps which do not
 		// enforce uniqueness in manual validation. Those either need to not be
 		// maps or we need to allow types to opt-out from this validation.  SSA
