@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package conntrack
 
 import (
 	"context"
@@ -34,6 +34,10 @@ import (
 	"k8s.io/klog/v2"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
+
+func SetSysctls(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
+	return setSysctls(ctx, realConntrackConfigurer{}, config)
+}
 
 // conntrackConfigurer is a mockable interface for setting conntrack sysctls.
 //
@@ -54,7 +58,7 @@ type conntrackConfigurer interface {
 	SetUDPStreamTimeout(ctx context.Context, seconds int) error
 }
 
-func setupConntrack(ctx context.Context, ct conntrackConfigurer, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
+func setSysctls(ctx context.Context, ct conntrackConfigurer, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
 	max, err := getConntrackMax(ctx, config)
 	if err != nil {
 		return err

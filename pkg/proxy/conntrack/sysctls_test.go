@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package conntrack
 
 import (
 	"context"
@@ -226,7 +226,7 @@ func TestSetupConntrack(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fc := &fakeConntracker{err: test.conntrackErr}
-			err := setupConntrack(ctx, fc, &test.config)
+			err := setSysctls(ctx, fc, &test.config)
 			if test.wantErr && err == nil {
 				t.Errorf("Test %q: Expected error, got nil", test.name)
 			}

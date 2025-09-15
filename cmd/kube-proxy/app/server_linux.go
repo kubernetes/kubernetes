@@ -32,6 +32,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
@@ -64,10 +65,8 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 // Proxier. It should fill in any platform-specific fields and perform other
 // platform-specific setup.
 func (s *ProxyServer) platformSetup(ctx context.Context) error {
-	ct := &realConntrackConfigurer{}
-	err := setupConntrack(ctx, ct, &s.Config.Linux.Conntrack)
-	if err != nil {
-		return err
+	if err := conntrack.SetSysctls(ctx, &s.Config.Linux.Conntrack); err != nil {
+		return fmt.Errorf("could not set conntrack parameters from kube-proxy configuration: %w", err)
 	}
 
 	return nil
