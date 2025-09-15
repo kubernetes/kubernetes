@@ -18,14 +18,12 @@ package app
 
 import (
 	"context"
-	"errors"
 	"os"
 	"strconv"
 	"strings"
 
 	"k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
 )
 
 // Conntracker is an interface to the global sysctl. Descriptions of the various
@@ -50,8 +48,6 @@ type Conntracker interface {
 type realConntracker struct {
 }
 
-var errReadOnlySysFS = errors.New("readOnlySysFS")
-
 func (rct realConntracker) SetMax(ctx context.Context, max int) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Setting nf_conntrack_max", "nfConntrackMax", max)
@@ -66,20 +62,6 @@ func (rct realConntracker) SetMax(ctx context.Context, max int) error {
 	}
 	if hashsize >= (max / 4) {
 		return nil
-	}
-
-	// sysfs is expected to be mounted as 'rw'. However, it may be unexpectedly
-	// mounted as 'ro' by docker because of known bugs (https://issues.k8s.io/134108).
-	// In that case we return a special error errReadOnlySysFS here, which the caller
-	// should deal with specially.
-	//
-	// TODO: this workaround can go away once we no longer support containerd 1.7.
-	writable, err := rct.isSysFSWritable(ctx)
-	if err != nil {
-		return err
-	}
-	if !writable {
-		return errReadOnlySysFS
 	}
 
 	logger.Info("Setting conntrack hashsize", "conntrackHashsize", max/4)
@@ -118,33 +100,6 @@ func (rct realConntracker) setIntSysCtl(ctx context.Context, name string, value 
 		}
 	}
 	return nil
-}
-
-// isSysFSWritable checks /proc/mounts to see whether sysfs is 'rw' or not.
-func (rct realConntracker) isSysFSWritable(ctx context.Context) (bool, error) {
-	logger := klog.FromContext(ctx)
-	const permWritable = "rw"
-	const sysfsDevice = "sysfs"
-	m := mount.New("" /* default mount path */)
-	mountPoints, err := m.List()
-	if err != nil {
-		logger.Error(err, "Failed to list mount points")
-		return false, err
-	}
-
-	for _, mountPoint := range mountPoints {
-		if mountPoint.Type != sysfsDevice {
-			continue
-		}
-		// Check whether sysfs is 'rw'
-		if len(mountPoint.Opts) > 0 && mountPoint.Opts[0] == permWritable {
-			return true, nil
-		}
-		logger.Error(nil, "Sysfs is not writable", "mountPoint", mountPoint, "mountOptions", mountPoint.Opts)
-		return false, errReadOnlySysFS
-	}
-
-	return false, errors.New("no sysfs mounted")
 }
 
 func readIntStringFile(filename string) (int, error) {

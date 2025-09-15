@@ -304,15 +304,7 @@ func (s *ProxyServer) setupConntrack(ctx context.Context, ct Conntracker) error 
 	if max > 0 {
 		err := ct.SetMax(ctx, max)
 		if err != nil {
-			if err != errReadOnlySysFS {
-				return err
-			}
-			// errReadOnlySysFS means we ran into a known container runtim bug
-			// (https://issues.k8s.io/134108). For historical reasons we ignore
-			// this problem and just alert the admin that it occurred.
-			const message = "CRI error: /sys is read-only: " +
-				"cannot modify conntrack limits, problems may arise later (If running Docker, see docker issue #24000)"
-			s.Recorder.Eventf(s.NodeRef, nil, v1.EventTypeWarning, err.Error(), "StartKubeProxy", message)
+			return err
 		}
 	}
 
