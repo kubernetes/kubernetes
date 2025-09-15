@@ -4,6 +4,10 @@
       "github.com/libopenstorage/openstorage": {
         "Version": "v1.0.0",
         "Reason": "portworx csi driver has been deprecated and will be removed - https://github.com/kubernetes/enhancements/issues/2589"
+      },
+      "go.opentelemetry.io/auto/sdk": {
+        "Version": "v1.1.0",
+        "Reason": "support broken for 386 platform(s) - https://github.com/kubernetes/kubernetes/issues/134066"
       }
     },
     "unwantedModules": {
