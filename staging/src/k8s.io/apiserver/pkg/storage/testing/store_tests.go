@@ -3777,3 +3777,81 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 		t.Errorf("CompactRevision()=%d, expected: %d", store.CompactRevision(), expectCompactedRV)
 	}
 }
+
+func RunTestKeySchema(ctx context.Context, t *testing.T, store storage.Interface) {
+	createObj := &example.Pod{}
+	createOut := &example.Pod{}
+	require.ErrorContains(t, store.Create(ctx, "", createObj, createOut, 0), "empty key")
+	require.ErrorContains(t, store.Create(ctx, "/", createObj, createOut, 0), "empty key")
+	require.ErrorContains(t, store.Create(ctx, ".", createObj, createOut, 0), "invalid key")
+	require.ErrorContains(t, store.Create(ctx, "..", createObj, createOut, 0), "invalid key")
+	require.NoError(t, store.Create(ctx, "/pods/", createObj, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/name", createObj, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/namespace", createObj, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/namespace/name", createObj, createOut, 0))
+
+	listOut := &example.PodList{}
+	recursiveListOpts := storage.ListOptions{Predicate: storage.Everything, Recursive: true}
+	require.ErrorContains(t, store.GetList(ctx, "", recursiveListOpts, listOut), "empty key")
+	require.ErrorContains(t, store.GetList(ctx, "/", recursiveListOpts, listOut), "empty key")
+	require.ErrorContains(t, store.GetList(ctx, ".", recursiveListOpts, listOut), "invalid key")
+	require.ErrorContains(t, store.GetList(ctx, "..", recursiveListOpts, listOut), "invalid key")
+	require.NoError(t, store.GetList(ctx, "/pods", recursiveListOpts, listOut))
+	require.NoError(t, store.GetList(ctx, "/pods/", recursiveListOpts, listOut))
+	require.NoError(t, store.GetList(ctx, "/pods/namespace", recursiveListOpts, listOut))
+	require.NoError(t, store.GetList(ctx, "/pods/namespace/name", recursiveListOpts, listOut))
+
+	getOut := &example.Pod{}
+	getOpts := storage.GetOptions{}
+	require.ErrorContains(t, store.Get(ctx, "", getOpts, getOut), "empty key")
+	require.ErrorContains(t, store.Get(ctx, "/", getOpts, getOut), "empty key")
+	require.ErrorContains(t, store.Get(ctx, ".", getOpts, getOut), "invalid key")
+	require.ErrorContains(t, store.Get(ctx, "..", getOpts, getOut), "invalid key")
+	require.NoError(t, store.Get(ctx, "/pods/", getOpts, getOut))
+	require.NoError(t, store.Get(ctx, "/pods/namespace", getOpts, getOut))
+	require.NoError(t, store.Get(ctx, "/pods/namespace/name", getOpts, getOut))
+
+	_, err := store.Watch(ctx, "", recursiveListOpts)
+	require.ErrorContains(t, err, "empty key")
+	_, err = store.Watch(ctx, "/", recursiveListOpts)
+	require.ErrorContains(t, err, "empty key")
+	_, err = store.Watch(ctx, ".", recursiveListOpts)
+	require.ErrorContains(t, err, "invalid key")
+	_, err = store.Watch(ctx, "..", recursiveListOpts)
+	require.ErrorContains(t, err, "invalid key")
+	w, err := store.Watch(ctx, "/pods/", recursiveListOpts)
+	require.NoError(t, err)
+	w.Stop()
+	w, err = store.Watch(ctx, "/pods/namespace", recursiveListOpts)
+	require.NoError(t, err)
+	w.Stop()
+	w, err = store.Watch(ctx, "/pods/namespace/name", recursiveListOpts)
+	require.NoError(t, err)
+	w.Stop()
+
+	updateIn := &example.Pod{}
+	updateOut := &example.Pod{}
+	updateFunc := func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+		return updateIn, nil, nil
+	}
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "", updateOut, false, nil, updateFunc, nil), "empty key")
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "/", updateOut, false, nil, updateFunc, nil), "empty key")
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, ".", updateOut, false, nil, updateFunc, nil), "invalid key")
+	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "..", updateOut, false, nil, updateFunc, nil), "invalid key")
+	require.NoError(t, store.GuaranteedUpdate(ctx, "/pods/", updateOut, false, nil, updateFunc, nil))
+	require.NoError(t, store.GuaranteedUpdate(ctx, "/pods/namespace", updateOut, false, nil, updateFunc, nil))
+	require.NoError(t, store.GuaranteedUpdate(ctx, "/pods/namespace/name", updateOut, false, nil, updateFunc, nil))
+
+	deleteOut := &example.Pod{}
+	deleteFunc := func(ctx context.Context, obj runtime.Object) error {
+		return nil
+	}
+	deleteOpts := storage.DeleteOptions{}
+	require.ErrorContains(t, store.Delete(ctx, "", deleteOut, nil, deleteFunc, nil, deleteOpts), "empty key")
+	require.ErrorContains(t, store.Delete(ctx, "/", deleteOut, nil, deleteFunc, nil, deleteOpts), "empty key")
+	require.ErrorContains(t, store.Delete(ctx, ".", deleteOut, nil, deleteFunc, nil, deleteOpts), "invalid key")
+	require.ErrorContains(t, store.Delete(ctx, "..", deleteOut, nil, deleteFunc, nil, deleteOpts), "invalid key")
+	require.NoError(t, store.Delete(ctx, "/pods/", deleteOut, nil, deleteFunc, nil, deleteOpts))
+	require.NoError(t, store.Delete(ctx, "/pods/namespace", deleteOut, nil, deleteFunc, nil, deleteOpts))
+	require.NoError(t, store.Delete(ctx, "/pods/namespace/name", deleteOut, nil, deleteFunc, nil, deleteOpts))
+}
