@@ -230,7 +230,7 @@ func (s *store) getResourceSizeEstimator() *resourceSizeEstimator {
 
 // Get implements storage.Interface.Get.
 func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, out runtime.Object) error {
-	preparedKey, err := s.prepareKey(key)
+	preparedKey, err := s.prepareKey(key, false)
 	if err != nil {
 		return err
 	}
@@ -266,7 +266,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 // Create implements storage.Interface.Create.
 func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	preparedKey, err := s.prepareKey(key)
+	preparedKey, err := s.prepareKey(key, false)
 	if err != nil {
 		return err
 	}
@@ -336,7 +336,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 func (s *store) Delete(
 	ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions,
 	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
-	preparedKey, err := s.prepareKey(key)
+	preparedKey, err := s.prepareKey(key, false)
 	if err != nil {
 		return err
 	}
@@ -457,7 +457,7 @@ func (s *store) conditionalDelete(
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
-	preparedKey, err := s.prepareKey(key)
+	preparedKey, err := s.prepareKey(key, false)
 	if err != nil {
 		return err
 	}
@@ -645,12 +645,9 @@ func (s *store) Stats(ctx context.Context) (storage.Stats, error) {
 	// returning stats without resource size
 
 	startTime := time.Now()
-	prefix, err := s.prepareKey(s.resourcePrefix)
+	prefix, err := s.prepareKey(s.resourcePrefix, true)
 	if err != nil {
 		return storage.Stats{}, err
-	}
-	if !strings.HasSuffix(prefix, "/") {
-		prefix += "/"
 	}
 	count, err := s.client.Kubernetes.Count(ctx, prefix, kubernetes.CountOptions{})
 	metrics.RecordEtcdRequest("listWithCount", s.groupResource, err, startTime)
@@ -677,12 +674,9 @@ func (s *store) EnableResourceSizeEstimation(getKeys storage.KeysFunc) error {
 
 func (s *store) getKeys(ctx context.Context) ([]string, error) {
 	startTime := time.Now()
-	prefix, err := s.prepareKey(s.resourcePrefix)
+	prefix, err := s.prepareKey(s.resourcePrefix, true)
 	if err != nil {
 		return nil, err
-	}
-	if !strings.HasSuffix(prefix, "/") {
-		prefix += "/"
 	}
 	resp, err := s.client.KV.Get(ctx, prefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 	metrics.RecordEtcdRequest("listOnlyKeys", s.groupResource, err, startTime)
@@ -734,7 +728,7 @@ func (s *store) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
 
 // GetList implements storage.Interface.
 func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	keyPrefix, err := s.prepareKey(key)
+	keyPrefix, err := s.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return err
 	}
@@ -753,14 +747,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	v, err := conversion.EnforcePtr(listPtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		return fmt.Errorf("need ptr to slice: %v", err)
-	}
-
-	// For recursive lists, we need to make sure the key ended with "/" so that we only
-	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
-	// with prefix "/a" will return all three, while with prefix "/a/" will return only
-	// "/a/b" which is the correct answer.
-	if opts.Recursive && !strings.HasSuffix(keyPrefix, "/") {
-		keyPrefix += "/"
 	}
 
 	// set the appropriate clientv3 options to filter the returned data set
@@ -971,7 +957,7 @@ func growSlice(v reflect.Value, maxCapacity int, sizes ...int) {
 
 // Watch implements storage.Interface.Watch.
 func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
-	preparedKey, err := s.prepareKey(key)
+	preparedKey, err := s.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return nil, err
 	}
@@ -1118,7 +1104,7 @@ func (s *store) validateMinimumResourceVersion(minimumResourceVersion string, ac
 	return nil
 }
 
-func (s *store) prepareKey(key string) (string, error) {
+func (s *store) prepareKey(key string, recursive bool) (string, error) {
 	if key == ".." ||
 		strings.HasPrefix(key, "../") ||
 		strings.HasSuffix(key, "/..") ||
@@ -1138,6 +1124,13 @@ func (s *store) prepareKey(key string) (string, error) {
 	startIndex := 0
 	if key[0] == '/' {
 		startIndex = 1
+	}
+	// For recursive requests, we need to make sure the key ended with "/" so that we only
+	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
+	// with prefix "/a" will return all three, while with prefix "/a/" will return only
+	// "/a/b" which is the correct answer.
+	if recursive && !strings.HasSuffix(key, "/") {
+		key += "/"
 	}
 	return s.pathPrefix + key[startIndex:], nil
 }
