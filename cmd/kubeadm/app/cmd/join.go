@@ -463,11 +463,11 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		}
 	}
 
-	// if dry running, creates a temporary folder to save kubeadm generated files
+	// If dry running creates a temporary directory for saving kubeadm generated files.
 	dryRunDir := ""
 	if opt.dryRun || cfg.DryRun {
 		if dryRunDir, err = kubeadmconstants.GetDryRunDir(kubeadmconstants.EnvVarJoinDryRunDir, "kubeadm-join-dryrun", klog.Warningf); err != nil {
-			return nil, errors.Wrap(err, "couldn't create a temporary directory on dryrun")
+			return nil, errors.Wrap(err, "could not create a temporary directory on dryrun")
 		}
 	}
 
@@ -500,7 +500,7 @@ func (j *joinData) DryRun() bool {
 	return j.dryRun
 }
 
-// KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
+// KubeConfigDir returns the Kubernetes configuration directory or the temporary directory if DryRun is true.
 func (j *joinData) KubeConfigDir() string {
 	if j.dryRun {
 		return j.dryRunDir
@@ -508,7 +508,7 @@ func (j *joinData) KubeConfigDir() string {
 	return kubeadmconstants.KubernetesDir
 }
 
-// KubeletDir returns the path of the kubelet configuration folder or the temporary folder in case of DryRun.
+// KubeletDir returns the kubelet configuration directory or the temporary directory if DryRun is true.
 func (j *joinData) KubeletDir() string {
 	if j.dryRun {
 		return j.dryRunDir
@@ -516,7 +516,7 @@ func (j *joinData) KubeletDir() string {
 	return kubeadmconstants.KubeletRunDirectory
 }
 
-// ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
+// ManifestDir returns the path where manifest should be stored or the temporary directory if DryRun is true.
 func (j *joinData) ManifestDir() string {
 	if j.dryRun {
 		return j.dryRunDir
@@ -524,7 +524,7 @@ func (j *joinData) ManifestDir() string {
 	return kubeadmconstants.GetStaticPodDirectory()
 }
 
-// CertificateWriteDir returns the path where certs should be stored or the temporary folder path in case of DryRun.
+// CertificateWriteDir returns the path where certs should be stored or the temporary directory if DryRun is true.
 func (j *joinData) CertificateWriteDir() string {
 	if j.dryRun {
 		return j.dryRunDir
