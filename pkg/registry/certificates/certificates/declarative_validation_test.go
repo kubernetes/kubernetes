@@ -177,6 +177,11 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 			),
 			subresources: []string{"/approval"}, // Can only modify Approved and Denied conditions on /approval subresource
 		},
+		"ratcheting: allow existing duplicate types - valid": {
+			old:          makeValidCSR(withApprovedCondition(), withApprovedCondition(), withDeniedCondition(), withDeniedCondition()),
+			update:       makeValidCSR(withDeniedCondition(), withDeniedCondition(), withApprovedCondition(), withApprovedCondition()),
+			subresources: []string{"/status"},
+		},
 	}
 
 	for k, tc := range testCases {
