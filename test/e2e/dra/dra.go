@@ -80,11 +80,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 	f.Context("CRUD Tests", func() {
 		/*
-		   Release: v1.?
+		   Release: v1.35
 		   Testname: CRUD operations for deviceclasses
 		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 DeviceClass.
 		*/
-		framework.It("resource.k8s.io/v1 DeviceClass", func(ctx context.Context) {
+		framework.ConformanceIt("resource.k8s.io/v1 DeviceClass", func(ctx context.Context) {
 			e2econformance.TestResource(ctx, f,
 				&e2econformance.ResourceTestcase[*resourceapi.DeviceClass]{
 					GVR:        resourceapi.SchemeGroupVersion.WithResource("deviceclasses"),
@@ -108,11 +108,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 
 		/*
-		   Release: v1.?
+		   Release: v1.35
 		   Testname: CRUD operations for resourceclaims
 		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 ResourceClaim.
 		*/
-		framework.It("resource.k8s.io/v1 ResourceClaim", func(ctx context.Context) {
+		framework.ConformanceIt("resource.k8s.io/v1 ResourceClaim", func(ctx context.Context) {
 			e2econformance.TestResource(ctx, f,
 				&e2econformance.ResourceTestcase[*resourceapi.ResourceClaim]{
 					GVR:        resourceapi.SchemeGroupVersion.WithResource("resourceclaims"),
@@ -160,11 +160,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 
 		/*
-		   Release: v1.?
+		   Release: v1.35
 		   Testname: CRUD operations for resourceclaimtemplates
 		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 ResourceClaimTemplate.
 		*/
-		framework.It("resource.k8s.io/v1 ResourceClaimTemplate", func(ctx context.Context) {
+		framework.ConformanceIt("resource.k8s.io/v1 ResourceClaimTemplate", func(ctx context.Context) {
 			e2econformance.TestResource(ctx, f,
 				&e2econformance.ResourceTestcase[*resourceapi.ResourceClaimTemplate]{
 					GVR:        resourceapi.SchemeGroupVersion.WithResource("resourceclaimtemplates"),
@@ -197,11 +197,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 
 		/*
-		   Release: v1.?
+		   Release: v1.35
 		   Testname: CRUD operations for resoureslices
 		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 ResourceSlice.
 		*/
-		framework.It("resource.k8s.io/v1 ResourceSlice", func(ctx context.Context) {
+		framework.ConformanceIt("resource.k8s.io/v1 ResourceSlice", func(ctx context.Context) {
 			e2econformance.TestResource(ctx, f,
 				&e2econformance.ResourceTestcase[*resourceapi.ResourceSlice]{
 					GVR:        resourceapi.SchemeGroupVersion.WithResource("resourceslices"),
