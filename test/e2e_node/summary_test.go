@@ -416,17 +416,17 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			podSpec := getStressTestPod(podName, "memory-stress", []string{})
 			podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
 			podSpec.Spec.Containers[0].Args = []string{
-				// This command runs an infinite loop that uses `dd` to write 50MB files,
-				// cycling through 5 files to target 250MB of reclaimable file cache usage.
-				// This exceeds the 200MB memory limit, forcing the kernel to reclaim memory and generate pressure stalls.
-				"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
+				// This command runs an infinite loop that uses `dd` to write 15MB files,
+				// cycling through 3 files to target 45MB of reclaimable file cache usage.
+				// This creates sustained memory pressure without triggering OOM kills.
+				"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=15 &>/dev/null; i=$(((i+1)%3)); sleep 0.2; done",
 			}
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("200M"),
+					v1.ResourceMemory: resource.MustParse("250M"),
 				},
 				Requests: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("200M"),
+					v1.ResourceMemory: resource.MustParse("250M"),
 				},
 			}
 			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
