@@ -124,11 +124,7 @@ func probeControllerVolumePlugins(logger klog.Logger, config persistentvolumecon
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 
-	var err error
-	allPlugins, err = appendLegacyControllerProviders(logger, allPlugins, utilfeature.DefaultFeatureGate)
-	if err != nil {
-		return allPlugins, err
-	}
+	allPlugins = appendLegacyControllerProviders(logger, allPlugins, utilfeature.DefaultFeatureGate)
 
 	var filteredPlugins []volume.VolumePlugin
 	if filter == nil {
