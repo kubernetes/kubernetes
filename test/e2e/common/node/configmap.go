@@ -141,7 +141,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		gomega.Expect(err).To(gomega.HaveOccurred(), "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
 	})
 
-	ginkgo.It("should update ConfigMap successfully", func(ctx context.Context) {
+	framework.ConformanceIt("should update ConfigMap successfully", f.WithNodeConformance(), func(ctx context.Context) {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
