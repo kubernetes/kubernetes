@@ -102,7 +102,7 @@ readonly __default_go_runner_version=v2.4.0-go1.24.6-bookworm.0
 readonly __default_setcap_version=bookworm-v1.0.4
 
 # These are the base images for the Docker-wrapped binaries.
-readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
+readonly KUBE_GORUNNER_IMAGE="gcr.io/k8s-staging-releng-test/go-runner:v2.4.0-go1.25.1-bookworm.0"
 readonly KUBE_APISERVER_BASE_IMAGE="${KUBE_APISERVER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
 readonly KUBE_CONTROLLER_MANAGER_BASE_IMAGE="${KUBE_CONTROLLER_MANAGER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
 readonly KUBE_SCHEDULER_BASE_IMAGE="${KUBE_SCHEDULER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
