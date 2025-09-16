@@ -1,0 +1,62 @@
+name: "CodeQL"
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Removed "actions" since no GitHub Actions source code exists
+        language: ['go', 'cpp', 'python'] # add 'cython' if needed
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Cache Go modules for faster builds
+      - name: Cache Go modules
+        if: matrix.language == 'go'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-mod-${{ hashFiles('**/go.sum') }}
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      # Manual build for Kubernetes monorepo
+      - name: Build Kubernetes
+        run: |
+          if [ "${{ matrix.language }}" = "go" ]; then
+            make WHAT=cmd/kubectl
+            make WHAT=cmd/kubelet
+            make WHAT=cmd/kube-apiserver
+          elif [ "${{ matrix.language }}" = "cpp" ]; then
+            echo "No C++ build steps defined — skipping."
+          elif [ "${{ matrix.language }}" = "python" ]; then
+            echo "No Python build steps defined — skipping."
+          fi
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          cache: true
+          cache-key: codeql-${{ matrix.language }}-${{ github.job }}-${{ github.run_id }}
