@@ -170,6 +170,7 @@ func TestPodCertificateManager(t *testing.T) {
 	node1PodCertificateManager := podcertificate.NewIssuingManager(
 		node1Client,
 		node1PodManager,
+		nil,
 		node1PCRInformerFactory.Certificates().V1beta1().PodCertificateRequests(),
 		node1NodeInformerFactory.Core().V1().Nodes(),
 		types.NodeName(node1.ObjectMeta.Name),
