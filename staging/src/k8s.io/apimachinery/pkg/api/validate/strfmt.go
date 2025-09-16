@@ -97,6 +97,9 @@ func LabelKey[T ~string](_ context.Context, op operation.Operation, fldPath *fie
 //   - must be less than 254 characters long
 //   - each element must start and end with alphanumeric characters
 //   - each element must contain only alphanumeric characters or dashes
+//
+// Deprecated: Case-insensitive names are not recommended as they can lead to ambiguity
+// (e.g., 'Foo', 'FOO', and 'foo' would be allowed names for foo). Use LongName for strict, lowercase validation.
 func LongNameCaseless[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
 		return nil
