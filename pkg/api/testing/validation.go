@@ -204,27 +204,35 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	var declarativeTakeoverErrs field.ErrorList
 	var imperativeErrs field.ErrorList
 
-	for _, gateVal := range []bool{true, false} {
-		// We only need to test both gate enabled and disabled together, because
-		// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
-		// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
-		errs := runValidations()
-		if gateVal {
-			declarativeTakeoverErrs = errs
-		} else {
-			imperativeErrs = errs
-		}
+	// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
+	errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 
-		// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
-		errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+	// We only need to test both gate enabled and disabled together, because
+	// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
+	// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
+	t.Run("with declarative validation", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, true)
+		declarativeTakeoverErrs = runValidations()
+
 		if len(expectedErrs) > 0 {
-			errOutputMatcher.Test(t, expectedErrs, errs)
-		} else if len(errs) != 0 {
-			t.Errorf("expected no errors, but got: %v", errs)
+			errOutputMatcher.Test(t, expectedErrs, declarativeTakeoverErrs)
+		} else if len(declarativeTakeoverErrs) != 0 {
+			t.Errorf("expected no errors, but got: %v", declarativeTakeoverErrs)
 		}
-	}
+	})
+
+	t.Run("without declarative validation", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, false)
+		imperativeErrs = runValidations()
+
+		if len(expectedErrs) > 0 {
+			errOutputMatcher.Test(t, expectedErrs, imperativeErrs)
+		} else if len(imperativeErrs) != 0 {
+			t.Errorf("expected no errors, but got: %v", imperativeErrs)
+		}
+	})
 
 	// The equivalenceMatcher is used to verify the output errors from hand-written imperative validation
 	// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
