@@ -55,13 +55,13 @@ import (
 //
 // stopCh should be used to indicate when the transport is unused and doesn't need
 // to continue checking the manager.
-func UpdateTransport(stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
-	return updateTransport(stopCh, 10*time.Second, clientConfig, clientCertificateManager, exitAfter)
+func UpdateTransport(logger klog.Logger, stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
+	return updateTransport(logger, stopCh, 10*time.Second, clientConfig, clientCertificateManager, exitAfter)
 }
 
 // updateTransport is an internal method that exposes how often this method checks that the
 // client cert has changed.
-func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
+func updateTransport(logger klog.Logger, stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
 	if clientConfig.Transport != nil || clientConfig.Dial != nil {
 		return nil, fmt.Errorf("there is already a transport or dialer configured")
 	}
@@ -69,7 +69,7 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	d := connrotation.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
 
 	if clientCertificateManager != nil {
-		if err := addCertRotation(stopCh, period, clientConfig, clientCertificateManager, exitAfter, d); err != nil {
+		if err := addCertRotation(logger, stopCh, period, clientConfig, clientCertificateManager, exitAfter, d); err != nil {
 			return nil, err
 		}
 	} else {
@@ -79,7 +79,7 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	return d.CloseAll, nil
 }
 
-func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration, d *connrotation.Dialer) error {
+func addCertRotation(logger klog.Logger, stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration, d *connrotation.Dialer) error {
 	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
 	if err != nil {
 		return fmt.Errorf("unable to configure TLS for the rest client: %v", err)
@@ -117,20 +117,20 @@ func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig 
 				// the certificate has been deleted from disk or is otherwise corrupt
 				if now.After(lastCertAvailable.Add(exitAfter)) {
 					if clientCertificateManager.ServerHealthy() {
-						klog.ErrorS(nil, "No valid client certificate is found and the server is responsive, exiting.", "lastCertificateAvailabilityTime", lastCertAvailable, "shutdownThreshold", exitAfter)
+						logger.Error(nil, "No valid client certificate is found and the server is responsive, exiting.", "lastCertificateAvailabilityTime", lastCertAvailable, "shutdownThreshold", exitAfter)
 						os.Exit(1)
 					} else {
-						klog.ErrorS(nil, "No valid client certificate is found but the server is not responsive. A restart may be necessary to retrieve new initial credentials.", "lastCertificateAvailabilityTime", lastCertAvailable, "shutdownThreshold", exitAfter)
+						logger.Error(nil, "No valid client certificate is found but the server is not responsive. A restart may be necessary to retrieve new initial credentials.", "lastCertificateAvailabilityTime", lastCertAvailable, "shutdownThreshold", exitAfter)
 					}
 				}
 			} else {
 				// the certificate is expired
 				if now.After(curr.Leaf.NotAfter) {
 					if clientCertificateManager.ServerHealthy() {
-						klog.ErrorS(nil, "The currently active client certificate has expired and the server is responsive, exiting.")
+						logger.Error(nil, "The currently active client certificate has expired and the server is responsive, exiting.")
 						os.Exit(1)
 					} else {
-						klog.ErrorS(nil, "The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
+						logger.Error(nil, "The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
 					}
 				}
 				lastCertAvailable = now
@@ -144,7 +144,7 @@ func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		lastCert = curr
 		hasCert.Store(lastCert != nil)
 
-		klog.InfoS("Certificate rotation detected, shutting down client connections to start using new credentials")
+		logger.Info("Certificate rotation detected, shutting down client connections to start using new credentials")
 		// The cert has been rotated. Close all existing connections to force the client
 		// to reperform its TLS handshake with new cert.
 		//
