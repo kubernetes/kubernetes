@@ -27,7 +27,9 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"net/mail"
 	"strconv"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -595,6 +597,11 @@ func ValidatePodCertificateRequestCreate(req *certificates.PodCertificateRequest
 	signerNameErrors := apivalidation.ValidateSignerName(field.NewPath("spec", "signerName"), req.Spec.SignerName)
 	allErrors = append(allErrors, signerNameErrors...)
 
+	if req.Spec.UnverifiedUserAnnotations != nil {
+		userAnnotationsErrors := apivalidation.ValidateUserAnnotations(req.Spec.UnverifiedUserAnnotations, field.NewPath("spec", "unverifiedUserAnnotations"))
+		allErrors = append(allErrors, userAnnotationsErrors...)
+	}
+
 	for _, msg := range apivalidation.ValidatePodName(req.Spec.PodName, false) {
 		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "podName"), req.Spec.PodName, msg))
 	}
@@ -801,6 +808,22 @@ func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodC
 		if err != nil {
 			allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "leaf certificate does not parse as valid X.509"))
 			return allErrors
+		}
+		for _, dnsName := range leafCert.DNSNames {
+			if dnsName == "" {
+				allErrors = append(allErrors, field.Invalid(certChainPath, dnsName, "leaf certificate should not contain empty DNSName"))
+			}
+			if strings.Contains(dnsName, "..") {
+				allErrors = append(allErrors, field.Invalid(certChainPath, dnsName, "leaf certificate's DNSName should not contain '..'"))
+			}
+			if strings.HasPrefix(dnsName, ".") || strings.HasSuffix(dnsName, ".") {
+				allErrors = append(allErrors, field.Invalid(certChainPath, dnsName, "leaf certificate's DNSName should not start or end with '.'"))
+			}
+		}
+		for _, emailAddress := range leafCert.EmailAddresses {
+			if _, err := mail.ParseAddress(emailAddress); err != nil {
+				allErrors = append(allErrors, field.Invalid(certChainPath, emailAddress, "leaf certificate should not contain invalid EmailAddress"))
+			}
 		}
 
 		// Was the certificate issued to the public key in the spec?

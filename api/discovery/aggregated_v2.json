@@ -705,32 +705,6 @@
                 "update",
                 "watch"
               ]
-            }
-          ],
-          "version": "v1beta1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "clustertrustbundles",
-              "responseKind": {
-                "group": "",
-                "kind": "ClusterTrustBundle",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "clustertrustbundle",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
             },
             {
               "resource": "podcertificaterequests",
@@ -756,6 +730,32 @@
                   ]
                 }
               ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "clustertrustbundles",
+              "responseKind": {
+                "group": "",
+                "kind": "ClusterTrustBundle",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "clustertrustbundle",
               "verbs": [
                 "create",
                 "delete",
