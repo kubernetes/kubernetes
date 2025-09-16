@@ -1,0 +1,68 @@
+name: "CodeQL Analysis"
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  schedule:
+    - cron: '0 0 * * 0' # Weekly scan on Sunday at midnight UTC
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Removed "actions" to avoid fatal errors
+        language: ['go', 'cpp', 'python'] # add 'cython' if needed
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      # Cache Go modules
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      # Manual build for Kubernetes Go code
+      - name: Build Kubernetes binaries
+        if: matrix.language == 'go'
+        run: |
+          go mod download
+          go build ./cmd/kubectl
+          go build ./cmd/kubelet
+          go build ./cmd/kube-apiserver
+
+      # Placeholder for C++ build
+      - name: Build C++ components
+        if: matrix.language == 'cpp'
+        run: echo "No C++ build steps yet"
+
+      # Placeholder for Python build
+      - name: Build Python components
+        if: matrix.language == 'python'
+        run: echo "No Python build steps yet"
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          upload: true
