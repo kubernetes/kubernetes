@@ -38,3 +38,11 @@ func (*ClusterTrustBundleList) ProtoMessage() {}
 func (*ClusterTrustBundleSpec) ProtoMessage() {}
 
 func (*ExtraValue) ProtoMessage() {}
+
+func (*PodCertificateRequest) ProtoMessage() {}
+
+func (*PodCertificateRequestList) ProtoMessage() {}
+
+func (*PodCertificateRequestSpec) ProtoMessage() {}
+
+func (*PodCertificateRequestStatus) ProtoMessage() {}

@@ -34,6 +34,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -11194,6 +11195,27 @@ func TestValidatePod(t *testing.T) {
 				},
 			}),
 		),
+		"valid PodCertificate projected volume source, user config is not nil": *podtest.MakePod("valid-podcertificate-5",
+			podtest.SetVolumes(core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{
+							{
+								PodCertificate: &core.PodCertificateProjection{
+									SignerName:           "example.com/foo",
+									KeyType:              "ED25519",
+									MaxExpirationSeconds: ptr.To[int32](3600),
+									KeyPath:              "key.pem",
+									CertificateChainPath: "certificates.pem",
+									UserAnnotations:      map[string]string{"test.domain/attribute": "test-value"},
+								},
+							},
+						},
+					},
+				},
+			}),
+		),
 		"ephemeral volume + PVC, no conflict between them": *podtest.MakePod("valid-extended",
 			podtest.SetVolumes(
 				core.Volume{Name: "pvc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
@@ -12834,6 +12856,75 @@ func TestValidatePod(t *testing.T) {
 										SignerName:           "example.com/foo",
 										KeyPath:              "key.pem",
 										CertificateChainPath: "/certificates.pem",
+									},
+								},
+							},
+						},
+					},
+				}),
+			),
+		},
+		"PodCertificate projected volume with bad user annotations, invalid key": {
+			expectedError: "must be a domain-prefixed key",
+			spec: *podtest.MakePod("pod1",
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{
+								{
+									PodCertificate: &core.PodCertificateProjection{
+										SignerName:           "example.com/foo",
+										KeyType:              "ED25519",
+										KeyPath:              "key.pem",
+										CertificateChainPath: "certificates.pem",
+										UserAnnotations:      map[string]string{"only/one/slash": "bar"},
+									},
+								},
+							},
+						},
+					},
+				}),
+			),
+		},
+		"PodCertificate projected volume with bad user annotations, too long key prefix size": {
+			expectedError: "must be no more than 253 characters",
+			spec: *podtest.MakePod("pod1",
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{
+								{
+									PodCertificate: &core.PodCertificateProjection{
+										SignerName:           "example.com/foo",
+										KeyType:              "ED25519",
+										KeyPath:              "key.pem",
+										CertificateChainPath: "certificates.pem",
+										UserAnnotations:      map[string]string{strings.Repeat("a", 254) + "/foo": "bar"},
+									},
+								},
+							},
+						},
+					},
+				}),
+			),
+		},
+		"PodCertificate projected volume with bad user annotations, too long total key/value size": {
+			expectedError: "may not be more than 262144 bytes",
+			spec: *podtest.MakePod("pod1",
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{
+								{
+									PodCertificate: &core.PodCertificateProjection{
+										SignerName:           "example.com/foo",
+										KeyType:              "ED25519",
+										KeyPath:              "key.pem",
+										CertificateChainPath: "certificates.pem",
+										UserAnnotations:      map[string]string{"domain/a": strings.Repeat("d", apimachineryvalidation.TotalAnnotationSizeLimitB)},
 									},
 								},
 							},

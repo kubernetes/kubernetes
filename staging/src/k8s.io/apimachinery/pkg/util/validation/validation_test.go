@@ -719,3 +719,71 @@ func TestIsDNS1123SubdomainWithUnderscore(t *testing.T) {
 		})
 	}
 }
+
+func TestIsDomainPrefixedKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected field.ErrorList
+	}{
+		{
+			name:     "valid domain-prefixed key 1",
+			value:    "example.com/foo",
+			expected: nil,
+		},
+		{
+			name:     "valid domain-prefixed key  2",
+			value:    "example/com",
+			expected: nil,
+		},
+		{
+			name:     "invalid key 1",
+			value:    "example",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example", "must be a domain-prefixed key (such as \"acme.io/foo\")")},
+		},
+		{
+			name:     "invalid key 2",
+			value:    "example/foo/bar",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "example/foo/bar", "must be a domain-prefixed key (such as \"acme.io/foo\")")},
+		},
+		{
+			name:     "invalid key 3",
+			value:    "/example/foo",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "/example/foo", "must be a domain-prefixed key (such as \"acme.io/foo\")")},
+		},
+		{
+			name:     "invalid key 4",
+			value:    "",
+			expected: field.ErrorList{field.Required(field.NewPath("test"), "")},
+		},
+		{
+			name:     "invalid key 5",
+			value:    "example.com/_e",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "_e", "Invalid key suffix (regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+		{
+			name:     "invalid key 6",
+			value:    "example.com/e_",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "e_", "Invalid key suffix (regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+		{
+			name:     "invalid key 7",
+			value:    "example.com/e?",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "e?", "Invalid key suffix (regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+		{
+			name:     "invalid key 8",
+			value:    "example.com/e_$",
+			expected: field.ErrorList{field.Invalid(field.NewPath("test"), "e_$", "Invalid key suffix (regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsDomainPrefixedKey(field.NewPath("test"), tt.value)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("IsDomainPrefixedKey(%q) = %v; want %v", tt.value, result, tt.expected)
+			}
+		})
+	}
+}

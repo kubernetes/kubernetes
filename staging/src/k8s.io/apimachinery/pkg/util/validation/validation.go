@@ -86,8 +86,13 @@ func IsFullyQualifiedDomainName(fldPath *field.Path, name string) field.ErrorLis
 // * sub-delims ("!", "$", "&", "'", "(", ")", "*", "+", ",", ";", "=")
 // * a colon character (":")
 const httpPathFmt string = `[A-Za-z0-9/\-._~%!$&'()*+,;=:]+`
+const keyCharFmt string = "[A-Za-z0-9]"
+const keyExtCharFmt string = "[-A-Za-z0-9_.]"
+const keyFmt string = "(" + keyCharFmt + keyExtCharFmt + "*)?" + keyCharFmt
 
 var httpPathRegexp = regexp.MustCompile("^" + httpPathFmt + "$")
+
+var keyRegexp = regexp.MustCompile("^" + keyFmt + "$")
 
 // IsDomainPrefixedPath checks if the given string is a domain-prefixed path
 // (e.g. acme.io/foo). All characters before the first "/" must be a valid
@@ -112,6 +117,34 @@ func IsDomainPrefixedPath(fldPath *field.Path, dpPath string) field.ErrorList {
 	path := segments[1]
 	if !httpPathRegexp.MatchString(path) {
 		return append(allErrs, field.Invalid(fldPath, path, RegexError("Invalid path", httpPathFmt)))
+	}
+
+	return allErrs
+}
+
+// IsDomainPrefixedKey checks if the given key string is a domain-prefixed key
+// (e.g. acme.io/foo). All characters before the first "/" must be a valid
+// subdomain as defined by RFC 1123. All characters trailing the first "/" must
+// be non-empty and match the regex ^([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$.
+func IsDomainPrefixedKey(fldPath *field.Path, key string) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(key) == 0 {
+		return append(allErrs, field.Required(fldPath, ""))
+	}
+
+	segments := strings.Split(key, "/")
+	if len(segments) != 2 || len(segments[0]) == 0 || len(segments[1]) == 0 {
+		return append(allErrs, field.Invalid(fldPath, key, "must be a domain-prefixed key (such as \"acme.io/foo\")"))
+	}
+
+	host := segments[0]
+	for _, err := range IsDNS1123Subdomain(host) {
+		allErrs = append(allErrs, field.Invalid(fldPath, host, err))
+	}
+
+	suffixKey := segments[1]
+	if !keyRegexp.MatchString(suffixKey) {
+		return append(allErrs, field.Invalid(fldPath, suffixKey, RegexError("Invalid key suffix", keyFmt)))
 	}
 
 	return allErrs

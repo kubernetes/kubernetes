@@ -30,6 +30,7 @@ type CertificatesV1beta1Interface interface {
 	RESTClient() rest.Interface
 	CertificateSigningRequestsGetter
 	ClusterTrustBundlesGetter
+	PodCertificateRequestsGetter
 }
 
 // CertificatesV1beta1Client is used to interact with features provided by the certificates.k8s.io group.
@@ -43,6 +44,10 @@ func (c *CertificatesV1beta1Client) CertificateSigningRequests() CertificateSign
 
 func (c *CertificatesV1beta1Client) ClusterTrustBundles() ClusterTrustBundleInterface {
 	return newClusterTrustBundles(c)
+}
+
+func (c *CertificatesV1beta1Client) PodCertificateRequests(namespace string) PodCertificateRequestInterface {
+	return newPodCertificateRequests(c, namespace)
 }
 
 // NewForConfig creates a new CertificatesV1beta1Client for the given config.
