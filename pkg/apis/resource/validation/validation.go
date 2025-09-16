@@ -64,7 +64,7 @@ var (
 func validatePoolName(name string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if name == "" {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+		allErrs = append(allErrs, field.Required(fldPath, "").MarkCoveredByDeclarative())
 	} else {
 		if len(name) > resource.PoolNameMaxLength {
 			allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.PoolNameMaxLength).WithOrigin("format=k8s-resource-pool-name"))
