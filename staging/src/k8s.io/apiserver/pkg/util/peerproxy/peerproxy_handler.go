@@ -62,7 +62,7 @@ type peerProxyHandler struct {
 	// Identity for this server.
 	serverID         string
 	finishedSync     atomic.Bool
-	discoveryManager aggregated.ResourceManager
+	discoveryManager aggregated.PeerMergedResourceManager
 
 	// Label to check against in identity leases to make sure
 	// we are working with apiserver identity leases only.

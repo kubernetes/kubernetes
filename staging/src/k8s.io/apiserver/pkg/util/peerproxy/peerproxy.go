@@ -63,7 +63,7 @@ type Interface interface {
 // and is subject to future modifications.
 func NewPeerProxyHandler(
 	serverId string,
-	discoveryManager aggregated.ResourceManager,
+	discoveryManager aggregated.PeerMergedResourceManager,
 	identityLeaseLabelSelector string,
 	leaseInformer coordinationv1informers.LeaseInformer,
 	reconciler reconcilers.PeerEndpointLeaseReconciler,
