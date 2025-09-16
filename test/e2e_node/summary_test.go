@@ -481,7 +481,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 				echo "Starting memory allocation stepping..."
 				step=1
 				while true; do
-					size_mb=$((step * 50))
+					size_mb=$((step * 500))
 					echo "Step $step: Allocating ${size_mb}MB"
 					# Use dd to create files of increasing size, keeping them in memory
 					dd if=/dev/zero of=/tmp/memfile_$step bs=1M count=$size_mb 2>/dev/null &
@@ -493,10 +493,10 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			// Guaranteed: requests = limits (set high enough to allow stepping)
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("500M"),
+					v1.ResourceMemory: resource.MustParse("5000M"),
 				},
 				Requests: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("500M"),
+					v1.ResourceMemory: resource.MustParse("5000M"),
 				},
 			}
 
