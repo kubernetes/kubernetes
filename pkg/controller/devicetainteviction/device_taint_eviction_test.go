@@ -19,6 +19,7 @@ package devicetainteviction
 import (
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"math"
 	"slices"
 	"sort"
@@ -212,8 +213,8 @@ var (
 	taintKey     = "example.com/taint"
 	taintValue   = "something"
 	simpleSlice  = st.MakeResourceSlice(nodeName, driver).
-			Device("instance").
-			Obj()
+		Device("instance").
+		Obj()
 	slice = st.MakeResourceSlice(nodeName, driver).
 		Device("instance").
 		Device("instance-no-schedule", resourceapi.DeviceTaint{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoSchedule}).
@@ -299,10 +300,10 @@ var (
 		},
 	}
 	inUseClaim = st.FromResourceClaim(claim).
-			OwnerReference(podName, podUID, podKind).
-			Allocation(allocationResult).
-			ReservedForPod(podName, types.UID(podUID)).
-			Obj()
+		OwnerReference(podName, podUID, podKind).
+		Allocation(allocationResult).
+		ReservedForPod(podName, types.UID(podUID)).
+		Obj()
 	// A test may run for an hour without reaching the end of this period.
 	tolerationDuration       = 60 * 60 * time.Second
 	inUseClaimWithToleration = func() *resourceapi.ResourceClaim {
@@ -317,28 +318,28 @@ var (
 		return claim
 	}()
 	inUseClaimOld = st.FromResourceClaim(inUseClaim).
-			OwnerReference(podName, podUID+"-other", podKind).
-			UID("other").
-			Obj()
+		OwnerReference(podName, podUID+"-other", podKind).
+		UID("other").
+		Obj()
 	unscheduledPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
-					UID(podUID).
-					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
-					Obj()
+		UID(podUID).
+		PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+		Obj()
 	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
-				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
-				Node(nodeName).
-				Obj()
+		UID(podUID).
+		PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+		Node(nodeName).
+		Obj()
 	podWithClaimNameOther = st.MakePod().Name(podName).Namespace(namespace).
-				UID(podUID + "-other").
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
-				Node(nodeName).
-				Obj()
+		UID(podUID + "-other").
+		PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+		Node(nodeName).
+		Obj()
 	podWithClaimTemplate = st.MakePod().Name(podName).Namespace(namespace).
-				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
-				Node(nodeName).
-				Obj()
+		UID(podUID).
+		PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
+		Node(nodeName).
+		Obj()
 	podWithClaimTemplateInStatus = func() *v1.Pod {
 		pod := podWithClaimTemplate.DeepCopy()
 		pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
@@ -1209,12 +1210,14 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 	var numWatches atomic.Int32
 	clientSet.PrependWatchReactor("*", func(action core.Action) (handled bool, ret watch.Interface, err error) {
 		var opts metav1.ListOptions
+		var gvk schema.GroupVersionKind
 		if watchActcion, ok := action.(core.WatchActionImpl); ok {
 			opts = watchActcion.ListOptions
+			gvk = watchActcion.Kind
 		}
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
-		watch, err := clientSet.Tracker().Watch(gvr, ns, opts)
+		watch, err := clientSet.Tracker().Watch(gvr, gvk, ns, opts)
 		if err != nil {
 			return false, nil, err
 		}

@@ -62,6 +62,7 @@ func (lw *listerWatcher) List(options metav1.ListOptions) (runtime.Object, error
 	}
 
 	storageOpts := storage.ListOptions{
+		ResourceVersion:      options.ResourceVersion,
 		ResourceVersionMatch: options.ResourceVersionMatch,
 		Predicate:            pred,
 		Recursive:            true,

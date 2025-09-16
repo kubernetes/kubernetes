@@ -376,6 +376,7 @@ func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
 }
 
 func TestRequestNodeCertificate(t *testing.T) {
+	t.Fatal("broken watchlist")
 	privateKeyData, err := keyutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
 		t.Fatalf("Unable to generate a new private key: %v", err)

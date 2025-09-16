@@ -832,6 +832,7 @@ func findPodVolumes(logger klog.Logger, binder SchedulerVolumeBinder, pod *v1.Po
 }
 
 func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	t.Parallel()
 
 	type scenarioType struct {
@@ -1033,6 +1034,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 }
 
 func TestFindPodVolumesWithProvisioning(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	t.Parallel()
 
 	type scenarioType struct {
@@ -1171,6 +1173,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 // TestFindPodVolumesWithCSIMigration aims to test the node affinity check procedure that's
 // done in FindPodVolumes. In order to reach this code path, the given PVCs must be bound to a PV.
 func TestFindPodVolumesWithCSIMigration(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	type scenarioType struct {
 		// Inputs
 		pvs     []*v1.PersistentVolume
@@ -1269,6 +1272,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 }
 
 func TestAssumePodVolumes(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	type scenarioType struct {
 		// Inputs
 		podPVCs           []*v1.PersistentVolumeClaim
@@ -1386,6 +1390,7 @@ func TestAssumePodVolumes(t *testing.T) {
 }
 
 func TestRevertAssumedPodVolumes(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -1422,6 +1427,7 @@ func TestRevertAssumedPodVolumes(t *testing.T) {
 }
 
 func TestBindAPIUpdate(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	type scenarioType struct {
 		// Inputs
 		bindings  []*BindingInfo
@@ -1561,6 +1567,7 @@ func TestBindAPIUpdate(t *testing.T) {
 }
 
 func TestCheckBindings(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	t.Parallel()
 
 	type scenarioType struct {
@@ -1766,6 +1773,7 @@ func TestCheckBindings(t *testing.T) {
 }
 
 func TestCheckBindingsWithCSIMigration(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	t.Parallel()
 
 	type scenarioType struct {
@@ -1886,6 +1894,7 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 }
 
 func TestBindPodVolumes(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	t.Parallel()
 
 	type scenarioType struct {
@@ -2112,6 +2121,7 @@ func TestBindPodVolumes(t *testing.T) {
 }
 
 func TestFindAssumeVolumes(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	// Test case
 	podPVCs := []*v1.PersistentVolumeClaim{unboundPVC}
 	pvs := []*v1.PersistentVolume{pvNode2, pvNode1a, pvNode1c}
@@ -2179,6 +2189,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 // TestCapacity covers different scenarios involving CSIStorageCapacity objects.
 // Scenarios without those are covered by TestFindPodVolumesWithProvisioning.
 func TestCapacity(t *testing.T) {
+	t.Fatalf("broken watchlist")
 	type scenarioType struct {
 		// Inputs
 		pvcs       []*v1.PersistentVolumeClaim
