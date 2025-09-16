@@ -19,6 +19,7 @@ package statefulset
 import (
 	"context"
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -63,9 +64,15 @@ func WaitForRunning(ctx context.Context, c clientset.Interface, numPodsRunning, 
 	}
 }
 
-// WaitForState periodically polls for the ss and its pods until the until function returns either true or an error
-func WaitForState(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error)) {
-	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true,
+// WaitForState periodically polls for the ss and its pods until the until function returns either true or an error.
+// Optionally accepts a polling interval.
+func WaitForState(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error), pollInterval ...time.Duration) {
+	interval := StatefulSetPoll
+	if len(pollInterval) > 0 {
+		interval = pollInterval[0]
+	}
+
+	pollErr := wait.PollUntilContextTimeout(ctx, interval, StatefulSetTimeout, true,
 		func(ctx context.Context) (bool, error) {
 			ssGet, err := c.AppsV1().StatefulSets(ss.Namespace).Get(ctx, ss.Name, metav1.GetOptions{})
 			if err != nil {
