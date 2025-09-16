@@ -1678,6 +1678,21 @@ func TestDeleteInternalConflict(t *testing.T) {
 		expectError           func(*testing.T, error)
 	}{
 		{
+			name:             "no conflict",
+			interceptGets:    []interceptFunc{ /*0*/ noop},
+			interceptDeletes: []interceptFunc{ /*1*/ noop},
+			expectDeleted:    true,
+		},
+		{
+			name:                  "no conflict graceful",
+			supportGracefulDelete: true,
+			interceptGets:         []interceptFunc{ /*0*/ noop},
+			interceptUpdates:      []interceptFunc{ /*1*/ noop},
+			interceptDeletes:      []interceptFunc{ /*2*/ noop},
+			expectDeleted:         true,
+			expectTimestamp:       true,
+		},
+		{
 			name:             "race conflict",
 			interceptGets:    []interceptFunc{ /*0*/ noop /*2*/, noop},
 			interceptDeletes: []interceptFunc{ /*1*/ addLabel /*3*/, noop},

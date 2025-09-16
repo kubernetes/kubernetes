@@ -1182,14 +1182,18 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 		// TODO: remove the check, because we support no-op updates now.
 		if graceful || pendingFinalizers || shouldUpdateFinalizers {
 			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, deleteValidation, obj)
-			// Update the preconditions.ResourceVersion if set since we updated the object.
-			if err == nil && deleteImmediately && preconditions.ResourceVersion != nil {
+			if err == nil && deleteImmediately {
+				// Update our accessor if we're going to delete the object immediately.
+				// This is used to retrieve the new resourceVersion to use as a precondition, since we updated the object.
 				accessor, err = meta.Accessor(out)
 				if err != nil {
 					return out, false, apierrors.NewInternalError(err)
 				}
-				resourceVersion := accessor.GetResourceVersion()
-				preconditions.ResourceVersion = &resourceVersion
+				// Update the preconditions.ResourceVersion if set.
+				if preconditions.ResourceVersion != nil {
+					resourceVersion := accessor.GetResourceVersion()
+					preconditions.ResourceVersion = &resourceVersion
+				}
 			}
 		}
 
