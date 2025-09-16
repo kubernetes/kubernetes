@@ -409,42 +409,116 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 		})
 
 		ginkgo.It("should report Memory pressure in PSI metrics", func(ctx context.Context) {
-			podName := "memory-pressure-pod"
-			ginkgo.By("Creating a pod to generate Memory pressure")
-			// Create a pod that generates memory pressure by continuously writing to files,
-			// forcing kernel page cache reclamation.
-			podSpec := getStressTestPod(podName, "memory-stress", []string{})
+			var podsToDelete []*v1.Pod
+			defer func() {
+				// Clean up all pods
+				for _, pod := range podsToDelete {
+					framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+				}
+			}()
+
+			ginkgo.By("Creating 10 BestEffort pods")
+			for i := 0; i < 10; i++ {
+				podName := fmt.Sprintf("besteffort-pod-%d", i)
+				podSpec := getStressTestPod(podName, "besteffort-container", []string{})
+				podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
+				podSpec.Spec.Containers[0].Args = []string{"sleep 3600"}
+				// BestEffort: no resource requests or limits
+				pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
+				podsToDelete = append(podsToDelete, pod)
+			}
+
+			ginkgo.By("Creating 5 Burstable pods")
+			for i := 0; i < 5; i++ {
+				podName := fmt.Sprintf("burstable-pod-%d", i)
+				podSpec := getStressTestPod(podName, "burstable-container", []string{})
+				podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
+				podSpec.Spec.Containers[0].Args = []string{"sleep 3600"}
+				// Burstable: requests < limits
+				podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("200M"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("100M"),
+					},
+				}
+				pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
+				podsToDelete = append(podsToDelete, pod)
+			}
+
+			ginkgo.By("Creating 5 Guaranteed pods")
+			for i := 0; i < 5; i++ {
+				podName := fmt.Sprintf("guaranteed-background-pod-%d", i)
+				podSpec := getStressTestPod(podName, "guaranteed-container", []string{})
+				podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
+				podSpec.Spec.Containers[0].Args = []string{"sleep 3600"}
+				// Guaranteed: requests = limits
+				podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("150M"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("150M"),
+					},
+				}
+				pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
+				podsToDelete = append(podsToDelete, pod)
+			}
+
+			ginkgo.By("Waiting for all background pods to start")
+			for _, pod := range podsToDelete {
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+			}
+
+			ginkgo.By("Creating a Guaranteed pod with stepping memory usage")
+			memoryStepPodName := "guaranteed-memory-step-pod"
+			podSpec := getStressTestPod(memoryStepPodName, "memory-stress", []string{})
 			podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
 			podSpec.Spec.Containers[0].Args = []string{
-				// This command runs an infinite loop that uses `dd` to write 50MB files,
-				// cycling through 5 files to target 250MB of reclaimable file cache usage.
-				// This exceeds the 200MB memory limit, forcing the kernel to reclaim memory and generate pressure stalls.
-				"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%8)); sleep 0.3; done",
+				// Memory stepping script: starts at 50MB, increases by 50MB every 5 seconds
+				`
+				echo "Starting memory allocation stepping..."
+				step=1
+				while true; do
+					size_mb=$((step * 50))
+					echo "Step $step: Allocating ${size_mb}MB"
+					# Use dd to create files of increasing size, keeping them in memory
+					dd if=/dev/zero of=/tmp/memfile_$step bs=1M count=$size_mb 2>/dev/null &
+					sleep 5
+					step=$((step + 1))
+				done
+				`,
 			}
+			// Guaranteed: requests = limits (set high enough to allow stepping)
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("350M"),
+					v1.ResourceMemory: resource.MustParse("500M"),
 				},
 				Requests: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("350M"),
+					v1.ResourceMemory: resource.MustParse("500M"),
 				},
 			}
-			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
 
-			ginkgo.By("Waiting for the pod to start")
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+			memoryStepPod := e2epod.NewPodClient(f).Create(ctx, podSpec)
+			podsToDelete = append(podsToDelete, memoryStepPod)
 
-			ginkgo.By("Validating that Memory PSI metrics reflect pressure")
+			ginkgo.By("Waiting for memory stepping pod to start")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, memoryStepPod))
+
+			ginkgo.By("Monitoring for memory pressure on the stepping pod")
 			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				// Check if memory pressure is detected on the stepping pod
 				summary, err := getNodeSummary(ctx)
 				framework.ExpectNoError(err)
 				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
-					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					fmt.Sprintf("%s::%s", f.Namespace.Name, memoryStepPodName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 						"Memory": pressureDetected("full", 0.1),
 					}),
 				}))
-			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
-			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+			}, 5*time.Minute, 10*time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Memory pressure detected on the stepping guaranteed pod")
 		})
 
 		ginkgo.It("should report I/O pressure in PSI metrics", func(ctx context.Context) {
