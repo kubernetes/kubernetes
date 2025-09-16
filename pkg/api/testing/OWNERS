@@ -1,5 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+approvers:
+  - jpbetz
+
 reviewers:
   - thockin
   - smarterclayton
@@ -16,3 +19,7 @@ reviewers:
   - soltysh
   - jsafrane
   - rata
+  - jpbetz
+  - aaron-prindle
+  - lalitc375
+  - yongruilin
