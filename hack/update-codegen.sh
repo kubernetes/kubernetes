@@ -715,7 +715,8 @@ function codegen::openapi() {
     kube::util::read-array tag_files < <(
         k8s_tag_files_except \
             staging/src/k8s.io/code-generator \
-            staging/src/k8s.io/sample-apiserver
+            staging/src/k8s.io/sample-apiserver \
+            staging/src/k8s.io/sample-controller
         )
 
     local tag_dirs=()
