@@ -18,6 +18,7 @@ package validate
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -144,6 +145,100 @@ func TestLongName(t *testing.T) {
 	}
 }
 
+func TestLabelKey(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "valid key",
+		input:    "app",
+		wantErrs: nil,
+	}, {
+		name:     "valid key with dash",
+		input:    "app-name",
+		wantErrs: nil,
+	}, {
+		name:     "valid key with dot",
+		input:    "app.name",
+		wantErrs: nil,
+	}, {
+		name:     "valid key with underscore",
+		input:    "app_name",
+		wantErrs: nil,
+	}, {
+		name:     "valid key with prefix",
+		input:    "example.com/app",
+		wantErrs: nil,
+	}, {
+		name:     "valid key with long prefix",
+		input:    strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 55) + "/app",
+		wantErrs: nil,
+	}, {
+		name:  "invalid: empty string",
+		input: "",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-key"),
+		},
+	}, {
+		name:  "invalid: starts with dash",
+		input: "-app",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-key"),
+		},
+	}, {
+		name:  "invalid: ends with dash",
+		input: "app-",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-key"),
+		},
+	}, {
+		name:  "invalid: contains invalid characters",
+		input: "app^",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-key"),
+		},
+	}, {
+		name:  "invalid: name too long",
+		input: strings.Repeat("a", 64),
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-key"),
+		},
+	}, {
+		name:  "invalid: prefix too long",
+		input: strings.Repeat("a", 254) + "/app",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-key"),
+		},
+	}, {
+		name:  "invalid: prefix is not a DNS subdomain",
+		input: "example-.com/app",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-key"),
+		},
+	}, {
+		name:     "nil value",
+		input:    "", // This will be handled by setting value to nil in the test runner
+		wantErrs: nil,
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var value *string
+			if tc.name != "nil value" {
+				v := tc.input
+				value = &v
+			}
+			gotErrs := LabelKey(ctx, operation.Operation{}, fldPath, value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
 func TestK8sUUID(t *testing.T) {
 	ctx := context.Background()
 	fldPath := field.NewPath("test")
@@ -211,6 +306,107 @@ func TestK8sUUID(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			value := tc.input
 			gotErrs := UUID(ctx, operation.Operation{}, fldPath, &value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
+func TestLabelValue(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "valid value",
+		input:    "valid-value",
+		wantErrs: nil,
+	}, {
+		name:     "valid value with dots",
+		input:    "valid.value",
+		wantErrs: nil,
+	}, {
+		name:     "valid value with underscores",
+		input:    "valid_value",
+		wantErrs: nil,
+	}, {
+		name:     "valid single character value",
+		input:    "a",
+		wantErrs: nil,
+	}, {
+		name:     "valid value with numbers",
+		input:    "123-abc",
+		wantErrs: nil,
+	}, {
+		name:     "valid uppercase characters",
+		input:    "Valid-Value",
+		wantErrs: nil,
+	}, {
+		name:  "invalid: starts with dash",
+		input: "-invalid-value",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: ends with dash",
+		input: "invalid-value-",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: starts with dot",
+		input: ".invalid.value",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: ends with dot",
+		input: "invalid.value.",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: starts with underscore",
+		input: "_invalid_value",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: ends with underscore",
+		input: "invalid_value_",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: contains special characters",
+		input: "invalid@value",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:  "invalid: too long",
+		input: "a" + strings.Repeat("b", 62) + "c", // 64 characters
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-label-value"),
+		},
+	}, {
+		name:     "valid: max length",
+		input:    "a" + strings.Repeat("b", 61) + "c", // 63 characters
+		wantErrs: nil,
+	}, {
+		name:     "valid: empty string",
+		input:    "",
+		wantErrs: nil,
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := LabelValue(ctx, operation.Operation{}, fldPath, &value, nil)
+
 			matcher.Test(t, tc.wantErrs, gotErrs)
 		})
 	}
