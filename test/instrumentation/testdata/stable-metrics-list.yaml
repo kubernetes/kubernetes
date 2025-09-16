@@ -183,6 +183,15 @@
   help: The count of hidden metrics.
   type: Counter
   stabilityLevel: BETA
+- name: kubelet_podcertificate_states
+  subsystem: kubelet
+  help: Counter vector reporting the number of pod certificate projected volume sources,
+    faceted by signer_name and state.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - signer_name
+  - state
 - name: feature_enabled
   namespace: kubernetes
   help: This metric records the data about the stage and enablement of a k8s feature.

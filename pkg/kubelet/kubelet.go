@@ -952,6 +952,7 @@ func NewMainKubelet(ctx context.Context,
 		podCertificateManager := podcertificate.NewIssuingManager(
 			kubeDeps.KubeClient,
 			klet.podManager,
+			kubeDeps.Recorder,
 			kubeInformers.Certificates().V1beta1().PodCertificateRequests(),
 			nodeInformer,
 			nodeName,

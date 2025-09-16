@@ -176,6 +176,9 @@ const (
 	PodInfeasibleResizesKey          = "pod_infeasible_resizes_total"
 	PodInProgressResizesKey          = "pod_in_progress_resizes"
 	PodDeferredAcceptedResizesKey    = "pod_deferred_accepted_resizes_total"
+
+	// Metric key for podcertificate states.
+	PodCertificateStatesKey = "kubelet_podcertificate_states"
 )
 
 type imageSizeBucket struct {
@@ -1190,6 +1193,18 @@ var (
 		},
 		[]string{"retry_trigger"},
 	)
+
+	// A gauge vector reporting the current number of pod certificate projected volume
+	// sources being maintained by this kubelet instance.
+	PodCertificateStates = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodCertificateStatesKey,
+			Help:           "Counter vector reporting the number of pod certificate projected volume sources, faceted by signer_name and state.",
+			StabilityLevel: metrics.BETA,
+		},
+		[]string{"signer_name", "state"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1307,6 +1322,10 @@ func Register() {
 			legacyregistry.MustRegister(PodInfeasibleResizes)
 			legacyregistry.MustRegister(PodInProgressResizes)
 			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+			legacyregistry.MustRegister(PodCertificateStates)
 		}
 	})
 }
