@@ -1129,6 +1129,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 
 // Delete removes the item from storage.
 func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, originalOptions *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	var handleNotFoundErr func() (runtime.Object, bool, error)
 	for {
 		key, err := e.KeyFunc(ctx, name)
 		if err != nil {
@@ -1138,6 +1139,9 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 		obj := e.NewFunc()
 		qualifiedResource := e.qualifiedResourceFromContext(ctx)
 		if err = e.Storage.Get(ctx, key, storage.GetOptions{}, obj); err != nil {
+			if handleNotFoundErr != nil && storage.IsNotFound(err) {
+				return handleNotFoundErr()
+			}
 			return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 		}
 
@@ -1221,11 +1225,19 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 		if err := e.Storage.Delete(ctx, key, out, &preconditions, storage.ValidateObjectFunc(deleteValidation), dryrun.IsDryRun(options.DryRun), nil, storage.DeleteOptions{}); err != nil {
 			// Please refer to the place where we set ignoreNotFound for the reason
 			// why we ignore the NotFound error .
-			if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
+			if ignoreNotFound && lastExisting != nil {
 				// The lastExisting object may not be the last state of the object
 				// before its deletion, but it's the best approximation.
-				out, err := e.finalizeDelete(ctx, lastExisting, true, options)
-				return out, true, err
+				// Save a handler for NotFound errors encountered here or re-getting while retrying on a resourceVersion conflict.
+				handleNotFoundErr = func() (runtime.Object, bool, error) {
+					out, err := e.finalizeDelete(ctx, lastExisting, true, options)
+					return out, true, err
+				}
+				if storage.IsNotFound(err) {
+					return handleNotFoundErr()
+				}
+			} else {
+				handleNotFoundErr = nil
 			}
 
 			if retryOnRVConflict && storage.IsPreconditionErrorForField(err, storage.PreconditionResourceVersion) {

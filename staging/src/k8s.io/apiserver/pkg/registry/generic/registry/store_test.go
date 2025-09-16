@@ -1635,89 +1635,262 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 }
 
-func TestFinalizerRace(t *testing.T) {
-	var (
-		originalStorage storage.Interface
-		wrappedStorage  *deleteInterceptingStorage
-	)
-	wrapStorage := func(s storage.Interface) storage.Interface {
-		originalStorage = s
-		wrappedStorage = &deleteInterceptingStorage{Interface: originalStorage}
-		return wrappedStorage
+func TestDeleteInternalConflict(t *testing.T) {
+	type interceptFunc func(t *testing.T, ctx context.Context, key string, originalStorage storage.Interface) error
+
+	noop := func(t *testing.T, ctx context.Context, key string, originalStorage storage.Interface) error {
+		return nil
 	}
-	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
-	destroyFunc, registry := newTestGenericStoreRegistryWithOptions(t, scheme, testRegistryOptions{hasCacheEnabled: false, wrapStorage: wrapStorage})
-	defer destroyFunc()
-
-	registry.EnableGarbageCollection = true
-	registry.ReturnDeletedObject = true
-
-	// create pod
-	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: example.PodSpec{NodeName: "machine"}}
-	_, err := registry.Create(testContext, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	delete := func(t *testing.T, ctx context.Context, key string, originalStorage storage.Interface) error {
+		// simulate concurrent delete
+		return originalStorage.Delete(ctx, key, &example.Pod{}, &storage.Preconditions{}, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 	}
-
-	// intercept delete requests to mutate the object just before delete requests are processed
-	beforeDeleteCalled := 0
-	wrappedStorage.beforeDelete = func(ctx context.Context, key string) {
-		switch beforeDeleteCalled {
-		case 0:
-			// simulate concurrent update that didn't modify finalizers.
-			// should trigger an internal delete re-attempt.
-			err := originalStorage.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
-				input.(*example.Pod).Labels = map[string]string{"test": "true"}
-				return input, nil, nil
-			}, nil)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-		case 1:
-			// simulate concurrent update that added a finalizer.
-			// should not trigger an internal re-attempt because there's now a finalizer.
-			err := originalStorage.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
-				input.(*example.Pod).Finalizers = []string{"example.com/finalizer"}
-				return input, nil, nil
-			}, nil)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-		default:
-			// unexpected
-			t.Fatalf("unexpected 3rd call to beforeDelete")
+	addLabel := func(t *testing.T, ctx context.Context, key string, originalStorage storage.Interface) error {
+		// simulate concurrent update that didn't modify finalizers, should trigger an internal delete re-attempt.
+		return originalStorage.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+			input.(*example.Pod).Labels = map[string]string{"test": "true"}
+			return input, nil, nil
+		}, nil)
+	}
+	addFinalizer := func(t *testing.T, ctx context.Context, key string, originalStorage storage.Interface) error {
+		// simulate concurrent update that added a finalizer, should not trigger an internal re-attempt because there's now a finalizer.
+		return originalStorage.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
+			input.(*example.Pod).Finalizers = []string{"example.com/finalizer"}
+			return input, nil, nil
+		}, nil)
+	}
+	expectNotFound := func(t *testing.T, err error) {
+		if !errors.IsNotFound(err) {
+			t.Fatalf("expected NotFound error, got %v", err)
 		}
-		beforeDeleteCalled++
 	}
 
-	result, wasDeleted, err := registry.Delete(testContext, pod.Name, rest.ValidateAllObjectFunc, nil)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	testcases := []struct {
+		name                  string
+		supportGracefulDelete bool
+		deleteOptions         *metav1.DeleteOptions
+		interceptGets         []interceptFunc
+		interceptUpdates      []interceptFunc
+		interceptDeletes      []interceptFunc
+		expectDeleted         bool
+		expectTimestamp       bool
+		expectFinalizers      int
+		expectError           func(*testing.T, error)
+	}{
+		{
+			name:             "race conflict",
+			interceptGets:    []interceptFunc{ /*0*/ noop /*2*/, noop},
+			interceptDeletes: []interceptFunc{ /*1*/ addLabel /*3*/, noop},
+			expectDeleted:    true,
+		},
+		{
+			name:                  "race conflict graceful",
+			supportGracefulDelete: true,
+			interceptGets:         []interceptFunc{ /*0*/ noop /*3*/, noop},
+			interceptUpdates:      []interceptFunc{ /*1*/ noop},
+			interceptDeletes:      []interceptFunc{ /*2*/ addLabel /*4*/, noop},
+			expectDeleted:         true,
+			expectTimestamp:       true,
+		},
+		{
+			name:             "race delete before first delete",
+			interceptGets:    []interceptFunc{ /*0*/ noop},
+			interceptUpdates: []interceptFunc{ /*1*/ noop},
+			interceptDeletes: []interceptFunc{ /*2*/ delete},
+			expectError:      expectNotFound,
+		},
+		{
+			name:                  "race delete before first delete graceful",
+			supportGracefulDelete: true,
+			interceptGets:         []interceptFunc{ /*0*/ noop},
+			interceptUpdates:      []interceptFunc{ /*1*/ noop},
+			interceptDeletes:      []interceptFunc{ /*2*/ delete},
+			expectDeleted:         true, // graceful delete tolerates not found errors
+			expectTimestamp:       true,
+		},
+		{
+			name:          "race delete before first get",
+			interceptGets: []interceptFunc{delete},
+			expectError:   expectNotFound,
+		},
+		{
+			name:                  "race delete before first get graceful",
+			supportGracefulDelete: true,
+			interceptGets:         []interceptFunc{delete},
+			expectError:           expectNotFound,
+		},
+		{
+			name:             "race conflict and delete before second get",
+			interceptGets:    []interceptFunc{ /*0*/ noop /*2*/, delete},
+			interceptDeletes: []interceptFunc{ /*1*/ addLabel},
+			expectError:      expectNotFound,
+		},
+		{
+			name:                  "race conflict and delete before second get graceful",
+			supportGracefulDelete: true,
+			interceptGets:         []interceptFunc{ /*0*/ noop /*3*/, delete},
+			interceptUpdates:      []interceptFunc{ /*1*/ noop},
+			interceptDeletes:      []interceptFunc{ /*2*/ addLabel},
+			expectDeleted:         true, // graceful delete tolerates not found errors
+			expectTimestamp:       true,
+		},
+		{
+			name:             "race conflict and finalizer",
+			interceptGets:    []interceptFunc{ /*0*/ noop /*2*/, noop /*4*/, noop},
+			interceptUpdates: []interceptFunc{ /*5*/ noop},
+			interceptDeletes: []interceptFunc{ /*1*/ addLabel /*3*/, addFinalizer},
+			expectDeleted:    false,
+			expectTimestamp:  true,
+			expectFinalizers: 1,
+		},
+		{
+			name:                  "race conflict and finalizer graceful",
+			supportGracefulDelete: true,
+			interceptGets:         []interceptFunc{ /*0*/ noop /*3*/, noop /*5*/, noop},
+			interceptUpdates:      []interceptFunc{ /*1*/ noop /*6*/, noop},
+			interceptDeletes:      []interceptFunc{ /*2*/ addLabel /*4*/, addFinalizer},
+			expectDeleted:         false,
+			expectTimestamp:       true,
+			expectFinalizers:      1,
+		},
 	}
-	if wasDeleted {
-		t.Errorf("unexpected, pod %s should not have been deleted immediately", pod.Name)
-	}
-	if beforeDeleteCalled != 2 {
-		t.Errorf("expected beforeDelete called 2 times, got %d", beforeDeleteCalled)
-	}
-	if result.(*example.Pod).DeletionTimestamp == nil {
-		t.Errorf("expected deletionTimestamp, got nil")
-	}
-	if len(result.(*example.Pod).Finalizers) != 1 {
-		t.Errorf("expected finalizer, got none")
-	}
-	if result.(*example.Pod).Labels["test"] != "true" {
-		t.Errorf("expected test=true label")
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				originalStorage storage.Interface
+				wrappedStorage  *interceptingStorage
+			)
+			wrapStorage := func(s storage.Interface) storage.Interface {
+				originalStorage = s
+				wrappedStorage = &interceptingStorage{Interface: originalStorage}
+				return wrappedStorage
+			}
+			testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+			destroyFunc, registry := newTestGenericStoreRegistryWithOptions(t, scheme, testRegistryOptions{hasCacheEnabled: false, wrapStorage: wrapStorage})
+			defer destroyFunc()
+
+			registry.EnableGarbageCollection = true
+			registry.ReturnDeletedObject = true
+			if tc.supportGracefulDelete {
+				// re-define delete strategy to have graceful delete capability
+				defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+				registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+			}
+
+			// create pod
+			pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: example.PodSpec{NodeName: "machine"}}
+			_, err := registry.Create(testContext, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			var operations []string
+
+			// intercept get requests
+			beforeGetCalled := 0
+			wrappedStorage.beforeGet = func(ctx context.Context, key string) {
+				operations = append(operations, "get")
+				if len(tc.interceptGets) > beforeGetCalled {
+					err := tc.interceptGets[beforeGetCalled](t, ctx, key, originalStorage)
+					if err != nil {
+						t.Errorf("unexpected error: %v", err)
+					}
+				} else {
+					t.Errorf("unexpected %d call to beforeGet", beforeGetCalled)
+				}
+				beforeGetCalled++
+			}
+			// intercept update requests
+			beforeUpdateCalled := 0
+			wrappedStorage.beforeUpdate = func(ctx context.Context, key string) {
+				operations = append(operations, "update")
+				if len(tc.interceptUpdates) > beforeUpdateCalled {
+					err := tc.interceptUpdates[beforeUpdateCalled](t, ctx, key, originalStorage)
+					if err != nil {
+						t.Errorf("unexpected error: %v", err)
+					}
+				} else {
+					t.Errorf("unexpected %d call to beforeUpdate", beforeUpdateCalled)
+				}
+				beforeUpdateCalled++
+			}
+
+			// intercept delete requests to mutate the object just before delete requests are processed
+			beforeDeleteCalled := 0
+			wrappedStorage.beforeDelete = func(ctx context.Context, key string) {
+				operations = append(operations, "delete")
+				if len(tc.interceptDeletes) > beforeDeleteCalled {
+					err := tc.interceptDeletes[beforeDeleteCalled](t, ctx, key, originalStorage)
+					if err != nil {
+						t.Errorf("unexpected error: %v", err)
+					}
+				} else {
+					t.Errorf("unexpected %d call to beforeDelete", beforeDeleteCalled)
+				}
+				beforeDeleteCalled++
+			}
+
+			result, wasDeleted, err := registry.Delete(testContext, pod.Name, rest.ValidateAllObjectFunc, tc.deleteOptions)
+			if err != nil && tc.expectError == nil {
+				t.Fatalf("Unexpected error: %v", err)
+			} else if err == nil && tc.expectError != nil {
+				t.Fatalf("Unexpected success")
+			} else if err != nil && tc.expectError != nil {
+				// delegate to the testcase error checker
+				tc.expectError(t, err)
+				// no other results are usable / comparable
+				return
+			}
+
+			t.Logf("operations: %#v", operations)
+
+			if wasDeleted != tc.expectDeleted {
+				t.Errorf("expected wasDeleted=%v, got %v", tc.expectDeleted, wasDeleted)
+			}
+			if beforeGetCalled != len(tc.interceptGets) {
+				t.Errorf("expected beforeGet called %d times, got %d", len(tc.interceptGets), beforeGetCalled)
+			}
+			if beforeUpdateCalled != len(tc.interceptUpdates) {
+				t.Errorf("expected beforeUpdate called %d times, got %d", len(tc.interceptUpdates), beforeUpdateCalled)
+			}
+			if beforeDeleteCalled != len(tc.interceptDeletes) {
+				t.Errorf("expected beforeDelete called %d times, got %d", len(tc.interceptDeletes), beforeDeleteCalled)
+			}
+			if tc.expectTimestamp != (result.(*example.Pod).DeletionTimestamp != nil) {
+				t.Errorf("expected deletionTimestamp=%v, got %v", tc.expectTimestamp, result.(*example.Pod).DeletionTimestamp)
+			}
+			if tc.expectFinalizers != len(result.(*example.Pod).Finalizers) {
+				t.Errorf("expected finalizer count %d, got %d", tc.expectFinalizers, len(result.(*example.Pod).Finalizers))
+			}
+		})
 	}
 }
 
-type deleteInterceptingStorage struct {
+type interceptingStorage struct {
 	storage.Interface
-
+	beforeGet    func(ctx context.Context, key string)
+	beforeUpdate func(ctx context.Context, key string)
 	beforeDelete func(ctx context.Context, key string)
 }
 
-func (t *deleteInterceptingStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+func (t *interceptingStorage) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	if t.beforeGet != nil {
+		t.beforeGet(ctx, key)
+	}
+	return t.Interface.Get(ctx, key, opts, objPtr)
+}
+
+func (t *interceptingStorage) GuaranteedUpdate(
+	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	if t.beforeUpdate != nil {
+		t.beforeUpdate(ctx, key)
+	}
+	return t.Interface.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
+}
+
+func (t *interceptingStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
 	if t.beforeDelete != nil {
 		t.beforeDelete(ctx, key)
 	}
