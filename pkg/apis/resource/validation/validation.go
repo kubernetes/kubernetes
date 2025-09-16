@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
@@ -63,14 +64,14 @@ var (
 func validatePoolName(name string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if name == "" {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+		allErrs = append(allErrs, field.Required(fldPath, "").MarkCoveredByDeclarative())
 	} else {
 		if len(name) > resource.PoolNameMaxLength {
-			allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.PoolNameMaxLength))
+			allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.PoolNameMaxLength).WithOrigin("format=k8s-resource-pool-name").MarkCoveredByDeclarative())
 		}
 		parts := strings.Split(name, "/")
 		for _, part := range parts {
-			allErrs = append(allErrs, corevalidation.ValidateDNS1123Subdomain(part, fldPath)...)
+			allErrs = append(allErrs, corevalidation.ValidateDNS1123Subdomain(part, fldPath).WithOrigin("format=k8s-resource-pool-name").MarkCoveredByDeclarative()...)
 		}
 	}
 	return allErrs
