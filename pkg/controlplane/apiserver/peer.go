@@ -45,7 +45,7 @@ const (
 )
 
 func BuildPeerProxy(
-	discoveryManager aggregated.ResourceManager,
+	discoveryManager aggregated.PeerMergedResourceManager,
 	leaseInformer coordinationv1informers.LeaseInformer,
 	loopbackClientConfig *rest.Config,
 	proxyClientCertFile string,

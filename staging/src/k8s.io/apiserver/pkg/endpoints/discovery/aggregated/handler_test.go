@@ -823,7 +823,8 @@ func TestMergedAndUnmergedDiscovery(t *testing.T) {
 	legacyregistry.Reset()
 	manager := discoveryendpoint.NewResourceManager("apis")
 	peerProvider := &mockPeerDiscoveryProvider{}
-	manager.SetPeerDiscoveryProvider(peerProvider)
+	peerMergedDiscoveryManager := discoveryendpoint.NewPeerMergedDiscoveryHandler(manager, "apis")
+	peerMergedDiscoveryManager.SetPeerDiscoveryProvider(peerProvider)
 
 	// Add local resource.
 	localGroup := newAPIGroup("local.example.com", "v1", "local-resource")
@@ -834,7 +835,7 @@ func TestMergedAndUnmergedDiscovery(t *testing.T) {
 	peerProvider.addResource("peer-server-1", peerGVR, newAPIResource(peerGVR))
 
 	// Merged request (no profile=unmerged).
-	wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(manager, manager)
+	wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(manager, manager, peerMergedDiscoveryManager)
 	respMerged, _, mergedDecoded := fetchPath(wrapped, "application/json", "/apis", "")
 	require.Equal(t, http.StatusOK, respMerged.StatusCode)
 	require.NotNil(t, mergedDecoded)

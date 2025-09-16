@@ -119,7 +119,7 @@ func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
 
 	// After updating peer discovery cache, invalidate discovery manager cache.
 	if h.discoveryManager != nil {
-		h.discoveryManager.InvalidateMergedDiscoveryCache()
+		h.discoveryManager.InvalidateClusterWideCaches()
 	}
 	return fetchDiscoveryErr
 }
