@@ -655,7 +655,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 	return ctx, store, client
 }
 
-func TestValidateKey(t *testing.T) {
+func TestPrepareKey(t *testing.T) {
 	validKeys := []string{
 		"/foo/bar/baz/a.b.c/",
 		"/foo",
@@ -689,21 +689,46 @@ func TestValidateKey(t *testing.T) {
 	)
 	_, store, _ := testSetup(t, withPrefix(pathPrefix))
 
-	for _, key := range validKeys {
-		k, err := store.prepareKey(key)
-		if err != nil {
-			t.Errorf("key %q should be valid; unexpected error: %v", key, err)
-		} else if !strings.HasPrefix(k, expectPrefix) {
-			t.Errorf("key %q should have prefix %q", k, expectPrefix)
+	t.Run("Non-recursive", func(t *testing.T) {
+		for _, key := range validKeys {
+			preparedKey, err := store.prepareKey(key, false)
+			if err != nil {
+				t.Errorf("preparing key %q should be valid; unexpected error: %v", key, err)
+				continue
+			}
+			if !strings.HasPrefix(preparedKey, expectPrefix) {
+				t.Errorf("prepared key %q should have prefix %q", preparedKey, expectPrefix)
+			}
+			if !strings.HasSuffix(preparedKey, key) {
+				t.Errorf("Prepared non-recursive key %q should have suffix %q", preparedKey, key)
+			}
 		}
-	}
+	})
 
-	for _, key := range invalidKeys {
-		_, err := store.prepareKey(key)
-		if err == nil {
-			t.Errorf("key %q should be invalid", key)
+	t.Run("Recursive", func(t *testing.T) {
+		for _, key := range validKeys {
+			preparedKey, err := store.prepareKey(key, true)
+			if err != nil {
+				t.Errorf("preparing key %q should be valid; unexpected error: %v", key, err)
+				continue
+			}
+			if !strings.HasPrefix(preparedKey, expectPrefix) {
+				t.Errorf("prepared key %q should have prefix %q", preparedKey, expectPrefix)
+			}
+			if !strings.HasSuffix(preparedKey, "/") {
+				t.Errorf("Prepared non-recursive key %q should have suffix '/'", preparedKey)
+			}
 		}
-	}
+	})
+
+	t.Run("Invalid", func(t *testing.T) {
+		for _, key := range invalidKeys {
+			_, err := store.prepareKey(key, false)
+			if err == nil {
+				t.Errorf("key %q should be invalid", key)
+			}
+		}
+	})
 }
 
 func TestInvalidKeys(t *testing.T) {
