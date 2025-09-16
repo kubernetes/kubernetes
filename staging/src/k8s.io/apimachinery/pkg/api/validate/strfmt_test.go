@@ -469,3 +469,106 @@ func TestLongNameCaseless(t *testing.T) {
 		})
 	}
 }
+
+func TestResourcePoolName(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:  "valid: single segment",
+		input: "a.valid.long-name",
+	}, {
+		name:  "valid: two segments",
+		input: "a.valid.long-name/another.one",
+	}, {
+		name:  "valid: multiple segments",
+		input: "a/b/c.d.e",
+	}, {
+		name:  "valid: segments with numbers",
+		input: "1.2.3/4.5.6",
+	}, {
+		name:  "invalid: empty string",
+		input: "",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "", "segment 0: must not be empty").WithOrigin("format=k8s-resource-pool-name"),
+		},
+	}, {
+		name:  "invalid: leading slash",
+		input: "/a.b.c",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-resource-pool-name"),
+		},
+	}, {
+		name:  "invalid: trailing slash",
+		input: "a.b.c/",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-resource-pool-name"),
+		},
+	}, {
+		name:  "invalid: double slash",
+		input: "a.b.c//d.e.f",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-resource-pool-name"),
+		},
+	}, {
+		name:  "invalid: one segment has uppercase",
+		input: "a.valid.name/Not.Valid",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "segment 1: a lowercase RFC 1123").WithOrigin("format=k8s-resource-pool-name"),
+		},
+	}, {
+		name:  "invalid: one segment starts with dash",
+		input: "a.valid.name/-not-valid",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "segment 1: a lowercase RFC 1123").WithOrigin("format=k8s-resource-pool-name"),
+		},
+	}, {
+		name:  "invalid: one segment has special characters",
+		input: "a.valid.name/not_valid",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "segment 1: a lowercase RFC 1123").WithOrigin("format=k8s-resource-pool-name"),
+		},
+	}, {
+		name:  "invalid: too long",
+		input: "a.valid.name/" + strings.Repeat("b", 253),
+		wantErrs: field.ErrorList{
+			field.TooLong(fldPath, nil, 253).WithOrigin("format=k8s-resource-pool-name"),
+		},
+	}, {
+		name:  "invalid: segment too long",
+		input: strings.Repeat("b", 254),
+		wantErrs: field.ErrorList{
+			field.TooLong(fldPath, nil, 253).WithOrigin("format=k8s-resource-pool-name"),
+			field.Invalid(fldPath, nil, "segment 0: must be no more than 253 bytes").WithOrigin("format=k8s-resource-pool-name"),
+		},
+	}, {
+		name:  "invalid: multiple invalid segments",
+		input: "Not/Valid/Either",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "segment 0: a lowercase RFC 1123").WithOrigin("format=k8s-resource-pool-name"),
+			field.Invalid(fldPath, nil, "segment 1: a lowercase RFC 1123").WithOrigin("format=k8s-resource-pool-name"),
+			field.Invalid(fldPath, nil, "segment 2: a lowercase RFC 1123").WithOrigin("format=k8s-resource-pool-name"),
+		},
+	}, {
+		name:  "invalid: just a slash",
+		input: "/",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "segment 0: must not be empty").WithOrigin("format=k8s-resource-pool-name"),
+			field.Invalid(fldPath, nil, "segment 1: must not be empty").WithOrigin("format=k8s-resource-pool-name"),
+		},
+	}}
+
+	exactMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := &tc.input
+			gotErrs := ResourcePoolName(ctx, operation.Operation{}, fldPath, value, nil)
+			exactMatcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
