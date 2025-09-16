@@ -26,22 +26,55 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
-	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
 )
 
-const enumTagName = "k8s:enum"
+const (
+	enumTagName        = "k8s:enum"
+	enumExcludeTagName = "k8s:enumExclude"
+)
 
 func init() {
 	RegisterTagValidator(&enumTagValidator{})
+	RegisterTagValidator(&enumExcludeTagValidator{})
+}
+
+type enumExcludeTagValidator struct {
+}
+
+func (*enumExcludeTagValidator) Init(_ Config) {
+}
+
+func (*enumExcludeTagValidator) TagName() string {
+	return enumExcludeTagName
+}
+
+var enumExcludeValidScope = sets.New(ScopeConst)
+
+func (*enumExcludeTagValidator) ValidScopes() sets.Set[Scope] {
+	return enumExcludeValidScope
+}
+
+func (*enumExcludeTagValidator) GetValidations(_ Context, _ codetags.Tag) (Validations, error) {
+	return Validations{}, nil
+}
+
+func (eetv *enumExcludeTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:    eetv.TagName(),
+		Scopes: eetv.ValidScopes().UnsortedList(),
+		Description: `Indicates that an constant value is not part of an enum, even if the constant's type is tagged with k8s:enum.
+May be conditionally excluded via +k8s:ifEnabled(Option)=+k8s:enumExclude or +k8s:ifDisabled(Option)=+k8s:enumExclude.
+If multiple +k8s:ifEnabled/+k8s:ifDisabled tags are used, the value is excluded if any of the exclude conditions are met.`,
+	}
 }
 
 type enumTagValidator struct {
-	enumContext *enumContext
+	validator Validator
 }
 
 func (etv *enumTagValidator) Init(cfg Config) {
-	etv.enumContext = newEnumContext(cfg.GengoContext)
+	etv.validator = cfg.Validator
 }
 
 func (enumTagValidator) TagName() string {
@@ -55,10 +88,10 @@ func (enumTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	enumValidator = types.Name{Package: libValidationPkg, Name: "Enum"}
+	enumValidator     = types.Name{Package: libValidationPkg, Name: "Enum"}
+	enumExclusionType = types.Name{Package: libValidationPkg, Name: "EnumExclusion"}
+	setsNew           = types.Name{Package: "k8s.io/apimachinery/pkg/util/sets", Name: "New"}
 )
-
-var setsNew = types.Name{Package: "k8s.io/apimachinery/pkg/util/sets", Name: "New"}
 
 func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	// NOTE: typedefs to pointers are not supported, so we should never see a pointer here.
@@ -66,18 +99,93 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
+	enum := &enumType{Name: context.Type.Name}
+	for _, c := range context.Constants {
+		var exclusions []enumExclude
+		isExcluded := false
+		for _, tag := range c.Tags {
+			switch tag.Name {
+			case enumExcludeTagName:
+				isExcluded = true
+			case ifEnabledTag, ifDisabledTag:
+				if tag.ValueTag != nil && tag.ValueTag.Name == enumExcludeTagName {
+					if option, ok := tag.PositionalArg(); ok {
+						exclusions = append(exclusions, enumExclude{
+							excludeWhen: tag.Name == ifEnabledTag,
+							option:      option.Value,
+						})
+					}
+				}
+			}
+		}
+		if isExcluded {
+			continue
+		}
+
+		value := &enumValue{
+			Name:       c.Constant.Name,
+			Value:      *c.Constant.ConstValue,
+			Comment:    strings.Join(c.Constant.CommentLines, " "),
+			Exclusions: exclusions,
+		}
+		enum.addIfNotPresent(value)
+	}
+
+	// Sort the values for the codegen that happens later.
+	slices.SortFunc(enum.Values, func(a, b *enumValue) int {
+		return cmp.Compare(a.Name.Name, b.Name.Name)
+	})
+	for _, v := range enum.Values {
+		slices.SortFunc(v.Exclusions, func(a, b enumExclude) int {
+			if a.excludeWhen == b.excludeWhen {
+				return cmp.Compare(a.option, b.option)
+			}
+			if a.excludeWhen {
+				return 1
+			}
+			return -1
+		})
+	}
+
 	var result Validations
 
-	if enum, ok := etv.enumContext.EnumType(context.Type); ok {
-		// TODO: Avoid the "local" here. This was added to avoid errors caused when the package is an empty string.
-		//       The correct package would be the output package but is not known here. This does not show up in generated code.
-		// TODO: Append a consistent hash suffix to avoid generated name conflicts?
-		supportVarName := PrivateVar{Name: "SymbolsFor" + context.Type.Name.Name, Package: "local"}
-		supportVar := Variable(supportVarName, Function(enumTagName, DefaultFlags, setsNew, enum.ValueArgs()...).WithTypeArgs(enum.Name))
-		result.AddVariable(supportVar)
-		fn := Function(enumTagName, DefaultFlags, enumValidator, supportVarName)
-		result.AddFunction(fn)
+	// TODO: Avoid the "local" here. This was added to avoid errors caused when the package is an empty string.
+	//       The correct package would be the output package but is not known here. This does not show up in generated code.
+	// TODO: Append a consistent hash suffix to avoid generated name conflicts?
+	symbolsVarName := PrivateVar{Name: "SymbolsFor" + context.Type.Name.Name, Package: "local"}
+	var allValues []any
+	var exclusionRules []any
+	for _, v := range enum.Values {
+		allValues = append(allValues, Identifier(v.Name))
+		for _, exclusion := range v.Exclusions {
+			exclusionRules = append(exclusionRules, StructLiteral{
+				Type:     enumExclusionType,
+				TypeArgs: []*types.Type{context.Type},
+				Fields: []StructLiteralField{
+					{"Value", Identifier(v.Name)},
+					{"Option", exclusion.option},
+					{"ExcludeWhen", exclusion.excludeWhen},
+				},
+			})
+		}
 	}
+	initFn := Function("setsNew", DefaultFlags, setsNew, allValues...)
+	if len(allValues) == 0 {
+		initFn = initFn.WithTypeArgs(enum.Name)
+	}
+	result.AddVariable(Variable(symbolsVarName, initFn))
+	var exclusions any = Literal("nil")
+	if len(exclusionRules) > 0 {
+		exclusionsVar := PrivateVar{Name: "ExclusionsFor" + context.Type.Name.Name, Package: "local"}
+		result.AddVariable(Variable(exclusionsVar, SliceLiteral{
+			ElementType:     enumExclusionType,
+			ElementTypeArgs: []*types.Type{context.Type},
+			Elements:        exclusionRules,
+		}))
+		exclusions = exclusionsVar
+	}
+	fn := Function(enumTagName, DefaultFlags, enumValidator, symbolsVarName, exclusions)
+	result.AddFunction(fn)
 
 	return result, nil
 }
@@ -86,7 +194,7 @@ func (etv *enumTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:         etv.TagName(),
 		Scopes:      etv.ValidScopes().UnsortedList(),
-		Description: "Indicates that a string type is an enum. All const values of this type are considered values in the enum.",
+		Description: "Indicates that a string type is an enum. All constant values of this type are considered values in the enum unless excluded using +k8s:enumExclude.",
 	}
 }
 
@@ -111,38 +219,25 @@ func (et *enumType) SymbolConstants() []Identifier {
 
 // TODO: Everything below this comment is copied from kube-openapi's enum.go.
 
-type enumValue struct {
-	Name    types.Name
-	Value   string
-	Comment string
-}
-
 type enumType struct {
 	Name   types.Name
 	Values []*enumValue
 }
 
-// enumMap is a map from the name to the matching enum type.
-type enumMap map[types.Name]*enumType
-
-type enumContext struct {
-	enumTypes enumMap
+type enumValue struct {
+	Name       types.Name
+	Value      string
+	Comment    string
+	Exclusions []enumExclude
 }
 
-func newEnumContext(c *generator.Context) *enumContext {
-	return &enumContext{enumTypes: parseEnums(c)}
-}
-
-// EnumType checks and finds the enumType for a given type.
-// If the given type is a known enum type, returns the enumType, true
-// Otherwise, returns nil, false
-func (ec *enumContext) EnumType(t *types.Type) (enum *enumType, isEnum bool) {
-	// if t is a pointer, use its underlying type instead
-	if t.Kind == types.Pointer {
-		t = t.Elem
-	}
-	enum, ok := ec.enumTypes[t.Name]
-	return enum, ok
+type enumExclude struct {
+	// excludeWhen determines the condition for exclusion.
+	// If true, the value is excluded if the option is present.
+	// If false, the value is excluded if the option is NOT present.
+	excludeWhen bool
+	// option is the name of the feature option that controls the exclusion.
+	option string
 }
 
 // ValueStrings returns all possible values of the enum type as strings
@@ -155,39 +250,6 @@ func (et *enumType) ValueStrings() []string {
 	}
 	sort.Strings(values)
 	return values
-}
-
-func parseEnums(c *generator.Context) enumMap {
-	// find all enum types.
-	enumTypes := make(enumMap)
-	for _, p := range c.Universe {
-		for _, t := range p.Types {
-			if isEnumType(t) {
-				if _, ok := enumTypes[t.Name]; !ok {
-					enumTypes[t.Name] = &enumType{
-						Name: t.Name,
-					}
-				}
-			}
-		}
-	}
-
-	// find all enum values from constants, and try to match each with its type.
-	for _, p := range c.Universe {
-		for _, c := range p.Constants {
-			enumType := c.Underlying
-			if _, ok := enumTypes[enumType.Name]; ok {
-				value := &enumValue{
-					Name:    c.Name,
-					Value:   *c.ConstValue,
-					Comment: strings.Join(c.CommentLines, " "),
-				}
-				enumTypes[enumType.Name].addIfNotPresent(value)
-			}
-		}
-	}
-
-	return enumTypes
 }
 
 func (et *enumType) addIfNotPresent(value *enumValue) {
@@ -206,15 +268,4 @@ func (et *enumType) addIfNotPresent(value *enumValue) {
 		}
 	}
 	et.Values = append(et.Values, value)
-}
-
-// isEnumType checks if a given type is an enum by the definition
-// An enum type should be an alias of string and has tag '+enum' in its comment.
-// Additionally, pass the type of builtin 'string' to check against.
-func isEnumType(t *types.Type) bool {
-	return t.Kind == types.Alias && t.Underlying == types.String && hasEnumTag(t)
-}
-
-func hasEnumTag(t *types.Type) bool {
-	return codetags.Extract("+", t.CommentLines)[enumTagName] != nil
 }

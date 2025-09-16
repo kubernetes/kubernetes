@@ -112,11 +112,13 @@ func viewRules() []rbacv1.PolicyRule {
 	rules := []rbacv1.PolicyRule{
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("pods", "replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
 			"services", "services/status", "endpoints", "persistentvolumeclaims", "persistentvolumeclaims/status", "configmaps").RuleOrDie(),
-		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("limitranges", "resourcequotas", "bindings", "events",
+		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("limitranges", "resourcequotas", "bindings",
 			"pods/status", "resourcequotas/status", "namespaces/status", "replicationcontrollers/status", "pods/log").RuleOrDie(),
 		// read access to namespaces at the namespace scope means you can read *this* namespace.  This can be used as an
 		// indicator of which namespaces you have access to.
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
+
+		rbacv1helpers.NewRule(Read...).Groups(legacyGroup, eventsGroup).Resources("events").RuleOrDie(),
 
 		rbacv1helpers.NewRule(Read...).Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 
@@ -155,8 +157,10 @@ func editRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("pods/eviction").RuleOrDie(),
 		rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
-			"services", "services/proxy", "persistentvolumeclaims", "configmaps", "secrets", "events").RuleOrDie(),
+			"services", "services/proxy", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
 		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie(),
+
+		rbacv1helpers.NewRule(Write...).Groups(legacyGroup, eventsGroup).Resources("events").RuleOrDie(),
 
 		rbacv1helpers.NewRule(Write...).Groups(appsGroup).Resources(
 			"statefulsets", "statefulsets/scale",
@@ -202,7 +206,7 @@ func NodeRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 
 		// TODO: restrict to the bound node as creator in the NodeRestrictions admission plugin
-		rbacv1helpers.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
+		rbacv1helpers.NewRule("create", "update", "patch").Groups(legacyGroup, eventsGroup).Resources("events").RuleOrDie(),
 
 		// Use the Node authorizer to limit get to pods related to the node, and to limit list/watch to field selectors related to the node.
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("pods").RuleOrDie(),

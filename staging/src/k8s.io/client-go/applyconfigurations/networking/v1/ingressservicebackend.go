@@ -20,8 +20,14 @@ package v1
 
 // IngressServiceBackendApplyConfiguration represents a declarative configuration of the IngressServiceBackend type for use
 // with apply.
+//
+// IngressServiceBackend references a Kubernetes Service as a Backend.
 type IngressServiceBackendApplyConfiguration struct {
-	Name *string                               `json:"name,omitempty"`
+	// name is the referenced service. The service must exist in
+	// the same namespace as the Ingress object.
+	Name *string `json:"name,omitempty"`
+	// port of the referenced service. A port name or port number
+	// is required for a IngressServiceBackend.
 	Port *ServiceBackendPortApplyConfiguration `json:"port,omitempty"`
 }
 

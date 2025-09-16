@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
@@ -90,8 +91,10 @@ type store struct {
 
 	resourcePrefix string
 	newListFunc    func() runtime.Object
-	stats          *statsCache
 	compactor      Compactor
+
+	collectorMux          sync.RWMutex
+	resourceSizeEstimator *resourceSizeEstimator
 }
 
 var _ storage.Interface = (*store)(nil)
@@ -142,7 +145,7 @@ func (a *abortOnFirstError) Aggregate(key string, err error) bool {
 func (a *abortOnFirstError) Err() error { return a.err }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
+func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) (*store, error) {
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
 	// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
@@ -150,6 +153,9 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	if !strings.HasSuffix(pathPrefix, "/") {
 		// Ensure the pathPrefix ends in "/" here to simplify key concatenation later.
 		pathPrefix += "/"
+	}
+	if resourcePrefix == "" {
+		return nil, fmt.Errorf("resourcePrefix cannot be empty")
 	}
 
 	listErrAggrFactory := defaultListErrorAggregatorFactory
@@ -186,19 +192,15 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 		newListFunc:    newListFunc,
 		compactor:      compactor,
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		stats := newStatsCache(pathPrefix, s.getKeys)
-		s.stats = stats
-		w.stats = stats
-	}
 
+	w.getResourceSizeEstimator = s.getResourceSizeEstimator
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
 		return s.GetCurrentResourceVersion(ctx)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
 		etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
 	}
-	return s
+	return s, nil
 }
 
 func (s *store) CompactRevision() int64 {
@@ -214,9 +216,16 @@ func (s *store) Versioner() storage.Versioner {
 }
 
 func (s *store) Close() {
-	if s.stats != nil {
-		s.stats.Close()
+	stats := s.getResourceSizeEstimator()
+	if stats != nil {
+		stats.Close()
 	}
+}
+
+func (s *store) getResourceSizeEstimator() *resourceSizeEstimator {
+	s.collectorMux.RLock()
+	defer s.collectorMux.RUnlock()
+	return s.resourceSizeEstimator
 }
 
 // Get implements storage.Interface.Get.
@@ -629,10 +638,12 @@ func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Obje
 	}
 }
 
-func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
-	if s.stats != nil {
-		return s.stats.Stats(ctx)
+func (s *store) Stats(ctx context.Context) (storage.Stats, error) {
+	if collector := s.getResourceSizeEstimator(); collector != nil {
+		return collector.Stats(ctx)
 	}
+	// returning stats without resource size
+
 	startTime := time.Now()
 	prefix, err := s.prepareKey(s.resourcePrefix)
 	if err != nil {
@@ -651,10 +662,17 @@ func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
 	}, nil
 }
 
-func (s *store) SetKeysFunc(keys storage.KeysFunc) {
-	if s.stats != nil {
-		s.stats.SetKeysFunc(keys)
+func (s *store) EnableResourceSizeEstimation(getKeys storage.KeysFunc) error {
+	if getKeys == nil {
+		return errors.New("KeysFunc cannot be nil")
 	}
+	s.collectorMux.Lock()
+	defer s.collectorMux.Unlock()
+	if s.resourceSizeEstimator != nil {
+		return errors.New("resourceSizeEstimator already enabled")
+	}
+	s.resourceSizeEstimator = newResourceSizeEstimator(s.pathPrefix, getKeys)
+	return nil
 }
 
 func (s *store) getKeys(ctx context.Context) ([]string, error) {
@@ -773,6 +791,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		metricsOp = "list"
 	}
 
+	stats := s.getResourceSizeEstimator()
+
 	aggregator := s.listErrAggrFactory()
 	for {
 		startTime := time.Now()
@@ -814,8 +834,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		} else {
 			growSlice(v, 2048, len(getResp.Kvs))
 		}
-		if s.stats != nil {
-			s.stats.Update(getResp.Kvs)
+		if stats != nil {
+			stats.Update(getResp.Kvs)
 		}
 
 		// take items from the response until the bucket is full, filtering as we go

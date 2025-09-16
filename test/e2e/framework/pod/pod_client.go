@@ -271,18 +271,13 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 	// during the test.
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
-		if c.ImagePullPolicy == v1.PullAlways {
-			// If the image pull policy is PullAlways, the image doesn't need to be in
-			// the allow list or pre-pulled, because the image is expected to be pulled
-			// in the test anyway.
-			continue
+		if c.ImagePullPolicy == v1.PullNever {
+			// If the image pull policy is PullNever, make sure it is in the pre-pull list.
+			gomega.Expect(ImagePrePullList.Has(c.Image)).To(gomega.BeTrueBecause("Image %q is not in the pre-pull list, consider adding it to PrePulledImages in test/e2e/common/util.go or NodePrePullImageList in test/e2e_node/image_list.go", c.Image))
 		}
-		// If the image policy is not PullAlways, the image must be in the pre-pull list and
-		// pre-pulled.
-		gomega.Expect(ImagePrePullList.Has(c.Image)).To(gomega.BeTrueBecause("Image %q is not in the pre-pull list, consider adding it to PrePulledImages in test/e2e/common/util.go or NodePrePullImageList in test/e2e_node/image_list.go", c.Image))
-		// Do not pull images during the tests because the images in pre-pull list should have
-		// been prepulled.
-		c.ImagePullPolicy = v1.PullNever
+		// If the image pull policy is PullAlways or PullIfNotPresent, the image doesn't need
+		// to be in the allow list or pre-pulled, because the image is expected to be pulled
+		// in the test anyway.
 	}
 }
 

@@ -17,9 +17,9 @@
 # Combining `performance` and `short` selects suitable workloads for a local
 # before/after comparisons with benchstat.
 
-# SteadyStateResourceClaimTemplateFirstAvailable is a variant of SteadyStateResourceClaimTemplate
+# FirstAvailable is a variant of SchedulingWithResourceClaimTemplate
 # with a claim template that uses the "firstAvailable" subrequests, aka DRAPrioritizedList.
-- name: SteadyStateClusterResourceClaimTemplateFirstAvailable
+- name: FirstAvailable
   featureGates:
     DynamicResourceAllocation: true
     DRAPrioritizedList: true
@@ -36,6 +36,8 @@
   - opcode: createAny
     templatePath: ../templates/deviceclass.yaml
   - opcode: createAny
+    templatePath: ../templates/deviceclass-no-devices.yaml
+  - opcode: createAny
     templatePath: ../templates/resourceclaim.yaml
     countParam: $initClaims
     namespace: init
@@ -47,8 +49,6 @@
   - opcode: createPods
     namespace: test
     count: 10
-    steadyState: true
-    durationParam: $duration
     podTemplatePath: ../templates/pod-with-claim-template.yaml
     collectMetrics: true
   workloads:
@@ -63,7 +63,6 @@
       nodesWithoutDRA: 1
       initClaims: 0
       maxClaimsPerNode: 10
-      duration: 2s
   - name: fast_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
@@ -75,4 +74,3 @@
       nodesWithoutDRA: 1
       initClaims: 0
       maxClaimsPerNode: 10
-      duration: 2s

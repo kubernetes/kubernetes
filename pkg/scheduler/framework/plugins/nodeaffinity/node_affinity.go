@@ -29,7 +29,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -38,17 +37,17 @@ import (
 
 // NodeAffinity is a plugin that checks if a pod node selector matches the node label.
 type NodeAffinity struct {
-	handle                    framework.Handle
+	handle                    fwk.Handle
 	addedNodeSelector         *nodeaffinity.NodeSelector
 	addedPrefSchedTerms       *nodeaffinity.PreferredSchedulingTerms
 	enableSchedulingQueueHint bool
 }
 
-var _ framework.PreFilterPlugin = &NodeAffinity{}
-var _ framework.FilterPlugin = &NodeAffinity{}
-var _ framework.PreScorePlugin = &NodeAffinity{}
-var _ framework.ScorePlugin = &NodeAffinity{}
-var _ framework.EnqueueExtensions = &NodeAffinity{}
+var _ fwk.PreFilterPlugin = &NodeAffinity{}
+var _ fwk.FilterPlugin = &NodeAffinity{}
+var _ fwk.PreScorePlugin = &NodeAffinity{}
+var _ fwk.ScorePlugin = &NodeAffinity{}
+var _ fwk.EnqueueExtensions = &NodeAffinity{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -144,7 +143,7 @@ func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1
 }
 
 // PreFilter builds and writes cycle state used by Filter.
-func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	affinity := pod.Spec.Affinity
 	noNodeAffinity := (affinity == nil ||
 		affinity.NodeAffinity == nil ||
@@ -190,14 +189,14 @@ func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState
 	if nodeNames != nil && len(nodeNames) == 0 {
 		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonConflict)
 	} else if len(nodeNames) > 0 {
-		return &framework.PreFilterResult{NodeNames: nodeNames}, nil
+		return &fwk.PreFilterResult{NodeNames: nodeNames}, nil
 	}
 	return nil, nil
 
 }
 
 // PreFilterExtensions not necessary for this plugin as state doesn't depend on pod additions or deletions.
-func (pl *NodeAffinity) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *NodeAffinity) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
@@ -285,17 +284,17 @@ func (pl *NodeAffinity) Score(ctx context.Context, state fwk.CycleState, pod *v1
 }
 
 // NormalizeScore invoked after scoring all nodes.
-func (pl *NodeAffinity) NormalizeScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *fwk.Status {
-	return helper.DefaultNormalizeScore(framework.MaxNodeScore, false, scores)
+func (pl *NodeAffinity) NormalizeScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, scores fwk.NodeScoreList) *fwk.Status {
+	return helper.DefaultNormalizeScore(fwk.MaxNodeScore, false, scores)
 }
 
 // ScoreExtensions of the Score plugin.
-func (pl *NodeAffinity) ScoreExtensions() framework.ScoreExtensions {
+func (pl *NodeAffinity) ScoreExtensions() fwk.ScoreExtensions {
 	return pl
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, plArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	args, err := getArgs(plArgs)
 	if err != nil {
 		return nil, err

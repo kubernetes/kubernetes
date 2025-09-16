@@ -27,6 +27,8 @@ import (
 
 // FlunderApplyConfiguration represents a declarative configuration of the Flunder type for use
 // with apply.
+//
+// Flunder is an example type with a spec and a status.
 type FlunderApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`

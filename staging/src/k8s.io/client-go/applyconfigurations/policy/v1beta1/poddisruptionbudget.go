@@ -29,11 +29,17 @@ import (
 
 // PodDisruptionBudgetApplyConfiguration represents a declarative configuration of the PodDisruptionBudget type for use
 // with apply.
+//
+// PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudgetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PodDisruptionBudgetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *PodDisruptionBudgetStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the PodDisruptionBudget.
+	Spec *PodDisruptionBudgetSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the PodDisruptionBudget.
+	Status *PodDisruptionBudgetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PodDisruptionBudget constructs a declarative configuration of the PodDisruptionBudget type for use with
@@ -54,7 +60,6 @@ func PodDisruptionBudget(name, namespace string) *PodDisruptionBudgetApplyConfig
 // ExtractPodDisruptionBudgetFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPodDisruptionBudgetFrom(podDisruptionBudget *policyv1beta1.PodDisruptionBudget, fieldManager string, subresource string) (*PodDisruptionBudgetApplyConfiguration, error) {
 	b := &PodDisruptionBudgetApplyConfiguration{}
 	err := managedfields.ExtractInto(podDisruptionBudget, internal.Parser().Type("io.k8s.api.policy.v1beta1.PodDisruptionBudget"), fieldManager, b, subresource)
@@ -79,14 +84,12 @@ func ExtractPodDisruptionBudgetFrom(podDisruptionBudget *policyv1beta1.PodDisrup
 // ExtractPodDisruptionBudget provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPodDisruptionBudget(podDisruptionBudget *policyv1beta1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
 	return ExtractPodDisruptionBudgetFrom(podDisruptionBudget, fieldManager, "")
 }
 
 // ExtractPodDisruptionBudgetStatus extracts the applied configuration owned by fieldManager from
 // podDisruptionBudget for the status subresource.
-// Experimental!
 func ExtractPodDisruptionBudgetStatus(podDisruptionBudget *policyv1beta1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
 	return ExtractPodDisruptionBudgetFrom(podDisruptionBudget, fieldManager, "status")
 }

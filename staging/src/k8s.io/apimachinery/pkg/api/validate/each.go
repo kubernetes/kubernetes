@@ -169,3 +169,18 @@ func SemanticDeepEqual[T any](a, b T) bool {
 func DirectEqual[T comparable](a, b T) bool {
 	return a == b
 }
+
+// DirectEqualPtr is a MatchFunc that dereferences two pointers and uses the ==
+// operator to compare the values. If both pointers are nil, it returns true.
+// If one pointer is nil and the other is not, it returns false.
+// It can be used by any other function that needs to compare two pointees
+// directly.
+func DirectEqualPtr[T comparable](a, b *T) bool {
+	if a == b {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}

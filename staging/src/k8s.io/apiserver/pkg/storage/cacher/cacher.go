@@ -441,6 +441,13 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+		err := config.Storage.EnableResourceSizeEstimation(cacher.getKeys)
+		if err != nil {
+			return nil, fmt.Errorf("failed to enable resource size estimation: %w", err)
+		}
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 		cacher.compactor = newCompactor(config.Storage, watchCache, config.Clock)
 		go cacher.compactor.Run(stopCh)
@@ -461,7 +468,6 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 			}, time.Second, stopCh,
 		)
 	}()
-	config.Storage.SetKeysFunc(cacher.getKeys)
 	return cacher, nil
 }
 

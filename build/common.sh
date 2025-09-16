@@ -540,6 +540,7 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_BUILD_PLATFORMS=${KUBE_BUILD_PLATFORMS:-}"
     --env "KUBE_CGO_OVERRIDES=' ${KUBE_CGO_OVERRIDES[*]:-} '"
     --env "KUBE_STATIC_OVERRIDES=' ${KUBE_STATIC_OVERRIDES[*]:-} '"
+    --env "KUBE_RACE=${KUBE_RACE:-}"
     --env "FORCE_HOST_GO=${FORCE_HOST_GO:-}"
     --env "GO_VERSION=${GO_VERSION:-}"
     --env "GOTOOLCHAIN=${GOTOOLCHAIN:-}"

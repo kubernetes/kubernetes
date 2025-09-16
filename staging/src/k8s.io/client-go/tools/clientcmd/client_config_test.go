@@ -1222,3 +1222,166 @@ func TestMergeRawConfigDoOverride(t *testing.T) {
 		t.Errorf("Expected namespace %v, got %v", config.Contexts["clean"].Namespace, act.Contexts["clean"].Namespace)
 	}
 }
+
+func TestClientCertOverrideData(t *testing.T) {
+	// Test that when overrides contain cert/key file paths or data fields,
+	// the corresponding fields are properly handled to avoid validation conflicts
+	// in particular code in DirectClientConfig::getAuthInfo.
+	// This covers both scenarios: overrides with file paths (which clear data fields)
+	// and overrides with data fields (which clear file paths).
+
+	testCases := []struct {
+		name        string
+		description string
+		setupTest   func(t *testing.T) (*clientcmdapi.Config, *ConfigOverrides, func())
+		validate    func(t *testing.T, authInfo *clientcmdapi.AuthInfo)
+	}{
+		{
+			name:        "override-with-file-paths",
+			description: "Test override with cert/key file paths",
+			setupTest: func(t *testing.T) (*clientcmdapi.Config, *ConfigOverrides, func()) {
+				certFile, err := os.CreateTemp("", "test-client-*.crt")
+				if err != nil {
+					t.Fatalf("Failed to create temp cert file: %v", err)
+				}
+
+				keyFile, err := os.CreateTemp("", "test-client-*.key")
+				if err != nil {
+					t.Fatalf("Failed to create temp key file: %v", err)
+				}
+
+				if err := os.WriteFile(certFile.Name(), []byte("dummy-cert-content"), 0600); err != nil {
+					t.Fatalf("Failed to write cert file: %v", err)
+				}
+				if err := os.WriteFile(keyFile.Name(), []byte("dummy-key-content"), 0600); err != nil {
+					t.Fatalf("Failed to write key file: %v", err)
+				}
+
+				baseConfig := clientcmdapi.Config{
+					Clusters: map[string]*clientcmdapi.Cluster{
+						"test-cluster": {
+							Server:                   "https://example.com:6443",
+							CertificateAuthorityData: []byte("fake-ca-data"),
+						},
+					},
+					AuthInfos: map[string]*clientcmdapi.AuthInfo{
+						"test-user": {
+							ClientCertificateData: []byte("base-cert-data"),
+							ClientKeyData:         []byte("base-key-data"),
+						},
+					},
+					Contexts: map[string]*clientcmdapi.Context{
+						"test-context": {
+							Cluster:  "test-cluster",
+							AuthInfo: "test-user",
+						},
+					},
+					CurrentContext: "test-context",
+				}
+
+				overrides := &ConfigOverrides{
+					AuthInfo: clientcmdapi.AuthInfo{
+						ClientCertificate:     certFile.Name(),
+						ClientCertificateData: nil,
+						ClientKey:             keyFile.Name(),
+						ClientKeyData:         nil,
+					},
+				}
+
+				cleanup := func() {
+					utiltesting.CloseAndRemove(t, certFile)
+					utiltesting.CloseAndRemove(t, keyFile)
+				}
+
+				return &baseConfig, overrides, cleanup
+			},
+			validate: func(t *testing.T, authInfo *clientcmdapi.AuthInfo) {
+				if authInfo.ClientCertificate == "" {
+					t.Errorf("Expected ClientCertificate file path to be set")
+				}
+				if authInfo.ClientKey == "" {
+					t.Errorf("Expected ClientKey file path to be set")
+				}
+				if authInfo.ClientCertificateData != nil {
+					t.Errorf("Expected ClientCertificateData to be nil when file path is used")
+				}
+				if authInfo.ClientKeyData != nil {
+					t.Errorf("Expected ClientKeyData to be nil when file path is used")
+				}
+			},
+		},
+		{
+			name:        "override-with-data-fields",
+			description: "Test override with cert/key data fields",
+			setupTest: func(t *testing.T) (*clientcmdapi.Config, *ConfigOverrides, func()) {
+				baseConfig := clientcmdapi.Config{
+					Clusters: map[string]*clientcmdapi.Cluster{
+						"test-cluster": {
+							Server:                   "https://example.com:6443",
+							CertificateAuthorityData: []byte("fake-ca-data"),
+						},
+					},
+					AuthInfos: map[string]*clientcmdapi.AuthInfo{
+						"test-user": {
+							ClientCertificate: "/path/to/base-cert.pem",
+							ClientKey:         "/path/to/base-key.pem",
+						},
+					},
+					Contexts: map[string]*clientcmdapi.Context{
+						"test-context": {
+							Cluster:  "test-cluster",
+							AuthInfo: "test-user",
+						},
+					},
+					CurrentContext: "test-context",
+				}
+
+				overrides := &ConfigOverrides{
+					AuthInfo: clientcmdapi.AuthInfo{
+						ClientCertificate:     "",
+						ClientCertificateData: []byte("override-cert-data"),
+						ClientKey:             "",
+						ClientKeyData:         []byte("override-key-data"),
+					},
+				}
+
+				return &baseConfig, overrides, func() {}
+			},
+			validate: func(t *testing.T, authInfo *clientcmdapi.AuthInfo) {
+				if authInfo.ClientCertificate != "" {
+					t.Errorf("Expected ClientCertificate file path to be empty when data is used")
+				}
+				if authInfo.ClientKey != "" {
+					t.Errorf("Expected ClientKey file path to be empty when data is used")
+				}
+				if string(authInfo.ClientCertificateData) != "override-cert-data" {
+					t.Errorf("Expected ClientCertificateData to be 'override-cert-data', got %s", string(authInfo.ClientCertificateData))
+				}
+				if string(authInfo.ClientKeyData) != "override-key-data" {
+					t.Errorf("Expected ClientKeyData to be 'override-key-data', got %s", string(authInfo.ClientKeyData))
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			baseConfig, overrides, cleanup := tc.setupTest(t)
+			defer cleanup()
+
+			clientConfig := NewNonInteractiveClientConfig(*baseConfig, "test-context", overrides, nil)
+
+			mergedConfig, err := clientConfig.MergedRawConfig()
+			if err != nil {
+				t.Fatalf("MergedRawConfig() failed: %v", err)
+			}
+
+			authInfo := mergedConfig.AuthInfos["test-user"]
+			if authInfo == nil {
+				t.Fatalf("Expected AuthInfo 'test-user' not found")
+			}
+
+			tc.validate(t, authInfo)
+		})
+	}
+}

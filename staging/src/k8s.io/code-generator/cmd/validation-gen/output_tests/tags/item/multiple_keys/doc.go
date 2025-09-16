@@ -33,6 +33,13 @@ type Struct struct {
 	// +k8s:listMapKey=boolKey
 	// +k8s:item(stringKey: "target", intKey: 42, boolKey: true)=+k8s:validateFalse="item Items[stringKey=target,intKey=42,boolKey=true]"
 	Items []Item `json:"items"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=stringKey
+	// +k8s:listMapKey=intKey
+	// +k8s:listMapKey=boolKey
+	// +k8s:item(boolKey: true, stringKey: "target", intKey: 42)=+k8s:validateFalse="item OutOfOrder[boolKey=42,stringKey=target,intKey=42]"
+	OutOfOrder []Item `json:"outOfOrder"`
 }
 
 type Item struct {

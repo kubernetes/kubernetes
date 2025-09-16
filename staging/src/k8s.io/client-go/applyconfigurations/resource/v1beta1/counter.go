@@ -24,7 +24,10 @@ import (
 
 // CounterApplyConfiguration represents a declarative configuration of the Counter type for use
 // with apply.
+//
+// Counter describes a quantity associated with a device.
 type CounterApplyConfiguration struct {
+	// Value defines how much of a certain device counter is available.
 	Value *resource.Quantity `json:"value,omitempty"`
 }
 

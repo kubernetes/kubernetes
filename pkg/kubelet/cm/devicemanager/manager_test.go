@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -307,15 +309,16 @@ func setupPluginManager(t *testing.T, pluginSocketName string, m Manager) plugin
 		&record.FakeRecorder{},
 	)
 
-	runPluginManager(pluginManager)
+	tCtx := ktesting.Init(t)
+	runPluginManager(tCtx, pluginManager)
 	pluginManager.AddHandler(watcherapi.DevicePlugin, m.GetWatcherHandler())
 	return pluginManager
 }
 
-func runPluginManager(pluginManager pluginmanager.PluginManager) {
+func runPluginManager(ctx context.Context, pluginManager pluginmanager.PluginManager) {
 	// FIXME: Replace sets.Set[string] with sets.Set[string]
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
-	go pluginManager.Run(sourcesReady, wait.NeverStop)
+	go pluginManager.Run(ctx, sourcesReady, wait.NeverStop)
 }
 
 func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub) {

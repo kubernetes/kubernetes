@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
@@ -46,7 +45,7 @@ func (pl *FalseFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1
 }
 
 // NewFalseFilterPlugin initializes a FalseFilterPlugin and returns it.
-func NewFalseFilterPlugin(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func NewFalseFilterPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 	return &FalseFilterPlugin{}, nil
 }
 
@@ -64,7 +63,7 @@ func (pl *TrueFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.
 }
 
 // NewTrueFilterPlugin initializes a TrueFilterPlugin and returns it.
-func NewTrueFilterPlugin(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func NewTrueFilterPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 	return &TrueFilterPlugin{}, nil
 }
 
@@ -103,7 +102,7 @@ func (pl *FakeFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.
 
 // NewFakeFilterPlugin initializes a fakeFilterPlugin and returns it.
 func NewFakeFilterPlugin(failedNodeReturnCodeMap map[string]fwk.Code) frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &FakeFilterPlugin{
 			FailedNodeReturnCodeMap: failedNodeReturnCodeMap,
 		}, nil
@@ -132,13 +131,13 @@ func (pl *MatchFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1
 }
 
 // NewMatchFilterPlugin initializes a MatchFilterPlugin and returns it.
-func NewMatchFilterPlugin(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func NewMatchFilterPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 	return &MatchFilterPlugin{}, nil
 }
 
 // FakePreFilterPlugin is a test filter plugin.
 type FakePreFilterPlugin struct {
-	Result *framework.PreFilterResult
+	Result *fwk.PreFilterResult
 	Status *fwk.Status
 	name   string
 }
@@ -149,18 +148,18 @@ func (pl *FakePreFilterPlugin) Name() string {
 }
 
 // PreFilter invoked at the PreFilter extension point.
-func (pl *FakePreFilterPlugin) PreFilter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *FakePreFilterPlugin) PreFilter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	return pl.Result, pl.Status
 }
 
 // PreFilterExtensions no extensions implemented by this plugin.
-func (pl *FakePreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *FakePreFilterPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
 // NewFakePreFilterPlugin initializes a fakePreFilterPlugin and returns it.
-func NewFakePreFilterPlugin(name string, result *framework.PreFilterResult, status *fwk.Status) frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func NewFakePreFilterPlugin(name string, result *fwk.PreFilterResult, status *fwk.Status) frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &FakePreFilterPlugin{
 			Result: result,
 			Status: status,
@@ -190,7 +189,7 @@ func (pl *FakeReservePlugin) Unreserve(_ context.Context, _ fwk.CycleState, _ *v
 
 // NewFakeReservePlugin initializes a fakeReservePlugin and returns it.
 func NewFakeReservePlugin(status *fwk.Status) frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &FakeReservePlugin{
 			Status: status,
 		}, nil
@@ -220,7 +219,7 @@ func (pl *FakePreBindPlugin) PreBind(_ context.Context, _ fwk.CycleState, _ *v1.
 
 // NewFakePreBindPlugin initializes a fakePreBindPlugin and returns it.
 func NewFakePreBindPlugin(preBindPreFlightStatus, preBindStatus *fwk.Status) frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &FakePreBindPlugin{
 			PreBindPreFlightStatus: preBindPreFlightStatus,
 			PreBindStatus:          preBindStatus,
@@ -230,7 +229,7 @@ func NewFakePreBindPlugin(preBindPreFlightStatus, preBindStatus *fwk.Status) fra
 
 // FakePermitPlugin is a test permit plugin.
 type FakePermitPlugin struct {
-	Handle  framework.Handle
+	Handle  fwk.Handle
 	Status  *fwk.Status
 	Timeout time.Duration
 }
@@ -247,7 +246,7 @@ func (pl *FakePermitPlugin) Permit(_ context.Context, _ fwk.CycleState, p *v1.Po
 
 // NewFakePermitPlugin initializes a fakePermitPlugin and returns it.
 func NewFakePermitPlugin(status *fwk.Status, timeout time.Duration) frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, h framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, h fwk.Handle) (fwk.Plugin, error) {
 		return &FakePermitPlugin{
 			Status:  status,
 			Timeout: timeout,
@@ -272,7 +271,7 @@ func (pl *FakePreScoreAndScorePlugin) Score(ctx context.Context, state fwk.Cycle
 	return pl.score, pl.scoreStatus
 }
 
-func (pl *FakePreScoreAndScorePlugin) ScoreExtensions() framework.ScoreExtensions {
+func (pl *FakePreScoreAndScorePlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
@@ -281,7 +280,7 @@ func (pl *FakePreScoreAndScorePlugin) PreScore(ctx context.Context, state fwk.Cy
 }
 
 func NewFakePreScoreAndScorePlugin(name string, score int64, preScoreStatus, scoreStatus *fwk.Status) frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &FakePreScoreAndScorePlugin{
 			name:           name,
 			score:          score,
@@ -293,7 +292,7 @@ func NewFakePreScoreAndScorePlugin(name string, score int64, preScoreStatus, sco
 
 // NewEqualPrioritizerPlugin returns a factory function to build equalPrioritizerPlugin.
 func NewEqualPrioritizerPlugin() frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &FakePreScoreAndScorePlugin{
 			name:  "EqualPrioritizerPlugin",
 			score: 1,

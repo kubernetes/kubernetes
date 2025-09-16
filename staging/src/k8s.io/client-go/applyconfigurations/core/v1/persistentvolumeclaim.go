@@ -29,11 +29,20 @@ import (
 
 // PersistentVolumeClaimApplyConfiguration represents a declarative configuration of the PersistentVolumeClaim type for use
 // with apply.
+//
+// PersistentVolumeClaim is a user's request for and claim to a persistent volume
 type PersistentVolumeClaimApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *PersistentVolumeClaimSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *PersistentVolumeClaimStatusApplyConfiguration `json:"status,omitempty"`
+	// spec defines the desired characteristics of a volume requested by a pod author.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
+	Spec *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty"`
+	// status represents the current information/status of a persistent volume claim.
+	// Read-only.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
+	Status *PersistentVolumeClaimStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PersistentVolumeClaim constructs a declarative configuration of the PersistentVolumeClaim type for use with
@@ -54,7 +63,6 @@ func PersistentVolumeClaim(name, namespace string) *PersistentVolumeClaimApplyCo
 // ExtractPersistentVolumeClaimFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPersistentVolumeClaimFrom(persistentVolumeClaim *corev1.PersistentVolumeClaim, fieldManager string, subresource string) (*PersistentVolumeClaimApplyConfiguration, error) {
 	b := &PersistentVolumeClaimApplyConfiguration{}
 	err := managedfields.ExtractInto(persistentVolumeClaim, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolumeClaim"), fieldManager, b, subresource)
@@ -79,14 +87,12 @@ func ExtractPersistentVolumeClaimFrom(persistentVolumeClaim *corev1.PersistentVo
 // ExtractPersistentVolumeClaim provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPersistentVolumeClaim(persistentVolumeClaim *corev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
 	return ExtractPersistentVolumeClaimFrom(persistentVolumeClaim, fieldManager, "")
 }
 
 // ExtractPersistentVolumeClaimStatus extracts the applied configuration owned by fieldManager from
 // persistentVolumeClaim for the status subresource.
-// Experimental!
 func ExtractPersistentVolumeClaimStatus(persistentVolumeClaim *corev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
 	return ExtractPersistentVolumeClaimFrom(persistentVolumeClaim, fieldManager, "status")
 }

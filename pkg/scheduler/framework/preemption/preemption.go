@@ -129,7 +129,7 @@ type Interface interface {
 
 type Evaluator struct {
 	PluginName string
-	Handler    framework.Handle
+	Handler    fwk.Handle
 	PodLister  corelisters.PodLister
 	PdbLister  policylisters.PodDisruptionBudgetLister
 
@@ -146,7 +146,7 @@ type Evaluator struct {
 	Interface
 }
 
-func NewEvaluator(pluginName string, fh framework.Handle, i Interface, enableAsyncPreemption bool) *Evaluator {
+func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPreemption bool) *Evaluator {
 	podLister := fh.SharedInformerFactory().Core().V1().Pods().Lister()
 	pdbLister := fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister()
 
@@ -231,7 +231,7 @@ func (ev *Evaluator) IsPodRunningPreemption(podUID types.UID) bool {
 //
 //   - <non-nil PostFilterResult, Success>. It's the regular happy path
 //     and the non-empty nominatedNodeName will be applied to the preemptor pod.
-func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *fwk.Status) {
+func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
 	// 0) Fetch the latest version of <pod>.
@@ -306,7 +306,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 
 // FindCandidates calculates a slice of preemption candidates.
 // Each candidate is executable to make the given <pod> schedulable.
-func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, allNodes []fwk.NodeInfo, pod *v1.Pod, m framework.NodeToStatusReader) ([]Candidate, *framework.NodeToStatus, error) {
+func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, allNodes []fwk.NodeInfo, pod *v1.Pod, m fwk.NodeToStatusReader) ([]Candidate, *framework.NodeToStatus, error) {
 	if len(allNodes) == 0 {
 		return nil, nil, errors.New("no nodes available")
 	}
@@ -468,12 +468,12 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 
 // clearNominatedNodeName internally submit a patch request to API server
 // to set each pods[*].Status.NominatedNodeName> to "".
-func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCacher framework.APICacher, pods ...*v1.Pod) utilerrors.Aggregate {
+func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCacher fwk.APICacher, pods ...*v1.Pod) utilerrors.Aggregate {
 	var errs []error
 	for _, p := range pods {
 		if apiCacher != nil {
 			// When API cacher is available, use it to clear the NominatedNodeName.
-			_, err := apiCacher.PatchPodStatus(p, nil, &framework.NominatingInfo{NominatedNodeName: "", NominatingMode: framework.ModeOverride})
+			_, err := apiCacher.PatchPodStatus(p, nil, &fwk.NominatingInfo{NominatedNodeName: "", NominatingMode: fwk.ModeOverride})
 			if err != nil {
 				errs = append(errs, err)
 			}
@@ -716,7 +716,7 @@ func pickOneNodeForPreemption(logger klog.Logger, nodesToVictims map[string]*ext
 // manipulation of NodeInfo and PreFilter state per nominated pod. It may not be
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
-func getLowerPriorityNominatedPods(logger klog.Logger, pn framework.PodNominator, pod *v1.Pod, nodeName string) []*v1.Pod {
+func getLowerPriorityNominatedPods(logger klog.Logger, pn fwk.PodNominator, pod *v1.Pod, nodeName string) []*v1.Pod {
 	podInfos := pn.NominatedPodsForNode(nodeName)
 
 	if len(podInfos) == 0 {

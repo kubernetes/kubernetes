@@ -27,16 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/informers"
-	corelisters "k8s.io/client-go/listers/core/v1"
-	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
@@ -66,11 +62,9 @@ type MoreImportantPodFunc func(pod1, pod2 *v1.Pod) bool
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
-	fh        framework.Handle
+	fh        fwk.Handle
 	fts       feature.Features
 	args      config.DefaultPreemptionArgs
-	podLister corelisters.PodLister
-	pdbLister policylisters.PodDisruptionBudgetLister
 	Evaluator *preemption.Evaluator
 
 	// IsEligiblePod returns whether a victim pod is allowed to be preempted by a preemptor pod.
@@ -86,8 +80,8 @@ type DefaultPreemption struct {
 	MoreImportantPod MoreImportantPodFunc
 }
 
-var _ framework.PostFilterPlugin = &DefaultPreemption{}
-var _ framework.PreEnqueuePlugin = &DefaultPreemption{}
+var _ fwk.PostFilterPlugin = &DefaultPreemption{}
+var _ fwk.PreEnqueuePlugin = &DefaultPreemption{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DefaultPreemption) Name() string {
@@ -95,7 +89,7 @@ func (pl *DefaultPreemption) Name() string {
 }
 
 // New initializes a new plugin and returns it. The plugin type is retained to allow modification.
-func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (*DefaultPreemption, error) {
+func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Features) (*DefaultPreemption, error) {
 	args, ok := dpArgs.(*config.DefaultPreemptionArgs)
 	if !ok {
 		return nil, fmt.Errorf("got args of type %T, want *DefaultPreemptionArgs", dpArgs)
@@ -104,15 +98,10 @@ func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feat
 		return nil, err
 	}
 
-	podLister := fh.SharedInformerFactory().Core().V1().Pods().Lister()
-	pdbLister := getPDBLister(fh.SharedInformerFactory())
-
 	pl := DefaultPreemption{
-		fh:        fh,
-		fts:       fts,
-		args:      *args,
-		podLister: podLister,
-		pdbLister: pdbLister,
+		fh:   fh,
+		fts:  fts,
+		args: *args,
 	}
 	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, fts.EnableAsyncPreemption)
 
@@ -129,7 +118,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feat
 }
 
 // PostFilter invoked at the postFilter extension point.
-func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *fwk.Status) {
+func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	defer func() {
 		metrics.PreemptionAttempts.Inc()
 	}()
@@ -427,8 +416,4 @@ func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisrup
 		}
 	}
 	return violatingPodInfos, nonViolatingPodInfos
-}
-
-func getPDBLister(informerFactory informers.SharedInformerFactory) policylisters.PodDisruptionBudgetLister {
-	return informerFactory.Policy().V1().PodDisruptionBudgets().Lister()
 }

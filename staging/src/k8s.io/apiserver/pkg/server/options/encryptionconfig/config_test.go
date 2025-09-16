@@ -1853,10 +1853,8 @@ func TestComputeEncryptionConfigHash(t *testing.T) {
 func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 	defaultUseSeed := GetKDF("")
 
-	origNowFunc := envelopekmsv2.NowFunc
+	origNowFunc := envelopekmsv2.GetNowFunc("")
 	now := origNowFunc() // freeze time
-	t.Cleanup(func() { envelopekmsv2.NowFunc = origNowFunc })
-	envelopekmsv2.NowFunc = func() time.Time { return now }
 
 	klog.LogToStderr(false)
 	var level klog.Level
@@ -2083,6 +2081,9 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			kmsName := fmt.Sprintf("panda-%d", i)
 			defer SetKDFForTests(kmsName, tt.useSeed)()
 
+			resetNowFunc := envelopekmsv2.SetNowFuncForTests(kmsName, func() time.Time { return now })
+			t.Cleanup(resetNowFunc)
+
 			var buf bytes.Buffer
 			klog.SetOutput(&buf)
 
@@ -2092,6 +2093,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 				name:    kmsName,
 				service: tt.service,
 			}
+			tt.state.KMSProviderName = kmsName
 			h.state.Store(&tt.state)
 
 			err := h.rotateDEKOnKeyIDChange(ctx, tt.statusKeyID, "panda")
@@ -2106,6 +2108,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			ignoredFields := sets.NewString("Transformer", "EncryptedObjectEncryptedDEKSource", "UID", "CacheKey")
 
 			gotState := *h.state.Load()
+			gotState.KMSProviderName = kmsName
+			tt.wantState.KMSProviderName = kmsName
 
 			if diff := cmp.Diff(tt.wantState, gotState,
 				cmp.FilterPath(func(path cmp.Path) bool { return ignoredFields.Has(path.String()) }, cmp.Ignore()),

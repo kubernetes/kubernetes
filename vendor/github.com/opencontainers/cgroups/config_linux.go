@@ -29,7 +29,7 @@ type Cgroup struct {
 	ScopePrefix string `json:"scope_prefix,omitempty"`
 
 	// Resources contains various cgroups settings to apply.
-	*Resources `json:"Resources,omitempty"`
+	*Resources
 
 	// Systemd tells if systemd should be used to manage cgroups.
 	Systemd bool `json:"Systemd,omitempty"`

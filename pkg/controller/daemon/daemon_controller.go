@@ -310,7 +310,7 @@ func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting daemon sets controller")
 	defer logger.Info("Shutting down daemon sets controller")
 
-	if !cache.WaitForNamedCacheSync("daemon sets", ctx.Done(), dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
 		return
 	}
 

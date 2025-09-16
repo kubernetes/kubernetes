@@ -37,6 +37,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type E01
 	scheme.AddValidationFunc((*E01)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -44,6 +45,7 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
+	// type E02
 	scheme.AddValidationFunc((*E02)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -51,6 +53,7 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
+	// type E03
 	scheme.AddValidationFunc((*E03)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -58,6 +61,7 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
+	// type EMultiple
 	scheme.AddValidationFunc((*EMultiple)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -68,21 +72,17 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_E01 validates an instance of E01 according
+// to declarative validation rules in the API schema.
 func Validate_E01(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *E01) (errs field.ErrorList) {
-	// type E01
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil // no changes
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E01, no flags")...)
 
 	return errs
 }
 
+// Validate_E02 validates an instance of E02 according
+// to declarative validation rules in the API schema.
 func Validate_E02(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *E02) (errs field.ErrorList) {
-	// type E02
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil // no changes
-	}
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E02, ShortCircuit"); len(e) != 0 {
 		errs = append(errs, e...)
 		return // do not proceed
@@ -91,11 +91,9 @@ func Validate_E02(ctx context.Context, op operation.Operation, fldPath *field.Pa
 	return errs
 }
 
+// Validate_E03 validates an instance of E03 according
+// to declarative validation rules in the API schema.
 func Validate_E03(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *E03) (errs field.ErrorList) {
-	// type E03
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil // no changes
-	}
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E03, ShortCircuit"); len(e) != 0 {
 		errs = append(errs, e...)
 		return // do not proceed
@@ -105,11 +103,9 @@ func Validate_E03(ctx context.Context, op operation.Operation, fldPath *field.Pa
 	return errs
 }
 
+// Validate_EMultiple validates an instance of EMultiple according
+// to declarative validation rules in the API schema.
 func Validate_EMultiple(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *EMultiple) (errs field.ErrorList) {
-	// type EMultiple
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil // no changes
-	}
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "EMultiple, ShortCircuit 1"); len(e) != 0 {
 		errs = append(errs, e...)
 		return // do not proceed

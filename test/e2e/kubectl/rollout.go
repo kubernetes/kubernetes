@@ -48,25 +48,25 @@ var _ = SIGDescribe("Kubectl rollout", func() {
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		deploymentYaml = commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment1Filename)))
+		deploymentYaml = commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostDeployment1Filename)))
 	})
 
 	ginkgo.Describe("undo", func() {
 		ginkgo.AfterEach(func() {
-			cleanupKubectlInputs(deploymentYaml, ns, "app=httpd")
+			cleanupKubectlInputs(deploymentYaml, ns, "app=agnhost")
 		})
 		ginkgo.It("undo should rollback and update deployment env", func(ctx context.Context) {
 			var err error
 			// create deployment
 			e2ekubectl.RunKubectlOrDieInput(ns, deploymentYaml, "apply", "-f", "-")
 
-			if err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, "httpd-deployment", "1", imageutils.GetE2EImage(imageutils.HttpdNew)); err != nil {
-				framework.Failf("created deployment not ready")
+			if err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, "agnhost-deployment", "1", imageutils.GetE2EImage(imageutils.Agnhost)); err != nil {
+				framework.Failf("created deployment not ready, err: %v", err)
 			}
 
 			var d *appsv1.Deployment
-			if d, err = c.AppsV1().Deployments(ns).Get(ctx, "httpd-deployment", metav1.GetOptions{}); err != nil {
-				framework.Failf("get deployment failed")
+			if d, err = c.AppsV1().Deployments(ns).Get(ctx, "agnhost-deployment", metav1.GetOptions{}); err != nil {
+				framework.Failf("get deployment failed, err: %v", err)
 			}
 
 			origEnv := d.Spec.Template.Spec.Containers[0].Env
@@ -87,14 +87,14 @@ var _ = SIGDescribe("Kubectl rollout", func() {
 			}
 
 			// do a small update
-			if _, err = e2ekubectl.RunKubectl(ns, "set", "env", "deployment/httpd-deployment", "foo=bar"); err != nil {
+			if _, err = e2ekubectl.RunKubectl(ns, "set", "env", "deployment/agnhost-deployment", "foo=bar"); err != nil {
 				framework.Failf("kubectl failed set env for deployment")
 			}
 			// wait for env to be set
 			if err = e2edeployment.WaitForDeploymentComplete(c, d); err != nil {
 				framework.Failf("update deployment failed")
 			}
-			if d, err = c.AppsV1().Deployments(ns).Get(ctx, "httpd-deployment", metav1.GetOptions{}); err != nil {
+			if d, err = c.AppsV1().Deployments(ns).Get(ctx, "agnhost-deployment", metav1.GetOptions{}); err != nil {
 				framework.Failf("get deployment failed")
 			}
 			envs := d.Spec.Template.Spec.Containers[0].Env
@@ -111,14 +111,14 @@ var _ = SIGDescribe("Kubectl rollout", func() {
 			}
 
 			// rollback
-			if _, err = e2ekubectl.RunKubectl(ns, "rollout", "undo", "deployment/httpd-deployment"); err != nil {
+			if _, err = e2ekubectl.RunKubectl(ns, "rollout", "undo", "deployment/agnhost-deployment"); err != nil {
 				framework.Failf("kubectl failed to rollback deployment")
 			}
 			// wait for rollback finished
 			if err = e2edeployment.WaitForDeploymentComplete(c, d); err != nil {
 				framework.Failf("rollback deployment failed")
 			}
-			if d, err = c.AppsV1().Deployments(ns).Get(ctx, "httpd-deployment", metav1.GetOptions{}); err != nil {
+			if d, err = c.AppsV1().Deployments(ns).Get(ctx, "agnhost-deployment", metav1.GetOptions{}); err != nil {
 				framework.Failf("get deployment failed")
 			}
 

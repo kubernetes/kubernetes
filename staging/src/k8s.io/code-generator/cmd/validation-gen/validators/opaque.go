@@ -38,7 +38,7 @@ func (opaqueTypeTagValidator) TagName() string {
 }
 
 func (opaqueTypeTagValidator) ValidScopes() sets.Set[Scope] {
-	return sets.New(ScopeAny)
+	return sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 }
 
 func (opaqueTypeTagValidator) GetValidations(_ Context, _ codetags.Tag) (Validations, error) {

@@ -281,7 +281,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting endpoint slice controller")
 	defer logger.Info("Shutting down endpoint slice controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint_slice", ctx.Done(), c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
 		return
 	}
 

@@ -185,7 +185,7 @@ func (c *ReplicaCalculator) GetMetricReplicas(currentReplicas int32, targetUsage
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v", metricName, err)
 	}
 
-	replicaCount, usage, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUsage, tolerances, namespace, selector, v1.ResourceName(""))
+	replicaCount, usage, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUsage, tolerances, namespace, selector, "")
 	return replicaCount, usage, timestamp, err
 }
 
@@ -360,8 +360,14 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, tar
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, metricSelector, err)
 	}
+
 	usage = 0
 	for _, val := range metrics {
+		// Cap at MaxInt64 for positive overflow
+		if val > 0 && usage > math.MaxInt64-val {
+			usage = math.MaxInt64
+			break
+		}
 		usage = usage + val
 	}
 

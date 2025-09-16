@@ -229,10 +229,6 @@
         "github.com/google/cel-go",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2"
       ],
-      "gopkg.in/yaml.v2": [
-        "github.com/prometheus/client_golang",
-        "github.com/prometheus/common"
-      ],
       "gopkg.in/yaml.v3": [
         "github.com/containerd/containerd/api",
         "github.com/coreos/go-semver",

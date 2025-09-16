@@ -122,9 +122,9 @@ type kexDHGexReplyMsg struct {
 const msgKexDHGexRequest = 34
 
 type kexDHGexRequestMsg struct {
-	MinBits      uint32 `sshtype:"34"`
-	PreferedBits uint32
-	MaxBits      uint32
+	MinBits       uint32 `sshtype:"34"`
+	PreferredBits uint32
+	MaxBits       uint32
 }
 
 // See RFC 4253, section 10.

@@ -41,6 +41,10 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.32"
+  - default: false
+    lockToDefault: true
+    preRelease: Deprecated
+    version: "1.35"
 - name: AllowParsingUserUIDFromCertAuth
   versionedSpecs:
   - default: true
@@ -216,20 +220,6 @@
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: "1.32"
-- name: ComponentSLIs
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.26"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.27"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
     version: "1.32"
 - name: ComponentStatusz
   versionedSpecs:
@@ -427,6 +417,10 @@
     lockToDefault: false
     preRelease: GA
     version: "1.34"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.35"
 - name: DisableCPUQuotaWithExclusiveCPUs
   versionedSpecs:
   - default: true
@@ -1129,16 +1123,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.22"
-- name: PodIndexLabel
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.28"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.32"
 - name: PodLevelResources
   versionedSpecs:
   - default: false
@@ -1595,20 +1579,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
-- name: SizeMemoryBackedVolumes
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.20"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.22"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.32"
 - name: StorageCapacityScoring
   versionedSpecs:
   - default: false

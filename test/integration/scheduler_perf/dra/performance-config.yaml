@@ -17,6 +17,45 @@
 # Combining `performance` and `short` selects suitable workloads for a local
 # before/after comparisons with benchstat.
 
+# PublishResourceSlices measures how quickly the scheduler consumes ResourceSlices as they
+# get created by a DRA driver. The other tests don't include this part and instead start
+# the measurement only after the scheduler is up-to-date.
+#
+# Any cost associated with handling ResourceSlices gets amortized over multiple pod scheduling
+# cycles: the more pods get scheduled without changes to ResourceSlices, the less it matters
+# how long this takes.
+- name: PublishResourceSlices
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAPrioritizedList: false
+    DRAAdminAccess: false
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: startCollectingMetrics
+    namespaces: ["default"]
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      maxClaimsPerNode: 10
+  - name: 5000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 5000
+      nodesWithoutDRA: 0
+      maxClaimsPerNode: 10
+
 # SchedulingWithResourceClaimTemplate uses a ResourceClaimTemplate
 # and dynamically creates ResourceClaim instances for each pod. Node, pod and
 # device counts are chosen so that the cluster gets filled up completely.
@@ -153,30 +192,6 @@
     podTemplatePath: templates/pod-with-claim-template.yaml
     collectMetrics: true
   workloads:
-  - name: fast
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      # This testcase runs through all code paths without
-      # taking too long overall.
-      nodesWithDRA: 1
-      nodesWithoutDRA: 1
-      initClaims: 0
-      maxClaimsPerNode: 10
-      duration: 2s
-  - name: fast_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [integration-test, short]
-    params:
-      # This testcase runs through all code paths without
-      # taking too long overall.
-      nodesWithDRA: 1
-      nodesWithoutDRA: 1
-      initClaims: 0
-      maxClaimsPerNode: 10
-      duration: 2s
   - name: empty_100nodes
     params:
       nodesWithDRA: 100

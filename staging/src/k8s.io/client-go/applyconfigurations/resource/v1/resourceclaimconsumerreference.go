@@ -24,11 +24,21 @@ import (
 
 // ResourceClaimConsumerReferenceApplyConfiguration represents a declarative configuration of the ResourceClaimConsumerReference type for use
 // with apply.
+//
+// ResourceClaimConsumerReference contains enough information to let you
+// locate the consumer of a ResourceClaim. The user must be a resource in the same
+// namespace as the ResourceClaim.
 type ResourceClaimConsumerReferenceApplyConfiguration struct {
-	APIGroup *string    `json:"apiGroup,omitempty"`
-	Resource *string    `json:"resource,omitempty"`
-	Name     *string    `json:"name,omitempty"`
-	UID      *types.UID `json:"uid,omitempty"`
+	// APIGroup is the group for the resource being referenced. It is
+	// empty for the core API. This matches the group in the APIVersion
+	// that is used when creating the resources.
+	APIGroup *string `json:"apiGroup,omitempty"`
+	// Resource is the type of resource being referenced, for example "pods".
+	Resource *string `json:"resource,omitempty"`
+	// Name is the name of resource being referenced.
+	Name *string `json:"name,omitempty"`
+	// UID identifies exactly one incarnation of the resource.
+	UID *types.UID `json:"uid,omitempty"`
 }
 
 // ResourceClaimConsumerReferenceApplyConfiguration constructs a declarative configuration of the ResourceClaimConsumerReference type for use with
