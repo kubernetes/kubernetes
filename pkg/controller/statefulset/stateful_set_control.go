@@ -785,20 +785,21 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	// complete any in progress rolling update if necessary
 	completeRollingUpdate(set, status)
 
-	// Update metrics - this ensures metrics are always updated regardless of update strategy
-	podManagementPolicy := string(set.Spec.PodManagementPolicy)
-	replicaCount := int(*set.Spec.Replicas)
+	if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
+		// Update metrics - this ensures metrics are always updated regardless of update strategy
+		podManagementPolicy := string(set.Spec.PodManagementPolicy)
+		replicaCount := int(*set.Spec.Replicas)
 
-	var err error
-	maxUnavailable := 1
-	if set.Spec.UpdateStrategy.RollingUpdate != nil {
-		maxUnavailable, err = getStatefulSetMaxUnavailable(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, replicaCount)
-		if err != nil {
-			return err
+		var err error
+		maxUnavailable := 1
+		if set.Spec.UpdateStrategy.RollingUpdate != nil {
+			maxUnavailable, err = getStatefulSetMaxUnavailable(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, replicaCount)
+			if err != nil {
+				return err
+			}
 		}
+		metrics.MaxUnavailable.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(maxUnavailable))
 	}
-	metrics.MaxUnavailable.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(maxUnavailable))
-
 	// if the status is not inconsistent do not perform an update
 	if !inconsistentStatus(set, status) {
 		return nil

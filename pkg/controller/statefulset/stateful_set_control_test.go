@@ -989,9 +989,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatalf("Expected create pods 4/5, got pods %v", len(pods))
 		}
 
-		// if pod 4 ready, start to update pod 3, even though 5 is not ready
+		// if pod 4 ready, start to update pod 3.
 		spc.setPodRunning(set, 4)
-		spc.setPodRunning(set, 5)
 		originalPods, _ := spc.setPodReadyCondition(set, 4, true)
 		sort.Sort(ascendingOrdinal(originalPods))
 		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
@@ -1034,7 +1033,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatalf("Expected create pods 5, got pods %v", len(pods))
 		}
 		spc.setPodRunning(set, 4)
-		_, _ = spc.setPodReadyCondition(set, 4, true)
+		spc.setPodReadyCondition(set, 4, true)
 
 		// create new pod 4 (only one pod gets created at a time due to OrderedReady)
 		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
@@ -1045,7 +1044,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// In OrderedReady mode, only 5 pods exist at this point (pod 5 not created yet)
+		// In OrderedReady mode, only 4 pods exist at this point (pod 5 not created yet)
 		if len(pods) != totalPods-1 {
 			t.Fatalf("Expected create pods %d, got pods %v", totalPods-1, len(pods))
 		}
@@ -1135,6 +1134,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		// pods 3/4/5 ready, should not update other pods
 		spc.setPodRunning(set, 3)
 		spc.setPodRunning(set, 5)
+		spc.setPodReadyCondition(set, 5, true)
 		originalPods, _ = spc.setPodReadyCondition(set, 3, true)
 		sort.Sort(ascendingOrdinal(originalPods))
 		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
