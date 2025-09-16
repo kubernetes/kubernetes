@@ -59,15 +59,13 @@ const (
 	// defaultBurst is the default burst to be used with the discovery client's token bucket rate limiter
 	defaultBurst = 300
 
-	AcceptV1         = runtime.ContentTypeJSON
-	AcceptV1Unmerged = runtime.ContentTypeJSON + ";profile=unmerged"
+	AcceptV1 = runtime.ContentTypeJSON
 	// Aggregated discovery content-type (v2beta1). NOTE: content-type parameters
 	// MUST be ordered (g, v, as) for server in "Accept" header (BUT we are resilient
 	// to ordering when comparing returned values in "Content-Type" header).
-	AcceptV2Beta1         = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
-	AcceptV2Beta1Unmerged = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList;profile=unmerged"
-	AcceptV2              = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
-	AcceptV2Unmerged      = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=unmerged"
+	AcceptV2Beta1    = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
+	AcceptV2         = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
+	AcceptV2Unmerged = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=unmerged"
 	// Prioritize aggregated discovery by placing first in the order of discovery accept types.
 	acceptDiscoveryFormats = AcceptV2 + "," + AcceptV2Beta1 + "," + AcceptV1
 )
@@ -354,9 +352,9 @@ func selectDiscoveryAcceptHeader(useLegacy, forceUnmerged bool) string {
 		return AcceptV1
 	}
 	if forceUnmerged {
-		return AcceptV2Unmerged + "," + AcceptV2Beta1Unmerged + "," + AcceptV1Unmerged
+		return AcceptV2Unmerged + acceptDiscoveryFormats
 	}
-	return AcceptV2 + "," + AcceptV2Beta1 + "," + AcceptV1
+	return acceptDiscoveryFormats
 }
 
 // ContentTypeIsGVK checks of the content-type string is both

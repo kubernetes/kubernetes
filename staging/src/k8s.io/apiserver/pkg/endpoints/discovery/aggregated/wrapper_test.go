@@ -63,7 +63,8 @@ func (f fakeHTTPHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) 
 func TestAggregationEnabled(t *testing.T) {
 	unaggregated := fakeHTTPHandler{data: "unaggregated"}
 	aggregated := fakeHTTPHandler{data: "aggregated"}
-	wrapped := WrapAggregatedDiscoveryToHandler(unaggregated, aggregated)
+	merged := fakeHTTPHandler{data: "merged"}
+	wrapped := WrapAggregatedDiscoveryToHandler(unaggregated, aggregated, merged)
 
 	testCases := []struct {
 		accept   string
