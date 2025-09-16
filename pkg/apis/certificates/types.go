@@ -375,6 +375,18 @@ type PodCertificateRequestSpec struct {
 	// [ED25519 Specification](https://ed25519.cr.yp.to/) (as implemented by the
 	// golang library crypto/ed25519.Sign).
 	ProofOfPossession []byte
+
+	// unverifiedUserAnnotations allow pod authors to pass additional information to
+	// the signer implementation. Kubernetes does not restrict or validate this
+	// metadata in any way.
+	//
+	// Entries are subject to the same validation as object metadata annotations,
+	// with the addition that all keys must be domain-prefixed. No restrictions
+	// are placed on values, except an overall size limitation on the entire field.
+	//
+	// Signers should document the keys and values they support. Signers should
+	// deny requests that contain keys they do not recognize.
+	UnverifiedUserAnnotations map[string]string
 }
 
 type PodCertificateRequestStatus struct {
@@ -458,6 +470,11 @@ const (
 	// UnsupportedKeyType should be set on "Denied" conditions when the signer
 	// doesn't support the key type of publicKey.
 	PodCertificateRequestConditionUnsupportedKeyType string = "UnsupportedKeyType"
+
+	// InvalidUnverifiedUserAnnotations should be set on "Denied" conditions when the signer
+	// does not recognize one of the keys passed in userConfig, or if the signer
+	// otherwise considers the userConfig of the request to be invalid.
+	PodCertificateRequestConditionInvalidUserConfig string = "InvalidUnverifiedUserAnnotations"
 )
 
 const (

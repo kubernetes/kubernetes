@@ -7001,6 +7001,81 @@ func TestPrintClusterTrustBundle(t *testing.T) {
 	}
 }
 
+func TestPrintPodCertificateRequest(t *testing.T) {
+	tests := []struct {
+		bundle   certificates.PodCertificateRequest
+		options  printers.GenerateOptions
+		expected []metav1.TableRow
+	}{
+		{
+			bundle: certificates.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: certificates.PodCertificateRequestSpec{
+					SignerName:                "foo.com/abc",
+					PodName:                   "pod-1",
+					ServiceAccountName:        "sa-1",
+					NodeName:                  types.NodeName("node-1"),
+					UnverifiedUserAnnotations: map[string]string{"test/domain": "bar", "test/foo": "abc"},
+				},
+				Status: certificates.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type: certificates.PodCertificateRequestConditionTypeIssued,
+						},
+					}},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"bar", "pod-1", "sa-1", "node-1", "foo.com/abc", "Issued", "test/domain=bar,test/foo=abc"},
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+		},
+		{
+			bundle: certificates.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: certificates.PodCertificateRequestSpec{
+					SignerName:                "foo.com/abc",
+					PodName:                   "pod-1",
+					ServiceAccountName:        "sa-1",
+					NodeName:                  types.NodeName("node-1"),
+					UnverifiedUserAnnotations: map[string]string{"test/domain": "bar", "test/foo": "abc"},
+				},
+				Status: certificates.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type: certificates.PodCertificateRequestConditionTypeIssued,
+						},
+					}},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"bar", "pod-1", "sa-1", "node-1", "foo.com/abc", "Issued"},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printPodCertificateRequest(&test.bundle, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
 func TestPrintValidatingAdmissionPolicyBinding(t *testing.T) {
 	tests := []struct {
 		validatingAdmissionPolicyBinding admissionregistration.ValidatingAdmissionPolicyBinding
@@ -7318,6 +7393,12 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			name: "PersistentVolumeClaim",
 			printer: func() ([]metav1.TableRow, error) {
 				return printPersistentVolumeClaim(&api.PersistentVolumeClaim{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "PodCertificateRequest",
+			printer: func() ([]metav1.TableRow, error) {
+				return printPodCertificateRequest(&certificates.PodCertificateRequest{}, printers.GenerateOptions{})
 			},
 		},
 		{

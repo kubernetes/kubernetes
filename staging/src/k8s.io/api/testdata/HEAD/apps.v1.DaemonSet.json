@@ -367,7 +367,10 @@
                     "maxExpirationSeconds": 3,
                     "credentialBundlePath": "credentialBundlePathValue",
                     "keyPath": "keyPathValue",
-                    "certificateChainPath": "certificateChainPathValue"
+                    "certificateChainPath": "certificateChainPathValue",
+                    "userAnnotations": {
+                      "userAnnotationsKey": "userAnnotationsValue"
+                    }
                   }
                 }
               ],
