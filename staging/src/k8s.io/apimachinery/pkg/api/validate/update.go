@@ -24,152 +24,130 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// NoSetValue verifies that a field cannot be set (transition from unset to set) for comparable types.
-func NoSetValue[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
+// UpdateConstraint represents a constraint on update operations
+type UpdateConstraint int
+
+const (
+	// NoSet prevents unset->set transitions
+	NoSet UpdateConstraint = iota
+	// NoUnset prevents set->unset transitions
+	NoUnset
+	// NoModify prevents value changes but allows set/unset transitions
+	NoModify
+)
+
+// UpdateValueByCompare verifies update constraints for comparable value types.
+func UpdateValueByCompare[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T, constraints ...UpdateConstraint) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
 	}
 
+	var errs field.ErrorList
 	var zero T
-	if *oldValue == zero && *value != zero {
-		return field.ErrorList{
-			field.Forbidden(fldPath, "field cannot be set once created"),
+
+	for _, constraint := range constraints {
+		switch constraint {
+		case NoSet:
+			if *oldValue == zero && *value != zero {
+				errs = append(errs, field.Forbidden(fldPath, "field cannot be set once created"))
+			}
+		case NoUnset:
+			if *oldValue != zero && *value == zero {
+				errs = append(errs, field.Forbidden(fldPath, "field cannot be cleared once set"))
+			}
+		case NoModify:
+			// Allow transitions between set/unset
+			if *oldValue != zero && *value != zero && *value != *oldValue {
+				errs = append(errs, field.Forbidden(fldPath, "field cannot be modified once set"))
+			}
 		}
 	}
 
-	return nil
+	return errs
 }
 
-// NoSetPointer verifies that a pointer field cannot be set (transition from nil to non-nil).
-func NoSetPointer[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
+// UpdatePointer verifies update constraints for pointer types.
+func UpdatePointer[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T, constraints ...UpdateConstraint) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
 	}
 
-	if oldValue == nil && value != nil {
-		return field.ErrorList{
-			field.Forbidden(fldPath, "field cannot be set once created"),
+	var errs field.ErrorList
+
+	for _, constraint := range constraints {
+		switch constraint {
+		case NoSet:
+			if oldValue == nil && value != nil {
+				errs = append(errs, field.Forbidden(fldPath, "field cannot be set once created"))
+			}
+		case NoUnset:
+			if oldValue != nil && value == nil {
+				errs = append(errs, field.Forbidden(fldPath, "field cannot be cleared once set"))
+			}
+		case NoModify:
+			// Allow transitions between set/unset
+			if oldValue != nil && value != nil && !equality.Semantic.DeepEqual(value, oldValue) {
+				errs = append(errs, field.Forbidden(fldPath, "field cannot be modified once set"))
+			}
 		}
 	}
 
-	return nil
+	return errs
 }
 
-// NoUnsetValue verifies that a field cannot be unset (transition from set to unset) for comparable types.
-func NoUnsetValue[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
+// UpdateValueByReflect verifies update constraints for non-comparable value types using reflection.
+func UpdateValueByReflect[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T, constraints ...UpdateConstraint) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
 	}
 
-	var zero T
-	if *oldValue != zero && *value == zero {
-		return field.ErrorList{
-			field.Forbidden(fldPath, "field cannot be cleared once set"),
-		}
-	}
-
-	return nil
-}
-
-// NoUnsetPointer verifies that a pointer field cannot be unset (transition from non-nil to nil).
-func NoUnsetPointer[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
-	if op.Type != operation.Update {
-		return nil
-	}
-
-	if oldValue != nil && value == nil {
-		return field.ErrorList{
-			field.Forbidden(fldPath, "field cannot be cleared once set"),
-		}
-	}
-
-	return nil
-}
-
-// NoModifyValue verifies that a field's value cannot be modified (but allows set/unset transitions) for comparable types.
-// This uses direct comparison for performance, similar to ImmutableByCompare.
-func NoModifyValue[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
-	if op.Type != operation.Update {
-		return nil
-	}
-
-	var zero T
-	// Allow transitions between set/unset
-	if *oldValue == zero || *value == zero {
-		return nil
-	}
-
-	// Both are set - use direct comparison for performance
-	if *value != *oldValue {
-		return field.ErrorList{
-			field.Forbidden(fldPath, "field cannot be modified once set"),
-		}
-	}
-
-	return nil
-}
-
-// NoModifyValueByReflect verifies that a field's value cannot be modified (but allows set/unset transitions).
-// This uses DeepEqual for types that are not directly comparable.
-func NoModifyValueByReflect[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
-	if op.Type != operation.Update {
-		return nil
-	}
-
-	// Check if values are zero using reflection
+	var errs field.ErrorList
 	var zero T
 	valueIsZero := equality.Semantic.DeepEqual(*value, zero)
 	oldValueIsZero := equality.Semantic.DeepEqual(*oldValue, zero)
 
-	// Allow transitions between set/unset
-	if oldValueIsZero || valueIsZero {
-		return nil
-	}
-
-	// Both are set - check if they're equal using DeepEqual
-	if !equality.Semantic.DeepEqual(*value, *oldValue) {
-		return field.ErrorList{
-			field.Forbidden(fldPath, "field cannot be modified once set"),
+	for _, constraint := range constraints {
+		switch constraint {
+		case NoSet:
+			if oldValueIsZero && !valueIsZero {
+				errs = append(errs, field.Forbidden(fldPath, "field cannot be set once created"))
+			}
+		case NoUnset:
+			if !oldValueIsZero && valueIsZero {
+				errs = append(errs, field.Forbidden(fldPath, "field cannot be cleared once set"))
+			}
+		case NoModify:
+			// Allow transitions between set/unset
+			if !oldValueIsZero && !valueIsZero && !equality.Semantic.DeepEqual(*value, *oldValue) {
+				errs = append(errs, field.Forbidden(fldPath, "field cannot be modified once set"))
+			}
 		}
 	}
 
-	return nil
+	return errs
 }
 
-// NoModifyPointer verifies that a pointer field's value cannot be modified (but allows set/unset transitions).
-func NoModifyPointer[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
-	if op.Type != operation.Update {
-		return nil
-	}
-
-	// Allow transitions between set/unset
-	if oldValue == nil || value == nil {
-		return nil
-	}
-
-	// Both are set - check if they're equal using DeepEqual for the pointed values
-	if !equality.Semantic.DeepEqual(value, oldValue) {
-		return field.ErrorList{
-			field.Forbidden(fldPath, "field cannot be modified once set"),
-		}
-	}
-
-	return nil
-}
-
-// NoModifyStruct verifies that a non-pointer struct field cannot be modified.
+// UpdateStruct verifies update constraints for non-pointer struct types.
 // Non-pointer structs are always considered "set" and never "unset".
-func NoModifyStruct[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
+func UpdateStruct[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T, constraints ...UpdateConstraint) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
 	}
 
-	// For structs, we always check equality since they can't be unset
-	if !equality.Semantic.DeepEqual(value, oldValue) {
-		return field.ErrorList{
-			field.Forbidden(fldPath, "field cannot be modified once set"),
+	var errs field.ErrorList
+
+	for _, constraint := range constraints {
+		switch constraint {
+		case NoSet, NoUnset:
+			// These constraints don't apply to non-pointer structs
+			// as they can't be unset. This should be caught at generation time.
+			continue
+		case NoModify:
+			if !equality.Semantic.DeepEqual(value, oldValue) {
+				errs = append(errs, field.Forbidden(fldPath, "field cannot be modified once set"))
+			}
 		}
 	}
 
-	return nil
+	return errs
 }

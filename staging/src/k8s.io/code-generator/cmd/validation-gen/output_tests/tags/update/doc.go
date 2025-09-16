@@ -27,80 +27,85 @@ var localSchemeBuilder = testscheme.New()
 type UpdateTestStruct struct {
 	TypeMeta int
 
-	// +k8s:update=`NoSet`
+	// +k8s:update=NoSet
 	StringNoSet string `json:"stringNoSet"`
 
-	// +k8s:update=`NoUnset`
+	// +k8s:update=NoUnset
 	StringNoUnset string `json:"stringNoUnset"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	StringNoModify string `json:"stringNoModify"`
 
-	// +k8s:update=`NoSet,NoUnset,NoModify`
+	// +k8s:update=NoSet
+	// +k8s:update=NoModify
+	// +k8s:update=NoUnset
 	StringFullyRestricted string `json:"stringFullyRestricted"`
 
-	// +k8s:update=`NoModify,NoUnset`
+	// +k8s:update=NoModify
+	// +k8s:update=NoUnset
 	StringSetOnce string `json:"stringSetOnce"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	IntNoModify int `json:"intNoModify"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	Int32NoModify int32 `json:"int32NoModify"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	Int64NoModify int64 `json:"int64NoModify"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	UintNoModify uint `json:"uintNoModify"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	BoolNoModify bool `json:"boolNoModify"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	Float32NoModify float32 `json:"float32NoModify"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	Float64NoModify float64 `json:"float64NoModify"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	ByteNoModify byte `json:"byteNoModify"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	StructNoModify TestStruct `json:"structNoModify"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	NonComparableStructNoModify NonComparableStruct `json:"nonComparableStructNoModify"`
 
 	// Pointer field tests
 
-	// +k8s:update=`NoSet`
+	// +k8s:update=NoSet
 	PointerNoSet *string `json:"pointerNoSet"`
 
-	// +k8s:update=`NoUnset`
+	// +k8s:update=NoUnset
 	PointerNoUnset *string `json:"pointerNoUnset"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	PointerNoModify *string `json:"pointerNoModify"`
 
-	// +k8s:update=`NoSet,NoUnset,NoModify`
+	// +k8s:update=NoSet
+	// +k8s:update=NoModify
+	// +k8s:update=NoUnset
 	PointerFullyRestricted *string `json:"pointerFullyRestricted"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	IntPointerNoModify *int `json:"intPointerNoModify"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	BoolPointerNoModify *bool `json:"boolPointerNoModify"`
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	StructPointerNoModify *TestStruct `json:"structPointerNoModify"`
 
 	// Type alias tests
 
-	// +k8s:update=`NoModify`
+	// +k8s:update=NoModify
 	CustomTypeNoModify CustomString `json:"customTypeNoModify"`
 
-	// +k8s:update=`NoSet`
+	// +k8s:update=NoSet
 	CustomTypeNoSet CustomInt `json:"customTypeNoSet"`
 }
 

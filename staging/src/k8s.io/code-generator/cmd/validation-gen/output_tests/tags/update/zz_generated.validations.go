@@ -63,7 +63,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoSetValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -82,7 +82,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoUnsetValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -101,7 +101,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -120,15 +120,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoSetValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if e := validate.NoUnsetValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoUnset, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -147,11 +139,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if e := validate.NoUnsetValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -170,7 +158,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -189,7 +177,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -208,7 +196,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -227,7 +215,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -246,7 +234,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -265,7 +253,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -284,7 +272,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -303,7 +291,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -322,7 +310,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyStruct(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -341,7 +329,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyStruct(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -360,7 +348,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoSetPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoSet); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -379,7 +367,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoUnsetPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -398,7 +386,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -417,15 +405,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoSetPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if e := validate.NoUnsetPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if e := validate.NoModifyPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoUnset, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -444,7 +424,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -463,7 +443,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -482,7 +462,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -501,7 +481,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoModifyValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -520,7 +500,7 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.NoSetValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}

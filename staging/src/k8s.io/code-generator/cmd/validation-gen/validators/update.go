@@ -18,8 +18,9 @@ package validators
 
 import (
 	"fmt"
-	"strings"
+	"sort"
 
+	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
@@ -30,26 +31,15 @@ const (
 	updateTagName = "k8s:update"
 )
 
-type updateConstraint string
-
-const (
-	// constraintNoSet prevents unset->set transitions
-	constraintNoSet updateConstraint = "NoSet"
-	// constraintNoUnset prevents set->unset transitions
-	constraintNoUnset updateConstraint = "NoUnset"
-	// constraintNoModify prevents value changes but allows set/unset transitions
-	constraintNoModify updateConstraint = "NoModify"
-)
-
 func init() {
-	shared := map[string][]updateConstraint{}
+	shared := map[string]sets.Set[validate.UpdateConstraint]{}
 	RegisterFieldValidator(updateFieldValidator{byFieldPath: shared})
 	RegisterTagValidator(updateTagCollector{byFieldPath: shared})
 }
 
 // updateTagCollector collects +k8s:update tags
 type updateTagCollector struct {
-	byFieldPath map[string][]updateConstraint
+	byFieldPath map[string]sets.Set[validate.UpdateConstraint]
 }
 
 func (updateTagCollector) Init(_ Config) {}
@@ -65,46 +55,37 @@ func (updateTagCollector) ValidScopes() sets.Set[Scope] {
 }
 
 func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	tagValue := strings.TrimSpace(tag.Value)
-	tagValue = strings.Trim(tagValue, "`\"")
-
-	if tagValue == "" {
-		return Validations{}, nil
+	// Parse constraint from this tag
+	var constraint validate.UpdateConstraint
+	switch tag.Value {
+	case "NoSet":
+		constraint = validate.NoSet
+	case "NoUnset":
+		constraint = validate.NoUnset
+	case "NoModify":
+		constraint = validate.NoModify
+	default:
+		return Validations{}, fmt.Errorf("unknown +k8s:update constraint: %s", tag.Value)
 	}
 
-	var constraints []updateConstraint
-
-	// Parse constraints from payload
-	for _, value := range strings.Split(tagValue, ",") {
-		constraintStr := strings.TrimSpace(value)
-		var constraint updateConstraint
-		switch constraintStr {
-		case string(constraintNoSet):
-			constraint = constraintNoSet
-		case string(constraintNoUnset):
-			constraint = constraintNoUnset
-		case string(constraintNoModify):
-			constraint = constraintNoModify
-		default:
-			return Validations{}, fmt.Errorf("unknown +k8s:update constraint: %s", constraintStr)
-		}
-
-		constraints = append(constraints, constraint)
+	// Initialize set if doesn't exist
+	fieldPath := context.Path.String()
+	if utc.byFieldPath[fieldPath] == nil {
+		utc.byFieldPath[fieldPath] = sets.New[validate.UpdateConstraint]()
 	}
 
-	// Validate constraints are appropriate for the field type
-	if err := utc.validateConstraintsForType(context, constraints); err != nil {
+	// Add this constraint to the set for this field
+	utc.byFieldPath[fieldPath].Insert(constraint)
+
+	if err := utc.validateConstraintsForType(context, utc.byFieldPath[fieldPath].UnsortedList()); err != nil {
 		return Validations{}, err
 	}
-
-	// Store the constraints for this field
-	utc.byFieldPath[context.Path.String()] = constraints
 
 	// Don't generate validations here, just collect
 	return Validations{}, nil
 }
 
-func (utc updateTagCollector) validateConstraintsForType(context Context, constraints []updateConstraint) error {
+func (utc updateTagCollector) validateConstraintsForType(context Context, constraints []validate.UpdateConstraint) error {
 	t := util.NonPointer(util.NativeType(context.Type))
 	isCompound := t.Kind == types.Slice || t.Kind == types.Map
 	isPointer := context.Type.Kind == types.Pointer
@@ -112,15 +93,15 @@ func (utc updateTagCollector) validateConstraintsForType(context Context, constr
 
 	if isCompound {
 		for _, constraint := range constraints {
-			return fmt.Errorf("+k8s:update=%s is currently not supported on list or map fields", constraint)
+			return fmt.Errorf("+k8s:update=%s is currently not supported on list or map fields", constraintName(constraint))
 		}
 	}
 
 	// For non-pointer struct fields, only NoModify is applicable
 	if isStruct && !isPointer {
 		for _, constraint := range constraints {
-			if constraint == constraintNoSet || constraint == constraintNoUnset {
-				return fmt.Errorf("+k8s:update=%s cannot be used on non-pointer struct fields (they cannot be unset)", constraint)
+			if constraint == validate.NoSet || constraint == validate.NoUnset {
+				return fmt.Errorf("+k8s:update=%s cannot be used on non-pointer struct fields (they cannot be unset)", constraintName(constraint))
 			}
 		}
 	}
@@ -128,23 +109,39 @@ func (utc updateTagCollector) validateConstraintsForType(context Context, constr
 	return nil
 }
 
+func constraintName(c validate.UpdateConstraint) string {
+	switch c {
+	case validate.NoSet:
+		return "NoSet"
+	case validate.NoUnset:
+		return "NoUnset"
+	case validate.NoModify:
+		return "NoModify"
+	default:
+		return fmt.Sprintf("Unknown(%d)", c)
+	}
+}
+
 func (utc updateTagCollector) Docs() TagDoc {
 	return TagDoc{
 		Tag:          utc.TagName(),
 		Scopes:       utc.ValidScopes().UnsortedList(),
 		PayloadsType: codetags.ValueTypeString,
-		Description: "Provides fine-grained control over field update operations. " +
-			"Only for non-list/map fields: NoSet (prevents unset->set), NoUnset (prevents set->unset), " +
+		Description: "Provides constraints on the allowed update operations of a field. " +
+			"Currently supports non-list and non-map fields only. " +
+			"Constraints: NoSet (prevents unset->set transitions), NoUnset (prevents set->unset transitions), " +
 			"NoModify (prevents value changes but allows set/unset transitions). " +
-			"Multiple values can be specified separated by commas. " +
-			"Examples: +k8s:update=`NoModify,NoUnset` for set-once fields; " +
-			"+k8s:update=`NoSet` for fields that must be set at creation or never.",
+			"Multiple constraints can be specified using multiple tags. " +
+			"For non-pointer structs, NoSet and NoUnset have no effect as these fields cannot be unset. " +
+			"Future support planned for lists/maps with NoAddItem and NoRemoveItem constraints. " +
+			"Examples: +k8s:update=NoModify +k8s:update=NoUnset for set-once fields; " +
+			"+k8s:update=NoSet for fields that must be set at creation or never.",
 	}
 }
 
 // updateFieldValidator processes all collected update tags and generates validations
 type updateFieldValidator struct {
-	byFieldPath map[string][]updateConstraint
+	byFieldPath map[string]sets.Set[validate.UpdateConstraint]
 }
 
 func (updateFieldValidator) Init(_ Config) {}
@@ -154,21 +151,24 @@ func (updateFieldValidator) Name() string {
 }
 
 var (
-	noSetValueValidator             = types.Name{Package: libValidationPkg, Name: "NoSetValue"}
-	noSetPointerValidator           = types.Name{Package: libValidationPkg, Name: "NoSetPointer"}
-	noUnsetValueValidator           = types.Name{Package: libValidationPkg, Name: "NoUnsetValue"}
-	noUnsetPointerValidator         = types.Name{Package: libValidationPkg, Name: "NoUnsetPointer"}
-	noModifyValueValidator          = types.Name{Package: libValidationPkg, Name: "NoModifyValue"}
-	noModifyValueByReflectValidator = types.Name{Package: libValidationPkg, Name: "NoModifyValueByReflect"}
-	noModifyPointerValidator        = types.Name{Package: libValidationPkg, Name: "NoModifyPointer"}
-	noModifyStructValidator         = types.Name{Package: libValidationPkg, Name: "NoModifyStruct"}
+	updateValueValidator          = types.Name{Package: libValidationPkg, Name: "UpdateValueByCompare"}
+	updatePointerValidator        = types.Name{Package: libValidationPkg, Name: "UpdatePointer"}
+	updateValueByReflectValidator = types.Name{Package: libValidationPkg, Name: "UpdateValueByReflect"}
+	updateStructValidator         = types.Name{Package: libValidationPkg, Name: "UpdateStruct"}
+
+	// Constraint constants that will be used as arguments
+	noSetConstraint    = types.Name{Package: libValidationPkg, Name: "NoSet"}
+	noUnsetConstraint  = types.Name{Package: libValidationPkg, Name: "NoUnset"}
+	noModifyConstraint = types.Name{Package: libValidationPkg, Name: "NoModify"}
 )
 
 func (ufv updateFieldValidator) GetValidations(context Context) (Validations, error) {
-	constraints, ok := ufv.byFieldPath[context.Path.String()]
-	if !ok || len(constraints) == 0 {
+	constraintSet, ok := ufv.byFieldPath[context.Path.String()]
+	if !ok || constraintSet.Len() == 0 {
 		return Validations{}, nil
 	}
+
+	constraints := constraintSet.UnsortedList()
 
 	t := util.NonPointer(util.NativeType(context.Type))
 	if t.Kind == types.Slice || t.Kind == types.Map {
@@ -176,53 +176,50 @@ func (ufv updateFieldValidator) GetValidations(context Context) (Validations, er
 		return Validations{}, fmt.Errorf("update constraints are currently not supported on list or map fields")
 	}
 
-	return ufv.generateValidations(context, constraints)
+	return ufv.generateValidation(context, constraints)
 }
 
-func (ufv updateFieldValidator) generateValidations(context Context, constraints []updateConstraint) (Validations, error) {
+func (ufv updateFieldValidator) generateValidation(context Context, constraints []validate.UpdateConstraint) (Validations, error) {
 	var result Validations
 
-	// Determine the appropriate validator functions based on field type
+	// Determine the appropriate validator function based on field type
 	t := util.NonPointer(util.NativeType(context.Type))
 	isPointer := context.Type.Kind == types.Pointer
 	isStruct := t.Kind == types.Struct
 	isComparable := util.IsDirectComparable(t)
-	var noSetValidator, noUnsetValidator, noModifyValidator types.Name
 
+	var validatorFunc types.Name
 	if isPointer {
-		noSetValidator = noSetPointerValidator
-		noUnsetValidator = noUnsetPointerValidator
-		noModifyValidator = noModifyPointerValidator
+		validatorFunc = updatePointerValidator
 	} else if isStruct {
-		// Struct types can only use NoModify
-		noModifyValidator = noModifyStructValidator
+		validatorFunc = updateStructValidator
+	} else if isComparable {
+		validatorFunc = updateValueValidator
 	} else {
-		noSetValidator = noSetValueValidator
-		noUnsetValidator = noUnsetValueValidator
-		if isComparable {
-			noModifyValidator = noModifyValueValidator
-		} else {
-			noModifyValidator = noModifyValueByReflectValidator
+		validatorFunc = updateValueByReflectValidator
+	}
+
+	// Sort constraints to ensure deterministic order
+	sort.Slice(constraints, func(i, j int) bool {
+		return constraints[i] < constraints[j]
+	})
+
+	// Build the constraint arguments in deterministic order
+	var constraintArgs []any
+	for _, constraint := range constraints {
+		switch constraint {
+		case validate.NoSet:
+			constraintArgs = append(constraintArgs, Identifier(noSetConstraint))
+		case validate.NoUnset:
+			constraintArgs = append(constraintArgs, Identifier(noUnsetConstraint))
+		case validate.NoModify:
+			constraintArgs = append(constraintArgs, Identifier(noModifyConstraint))
 		}
 	}
 
 	// Use ShortCircuit flag so these run in the same group as +k8s:optional
-	for _, constraint := range constraints {
-		switch constraint {
-		case constraintNoSet:
-			if noSetValidator.Name != "" {
-				result.AddFunction(Function("update:NoSet", ShortCircuit, noSetValidator))
-			}
-		case constraintNoUnset:
-			if noUnsetValidator.Name != "" {
-				result.AddFunction(Function("update:NoUnset", ShortCircuit, noUnsetValidator))
-			}
-		case constraintNoModify:
-			if noModifyValidator.Name != "" {
-				result.AddFunction(Function("update:NoModify", ShortCircuit, noModifyValidator))
-			}
-		}
-	}
+	fn := Function(updateTagName, ShortCircuit, validatorFunc, constraintArgs...)
+	result.AddFunction(fn)
 
 	return result, nil
 }

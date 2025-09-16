@@ -24,553 +24,421 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-func TestNoSetValue(t *testing.T) {
+func TestUpdateValue(t *testing.T) {
 	tests := []struct {
-		name     string
-		op       operation.Type
-		value    string
-		oldValue string
-		wantErr  bool
+		name        string
+		op          operation.Type
+		value       string
+		oldValue    string
+		constraints []UpdateConstraint
+		wantErrs    int
+		wantMsgs    []string
 	}{
 		{
-			name:     "create operation - no validation",
-			op:       operation.Create,
-			value:    "value",
-			oldValue: "",
-			wantErr:  false,
+			name:        "create operation - no validation",
+			op:          operation.Create,
+			value:       "value",
+			oldValue:    "",
+			constraints: []UpdateConstraint{NoSet, NoUnset, NoModify},
+			wantErrs:    0,
 		},
 		{
-			name:     "update - unset to set transition (forbidden)",
-			op:       operation.Update,
-			value:    "value",
-			oldValue: "",
-			wantErr:  true,
+			name:        "NoSet - unset to set transition (forbidden)",
+			op:          operation.Update,
+			value:       "value",
+			oldValue:    "",
+			constraints: []UpdateConstraint{NoSet},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be set once created"},
 		},
 		{
-			name:     "update - set to set transition (allowed)",
-			op:       operation.Update,
-			value:    "value2",
-			oldValue: "value1",
-			wantErr:  false,
+			name:        "NoSet - set to set transition (allowed)",
+			op:          operation.Update,
+			value:       "value2",
+			oldValue:    "value1",
+			constraints: []UpdateConstraint{NoSet},
+			wantErrs:    0,
 		},
 		{
-			name:     "update - unset to unset (allowed)",
-			op:       operation.Update,
-			value:    "",
-			oldValue: "",
-			wantErr:  false,
+			name:        "NoUnset - set to unset transition (forbidden)",
+			op:          operation.Update,
+			value:       "",
+			oldValue:    "value",
+			constraints: []UpdateConstraint{NoUnset},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be cleared once set"},
 		},
 		{
-			name:     "update - set to unset transition (allowed)",
-			op:       operation.Update,
-			value:    "",
-			oldValue: "value",
-			wantErr:  false,
+			name:        "NoUnset - unset to set transition (allowed)",
+			op:          operation.Update,
+			value:       "value",
+			oldValue:    "",
+			constraints: []UpdateConstraint{NoUnset},
+			wantErrs:    0,
+		},
+		{
+			name:        "NoModify - set to different value (forbidden)",
+			op:          operation.Update,
+			value:       "value2",
+			oldValue:    "value1",
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
+		},
+		{
+			name:        "NoModify - unset to set transition (allowed)",
+			op:          operation.Update,
+			value:       "value",
+			oldValue:    "",
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
+		},
+		{
+			name:        "NoModify - set to unset transition (allowed)",
+			op:          operation.Update,
+			value:       "",
+			oldValue:    "value",
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
+		},
+		{
+			name:        "Multiple constraints - NoSet and NoUnset",
+			op:          operation.Update,
+			value:       "value",
+			oldValue:    "",
+			constraints: []UpdateConstraint{NoSet, NoUnset},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be set once created"},
+		},
+		{
+			name:        "Multiple constraints - NoUnset and NoModify",
+			op:          operation.Update,
+			value:       "",
+			oldValue:    "value",
+			constraints: []UpdateConstraint{NoUnset, NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be cleared once set"},
+		},
+		{
+			name:        "Multiple constraints - NoSet, NoUnset, NoModify - modify attempt",
+			op:          operation.Update,
+			value:       "value2",
+			oldValue:    "value1",
+			constraints: []UpdateConstraint{NoSet, NoUnset, NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
+		},
+		{
+			name:        "No constraints",
+			op:          operation.Update,
+			value:       "value2",
+			oldValue:    "value1",
+			constraints: []UpdateConstraint{},
+			wantErrs:    0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			op := operation.Operation{Type: tt.op}
-			errs := NoSetValue(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue)
-			if (len(errs) > 0) != tt.wantErr {
-				t.Errorf("NoSetValue() error = %v, wantErr %v", errs, tt.wantErr)
+			errs := UpdateValueByCompare(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue, tt.constraints...)
+			if len(errs) != tt.wantErrs {
+				t.Errorf("UpdateValue() returned %d errors, want %d: %v", len(errs), tt.wantErrs, errs)
 			}
-			if tt.wantErr && len(errs) > 0 {
-				if errs[0].Detail != "field cannot be set once created" {
-					t.Errorf("NoSetValue() wrong error message: %v", errs[0].Detail)
+			for i, msg := range tt.wantMsgs {
+				if i >= len(errs) {
+					t.Errorf("Expected error message %q not found", msg)
+					continue
+				}
+				if errs[i].Detail != msg {
+					t.Errorf("UpdateValue() error message = %q, want %q", errs[i].Detail, msg)
 				}
 			}
 		})
 	}
 }
 
-func TestNoSetPointer(t *testing.T) {
+func TestUpdatePointer(t *testing.T) {
 	stringPtr := func(s string) *string { return &s }
 
 	tests := []struct {
-		name     string
-		op       operation.Type
-		value    *string
-		oldValue *string
-		wantErr  bool
+		name        string
+		op          operation.Type
+		value       *string
+		oldValue    *string
+		constraints []UpdateConstraint
+		wantErrs    int
+		wantMsgs    []string
 	}{
 		{
-			name:     "create operation - no validation",
-			op:       operation.Create,
-			value:    stringPtr("value"),
-			oldValue: nil,
-			wantErr:  false,
+			name:        "create operation - no validation",
+			op:          operation.Create,
+			value:       stringPtr("value"),
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoSet, NoUnset, NoModify},
+			wantErrs:    0,
 		},
 		{
-			name:     "update - nil to non-nil transition (forbidden)",
-			op:       operation.Update,
-			value:    stringPtr("value"),
-			oldValue: nil,
-			wantErr:  true,
+			name:        "NoSet - nil to non-nil transition (forbidden)",
+			op:          operation.Update,
+			value:       stringPtr("value"),
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoSet},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be set once created"},
 		},
 		{
-			name:     "update - non-nil to non-nil transition (allowed)",
-			op:       operation.Update,
-			value:    stringPtr("value2"),
-			oldValue: stringPtr("value1"),
-			wantErr:  false,
+			name:        "NoSet - non-nil to non-nil transition (allowed)",
+			op:          operation.Update,
+			value:       stringPtr("value2"),
+			oldValue:    stringPtr("value1"),
+			constraints: []UpdateConstraint{NoSet},
+			wantErrs:    0,
 		},
 		{
-			name:     "update - nil to nil (allowed)",
-			op:       operation.Update,
-			value:    nil,
-			oldValue: nil,
-			wantErr:  false,
+			name:        "NoUnset - non-nil to nil transition (forbidden)",
+			op:          operation.Update,
+			value:       nil,
+			oldValue:    stringPtr("value"),
+			constraints: []UpdateConstraint{NoUnset},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be cleared once set"},
 		},
 		{
-			name:     "update - non-nil to nil transition (allowed)",
-			op:       operation.Update,
-			value:    nil,
-			oldValue: stringPtr("value"),
-			wantErr:  false,
+			name:        "NoUnset - nil to non-nil transition (allowed)",
+			op:          operation.Update,
+			value:       stringPtr("value"),
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoUnset},
+			wantErrs:    0,
+		},
+		{
+			name:        "NoModify - different values (forbidden)",
+			op:          operation.Update,
+			value:       stringPtr("value2"),
+			oldValue:    stringPtr("value1"),
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
+		},
+		{
+			name:        "NoModify - nil to non-nil transition (allowed)",
+			op:          operation.Update,
+			value:       stringPtr("value"),
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
+		},
+		{
+			name:        "NoModify - non-nil to nil transition (allowed)",
+			op:          operation.Update,
+			value:       nil,
+			oldValue:    stringPtr("value"),
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
+		},
+		{
+			name:        "Multiple constraints - all three",
+			op:          operation.Update,
+			value:       stringPtr("value2"),
+			oldValue:    stringPtr("value1"),
+			constraints: []UpdateConstraint{NoSet, NoUnset, NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			op := operation.Operation{Type: tt.op}
-			errs := NoSetPointer(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue)
-			if (len(errs) > 0) != tt.wantErr {
-				t.Errorf("NoSetPointer() error = %v, wantErr %v", errs, tt.wantErr)
+			errs := UpdatePointer(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue, tt.constraints...)
+			if len(errs) != tt.wantErrs {
+				t.Errorf("UpdatePointer() returned %d errors, want %d: %v", len(errs), tt.wantErrs, errs)
 			}
-			if tt.wantErr && len(errs) > 0 {
-				if errs[0].Detail != "field cannot be set once created" {
-					t.Errorf("NoSetPointer() wrong error message: %v", errs[0].Detail)
+			for i, msg := range tt.wantMsgs {
+				if i >= len(errs) {
+					t.Errorf("Expected error message %q not found", msg)
+					continue
+				}
+				if errs[i].Detail != msg {
+					t.Errorf("UpdatePointer() error message = %q, want %q", errs[i].Detail, msg)
 				}
 			}
 		})
 	}
 }
 
-func TestNoUnsetValue(t *testing.T) {
-	tests := []struct {
-		name     string
-		op       operation.Type
-		value    string
-		oldValue string
-		wantErr  bool
-	}{
-		{
-			name:     "create operation - no validation",
-			op:       operation.Create,
-			value:    "",
-			oldValue: "value",
-			wantErr:  false,
-		},
-		{
-			name:     "update - set to unset transition (forbidden)",
-			op:       operation.Update,
-			value:    "",
-			oldValue: "value",
-			wantErr:  true,
-		},
-		{
-			name:     "update - unset to set transition (allowed)",
-			op:       operation.Update,
-			value:    "value",
-			oldValue: "",
-			wantErr:  false,
-		},
-		{
-			name:     "update - set to set transition (allowed)",
-			op:       operation.Update,
-			value:    "value2",
-			oldValue: "value1",
-			wantErr:  false,
-		},
-		{
-			name:     "update - unset to unset (allowed)",
-			op:       operation.Update,
-			value:    "",
-			oldValue: "",
-			wantErr:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			op := operation.Operation{Type: tt.op}
-			errs := NoUnsetValue(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue)
-			if (len(errs) > 0) != tt.wantErr {
-				t.Errorf("NoUnsetValue() error = %v, wantErr %v", errs, tt.wantErr)
-			}
-			if tt.wantErr && len(errs) > 0 {
-				if errs[0].Detail != "field cannot be cleared once set" {
-					t.Errorf("NoUnsetValue() wrong error message: %v", errs[0].Detail)
-				}
-			}
-		})
-	}
-}
-
-func TestNoUnsetPointer(t *testing.T) {
-	stringPtr := func(s string) *string { return &s }
-
-	tests := []struct {
-		name     string
-		op       operation.Type
-		value    *string
-		oldValue *string
-		wantErr  bool
-	}{
-		{
-			name:     "create operation - no validation",
-			op:       operation.Create,
-			value:    nil,
-			oldValue: stringPtr("value"),
-			wantErr:  false,
-		},
-		{
-			name:     "update - non-nil to nil transition (forbidden)",
-			op:       operation.Update,
-			value:    nil,
-			oldValue: stringPtr("value"),
-			wantErr:  true,
-		},
-		{
-			name:     "update - nil to non-nil transition (allowed)",
-			op:       operation.Update,
-			value:    stringPtr("value"),
-			oldValue: nil,
-			wantErr:  false,
-		},
-		{
-			name:     "update - non-nil to non-nil transition (allowed)",
-			op:       operation.Update,
-			value:    stringPtr("value2"),
-			oldValue: stringPtr("value1"),
-			wantErr:  false,
-		},
-		{
-			name:     "update - nil to nil (allowed)",
-			op:       operation.Update,
-			value:    nil,
-			oldValue: nil,
-			wantErr:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			op := operation.Operation{Type: tt.op}
-			errs := NoUnsetPointer(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue)
-			if (len(errs) > 0) != tt.wantErr {
-				t.Errorf("NoUnsetPointer() error = %v, wantErr %v", errs, tt.wantErr)
-			}
-			if tt.wantErr && len(errs) > 0 {
-				if errs[0].Detail != "field cannot be cleared once set" {
-					t.Errorf("NoUnsetPointer() wrong error message: %v", errs[0].Detail)
-				}
-			}
-		})
-	}
-}
-
-func TestNoModifyValue(t *testing.T) {
-	tests := []struct {
-		name     string
-		op       operation.Type
-		value    string
-		oldValue string
-		wantErr  bool
-	}{
-		{
-			name:     "create operation - no validation",
-			op:       operation.Create,
-			value:    "value",
-			oldValue: "",
-			wantErr:  false,
-		},
-		{
-			name:     "update - unset to set transition (allowed)",
-			op:       operation.Update,
-			value:    "value",
-			oldValue: "",
-			wantErr:  false,
-		},
-		{
-			name:     "update - set to unset transition (allowed)",
-			op:       operation.Update,
-			value:    "",
-			oldValue: "value",
-			wantErr:  false,
-		},
-		{
-			name:     "update - set to different value (forbidden)",
-			op:       operation.Update,
-			value:    "value2",
-			oldValue: "value1",
-			wantErr:  true,
-		},
-		{
-			name:     "update - same value (allowed)",
-			op:       operation.Update,
-			value:    "value",
-			oldValue: "value",
-			wantErr:  false,
-		},
-		{
-			name:     "update - both unset (allowed)",
-			op:       operation.Update,
-			value:    "",
-			oldValue: "",
-			wantErr:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			op := operation.Operation{Type: tt.op}
-			errs := NoModifyValue(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue)
-			if (len(errs) > 0) != tt.wantErr {
-				t.Errorf("NoModifyValue() error = %v, wantErr %v", errs, tt.wantErr)
-			}
-			if tt.wantErr && len(errs) > 0 {
-				if errs[0].Detail != "field cannot be modified once set" {
-					t.Errorf("NoModifyValue() wrong error message: %v", errs[0].Detail)
-				}
-			}
-		})
-	}
-}
-
-func TestNoModifyValueWithInts(t *testing.T) {
-	tests := []struct {
-		name     string
-		op       operation.Type
-		value    int
-		oldValue int
-		wantErr  bool
-	}{
-		{
-			name:     "update - zero to non-zero transition (allowed)",
-			op:       operation.Update,
-			value:    42,
-			oldValue: 0,
-			wantErr:  false,
-		},
-		{
-			name:     "update - non-zero to zero transition (allowed)",
-			op:       operation.Update,
-			value:    0,
-			oldValue: 42,
-			wantErr:  false,
-		},
-		{
-			name:     "update - non-zero to different non-zero (forbidden)",
-			op:       operation.Update,
-			value:    100,
-			oldValue: 42,
-			wantErr:  true,
-		},
-		{
-			name:     "update - same non-zero value (allowed)",
-			op:       operation.Update,
-			value:    42,
-			oldValue: 42,
-			wantErr:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			op := operation.Operation{Type: tt.op}
-			errs := NoModifyValue(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue)
-			if (len(errs) > 0) != tt.wantErr {
-				t.Errorf("NoModifyValue() error = %v, wantErr %v", errs, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestNoModifyValueByReflect(t *testing.T) {
+func TestUpdateValueByReflect(t *testing.T) {
 	type CustomStruct struct {
 		Field1 string
 		Field2 int
 	}
 
 	tests := []struct {
-		name     string
-		op       operation.Type
-		value    CustomStruct
-		oldValue CustomStruct
-		wantErr  bool
+		name        string
+		op          operation.Type
+		value       CustomStruct
+		oldValue    CustomStruct
+		constraints []UpdateConstraint
+		wantErrs    int
+		wantMsgs    []string
 	}{
 		{
-			name:     "update - zero to non-zero transition (allowed)",
-			op:       operation.Update,
-			value:    CustomStruct{Field1: "test", Field2: 42},
-			oldValue: CustomStruct{},
-			wantErr:  false,
+			name:        "NoModify - zero to non-zero transition (allowed)",
+			op:          operation.Update,
+			value:       CustomStruct{Field1: "test", Field2: 42},
+			oldValue:    CustomStruct{},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
 		},
 		{
-			name:     "update - non-zero to zero transition (allowed)",
-			op:       operation.Update,
-			value:    CustomStruct{},
-			oldValue: CustomStruct{Field1: "test", Field2: 42},
-			wantErr:  false,
+			name:        "NoModify - non-zero to zero transition (allowed)",
+			op:          operation.Update,
+			value:       CustomStruct{},
+			oldValue:    CustomStruct{Field1: "test", Field2: 42},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
 		},
 		{
-			name:     "update - different values (forbidden)",
-			op:       operation.Update,
-			value:    CustomStruct{Field1: "test2", Field2: 100},
-			oldValue: CustomStruct{Field1: "test1", Field2: 42},
-			wantErr:  true,
+			name:        "NoModify - different values (forbidden)",
+			op:          operation.Update,
+			value:       CustomStruct{Field1: "test2", Field2: 100},
+			oldValue:    CustomStruct{Field1: "test1", Field2: 42},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
 		},
 		{
-			name:     "update - same values (allowed)",
-			op:       operation.Update,
-			value:    CustomStruct{Field1: "test", Field2: 42},
-			oldValue: CustomStruct{Field1: "test", Field2: 42},
-			wantErr:  false,
+			name:        "NoSet - zero to non-zero (forbidden)",
+			op:          operation.Update,
+			value:       CustomStruct{Field1: "test", Field2: 42},
+			oldValue:    CustomStruct{},
+			constraints: []UpdateConstraint{NoSet},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be set once created"},
+		},
+		{
+			name:        "NoUnset - non-zero to zero (forbidden)",
+			op:          operation.Update,
+			value:       CustomStruct{},
+			oldValue:    CustomStruct{Field1: "test", Field2: 42},
+			constraints: []UpdateConstraint{NoUnset},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be cleared once set"},
+		},
+		{
+			name:        "Multiple constraints",
+			op:          operation.Update,
+			value:       CustomStruct{Field1: "test", Field2: 42},
+			oldValue:    CustomStruct{},
+			constraints: []UpdateConstraint{NoSet, NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be set once created"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			op := operation.Operation{Type: tt.op}
-			errs := NoModifyValueByReflect(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue)
-			if (len(errs) > 0) != tt.wantErr {
-				t.Errorf("NoModifyValueByReflect() error = %v, wantErr %v", errs, tt.wantErr)
+			errs := UpdateValueByReflect(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue, tt.constraints...)
+			if len(errs) != tt.wantErrs {
+				t.Errorf("UpdateValueByReflect() returned %d errors, want %d: %v", len(errs), tt.wantErrs, errs)
 			}
-			if tt.wantErr && len(errs) > 0 {
-				if errs[0].Detail != "field cannot be modified once set" {
-					t.Errorf("NoModifyValueByReflect() wrong error message: %v", errs[0].Detail)
+			for i, msg := range tt.wantMsgs {
+				if i >= len(errs) {
+					t.Errorf("Expected error message %q not found", msg)
+					continue
+				}
+				if errs[i].Detail != msg {
+					t.Errorf("UpdateValueByReflect() error message = %q, want %q", errs[i].Detail, msg)
 				}
 			}
 		})
 	}
 }
 
-func TestNoModifyPointer(t *testing.T) {
-	stringPtr := func(s string) *string { return &s }
-
-	tests := []struct {
-		name     string
-		op       operation.Type
-		value    *string
-		oldValue *string
-		wantErr  bool
-	}{
-		{
-			name:     "update - nil to non-nil transition (allowed)",
-			op:       operation.Update,
-			value:    stringPtr("value"),
-			oldValue: nil,
-			wantErr:  false,
-		},
-		{
-			name:     "update - non-nil to nil transition (allowed)",
-			op:       operation.Update,
-			value:    nil,
-			oldValue: stringPtr("value"),
-			wantErr:  false,
-		},
-		{
-			name:     "update - different values (forbidden)",
-			op:       operation.Update,
-			value:    stringPtr("value2"),
-			oldValue: stringPtr("value1"),
-			wantErr:  true,
-		},
-		{
-			name:     "update - same values (allowed)",
-			op:       operation.Update,
-			value:    stringPtr("value"),
-			oldValue: stringPtr("value"),
-			wantErr:  false,
-		},
-		{
-			name:     "update - both nil (allowed)",
-			op:       operation.Update,
-			value:    nil,
-			oldValue: nil,
-			wantErr:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			op := operation.Operation{Type: tt.op}
-			errs := NoModifyPointer(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue)
-			if (len(errs) > 0) != tt.wantErr {
-				t.Errorf("NoModifyPointer() error = %v, wantErr %v", errs, tt.wantErr)
-			}
-			if tt.wantErr && len(errs) > 0 {
-				if errs[0].Detail != "field cannot be modified once set" {
-					t.Errorf("NoModifyPointer() wrong error message: %v", errs[0].Detail)
-				}
-			}
-		})
-	}
-}
-
-func TestNoModifyStruct(t *testing.T) {
+func TestUpdateStruct(t *testing.T) {
 	type TestStruct struct {
 		Field1 string
 		Field2 int
 	}
 
 	tests := []struct {
-		name     string
-		op       operation.Type
-		value    TestStruct
-		oldValue TestStruct
-		wantErr  bool
+		name        string
+		op          operation.Type
+		value       TestStruct
+		oldValue    TestStruct
+		constraints []UpdateConstraint
+		wantErrs    int
+		wantMsgs    []string
 	}{
 		{
-			name:     "create operation - no validation",
-			op:       operation.Create,
-			value:    TestStruct{Field1: "test", Field2: 42},
-			oldValue: TestStruct{},
-			wantErr:  false,
+			name:        "create operation - no validation",
+			op:          operation.Create,
+			value:       TestStruct{Field1: "test", Field2: 42},
+			oldValue:    TestStruct{},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
 		},
 		{
-			name:     "update - different values (forbidden)",
-			op:       operation.Update,
-			value:    TestStruct{Field1: "test2", Field2: 100},
-			oldValue: TestStruct{Field1: "test1", Field2: 42},
-			wantErr:  true,
+			name:        "NoModify - different values (forbidden)",
+			op:          operation.Update,
+			value:       TestStruct{Field1: "test2", Field2: 100},
+			oldValue:    TestStruct{Field1: "test1", Field2: 42},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
 		},
 		{
-			name:     "update - same values (allowed)",
-			op:       operation.Update,
-			value:    TestStruct{Field1: "test", Field2: 42},
-			oldValue: TestStruct{Field1: "test", Field2: 42},
-			wantErr:  false,
+			name:        "NoModify - same values (allowed)",
+			op:          operation.Update,
+			value:       TestStruct{Field1: "test", Field2: 42},
+			oldValue:    TestStruct{Field1: "test", Field2: 42},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
 		},
 		{
-			name:     "update - zero value to non-zero (forbidden)",
-			op:       operation.Update,
-			value:    TestStruct{Field1: "test", Field2: 42},
-			oldValue: TestStruct{},
-			wantErr:  true,
+			name:        "NoModify - zero value to non-zero (forbidden)",
+			op:          operation.Update,
+			value:       TestStruct{Field1: "test", Field2: 42},
+			oldValue:    TestStruct{},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
 		},
 		{
-			name:     "update - non-zero to zero value (forbidden)",
-			op:       operation.Update,
-			value:    TestStruct{},
-			oldValue: TestStruct{Field1: "test", Field2: 42},
-			wantErr:  true,
+			name:        "NoSet and NoUnset - ignored for structs",
+			op:          operation.Update,
+			value:       TestStruct{Field1: "test", Field2: 42},
+			oldValue:    TestStruct{Field1: "test", Field2: 42},
+			constraints: []UpdateConstraint{NoSet, NoUnset, NoModify},
+			wantErrs:    0,
+		},
+		{
+			name:        "NoSet and NoUnset with modification - only NoModify triggers",
+			op:          operation.Update,
+			value:       TestStruct{Field1: "test2", Field2: 100},
+			oldValue:    TestStruct{Field1: "test1", Field2: 42},
+			constraints: []UpdateConstraint{NoSet, NoUnset, NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			op := operation.Operation{Type: tt.op}
-			errs := NoModifyStruct(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue)
-			if (len(errs) > 0) != tt.wantErr {
-				t.Errorf("NoModifyStruct() error = %v, wantErr %v", errs, tt.wantErr)
+			errs := UpdateStruct(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue, tt.constraints...)
+			if len(errs) != tt.wantErrs {
+				t.Errorf("UpdateStruct() returned %d errors, want %d: %v", len(errs), tt.wantErrs, errs)
 			}
-			if tt.wantErr && len(errs) > 0 {
-				if errs[0].Detail != "field cannot be modified once set" {
-					t.Errorf("NoModifyStruct() wrong error message: %v", errs[0].Detail)
+			for i, msg := range tt.wantMsgs {
+				if i >= len(errs) {
+					t.Errorf("Expected error message %q not found", msg)
+					continue
+				}
+				if errs[i].Detail != msg {
+					t.Errorf("UpdateStruct() error message = %q, want %q", errs[i].Detail, msg)
 				}
 			}
 		})
