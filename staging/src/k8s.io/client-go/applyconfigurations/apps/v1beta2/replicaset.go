@@ -29,11 +29,25 @@ import (
 
 // ReplicaSetApplyConfiguration represents a declarative configuration of the ReplicaSet type for use
 // with apply.
+//
+// DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1/ReplicaSet. See the release notes for
+// more information.
+// ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 type ReplicaSetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// If the Labels of a ReplicaSet are empty, they are defaulted to
+	// be the same as the Pod(s) that the ReplicaSet manages.
+	// Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ReplicaSetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ReplicaSetStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the specification of the desired behavior of the ReplicaSet.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *ReplicaSetSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is the most recently observed status of the ReplicaSet.
+	// This data may be out of date by some window of time.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *ReplicaSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ReplicaSet constructs a declarative configuration of the ReplicaSet type for use with
@@ -47,29 +61,14 @@ func ReplicaSet(name, namespace string) *ReplicaSetApplyConfiguration {
 	return b
 }
 
-// ExtractReplicaSet extracts the applied configuration owned by fieldManager from
-// replicaSet. If no managedFields are found in replicaSet for fieldManager, a
-// ReplicaSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractReplicaSetFrom extracts the applied configuration owned by fieldManager from
+// replicaSet for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // replicaSet must be a unmodified ReplicaSet API object that was retrieved from the Kubernetes API.
-// ExtractReplicaSet provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractReplicaSetFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractReplicaSet(replicaSet *appsv1beta2.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
-	return extractReplicaSet(replicaSet, fieldManager, "")
-}
-
-// ExtractReplicaSetStatus is the same as ExtractReplicaSet except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractReplicaSetStatus(replicaSet *appsv1beta2.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
-	return extractReplicaSet(replicaSet, fieldManager, "status")
-}
-
-func extractReplicaSet(replicaSet *appsv1beta2.ReplicaSet, fieldManager string, subresource string) (*ReplicaSetApplyConfiguration, error) {
+func ExtractReplicaSetFrom(replicaSet *appsv1beta2.ReplicaSet, fieldManager string, subresource string) (*ReplicaSetApplyConfiguration, error) {
 	b := &ReplicaSetApplyConfiguration{}
 	err := managedfields.ExtractInto(replicaSet, internal.Parser().Type("io.k8s.api.apps.v1beta2.ReplicaSet"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +81,28 @@ func extractReplicaSet(replicaSet *appsv1beta2.ReplicaSet, fieldManager string, 
 	b.WithAPIVersion("apps/v1beta2")
 	return b, nil
 }
+
+// ExtractReplicaSet extracts the applied configuration owned by fieldManager from
+// replicaSet. If no managedFields are found in replicaSet for fieldManager, a
+// ReplicaSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// replicaSet must be a unmodified ReplicaSet API object that was retrieved from the Kubernetes API.
+// ExtractReplicaSet provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractReplicaSet(replicaSet *appsv1beta2.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
+	return ExtractReplicaSetFrom(replicaSet, fieldManager, "")
+}
+
+// ExtractReplicaSetStatus extracts the applied configuration owned by fieldManager from
+// replicaSet for the status subresource.
+func ExtractReplicaSetStatus(replicaSet *appsv1beta2.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
+	return ExtractReplicaSetFrom(replicaSet, fieldManager, "status")
+}
+
+func (b ReplicaSetApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -257,8 +278,24 @@ func (b *ReplicaSetApplyConfiguration) WithStatus(value *ReplicaSetStatusApplyCo
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ReplicaSetApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ReplicaSetApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ReplicaSetApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ReplicaSetApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

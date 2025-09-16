@@ -22,5 +22,6 @@ limitations under the License.
 //     will only be processed once.
 //   - Multiple consumers and producers. In particular, it is allowed for an
 //     item to be reenqueued while it is being processed.
+//     In this case it will be processed again.
 //   - Shutdown notifications.
-package workqueue // import "k8s.io/client-go/util/workqueue"
+package workqueue

@@ -92,10 +92,21 @@ type OpenAPICanonicalTypeNamer interface {
 	OpenAPICanonicalTypeName() string
 }
 
+// OpenAPIModelNamer is an interface Go types may implement to provide an OpenAPI model name.
+//
+// This takes precedence over OpenAPICanonicalTypeNamer, and should be used when a Go type has a model
+// name that differs from its canonical type name as determined by Go package name reflection.
+type OpenAPIModelNamer interface {
+	OpenAPIModelName() string
+}
+
 // GetCanonicalTypeName will find the canonical type name of a sample object, removing
 // the "vendor" part of the path
 func GetCanonicalTypeName(model interface{}) string {
-	if namer, ok := model.(OpenAPICanonicalTypeNamer); ok {
+	switch namer := model.(type) {
+	case OpenAPIModelNamer:
+		return namer.OpenAPIModelName()
+	case OpenAPICanonicalTypeNamer:
 		return namer.OpenAPICanonicalTypeName()
 	}
 	t := reflect.TypeOf(model)

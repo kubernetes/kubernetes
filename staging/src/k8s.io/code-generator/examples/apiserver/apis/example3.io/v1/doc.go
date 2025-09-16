@@ -20,5 +20,6 @@ limitations under the License.
 // +groupName=example.dots.apiserver.code-generator.k8s.io
 // +k8s:conversion-gen=k8s.io/code-generator/examples/apiserver/apis/example3.io
 // +groupGoName=ThirdExample
+// +k8s:openapi-model-package=io.k8s.code-generator.examples.apiserver.apis.example3.io.v1
 
-package v1 // import "k8s.io/code-generator/examples/apiserver/apis/example3.io/v1"
+package v1

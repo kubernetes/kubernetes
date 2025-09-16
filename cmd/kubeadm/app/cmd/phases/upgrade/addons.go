@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
-
 	clientset "k8s.io/client-go/kubernetes"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -31,6 +29,7 @@ import (
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // NewAddonPhase returns a new addon phase.
@@ -83,13 +82,20 @@ func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.I
 
 // runCoreDNSAddon upgrades the CoreDNS addon.
 func runCoreDNSAddon(c workflow.RunData) error {
+	const skipMessagePrefix = "[upgrade/addon] Skipping the addon/coredns phase."
+
 	cfg, client, patchesDir, out, dryRun, isControlPlaneNode, err := getInitData(c)
 	if err != nil {
 		return err
 	}
 
 	if !isControlPlaneNode {
-		fmt.Println("[upgrade/addon] Skipping addon/coredns phase. Not a control plane node.")
+		fmt.Fprintf(out, "%s Not a control plane node.\n", skipMessagePrefix)
+		return nil
+	}
+
+	if cfg.ClusterConfiguration.DNS.Disabled {
+		fmt.Fprintf(out, "%s The addon is disabled.\n", skipMessagePrefix)
 		return nil
 	}
 
@@ -110,13 +116,20 @@ func runCoreDNSAddon(c workflow.RunData) error {
 
 // runKubeProxyAddon upgrades the kube-proxy addon.
 func runKubeProxyAddon(c workflow.RunData) error {
+	const skipMessagePrefix = "[upgrade/addon] Skipping the addon/kube-proxy phase."
+
 	cfg, client, _, out, dryRun, isControlPlaneNode, err := getInitData(c)
 	if err != nil {
 		return err
 	}
 
 	if !isControlPlaneNode {
-		fmt.Println("[upgrade/addon] Skipping addon/kube-proxy phase. Not a control plane node.")
+		fmt.Fprintf(out, "%s Not a control plane node.\n", skipMessagePrefix)
+		return nil
+	}
+
+	if cfg.ClusterConfiguration.Proxy.Disabled {
+		fmt.Fprintf(out, "%s The addon is disabled.\n", skipMessagePrefix)
 		return nil
 	}
 

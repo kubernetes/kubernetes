@@ -72,9 +72,9 @@ const (
 	// maxSyncBackOff is the max backoff period for syncService calls.
 	maxSyncBackOff = 1000 * time.Second
 
-	// controllerName is a unique value used with LabelManagedBy to indicated
+	// ControllerName is a unique value used with LabelManagedBy to indicated
 	// the component managing an EndpointSlice.
-	controllerName = "endpointslice-controller.k8s.io"
+	ControllerName = "endpointslice-controller.k8s.io"
 
 	// topologyQueueItemKey is the key for all items in the topologyQueue.
 	topologyQueueItemKey = "topologyQueueItemKey"
@@ -185,8 +185,8 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		c.endpointSliceTracker,
 		c.topologyCache,
 		c.eventRecorder,
-		controllerName,
-		endpointslicerec.WithTrafficDistributionEnabled(utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution)),
+		ControllerName,
+		endpointslicerec.WithTrafficDistributionEnabled(utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution), utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution)),
 	)
 
 	return c
@@ -281,7 +281,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting endpoint slice controller")
 	defer logger.Info("Shutting down endpoint slice controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint_slice", ctx.Done(), c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
 		return
 	}
 

@@ -15,6 +15,7 @@
 package interpreter
 
 import (
+	"errors"
 	"math"
 
 	"github.com/google/cel-go/common"
@@ -34,78 +35,172 @@ type ActualCostEstimator interface {
 	CallCost(function, overloadID string, args []ref.Val, result ref.Val) *uint64
 }
 
-// CostObserver provides an observer that tracks runtime cost.
-func CostObserver(tracker *CostTracker) EvalObserver {
-	observer := func(id int64, programStep any, val ref.Val) {
-		switch t := programStep.(type) {
-		case ConstantQualifier:
-			// TODO: Push identifiers on to the stack before observing constant qualifiers that apply to them
-			// and enable the below pop. Once enabled this can case can be collapsed into the Qualifier case.
-			tracker.cost++
-		case InterpretableConst:
-			// zero cost
-		case InterpretableAttribute:
-			switch a := t.Attr().(type) {
-			case *conditionalAttribute:
-				// Ternary has no direct cost. All cost is from the conditional and the true/false branch expressions.
-				tracker.stack.drop(a.falsy.ID(), a.truthy.ID(), a.expr.ID())
-			default:
-				tracker.stack.drop(t.Attr().ID())
-				tracker.cost += common.SelectAndIdentCost
-			}
-			if !tracker.presenceTestHasCost {
-				if _, isTestOnly := programStep.(*evalTestOnly); isTestOnly {
-					tracker.cost -= common.SelectAndIdentCost
-				}
-			}
-		case *evalExhaustiveConditional:
-			// Ternary has no direct cost. All cost is from the conditional and the true/false branch expressions.
-			tracker.stack.drop(t.attr.falsy.ID(), t.attr.truthy.ID(), t.attr.expr.ID())
+// costTrackPlanOption modifies the cost tracking factory associatied with the CostObserver
+type costTrackPlanOption func(*costTrackerFactory) *costTrackerFactory
 
-		// While the field names are identical, the boolean operation eval structs do not share an interface and so
-		// must be handled individually.
-		case *evalOr:
-			for _, term := range t.terms {
-				tracker.stack.drop(term.ID())
-			}
-		case *evalAnd:
-			for _, term := range t.terms {
-				tracker.stack.drop(term.ID())
-			}
-		case *evalExhaustiveOr:
-			for _, term := range t.terms {
-				tracker.stack.drop(term.ID())
-			}
-		case *evalExhaustiveAnd:
-			for _, term := range t.terms {
-				tracker.stack.drop(term.ID())
-			}
-		case *evalFold:
-			tracker.stack.drop(t.iterRange.ID())
-		case Qualifier:
-			tracker.cost++
-		case InterpretableCall:
-			if argVals, ok := tracker.stack.dropArgs(t.Args()); ok {
-				tracker.cost += tracker.costCall(t, argVals, val)
-			}
-		case InterpretableConstructor:
-			tracker.stack.dropArgs(t.InitVals())
-			switch t.Type() {
-			case types.ListType:
-				tracker.cost += common.ListCreateBaseCost
-			case types.MapType:
-				tracker.cost += common.MapCreateBaseCost
-			default:
-				tracker.cost += common.StructCreateBaseCost
+// CostTrackerFactory configures the factory method to generate a new cost-tracker per-evaluation.
+func CostTrackerFactory(factory func() (*CostTracker, error)) costTrackPlanOption {
+	return func(fac *costTrackerFactory) *costTrackerFactory {
+		fac.factory = factory
+		return fac
+	}
+}
+
+// CostObserver provides an observer that tracks runtime cost.
+func CostObserver(opts ...costTrackPlanOption) PlannerOption {
+	ct := &costTrackerFactory{}
+	for _, o := range opts {
+		ct = o(ct)
+	}
+	return func(p *planner) (*planner, error) {
+		if ct.factory == nil {
+			return nil, errors.New("cost tracker factory not configured")
+		}
+		p.observers = append(p.observers, ct)
+		p.decorators = append(p.decorators, decObserveEval(ct.Observe))
+		return p, nil
+	}
+}
+
+// costTrackerConverter identifies an object which is convertible to a CostTracker instance.
+type costTrackerConverter interface {
+	asCostTracker() *CostTracker
+}
+
+// costTrackActivation hides state in the Activation in a manner not accessible to expressions.
+type costTrackActivation struct {
+	vars        Activation
+	costTracker *CostTracker
+}
+
+// ResolveName proxies variable lookups to the backing activation.
+func (cta costTrackActivation) ResolveName(name string) (any, bool) {
+	return cta.vars.ResolveName(name)
+}
+
+// Parent proxies parent lookups to the backing activation.
+func (cta costTrackActivation) Parent() Activation {
+	return cta.vars
+}
+
+// AsPartialActivation supports conversion to a partial activation in order to detect unknown attributes.
+func (cta costTrackActivation) AsPartialActivation() (PartialActivation, bool) {
+	return AsPartialActivation(cta.vars)
+}
+
+// asCostTracker implements the costTrackerConverter method.
+func (cta costTrackActivation) asCostTracker() *CostTracker {
+	return cta.costTracker
+}
+
+// asCostTracker walks the Activation hierarchy and returns the first cost tracker found, if present.
+func asCostTracker(vars Activation) (*CostTracker, bool) {
+	if conv, ok := vars.(costTrackerConverter); ok {
+		return conv.asCostTracker(), true
+	}
+	if vars.Parent() != nil {
+		return asCostTracker(vars.Parent())
+	}
+	return nil, false
+}
+
+// costTrackerFactory holds a factory for producing new CostTracker instances on each Eval call.
+type costTrackerFactory struct {
+	factory func() (*CostTracker, error)
+}
+
+// InitState produces a CostTracker and bundles it into an Activation in a way which is not visible
+// to expression evaluation.
+func (ct *costTrackerFactory) InitState(vars Activation) (Activation, error) {
+	tracker, err := ct.factory()
+	if err != nil {
+		return nil, err
+	}
+	return costTrackActivation{vars: vars, costTracker: tracker}, nil
+}
+
+// GetState extracts the CostTracker from the Activation.
+func (ct *costTrackerFactory) GetState(vars Activation) any {
+	if tracker, found := asCostTracker(vars); found {
+		return tracker
+	}
+	return nil
+}
+
+// Observe computes the incremental cost of each step and records it into the CostTracker associated
+// with the evaluation.
+func (ct *costTrackerFactory) Observe(vars Activation, id int64, programStep any, val ref.Val) {
+	tracker, found := asCostTracker(vars)
+	if !found {
+		return
+	}
+	switch t := programStep.(type) {
+	case ConstantQualifier:
+		// TODO: Push identifiers on to the stack before observing constant qualifiers that apply to them
+		// and enable the below pop. Once enabled this can case can be collapsed into the Qualifier case.
+		tracker.cost++
+	case InterpretableConst:
+		// zero cost
+	case InterpretableAttribute:
+		switch a := t.Attr().(type) {
+		case *conditionalAttribute:
+			// Ternary has no direct cost. All cost is from the conditional and the true/false branch expressions.
+			tracker.stack.drop(a.falsy.ID(), a.truthy.ID(), a.expr.ID())
+		default:
+			tracker.stack.drop(t.Attr().ID())
+			tracker.cost += common.SelectAndIdentCost
+		}
+		if !tracker.presenceTestHasCost {
+			if _, isTestOnly := programStep.(*evalTestOnly); isTestOnly {
+				tracker.cost -= common.SelectAndIdentCost
 			}
 		}
-		tracker.stack.push(val, id)
+	case *evalExhaustiveConditional:
+		// Ternary has no direct cost. All cost is from the conditional and the true/false branch expressions.
+		tracker.stack.drop(t.attr.falsy.ID(), t.attr.truthy.ID(), t.attr.expr.ID())
 
-		if tracker.Limit != nil && tracker.cost > *tracker.Limit {
-			panic(EvalCancelledError{Cause: CostLimitExceeded, Message: "operation cancelled: actual cost limit exceeded"})
+	// While the field names are identical, the boolean operation eval structs do not share an interface and so
+	// must be handled individually.
+	case *evalOr:
+		for _, term := range t.terms {
+			tracker.stack.drop(term.ID())
+		}
+	case *evalAnd:
+		for _, term := range t.terms {
+			tracker.stack.drop(term.ID())
+		}
+	case *evalExhaustiveOr:
+		for _, term := range t.terms {
+			tracker.stack.drop(term.ID())
+		}
+	case *evalExhaustiveAnd:
+		for _, term := range t.terms {
+			tracker.stack.drop(term.ID())
+		}
+	case *evalFold:
+		tracker.stack.drop(t.iterRange.ID())
+	case Qualifier:
+		tracker.cost++
+	case InterpretableCall:
+		if argVals, ok := tracker.stack.dropArgs(t.Args()); ok {
+			tracker.cost += tracker.costCall(t, argVals, val)
+		}
+	case InterpretableConstructor:
+		tracker.stack.dropArgs(t.InitVals())
+		switch t.Type() {
+		case types.ListType:
+			tracker.cost += common.ListCreateBaseCost
+		case types.MapType:
+			tracker.cost += common.MapCreateBaseCost
+		default:
+			tracker.cost += common.StructCreateBaseCost
 		}
 	}
-	return observer
+	tracker.stack.push(val, id)
+
+	if tracker.Limit != nil && tracker.cost > *tracker.Limit {
+		panic(EvalCancelledError{Cause: CostLimitExceeded, Message: "operation cancelled: actual cost limit exceeded"})
+	}
 }
 
 // CostTrackerOption configures the behavior of CostTracker objects.
@@ -198,20 +293,20 @@ func (c *CostTracker) costCall(call InterpretableCall, args []ref.Val, result re
 	switch call.OverloadID() {
 	// O(n) functions
 	case overloads.StartsWithString, overloads.EndsWithString, overloads.StringToBytes, overloads.BytesToString, overloads.ExtQuoteString, overloads.ExtFormatString:
-		cost += uint64(math.Ceil(float64(c.actualSize(args[0])) * common.StringTraversalCostFactor))
+		cost += uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
 	case overloads.InList:
 		// If a list is composed entirely of constant values this is O(1), but we don't account for that here.
 		// We just assume all list containment checks are O(n).
-		cost += c.actualSize(args[1])
+		cost += actualSize(args[1])
 	// O(min(m, n)) functions
 	case overloads.LessString, overloads.GreaterString, overloads.LessEqualsString, overloads.GreaterEqualsString,
 		overloads.LessBytes, overloads.GreaterBytes, overloads.LessEqualsBytes, overloads.GreaterEqualsBytes,
 		overloads.Equals, overloads.NotEquals:
 		// When we check the equality of 2 scalar values (e.g. 2 integers, 2 floating-point numbers, 2 booleans etc.),
-		// the CostTracker.actualSize() function by definition returns 1 for each operand, resulting in an overall cost
+		// the CostTracker.ActualSize() function by definition returns 1 for each operand, resulting in an overall cost
 		// of 1.
-		lhsSize := c.actualSize(args[0])
-		rhsSize := c.actualSize(args[1])
+		lhsSize := actualSize(args[0])
+		rhsSize := actualSize(args[1])
 		minSize := lhsSize
 		if rhsSize < minSize {
 			minSize = rhsSize
@@ -220,23 +315,23 @@ func (c *CostTracker) costCall(call InterpretableCall, args []ref.Val, result re
 	// O(m+n) functions
 	case overloads.AddString, overloads.AddBytes:
 		// In the worst case scenario, we would need to reallocate a new backing store and copy both operands over.
-		cost += uint64(math.Ceil(float64(c.actualSize(args[0])+c.actualSize(args[1])) * common.StringTraversalCostFactor))
+		cost += uint64(math.Ceil(float64(actualSize(args[0])+actualSize(args[1])) * common.StringTraversalCostFactor))
 	// O(nm) functions
 	case overloads.MatchesString:
 		// https://swtch.com/~rsc/regexp/regexp1.html applies to RE2 implementation supported by CEL
 		// Add one to string length for purposes of cost calculation to prevent product of string and regex to be 0
 		// in case where string is empty but regex is still expensive.
-		strCost := uint64(math.Ceil((1.0 + float64(c.actualSize(args[0]))) * common.StringTraversalCostFactor))
+		strCost := uint64(math.Ceil((1.0 + float64(actualSize(args[0]))) * common.StringTraversalCostFactor))
 		// We don't know how many expressions are in the regex, just the string length (a huge
 		// improvement here would be to somehow get a count the number of expressions in the regex or
 		// how many states are in the regex state machine and use that to measure regex cost).
 		// For now, we're making a guess that each expression in a regex is typically at least 4 chars
 		// in length.
-		regexCost := uint64(math.Ceil(float64(c.actualSize(args[1])) * common.RegexStringLengthCostFactor))
+		regexCost := uint64(math.Ceil(float64(actualSize(args[1])) * common.RegexStringLengthCostFactor))
 		cost += strCost * regexCost
 	case overloads.ContainsString:
-		strCost := uint64(math.Ceil(float64(c.actualSize(args[0])) * common.StringTraversalCostFactor))
-		substrCost := uint64(math.Ceil(float64(c.actualSize(args[1])) * common.StringTraversalCostFactor))
+		strCost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
+		substrCost := uint64(math.Ceil(float64(actualSize(args[1])) * common.StringTraversalCostFactor))
 		cost += strCost * substrCost
 
 	default:
@@ -253,10 +348,14 @@ func (c *CostTracker) costCall(call InterpretableCall, args []ref.Val, result re
 	return cost
 }
 
-// actualSize returns the size of value
-func (c *CostTracker) actualSize(value ref.Val) uint64 {
+// actualSize returns the size of the value for all traits.Sizer values, a fixed size for all proto-based
+// objects, and a size of 1 for all other value types.
+func actualSize(value ref.Val) uint64 {
 	if sz, ok := value.(traits.Sizer); ok {
 		return uint64(sz.Size().(types.Int))
+	}
+	if opt, ok := value.(*types.Optional); ok && opt.HasValue() {
+		return actualSize(opt.GetValue())
 	}
 	return 1
 }

@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -50,6 +50,10 @@ const (
 	// defined here:
 	// https://github.com/torvalds/linux/blob/cac03ac368fabff0122853de2422d4e17a32de08/kernel/sched/core.c#L10546
 	MinQuotaPeriod = 1000
+
+	// From the inverse of the conversion in MilliCPUToQuota:
+	// MinQuotaPeriod * MilliCPUToCPU / QuotaPeriod
+	MinMilliCPULimit = 10
 )
 
 // MilliCPUToQuota converts milliCPU to CFS quota and period values.

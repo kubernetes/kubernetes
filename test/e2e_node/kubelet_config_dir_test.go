@@ -20,17 +20,19 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
+	"k8s.io/utils/cpuset"
 )
 
-var _ = SIGDescribe("Kubelet Config", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.KubeletConfigDropInDir, func() {
+var _ = SIGDescribe("Kubelet Config", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.KubeletConfigDropInDir, func() {
 	f := framework.NewDefaultFramework("kubelet-config-drop-in-dir-test")
 	ginkgo.Context("when merging drop-in configs", func() {
 		var oldcfg *kubeletconfig.KubeletConfiguration
@@ -86,7 +88,6 @@ shutdownGracePeriodByPodPriority:
   - priority: 3
     shutdownGracePeriodSeconds: 30
 featureGates:
-  DisableKubeletCloudCredentialProviders: true
   PodAndContainerStatsFromCRI: true`)
 			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "10-kubelet.conf"), contents, 0755))
 			contents = []byte(`apiVersion: kubelet.config.k8s.io/v1beta1
@@ -119,6 +120,7 @@ shutdownGracePeriodByPodPriority:
   - priority: 6
     shutdownGracePeriodSeconds: 30
 featureGates:
+  KubeletServiceAccountTokenForCredentialProviders: true
   PodAndContainerStatsFromCRI: false
   DynamicResourceAllocation: true`)
 			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "20-kubelet.conf"), contents, 0755))
@@ -133,11 +135,18 @@ featureGates:
 			framework.ExpectNoError(err)
 
 			// Replace specific fields in the initial configuration with expectedConfig values
-			initialConfig.Port = int32(8080)                  // not overridden by second file, should be retained.
-			initialConfig.ReadOnlyPort = int32(10257)         // overridden by second file.
-			initialConfig.SystemReserved = map[string]string{ // overridden by map in second file.
-				"memory": "2Gi",
+			initialConfig.Port = int32(8080)          // not overridden by second file, should be retained.
+			initialConfig.ReadOnlyPort = int32(10257) // overridden by second file.
+			if initialConfig.SystemReserved == nil {
+				initialConfig.SystemReserved = map[string]string{}
 			}
+			if initialConfig.ReservedSystemCPUs != "" {
+				reservedCPUSet, err := cpuset.Parse(initialConfig.ReservedSystemCPUs)
+				if err == nil {
+					initialConfig.SystemReserved["cpu"] = strconv.Itoa(reservedCPUSet.Size())
+				}
+			}
+			initialConfig.SystemReserved["memory"] = "2Gi"
 			initialConfig.ClusterDNS = []string{"192.168.1.1", "192.168.1.5", "192.168.1.8"} // overridden by slice in second file.
 			// This value was explicitly set in the drop-in, make sure it is retained
 			initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: time.Second}
@@ -164,7 +173,14 @@ featureGates:
 				},
 			}
 			// This covers the case where the fields within the map are overridden.
-			overrides := map[string]bool{"DisableKubeletCloudCredentialProviders": true, "PodAndContainerStatsFromCRI": false, "DynamicResourceAllocation": true}
+			overrides := initialConfig.FeatureGates
+			if overrides == nil {
+				overrides = map[string]bool{}
+			}
+			overrides["PodAndContainerStatsFromCRI"] = false
+			overrides["DynamicResourceAllocation"] = true
+			overrides["KubeletServiceAccountTokenForCredentialProviders"] = true
+
 			// In some CI jobs, `NodeSwap` is explicitly disabled as the images are cgroupv1 based,
 			// so such flags should be picked up directly from the initial configuration
 			if _, ok := initialConfig.FeatureGates["NodeSwap"]; ok {

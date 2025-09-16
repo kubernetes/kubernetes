@@ -31,6 +31,7 @@ import (
 
 	"github.com/Microsoft/hnslib"
 	"github.com/Microsoft/hnslib/hcn"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -43,12 +44,11 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
 )
 
@@ -56,6 +56,10 @@ import (
 // present to run the windows kernel proxier.
 type KernelCompatTester interface {
 	IsCompatible() error
+}
+
+type HostMacProvider interface {
+	GetHostMac(nodeIP net.IP) string
 }
 
 // CanUseWinKernelProxier returns true if we should use the Kernel Proxier
@@ -85,14 +89,29 @@ type externalIPInfo struct {
 	hnsID string
 }
 
+func (info externalIPInfo) String() string {
+	return fmt.Sprintf("HnsID:%s, IP:%s", info.hnsID, info.ip)
+}
+
 type loadBalancerIngressInfo struct {
 	ip               string
 	hnsID            string
 	healthCheckHnsID string
 }
 
+func (info loadBalancerIngressInfo) String() string {
+	if len(info.healthCheckHnsID) > 0 {
+		return fmt.Sprintf("HealthCheckHnsID:%s, IP:%s", info.healthCheckHnsID, info.ip)
+	}
+	return fmt.Sprintf("HnsID:%s, IP:%s", info.hnsID, info.ip)
+}
+
 type loadBalancerInfo struct {
 	hnsID string
+}
+
+func (info loadBalancerInfo) String() string {
+	return fmt.Sprintf("HnsID:%s", info.hnsID)
 }
 
 type loadBalancerIdentifier struct {
@@ -101,6 +120,10 @@ type loadBalancerIdentifier struct {
 	externalPort  uint16
 	vip           string
 	endpointsHash [20]byte
+}
+
+func (info loadBalancerIdentifier) String() string {
+	return fmt.Sprintf("VIP:%s, Protocol:%d, InternalPort:%d, ExternalPort:%d", info.vip, info.protocol, info.internalPort, info.externalPort)
 }
 
 type loadBalancerFlags struct {
@@ -129,6 +152,20 @@ type serviceInfo struct {
 	localTrafficDSR        bool
 	internalTrafficLocal   bool
 	winProxyOptimization   bool
+}
+
+func (info serviceInfo) String() string {
+	svcInfoStr := fmt.Sprintf("HnsID:%s, TargetPort:%d", info.hnsID, info.targetPort)
+	if info.nodePorthnsID != "" {
+		svcInfoStr = fmt.Sprintf("%s, NodePortHnsID:%s", svcInfoStr, info.nodePorthnsID)
+	}
+	if len(info.externalIPs) > 0 {
+		svcInfoStr = fmt.Sprintf("%s, ExternalIPs:%v", svcInfoStr, info.externalIPs)
+	}
+	if len(info.loadBalancerIngressIPs) > 0 {
+		svcInfoStr = fmt.Sprintf("%s, IngressIPs:%v", svcInfoStr, info.loadBalancerIngressIPs)
+	}
+	return svcInfoStr
 }
 
 type hnsNetworkInfo struct {
@@ -291,8 +328,8 @@ type endpointInfo struct {
 }
 
 // String is part of proxy.Endpoint interface.
-func (info *endpointInfo) String() string {
-	return net.JoinHostPort(info.ip, strconv.Itoa(int(info.port)))
+func (info endpointInfo) String() string {
+	return fmt.Sprintf("HnsID:%s, Address:%s", info.hnsID, net.JoinHostPort(info.ip, strconv.Itoa(int(info.port))))
 }
 
 // IsLocal is part of proxy.Endpoint interface.
@@ -317,6 +354,11 @@ func (info *endpointInfo) IsTerminating() bool {
 
 // ZoneHints returns the zone hints for the endpoint.
 func (info *endpointInfo) ZoneHints() sets.Set[string] {
+	return sets.Set[string]{}
+}
+
+// NodeHints returns the node hints for the endpoint.
+func (info *endpointInfo) NodeHints() sets.Set[string] {
 	return sets.Set[string]{}
 }
 
@@ -492,6 +534,11 @@ func (ep *endpointInfo) DecrementRefCount() {
 	if !ep.IsLocal() && ep.refCount != nil && *ep.refCount > 0 {
 		*ep.refCount--
 	}
+	refCount := 0
+	if ep.refCount != nil {
+		refCount = int(*ep.refCount)
+	}
+	klog.V(5).InfoS("Endpoint RefCount after decrement.", "endpointInfo", ep, "refCount", refCount)
 }
 
 func (ep *endpointInfo) Cleanup() {
@@ -589,13 +636,10 @@ func (network hnsNetworkInfo) findRemoteSubnetProviderAddress(ip string) string 
 
 type endPointsReferenceCountMap map[string]*uint16
 
-// Proxier is an hns based proxy for connections between a localhost:lport
-// and services that provide the actual backends.
+// Proxier is an HNS-based proxy
 type Proxier struct {
 	// ipFamily defines the IP family which this proxier is tracking.
 	ipFamily v1.IPFamily
-	// TODO(imroc): implement node handler for winkernel proxier.
-	proxyconfig.NoopNodeHandler
 
 	// endpointsChanges and serviceChanges contains all changes to endpoints and
 	// services that happened since policies were synced. For a single object,
@@ -613,14 +657,13 @@ type Proxier struct {
 	endpointSlicesSynced bool
 	servicesSynced       bool
 	initialized          int32
-	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
+	syncRunner           *runner.BoundedFrequencyRunner // governs calls to syncProxyRules
 	// These are effectively const and do not need the mutex to be held.
-	hostname string
+	nodeName string
 	nodeIP   net.IP
-	recorder events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
-	healthzServer       *healthcheck.ProxierHealthServer
+	healthzServer       *healthcheck.ProxyHealthServer
 
 	hns               HostNetworkService
 	hcn               HcnService
@@ -668,26 +711,21 @@ type closeable interface {
 // Proxier implements proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
-// NewProxier returns a new Proxier
+// NewProxier returns a new single-stack winkernel proxier.
 func NewProxier(
 	ipFamily v1.IPFamily,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
-	hostname string,
+	nodeName string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
-	healthzServer *healthcheck.ProxierHealthServer,
+	healthzServer *healthcheck.ProxyHealthServer,
 	healthzBindAddress string,
 	config config.KubeProxyWinkernelConfiguration,
 ) (*Proxier, error) {
-	if nodeIP == nil {
-		klog.InfoS("Invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
-		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
-	}
-
 	// windows listens to all node addresses
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer)
 
 	var healthzPort int
 	if len(healthzBindAddress) > 0 {
@@ -696,6 +734,41 @@ func NewProxier(
 	}
 
 	hcnImpl := newHcnImpl()
+	proxier, err := newProxierInternal(
+		ipFamily,
+		nodeName,
+		nodeIP,
+		serviceHealthServer,
+		healthzServer,
+		healthzPort,
+		hcnImpl,
+		&localHostMacProvider{},
+		config,
+		true, // waitForHNSOverlay
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	klog.V(3).Info("Record sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "maxSyncPeriod", proxyutil.FullSyncPeriod)
+	proxier.syncRunner = runner.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, proxyutil.FullSyncPeriod)
+
+	return proxier, nil
+}
+
+// allow internal testing of proxier
+func newProxierInternal(
+	ipFamily v1.IPFamily,
+	nodeName string,
+	nodeIP net.IP,
+	serviceHealthServer healthcheck.ServiceHealthServer,
+	healthzServer *healthcheck.ProxyHealthServer,
+	healthzPort int,
+	hcnImpl HcnService,
+	hostMacProvider HostMacProvider,
+	config config.KubeProxyWinkernelConfiguration,
+	waitForHNSOverlay bool,
+) (*Proxier, error) {
 	hns, supportedFeatures := newHostNetworkService(hcnImpl)
 	hnsNetworkName, err := getNetworkName(config.NetworkName)
 	if err != nil {
@@ -714,7 +787,10 @@ func NewProxier(
 	// Network could have been detected before Remote Subnet Routes are applied or ManagementIP is updated
 	// Sleep and update the network to include new information
 	if isOverlay(hnsNetworkInfo) {
-		time.Sleep(10 * time.Second)
+		if waitForHNSOverlay {
+			time.Sleep(10 * time.Second)
+		}
+
 		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
 		if err != nil {
 			return nil, fmt.Errorf("could not find HNS network %s", hnsNetworkName)
@@ -738,7 +814,7 @@ func NewProxier(
 		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) {
 			return nil, fmt.Errorf("WinOverlay feature gate not enabled")
 		}
-		err = hcn.RemoteSubnetSupported()
+		err = hcnImpl.RemoteSubnetSupported()
 		if err != nil {
 			return nil, err
 		}
@@ -756,17 +832,8 @@ func NewProxier(
 			}
 		}
 
-		interfaces, _ := net.Interfaces() //TODO create interfaces
-		for _, inter := range interfaces {
-			addresses, _ := inter.Addrs()
-			for _, addr := range addresses {
-				addrIP, _, _ := netutils.ParseCIDRSloppy(addr.String())
-				if addrIP.String() == nodeIP.String() {
-					klog.V(2).InfoS("Record Host MAC address", "addr", inter.HardwareAddr)
-					hostMac = inter.HardwareAddr.String()
-				}
-			}
-		}
+		hostMac = hostMacProvider.GetHostMac(nodeIP)
+
 		if len(hostMac) == 0 {
 			return nil, fmt.Errorf("could not find host mac address for %s", nodeIP)
 		}
@@ -777,9 +844,8 @@ func NewProxier(
 		endPointsRefCount:     make(endPointsReferenceCountMap),
 		svcPortMap:            make(proxy.ServicePortMap),
 		endpointsMap:          make(proxy.EndpointsMap),
-		hostname:              hostname,
+		nodeName:              nodeName,
 		nodeIP:                nodeIP,
-		recorder:              recorder,
 		serviceHealthServer:   serviceHealthServer,
 		healthzServer:         healthzServer,
 		hns:                   hns,
@@ -796,42 +862,39 @@ func NewProxier(
 		terminatedEndpoints:   make(map[string]bool),
 	}
 
-	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, ipFamily, recorder, proxier.serviceMapChange)
-	endPointChangeTracker := proxy.NewEndpointsChangeTracker(hostname, proxier.newEndpointInfo, ipFamily, recorder, proxier.endpointsMapChange)
+	serviceChanges := proxy.NewServiceChangeTracker(ipFamily, proxier.newServiceInfo, proxier.serviceMapChange)
+	endPointChangeTracker := proxy.NewEndpointsChangeTracker(ipFamily, nodeName, proxier.newEndpointInfo, proxier.endpointsMapChange)
 	proxier.endpointsChanges = endPointChangeTracker
 	proxier.serviceChanges = serviceChanges
 
-	burstSyncs := 2
-	klog.V(3).InfoS("Record sync param", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
-	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 	return proxier, nil
 }
 
 func NewDualStackProxier(
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
-	hostname string,
+	nodeName string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
-	healthzServer *healthcheck.ProxierHealthServer,
+	healthzServer *healthcheck.ProxyHealthServer,
 	healthzBindAddress string,
 	config config.KubeProxyWinkernelConfiguration,
 ) (proxy.Provider, error) {
 
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, syncPeriod, minSyncPeriod,
-		hostname, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
+		nodeName, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
 		healthzBindAddress, config)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, nodeIP:%v", err, hostname, nodeIPs[v1.IPv4Protocol])
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, nodeName: %s, nodeIP:%v", err, nodeName, nodeIPs[v1.IPv4Protocol])
 	}
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, syncPeriod, minSyncPeriod,
-		hostname, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
+		nodeName, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
 		healthzBindAddress, config)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, nodeIP:%v", err, hostname, nodeIPs[v1.IPv6Protocol])
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, nodeName: %s, nodeIP:%v", err, nodeName, nodeIPs[v1.IPv6Protocol])
 	}
 
 	// Return a meta-proxier that dispatch calls between the two
@@ -933,7 +996,7 @@ func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.QueuedUpdate(proxier.ipFamily)
 	}
-	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
+	metrics.SyncProxyRulesLastQueuedTimestamp.WithLabelValues(string(proxier.ipFamily)).SetToCurrentTime()
 	proxier.syncRunner.Run()
 }
 
@@ -944,7 +1007,7 @@ func (proxier *Proxier) SyncLoop() {
 		proxier.healthzServer.Updated(proxier.ipFamily)
 	}
 	// synthesize "last change queued" time as the informers are syncing.
-	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
+	metrics.SyncProxyRulesLastQueuedTimestamp.WithLabelValues(string(proxier.ipFamily)).SetToCurrentTime()
 	proxier.syncRunner.Loop(wait.NeverStop)
 }
 
@@ -1031,6 +1094,13 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 // OnServiceCIDRsChanged is called whenever a change is observed
 // in any of the ServiceCIDRs, and provides complete list of service cidrs.
 func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
+
+// TODO(imroc): implement OnTopologyChanged for winkernel proxier.
+// OnTopologyChange is called whenever node topology labels are changed.
+// The informer is tweaked to listen for updates of the node where this
+// instance of kube-proxy is running, this guarantees the changed labels
+// are for this node.
+func (proxier *Proxier) OnTopologyChange(topologyLabels map[string]string) {}
 
 func (proxier *Proxier) cleanupAllPolicies() {
 	for svcName, svc := range proxier.svcPortMap {
@@ -1127,7 +1197,7 @@ func (proxier *Proxier) handleUpdateLoadbalancerFailure(err error, hnsID, svcIP 
 
 // This is where all of the hns save/restore calls happen.
 // assumes proxier.mu is held
-func (proxier *Proxier) syncProxyRules() {
+func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
@@ -1140,7 +1210,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// Keep track of how long syncs take.
 	start := time.Now()
 	defer func() {
-		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		metrics.SyncProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
 		klog.V(4).InfoS("Syncing proxy rules complete", "elapsed", time.Since(start))
 	}()
 
@@ -1290,7 +1360,9 @@ func (proxier *Proxier) syncProxyRules() {
 			// targetPort is zero if it is specified as a name in port.TargetPort, so the real port should be got from endpoints.
 			// Note that hnslib.AddLoadBalancer() doesn't support endpoints with different ports, so only port from first endpoint is used.
 			// TODO(feiskyer): add support of different endpoint ports after hnslib.AddLoadBalancer() add that.
-			if svcInfo.targetPort == 0 {
+			if svcInfo.targetPort == 0 || svcInfo.targetPort != int(ep.port) {
+				// Update the targetPort to the first endpoint's port if it is not specified or different from the endpoint's port.
+				klog.V(3).InfoS("Update targetPort", "oldTargetPort", svcInfo.targetPort, "newTargetPort", ep.port)
 				svcInfo.targetPort = int(ep.port)
 			}
 			// There is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address, so we need to check using endpoint ID first.
@@ -1396,7 +1468,7 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(3).InfoS("Endpoint resource found", "endpointInfo", ep)
 		}
 
-		klog.V(3).InfoS("Associated endpoints for service", "endpointInfo", hnsEndpoints, "serviceName", svcName)
+		klog.V(3).InfoS("Associated endpoints for service", "endpointInfo", fmt.Sprintf("%v", hnsEndpoints), "serviceName", svcName)
 
 		if len(svcInfo.hnsID) > 0 {
 			// This should not happen
@@ -1454,7 +1526,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if !proxier.requiresUpdateLoadbalancer(svcInfo.hnsID, len(clusterIPEndpoints)) {
-			proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.hnsID, svcInfo.ClusterIP().String(), Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), hnsEndpoints, queriedLoadBalancers)
+			proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.hnsID, svcInfo.ClusterIP().String(), Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), clusterIPEndpoints, queriedLoadBalancers)
 			if len(clusterIPEndpoints) > 0 {
 
 				// If all endpoints are terminating, then no need to create Cluster IP LoadBalancer
@@ -1582,9 +1654,9 @@ func (proxier *Proxier) syncProxyRules() {
 						continue
 					}
 					externalIP.hnsID = hnsLoadBalancer.hnsID
-					klog.V(3).InfoS("Hns LoadBalancer resource created for externalIP resources", "externalIP", externalIP, "hnsID", hnsLoadBalancer.hnsID)
+					klog.V(3).InfoS("Hns LoadBalancer resource created for externalIP resources", "externalIPInfo", externalIP, "hnsID", hnsLoadBalancer.hnsID)
 				} else {
-					klog.V(3).InfoS("Skipped creating Hns LoadBalancer for externalIP resources", "externalIP", externalIP, "allEndpointsTerminating", allEndpointsTerminating)
+					klog.V(3).InfoS("Skipped creating Hns LoadBalancer for externalIP resources", "externalIPInfo", externalIP, "allEndpointsTerminating", allEndpointsTerminating)
 				}
 			}
 		}
@@ -1632,9 +1704,9 @@ func (proxier *Proxier) syncProxyRules() {
 						continue
 					}
 					lbIngressIP.hnsID = hnsLoadBalancer.hnsID
-					klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
+					klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIPInfo", lbIngressIP)
 				} else {
-					klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
+					klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIPInfo", lbIngressIP)
 				}
 			}
 
@@ -1685,7 +1757,7 @@ func (proxier *Proxier) syncProxyRules() {
 					klog.V(3).InfoS("Hns Health Check LoadBalancer resource created for loadBalancer Ingress resources", "ip", lbIngressIP)
 				}
 			} else {
-				klog.V(3).InfoS("Skipped creating Hns Health Check LoadBalancer for loadBalancer Ingress resources", "ip", lbIngressIP, "allEndpointsTerminating", allEndpointsTerminating)
+				klog.V(3).InfoS("Skipped creating Hns Health Check LoadBalancer for loadBalancer Ingress resources", "IngressIPInfo", lbIngressIP, "allEndpointsTerminating", allEndpointsTerminating)
 			}
 		}
 		svcInfo.policyApplied = true
@@ -1695,7 +1767,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.Updated(proxier.ipFamily)
 	}
-	metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
+	metrics.SyncProxyRulesLastTimestamp.WithLabelValues(string(proxier.ipFamily)).SetToCurrentTime()
 
 	// Update service healthchecks.  The endpoints list might include services that are
 	// not "OnlyLocal", but the services list will not, and the serviceHealthServer
@@ -1709,16 +1781,21 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// remove stale endpoint refcount entries
 	for epIP := range proxier.terminatedEndpoints {
-		if epToDelete := queriedEndpoints[epIP]; epToDelete != nil && epToDelete.hnsID != "" {
+		klog.V(5).InfoS("Terminated endpoints ready for deletion", "epIP", epIP)
+		if epToDelete := queriedEndpoints[epIP]; epToDelete != nil && epToDelete.hnsID != "" && !epToDelete.IsLocal() {
 			if refCount := proxier.endPointsRefCount.getRefCount(epToDelete.hnsID); refCount == nil || *refCount == 0 {
-				klog.V(3).InfoS("Deleting unreferenced remote endpoint", "hnsID", epToDelete.hnsID)
-				proxier.hns.deleteEndpoint(epToDelete.hnsID)
+				klog.V(3).InfoS("Deleting unreferenced remote endpoint", "hnsID", epToDelete.hnsID, "IP", epToDelete.ip)
+				err := proxier.hns.deleteEndpoint(epToDelete.hnsID)
+				if err != nil {
+					klog.ErrorS(err, "Deleting unreferenced remote endpoint failed", "hnsID", epToDelete.hnsID)
+				}
 			}
 		}
 	}
 	// This will cleanup stale load balancers which are pending delete
 	// in last iteration
 	proxier.cleanupStaleLoadbalancers()
+	return
 }
 
 // deleteExistingLoadBalancer checks whether loadbalancer delete is needed or not.
@@ -1758,4 +1835,22 @@ func (proxier *Proxier) deleteLoadBalancer(hns HostNetworkService, lbHnsID *stri
 	}
 	*lbHnsID = ""
 	return true
+}
+
+type localHostMacProvider struct{}
+
+func (r *localHostMacProvider) GetHostMac(nodeIP net.IP) string {
+	var hostMac string
+	interfaces, _ := net.Interfaces()
+	for _, inter := range interfaces {
+		addresses, _ := inter.Addrs()
+		for _, addr := range addresses {
+			addrIP, _, _ := netutils.ParseCIDRSloppy(addr.String())
+			if addrIP.String() == nodeIP.String() {
+				klog.V(2).InfoS("Record Host MAC address", "addr", inter.HardwareAddr)
+				hostMac = inter.HardwareAddr.String()
+			}
+		}
+	}
+	return hostMac
 }

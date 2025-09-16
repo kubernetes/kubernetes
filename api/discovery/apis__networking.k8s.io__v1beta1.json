@@ -11,7 +11,7 @@
         "ip"
       ],
       "singularName": "ipaddress",
-      "storageVersionHash": "O4H8VxQhW5Y=",
+      "storageVersionHash": "3f/plJFChNE=",
       "verbs": [
         "create",
         "delete",
@@ -28,7 +28,7 @@
       "name": "servicecidrs",
       "namespaced": false,
       "singularName": "servicecidr",
-      "storageVersionHash": "8ufAXOnr3Yg=",
+      "storageVersionHash": "gNLvruQhW2g=",
       "verbs": [
         "create",
         "delete",

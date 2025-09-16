@@ -72,6 +72,16 @@ type TestServer struct {
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
 func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
+	return StartTestServerWithOptions(ctx, customFlags, app.DefaultInitFuncConstructors, names.CCMControllerAliases())
+}
+
+// StartTestServerWithOptions starts a cloud-controller-manager with extra controller loop initializer constructors
+// and controller loop aliaes. Within the returned TestServer, a rest client config, a tear-down func,
+// and location of the tmpdir are returned; or an error if one occurred.
+func StartTestServerWithOptions(ctx context.Context,
+	customFlags []string,
+	constructors map[string]app.ControllerInitFuncConstructor,
+	aliases map[string]string) (result TestServer, err error) {
 	logger := klog.FromContext(ctx)
 	stopCh := make(chan struct{})
 	var errCh chan error
@@ -103,11 +113,11 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}
 
+	// Do not run leader election.
 	s, err := options.NewCloudControllerManagerOptions()
 	if err != nil {
 		return TestServer{}, err
 	}
-
 	s.Generic.LeaderElection.LeaderElect = false
 
 	cloudInitializer := func(config *config.CompletedConfig) cloudprovider.Interface {
@@ -126,7 +136,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		return cloud
 	}
 	fss := cliflag.NamedFlagSets{}
-	command := app.NewCloudControllerManagerCommand(s, cloudInitializer, app.DefaultInitFuncConstructors, names.CCMControllerAliases(), fss, stopCh)
+	command := app.NewCloudControllerManagerCommand(s, cloudInitializer, constructors, aliases, fss, stopCh)
 
 	commandArgs := []string{}
 	listeners := []net.Listener{}

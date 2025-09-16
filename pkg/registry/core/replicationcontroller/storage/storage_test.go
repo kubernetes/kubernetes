@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -62,7 +64,10 @@ func newStorage(t *testing.T) (ControllerStorage, *etcd3testing.EtcdTestServer) 
 
 // createController is a helper function that returns a controller with the updated resource version.
 func createController(storage *REST, rc api.ReplicationController, t *testing.T) (api.ReplicationController, error) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), rc.Namespace)
+	ctx := genericapirequest.WithRequestInfo(
+		genericapirequest.WithNamespace(genericapirequest.NewContext(), rc.Namespace),
+		&genericapirequest.RequestInfo{APIGroup: "", APIVersion: "v1"},
+	)
 	obj, err := storage.Create(ctx, &rc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Failed to create controller, %v", err)
@@ -85,6 +90,7 @@ func validNewController() *api.ReplicationController {
 				},
 				Spec: podtest.MakePodSpec(),
 			},
+			Replicas: ptr.To[int32](1),
 		},
 	}
 }
@@ -104,7 +110,7 @@ func TestCreate(t *testing.T) {
 		// invalid (invalid selector)
 		&api.ReplicationController{
 			Spec: api.ReplicationControllerSpec{
-				Replicas: 2,
+				Replicas: ptr.To[int32](2),
 				Selector: map[string]string{},
 				Template: validController.Spec.Template,
 			},
@@ -123,7 +129,7 @@ func TestUpdate(t *testing.T) {
 		// valid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.ReplicationController)
-			object.Spec.Replicas = object.Spec.Replicas + 1
+			object.Spec.Replicas = ptr.To[int32](*object.Spec.Replicas + 1)
 			return object
 		},
 		// invalid updateFunc
@@ -172,7 +178,7 @@ func TestGenerationNumber(t *testing.T) {
 	}
 
 	// Updates to spec should increment the generation number
-	controller.Spec.Replicas++
+	(*controller.Spec.Replicas)++
 	if _, _, err := storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -297,7 +303,7 @@ func TestScaleGet(t *testing.T) {
 			CreationTimestamp: rc.CreationTimestamp,
 		},
 		Spec: autoscaling.ScaleSpec{
-			Replicas: validController.Spec.Replicas,
+			Replicas: *validController.Spec.Replicas,
 		},
 		Status: autoscaling.ScaleStatus{
 			Replicas: validController.Status.Replicas,
@@ -341,7 +347,7 @@ func TestScaleUpdate(t *testing.T) {
 	}
 	scale := obj.(*autoscaling.Scale)
 	if scale.Spec.Replicas != replicas {
-		t.Errorf("wrong replicas count expected: %d got: %d", replicas, rc.Spec.Replicas)
+		t.Errorf("wrong replicas count expected: %d got: %d", replicas, *rc.Spec.Replicas)
 	}
 
 	update.ResourceVersion = rc.ResourceVersion

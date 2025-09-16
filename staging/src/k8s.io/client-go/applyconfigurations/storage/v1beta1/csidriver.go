@@ -29,10 +29,28 @@ import (
 
 // CSIDriverApplyConfiguration represents a declarative configuration of the CSIDriver type for use
 // with apply.
+//
+// CSIDriver captures information about a Container Storage Interface (CSI)
+// volume driver deployed on the cluster.
+// CSI drivers do not need to create the CSIDriver object directly. Instead they may use the
+// cluster-driver-registrar sidecar container. When deployed with a CSI driver it automatically
+// creates a CSIDriver object representing the driver.
+// Kubernetes attach detach controller uses this object to determine whether attach is required.
+// Kubelet uses this object to determine whether pod information needs to be passed on mount.
+// CSIDriver objects are non-namespaced.
 type CSIDriverApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata.
+	// metadata.Name indicates the name of the CSI driver that this object
+	// refers to; it MUST be the same name returned by the CSI GetPluginName()
+	// call for that driver.
+	// The driver name must be 63 characters or less, beginning and ending with
+	// an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and
+	// alphanumerics between.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *CSIDriverSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec represents the specification of the CSI Driver.
+	Spec *CSIDriverSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // CSIDriver constructs a declarative configuration of the CSIDriver type for use with
@@ -45,29 +63,14 @@ func CSIDriver(name string) *CSIDriverApplyConfiguration {
 	return b
 }
 
-// ExtractCSIDriver extracts the applied configuration owned by fieldManager from
-// cSIDriver. If no managedFields are found in cSIDriver for fieldManager, a
-// CSIDriverApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractCSIDriverFrom extracts the applied configuration owned by fieldManager from
+// cSIDriver for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // cSIDriver must be a unmodified CSIDriver API object that was retrieved from the Kubernetes API.
-// ExtractCSIDriver provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractCSIDriverFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractCSIDriver(cSIDriver *storagev1beta1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
-	return extractCSIDriver(cSIDriver, fieldManager, "")
-}
-
-// ExtractCSIDriverStatus is the same as ExtractCSIDriver except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractCSIDriverStatus(cSIDriver *storagev1beta1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
-	return extractCSIDriver(cSIDriver, fieldManager, "status")
-}
-
-func extractCSIDriver(cSIDriver *storagev1beta1.CSIDriver, fieldManager string, subresource string) (*CSIDriverApplyConfiguration, error) {
+func ExtractCSIDriverFrom(cSIDriver *storagev1beta1.CSIDriver, fieldManager string, subresource string) (*CSIDriverApplyConfiguration, error) {
 	b := &CSIDriverApplyConfiguration{}
 	err := managedfields.ExtractInto(cSIDriver, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSIDriver"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +82,22 @@ func extractCSIDriver(cSIDriver *storagev1beta1.CSIDriver, fieldManager string, 
 	b.WithAPIVersion("storage.k8s.io/v1beta1")
 	return b, nil
 }
+
+// ExtractCSIDriver extracts the applied configuration owned by fieldManager from
+// cSIDriver. If no managedFields are found in cSIDriver for fieldManager, a
+// CSIDriverApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// cSIDriver must be a unmodified CSIDriver API object that was retrieved from the Kubernetes API.
+// ExtractCSIDriver provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractCSIDriver(cSIDriver *storagev1beta1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
+	return ExtractCSIDriverFrom(cSIDriver, fieldManager, "")
+}
+
+func (b CSIDriverApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -246,8 +265,24 @@ func (b *CSIDriverApplyConfiguration) WithSpec(value *CSIDriverSpecApplyConfigur
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *CSIDriverApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *CSIDriverApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *CSIDriverApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *CSIDriverApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

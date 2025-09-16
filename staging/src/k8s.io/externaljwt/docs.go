@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package externaljwt contains the proto definitions for the ExternalJWTSigner.
-package externaljwt // import "k8s.io/externaljwt"
+package externaljwt

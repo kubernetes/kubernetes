@@ -18,13 +18,14 @@ package library
 
 import (
 	"fmt"
+	"math"
+
 	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-	"math"
 
 	"k8s.io/apiserver/pkg/cel"
 )
@@ -202,7 +203,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 
 			return &cost
 		}
-	case "quantity", "isQuantity":
+	case "quantity", "isQuantity", "semver", "isSemver":
 		if len(args) >= 1 {
 			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
 			return &cost
@@ -236,7 +237,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 		// Simply dictionary lookup
 		cost := uint64(1)
 		return &cost
-	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub":
+	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch":
 		cost := uint64(1)
 		return &cost
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
@@ -420,26 +421,22 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			return &checker.CallEstimate{CostEstimate: strCost.Multiply(regexCost), ResultSize: &checker.SizeEstimate{Min: 0, Max: sz.Max}}
 		}
 	case "cidr", "isIP", "isCIDR":
-		if target != nil {
+		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
 		}
 	case "ip":
-		if target != nil && len(args) >= 1 {
-			if overloadId == "cidr_ip" {
-				// The IP member of the CIDR object is just accessing a field.
-				// Nominal cost.
-				return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
-			}
-
-			sz := l.sizeEstimate(args[0])
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
-		} else if target != nil {
-			// The IP member of a CIDR is a just accessing a field, nominal cost.
+		if overloadId == "cidr_ip" {
+			// The IP member of the CIDR object is just accessing a field.
+			// Nominal cost.
 			return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 		}
+		if len(args) >= 1 {
+			sz := l.sizeEstimate(args[0])
+			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+		}
 	case "ip.isCanonical":
-		if target != nil && len(args) >= 1 {
+		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
 			// We have to parse the string and then compare the parsed string to the original string.
 			// So we double the cost of parsing the string.
@@ -449,7 +446,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 		// IP and CIDR accessors are nominal cost.
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "containsIP":
-		if target != nil && len(args) >= 1 {
+		if len(args) >= 1 {
 			// The base cost of the function is the cost of comparing two byte lists.
 			// The byte lists will be either ipv4 or ipv6 so will have a length of 4, or 16 bytes.
 			sz := checker.SizeEstimate{Min: 4, Max: 16}
@@ -465,7 +462,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			return &checker.CallEstimate{CostEstimate: ipCompCost}
 		}
 	case "containsCIDR":
-		if target != nil && len(args) >= 1 {
+		if len(args) >= 1 {
 			// The base cost of the function is the cost of comparing two byte lists.
 			// The byte lists will be either ipv4 or ipv6 so will have a length of 4, or 16 bytes.
 			sz := checker.SizeEstimate{Min: 4, Max: 16}
@@ -486,19 +483,19 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 
 			return &checker.CallEstimate{CostEstimate: ipCompCost}
 		}
-	case "quantity", "isQuantity":
-		if target != nil {
+	case "quantity", "isQuantity", "semver", "isSemver":
+		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
 		}
 	case "validate":
-		if target != nil {
+		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor).MultiplyByCostFactor(cel.MaxNameFormatRegexSize * common.RegexStringLengthCostFactor)}
 		}
 	case "format.named":
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
-	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub":
+	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch":
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
 		// url accessors

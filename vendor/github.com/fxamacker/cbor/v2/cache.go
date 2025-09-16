@@ -17,6 +17,7 @@ import (
 type encodeFuncs struct {
 	ef  encodeFunc
 	ief isEmptyFunc
+	izf isZeroFunc
 }
 
 var (
@@ -31,10 +32,12 @@ type specialType int
 const (
 	specialTypeNone specialType = iota
 	specialTypeUnmarshalerIface
+	specialTypeUnexportedUnmarshalerIface
 	specialTypeEmptyIface
 	specialTypeIface
 	specialTypeTag
 	specialTypeTime
+	specialTypeJSONUnmarshalerIface
 )
 
 type typeInfo struct {
@@ -50,7 +53,7 @@ type typeInfo struct {
 func newTypeInfo(t reflect.Type) *typeInfo {
 	tInfo := typeInfo{typ: t, kind: t.Kind()}
 
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 
@@ -69,8 +72,12 @@ func newTypeInfo(t reflect.Type) *typeInfo {
 		tInfo.spclType = specialTypeTag
 	} else if t == typeTime {
 		tInfo.spclType = specialTypeTime
-	} else if reflect.PtrTo(t).Implements(typeUnmarshaler) {
+	} else if reflect.PointerTo(t).Implements(typeUnexportedUnmarshaler) {
+		tInfo.spclType = specialTypeUnexportedUnmarshalerIface
+	} else if reflect.PointerTo(t).Implements(typeUnmarshaler) {
 		tInfo.spclType = specialTypeUnmarshalerIface
+	} else if reflect.PointerTo(t).Implements(typeJSONUnmarshaler) {
+		tInfo.spclType = specialTypeJSONUnmarshalerIface
 	}
 
 	switch k {
@@ -237,7 +244,7 @@ func getEncodingStructType(t reflect.Type) (*encodingStructType, error) {
 	e := getEncodeBuffer()
 	for i := 0; i < len(flds); i++ {
 		// Get field's encodeFunc
-		flds[i].ef, flds[i].ief = getEncodeFunc(flds[i].typ)
+		flds[i].ef, flds[i].ief, flds[i].izf = getEncodeFunc(flds[i].typ)
 		if flds[i].ef == nil {
 			err = &UnsupportedTypeError{t}
 			break
@@ -321,7 +328,7 @@ func getEncodingStructType(t reflect.Type) (*encodingStructType, error) {
 func getEncodingStructToArrayType(t reflect.Type, flds fields) (*encodingStructType, error) {
 	for i := 0; i < len(flds); i++ {
 		// Get field's encodeFunc
-		flds[i].ef, flds[i].ief = getEncodeFunc(flds[i].typ)
+		flds[i].ef, flds[i].ief, flds[i].izf = getEncodeFunc(flds[i].typ)
 		if flds[i].ef == nil {
 			structType := &encodingStructType{err: &UnsupportedTypeError{t}}
 			encodingStructTypeCache.Store(t, structType)
@@ -337,14 +344,14 @@ func getEncodingStructToArrayType(t reflect.Type, flds fields) (*encodingStructT
 	return structType, structType.err
 }
 
-func getEncodeFunc(t reflect.Type) (encodeFunc, isEmptyFunc) {
+func getEncodeFunc(t reflect.Type) (encodeFunc, isEmptyFunc, isZeroFunc) {
 	if v, _ := encodeFuncCache.Load(t); v != nil {
 		fs := v.(encodeFuncs)
-		return fs.ef, fs.ief
+		return fs.ef, fs.ief, fs.izf
 	}
-	ef, ief := getEncodeFuncInternal(t)
-	encodeFuncCache.Store(t, encodeFuncs{ef, ief})
-	return ef, ief
+	ef, ief, izf := getEncodeFuncInternal(t)
+	encodeFuncCache.Store(t, encodeFuncs{ef, ief, izf})
+	return ef, ief, izf
 }
 
 func getTypeInfo(t reflect.Type) *typeInfo {

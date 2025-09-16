@@ -19,7 +19,6 @@ package peerproxy
 import (
 	"net/http"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -27,41 +26,38 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
-	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
-	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/reconcilers"
-	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	"k8s.io/apiserver/pkg/storageversion"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/peerproxy/metrics"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 const (
-	requestTimeout = 30 * time.Second
-	localServerID  = "local-apiserver"
-	remoteServerID = "remote-apiserver"
+	requestTimeout  = 30 * time.Second
+	localServerID   = "local-apiserver"
+	remoteServerID1 = "remote-apiserver-1"
+	remoteServerID2 = "remote-apiserver-2"
 )
-
-type FakeSVMapData struct {
-	gvr       schema.GroupVersionResource
-	serverIDs []string
-}
 
 type server struct {
 	publicIP string
@@ -76,205 +72,138 @@ type reconciler struct {
 func TestPeerProxy(t *testing.T) {
 	testCases := []struct {
 		desc                 string
-		svdata               FakeSVMapData
 		informerFinishedSync bool
 		requestPath          string
 		peerproxiedHeader    string
-		expectedStatus       int
-		metrics              []string
-		want                 string
 		reconcilerConfig     reconciler
+		localCache           map[schema.GroupVersionResource]bool
+		peerCache            map[string]map[schema.GroupVersionResource]bool
+		wantStatus           int
+		wantMetricsData      string
 	}{
 		{
-			desc:           "allow non resource requests",
-			requestPath:    "/foo/bar/baz",
-			expectedStatus: http.StatusOK,
+			desc:        "allow non resource requests",
+			requestPath: "/foo/bar/baz",
+			wantStatus:  http.StatusOK,
 		},
 		{
 			desc:              "allow if already proxied once",
 			requestPath:       "/api/bar/baz",
-			expectedStatus:    http.StatusOK,
 			peerproxiedHeader: "true",
+			wantStatus:        http.StatusOK,
 		},
 		{
 			desc:                 "allow if unsynced informers",
 			requestPath:          "/api/bar/baz",
-			expectedStatus:       http.StatusOK,
 			informerFinishedSync: false,
+			wantStatus:           http.StatusOK,
 		},
 		{
-			desc:                 "allow if no storage version found",
-			requestPath:          "/api/bar/baz",
-			expectedStatus:       http.StatusOK,
-			informerFinishedSync: true,
+			desc:        "Serve locally if serviceable",
+			requestPath: "/api/foo/bar",
+			localCache: map[schema.GroupVersionResource]bool{
+				{Group: "core", Version: "foo", Resource: "bar"}: true,
+			},
+			wantStatus: http.StatusOK,
 		},
 		{
-			// since if no server id is found, we pass request to next handler
-			//, and our last handler in local chain is an http ok handler
-			desc:                 "200 if no serverid found",
-			requestPath:          "/api/bar/baz",
-			expectedStatus:       http.StatusOK,
+			desc:                 "200 if no appropriate peers found, serve locally",
+			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			svdata: FakeSVMapData{
-				gvr: schema.GroupVersionResource{
-					Group:    "core",
-					Version:  "bar",
-					Resource: "baz"},
-				serverIDs: []string{}},
+			wantStatus:           http.StatusOK,
 		},
 		{
 			desc:                 "503 if no endpoint fetched from lease",
 			requestPath:          "/api/foo/bar",
-			expectedStatus:       http.StatusServiceUnavailable,
 			informerFinishedSync: true,
-			svdata: FakeSVMapData{
-				gvr: schema.GroupVersionResource{
-					Group:    "core",
-					Version:  "foo",
-					Resource: "bar"},
-				serverIDs: []string{remoteServerID}},
-		},
-		{
-			desc:                 "200 if locally serviceable",
-			requestPath:          "/api/foo/bar",
-			expectedStatus:       http.StatusOK,
-			informerFinishedSync: true,
-			svdata: FakeSVMapData{
-				gvr: schema.GroupVersionResource{
-					Group:    "core",
-					Version:  "foo",
-					Resource: "bar"},
-				serverIDs: []string{localServerID}},
+			peerCache: map[string]map[schema.GroupVersionResource]bool{
+				remoteServerID1: {
+					{Group: "core", Version: "foo", Resource: "bar"}: true,
+				},
+			},
+			wantStatus: http.StatusServiceUnavailable,
 		},
 		{
 			desc:                 "503 unreachable peer bind address",
 			requestPath:          "/api/foo/bar",
-			expectedStatus:       http.StatusServiceUnavailable,
 			informerFinishedSync: true,
-			svdata: FakeSVMapData{
-				gvr: schema.GroupVersionResource{
-					Group:    "core",
-					Version:  "foo",
-					Resource: "bar"},
-				serverIDs: []string{remoteServerID}},
+			peerCache: map[string]map[schema.GroupVersionResource]bool{
+				remoteServerID1: {
+					{Group: "core", Version: "foo", Resource: "bar"}: true,
+				},
+			},
 			reconcilerConfig: reconciler{
 				do: true,
 				servers: []server{
 					{
 						publicIP: "1.2.3.4",
-						serverID: remoteServerID,
+						serverID: remoteServerID1,
 					},
 				},
 			},
-			metrics: []string{
-				"apiserver_rerouted_request_total",
-			},
-			want: `
-			# HELP apiserver_rerouted_request_total [ALPHA] Total number of requests that were proxied to a peer kube apiserver because the local apiserver was not capable of serving it
-			# TYPE apiserver_rerouted_request_total counter
-			apiserver_rerouted_request_total{code="503"} 1
-			`,
-		},
-		{
-			desc:                 "503 unreachable peer public address",
-			requestPath:          "/api/foo/bar",
-			expectedStatus:       http.StatusServiceUnavailable,
-			informerFinishedSync: true,
-			svdata: FakeSVMapData{
-				gvr: schema.GroupVersionResource{
-					Group:    "core",
-					Version:  "foo",
-					Resource: "bar"},
-				serverIDs: []string{remoteServerID}},
-			reconcilerConfig: reconciler{
-				do: true,
-				servers: []server{
-					{
-						publicIP: "1.2.3.4",
-						serverID: remoteServerID,
-					},
-				},
-			},
-			metrics: []string{
-				"apiserver_rerouted_request_total",
-			},
-			want: `
-			# HELP apiserver_rerouted_request_total [ALPHA] Total number of requests that were proxied to a peer kube apiserver because the local apiserver was not capable of serving it
-			# TYPE apiserver_rerouted_request_total counter
-			apiserver_rerouted_request_total{code="503"} 2
-			`,
+			wantStatus: http.StatusServiceUnavailable,
+			wantMetricsData: `
+				# HELP apiserver_rerouted_request_total [ALPHA] Total number of requests that were proxied to a peer kube apiserver because the local apiserver was not capable of serving it
+				# TYPE apiserver_rerouted_request_total counter
+				apiserver_rerouted_request_total{code="503"} 1
+				`,
 		},
 		{
 			desc:                 "503 if one apiserver's endpoint lease wasnt found but another valid (unreachable) apiserver was found",
 			requestPath:          "/api/foo/bar",
-			expectedStatus:       http.StatusServiceUnavailable,
 			informerFinishedSync: true,
-			svdata: FakeSVMapData{
-				gvr: schema.GroupVersionResource{
-					Group:    "core",
-					Version:  "foo",
-					Resource: "bar"},
-				serverIDs: []string{"aggregated-apiserver", remoteServerID}},
+			peerCache: map[string]map[schema.GroupVersionResource]bool{
+				remoteServerID1: {
+					{Group: "core", Version: "foo", Resource: "bar"}: true,
+				},
+				remoteServerID2: {
+					{Group: "core", Version: "foo", Resource: "bar"}: true,
+				},
+			},
 			reconcilerConfig: reconciler{
 				do: true,
 				servers: []server{
 					{
 						publicIP: "1.2.3.4",
-						serverID: remoteServerID,
+						serverID: remoteServerID1,
 					},
 				},
 			},
-		},
-		{
-			desc:                 "503 if all peers had invalid host:port info",
-			requestPath:          "/api/foo/bar",
-			expectedStatus:       http.StatusServiceUnavailable,
-			informerFinishedSync: true,
-			svdata: FakeSVMapData{
-				gvr: schema.GroupVersionResource{
-					Group:    "core",
-					Version:  "foo",
-					Resource: "bar"},
-				serverIDs: []string{"aggregated-apiserver", remoteServerID}},
-			reconcilerConfig: reconciler{
-				do: true,
-				servers: []server{
-					{
-						publicIP: "1[2.4",
-						serverID: "aggregated-apiserver",
-					},
-					{
-						publicIP: "2.4]6",
-						serverID: remoteServerID,
-					},
-				},
-			},
+			wantStatus: http.StatusServiceUnavailable,
+			wantMetricsData: `
+				# HELP apiserver_rerouted_request_total [ALPHA] Total number of requests that were proxied to a peer kube apiserver because the local apiserver was not capable of serving it
+				# TYPE apiserver_rerouted_request_total counter
+				apiserver_rerouted_request_total{code="503"} 1
+				`,
 		},
 	}
 
 	metrics.Register()
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
+			defer metrics.Reset()
 			lastHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte("OK"))
 			})
-			reconciler := newFakePeerEndpointReconciler(t)
-			handler := newHandlerChain(t, lastHandler, reconciler, tt.informerFinishedSync, tt.svdata)
+			serverIDs := []string{localServerID}
+			for peerID := range tt.peerCache {
+				serverIDs = append(serverIDs, peerID)
+			}
+			fakeReconciler := newFakePeerEndpointReconciler(t)
+			handler := newHandlerChain(t, tt.informerFinishedSync, lastHandler, fakeReconciler, tt.localCache, tt.peerCache)
 			server, requestGetter := createHTTP2ServerWithClient(handler, requestTimeout*2)
 			defer server.Close()
 
 			if tt.reconcilerConfig.do {
-				// need to enable feature flags first
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)
 
-				for _, server := range tt.reconcilerConfig.servers {
-					err := reconciler.UpdateLease(server.serverID,
-						server.publicIP,
+				for _, s := range tt.reconcilerConfig.servers {
+					err := fakeReconciler.UpdateLease(s.serverID,
+						s.publicIP,
 						[]corev1.EndpointPort{{Name: "foo",
 							Port: 8080, Protocol: "TCP"}})
 					if err != nil {
-						t.Fatalf("failed to update peer endpoint lease - %v", err)
+						t.Errorf("Failed to update lease for server %s", s.serverID)
 					}
 				}
 			}
@@ -285,17 +214,14 @@ func TestPeerProxy(t *testing.T) {
 			}
 			req.Header.Set(PeerProxiedHeader, tt.peerproxiedHeader)
 
-			resp, err := requestGetter(req)
-			if err != nil {
-				t.Fatalf("unexpected error trying to get the request: %v", err)
-			}
+			resp, _ := requestGetter(req)
 
 			// compare response
-			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+			assert.Equal(t, tt.wantStatus, resp.StatusCode)
 
 			// compare metric
-			if tt.want != "" {
-				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
+			if tt.wantMetricsData != "" {
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.wantMetricsData), []string{"apiserver_rerouted_request_total"}...); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -324,10 +250,12 @@ func newFakePeerEndpointReconciler(t *testing.T) reconcilers.PeerEndpointLeaseRe
 	return reconciler
 }
 
-func newHandlerChain(t *testing.T, handler http.Handler, reconciler reconcilers.PeerEndpointLeaseReconciler, informerFinishedSync bool, svdata FakeSVMapData) http.Handler {
+func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handler,
+	reconciler reconcilers.PeerEndpointLeaseReconciler,
+	localCache map[schema.GroupVersionResource]bool, peerCache map[string]map[schema.GroupVersionResource]bool) http.Handler {
 	// Add peerproxy handler
 	s := serializer.NewCodecFactory(runtime.NewScheme()).WithoutConversion()
-	peerProxyHandler, err := newFakePeerProxyHandler(reconciler, svdata, localServerID, s)
+	peerProxyHandler, err := newFakePeerProxyHandler(informerFinishedSync, reconciler, localServerID, s, localCache, peerCache)
 	if err != nil {
 		t.Fatalf("Error creating peer proxy handler: %v", err)
 	}
@@ -343,36 +271,28 @@ func newHandlerChain(t *testing.T, handler http.Handler, reconciler reconcilers.
 	return handler
 }
 
-func newFakePeerProxyHandler(reconciler reconcilers.PeerEndpointLeaseReconciler, svdata FakeSVMapData, id string, s runtime.NegotiatedSerializer) (*peerProxyHandler, error) {
+func newFakePeerProxyHandler(informerFinishedSync bool,
+	reconciler reconcilers.PeerEndpointLeaseReconciler, id string, s runtime.NegotiatedSerializer,
+	localCache map[schema.GroupVersionResource]bool, peerCache map[string]map[schema.GroupVersionResource]bool) (*peerProxyHandler, error) {
 	clientset := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
+	leaseInformer := informerFactory.Coordination().V1().Leases()
 	clientConfig := &transport.Config{
 		TLS: transport.TLSConfig{
 			Insecure: false,
 		}}
-	proxyRoundTripper, err := transport.New(clientConfig)
+	loopbackClientConfig := &rest.Config{
+		Host: "localhost:1010",
+	}
+	ppH, err := NewPeerProxyHandler(id, "identity=testserver", leaseInformer, reconciler, s, loopbackClientConfig, clientConfig)
 	if err != nil {
 		return nil, err
 	}
-	ppI := NewPeerProxyHandler(informerFactory, storageversion.NewDefaultManager(), proxyRoundTripper, id, reconciler, s)
-	if testDataExists(svdata.gvr) {
-		ppI.addToStorageVersionMap(svdata.gvr, svdata.serverIDs)
-	}
-	return ppI, nil
-}
+	ppH.localDiscoveryInfoCache.Store(localCache)
+	ppH.peerDiscoveryInfoCache.Store(peerCache)
 
-func (h *peerProxyHandler) addToStorageVersionMap(gvr schema.GroupVersionResource, serverIDs []string) {
-	apiserversi, _ := h.svMap.LoadOrStore(gvr, &sync.Map{})
-	apiservers := apiserversi.(*sync.Map)
-	for _, serverID := range serverIDs {
-		if serverID != "" {
-			apiservers.Store(serverID, true)
-		}
-	}
-}
-
-func testDataExists(gvr schema.GroupVersionResource) bool {
-	return gvr.Group != "" && gvr.Version != "" && gvr.Resource != ""
+	ppH.finishedSync.Store(informerFinishedSync)
+	return ppH, nil
 }
 
 func withFakeUser(handler http.Handler) http.Handler {

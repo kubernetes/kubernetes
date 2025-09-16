@@ -18,4 +18,4 @@ limitations under the License.
 // +groupName=apidiscovery.k8s.io
 
 // Package apidiscovery provides api definitions for the "apidiscovery.k8s.io" api group.
-package apidiscovery // import "k8s.io/kubernetes/pkg/apis/apidiscovery"
+package apidiscovery

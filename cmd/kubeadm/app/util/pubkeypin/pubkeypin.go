@@ -24,7 +24,7 @@ import (
 	"encoding/hex"
 	"strings"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 const (

@@ -181,6 +181,18 @@ patterns in the spec.
 For a deeper discussion, see
 [this](https://github.com/open-telemetry/opentelemetry-specification/issues/165).
 
+## Tests
+
+Each functionality should be covered by tests.
+
+Performance-critical functionality should also be covered by benchmarks.
+
+- Pull requests adding a performance-critical functionality
+should have `go test -bench` output in their description.
+- Pull requests changing a performance-critical functionality
+should have [`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat)
+output in their description.
+
 ## Documentation
 
 Each (non-internal, non-test) package must be documented using
@@ -578,7 +590,10 @@ See also:
 The tests should never leak goroutines.
 
 Use the term `ConcurrentSafe` in the test name when it aims to verify the
-absence of race conditions.
+absence of race conditions. The top-level tests with this term will be run
+many times in the `test-concurrent-safe` CI job to increase the chance of
+catching concurrency issues. This does not apply to subtests when this term
+is not in their root name.
 
 ### Internal packages
 
@@ -626,13 +641,15 @@ should be canceled.
 
 ## Approvers and Maintainers
 
-### Approvers
+### Triagers
 
-- [Chester Cheung](https://github.com/hanyuancheung), Tencent
+- [Alex Kats](https://github.com/akats7), Capital One
+- [Cheng-Zhen Yang](https://github.com/scorpionknifes), Independent
+
+### Approvers
 
 ### Maintainers
 
-- [Aaron Clawson](https://github.com/MadVikingGod), LightStep
 - [Damien Mathieu](https://github.com/dmathieu), Elastic
 - [David Ashpole](https://github.com/dashpole), Google
 - [Robert Pająk](https://github.com/pellared), Splunk
@@ -641,16 +658,18 @@ should be canceled.
 
 ### Emeritus
 
-- [Liz Fong-Jones](https://github.com/lizthegrey), Honeycomb
-- [Gustavo Silva Paiva](https://github.com/paivagustavo), LightStep
-- [Josh MacDonald](https://github.com/jmacd), LightStep
-- [Anthony Mirabella](https://github.com/Aneurysm9), AWS
-- [Evan Torrie](https://github.com/evantorrie), Yahoo
+- [Aaron Clawson](https://github.com/MadVikingGod)
+- [Anthony Mirabella](https://github.com/Aneurysm9)
+- [Chester Cheung](https://github.com/hanyuancheung)
+- [Evan Torrie](https://github.com/evantorrie)
+- [Gustavo Silva Paiva](https://github.com/paivagustavo)
+- [Josh MacDonald](https://github.com/jmacd)
+- [Liz Fong-Jones](https://github.com/lizthegrey)
 
 ### Become an Approver or a Maintainer
 
 See the [community membership document in OpenTelemetry community
-repo](https://github.com/open-telemetry/community/blob/main/community-membership.md).
+repo](https://github.com/open-telemetry/community/blob/main/guides/contributor/membership.md).
 
 [Approver]: #approvers
 [Maintainer]: #maintainers

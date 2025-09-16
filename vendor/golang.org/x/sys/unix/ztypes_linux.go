@@ -114,8 +114,10 @@ type Statx_t struct {
 	Atomic_write_unit_min     uint32
 	Atomic_write_unit_max     uint32
 	Atomic_write_segments_max uint32
+	Dio_read_offset_align     uint32
+	Atomic_write_unit_max_opt uint32
 	_                         [1]uint32
-	_                         [9]uint64
+	_                         [8]uint64
 }
 
 type Fsid struct {
@@ -199,7 +201,8 @@ type FscryptAddKeyArg struct {
 	Key_spec FscryptKeySpecifier
 	Raw_size uint32
 	Key_id   uint32
-	_        [8]uint32
+	Flags    uint32
+	_        [7]uint32
 }
 
 type FscryptRemoveKeyArg struct {
@@ -1752,12 +1755,6 @@ const (
 	IFLA_IPVLAN_UNSPEC                         = 0x0
 	IFLA_IPVLAN_MODE                           = 0x1
 	IFLA_IPVLAN_FLAGS                          = 0x2
-	NETKIT_NEXT                                = -0x1
-	NETKIT_PASS                                = 0x0
-	NETKIT_DROP                                = 0x2
-	NETKIT_REDIRECT                            = 0x7
-	NETKIT_L2                                  = 0x0
-	NETKIT_L3                                  = 0x1
 	IFLA_NETKIT_UNSPEC                         = 0x0
 	IFLA_NETKIT_PEER_INFO                      = 0x1
 	IFLA_NETKIT_PRIMARY                        = 0x2
@@ -1796,6 +1793,7 @@ const (
 	IFLA_VXLAN_DF                              = 0x1d
 	IFLA_VXLAN_VNIFILTER                       = 0x1e
 	IFLA_VXLAN_LOCALBYPASS                     = 0x1f
+	IFLA_VXLAN_LABEL_POLICY                    = 0x20
 	IFLA_GENEVE_UNSPEC                         = 0x0
 	IFLA_GENEVE_ID                             = 0x1
 	IFLA_GENEVE_REMOTE                         = 0x2
@@ -1825,6 +1823,8 @@ const (
 	IFLA_GTP_ROLE                              = 0x4
 	IFLA_GTP_CREATE_SOCKETS                    = 0x5
 	IFLA_GTP_RESTART_COUNT                     = 0x6
+	IFLA_GTP_LOCAL                             = 0x7
+	IFLA_GTP_LOCAL6                            = 0x8
 	IFLA_BOND_UNSPEC                           = 0x0
 	IFLA_BOND_MODE                             = 0x1
 	IFLA_BOND_ACTIVE_SLAVE                     = 0x2
@@ -1857,6 +1857,7 @@ const (
 	IFLA_BOND_AD_LACP_ACTIVE                   = 0x1d
 	IFLA_BOND_MISSED_MAX                       = 0x1e
 	IFLA_BOND_NS_IP6_TARGET                    = 0x1f
+	IFLA_BOND_COUPLED_CONTROL                  = 0x20
 	IFLA_BOND_AD_INFO_UNSPEC                   = 0x0
 	IFLA_BOND_AD_INFO_AGGREGATOR               = 0x1
 	IFLA_BOND_AD_INFO_NUM_PORTS                = 0x2
@@ -1925,6 +1926,7 @@ const (
 	IFLA_HSR_SEQ_NR                            = 0x5
 	IFLA_HSR_VERSION                           = 0x6
 	IFLA_HSR_PROTOCOL                          = 0x7
+	IFLA_HSR_INTERLINK                         = 0x8
 	IFLA_STATS_UNSPEC                          = 0x0
 	IFLA_STATS_LINK_64                         = 0x1
 	IFLA_STATS_LINK_XSTATS                     = 0x2
@@ -1975,6 +1977,15 @@ const (
 	IFLA_DSA_UNSPEC                            = 0x0
 	IFLA_DSA_CONDUIT                           = 0x1
 	IFLA_DSA_MASTER                            = 0x1
+)
+
+const (
+	NETKIT_NEXT     = -0x1
+	NETKIT_PASS     = 0x0
+	NETKIT_DROP     = 0x2
+	NETKIT_REDIRECT = 0x7
+	NETKIT_L2       = 0x0
+	NETKIT_L3       = 0x1
 )
 
 const (
@@ -2218,8 +2229,11 @@ const (
 	NFT_PAYLOAD_LL_HEADER             = 0x0
 	NFT_PAYLOAD_NETWORK_HEADER        = 0x1
 	NFT_PAYLOAD_TRANSPORT_HEADER      = 0x2
+	NFT_PAYLOAD_INNER_HEADER          = 0x3
+	NFT_PAYLOAD_TUN_HEADER            = 0x4
 	NFT_PAYLOAD_CSUM_NONE             = 0x0
 	NFT_PAYLOAD_CSUM_INET             = 0x1
+	NFT_PAYLOAD_CSUM_SCTP             = 0x2
 	NFT_PAYLOAD_L4CSUM_PSEUDOHDR      = 0x1
 	NFTA_PAYLOAD_UNSPEC               = 0x0
 	NFTA_PAYLOAD_DREG                 = 0x1
@@ -2306,6 +2320,11 @@ const (
 	NFT_CT_AVGPKT                     = 0x10
 	NFT_CT_ZONE                       = 0x11
 	NFT_CT_EVENTMASK                  = 0x12
+	NFT_CT_SRC_IP                     = 0x13
+	NFT_CT_DST_IP                     = 0x14
+	NFT_CT_SRC_IP6                    = 0x15
+	NFT_CT_DST_IP6                    = 0x16
+	NFT_CT_ID                         = 0x17
 	NFTA_CT_UNSPEC                    = 0x0
 	NFTA_CT_DREG                      = 0x1
 	NFTA_CT_KEY                       = 0x2
@@ -2586,8 +2605,8 @@ const (
 	SOF_TIMESTAMPING_BIND_PHC     = 0x8000
 	SOF_TIMESTAMPING_OPT_ID_TCP   = 0x10000
 
-	SOF_TIMESTAMPING_LAST = 0x10000
-	SOF_TIMESTAMPING_MASK = 0x1ffff
+	SOF_TIMESTAMPING_LAST = 0x40000
+	SOF_TIMESTAMPING_MASK = 0x7ffff
 
 	SCM_TSTAMP_SND   = 0x0
 	SCM_TSTAMP_SCHED = 0x1
@@ -3533,7 +3552,7 @@ type Nhmsg struct {
 type NexthopGrp struct {
 	Id     uint32
 	Weight uint8
-	Resvd1 uint8
+	High   uint8
 	Resvd2 uint16
 }
 
@@ -3794,7 +3813,16 @@ const (
 	ETHTOOL_MSG_PSE_GET                       = 0x24
 	ETHTOOL_MSG_PSE_SET                       = 0x25
 	ETHTOOL_MSG_RSS_GET                       = 0x26
-	ETHTOOL_MSG_USER_MAX                      = 0x2c
+	ETHTOOL_MSG_PLCA_GET_CFG                  = 0x27
+	ETHTOOL_MSG_PLCA_SET_CFG                  = 0x28
+	ETHTOOL_MSG_PLCA_GET_STATUS               = 0x29
+	ETHTOOL_MSG_MM_GET                        = 0x2a
+	ETHTOOL_MSG_MM_SET                        = 0x2b
+	ETHTOOL_MSG_MODULE_FW_FLASH_ACT           = 0x2c
+	ETHTOOL_MSG_PHY_GET                       = 0x2d
+	ETHTOOL_MSG_TSCONFIG_GET                  = 0x2e
+	ETHTOOL_MSG_TSCONFIG_SET                  = 0x2f
+	ETHTOOL_MSG_USER_MAX                      = 0x2f
 	ETHTOOL_MSG_KERNEL_NONE                   = 0x0
 	ETHTOOL_MSG_STRSET_GET_REPLY              = 0x1
 	ETHTOOL_MSG_LINKINFO_GET_REPLY            = 0x2
@@ -3834,7 +3862,17 @@ const (
 	ETHTOOL_MSG_MODULE_NTF                    = 0x24
 	ETHTOOL_MSG_PSE_GET_REPLY                 = 0x25
 	ETHTOOL_MSG_RSS_GET_REPLY                 = 0x26
-	ETHTOOL_MSG_KERNEL_MAX                    = 0x2c
+	ETHTOOL_MSG_PLCA_GET_CFG_REPLY            = 0x27
+	ETHTOOL_MSG_PLCA_GET_STATUS_REPLY         = 0x28
+	ETHTOOL_MSG_PLCA_NTF                      = 0x29
+	ETHTOOL_MSG_MM_GET_REPLY                  = 0x2a
+	ETHTOOL_MSG_MM_NTF                        = 0x2b
+	ETHTOOL_MSG_MODULE_FW_FLASH_NTF           = 0x2c
+	ETHTOOL_MSG_PHY_GET_REPLY                 = 0x2d
+	ETHTOOL_MSG_PHY_NTF                       = 0x2e
+	ETHTOOL_MSG_TSCONFIG_GET_REPLY            = 0x2f
+	ETHTOOL_MSG_TSCONFIG_SET_REPLY            = 0x30
+	ETHTOOL_MSG_KERNEL_MAX                    = 0x30
 	ETHTOOL_FLAG_COMPACT_BITSETS              = 0x1
 	ETHTOOL_FLAG_OMIT_REPLY                   = 0x2
 	ETHTOOL_FLAG_STATS                        = 0x4
@@ -3842,7 +3880,7 @@ const (
 	ETHTOOL_A_HEADER_DEV_INDEX                = 0x1
 	ETHTOOL_A_HEADER_DEV_NAME                 = 0x2
 	ETHTOOL_A_HEADER_FLAGS                    = 0x3
-	ETHTOOL_A_HEADER_MAX                      = 0x3
+	ETHTOOL_A_HEADER_MAX                      = 0x4
 	ETHTOOL_A_BITSET_BIT_UNSPEC               = 0x0
 	ETHTOOL_A_BITSET_BIT_INDEX                = 0x1
 	ETHTOOL_A_BITSET_BIT_NAME                 = 0x2
@@ -3941,7 +3979,12 @@ const (
 	ETHTOOL_A_RINGS_TCP_DATA_SPLIT            = 0xb
 	ETHTOOL_A_RINGS_CQE_SIZE                  = 0xc
 	ETHTOOL_A_RINGS_TX_PUSH                   = 0xd
-	ETHTOOL_A_RINGS_MAX                       = 0x10
+	ETHTOOL_A_RINGS_RX_PUSH                   = 0xe
+	ETHTOOL_A_RINGS_TX_PUSH_BUF_LEN           = 0xf
+	ETHTOOL_A_RINGS_TX_PUSH_BUF_LEN_MAX       = 0x10
+	ETHTOOL_A_RINGS_HDS_THRESH                = 0x11
+	ETHTOOL_A_RINGS_HDS_THRESH_MAX            = 0x12
+	ETHTOOL_A_RINGS_MAX                       = 0x12
 	ETHTOOL_A_CHANNELS_UNSPEC                 = 0x0
 	ETHTOOL_A_CHANNELS_HEADER                 = 0x1
 	ETHTOOL_A_CHANNELS_RX_MAX                 = 0x2
@@ -4007,7 +4050,9 @@ const (
 	ETHTOOL_A_TSINFO_TX_TYPES                 = 0x3
 	ETHTOOL_A_TSINFO_RX_FILTERS               = 0x4
 	ETHTOOL_A_TSINFO_PHC_INDEX                = 0x5
-	ETHTOOL_A_TSINFO_MAX                      = 0x6
+	ETHTOOL_A_TSINFO_STATS                    = 0x6
+	ETHTOOL_A_TSINFO_HWTSTAMP_PROVIDER        = 0x7
+	ETHTOOL_A_TSINFO_MAX                      = 0x9
 	ETHTOOL_A_CABLE_TEST_UNSPEC               = 0x0
 	ETHTOOL_A_CABLE_TEST_HEADER               = 0x1
 	ETHTOOL_A_CABLE_TEST_MAX                  = 0x1
@@ -4023,11 +4068,11 @@ const (
 	ETHTOOL_A_CABLE_RESULT_UNSPEC             = 0x0
 	ETHTOOL_A_CABLE_RESULT_PAIR               = 0x1
 	ETHTOOL_A_CABLE_RESULT_CODE               = 0x2
-	ETHTOOL_A_CABLE_RESULT_MAX                = 0x2
+	ETHTOOL_A_CABLE_RESULT_MAX                = 0x3
 	ETHTOOL_A_CABLE_FAULT_LENGTH_UNSPEC       = 0x0
 	ETHTOOL_A_CABLE_FAULT_LENGTH_PAIR         = 0x1
 	ETHTOOL_A_CABLE_FAULT_LENGTH_CM           = 0x2
-	ETHTOOL_A_CABLE_FAULT_LENGTH_MAX          = 0x2
+	ETHTOOL_A_CABLE_FAULT_LENGTH_MAX          = 0x3
 	ETHTOOL_A_CABLE_TEST_NTF_STATUS_UNSPEC    = 0x0
 	ETHTOOL_A_CABLE_TEST_NTF_STATUS_STARTED   = 0x1
 	ETHTOOL_A_CABLE_TEST_NTF_STATUS_COMPLETED = 0x2
@@ -4093,6 +4138,19 @@ const (
 	ETHTOOL_A_TUNNEL_INFO_MAX                 = 0x2
 )
 
+const (
+	TCP_V4_FLOW    = 0x1
+	UDP_V4_FLOW    = 0x2
+	TCP_V6_FLOW    = 0x5
+	UDP_V6_FLOW    = 0x6
+	ESP_V4_FLOW    = 0xa
+	ESP_V6_FLOW    = 0xc
+	IP_USER_FLOW   = 0xd
+	IPV6_USER_FLOW = 0xe
+	IPV6_FLOW      = 0x11
+	ETHER_FLOW     = 0x12
+)
+
 const SPEED_UNKNOWN = -0x1
 
 type EthtoolDrvinfo struct {
@@ -4109,6 +4167,107 @@ type EthtoolDrvinfo struct {
 	Eedump_len   uint32
 	Regdump_len  uint32
 }
+
+type EthtoolTsInfo struct {
+	Cmd             uint32
+	So_timestamping uint32
+	Phc_index       int32
+	Tx_types        uint32
+	Tx_reserved     [3]uint32
+	Rx_filters      uint32
+	Rx_reserved     [3]uint32
+}
+
+type HwTstampConfig struct {
+	Flags     int32
+	Tx_type   int32
+	Rx_filter int32
+}
+
+const (
+	HWTSTAMP_FILTER_NONE            = 0x0
+	HWTSTAMP_FILTER_ALL             = 0x1
+	HWTSTAMP_FILTER_SOME            = 0x2
+	HWTSTAMP_FILTER_PTP_V1_L4_EVENT = 0x3
+	HWTSTAMP_FILTER_PTP_V2_L4_EVENT = 0x6
+	HWTSTAMP_FILTER_PTP_V2_L2_EVENT = 0x9
+	HWTSTAMP_FILTER_PTP_V2_EVENT    = 0xc
+)
+
+const (
+	HWTSTAMP_TX_OFF          = 0x0
+	HWTSTAMP_TX_ON           = 0x1
+	HWTSTAMP_TX_ONESTEP_SYNC = 0x2
+)
+
+type (
+	PtpClockCaps struct {
+		Max_adj            int32
+		N_alarm            int32
+		N_ext_ts           int32
+		N_per_out          int32
+		Pps                int32
+		N_pins             int32
+		Cross_timestamping int32
+		Adjust_phase       int32
+		Max_phase_adj      int32
+		Rsv                [11]int32
+	}
+	PtpClockTime struct {
+		Sec      int64
+		Nsec     uint32
+		Reserved uint32
+	}
+	PtpExttsEvent struct {
+		T     PtpClockTime
+		Index uint32
+		Flags uint32
+		Rsv   [2]uint32
+	}
+	PtpExttsRequest struct {
+		Index uint32
+		Flags uint32
+		Rsv   [2]uint32
+	}
+	PtpPeroutRequest struct {
+		StartOrPhase PtpClockTime
+		Period       PtpClockTime
+		Index        uint32
+		Flags        uint32
+		On           PtpClockTime
+	}
+	PtpPinDesc struct {
+		Name  [64]byte
+		Index uint32
+		Func  uint32
+		Chan  uint32
+		Rsv   [5]uint32
+	}
+	PtpSysOffset struct {
+		Samples uint32
+		Rsv     [3]uint32
+		Ts      [51]PtpClockTime
+	}
+	PtpSysOffsetExtended struct {
+		Samples uint32
+		Clockid int32
+		Rsv     [2]uint32
+		Ts      [25][3]PtpClockTime
+	}
+	PtpSysOffsetPrecise struct {
+		Device   PtpClockTime
+		Realtime PtpClockTime
+		Monoraw  PtpClockTime
+		Rsv      [4]uint32
+	}
+)
+
+const (
+	PTP_PF_NONE    = 0x0
+	PTP_PF_EXTTS   = 0x1
+	PTP_PF_PEROUT  = 0x2
+	PTP_PF_PHYSYNC = 0x3
+)
 
 type (
 	HIDRawReportDescriptor struct {
@@ -4291,6 +4450,7 @@ const (
 type LandlockRulesetAttr struct {
 	Access_fs  uint64
 	Access_net uint64
+	Scoped     uint64
 }
 
 type LandlockPathBeneathAttr struct {
@@ -4503,6 +4663,7 @@ const (
 	NL80211_ATTR_AKM_SUITES                                 = 0x4c
 	NL80211_ATTR_AP_ISOLATE                                 = 0x60
 	NL80211_ATTR_AP_SETTINGS_FLAGS                          = 0x135
+	NL80211_ATTR_ASSOC_SPP_AMSDU                            = 0x14a
 	NL80211_ATTR_AUTH_DATA                                  = 0x9c
 	NL80211_ATTR_AUTH_TYPE                                  = 0x35
 	NL80211_ATTR_BANDS                                      = 0xef
@@ -4513,6 +4674,7 @@ const (
 	NL80211_ATTR_BSS_BASIC_RATES                            = 0x24
 	NL80211_ATTR_BSS                                        = 0x2f
 	NL80211_ATTR_BSS_CTS_PROT                               = 0x1c
+	NL80211_ATTR_BSS_DUMP_INCLUDE_USE_DATA                  = 0x147
 	NL80211_ATTR_BSS_HT_OPMODE                              = 0x6d
 	NL80211_ATTR_BSSID                                      = 0xf5
 	NL80211_ATTR_BSS_SELECT                                 = 0xe3
@@ -4572,6 +4734,7 @@ const (
 	NL80211_ATTR_DTIM_PERIOD                                = 0xd
 	NL80211_ATTR_DURATION                                   = 0x57
 	NL80211_ATTR_EHT_CAPABILITY                             = 0x136
+	NL80211_ATTR_EMA_RNR_ELEMS                              = 0x145
 	NL80211_ATTR_EML_CAPABILITY                             = 0x13d
 	NL80211_ATTR_EXT_CAPA                                   = 0xa9
 	NL80211_ATTR_EXT_CAPA_MASK                              = 0xaa
@@ -4607,6 +4770,7 @@ const (
 	NL80211_ATTR_HIDDEN_SSID                                = 0x7e
 	NL80211_ATTR_HT_CAPABILITY                              = 0x1f
 	NL80211_ATTR_HT_CAPABILITY_MASK                         = 0x94
+	NL80211_ATTR_HW_TIMESTAMP_ENABLED                       = 0x144
 	NL80211_ATTR_IE_ASSOC_RESP                              = 0x80
 	NL80211_ATTR_IE                                         = 0x2a
 	NL80211_ATTR_IE_PROBE_RESP                              = 0x7f
@@ -4637,9 +4801,10 @@ const (
 	NL80211_ATTR_MAC_HINT                                   = 0xc8
 	NL80211_ATTR_MAC_MASK                                   = 0xd7
 	NL80211_ATTR_MAX_AP_ASSOC_STA                           = 0xca
-	NL80211_ATTR_MAX                                        = 0x14c
+	NL80211_ATTR_MAX                                        = 0x151
 	NL80211_ATTR_MAX_CRIT_PROT_DURATION                     = 0xb4
 	NL80211_ATTR_MAX_CSA_COUNTERS                           = 0xce
+	NL80211_ATTR_MAX_HW_TIMESTAMP_PEERS                     = 0x143
 	NL80211_ATTR_MAX_MATCH_SETS                             = 0x85
 	NL80211_ATTR_MAX_NUM_AKM_SUITES                         = 0x13c
 	NL80211_ATTR_MAX_NUM_PMKIDS                             = 0x56
@@ -4664,9 +4829,12 @@ const (
 	NL80211_ATTR_MGMT_SUBTYPE                               = 0x29
 	NL80211_ATTR_MLD_ADDR                                   = 0x13a
 	NL80211_ATTR_MLD_CAPA_AND_OPS                           = 0x13e
+	NL80211_ATTR_MLO_LINK_DISABLED                          = 0x146
 	NL80211_ATTR_MLO_LINK_ID                                = 0x139
 	NL80211_ATTR_MLO_LINKS                                  = 0x138
 	NL80211_ATTR_MLO_SUPPORT                                = 0x13b
+	NL80211_ATTR_MLO_TTLM_DLINK                             = 0x148
+	NL80211_ATTR_MLO_TTLM_ULINK                             = 0x149
 	NL80211_ATTR_MNTR_FLAGS                                 = 0x17
 	NL80211_ATTR_MPATH_INFO                                 = 0x1b
 	NL80211_ATTR_MPATH_NEXT_HOP                             = 0x1a
@@ -4699,12 +4867,14 @@ const (
 	NL80211_ATTR_PORT_AUTHORIZED                            = 0x103
 	NL80211_ATTR_POWER_RULE_MAX_ANT_GAIN                    = 0x5
 	NL80211_ATTR_POWER_RULE_MAX_EIRP                        = 0x6
+	NL80211_ATTR_POWER_RULE_PSD                             = 0x8
 	NL80211_ATTR_PREV_BSSID                                 = 0x4f
 	NL80211_ATTR_PRIVACY                                    = 0x46
 	NL80211_ATTR_PROBE_RESP                                 = 0x91
 	NL80211_ATTR_PROBE_RESP_OFFLOAD                         = 0x90
 	NL80211_ATTR_PROTOCOL_FEATURES                          = 0xad
 	NL80211_ATTR_PS_STATE                                   = 0x5d
+	NL80211_ATTR_PUNCT_BITMAP                               = 0x142
 	NL80211_ATTR_QOS_MAP                                    = 0xc7
 	NL80211_ATTR_RADAR_BACKGROUND                           = 0x134
 	NL80211_ATTR_RADAR_EVENT                                = 0xa8
@@ -4833,7 +5003,9 @@ const (
 	NL80211_ATTR_WIPHY_FREQ                                 = 0x26
 	NL80211_ATTR_WIPHY_FREQ_HINT                            = 0xc9
 	NL80211_ATTR_WIPHY_FREQ_OFFSET                          = 0x122
+	NL80211_ATTR_WIPHY_INTERFACE_COMBINATIONS               = 0x14c
 	NL80211_ATTR_WIPHY_NAME                                 = 0x2
+	NL80211_ATTR_WIPHY_RADIOS                               = 0x14b
 	NL80211_ATTR_WIPHY_RETRY_LONG                           = 0x3e
 	NL80211_ATTR_WIPHY_RETRY_SHORT                          = 0x3d
 	NL80211_ATTR_WIPHY_RTS_THRESHOLD                        = 0x40
@@ -4868,6 +5040,8 @@ const (
 	NL80211_BAND_ATTR_IFTYPE_DATA                           = 0x9
 	NL80211_BAND_ATTR_MAX                                   = 0xd
 	NL80211_BAND_ATTR_RATES                                 = 0x2
+	NL80211_BAND_ATTR_S1G_CAPA                              = 0xd
+	NL80211_BAND_ATTR_S1G_MCS_NSS_SET                       = 0xc
 	NL80211_BAND_ATTR_VHT_CAPA                              = 0x8
 	NL80211_BAND_ATTR_VHT_MCS_SET                           = 0x7
 	NL80211_BAND_IFTYPE_ATTR_EHT_CAP_MAC                    = 0x8
@@ -4891,6 +5065,10 @@ const (
 	NL80211_BSS_BEACON_INTERVAL                             = 0x4
 	NL80211_BSS_BEACON_TSF                                  = 0xd
 	NL80211_BSS_BSSID                                       = 0x1
+	NL80211_BSS_CANNOT_USE_6GHZ_PWR_MISMATCH                = 0x2
+	NL80211_BSS_CANNOT_USE_NSTR_NONPRIMARY                  = 0x1
+	NL80211_BSS_CANNOT_USE_REASONS                          = 0x18
+	NL80211_BSS_CANNOT_USE_UHB_PWR_MISMATCH                 = 0x2
 	NL80211_BSS_CAPABILITY                                  = 0x5
 	NL80211_BSS_CHAIN_SIGNAL                                = 0x13
 	NL80211_BSS_CHAN_WIDTH_10                               = 0x1
@@ -4922,6 +5100,9 @@ const (
 	NL80211_BSS_STATUS                                      = 0x9
 	NL80211_BSS_STATUS_IBSS_JOINED                          = 0x2
 	NL80211_BSS_TSF                                         = 0x3
+	NL80211_BSS_USE_FOR                                     = 0x17
+	NL80211_BSS_USE_FOR_MLD_LINK                            = 0x2
+	NL80211_BSS_USE_FOR_NORMAL                              = 0x1
 	NL80211_CHAN_HT20                                       = 0x1
 	NL80211_CHAN_HT40MINUS                                  = 0x2
 	NL80211_CHAN_HT40PLUS                                   = 0x3
@@ -5007,7 +5188,8 @@ const (
 	NL80211_CMD_LEAVE_IBSS                                  = 0x2c
 	NL80211_CMD_LEAVE_MESH                                  = 0x45
 	NL80211_CMD_LEAVE_OCB                                   = 0x6d
-	NL80211_CMD_MAX                                         = 0x9b
+	NL80211_CMD_LINKS_REMOVED                               = 0x9a
+	NL80211_CMD_MAX                                         = 0x9d
 	NL80211_CMD_MICHAEL_MIC_FAILURE                         = 0x29
 	NL80211_CMD_MODIFY_LINK_STA                             = 0x97
 	NL80211_CMD_NAN_MATCH                                   = 0x78
@@ -5051,6 +5233,7 @@ const (
 	NL80211_CMD_SET_COALESCE                                = 0x65
 	NL80211_CMD_SET_CQM                                     = 0x3f
 	NL80211_CMD_SET_FILS_AAD                                = 0x92
+	NL80211_CMD_SET_HW_TIMESTAMP                            = 0x99
 	NL80211_CMD_SET_INTERFACE                               = 0x6
 	NL80211_CMD_SET_KEY                                     = 0xa
 	NL80211_CMD_SET_MAC_ACL                                 = 0x5d
@@ -5070,6 +5253,7 @@ const (
 	NL80211_CMD_SET_SAR_SPECS                               = 0x8c
 	NL80211_CMD_SET_STATION                                 = 0x12
 	NL80211_CMD_SET_TID_CONFIG                              = 0x89
+	NL80211_CMD_SET_TID_TO_LINK_MAPPING                     = 0x9b
 	NL80211_CMD_SET_TX_BITRATE_MASK                         = 0x39
 	NL80211_CMD_SET_WDS_PEER                                = 0x42
 	NL80211_CMD_SET_WIPHY                                   = 0x2
@@ -5137,6 +5321,7 @@ const (
 	NL80211_EXT_FEATURE_AIRTIME_FAIRNESS                    = 0x21
 	NL80211_EXT_FEATURE_AP_PMKSA_CACHING                    = 0x22
 	NL80211_EXT_FEATURE_AQL                                 = 0x28
+	NL80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA           = 0x40
 	NL80211_EXT_FEATURE_BEACON_PROTECTION_CLIENT            = 0x2e
 	NL80211_EXT_FEATURE_BEACON_PROTECTION                   = 0x29
 	NL80211_EXT_FEATURE_BEACON_RATE_HE                      = 0x36
@@ -5152,6 +5337,7 @@ const (
 	NL80211_EXT_FEATURE_CQM_RSSI_LIST                       = 0xd
 	NL80211_EXT_FEATURE_DATA_ACK_SIGNAL_SUPPORT             = 0x1b
 	NL80211_EXT_FEATURE_DEL_IBSS_STA                        = 0x2c
+	NL80211_EXT_FEATURE_DFS_CONCURRENT                      = 0x43
 	NL80211_EXT_FEATURE_DFS_OFFLOAD                         = 0x19
 	NL80211_EXT_FEATURE_ENABLE_FTM_RESPONDER                = 0x20
 	NL80211_EXT_FEATURE_EXT_KEY_ID                          = 0x24
@@ -5171,9 +5357,12 @@ const (
 	NL80211_EXT_FEATURE_OCE_PROBE_REQ_DEFERRAL_SUPPRESSION  = 0x14
 	NL80211_EXT_FEATURE_OCE_PROBE_REQ_HIGH_TX_RATE          = 0x13
 	NL80211_EXT_FEATURE_OPERATING_CHANNEL_VALIDATION        = 0x31
+	NL80211_EXT_FEATURE_OWE_OFFLOAD_AP                      = 0x42
+	NL80211_EXT_FEATURE_OWE_OFFLOAD                         = 0x41
 	NL80211_EXT_FEATURE_POWERED_ADDR_CHANGE                 = 0x3d
 	NL80211_EXT_FEATURE_PROTECTED_TWT                       = 0x2b
 	NL80211_EXT_FEATURE_PROT_RANGE_NEGO_AND_MEASURE         = 0x39
+	NL80211_EXT_FEATURE_PUNCT                               = 0x3e
 	NL80211_EXT_FEATURE_RADAR_BACKGROUND                    = 0x3c
 	NL80211_EXT_FEATURE_RRM                                 = 0x1
 	NL80211_EXT_FEATURE_SAE_OFFLOAD_AP                      = 0x33
@@ -5185,8 +5374,10 @@ const (
 	NL80211_EXT_FEATURE_SCHED_SCAN_BAND_SPECIFIC_RSSI_THOLD = 0x23
 	NL80211_EXT_FEATURE_SCHED_SCAN_RELATIVE_RSSI            = 0xc
 	NL80211_EXT_FEATURE_SECURE_LTF                          = 0x37
+	NL80211_EXT_FEATURE_SECURE_NAN                          = 0x3f
 	NL80211_EXT_FEATURE_SECURE_RTT                          = 0x38
 	NL80211_EXT_FEATURE_SET_SCAN_DWELL                      = 0x5
+	NL80211_EXT_FEATURE_SPP_AMSDU_SUPPORT                   = 0x44
 	NL80211_EXT_FEATURE_STA_TX_PWR                          = 0x25
 	NL80211_EXT_FEATURE_TXQS                                = 0x1c
 	NL80211_EXT_FEATURE_UNSOL_BCAST_PROBE_RESP              = 0x35
@@ -5233,7 +5424,10 @@ const (
 	NL80211_FREQUENCY_ATTR_2MHZ                             = 0x16
 	NL80211_FREQUENCY_ATTR_4MHZ                             = 0x17
 	NL80211_FREQUENCY_ATTR_8MHZ                             = 0x18
+	NL80211_FREQUENCY_ATTR_ALLOW_6GHZ_VLP_AP                = 0x21
+	NL80211_FREQUENCY_ATTR_CAN_MONITOR                      = 0x20
 	NL80211_FREQUENCY_ATTR_DFS_CAC_TIME                     = 0xd
+	NL80211_FREQUENCY_ATTR_DFS_CONCURRENT                   = 0x1d
 	NL80211_FREQUENCY_ATTR_DFS_STATE                        = 0x7
 	NL80211_FREQUENCY_ATTR_DFS_TIME                         = 0x8
 	NL80211_FREQUENCY_ATTR_DISABLED                         = 0x2
@@ -5241,12 +5435,14 @@ const (
 	NL80211_FREQUENCY_ATTR_GO_CONCURRENT                    = 0xf
 	NL80211_FREQUENCY_ATTR_INDOOR_ONLY                      = 0xe
 	NL80211_FREQUENCY_ATTR_IR_CONCURRENT                    = 0xf
-	NL80211_FREQUENCY_ATTR_MAX                              = 0x21
+	NL80211_FREQUENCY_ATTR_MAX                              = 0x22
 	NL80211_FREQUENCY_ATTR_MAX_TX_POWER                     = 0x6
 	NL80211_FREQUENCY_ATTR_NO_10MHZ                         = 0x11
 	NL80211_FREQUENCY_ATTR_NO_160MHZ                        = 0xc
 	NL80211_FREQUENCY_ATTR_NO_20MHZ                         = 0x10
 	NL80211_FREQUENCY_ATTR_NO_320MHZ                        = 0x1a
+	NL80211_FREQUENCY_ATTR_NO_6GHZ_AFC_CLIENT               = 0x1f
+	NL80211_FREQUENCY_ATTR_NO_6GHZ_VLP_CLIENT               = 0x1e
 	NL80211_FREQUENCY_ATTR_NO_80MHZ                         = 0xb
 	NL80211_FREQUENCY_ATTR_NO_EHT                           = 0x1b
 	NL80211_FREQUENCY_ATTR_NO_HE                            = 0x13
@@ -5254,8 +5450,11 @@ const (
 	NL80211_FREQUENCY_ATTR_NO_HT40_PLUS                     = 0xa
 	NL80211_FREQUENCY_ATTR_NO_IBSS                          = 0x3
 	NL80211_FREQUENCY_ATTR_NO_IR                            = 0x3
+	NL80211_FREQUENCY_ATTR_NO_UHB_AFC_CLIENT                = 0x1f
+	NL80211_FREQUENCY_ATTR_NO_UHB_VLP_CLIENT                = 0x1e
 	NL80211_FREQUENCY_ATTR_OFFSET                           = 0x14
 	NL80211_FREQUENCY_ATTR_PASSIVE_SCAN                     = 0x3
+	NL80211_FREQUENCY_ATTR_PSD                              = 0x1c
 	NL80211_FREQUENCY_ATTR_RADAR                            = 0x5
 	NL80211_FREQUENCY_ATTR_WMM                              = 0x12
 	NL80211_FTM_RESP_ATTR_CIVICLOC                          = 0x3
@@ -5320,6 +5519,7 @@ const (
 	NL80211_IFTYPE_STATION                                  = 0x2
 	NL80211_IFTYPE_UNSPECIFIED                              = 0x0
 	NL80211_IFTYPE_WDS                                      = 0x5
+	NL80211_KCK_EXT_LEN_32                                  = 0x20
 	NL80211_KCK_EXT_LEN                                     = 0x18
 	NL80211_KCK_LEN                                         = 0x10
 	NL80211_KEK_EXT_LEN                                     = 0x20
@@ -5348,9 +5548,10 @@ const (
 	NL80211_MAX_SUPP_HT_RATES                               = 0x4d
 	NL80211_MAX_SUPP_RATES                                  = 0x20
 	NL80211_MAX_SUPP_REG_RULES                              = 0x80
+	NL80211_MAX_SUPP_SELECTORS                              = 0x80
 	NL80211_MBSSID_CONFIG_ATTR_EMA                          = 0x5
 	NL80211_MBSSID_CONFIG_ATTR_INDEX                        = 0x3
-	NL80211_MBSSID_CONFIG_ATTR_MAX                          = 0x5
+	NL80211_MBSSID_CONFIG_ATTR_MAX                          = 0x6
 	NL80211_MBSSID_CONFIG_ATTR_MAX_EMA_PROFILE_PERIODICITY  = 0x2
 	NL80211_MBSSID_CONFIG_ATTR_MAX_INTERFACES               = 0x1
 	NL80211_MBSSID_CONFIG_ATTR_TX_IFINDEX                   = 0x4
@@ -5409,7 +5610,7 @@ const (
 	NL80211_MNTR_FLAG_CONTROL                               = 0x3
 	NL80211_MNTR_FLAG_COOK_FRAMES                           = 0x5
 	NL80211_MNTR_FLAG_FCSFAIL                               = 0x1
-	NL80211_MNTR_FLAG_MAX                                   = 0x6
+	NL80211_MNTR_FLAG_MAX                                   = 0x7
 	NL80211_MNTR_FLAG_OTHER_BSS                             = 0x4
 	NL80211_MNTR_FLAG_PLCPFAIL                              = 0x2
 	NL80211_MPATH_FLAG_ACTIVE                               = 0x1
@@ -5593,11 +5794,16 @@ const (
 	NL80211_RADAR_PRE_CAC_EXPIRED                           = 0x4
 	NL80211_RATE_INFO_10_MHZ_WIDTH                          = 0xb
 	NL80211_RATE_INFO_160_MHZ_WIDTH                         = 0xa
+	NL80211_RATE_INFO_16_MHZ_WIDTH                          = 0x1d
+	NL80211_RATE_INFO_1_MHZ_WIDTH                           = 0x19
+	NL80211_RATE_INFO_2_MHZ_WIDTH                           = 0x1a
 	NL80211_RATE_INFO_320_MHZ_WIDTH                         = 0x12
 	NL80211_RATE_INFO_40_MHZ_WIDTH                          = 0x3
+	NL80211_RATE_INFO_4_MHZ_WIDTH                           = 0x1b
 	NL80211_RATE_INFO_5_MHZ_WIDTH                           = 0xc
 	NL80211_RATE_INFO_80_MHZ_WIDTH                          = 0x8
 	NL80211_RATE_INFO_80P80_MHZ_WIDTH                       = 0x9
+	NL80211_RATE_INFO_8_MHZ_WIDTH                           = 0x1c
 	NL80211_RATE_INFO_BITRATE32                             = 0x5
 	NL80211_RATE_INFO_BITRATE                               = 0x1
 	NL80211_RATE_INFO_EHT_GI_0_8                            = 0x0
@@ -5643,6 +5849,8 @@ const (
 	NL80211_RATE_INFO_HE_RU_ALLOC                           = 0x11
 	NL80211_RATE_INFO_MAX                                   = 0x1d
 	NL80211_RATE_INFO_MCS                                   = 0x2
+	NL80211_RATE_INFO_S1G_MCS                               = 0x17
+	NL80211_RATE_INFO_S1G_NSS                               = 0x18
 	NL80211_RATE_INFO_SHORT_GI                              = 0x4
 	NL80211_RATE_INFO_VHT_MCS                               = 0x6
 	NL80211_RATE_INFO_VHT_NSS                               = 0x7
@@ -5660,14 +5868,19 @@ const (
 	NL80211_REKEY_DATA_KEK                                  = 0x1
 	NL80211_REKEY_DATA_REPLAY_CTR                           = 0x3
 	NL80211_REPLAY_CTR_LEN                                  = 0x8
+	NL80211_RRF_ALLOW_6GHZ_VLP_AP                           = 0x1000000
 	NL80211_RRF_AUTO_BW                                     = 0x800
 	NL80211_RRF_DFS                                         = 0x10
+	NL80211_RRF_DFS_CONCURRENT                              = 0x200000
 	NL80211_RRF_GO_CONCURRENT                               = 0x1000
 	NL80211_RRF_IR_CONCURRENT                               = 0x1000
 	NL80211_RRF_NO_160MHZ                                   = 0x10000
 	NL80211_RRF_NO_320MHZ                                   = 0x40000
+	NL80211_RRF_NO_6GHZ_AFC_CLIENT                          = 0x800000
+	NL80211_RRF_NO_6GHZ_VLP_CLIENT                          = 0x400000
 	NL80211_RRF_NO_80MHZ                                    = 0x8000
 	NL80211_RRF_NO_CCK                                      = 0x2
+	NL80211_RRF_NO_EHT                                      = 0x80000
 	NL80211_RRF_NO_HE                                       = 0x20000
 	NL80211_RRF_NO_HT40                                     = 0x6000
 	NL80211_RRF_NO_HT40MINUS                                = 0x2000
@@ -5678,7 +5891,10 @@ const (
 	NL80211_RRF_NO_IR                                       = 0x80
 	NL80211_RRF_NO_OFDM                                     = 0x1
 	NL80211_RRF_NO_OUTDOOR                                  = 0x8
+	NL80211_RRF_NO_UHB_AFC_CLIENT                           = 0x800000
+	NL80211_RRF_NO_UHB_VLP_CLIENT                           = 0x400000
 	NL80211_RRF_PASSIVE_SCAN                                = 0x80
+	NL80211_RRF_PSD                                         = 0x100000
 	NL80211_RRF_PTMP_ONLY                                   = 0x40
 	NL80211_RRF_PTP_ONLY                                    = 0x20
 	NL80211_RXMGMT_FLAG_ANSWERED                            = 0x1
@@ -5739,6 +5955,7 @@ const (
 	NL80211_STA_FLAG_MAX_OLD_API                            = 0x6
 	NL80211_STA_FLAG_MFP                                    = 0x4
 	NL80211_STA_FLAG_SHORT_PREAMBLE                         = 0x2
+	NL80211_STA_FLAG_SPP_AMSDU                              = 0x8
 	NL80211_STA_FLAG_TDLS_PEER                              = 0x6
 	NL80211_STA_FLAG_WME                                    = 0x3
 	NL80211_STA_INFO_ACK_SIGNAL_AVG                         = 0x23
@@ -5897,6 +6114,13 @@ const (
 	NL80211_VHT_CAPABILITY_LEN                              = 0xc
 	NL80211_VHT_NSS_MAX                                     = 0x8
 	NL80211_WIPHY_NAME_MAXLEN                               = 0x40
+	NL80211_WIPHY_RADIO_ATTR_FREQ_RANGE                     = 0x2
+	NL80211_WIPHY_RADIO_ATTR_INDEX                          = 0x1
+	NL80211_WIPHY_RADIO_ATTR_INTERFACE_COMBINATION          = 0x3
+	NL80211_WIPHY_RADIO_ATTR_MAX                            = 0x4
+	NL80211_WIPHY_RADIO_FREQ_ATTR_END                       = 0x2
+	NL80211_WIPHY_RADIO_FREQ_ATTR_MAX                       = 0x2
+	NL80211_WIPHY_RADIO_FREQ_ATTR_START                     = 0x1
 	NL80211_WMMR_AIFSN                                      = 0x3
 	NL80211_WMMR_CW_MAX                                     = 0x2
 	NL80211_WMMR_CW_MIN                                     = 0x1
@@ -5928,6 +6152,7 @@ const (
 	NL80211_WOWLAN_TRIG_PKT_PATTERN                         = 0x4
 	NL80211_WOWLAN_TRIG_RFKILL_RELEASE                      = 0x9
 	NL80211_WOWLAN_TRIG_TCP_CONNECTION                      = 0xe
+	NL80211_WOWLAN_TRIG_UNPROTECTED_DEAUTH_DISASSOC         = 0x14
 	NL80211_WOWLAN_TRIG_WAKEUP_PKT_80211                    = 0xa
 	NL80211_WOWLAN_TRIG_WAKEUP_PKT_80211_LEN                = 0xb
 	NL80211_WOWLAN_TRIG_WAKEUP_PKT_8023                     = 0xc
@@ -6064,3 +6289,5 @@ type SockDiagReq struct {
 	Family   uint8
 	Protocol uint8
 }
+
+const RTM_NEWNVLAN = 0x70

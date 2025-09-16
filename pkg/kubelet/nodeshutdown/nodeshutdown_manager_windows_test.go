@@ -38,8 +38,6 @@ import (
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
-	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -82,14 +80,12 @@ func TestFeatureEnabled(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.WindowsGracefulNodeShutdown, tc.featureGateEnabled)
 
-			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
-			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil)
+			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			manager := NewManager(&Config{
 				Logger:                          logger,
-				ProbeManager:                    proberManager,
 				VolumeManager:                   fakeVolumeManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
@@ -107,9 +103,8 @@ func TestFeatureEnabled(t *testing.T) {
 
 func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 	var (
-		probeManager      = probetest.FakeManager{}
 		fakeRecorder      = &record.FakeRecorder{}
-		fakeVolumeManager = volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil)
+		fakeVolumeManager = volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 		syncNodeStatus    = func() {}
 		nodeRef           = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 		fakeclock         = testingclock.NewFakeClock(time.Now())
@@ -118,7 +113,6 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 	type fields struct {
 		recorder                         record.EventRecorder
 		nodeRef                          *v1.ObjectReference
-		probeManager                     prober.Manager
 		volumeManager                    volumemanager.VolumeManager
 		shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 		getPods                          eviction.ActivePodsFunc
@@ -139,7 +133,6 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 			fields: fields{
 				recorder:      fakeRecorder,
 				nodeRef:       nodeRef,
-				probeManager:  probeManager,
 				volumeManager: fakeVolumeManager,
 				shutdownGracePeriodByPodPriority: []kubeletconfig.ShutdownGracePeriodByPodPriority{
 					{
@@ -172,7 +165,6 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 			fields: fields{
 				recorder:      fakeRecorder,
 				nodeRef:       nodeRef,
-				probeManager:  probeManager,
 				volumeManager: fakeVolumeManager,
 				shutdownGracePeriodByPodPriority: []kubeletconfig.ShutdownGracePeriodByPodPriority{
 					{
@@ -203,14 +195,13 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 		{
 			name: "volumeManager failed timed out",
 			fields: fields{
-				recorder:     fakeRecorder,
-				nodeRef:      nodeRef,
-				probeManager: probeManager,
+				recorder: fakeRecorder,
+				nodeRef:  nodeRef,
 				volumeManager: volumemanager.NewFakeVolumeManager(
 					[]v1.UniqueVolumeName{},
 					3*time.Second, // This value is intentionally longer than the shutdownGracePeriodSeconds (2s) to test the behavior
 					// for volume unmount operations that take longer than the allowed grace period.
-					fmt.Errorf("unmount timeout"),
+					fmt.Errorf("unmount timeout"), false,
 				),
 				shutdownGracePeriodByPodPriority: []kubeletconfig.ShutdownGracePeriodByPodPriority{
 					{
@@ -246,7 +237,6 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 				logger:                logger,
 				recorder:              tt.fields.recorder,
 				nodeRef:               tt.fields.nodeRef,
-				probeManager:          tt.fields.probeManager,
 				getPods:               tt.fields.getPods,
 				syncNodeStatus:        tt.fields.syncNodeStatus,
 				nodeShuttingDownMutex: sync.Mutex{},

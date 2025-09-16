@@ -29,7 +29,8 @@ import (
 type FischerApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	DisallowedFlunders               []string `json:"disallowedFlunders,omitempty"`
+	// DisallowedFlunders holds a list of Flunder.Names that are disallowed.
+	DisallowedFlunders []string `json:"disallowedFlunders,omitempty"`
 }
 
 // Fischer constructs a declarative configuration of the Fischer type for use with
@@ -41,6 +42,8 @@ func Fischer(name string) *FischerApplyConfiguration {
 	b.WithAPIVersion("wardle.example.com/v1alpha1")
 	return b
 }
+
+func (b FischerApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -210,8 +213,24 @@ func (b *FischerApplyConfiguration) WithDisallowedFlunders(values ...string) *Fi
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *FischerApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *FischerApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *FischerApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *FischerApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

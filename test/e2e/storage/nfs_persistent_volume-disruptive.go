@@ -19,7 +19,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -28,15 +27,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubesystem "k8s.io/kubernetes/test/e2e/framework/kubesystem"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -48,47 +44,20 @@ type disruptiveTest struct {
 	runTest    testBody
 }
 
-// checkForControllerManagerHealthy checks that the controller manager does not crash within "duration"
-func checkForControllerManagerHealthy(ctx context.Context, duration time.Duration) error {
-	var PID string
-	cmd := "pidof kube-controller-manager"
-	for start := time.Now(); time.Since(start) < duration && ctx.Err() == nil; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(ctx, cmd, net.JoinHostPort(framework.APIAddress(), e2essh.SSHPort), framework.TestContext.Provider)
-		if err != nil {
-			// We don't necessarily know that it crashed, pipe could just be broken
-			e2essh.LogResult(result)
-			return fmt.Errorf("master unreachable after %v", time.Since(start))
-		} else if result.Code != 0 {
-			e2essh.LogResult(result)
-			return fmt.Errorf("SSH result code not 0. actually: %v after %v", result.Code, time.Since(start))
-		} else if result.Stdout != PID {
-			if PID == "" {
-				PID = result.Stdout
-			} else {
-				//its dead
-				return fmt.Errorf("controller manager crashed, old PID: %s, new PID: %s", PID, result.Stdout)
-			}
-		} else {
-			framework.Logf("kube-controller-manager still healthy after %v", time.Since(start))
-		}
-	}
-	return nil
-}
-
-var _ = utils.SIGDescribe("NFSPersistentVolumes", framework.WithDisruptive(), framework.WithFlaky(), func() {
+var _ = utils.SIGDescribe("NFSPersistentVolumes", framework.WithDisruptive(), func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
-		c                           clientset.Interface
-		ns                          string
-		nfsServerPod                *v1.Pod
-		nfsPVconfig                 e2epv.PersistentVolumeConfig
-		pvcConfig                   e2epv.PersistentVolumeClaimConfig
-		nfsServerHost, clientNodeIP string
-		clientNode                  *v1.Node
-		volLabel                    labels.Set
-		selector                    *metav1.LabelSelector
+		c             clientset.Interface
+		ns            string
+		nfsServerPod  *v1.Pod
+		nfsPVconfig   e2epv.PersistentVolumeConfig
+		pvcConfig     e2epv.PersistentVolumeClaimConfig
+		nfsServerHost string
+		clientNode    *v1.Node
+		volLabel      labels.Set
+		selector      *metav1.LabelSelector
 	)
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
@@ -119,113 +88,19 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes", framework.WithDisruptive(), fr
 			Selector:         selector,
 			StorageClassName: &emptyStorageClass,
 		}
-		// Get the first ready node IP that is not hosting the NFS pod.
-		if clientNodeIP == "" {
+		if clientNode == nil {
 			framework.Logf("Designating test node")
 			nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
 			framework.ExpectNoError(err)
 			for _, node := range nodes.Items {
 				if node.Name != nfsServerPod.Spec.NodeName {
 					clientNode = &node
-					clientNodeIP, err = e2enode.GetSSHExternalIP(clientNode)
 					framework.ExpectNoError(err)
 					break
 				}
 			}
-			gomega.Expect(clientNodeIP).NotTo(gomega.BeEmpty())
+			gomega.Expect(clientNode).NotTo(gomega.BeNil())
 		}
-	})
-
-	ginkgo.Context("when kube-controller-manager restarts", func() {
-		var (
-			diskName1, diskName2 string
-			err                  error
-			pvConfig1, pvConfig2 e2epv.PersistentVolumeConfig
-			pv1, pv2             *v1.PersistentVolume
-			pvSource1, pvSource2 *v1.PersistentVolumeSource
-			pvc1, pvc2           *v1.PersistentVolumeClaim
-			clientPod            *v1.Pod
-		)
-
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs("gce")
-			e2eskipper.SkipUnlessSSHKeyPresent()
-
-			ginkgo.By("Initializing first PD with PVPVC binding")
-			pvSource1, diskName1 = createGCEVolume(ctx)
-			framework.ExpectNoError(err)
-			pvConfig1 = e2epv.PersistentVolumeConfig{
-				NamePrefix: "gce-",
-				Labels:     volLabel,
-				PVSource:   *pvSource1,
-				Prebind:    nil,
-			}
-			pv1, pvc1, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig1, pvcConfig, ns, false)
-			framework.ExpectNoError(err)
-			framework.ExpectNoError(e2epv.WaitOnPVandPVC(ctx, c, f.Timeouts, ns, pv1, pvc1))
-
-			ginkgo.By("Initializing second PD with PVPVC binding")
-			pvSource2, diskName2 = createGCEVolume(ctx)
-			framework.ExpectNoError(err)
-			pvConfig2 = e2epv.PersistentVolumeConfig{
-				NamePrefix: "gce-",
-				Labels:     volLabel,
-				PVSource:   *pvSource2,
-				Prebind:    nil,
-			}
-			pv2, pvc2, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig2, pvcConfig, ns, false)
-			framework.ExpectNoError(err)
-			framework.ExpectNoError(e2epv.WaitOnPVandPVC(ctx, c, f.Timeouts, ns, pv2, pvc2))
-
-			ginkgo.By("Attaching both PVC's to a single pod")
-			clientPod, err = e2epod.CreatePod(ctx, c, ns, nil, []*v1.PersistentVolumeClaim{pvc1, pvc2}, f.NamespacePodSecurityLevel, "")
-			framework.ExpectNoError(err)
-		})
-
-		ginkgo.AfterEach(func(ctx context.Context) {
-			// Delete client/user pod first
-			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, clientPod))
-
-			// Delete PV and PVCs
-			if errs := e2epv.PVPVCCleanup(ctx, c, ns, pv1, pvc1); len(errs) > 0 {
-				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
-			}
-			pv1, pvc1 = nil, nil
-			if errs := e2epv.PVPVCCleanup(ctx, c, ns, pv2, pvc2); len(errs) > 0 {
-				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
-			}
-			pv2, pvc2 = nil, nil
-
-			// Delete the actual disks
-			if diskName1 != "" {
-				framework.ExpectNoError(e2epv.DeletePDWithRetry(ctx, diskName1))
-			}
-			if diskName2 != "" {
-				framework.ExpectNoError(e2epv.DeletePDWithRetry(ctx, diskName2))
-			}
-		})
-
-		ginkgo.It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func(ctx context.Context) {
-			e2eskipper.SkipUnlessSSHKeyPresent()
-
-			ginkgo.By("Deleting PVC for volume 2")
-			err = e2epv.DeletePersistentVolumeClaim(ctx, c, pvc2.Name, ns)
-			framework.ExpectNoError(err)
-			pvc2 = nil
-
-			ginkgo.By("Restarting the kube-controller-manager")
-			err = e2ekubesystem.RestartControllerManager(ctx)
-			framework.ExpectNoError(err)
-			err = e2ekubesystem.WaitForControllerManagerUp(ctx)
-			framework.ExpectNoError(err)
-			framework.Logf("kube-controller-manager restarted")
-
-			ginkgo.By("Observing the kube-controller-manager healthy for at least 2 minutes")
-			// Continue checking for 2 minutes to make sure kube-controller-manager is healthy
-			err = checkForControllerManagerHealthy(ctx, 2*time.Minute)
-			framework.ExpectNoError(err)
-		})
-
 	})
 
 	ginkgo.Context("when kubelet restarts", func() {
@@ -276,19 +151,6 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes", framework.WithDisruptive(), fr
 		}
 	})
 })
-
-// createGCEVolume creates PersistentVolumeSource for GCEVolume.
-func createGCEVolume(ctx context.Context) (*v1.PersistentVolumeSource, string) {
-	diskName, err := e2epv.CreatePDWithRetry(ctx)
-	framework.ExpectNoError(err)
-	return &v1.PersistentVolumeSource{
-		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-			PDName:   diskName,
-			FSType:   "ext3",
-			ReadOnly: false,
-		},
-	}, diskName
-}
 
 // initTestCase initializes spec resources (pv, pvc, and pod) and returns pointers to be consumed
 // by the test.

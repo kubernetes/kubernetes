@@ -18,7 +18,8 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/client-go/pkg/apis/clientauthentication
 // +k8s:openapi-gen=true
 // +k8s:defaulter-gen=TypeMeta
+// +k8s:openapi-model-package=io.k8s.client-go.pkg.apis.clientauthentication.v1beta1
 
 // +groupName=client.authentication.k8s.io
 
-package v1beta1 // import "k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
+package v1beta1

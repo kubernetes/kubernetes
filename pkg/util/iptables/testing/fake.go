@@ -327,8 +327,8 @@ func (f *FakeIPTables) HasRandomFully() bool {
 	return f.hasRandomFully
 }
 
-func (f *FakeIPTables) Present() bool {
-	return true
+func (f *FakeIPTables) Present() error {
+	return nil
 }
 
 var _ = iptables.Interface(&FakeIPTables{})

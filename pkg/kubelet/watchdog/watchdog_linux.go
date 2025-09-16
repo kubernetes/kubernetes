@@ -20,7 +20,9 @@ limitations under the License.
 package watchdog
 
 import (
+	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
@@ -59,14 +61,8 @@ func WithWatchdogClient(watchdog WatchdogClient) Option {
 	}
 }
 
-func WithExtendedCheckers(checkers []healthz.HealthChecker) Option {
-	return func(hc *healthChecker) {
-		hc.checkers = append(hc.checkers, checkers...)
-	}
-}
-
 type healthChecker struct {
-	checkers     []healthz.HealthChecker
+	checkers     atomic.Value
 	retryBackoff wait.Backoff
 	interval     time.Duration
 	watchdog     WatchdogClient
@@ -79,7 +75,7 @@ const minimalNotifyInterval = time.Second
 // NewHealthChecker creates a new HealthChecker instance.
 // This function initializes the health checker and configures its behavior based on the status of the systemd watchdog.
 // If the watchdog is not enabled, the function returns an error.
-func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChecker, error) {
+func NewHealthChecker(logger klog.Logger, opts ...Option) (HealthChecker, error) {
 	hc := &healthChecker{
 		watchdog: &DefaultWatchdogClient{},
 	}
@@ -96,66 +92,81 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 		return nil, fmt.Errorf("configure watchdog: %w", err)
 	}
 	if watchdogVal == 0 {
-		klog.InfoS("Systemd watchdog is not enabled")
+		logger.Info("Systemd watchdog is not enabled")
 		return &healthChecker{}, nil
 	}
 	if watchdogVal <= minimalNotifyInterval {
 		return nil, fmt.Errorf("configure watchdog timeout too small: %v", watchdogVal)
 	}
 
-	// The health checks performed by checkers are the same as those for "/healthz".
-	checkers := []healthz.HealthChecker{
-		healthz.PingHealthz,
-		healthz.LogHealthz,
-		healthz.NamedCheck("syncloop", syncLoop.SyncLoopHealthCheck),
-	}
 	retryBackoff := wait.Backoff{
 		Duration: time.Second,
 		Factor:   2.0,
 		Jitter:   0.1,
 		Steps:    2,
 	}
-	hc.checkers = append(hc.checkers, checkers...)
 	hc.retryBackoff = retryBackoff
 	hc.interval = watchdogVal / 2
 
 	return hc, nil
 }
 
-func (hc *healthChecker) Start() {
+func (hc *healthChecker) SetHealthCheckers(syncLoop syncLoopHealthChecker, checkers []healthz.HealthChecker) {
+	// Define the default set of health checkers that should always be present
+	defaultCheckers := []healthz.HealthChecker{
+		healthz.PingHealthz,
+		healthz.LogHealthz,
+		healthz.NamedCheck("syncloop", syncLoop.SyncLoopHealthCheck),
+	}
+
+	var combined []healthz.HealthChecker
+	combined = append(combined, defaultCheckers...)
+	combined = append(combined, checkers...)
+	hc.checkers.Store(combined)
+}
+
+func (hc *healthChecker) getHealthCheckers() []healthz.HealthChecker {
+	if v := hc.checkers.Load(); v != nil {
+		return v.([]healthz.HealthChecker)
+	}
+	return []healthz.HealthChecker{}
+}
+
+func (hc *healthChecker) Start(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	if hc.interval <= 0 {
-		klog.InfoS("Systemd watchdog is not enabled or the interval is invalid, so health checking will not be started.")
+		logger.Info("Systemd watchdog is not enabled or the interval is invalid, so health checking will not be started.")
 		return
 	}
-	klog.InfoS("Starting systemd watchdog with interval", "interval", hc.interval)
+	logger.Info("Starting systemd watchdog with interval", "interval", hc.interval)
 
-	go wait.Forever(func() {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		if err := hc.doCheck(); err != nil {
-			klog.ErrorS(err, "Do not notify watchdog this iteration as the kubelet is reportedly not healthy")
+			logger.Error(err, "Do not notify watchdog this iteration as the kubelet is reportedly not healthy")
 			return
 		}
 
-		err := wait.ExponentialBackoff(hc.retryBackoff, func() (bool, error) {
+		err := wait.ExponentialBackoffWithContext(ctx, hc.retryBackoff, func(_ context.Context) (bool, error) {
 			ack, err := hc.watchdog.SdNotify(false)
 			if err != nil {
-				klog.V(5).InfoS("Failed to notify systemd watchdog, retrying", "error", err)
+				logger.V(5).Info("Failed to notify systemd watchdog, retrying", "error", err)
 				return false, nil
 			}
 			if !ack {
 				return false, fmt.Errorf("failed to notify systemd watchdog, notification not supported - (i.e. NOTIFY_SOCKET is unset)")
 			}
 
-			klog.V(5).InfoS("Watchdog plugin notified", "acknowledgment", ack, "state", daemon.SdNotifyWatchdog)
+			logger.V(5).Info("Watchdog plugin notified", "acknowledgment", ack, "state", daemon.SdNotifyWatchdog)
 			return true, nil
 		})
 		if err != nil {
-			klog.ErrorS(err, "Failed to notify watchdog")
+			logger.Error(err, "Failed to notify watchdog")
 		}
 	}, hc.interval)
 }
 
 func (hc *healthChecker) doCheck() error {
-	for _, hc := range hc.checkers {
+	for _, hc := range hc.getHealthCheckers() {
 		if err := hc.Check(nil); err != nil {
 			return fmt.Errorf("checker %s failed: %w", hc.Name(), err)
 		}

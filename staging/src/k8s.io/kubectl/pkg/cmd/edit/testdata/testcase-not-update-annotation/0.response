@@ -3,7 +3,7 @@
   "kind": "Service",
   "metadata": {
     "annotations": {
-      "kubectl.kubernetes.io/last-applied-configuration": "{\"kind\":\"Service\",\"apiVersion\":\"v1\",\"metadata\":{\"name\":\"svc1\",\"creationTimestamp\":null,\"labels\":{\"app\":\"svc1\"}},\"spec\":{\"ports\":[{\"name\":\"80\",\"protocol\":\"TCP\",\"port\":80,\"targetPort\":80}],\"selector\":{\"app\":\"svc1\"},\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
+      "kubectl.kubernetes.io/last-applied-configuration": "{\"kind\":\"Service\",\"apiVersion\":\"v1\",\"metadata\":{\"name\":\"svc1\",\"labels\":{\"app\":\"svc1\"}},\"spec\":{\"ports\":[{\"name\":\"80\",\"protocol\":\"TCP\",\"port\":80,\"targetPort\":80}],\"selector\":{\"app\":\"svc1\"},\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
     },
     "creationTimestamp": "2017-02-27T19:40:53Z",
     "labels": {

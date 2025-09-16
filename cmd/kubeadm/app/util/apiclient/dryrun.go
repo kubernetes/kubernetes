@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -45,6 +44,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // DryRun is responsible for performing verbose dry-run operations with a set of different
@@ -568,7 +568,7 @@ func getNode(name string) *corev1.Node {
 				"kubernetes.io/hostname": name,
 			},
 			Annotations: map[string]string{
-				"kubeadm.alpha.kubernetes.io/cri-socket": "dry-run-cri-socket",
+				constants.AnnotationKubeadmCRISocket: "dry-run-cri-socket",
 			},
 		},
 	}
@@ -607,11 +607,10 @@ clusters:
 contexts: null
 current-context: ""
 kind: Config
-preferences: {}
 users: null
 `)
 	data := map[string]string{
-		bootstrapapi.JWSSignatureKeyPrefix + "abcdef": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImFiY2RlZiJ9..wUZ0q9o0VK1RWFptmSBOEem2bXHWrHyxrposHg0mb1w",
+		bootstrapapi.JWSSignatureKeyPrefix + "abcdef": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImFiY2RlZiJ9..rh3cVKiU2mdt3CqHzC81sNE-4WQLRHMtXduHWfSbrIM",
 		bootstrapapi.KubeConfigKey:                    kubeconfig,
 	}
 	return getConfigMap(metav1.NamespacePublic, bootstrapapi.ConfigMapClusterInfo, data)
@@ -754,7 +753,7 @@ func getPod(name, nodeName string) corev1.Pod {
 				"tier":      constants.ControlPlaneTier,
 			},
 			Annotations: map[string]string{
-				constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "127.0.0.1:6443",
+				constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "0.0.0.0:6443",
 			},
 		},
 		Spec: corev1.PodSpec{

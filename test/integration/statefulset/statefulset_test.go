@@ -32,17 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 	"k8s.io/kubernetes/pkg/controlplane"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -471,8 +468,6 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 		},
 	}
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
-
 	tCtx, closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
 	cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -766,5 +761,37 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 				t.Errorf("Unexpected singleton pod name: got = %v, want %v", pods.Items[0].Name, expectedNames[0])
 			}
 		})
+	}
+}
+func TestStatefulSetPodSubdomain(t *testing.T) {
+	tCtx, closeFn, rm, informers, c := scSetup(t)
+	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(c, "test-pod-subdomain", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	cancel := runControllerAndInformers(tCtx, rm, informers)
+	defer cancel()
+
+	// create a headless service
+	serviceName := "test-service"
+	service := newHeadlessService(ns.Name)
+	service.Name = serviceName
+	createHeadlessService(t, c, service)
+
+	// create StatefulSet with the service name
+	sts := newSTS("sts", ns.Name, 3)
+	sts.Spec.ServiceName = serviceName
+	stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
+	sts = stss[0]
+	waitSTSStable(t, c, sts)
+
+	// get pods and verify subdomain
+	labelMap := labelMap()
+	podClient := c.CoreV1().Pods(ns.Name)
+	pods := getPods(t, podClient, labelMap)
+
+	for _, pod := range pods.Items {
+		if pod.Spec.Subdomain != serviceName {
+			t.Errorf("Pod %s has incorrect subdomain: got %s, want %s", pod.Name, pod.Spec.Subdomain, serviceName)
+		}
 	}
 }

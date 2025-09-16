@@ -29,10 +29,39 @@ import (
 
 // ResourceSliceApplyConfiguration represents a declarative configuration of the ResourceSlice type for use
 // with apply.
+//
+// ResourceSlice represents one or more resources in a pool of similar resources,
+// managed by a common driver. A pool may span more than one ResourceSlice, and exactly how many
+// ResourceSlices comprise a pool is determined by the driver.
+//
+// At the moment, the only supported resources are devices with attributes and capacities.
+// Each device in a given pool, regardless of how many ResourceSlices, must have a unique name.
+// The ResourceSlice in which a device gets published may change over time. The unique identifier
+// for a device is the tuple <driver name>, <pool name>, <device name>.
+//
+// Whenever a driver needs to update a pool, it increments the pool.Spec.Pool.Generation number
+// and updates all ResourceSlices with that new number and new resource definitions. A consumer
+// must only use ResourceSlices with the highest generation number and ignore all others.
+//
+// When allocating all resources in a pool matching certain criteria or when
+// looking for the best solution among several different alternatives, a
+// consumer should check the number of ResourceSlices in a pool (included in
+// each ResourceSlice) to determine whether its view of a pool is complete and
+// if not, should wait until the driver has completed updating the pool.
+//
+// For resources that are not local to a node, the node name is not set. Instead,
+// the driver may use a node selector to specify where the devices are available.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
 type ResourceSliceApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ResourceSliceSpecApplyConfiguration `json:"spec,omitempty"`
+	// Contains the information published by the driver.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	Spec *ResourceSliceSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ResourceSlice constructs a declarative configuration of the ResourceSlice type for use with
@@ -45,29 +74,14 @@ func ResourceSlice(name string) *ResourceSliceApplyConfiguration {
 	return b
 }
 
-// ExtractResourceSlice extracts the applied configuration owned by fieldManager from
-// resourceSlice. If no managedFields are found in resourceSlice for fieldManager, a
-// ResourceSliceApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractResourceSliceFrom extracts the applied configuration owned by fieldManager from
+// resourceSlice for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // resourceSlice must be a unmodified ResourceSlice API object that was retrieved from the Kubernetes API.
-// ExtractResourceSlice provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractResourceSliceFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractResourceSlice(resourceSlice *resourcev1beta1.ResourceSlice, fieldManager string) (*ResourceSliceApplyConfiguration, error) {
-	return extractResourceSlice(resourceSlice, fieldManager, "")
-}
-
-// ExtractResourceSliceStatus is the same as ExtractResourceSlice except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractResourceSliceStatus(resourceSlice *resourcev1beta1.ResourceSlice, fieldManager string) (*ResourceSliceApplyConfiguration, error) {
-	return extractResourceSlice(resourceSlice, fieldManager, "status")
-}
-
-func extractResourceSlice(resourceSlice *resourcev1beta1.ResourceSlice, fieldManager string, subresource string) (*ResourceSliceApplyConfiguration, error) {
+func ExtractResourceSliceFrom(resourceSlice *resourcev1beta1.ResourceSlice, fieldManager string, subresource string) (*ResourceSliceApplyConfiguration, error) {
 	b := &ResourceSliceApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceSlice, internal.Parser().Type("io.k8s.api.resource.v1beta1.ResourceSlice"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +93,22 @@ func extractResourceSlice(resourceSlice *resourcev1beta1.ResourceSlice, fieldMan
 	b.WithAPIVersion("resource.k8s.io/v1beta1")
 	return b, nil
 }
+
+// ExtractResourceSlice extracts the applied configuration owned by fieldManager from
+// resourceSlice. If no managedFields are found in resourceSlice for fieldManager, a
+// ResourceSliceApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// resourceSlice must be a unmodified ResourceSlice API object that was retrieved from the Kubernetes API.
+// ExtractResourceSlice provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractResourceSlice(resourceSlice *resourcev1beta1.ResourceSlice, fieldManager string) (*ResourceSliceApplyConfiguration, error) {
+	return ExtractResourceSliceFrom(resourceSlice, fieldManager, "")
+}
+
+func (b ResourceSliceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -246,8 +276,24 @@ func (b *ResourceSliceApplyConfiguration) WithSpec(value *ResourceSliceSpecApply
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ResourceSliceApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ResourceSliceApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ResourceSliceApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ResourceSliceApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

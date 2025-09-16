@@ -19,4 +19,4 @@ limitations under the License.
 
 // Package apiserverinternal contains the "internal" version of the API used by
 // the apiservers themselves.
-package apiserverinternal // import "k8s.io/kubernetes/pkg/apis/apiserverinternal"
+package apiserverinternal

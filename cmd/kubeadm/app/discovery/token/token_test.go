@@ -69,7 +69,6 @@ contexts:
   name: token-bootstrap-client@somecluster
 current-context: token-bootstrap-client@somecluster
 kind: Config
-preferences: {}
 users: null
 `
 	)
@@ -303,7 +302,7 @@ type fakeConfigMap struct {
 }
 
 func (c *fakeConfigMap) createOrUpdate(client clientset.Interface) error {
-	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
+	return apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(metav1.NamespacePublic), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.name,
 			Namespace: metav1.NamespacePublic,

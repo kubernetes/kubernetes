@@ -28,6 +28,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -39,13 +40,14 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
+	basecompatibility "k8s.io/component-base/compatibility"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/config/options"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
-	utilversion "k8s.io/component-base/version"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -76,7 +78,7 @@ type Options struct {
 	Master string
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
-	ComponentGlobalsRegistry featuregate.ComponentGlobalsRegistry
+	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
 
 	// Flags hold the parsed CLI flags.
 	Flags *cliflag.NamedFlagSets
@@ -84,12 +86,17 @@ type Options struct {
 
 // NewOptions returns default scheduler app options.
 func NewOptions() *Options {
+	componentGlobalsRegistry := compatibility.DefaultComponentGlobalsRegistry
 	// make sure DefaultKubeComponent is registered in the DefaultComponentGlobalsRegistry.
-	if featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent) == nil {
+	if componentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent) == nil {
 		featureGate := utilfeature.DefaultMutableFeatureGate
-		effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
-		utilruntime.Must(featuregate.DefaultComponentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
+		effectiveVersion := compatibility.DefaultBuildEffectiveVersion()
+		utilruntime.Must(componentGlobalsRegistry.Register(basecompatibility.DefaultKubeComponent, effectiveVersion, featureGate))
 	}
+	return NewOptionsWithComponentGlobalsRegistry(componentGlobalsRegistry)
+}
+
+func NewOptionsWithComponentGlobalsRegistry(componentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry) *Options {
 	o := &Options{
 		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
@@ -108,7 +115,7 @@ func NewOptions() *Options {
 		},
 		Metrics:                  metrics.NewOptions(),
 		Logs:                     logs.NewOptions(),
-		ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+		ComponentGlobalsRegistry: componentGlobalsRegistry,
 	}
 
 	o.Authentication.TolerateInClusterLookupFailure = true
@@ -260,6 +267,11 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 	if o.Deprecated != nil {
 		c.PodMaxInUnschedulablePodsDuration = o.Deprecated.PodMaxInUnschedulablePodsDuration
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		if o.Flags != nil {
+			c.Flagz = flagz.NamedFlagSetsReader{FlagSets: *o.Flags}
+		}
+	}
 
 	return nil
 }
@@ -279,11 +291,6 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.Authentication.Validate()...)
 	errs = append(errs, o.Authorization.Validate()...)
 	errs = append(errs, o.Metrics.Validate()...)
-
-	effectiveVersion := o.ComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent)
-	if err := utilversion.ValidateKubeEffectiveVersion(effectiveVersion); err != nil {
-		errs = append(errs, err)
-	}
 
 	return errs
 }
@@ -330,6 +337,7 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	dynClient := dynamic.NewForConfigOrDie(c.KubeConfig)
 	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
 	c.LeaderElection = leaderElectionConfig
+	c.ComponentGlobalsRegistry = o.ComponentGlobalsRegistry
 
 	return c, nil
 }

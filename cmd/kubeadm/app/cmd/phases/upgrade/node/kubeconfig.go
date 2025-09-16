@@ -20,12 +20,10 @@ package node
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // NewKubeconfigPhase returns a new kubeconfig phase.
@@ -60,10 +58,8 @@ func runKubeconfig() func(c workflow.RunData) error {
 		// Otherwise, retrieve all the info required for kubeconfig upgrade.
 		cfg := data.InitCfg()
 
-		if features.Enabled(cfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-			if err := upgrade.UpdateKubeletLocalMode(cfg, data.DryRun()); err != nil {
-				return errors.Wrap(err, "failed to update kubelet local mode")
-			}
+		if err := upgrade.UpdateKubeletKubeconfigServer(cfg, data.DryRun()); err != nil {
+			return errors.Wrap(err, "failed to update kubelet local mode")
 		}
 
 		fmt.Println("[upgrade/kubeconfig] The kubeconfig files for this node were successfully upgraded!")

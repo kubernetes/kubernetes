@@ -20,17 +20,35 @@ package v1
 
 // NodeSystemInfoApplyConfiguration represents a declarative configuration of the NodeSystemInfo type for use
 // with apply.
+//
+// NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 type NodeSystemInfoApplyConfiguration struct {
-	MachineID               *string `json:"machineID,omitempty"`
-	SystemUUID              *string `json:"systemUUID,omitempty"`
-	BootID                  *string `json:"bootID,omitempty"`
-	KernelVersion           *string `json:"kernelVersion,omitempty"`
-	OSImage                 *string `json:"osImage,omitempty"`
+	// MachineID reported by the node. For unique machine identification
+	// in the cluster this field is preferred. Learn more from man(5)
+	// machine-id: http://man7.org/linux/man-pages/man5/machine-id.5.html
+	MachineID *string `json:"machineID,omitempty"`
+	// SystemUUID reported by the node. For unique machine identification
+	// MachineID is preferred. This field is specific to Red Hat hosts
+	// https://access.redhat.com/documentation/en-us/red_hat_subscription_management/1/html/rhsm/uuid
+	SystemUUID *string `json:"systemUUID,omitempty"`
+	// Boot ID reported by the node.
+	BootID *string `json:"bootID,omitempty"`
+	// Kernel Version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64).
+	KernelVersion *string `json:"kernelVersion,omitempty"`
+	// OS Image reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy)).
+	OSImage *string `json:"osImage,omitempty"`
+	// ContainerRuntime Version reported by the node through runtime remote API (e.g. containerd://1.4.2).
 	ContainerRuntimeVersion *string `json:"containerRuntimeVersion,omitempty"`
-	KubeletVersion          *string `json:"kubeletVersion,omitempty"`
-	KubeProxyVersion        *string `json:"kubeProxyVersion,omitempty"`
-	OperatingSystem         *string `json:"operatingSystem,omitempty"`
-	Architecture            *string `json:"architecture,omitempty"`
+	// Kubelet Version reported by the node.
+	KubeletVersion *string `json:"kubeletVersion,omitempty"`
+	// Deprecated: KubeProxy Version reported by the node.
+	KubeProxyVersion *string `json:"kubeProxyVersion,omitempty"`
+	// The Operating System reported by the node
+	OperatingSystem *string `json:"operatingSystem,omitempty"`
+	// The Architecture reported by the node
+	Architecture *string `json:"architecture,omitempty"`
+	// Swap Info reported by the node.
+	Swap *NodeSwapStatusApplyConfiguration `json:"swap,omitempty"`
 }
 
 // NodeSystemInfoApplyConfiguration constructs a declarative configuration of the NodeSystemInfo type for use with
@@ -116,5 +134,13 @@ func (b *NodeSystemInfoApplyConfiguration) WithOperatingSystem(value string) *No
 // If called multiple times, the Architecture field is set to the value of the last call.
 func (b *NodeSystemInfoApplyConfiguration) WithArchitecture(value string) *NodeSystemInfoApplyConfiguration {
 	b.Architecture = &value
+	return b
+}
+
+// WithSwap sets the Swap field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Swap field is set to the value of the last call.
+func (b *NodeSystemInfoApplyConfiguration) WithSwap(value *NodeSwapStatusApplyConfiguration) *NodeSystemInfoApplyConfiguration {
+	b.Swap = value
 	return b
 }

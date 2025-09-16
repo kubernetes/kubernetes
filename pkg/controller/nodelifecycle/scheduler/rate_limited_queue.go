@@ -81,7 +81,7 @@ func (h *TimedQueue) Pop() interface{} {
 type UniqueQueue struct {
 	lock  sync.Mutex
 	queue TimedQueue
-	set   sets.String
+	set   sets.Set[string]
 }
 
 // Add a new value to the queue if it wasn't added before, or was
@@ -189,7 +189,7 @@ func (q *UniqueQueue) Clear() {
 		q.queue = make(TimedQueue, 0)
 	}
 	if len(q.set) > 0 {
-		q.set = sets.NewString()
+		q.set = sets.New[string]()
 	}
 }
 
@@ -207,7 +207,7 @@ func NewRateLimitedTimedQueue(limiter flowcontrol.RateLimiter) *RateLimitedTimed
 	return &RateLimitedTimedQueue{
 		queue: UniqueQueue{
 			queue: TimedQueue{},
-			set:   sets.NewString(),
+			set:   sets.New[string](),
 		},
 		limiter: limiter,
 	}

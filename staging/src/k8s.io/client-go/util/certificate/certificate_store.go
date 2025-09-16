@@ -38,6 +38,7 @@ const (
 )
 
 type fileStore struct {
+	logger         klog.Logger
 	pairNamePrefix string
 	certDirectory  string
 	keyDirectory   string
@@ -67,7 +68,22 @@ type FileStore interface {
 // updates will be written to the ${certDirectory} directory and
 // ${certDirectory}/${pairNamePrefix}-current.pem will be created as a soft
 // link to the currently selected cert/key pair.
+//
+// Contextual logging: NewFileStoreWithLogger should be used instead of NewFileStore in code which supports contextual logging.
 func NewFileStore(
+	pairNamePrefix string,
+	certDirectory string,
+	keyDirectory string,
+	certFile string,
+	keyFile string) (FileStore, error) {
+	return NewFileStoreWithLogger(klog.Background(), pairNamePrefix, certDirectory, keyDirectory, certFile, keyFile)
+}
+
+// NewFileStoreWithLogger is a variant of NewFileStore where the caller is in
+// control of logging. All log messages get emitted with logger.Info, so
+// pass e.g. logger.V(3) to make logging less verbose.
+func NewFileStoreWithLogger(
+	logger klog.Logger,
 	pairNamePrefix string,
 	certDirectory string,
 	keyDirectory string,
@@ -75,6 +91,7 @@ func NewFileStore(
 	keyFile string) (FileStore, error) {
 
 	s := fileStore{
+		logger:         logger,
 		pairNamePrefix: pairNamePrefix,
 		certDirectory:  certDirectory,
 		keyDirectory:   keyDirectory,
@@ -127,7 +144,7 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 	if pairFileExists, err := fileExists(pairFile); err != nil {
 		return nil, err
 	} else if pairFileExists {
-		klog.Infof("Loading cert/key pair from %q.", pairFile)
+		s.logger.Info("Loading cert/key pair from a file", "filePath", pairFile)
 		return loadFile(pairFile)
 	}
 
@@ -140,7 +157,7 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 		return nil, err
 	}
 	if certFileExists && keyFileExists {
-		klog.Infof("Loading cert/key pair from (%q, %q).", s.certFile, s.keyFile)
+		s.logger.Info("Loading cert/key pair", "certFile", s.certFile, "keyFile", s.keyFile)
 		return loadX509KeyPair(s.certFile, s.keyFile)
 	}
 
@@ -155,7 +172,7 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 		return nil, err
 	}
 	if certFileExists && keyFileExists {
-		klog.Infof("Loading cert/key pair from (%q, %q).", c, k)
+		s.logger.Info("Loading cert/key pair", "certFile", c, "keyFile", k)
 		return loadX509KeyPair(c, k)
 	}
 
@@ -213,6 +230,11 @@ func (s *fileStore) Update(certData, keyData []byte) (*tls.Certificate, error) {
 		return nil, fmt.Errorf("invalid key data")
 	}
 	pem.Encode(f, keyBlock)
+
+	// Ensure data is written to disk
+	if err := f.Sync(); err != nil {
+		return nil, fmt.Errorf("failed to sync certificate data to disk: %w (file: %q)", err, certPath)
+	}
 
 	cert, err := loadFile(certPath)
 	if err != nil {

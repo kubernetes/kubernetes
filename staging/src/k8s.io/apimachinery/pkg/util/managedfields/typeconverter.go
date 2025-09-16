@@ -17,6 +17,9 @@ limitations under the License.
 package managedfields
 
 import (
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
+
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/managedfields/internal"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -44,4 +47,10 @@ func NewDeducedTypeConverter() TypeConverter {
 // https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema
 func NewTypeConverter(openapiSpec map[string]*spec.Schema, preserveUnknownFields bool) (TypeConverter, error) {
 	return internal.NewTypeConverter(openapiSpec, preserveUnknownFields)
+}
+
+// NewSchemeTypeConverter creates a TypeConverter that uses the provided scheme to
+// convert between runtime.Objects and TypedValues.
+func NewSchemeTypeConverter(scheme *runtime.Scheme, parser *typed.Parser) TypeConverter {
+	return internal.NewSchemeTypeConverter(scheme, parser)
 }

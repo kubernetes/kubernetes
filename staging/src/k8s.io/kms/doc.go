@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package kms contains the proto definitions for the kms API.
-package kms // import "k8s.io/kms"
+package kms

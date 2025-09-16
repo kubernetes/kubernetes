@@ -48,8 +48,8 @@ func NewStaticOptimizer(optimizers ...ASTOptimizer) *StaticOptimizer {
 // If issues are encountered, the Issues.Err() return value will be non-nil.
 func (opt *StaticOptimizer) Optimize(env *Env, a *Ast) (*Ast, *Issues) {
 	// Make a copy of the AST to be optimized.
-	optimized := ast.Copy(a.impl)
-	ids := newIDGenerator(ast.MaxID(a.impl))
+	optimized := ast.Copy(a.NativeRep())
+	ids := newIDGenerator(ast.MaxID(a.NativeRep()))
 
 	// Create the optimizer context, could be pooled in the future.
 	issues := NewIssues(common.NewErrors(a.Source()))
@@ -86,7 +86,7 @@ func (opt *StaticOptimizer) Optimize(env *Env, a *Ast) (*Ast, *Issues) {
 		if iss.Err() != nil {
 			return nil, iss
 		}
-		optimized = checked.impl
+		optimized = checked.NativeRep()
 	}
 
 	// Return the optimized result.

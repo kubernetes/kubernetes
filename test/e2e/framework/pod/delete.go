@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -44,7 +45,7 @@ func DeletePodOrFail(ctx context.Context, c clientset.Interface, ns, name string
 		return
 	}
 
-	expectNoError(err, "failed to delete pod %s in namespace %s", name, ns)
+	framework.ExpectNoErrorWithOffset(1, err, "failed to delete pod %s in namespace %s", name, ns)
 }
 
 // DeletePodWithWait deletes the passed-in pod and waits for the pod to be terminated. Resilient to the pod
@@ -54,6 +55,21 @@ func DeletePodWithWait(ctx context.Context, c clientset.Interface, pod *v1.Pod) 
 		return nil
 	}
 	return DeletePodWithWaitByName(ctx, c, pod.GetName(), pod.GetNamespace())
+}
+
+// DeletePodsWithWait deletes the passed-in pods, waits for them to be terminated, and reports any deletion errors that occur.
+func DeletePodsWithWait(ctx context.Context, c clientset.Interface, pods []*v1.Pod) {
+	var delErrs []error
+	for _, testPod := range pods {
+		delErr := c.CoreV1().Pods(testPod.Namespace).Delete(ctx, testPod.Name, metav1.DeleteOptions{})
+		if delErr != nil && !apierrors.IsNotFound(delErr) {
+			delErrs = append(delErrs, delErr)
+		}
+	}
+	framework.ExpectNoError(errors.NewAggregate(delErrs), "while deleting pods")
+	for _, testPod := range pods {
+		framework.ExpectNoError(WaitForPodNotFoundInNamespace(ctx, c, testPod.Name, testPod.Namespace, PodDeleteTimeout))
+	}
 }
 
 // DeletePodWithWaitByName deletes the named and namespaced pod and waits for the pod to be terminated. Resilient to the pod

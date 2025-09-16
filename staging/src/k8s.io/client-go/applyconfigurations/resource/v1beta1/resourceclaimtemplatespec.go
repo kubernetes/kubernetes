@@ -26,9 +26,17 @@ import (
 
 // ResourceClaimTemplateSpecApplyConfiguration represents a declarative configuration of the ResourceClaimTemplateSpec type for use
 // with apply.
+//
+// ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.
 type ResourceClaimTemplateSpecApplyConfiguration struct {
+	// ObjectMeta may contain labels and annotations that will be copied into the ResourceClaim
+	// when creating it. No other fields are allowed and will be rejected during
+	// validation.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ResourceClaimSpecApplyConfiguration `json:"spec,omitempty"`
+	// Spec for the ResourceClaim. The entire content is copied unchanged
+	// into the ResourceClaim that gets created from this template. The
+	// same fields as in a ResourceClaim are also valid here.
+	Spec *ResourceClaimSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ResourceClaimTemplateSpecApplyConfiguration constructs a declarative configuration of the ResourceClaimTemplateSpec type for use with
@@ -191,4 +199,10 @@ func (b *ResourceClaimTemplateSpecApplyConfiguration) WithSpec(value *ResourceCl
 func (b *ResourceClaimTemplateSpecApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ResourceClaimTemplateSpecApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

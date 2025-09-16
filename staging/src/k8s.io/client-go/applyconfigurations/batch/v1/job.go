@@ -29,11 +29,19 @@ import (
 
 // JobApplyConfiguration represents a declarative configuration of the Job type for use
 // with apply.
+//
+// Job represents the configuration of a single job.
 type JobApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *JobSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *JobStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of a job.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *JobSpecApplyConfiguration `json:"spec,omitempty"`
+	// Current status of a job.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *JobStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Job constructs a declarative configuration of the Job type for use with
@@ -47,29 +55,14 @@ func Job(name, namespace string) *JobApplyConfiguration {
 	return b
 }
 
-// ExtractJob extracts the applied configuration owned by fieldManager from
-// job. If no managedFields are found in job for fieldManager, a
-// JobApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractJobFrom extracts the applied configuration owned by fieldManager from
+// job for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // job must be a unmodified Job API object that was retrieved from the Kubernetes API.
-// ExtractJob provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractJobFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractJob(job *batchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
-	return extractJob(job, fieldManager, "")
-}
-
-// ExtractJobStatus is the same as ExtractJob except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractJobStatus(job *batchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
-	return extractJob(job, fieldManager, "status")
-}
-
-func extractJob(job *batchv1.Job, fieldManager string, subresource string) (*JobApplyConfiguration, error) {
+func ExtractJobFrom(job *batchv1.Job, fieldManager string, subresource string) (*JobApplyConfiguration, error) {
 	b := &JobApplyConfiguration{}
 	err := managedfields.ExtractInto(job, internal.Parser().Type("io.k8s.api.batch.v1.Job"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +75,28 @@ func extractJob(job *batchv1.Job, fieldManager string, subresource string) (*Job
 	b.WithAPIVersion("batch/v1")
 	return b, nil
 }
+
+// ExtractJob extracts the applied configuration owned by fieldManager from
+// job. If no managedFields are found in job for fieldManager, a
+// JobApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// job must be a unmodified Job API object that was retrieved from the Kubernetes API.
+// ExtractJob provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractJob(job *batchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
+	return ExtractJobFrom(job, fieldManager, "")
+}
+
+// ExtractJobStatus extracts the applied configuration owned by fieldManager from
+// job for the status subresource.
+func ExtractJobStatus(job *batchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
+	return ExtractJobFrom(job, fieldManager, "status")
+}
+
+func (b JobApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -257,8 +272,24 @@ func (b *JobApplyConfiguration) WithStatus(value *JobStatusApplyConfiguration) *
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *JobApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *JobApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *JobApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *JobApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

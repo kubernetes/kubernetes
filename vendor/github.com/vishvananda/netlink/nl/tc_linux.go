@@ -78,6 +78,17 @@ const (
 )
 
 const (
+	TCA_ACT_SAMPLE_UNSPEC = iota
+	TCA_ACT_SAMPLE_TM
+	TCA_ACT_SAMPLE_PARMS
+	TCA_ACT_SAMPLE_RATE
+	TCA_ACT_SAMPLE_TRUNC_SIZE
+	TCA_ACT_SAMPLE_PSAMPLE_GROUP
+	TCA_ACT_SAMPLE_PAD
+	TCA_ACT_SAMPLE_MAX
+)
+
+const (
 	TCA_PRIO_UNSPEC = iota
 	TCA_PRIO_MQ
 	TCA_PRIO_MAX = TCA_PRIO_MQ
@@ -115,6 +126,7 @@ const (
 	SizeofTcConnmark     = SizeofTcGen + 0x04
 	SizeofTcCsum         = SizeofTcGen + 0x04
 	SizeofTcMirred       = SizeofTcGen + 0x08
+	SizeofTcVlan         = SizeofTcGen + 0x04
 	SizeofTcTunnelKey    = SizeofTcGen + 0x04
 	SizeofTcSkbEdit      = SizeofTcGen
 	SizeofTcPolice       = 2*SizeofTcRateSpec + 0x20
@@ -817,6 +829,41 @@ func (x *TcMirred) Serialize() []byte {
 }
 
 const (
+	TCA_VLAN_UNSPEC = iota
+	TCA_VLAN_TM
+	TCA_VLAN_PARMS
+	TCA_VLAN_PUSH_VLAN_ID
+	TCA_VLAN_PUSH_VLAN_PROTOCOL
+	TCA_VLAN_PAD
+	TCA_VLAN_PUSH_VLAN_PRIORITY
+	TCA_VLAN_PUSH_ETH_DST
+	TCA_VLAN_PUSH_ETH_SRC
+	TCA_VLAN_MAX
+)
+
+//struct tc_vlan {
+//	tc_gen;
+//	int v_action;
+//};
+
+type TcVlan struct {
+	TcGen
+	Action int32
+}
+
+func (msg *TcVlan) Len() int {
+	return SizeofTcVlan
+}
+
+func DeserializeTcVlan(b []byte) *TcVlan {
+	return (*TcVlan)(unsafe.Pointer(&b[0:SizeofTcVlan][0]))
+}
+
+func (x *TcVlan) Serialize() []byte {
+	return (*(*[SizeofTcVlan]byte)(unsafe.Pointer(x)))[:]
+}
+
+const (
 	TCA_TUNNEL_KEY_UNSPEC = iota
 	TCA_TUNNEL_KEY_TM
 	TCA_TUNNEL_KEY_PARMS
@@ -1076,6 +1123,13 @@ const (
 	TCA_FLOWER_KEY_ENC_OPTS
 	TCA_FLOWER_KEY_ENC_OPTS_MASK
 
+	TCA_FLOWER_IN_HW_COUNT
+
+	TCA_FLOWER_KEY_PORT_SRC_MIN /* be16 */
+	TCA_FLOWER_KEY_PORT_SRC_MAX /* be16 */
+	TCA_FLOWER_KEY_PORT_DST_MIN /* be16 */
+	TCA_FLOWER_KEY_PORT_DST_MAX /* be16 */
+
 	__TCA_FLOWER_MAX
 )
 
@@ -1091,11 +1145,11 @@ const TCA_CLS_FLAGS_SKIP_SW = 1 << 1 /* don't use filter in SW */
 // };
 
 type TcSfqQopt struct {
-	Quantum uint8
+	Quantum uint32
 	Perturb int32
 	Limit   uint32
-	Divisor uint8
-	Flows   uint8
+	Divisor uint32
+	Flows   uint32
 }
 
 func (x *TcSfqQopt) Len() int {
@@ -1239,8 +1293,8 @@ const (
 )
 
 // /* TCA_PEDIT_KEY_EX_HDR_TYPE_NETWROK is a special case for legacy users. It
-//  * means no specific header type - offset is relative to the network layer
-//  */
+//   - means no specific header type - offset is relative to the network layer
+//     */
 type PeditHeaderType uint16
 
 const (
@@ -1533,7 +1587,7 @@ func (p *TcPedit) SetIPv6Dst(ip6 net.IP) {
 }
 
 func (p *TcPedit) SetIPv4Src(ip net.IP) {
-	u32 := NativeEndian().Uint32(ip[:4])
+	u32 := NativeEndian().Uint32(ip.To4())
 
 	tKey := TcPeditKey{}
 	tKeyEx := TcPeditKeyEx{}
@@ -1549,7 +1603,7 @@ func (p *TcPedit) SetIPv4Src(ip net.IP) {
 }
 
 func (p *TcPedit) SetIPv4Dst(ip net.IP) {
-	u32 := NativeEndian().Uint32(ip[:4])
+	u32 := NativeEndian().Uint32(ip.To4())
 
 	tKey := TcPeditKey{}
 	tKeyEx := TcPeditKeyEx{}

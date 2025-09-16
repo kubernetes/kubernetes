@@ -23,11 +23,13 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/klog/v2"
+
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/klog/v2"
 )
 
 var (
@@ -113,6 +115,15 @@ var sharedNothingSelector Selector = nothingSelector{}
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
 	return sharedNothingSelector
+}
+
+// MatchesNothing only returns true for selectors which are definitively determined to match no objects.
+// This currently only detects the `labels.Nothing()` selector, but may change over time to detect more selectors that match no objects.
+//
+// Note: The current implementation does not check for selector conflict scenarios (e.g., a=a,a!=a).
+// Support for detecting such cases can be added in the future.
+func MatchesNothing(selector Selector) bool {
+	return selector == sharedNothingSelector
 }
 
 // NewSelector returns a nil selector
@@ -236,26 +247,29 @@ func (r *Requirement) hasValue(value string) bool {
 func (r *Requirement) Matches(ls Labels) bool {
 	switch r.operator {
 	case selection.In, selection.Equals, selection.DoubleEquals:
-		if !ls.Has(r.key) {
+		val, exists := ls.Lookup(r.key)
+		if !exists {
 			return false
 		}
-		return r.hasValue(ls.Get(r.key))
+		return r.hasValue(val)
 	case selection.NotIn, selection.NotEquals:
-		if !ls.Has(r.key) {
+		val, exists := ls.Lookup(r.key)
+		if !exists {
 			return true
 		}
-		return !r.hasValue(ls.Get(r.key))
+		return !r.hasValue(val)
 	case selection.Exists:
 		return ls.Has(r.key)
 	case selection.DoesNotExist:
 		return !ls.Has(r.key)
 	case selection.GreaterThan, selection.LessThan:
-		if !ls.Has(r.key) {
+		val, exists := ls.Lookup(r.key)
+		if !exists {
 			return false
 		}
-		lsValue, err := strconv.ParseInt(ls.Get(r.key), 10, 64)
+		lsValue, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			klog.V(10).Infof("ParseInt failed for value %+v in label %+v, %+v", ls.Get(r.key), ls, err)
+			klog.V(10).Infof("ParseInt failed for value %+v in label %+v, %+v", val, ls, err)
 			return false
 		}
 
@@ -835,7 +849,6 @@ func (p *Parser) parseIdentifiersList() (sets.String, error) {
 				return s, nil
 			}
 			if tok2 == CommaToken {
-				p.consume(Values)
 				s.Insert("") // to handle ,, Double "" removed by StringSet
 			}
 		default: // it can be operator
@@ -914,7 +927,7 @@ func parse(selector string, path *field.Path) (internalSelector, error) {
 }
 
 func validateLabelKey(k string, path *field.Path) *field.Error {
-	if errs := validation.IsQualifiedName(k); len(errs) != 0 {
+	if errs := content.IsLabelKey(k); len(errs) != 0 {
 		return field.Invalid(path, k, strings.Join(errs, "; "))
 	}
 	return nil
@@ -996,7 +1009,8 @@ type ValidatedSetSelector Set
 
 func (s ValidatedSetSelector) Matches(labels Labels) bool {
 	for k, v := range s {
-		if !labels.Has(k) || v != labels.Get(k) {
+		val, exists := labels.Lookup(k)
+		if !exists || v != val {
 			return false
 		}
 	}

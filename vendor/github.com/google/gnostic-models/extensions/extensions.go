@@ -19,8 +19,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type extensionHandler func(name string, yamlInput string) (bool, proto.Message, error)
@@ -54,7 +54,7 @@ func Main(handler extensionHandler) {
 		response.Errors = append(response.Errors, err.Error())
 	} else if handled {
 		response.Handled = true
-		response.Value, err = ptypes.MarshalAny(output)
+		response.Value, err = anypb.New(output)
 		if err != nil {
 			response.Errors = append(response.Errors, err.Error())
 		}

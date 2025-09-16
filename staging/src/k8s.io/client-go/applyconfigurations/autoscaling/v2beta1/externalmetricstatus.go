@@ -25,11 +25,20 @@ import (
 
 // ExternalMetricStatusApplyConfiguration represents a declarative configuration of the ExternalMetricStatus type for use
 // with apply.
+//
+// ExternalMetricStatus indicates the current value of a global metric
+// not associated with any Kubernetes object.
 type ExternalMetricStatusApplyConfiguration struct {
-	MetricName          *string                             `json:"metricName,omitempty"`
-	MetricSelector      *v1.LabelSelectorApplyConfiguration `json:"metricSelector,omitempty"`
-	CurrentValue        *resource.Quantity                  `json:"currentValue,omitempty"`
-	CurrentAverageValue *resource.Quantity                  `json:"currentAverageValue,omitempty"`
+	// metricName is the name of a metric used for autoscaling in
+	// metric system.
+	MetricName *string `json:"metricName,omitempty"`
+	// metricSelector is used to identify a specific time series
+	// within a given metric.
+	MetricSelector *v1.LabelSelectorApplyConfiguration `json:"metricSelector,omitempty"`
+	// currentValue is the current value of the metric (as a quantity)
+	CurrentValue *resource.Quantity `json:"currentValue,omitempty"`
+	// currentAverageValue is the current value of metric averaged over autoscaled pods.
+	CurrentAverageValue *resource.Quantity `json:"currentAverageValue,omitempty"`
 }
 
 // ExternalMetricStatusApplyConfiguration constructs a declarative configuration of the ExternalMetricStatus type for use with

@@ -23,7 +23,10 @@ import (
 	"go/constant"
 	"go/token"
 	gotypes "go/types"
+	"maps"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -382,11 +385,117 @@ func (p *Parser) NewUniverse() (types.Universe, error) {
 	return u, nil
 }
 
+// minimize returns a copy of lines with "irrelevant" lines removed.  This
+// includes blank lines and paragraphs starting with "Deprecated:".
+func minimize(lines []string) []string {
+	out := make([]string, 0, len(lines))
+	inDeprecated := false // paragraph tracking
+	prevWasBlank := false
+	for _, line := range lines {
+		if len(strings.TrimSpace(line)) == 0 {
+			prevWasBlank = true
+			inDeprecated = false
+			continue
+		}
+		if inDeprecated {
+			continue
+		}
+		if prevWasBlank && strings.HasPrefix(strings.TrimSpace(line), "Deprecated:") {
+			prevWasBlank = false
+			inDeprecated = true
+			continue
+		}
+		prevWasBlank = false
+		out = append(out, line)
+	}
+	return out
+}
+
 // addCommentsToType takes any accumulated comment lines prior to obj and
 // attaches them to the type t.
 func (p *Parser) addCommentsToType(obj gotypes.Object, t *types.Type) {
-	t.CommentLines = p.docComment(obj.Pos())
-	t.SecondClosestCommentLines = p.priorDetachedComment(obj.Pos())
+	if newLines, oldLines := p.docComment(obj.Pos()), t.CommentLines; len(newLines) > 0 {
+		switch {
+		case reflect.DeepEqual(oldLines, newLines):
+			// nothing needed
+
+		case len(oldLines) == 0:
+			// no comments associated, or comments match exactly
+			t.CommentLines = newLines
+
+		case isTypeAlias(obj.Type()):
+			// Ignore mismatched comments from obj because it's an alias.
+			// This can only be hit if gotypesalias is enabled.
+			if !reflect.DeepEqual(minimize(oldLines), minimize(newLines)) {
+				klog.Warningf(
+					"Mismatched comments on type %v.\n  Using comments:\n%s\n  Ignoring comments from type alias:\n%s\n",
+					t.GoType,
+					formatCommentBlock(oldLines),
+					formatCommentBlock(newLines),
+				)
+			}
+
+		case !isTypeAlias(obj.Type()):
+			// Overwrite existing comments with ones from obj because obj is not an alias.
+			// If gotypesalias is enabled, this should mean we found the "real"
+			// type, not an alias.  If gotypesalias is disabled, we can end up
+			// overwriting the "real" comments with an alias's comments, but
+			// it is not clear if we can assume which one is the "real" one.
+			t.CommentLines = newLines
+			if !reflect.DeepEqual(minimize(oldLines), minimize(newLines)) {
+				klog.Warningf(
+					"Mismatched comments on type %v.\n  Using comments:\n%s\n  Ignoring comments from possible type alias:\n%s\n",
+					t.GoType,
+					formatCommentBlock(newLines),
+					formatCommentBlock(oldLines),
+				)
+			}
+		}
+	}
+
+	if newLines, oldLines := p.priorDetachedComment(obj.Pos()), t.SecondClosestCommentLines; len(newLines) > 0 {
+		switch {
+		case reflect.DeepEqual(oldLines, newLines):
+			// nothing needed
+
+		case len(oldLines) == 0:
+			// no comments associated, or comments match exactly
+			t.SecondClosestCommentLines = newLines
+
+		case isTypeAlias(obj.Type()):
+			// Ignore mismatched comments from obj because it's an alias.
+			// This can only be hit if gotypesalias is enabled.
+			if !reflect.DeepEqual(minimize(oldLines), minimize(newLines)) {
+				// ignore mismatched comments from obj because it's an alias
+				klog.Warningf(
+					"Mismatched secondClosestCommentLines on type %v.\n  Using comments:\n%s\n  Ignoring comments from type alias:\n%s\n",
+					t.GoType,
+					formatCommentBlock(oldLines),
+					formatCommentBlock(newLines),
+				)
+			}
+
+		case !isTypeAlias(obj.Type()):
+			// Overwrite existing comments with ones from obj because obj is not an alias.
+			// If gotypesalias is enabled, this should mean we found the "real"
+			// type, not an alias.  If gotypesalias is disabled, we can end up
+			// overwriting the "real" comments with an alias's comments, but
+			// it is not clear if we can assume which one is the "real" one.
+			t.SecondClosestCommentLines = newLines
+			if !reflect.DeepEqual(minimize(oldLines), minimize(newLines)) {
+				klog.Warningf(
+					"Mismatched secondClosestCommentLines on type %v.\n  Using comments:\n%s\n  Ignoring comments from possible type alias:\n%s\n",
+					t.GoType,
+					formatCommentBlock(newLines),
+					formatCommentBlock(oldLines),
+				)
+			}
+		}
+	}
+}
+
+func formatCommentBlock(lines []string) string {
+	return "    ```\n    " + strings.Join(lines, "\n    ") + "\n    ```"
 }
 
 // packageDir tries to figure out the directory of the specified package.
@@ -510,7 +619,9 @@ func (p *Parser) addPkgToUniverse(pkg *packages.Package, u *types.Universe) erro
 
 	// Add all of this package's imports.
 	importedPkgs := []string{}
-	for _, imp := range pkg.Imports {
+	// Iterate imports in a predictable order
+	for _, key := range slices.Sorted(maps.Keys(pkg.Imports)) {
+		imp := pkg.Imports[key]
 		if err := p.addPkgToUniverse(imp, u); err != nil {
 			return err
 		}
@@ -557,7 +668,11 @@ func (p *Parser) priorCommentLines(pos token.Pos, lines int) *ast.CommentGroup {
 }
 
 func splitLines(str string) []string {
-	return strings.Split(strings.TrimRight(str, "\n"), "\n")
+	lines := strings.Split(strings.TrimRight(str, "\n"), "\n")
+	if len(lines) == 1 && lines[0] == "" {
+		return nil
+	}
+	return lines
 }
 
 func goFuncNameToName(in string) types.Name {
@@ -652,6 +767,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 	switch t := in.(type) {
 	case *gotypes.Struct:
 		out := u.Type(name)
+		out.GoType = in
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -670,6 +786,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 		return out
 	case *gotypes.Map:
 		out := u.Type(name)
+		out.GoType = in
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -679,6 +796,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 		return out
 	case *gotypes.Pointer:
 		out := u.Type(name)
+		out.GoType = in
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -687,6 +805,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 		return out
 	case *gotypes.Slice:
 		out := u.Type(name)
+		out.GoType = in
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -695,6 +814,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 		return out
 	case *gotypes.Array:
 		out := u.Type(name)
+		out.GoType = in
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -704,6 +824,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 		return out
 	case *gotypes.Chan:
 		out := u.Type(name)
+		out.GoType = in
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -717,6 +838,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 			Package: "", // This is a magic package name in the Universe.
 			Name:    t.Name(),
 		})
+		out.GoType = in
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -724,6 +846,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 		return out
 	case *gotypes.Signature:
 		out := u.Type(name)
+		out.GoType = in
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -732,6 +855,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 		return out
 	case *gotypes.Interface:
 		out := u.Type(name)
+		out.GoType = in
 		if out.Kind != types.Unknown {
 			return out
 		}
@@ -754,6 +878,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 		case *gotypes.Named, *gotypes.Basic, *gotypes.Map, *gotypes.Slice:
 			name := goNameToName(t.String())
 			out = u.Type(name)
+			out.GoType = in
 			if out.Kind != types.Unknown {
 				return out
 			}
@@ -776,6 +901,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 			}
 
 			if out := u.Type(name); out.Kind != types.Unknown {
+				out.GoType = in
 				return out // short circuit if we've already made this.
 			}
 			out = p.walkType(u, &name, t.Underlying())
@@ -817,6 +943,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
 		}
 	default:
 		out := u.Type(name)
+		out.GoType = in
 		if out.Kind != types.Unknown {
 			return out
 		}

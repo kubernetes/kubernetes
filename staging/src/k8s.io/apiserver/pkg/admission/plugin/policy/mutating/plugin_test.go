@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +46,7 @@ func setupTest(
 ) *generic.PolicyTestContext[*mutating.Policy, *mutating.PolicyBinding, mutating.PolicyEvaluator] {
 
 	testContext, testCancel, err := generic.NewPolicyTestContext[*mutating.Policy, *mutating.PolicyBinding, mutating.PolicyEvaluator](
+		t,
 		mutating.NewMutatingAdmissionPolicyAccessor,
 		mutating.NewMutatingAdmissionPolicyBindingAccessor,
 		compiler,
@@ -88,25 +89,25 @@ func TestBasicPatch(t *testing.T) {
 	require.NoError(t, testContext.UpdateAndWait(
 		&mutating.Policy{
 			ObjectMeta: metav1.ObjectMeta{Name: "policy"},
-			Spec: v1alpha1.MutatingAdmissionPolicySpec{
-				MatchConstraints: &v1alpha1.MatchResources{
-					MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+			Spec: v1beta1.MutatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{
+					MatchPolicy:       ptr.To(v1beta1.Equivalent),
 					NamespaceSelector: &metav1.LabelSelector{},
 					ObjectSelector:    &metav1.LabelSelector{},
 				},
-				Mutations: []v1alpha1.Mutation{
+				Mutations: []v1beta1.Mutation{
 					{
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: "ignored, but required",
 						},
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
 					},
 				},
 			},
 		},
 		&mutating.PolicyBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-			Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+			Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 				PolicyName: "policy",
 			},
 		},
@@ -145,25 +146,25 @@ func TestJSONPatch(t *testing.T) {
 	require.NoError(t, testContext.UpdateAndWait(
 		&mutating.Policy{
 			ObjectMeta: metav1.ObjectMeta{Name: "policy"},
-			Spec: v1alpha1.MutatingAdmissionPolicySpec{
-				MatchConstraints: &v1alpha1.MatchResources{
-					MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+			Spec: v1beta1.MutatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{
+					MatchPolicy:       ptr.To(v1beta1.Equivalent),
 					NamespaceSelector: &metav1.LabelSelector{},
 					ObjectSelector:    &metav1.LabelSelector{},
 				},
-				Mutations: []v1alpha1.Mutation{
+				Mutations: []v1beta1.Mutation{
 					{
-						JSONPatch: &v1alpha1.JSONPatch{
+						JSONPatch: &v1beta1.JSONPatch{
 							Expression: "ignored, but required",
 						},
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
 					},
 				},
 			},
 		},
 		&mutating.PolicyBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-			Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+			Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 				PolicyName: "policy",
 			},
 		},
@@ -207,25 +208,25 @@ func TestSSAPatch(t *testing.T) {
 	require.NoError(t, testContext.UpdateAndWait(
 		&mutating.Policy{
 			ObjectMeta: metav1.ObjectMeta{Name: "policy"},
-			Spec: v1alpha1.MutatingAdmissionPolicySpec{
-				MatchConstraints: &v1alpha1.MatchResources{
-					MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+			Spec: v1beta1.MutatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{
+					MatchPolicy:       ptr.To(v1beta1.Equivalent),
 					NamespaceSelector: &metav1.LabelSelector{},
 					ObjectSelector:    &metav1.LabelSelector{},
 				},
-				Mutations: []v1alpha1.Mutation{
+				Mutations: []v1beta1.Mutation{
 					{
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: "ignored, but required",
 						},
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
 					},
 				},
 			},
 		},
 		&mutating.PolicyBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-			Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+			Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 				PolicyName: "policy",
 			},
 		},
@@ -274,25 +275,25 @@ func TestSSAMapList(t *testing.T) {
 	require.NoError(t, testContext.UpdateAndWait(
 		&mutating.Policy{
 			ObjectMeta: metav1.ObjectMeta{Name: "policy"},
-			Spec: v1alpha1.MutatingAdmissionPolicySpec{
-				MatchConstraints: &v1alpha1.MatchResources{
-					MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+			Spec: v1beta1.MutatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{
+					MatchPolicy:       ptr.To(v1beta1.Equivalent),
 					NamespaceSelector: &metav1.LabelSelector{},
 					ObjectSelector:    &metav1.LabelSelector{},
 				},
-				Mutations: []v1alpha1.Mutation{
+				Mutations: []v1beta1.Mutation{
 					{
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: "ignored, but required",
 						},
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
 					},
 				},
 			},
 		},
 		&mutating.PolicyBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-			Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+			Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 				PolicyName: "policy",
 			},
 		},

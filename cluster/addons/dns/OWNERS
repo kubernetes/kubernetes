@@ -2,11 +2,12 @@
 
 approvers:
   - bowei
+  - DamianSawicki
   - mrhohn
-  - kl52752
 reviewers:
   - bowei
+  - DamianSawicki
   - mrhohn
-  - kl52752
 emeritus_approvers:
   - dpasiukevich
+  - kl52752

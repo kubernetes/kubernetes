@@ -122,9 +122,9 @@ type kexDHGexReplyMsg struct {
 const msgKexDHGexRequest = 34
 
 type kexDHGexRequestMsg struct {
-	MinBits      uint32 `sshtype:"34"`
-	PreferedBits uint32
-	MaxBits      uint32
+	MinBits       uint32 `sshtype:"34"`
+	PreferredBits uint32
+	MaxBits       uint32
 }
 
 // See RFC 4253, section 10.
@@ -818,6 +818,8 @@ func decode(packet []byte) (interface{}, error) {
 		return new(userAuthSuccessMsg), nil
 	case msgUserAuthFailure:
 		msg = new(userAuthFailureMsg)
+	case msgUserAuthBanner:
+		msg = new(userAuthBannerMsg)
 	case msgUserAuthPubKeyOk:
 		msg = new(userAuthPubKeyOkMsg)
 	case msgGlobalRequest:

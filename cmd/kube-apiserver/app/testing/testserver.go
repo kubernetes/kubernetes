@@ -22,6 +22,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -43,22 +44,22 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storageversion"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	clientgotransport "k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
-	"k8s.io/component-base/featuregate"
+	basecompatibility "k8s.io/component-base/compatibility"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
-	utilversion "k8s.io/component-base/version"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/features"
@@ -104,11 +105,8 @@ type TestServerInstanceOptions struct {
 	// an apiserver version skew scenario where all apiservers use the same proxyCA to verify client connections.
 	ProxyCA *ProxyCA
 	// Set the BinaryVersion of server effective version.
-	// If empty, effective version will default to version.DefaultKubeBinaryVersion.
+	// If empty, effective version will default to DefaultKubeEffectiveVersion.
 	BinaryVersion string
-	// Set the EmulationVersion of server effective version.
-	// If empty, emulation version will default to the effective version.
-	EmulationVersion string
 	// Set non-default request timeout in the server.
 	RequestTimeout time.Duration
 }
@@ -194,26 +192,32 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
-	featureGate := utilfeature.DefaultMutableFeatureGate
-	featureGate.AddMetrics()
-	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
+	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
+	effectiveVersion := compatibility.DefaultKubeEffectiveVersionForTest()
 	if instanceOptions.BinaryVersion != "" {
-		effectiveVersion = utilversion.NewEffectiveVersion(instanceOptions.BinaryVersion)
+		effectiveVersion = basecompatibility.NewEffectiveVersionFromString(instanceOptions.BinaryVersion, "", "")
 	}
-	if instanceOptions.EmulationVersion != "" {
-		effectiveVersion.SetEmulationVersion(version.MustParse(instanceOptions.EmulationVersion))
+	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
+	if err := componentGlobalsRegistry.Register(basecompatibility.DefaultKubeComponent, effectiveVersion, featureGate); err != nil {
+		return result, err
 	}
-	// need to call SetFeatureGateEmulationVersionDuringTest to reset the feature gate emulation version at the end of the test.
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, featureGate, effectiveVersion.EmulationVersion())
-	featuregate.DefaultComponentGlobalsRegistry.Reset()
-	utilruntime.Must(featuregate.DefaultComponentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
 
 	s := options.NewServerRunOptions()
+	if !effectiveVersion.BinaryVersion().EqualTo(effectiveVersion.EmulationVersion()) {
+		// Allow new APIs because features might be enabled explicitly which depend
+		// some API which gets disabled when emulating versions.
+		s.GenericServerRunOptions.RuntimeConfigEmulationForwardCompatible = true
+	}
+
+	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
+	s.Options.GenericServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
 	if instanceOptions.RequestTimeout > 0 {
 		s.GenericServerRunOptions.RequestTimeout = instanceOptions.RequestTimeout
 	}
 
-	for _, f := range s.Flags().FlagSets {
+	namedFlagSets := s.Flags()
+	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
 
@@ -330,15 +334,6 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 			return result, err
 		}
 		s.Authentication.ClientCert.ClientCA = clientCACertFile
-		if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
-			// TODO: set up a general clean up for testserver
-			if clientgotransport.DialerStopCh == wait.NeverStop {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
-				t.Cleanup(cancel)
-				clientgotransport.DialerStopCh = ctx.Done()
-			}
-			s.PeerCAFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, s.SecureServing.ServerCert.PairName+".crt")
-		}
 	}
 
 	s.SecureServing.ExternalAddress = s.SecureServing.Listener.Addr().(*net.TCPAddr).IP // use listener addr although it is a loopback device
@@ -351,10 +346,12 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	s.ServiceClusterIPRanges = "10.0.0.0/16"
 	s.Etcd.StorageConfig = *storageConfig
-	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
 	if err := fs.Parse(customFlags); err != nil {
 		return result, err
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		s.Flagz = flagz.NamedFlagSetsReader{FlagSets: namedFlagSets}
 	}
 
 	// the RequestHeader options pointer gets replaced in the case of EnableCertAuth override
@@ -374,8 +371,32 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		s.Authentication.RequestHeader.ExtraHeaderPrefixes = extraHeaders
 	}
 
-	if err := featuregate.DefaultComponentGlobalsRegistry.Set(); err != nil {
-		return result, err
+	if err := componentGlobalsRegistry.Set(); err != nil {
+		return result, fmt.Errorf("%w\nIf you are using SetFeatureGate*DuringTest, try using --emulated-version and --feature-gates flags instead", err)
+	}
+	// If the local ComponentGlobalsRegistry is changed by the flags,
+	// we need to copy the new feature values back to the DefaultFeatureGate because most feature checks still use the DefaultFeatureGate.
+	// We cannot directly use DefaultFeatureGate in ComponentGlobalsRegistry because the changes done by ComponentGlobalsRegistry.Set() will not be undone at the end of the test.
+	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	}
+	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
+		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, featureGate.Enabled(f))
+		}
+	}
+	utilfeature.DefaultMutableFeatureGate.AddMetrics()
+
+	if instanceOptions.EnableCertAuth {
+		if featureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+			// TODO: set up a general clean up for testserver
+			if clientgotransport.DialerStopCh == wait.NeverStop {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+				t.Cleanup(cancel)
+				clientgotransport.DialerStopCh = ctx.Done()
+			}
+			s.PeerCAFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, s.SecureServing.ServerCert.PairName+".crt")
+		}
 	}
 
 	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
@@ -487,26 +508,9 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
 	}
 
-	tlsInfo := transport.TLSInfo{
-		CertFile:      storageConfig.Transport.CertFile,
-		KeyFile:       storageConfig.Transport.KeyFile,
-		TrustedCAFile: storageConfig.Transport.TrustedCAFile,
-	}
-	tlsConfig, err := tlsInfo.ClientConfig()
+	etcdClient, _, err := GetEtcdClients(storageConfig.Transport)
 	if err != nil {
-		return result, err
-	}
-	etcdConfig := clientv3.Config{
-		Endpoints:   storageConfig.Transport.ServerList,
-		DialTimeout: 20 * time.Second,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: tlsConfig,
-	}
-	etcdClient, err := clientv3.New(etcdConfig)
-	if err != nil {
-		return result, err
+		return result, fmt.Errorf("create etcd client: %w", err)
 	}
 
 	// from here the caller must call tearDown
@@ -522,6 +526,45 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	result.EtcdStoragePrefix = storageConfig.Prefix
 
 	return result, nil
+}
+
+// GetEtcdClients returns an initialized etcd clientv3.Client and clientv3.KV.
+func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, clientv3.KV, error) {
+	// clientv3.New ignores an invalid TLS config for http://, but not for unix:// (https://github.com/etcd-io/etcd/blob/5a8fba466087686fc15815f5bc041fb7eb1f23ea/client/v3/internal/endpoint/endpoint.go#L61-L66).
+	// To support unix://, we must not set Config.TLS unless we really have
+	// transport security.
+	var tlsConfig *tls.Config
+	if config.CertFile != "" ||
+		config.KeyFile != "" ||
+		config.TrustedCAFile != "" {
+		tlsInfo := transport.TLSInfo{
+			CertFile:      config.CertFile,
+			KeyFile:       config.KeyFile,
+			TrustedCAFile: config.TrustedCAFile,
+		}
+
+		var err error
+		tlsConfig, err = tlsInfo.ClientConfig()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	cfg := clientv3.Config{
+		Endpoints:   config.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
+	}
+
+	c, err := clientv3.New(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return c, clientv3.NewKV(c), nil
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.

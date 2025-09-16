@@ -63,7 +63,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 
 	endTime := time.Now().Add(o.Timeout)
 	timeout := time.Until(endTime)
-	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info) // nolint:staticcheck // SA1019
+	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrorInterrupted(nil), info) // nolint:staticcheck // SA1019
 	if o.Timeout == 0 {
 		// If timeout is zero check if the object exists once only
 		if gottenObj == nil {
@@ -113,7 +113,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 		return err
 	})
 	if err != nil {
-		if errors.Is(err, wait.ErrWaitTimeout) { // nolint:staticcheck // SA1019
+		if wait.Interrupted(err) { // nolint:staticcheck // SA1019
 			return gottenObj, false, errWaitTimeoutWithName
 		}
 		return gottenObj, false, err

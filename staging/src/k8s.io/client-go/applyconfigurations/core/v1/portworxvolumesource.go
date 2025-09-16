@@ -20,10 +20,18 @@ package v1
 
 // PortworxVolumeSourceApplyConfiguration represents a declarative configuration of the PortworxVolumeSource type for use
 // with apply.
+//
+// PortworxVolumeSource represents a Portworx volume resource.
 type PortworxVolumeSourceApplyConfiguration struct {
+	// volumeID uniquely identifies a Portworx volume
 	VolumeID *string `json:"volumeID,omitempty"`
-	FSType   *string `json:"fsType,omitempty"`
-	ReadOnly *bool   `json:"readOnly,omitempty"`
+	// fSType represents the filesystem type to mount
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType *string `json:"fsType,omitempty"`
+	// readOnly defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // PortworxVolumeSourceApplyConfiguration constructs a declarative configuration of the PortworxVolumeSource type for use with

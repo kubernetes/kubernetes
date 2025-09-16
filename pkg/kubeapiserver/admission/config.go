@@ -17,28 +17,13 @@ limitations under the License.
 package admission
 
 import (
-	"os"
-
-	"k8s.io/klog/v2"
-
 	"k8s.io/apiserver/pkg/admission"
 )
 
 // Config holds the configuration needed to for initialize the admission plugins
-type Config struct {
-	CloudConfigFile string
-}
+type Config struct{}
 
 // New sets up the plugins and admission start hooks needed for admission
 func (c *Config) New() ([]admission.PluginInitializer, error) {
-	var cloudConfig []byte
-	if c.CloudConfigFile != "" {
-		var err error
-		cloudConfig, err = os.ReadFile(c.CloudConfigFile)
-		if err != nil {
-			klog.Fatalf("Error reading from cloud configuration file %s: %#v", c.CloudConfigFile, err)
-		}
-	}
-
-	return []admission.PluginInitializer{NewPluginInitializer(cloudConfig)}, nil
+	return []admission.PluginInitializer{NewPluginInitializer()}, nil
 }

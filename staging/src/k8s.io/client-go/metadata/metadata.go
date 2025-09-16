@@ -33,8 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/consistencydetector"
-	"k8s.io/client-go/util/watchlist"
 )
 
 var deleteScheme = runtime.NewScheme()
@@ -220,24 +218,6 @@ func (c *client) Get(ctx context.Context, name string, opts metav1.GetOptions, s
 
 // List returns all resources within the specified scope (namespace or cluster).
 func (c *client) List(ctx context.Context, opts metav1.ListOptions) (*metav1.PartialObjectMetadataList, error) {
-	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.FromContext(ctx).Error(watchListOptionsErr, "Failed preparing watchlist options, falling back to the standard LIST semantics", "resource", c.resource)
-	} else if hasWatchListOptionsPrepared {
-		result, err := c.watchList(ctx, watchListOptions)
-		if err == nil {
-			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, fmt.Sprintf("watchlist request for %v", c.resource), c.list, opts, result)
-			return result, nil
-		}
-		klog.FromContext(ctx).Error(err, "The watchlist request ended with an error, falling back to the standard LIST semantics", "resource", c.resource)
-	}
-	result, err := c.list(ctx, opts)
-	if err == nil {
-		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, fmt.Sprintf("list request for %v", c.resource), c.list, opts, result)
-	}
-	return result, err
-}
-
-func (c *client) list(ctx context.Context, opts metav1.ListOptions) (*metav1.PartialObjectMetadataList, error) {
 	result := c.client.client.Get().AbsPath(c.makeURLSegments("")...).
 		SetHeader("Accept", "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1,application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1,application/json").
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
@@ -267,25 +247,6 @@ func (c *client) list(ctx context.Context, opts metav1.ListOptions) (*metav1.Par
 		return nil, fmt.Errorf("unexpected object, expected PartialObjectMetadata but got %T", obj)
 	}
 	return partial, nil
-}
-
-// watchList establishes a watch stream with the server and returns PartialObjectMetadataList.
-func (c *client) watchList(ctx context.Context, opts metav1.ListOptions) (*metav1.PartialObjectMetadataList, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-
-	result := &metav1.PartialObjectMetadataList{}
-	err := c.client.client.Get().
-		AbsPath(c.makeURLSegments("")...).
-		SetHeader("Accept", "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json").
-		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
-		Timeout(timeout).
-		WatchList(ctx).
-		Into(result)
-
-	return result, err
 }
 
 // Watch finds all changes to the resources in the specified scope (namespace or cluster).

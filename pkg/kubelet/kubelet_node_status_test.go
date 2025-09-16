@@ -213,7 +213,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			}
 			inputImageList, expectedImageList := generateTestingImageLists(numTestImages, int(tc.nodeStatusMaxImages))
 			testKubelet := newTestKubeletWithImageList(
-				t, inputImageList, false /* controllerAttachDetachEnabled */, true /*initFakeVolumePlugin*/, true /* localStorageCapacityIsolation */)
+				t, inputImageList, false /* controllerAttachDetachEnabled */, true /*initFakeVolumePlugin*/, true /* localStorageCapacityIsolation */, false /*excludePodAdmitHandlers*/, false /*enableResizing*/)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 			kubelet.nodeStatusMaxImages = tc.nodeStatusMaxImages
@@ -296,7 +296,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 						Architecture:            goruntime.GOARCH,
 						ContainerRuntimeVersion: "test://1.5.0",
 						KubeletVersion:          version.Get().String(),
-						KubeProxyVersion:        version.Get().String(),
+						KubeProxyVersion:        "",
 					},
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -476,7 +476,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
+				KubeProxyVersion:        "",
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -682,7 +682,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
+				KubeProxyVersion:        "",
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -916,7 +916,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
+				KubeProxyVersion:        "",
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -1131,7 +1131,7 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 			kubelet.setCachedMachineInfo(&cadvisorapi.MachineInfo{})
 
 			// override test volumeManager
-			fakeVolumeManager := kubeletvolume.NewFakeVolumeManager(tc.existingVolumes, 0, nil)
+			fakeVolumeManager := kubeletvolume.NewFakeVolumeManager(tc.existingVolumes, 0, nil, false)
 			kubelet.volumeManager = fakeVolumeManager
 
 			// Only test VolumesInUse setter
@@ -1588,7 +1588,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	// generate one more in inputImageList than we configure the Kubelet to report
 	inputImageList, _ := generateTestingImageLists(nodeStatusMaxImages+1, nodeStatusMaxImages)
 	testKubelet := newTestKubeletWithImageList(
-		t, inputImageList, false /* controllerAttachDetachEnabled */, true /* initFakeVolumePlugin */, true)
+		t, inputImageList, false /* controllerAttachDetachEnabled */, true /* initFakeVolumePlugin */, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/, false /*enableResizing*/)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.nodeStatusMaxImages = nodeStatusMaxImages
@@ -2761,8 +2761,12 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 
 	addNotImplatedReaction(kubeClient)
 
-	// Make node to be unschedulable.
-	kubelet.registerSchedulable = false
+	unschedulableTaint := v1.Taint{
+		Key:    v1.TaintNodeUnschedulable,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+	// Mark node with unschedulable taints
+	kubelet.registerWithTaints = []v1.Taint{unschedulableTaint}
 
 	// Reset kubelet status for each test.
 	kubelet.registrationCompleted = false
@@ -2772,13 +2776,9 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 
 	// Check the unschedulable taint.
 	got := gotNode.(*v1.Node)
-	unschedulableTaint := &v1.Taint{
-		Key:    v1.TaintNodeUnschedulable,
-		Effect: v1.TaintEffectNoSchedule,
-	}
 
 	require.True(t,
-		taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
+		taintutil.TaintExists(got.Spec.Taints, &unschedulableTaint),
 		"test unschedulable taint for TaintNodesByCondition")
 }
 
@@ -3092,7 +3092,7 @@ func TestUpdateNodeAddresses(t *testing.T) {
 	}
 }
 
-func TestIsUpdateStatusPeriodExperid(t *testing.T) {
+func TestIsUpdateStatusPeriodExpired(t *testing.T) {
 	testcases := []struct {
 		name                       string
 		lastStatusReportTime       time.Time
@@ -3103,13 +3103,13 @@ func TestIsUpdateStatusPeriodExperid(t *testing.T) {
 			name:                       "no status update before and no delay",
 			lastStatusReportTime:       time.Time{},
 			delayAfterNodeStatusChange: 0,
-			expectExpired:              false,
+			expectExpired:              true,
 		},
 		{
 			name:                       "no status update before and existing delay",
 			lastStatusReportTime:       time.Time{},
 			delayAfterNodeStatusChange: 30 * time.Second,
-			expectExpired:              false,
+			expectExpired:              true,
 		},
 		{
 			name:                       "not expired and no delay",
@@ -3129,6 +3129,12 @@ func TestIsUpdateStatusPeriodExperid(t *testing.T) {
 			delayAfterNodeStatusChange: -2 * time.Minute,
 			expectExpired:              true,
 		},
+		{
+			name:                       "Delay exactly at threshold",
+			lastStatusReportTime:       time.Now().Add(-5 * time.Minute),
+			delayAfterNodeStatusChange: 0,
+			expectExpired:              true,
+		},
 	}
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -3139,7 +3145,7 @@ func TestIsUpdateStatusPeriodExperid(t *testing.T) {
 	for _, tc := range testcases {
 		kubelet.lastStatusReportTime = tc.lastStatusReportTime
 		kubelet.delayAfterNodeStatusChange = tc.delayAfterNodeStatusChange
-		expired := kubelet.isUpdateStatusPeriodExperid()
+		expired := kubelet.isUpdateStatusPeriodExpired()
 		assert.Equal(t, tc.expectExpired, expired, tc.name)
 	}
 }

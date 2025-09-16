@@ -183,6 +183,7 @@ func (l *alsoFakeLister[T, L]) List(ctx context.Context, opts metav1.ListOptions
 
 // Watch returns a watch.Interface that watches the requested resources.
 func (c *FakeClient[T]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	return c.Fake.
 		InvokesWatch(testing.NewWatchActionWithOptions(c.resource, c.ns, opts))
 }

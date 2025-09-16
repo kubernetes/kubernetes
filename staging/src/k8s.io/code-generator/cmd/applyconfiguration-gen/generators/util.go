@@ -142,17 +142,18 @@ func (g *utilGenerator) GenerateType(c *generator.Context, _ *types.Type, w io.W
 		"runtimeScheme":          runtimeScheme,
 		"schemeGVs":              schemeGVs,
 		"schemaGroupVersionKind": groupVersionKind,
-		"testingTypeConverter":   testingTypeConverter,
+		"typeConverter":          typeConverter,
+		"newSchemeTypeConverter": newSchemeTypeConverter,
 	}
 	sw.Do(forKindFunc, m)
-	sw.Do(typeConverter, m)
+	sw.Do(newTypeConverterFunc, m)
 
 	return sw.Error()
 }
 
-var typeConverter = `
-func NewTypeConverter(scheme *{{.runtimeScheme|raw}}) *{{.testingTypeConverter|raw}} {
-	return &{{.testingTypeConverter|raw}}{Scheme: scheme, TypeResolver: {{.internalParser|raw}}()}
+var newTypeConverterFunc = `
+func NewTypeConverter(scheme *{{.runtimeScheme|raw}}) {{.typeConverter|raw}} {
+	return {{.newSchemeTypeConverter|raw}}(scheme, {{.internalParser|raw}}())
 }
 `
 

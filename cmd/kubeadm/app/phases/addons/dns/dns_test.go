@@ -666,7 +666,7 @@ func TestCoreDNSAddon(t *testing.T) {
 				client:        newMockClientForTest(t, 2, 1, "", "", ""),
 				printManifest: true,
 			},
-			wantOut: dedent.Dedent(`---
+			wantOut: dedent.Dedent(fmt.Sprintf(`---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -710,7 +710,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: foo.bar.io/coredns:v1.11.3
+        image: foo.bar.io/coredns:%s
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -733,10 +733,16 @@ spec:
         - containerPort: 9153
           name: metrics
           protocol: TCP
+        - containerPort: 8080
+          name: liveness-probe
+          protocol: TCP
+        - containerPort: 8181
+          name: readiness-probe
+          protocol: TCP
         livenessProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: liveness-probe
             scheme: HTTP
           initialDelaySeconds: 60
           timeoutSeconds: 5
@@ -745,7 +751,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /ready
-            port: 8181
+            port: readiness-probe
             scheme: HTTP
         securityContext:
           allowPrivilegeEscalation: false
@@ -866,7 +872,7 @@ kind: ServiceAccount
 metadata:
   name: coredns
   namespace: kube-system
-`),
+`, kubeadmconstants.CoreDNSVersion)),
 			wantErr: false,
 		},
 	}
@@ -950,7 +956,7 @@ func TestEnsureDNSAddon(t *testing.T) {
 				client:        newMockClientForTest(t, 0, 1, "", "", ""),
 				printManifest: true,
 			},
-			wantOut: dedent.Dedent(`---
+			wantOut: dedent.Dedent(fmt.Sprintf(`---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -994,7 +1000,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: foo.bar.io/coredns:v1.11.3
+        image: foo.bar.io/coredns:%s
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -1017,10 +1023,16 @@ spec:
         - containerPort: 9153
           name: metrics
           protocol: TCP
+        - containerPort: 8080
+          name: liveness-probe
+          protocol: TCP
+        - containerPort: 8181
+          name: readiness-probe
+          protocol: TCP
         livenessProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: liveness-probe
             scheme: HTTP
           initialDelaySeconds: 60
           timeoutSeconds: 5
@@ -1029,7 +1041,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /ready
-            port: 8181
+            port: readiness-probe
             scheme: HTTP
         securityContext:
           allowPrivilegeEscalation: false
@@ -1150,7 +1162,7 @@ kind: ServiceAccount
 metadata:
   name: coredns
   namespace: kube-system
-`),
+`, kubeadmconstants.CoreDNSVersion)),
 			wantErr: false,
 		},
 	}
@@ -1423,28 +1435,28 @@ func TestDeployedDNSAddon(t *testing.T) {
 	}{
 		{
 			name:           "default",
-			image:          "registry.k8s.io/coredns/coredns:v1.11.3",
+			image:          "registry.k8s.io/coredns/coredns:" + kubeadmconstants.CoreDNSVersion,
 			deploymentSize: 1,
-			wantVersion:    "v1.11.3",
+			wantVersion:    kubeadmconstants.CoreDNSVersion,
 		},
 		{
 			name:           "no dns addon deployment",
-			image:          "registry.k8s.io/coredns/coredns:v1.11.3",
+			image:          "registry.k8s.io/coredns/coredns:" + kubeadmconstants.CoreDNSVersion,
 			deploymentSize: 0,
 			wantVersion:    "",
 		},
 		{
 			name:           "multiple dns addon deployment",
-			image:          "registry.k8s.io/coredns/coredns:v1.11.3",
+			image:          "registry.k8s.io/coredns/coredns:" + kubeadmconstants.CoreDNSVersion,
 			deploymentSize: 2,
 			wantVersion:    "",
 			wantErr:        true,
 		},
 		{
 			name:           "with digest",
-			image:          "registry.k8s.io/coredns/coredns:v1.11.3@sha256:a0ead06651cf580044aeb0a0feba63591858fb2e43ade8c9dea45a6a89ae7e5e",
+			image:          "registry.k8s.io/coredns/coredns:v1.12.3@sha256:1391544c978029fcddc65068f6ad67f396e55585b664ecccd7fefba029b9b706",
 			deploymentSize: 1,
-			wantVersion:    "v1.11.3",
+			wantVersion:    kubeadmconstants.CoreDNSVersion,
 		},
 		{
 			name:           "without registry",
@@ -1664,7 +1676,7 @@ func TestIsCoreDNSConfigMapMigrationRequired(t *testing.T) {
 // deploymentSize is the number of deployments with `k8s-app=kube-dns` label.
 func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, image string, configMap string, configData string) *clientsetfake.Clientset {
 	if image == "" {
-		image = "registry.k8s.io/coredns/coredns:v1.11.3"
+		image = "registry.k8s.io/coredns/coredns:" + kubeadmconstants.CoreDNSVersion
 	}
 	client := clientsetfake.NewSimpleClientset()
 	for i := 0; i < deploymentSize; i++ {

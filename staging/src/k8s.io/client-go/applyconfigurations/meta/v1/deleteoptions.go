@@ -24,14 +24,51 @@ import (
 
 // DeleteOptionsApplyConfiguration represents a declarative configuration of the DeleteOptions type for use
 // with apply.
+//
+// DeleteOptions may be provided when deleting an API object.
 type DeleteOptionsApplyConfiguration struct {
-	TypeMetaApplyConfiguration                       `json:",inline"`
-	GracePeriodSeconds                               *int64                           `json:"gracePeriodSeconds,omitempty"`
-	Preconditions                                    *PreconditionsApplyConfiguration `json:"preconditions,omitempty"`
-	OrphanDependents                                 *bool                            `json:"orphanDependents,omitempty"`
-	PropagationPolicy                                *metav1.DeletionPropagation      `json:"propagationPolicy,omitempty"`
-	DryRun                                           []string                         `json:"dryRun,omitempty"`
-	IgnoreStoreReadErrorWithClusterBreakingPotential *bool                            `json:"ignoreStoreReadErrorWithClusterBreakingPotential,omitempty"`
+	TypeMetaApplyConfiguration `json:",inline"`
+	// The duration in seconds before the object should be deleted. Value must be non-negative integer.
+	// The value zero indicates delete immediately. If this value is nil, the default grace period for the
+	// specified type will be used.
+	// Defaults to a per object value if not specified. zero means delete immediately.
+	GracePeriodSeconds *int64 `json:"gracePeriodSeconds,omitempty"`
+	// Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
+	// returned.
+	Preconditions *PreconditionsApplyConfiguration `json:"preconditions,omitempty"`
+	// Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7.
+	// Should the dependent objects be orphaned. If true/false, the "orphan"
+	// finalizer will be added to/removed from the object's finalizers list.
+	// Either this field or PropagationPolicy may be set, but not both.
+	OrphanDependents *bool `json:"orphanDependents,omitempty"`
+	// Whether and how garbage collection will be performed.
+	// Either this field or OrphanDependents may be set, but not both.
+	// The default policy is decided by the existing finalizer set in the
+	// metadata.finalizers and the resource-specific default policy.
+	// Acceptable values are: 'Orphan' - orphan the dependents; 'Background' -
+	// allow the garbage collector to delete the dependents in the background;
+	// 'Foreground' - a cascading policy that deletes all dependents in the
+	// foreground.
+	PropagationPolicy *metav1.DeletionPropagation `json:"propagationPolicy,omitempty"`
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	DryRun []string `json:"dryRun,omitempty"`
+	// if set to true, it will trigger an unsafe deletion of the resource in
+	// case the normal deletion flow fails with a corrupt object error.
+	// A resource is considered corrupt if it can not be retrieved from
+	// the underlying storage successfully because of a) its data can
+	// not be transformed e.g. decryption failure, or b) it fails
+	// to decode into an object.
+	// NOTE: unsafe deletion ignores finalizer constraints, skips
+	// precondition checks, and removes the object from the storage.
+	// WARNING: This may potentially break the cluster if the workload
+	// associated with the resource being unsafe-deleted relies on normal
+	// deletion flow. Use only if you REALLY know what you are doing.
+	// The default value is false, and the user must opt in to enable it
+	IgnoreStoreReadErrorWithClusterBreakingPotential *bool `json:"ignoreStoreReadErrorWithClusterBreakingPotential,omitempty"`
 }
 
 // DeleteOptionsApplyConfiguration constructs a declarative configuration of the DeleteOptions type for use with
@@ -42,6 +79,8 @@ func DeleteOptions() *DeleteOptionsApplyConfiguration {
 	b.WithAPIVersion("meta.k8s.io/v1")
 	return b
 }
+
+func (b DeleteOptionsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -107,4 +146,14 @@ func (b *DeleteOptionsApplyConfiguration) WithDryRun(values ...string) *DeleteOp
 func (b *DeleteOptionsApplyConfiguration) WithIgnoreStoreReadErrorWithClusterBreakingPotential(value bool) *DeleteOptionsApplyConfiguration {
 	b.IgnoreStoreReadErrorWithClusterBreakingPotential = &value
 	return b
+}
+
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *DeleteOptionsApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *DeleteOptionsApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
 }

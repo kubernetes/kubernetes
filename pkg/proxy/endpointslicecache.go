@@ -22,15 +22,12 @@ import (
 	"sort"
 	"sync"
 
-	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -48,9 +45,7 @@ type EndpointSliceCache struct {
 	trackerByServiceMap map[types.NamespacedName]*endpointSliceTracker
 
 	makeEndpointInfo makeEndpointFunc
-	hostname         string
-	ipFamily         v1.IPFamily
-	recorder         events.EventRecorder
+	nodeName         string
 }
 
 // endpointSliceTracker keeps track of EndpointSlices as they have been applied
@@ -72,16 +67,14 @@ type endpointSliceData struct {
 }
 
 // NewEndpointSliceCache initializes an EndpointSliceCache.
-func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder events.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
+func NewEndpointSliceCache(nodeName string, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
 		makeEndpointInfo = standardEndpointInfo
 	}
 	return &EndpointSliceCache{
 		trackerByServiceMap: map[types.NamespacedName]*endpointSliceTracker{},
-		hostname:            hostname,
-		ipFamily:            ipFamily,
+		nodeName:            nodeName,
 		makeEndpointInfo:    makeEndpointInfo,
-		recorder:            recorder,
 	}
 }
 
@@ -149,6 +142,9 @@ func (cache *EndpointSliceCache) checkoutChanges() map[types.NamespacedName]*end
 			}
 
 			delete(esTracker.pending, name)
+			if len(esTracker.applied) == 0 && len(esTracker.pending) == 0 {
+				delete(cache.trackerByServiceMap, serviceNN)
+			}
 		}
 
 		change.current = cache.getEndpointsMap(serviceNN, esTracker.applied)
@@ -210,34 +206,31 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 			continue
 		}
 
-		// Filter out the incorrect IP version case. Any endpoint port that
-		// contains incorrect IP version will be ignored.
-		if (cache.ipFamily == v1.IPv6Protocol) != utilnet.IsIPv6String(endpoint.Addresses[0]) {
-			// Emit event on the corresponding service which had a different IP
-			// version than the endpoint.
-			proxyutil.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], svcPortName.NamespacedName.Namespace, svcPortName.NamespacedName.Name, "")
-			continue
-		}
-
 		isLocal := endpoint.NodeName != nil && cache.isLocal(*endpoint.NodeName)
 
 		ready := endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready
 		serving := endpoint.Conditions.Serving == nil || *endpoint.Conditions.Serving
 		terminating := endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating
 
-		var zoneHints sets.Set[string]
-		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
-			if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
+		var zoneHints, nodeHints sets.Set[string]
+		if endpoint.Hints != nil {
+			if len(endpoint.Hints.ForZones) > 0 {
 				zoneHints = sets.New[string]()
 				for _, zone := range endpoint.Hints.ForZones {
 					zoneHints.Insert(zone.Name)
+				}
+			}
+			if len(endpoint.Hints.ForNodes) > 0 && utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
+				nodeHints = sets.New[string]()
+				for _, node := range endpoint.Hints.ForNodes {
+					nodeHints.Insert(node.Name)
 				}
 			}
 		}
 
 		endpointIP := utilnet.ParseIPSloppy(endpoint.Addresses[0]).String()
 		endpointInfo := newBaseEndpointInfo(endpointIP, portNum, isLocal,
-			ready, serving, terminating, zoneHints)
+			ready, serving, terminating, zoneHints, nodeHints)
 
 		// This logic ensures we're deduplicating potential overlapping endpoints
 		// isLocal should not vary between matching endpoints, but if it does, we
@@ -250,8 +243,8 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 	return endpointSet
 }
 
-func (cache *EndpointSliceCache) isLocal(hostname string) bool {
-	return len(cache.hostname) > 0 && hostname == cache.hostname
+func (cache *EndpointSliceCache) isLocal(nodeName string) bool {
+	return len(cache.nodeName) > 0 && nodeName == cache.nodeName
 }
 
 // esDataChanged returns true if the esData parameter should be set as a new

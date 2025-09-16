@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package server contains the plumbing to create kubernetes-like API server command.
-package server // import "k8s.io/apiserver/pkg/server"
+package server

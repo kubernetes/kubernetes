@@ -21,7 +21,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +39,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -50,7 +50,6 @@ type applyFlags struct {
 	nonInteractiveMode bool
 	force              bool
 	dryRun             bool
-	etcdUpgrade        bool
 	renewCerts         bool
 	patchesDir         string
 }
@@ -64,6 +63,7 @@ type applyData struct {
 	nonInteractiveMode        bool
 	force                     bool
 	dryRun                    bool
+	dryRunDir                 string
 	etcdUpgrade               bool
 	renewCerts                bool
 	allowExperimentalUpgrades bool
@@ -81,7 +81,6 @@ type applyData struct {
 func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	flags := &applyFlags{
 		applyPlanFlags: apf,
-		etcdUpgrade:    true,
 		renewCerts:     true,
 	}
 
@@ -126,7 +125,6 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	cmd.Flags().BoolVarP(&flags.nonInteractiveMode, "yes", "y", flags.nonInteractiveMode, "Perform the upgrade and do not prompt for confirmation (non-interactive mode).")
 	cmd.Flags().BoolVarP(&flags.force, options.Force, "f", flags.force, "Force upgrading although some requirements might not be met. This also implies non-interactive mode.")
 	cmd.Flags().BoolVar(&flags.dryRun, options.DryRun, flags.dryRun, "Do not change any state, just output what actions would be performed.")
-	cmd.Flags().BoolVar(&flags.etcdUpgrade, options.EtcdUpgrade, flags.etcdUpgrade, "Perform the upgrade of etcd.")
 	cmd.Flags().BoolVar(&flags.renewCerts, options.CertificateRenewal, flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 	options.AddPatchesFlag(cmd.Flags(), &flags.patchesDir)
 
@@ -198,6 +196,14 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 		return nil, cmdutil.TypeMismatchErr("dryRun", "bool")
 	}
 
+	// If dry running creates a temporary directory for saving kubeadm generated files.
+	dryRunDir := ""
+	if *dryRun {
+		if dryRunDir, err = constants.GetDryRunDir(constants.EnvVarUpgradeDryRunDir, "kubeadm-upgrade-apply-dryrun", klog.Warningf); err != nil {
+			return nil, errors.Wrap(err, "could not create a temporary directory on dryrun")
+		}
+	}
+
 	etcdUpgrade, ok := cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.EtcdUpgrade, upgradeCfg.Apply.EtcdUpgrade, &applyFlags.etcdUpgrade).(*bool)
 	if !ok {
 		return nil, cmdutil.TypeMismatchErr("etcdUpgrade", "bool")
@@ -236,7 +242,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			_, _ = printer.Printf("[upgrade] In order to upgrade, a ConfigMap called %q in the %q namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			_, _ = printer.Printf("[upgrade] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n")
+			_, _ = printer.Printf("[upgrade/config] Use 'kubeadm init phase upload-config kubeadm --config your-config-file' to re-upload it.\n")
 			err = errors.Errorf("the ConfigMap %q in the %q namespace was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
 		return nil, errors.Wrap(err, "[upgrade] FATAL")
@@ -273,6 +279,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 		nonInteractiveMode:        applyFlags.nonInteractiveMode,
 		force:                     *force,
 		dryRun:                    *dryRun,
+		dryRunDir:                 dryRunDir,
 		etcdUpgrade:               *etcdUpgrade,
 		renewCerts:                *renewCerts,
 		allowExperimentalUpgrades: *allowExperimentalUpgrades,
@@ -356,4 +363,20 @@ func (d *applyData) ForceUpgrade() bool {
 func (d *applyData) IsControlPlaneNode() bool {
 	// `kubeadm upgrade apply` should always be executed on a control-plane node
 	return true
+}
+
+// KubeConfigDir returns the Kubernetes configuration directory or the temporary directory if DryRun is true.
+func (j *applyData) KubeConfigDir() string {
+	if j.dryRun {
+		return j.dryRunDir
+	}
+	return constants.KubernetesDir
+}
+
+// KubeletDir returns the kubelet configuration directory or the temporary directory if DryRun is true.
+func (j *applyData) KubeletDir() string {
+	if j.dryRun {
+		return j.dryRunDir
+	}
+	return constants.KubeletRunDirectory
 }

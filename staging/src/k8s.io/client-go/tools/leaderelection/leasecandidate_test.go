@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 )
 
 type testcase struct {
@@ -34,6 +35,7 @@ type testcase struct {
 }
 
 func TestLeaseCandidateCreation(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tc := testcase{
 		candidateName:      "foo",
 		candidateNamespace: "default",
@@ -42,7 +44,7 @@ func TestLeaseCandidateCreation(t *testing.T) {
 		emulationVersion:   "1.30.0",
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
 	client := fake.NewSimpleClientset()
@@ -67,6 +69,8 @@ func TestLeaseCandidateCreation(t *testing.T) {
 }
 
 func TestLeaseCandidateAck(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
 	tc := testcase{
 		candidateName:      "foo",
 		candidateNamespace: "default",
@@ -75,7 +79,7 @@ func TestLeaseCandidateAck(t *testing.T) {
 		emulationVersion:   "1.30.0",
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
 	client := fake.NewSimpleClientset()
@@ -101,12 +105,12 @@ func TestLeaseCandidateAck(t *testing.T) {
 
 	// Update PingTime and verify that the client renews
 	ensureAfter := &metav1.MicroTime{Time: time.Now()}
-	lc, err := client.CoordinationV1alpha2().LeaseCandidates(tc.candidateNamespace).Get(ctx, tc.candidateName, metav1.GetOptions{})
+	lc, err := client.CoordinationV1beta1().LeaseCandidates(tc.candidateNamespace).Get(ctx, tc.candidateName, metav1.GetOptions{})
 	if err == nil {
 		if lc.Spec.PingTime == nil {
 			c := lc.DeepCopy()
 			c.Spec.PingTime = &metav1.MicroTime{Time: time.Now()}
-			_, err = client.CoordinationV1alpha2().LeaseCandidates(tc.candidateNamespace).Update(ctx, c, metav1.UpdateOptions{})
+			_, err = client.CoordinationV1beta1().LeaseCandidates(tc.candidateNamespace).Update(ctx, c, metav1.UpdateOptions{})
 			if err != nil {
 				t.Error(err)
 			}
@@ -120,7 +124,7 @@ func TestLeaseCandidateAck(t *testing.T) {
 
 func pollForLease(ctx context.Context, tc testcase, client *fake.Clientset, t *metav1.MicroTime) error {
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		lc, err := client.CoordinationV1alpha2().LeaseCandidates(tc.candidateNamespace).Get(ctx, tc.candidateName, metav1.GetOptions{})
+		lc, err := client.CoordinationV1beta1().LeaseCandidates(tc.candidateNamespace).Get(ctx, tc.candidateName, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return false, nil

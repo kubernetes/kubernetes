@@ -19,15 +19,9 @@ package dump
 import (
 	"fmt"
 	"testing"
+
+	"k8s.io/utils/ptr"
 )
-
-func ptrint(i int) *int {
-	return &i
-}
-
-func ptrstr(s string) *string {
-	return &s
-}
 
 // custom type to test Stringer interface on non-pointer receiver.
 type customString string
@@ -101,7 +95,7 @@ func TestPretty(t *testing.T) {
 		{uint32(93), "(uint32) 93\n"},
 		{uint64(93), "(uint64) 93\n"},
 		{uintptr(93), "(uintptr) 0x5d\n"},
-		{ptrint(93), "(*int)(93)\n"},
+		{ptr.To(93), "(*int)(93)\n"},
 		{float32(93.76), "(float32) 93.76\n"},
 		{float64(93.76), "(float64) 93.76\n"},
 		{complex64(93i), "(complex64) (0+93i)\n"},
@@ -109,7 +103,7 @@ func TestPretty(t *testing.T) {
 		{bool(true), "(bool) true\n"},
 		{bool(false), "(bool) false\n"},
 		{string("test"), "(string) (len=4) \"test\"\n"},
-		{ptrstr("test"), "(*string)((len=4) \"test\")\n"},
+		{ptr.To("test"), "(*string)((len=4) \"test\")\n"},
 		{[1]string{"arr"}, "([1]string) (len=1) {\n  (string) (len=3) \"arr\"\n}\n"},
 		{[]string{"slice"}, "([]string) (len=1) {\n  (string) (len=5) \"slice\"\n}\n"},
 		{tcs, "(dump.customString) (len=4) \"test\"\n"},
@@ -180,7 +174,7 @@ func TestForHash(t *testing.T) {
 		{uint32(93), "(uint32)93"},
 		{uint64(93), "(uint64)93"},
 		{uintptr(93), "(uintptr)0x5d"},
-		{ptrint(93), "(*int)93"},
+		{ptr.To(93), "(*int)93"},
 		{float32(93.76), "(float32)93.76"},
 		{float64(93.76), "(float64)93.76"},
 		{complex64(93i), "(complex64)(0+93i)"},
@@ -188,7 +182,7 @@ func TestForHash(t *testing.T) {
 		{bool(true), "(bool)true"},
 		{bool(false), "(bool)false"},
 		{string("test"), "(string)test"},
-		{ptrstr("test"), "(*string)test"},
+		{ptr.To("test"), "(*string)test"},
 		{[1]string{"arr"}, "([1]string)[arr]"},
 		{[]string{"slice"}, "([]string)[slice]"},
 		{tcs, "(dump.customString)test"},
@@ -259,7 +253,7 @@ func TestOneLine(t *testing.T) {
 		{uint32(93), "(uint32)93"},
 		{uint64(93), "(uint64)93"},
 		{uintptr(93), "(uintptr)0x5d"},
-		{ptrint(93), "(*int)93"},
+		{ptr.To(93), "(*int)93"},
 		{float32(93.76), "(float32)93.76"},
 		{float64(93.76), "(float64)93.76"},
 		{complex64(93i), "(complex64)(0+93i)"},
@@ -267,7 +261,7 @@ func TestOneLine(t *testing.T) {
 		{bool(true), "(bool)true"},
 		{bool(false), "(bool)false"},
 		{string("test"), "(string)test"},
-		{ptrstr("test"), "(*string)test"},
+		{ptr.To("test"), "(*string)test"},
 		{[1]string{"arr"}, "([1]string)[arr]"},
 		{[]string{"slice"}, "([]string)[slice]"},
 		{tcs, "(dump.customString)test"},

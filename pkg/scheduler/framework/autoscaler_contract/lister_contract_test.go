@@ -21,36 +21,36 @@ limitations under the License.
 package contract
 
 import (
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
-var _ framework.NodeInfoLister = &nodeInfoListerContract{}
-var _ framework.StorageInfoLister = &storageInfoListerContract{}
-var _ framework.SharedLister = &shareListerContract{}
-var _ framework.ResourceSliceLister = &resourceSliceListerContract{}
-var _ framework.DeviceClassLister = &deviceClassListerContract{}
-var _ framework.ResourceClaimTracker = &resourceClaimTrackerContract{}
-var _ framework.SharedDRAManager = &sharedDRAManagerContract{}
+var _ fwk.NodeInfoLister = &nodeInfoListerContract{}
+var _ fwk.StorageInfoLister = &storageInfoListerContract{}
+var _ fwk.SharedLister = &shareListerContract{}
+var _ fwk.ResourceSliceLister = &resourceSliceListerContract{}
+var _ fwk.DeviceClassLister = &deviceClassListerContract{}
+var _ fwk.ResourceClaimTracker = &resourceClaimTrackerContract{}
+var _ fwk.SharedDRAManager = &sharedDRAManagerContract{}
 
 type nodeInfoListerContract struct{}
 
-func (c *nodeInfoListerContract) List() ([]*framework.NodeInfo, error) {
+func (c *nodeInfoListerContract) List() ([]fwk.NodeInfo, error) {
 	return nil, nil
 }
 
-func (c *nodeInfoListerContract) HavePodsWithAffinityList() ([]*framework.NodeInfo, error) {
+func (c *nodeInfoListerContract) HavePodsWithAffinityList() ([]fwk.NodeInfo, error) {
 	return nil, nil
 }
 
-func (c *nodeInfoListerContract) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error) {
+func (c *nodeInfoListerContract) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error) {
 	return nil, nil
 }
 
-func (c *nodeInfoListerContract) Get(_ string) (*framework.NodeInfo, error) {
+func (c *nodeInfoListerContract) Get(_ string) (fwk.NodeInfo, error) {
 	return nil, nil
 }
 
@@ -62,17 +62,17 @@ func (c *storageInfoListerContract) IsPVCUsedByPods(_ string) bool {
 
 type shareListerContract struct{}
 
-func (c *shareListerContract) NodeInfos() framework.NodeInfoLister {
+func (c *shareListerContract) NodeInfos() fwk.NodeInfoLister {
 	return nil
 }
 
-func (c *shareListerContract) StorageInfos() framework.StorageInfoLister {
+func (c *shareListerContract) StorageInfos() fwk.StorageInfoLister {
 	return nil
 }
 
 type resourceSliceListerContract struct{}
 
-func (c *resourceSliceListerContract) List() ([]*resourceapi.ResourceSlice, error) {
+func (c *resourceSliceListerContract) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error) {
 	return nil, nil
 }
 
@@ -100,6 +100,10 @@ func (r *resourceClaimTrackerContract) ListAllAllocatedDevices() (sets.Set[struc
 	return nil, nil
 }
 
+func (r *resourceClaimTrackerContract) GatherAllocatedState() (*structured.AllocatedState, error) {
+	return nil, nil
+}
+
 func (r *resourceClaimTrackerContract) SignalClaimPendingAllocation(_ types.UID, _ *resourceapi.ResourceClaim) error {
 	return nil
 }
@@ -121,14 +125,14 @@ func (r *resourceClaimTrackerContract) AssumedClaimRestore(_, _ string) {
 
 type sharedDRAManagerContract struct{}
 
-func (s *sharedDRAManagerContract) ResourceClaims() framework.ResourceClaimTracker {
+func (s *sharedDRAManagerContract) ResourceClaims() fwk.ResourceClaimTracker {
 	return nil
 }
 
-func (s *sharedDRAManagerContract) ResourceSlices() framework.ResourceSliceLister {
+func (s *sharedDRAManagerContract) ResourceSlices() fwk.ResourceSliceLister {
 	return nil
 }
 
-func (s *sharedDRAManagerContract) DeviceClasses() framework.DeviceClassLister {
+func (s *sharedDRAManagerContract) DeviceClasses() fwk.DeviceClassLister {
 	return nil
 }

@@ -17,9 +17,9 @@ package adapter
 import (
 	"context"
 
-	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
-
 	"google.golang.org/grpc"
+
+	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 )
 
 type mts2mtc struct{ mts pb.MaintenanceServer }
@@ -72,8 +72,9 @@ type ss2scServerStream struct{ chanServerStream }
 func (s *ss2scClientStream) Send(rr *pb.SnapshotRequest) error {
 	return s.SendMsg(rr)
 }
+
 func (s *ss2scClientStream) Recv() (*pb.SnapshotResponse, error) {
-	var v interface{}
+	var v any
 	if err := s.RecvMsg(&v); err != nil {
 		return nil, err
 	}
@@ -83,8 +84,9 @@ func (s *ss2scClientStream) Recv() (*pb.SnapshotResponse, error) {
 func (s *ss2scServerStream) Send(rr *pb.SnapshotResponse) error {
 	return s.SendMsg(rr)
 }
+
 func (s *ss2scServerStream) Recv() (*pb.SnapshotRequest, error) {
-	var v interface{}
+	var v any
 	if err := s.RecvMsg(&v); err != nil {
 		return nil, err
 	}

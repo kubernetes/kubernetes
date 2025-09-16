@@ -21,4 +21,4 @@ limitations under the License.
 // standard command line arguments and parameters into a Visitor that can iterate
 // over all of the identified resources, whether on the server or on the local
 // filesystem.
-package resource // import "k8s.io/cli-runtime/pkg/resource"
+package resource

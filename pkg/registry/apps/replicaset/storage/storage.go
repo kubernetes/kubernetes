@@ -43,7 +43,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/replicaset"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // ReplicaSetStorage includes dummy storage for ReplicaSets and for Scale subresource.
@@ -202,7 +202,7 @@ func (r *ScaleREST) Destroy() {
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
-		return nil, errors.NewNotFound(apps.Resource("replicasets/scale"), name)
+		return nil, err
 	}
 	rs := obj.(*apps.ReplicaSet)
 	scale, err := scaleFromReplicaSet(rs)

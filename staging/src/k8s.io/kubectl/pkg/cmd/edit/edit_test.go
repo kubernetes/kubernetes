@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
 
+	yaml "go.yaml.in/yaml/v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/kubectl/pkg/cmd/create"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 type EditTestCase struct {
@@ -172,7 +172,7 @@ func TestEdit(t *testing.T) {
 	t.Setenv("KUBE_EDITOR", "testdata/test_editor.sh")
 	t.Setenv("KUBE_EDITOR_CALLBACK", server.URL+"/callback")
 
-	testcases := sets.NewString()
+	testcases := sets.New[string]()
 	filepath.Walk("testdata", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -194,7 +194,7 @@ func TestEdit(t *testing.T) {
 		t.Fatalf("Error locating edit testcases")
 	}
 
-	for _, testcaseName := range testcases.List() {
+	for _, testcaseName := range testcases.UnsortedList() {
 		t.Run(testcaseName, func(t *testing.T) {
 			i = 0
 			name = testcaseName

@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestIsSubPath(t *testing.T) {
@@ -64,6 +65,7 @@ func TestIsSubPath(t *testing.T) {
 }
 
 func TestGetRequestAttributes(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	for _, fineGrained := range []bool{false, true} {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGrained)
 		for _, test := range AuthzTestCases(fineGrained) {
@@ -72,7 +74,7 @@ func TestGetRequestAttributes(t *testing.T) {
 
 				req, err := http.NewRequest(test.Method, "https://localhost:1234"+test.Path, nil)
 				require.NoError(t, err)
-				attrs := getter.GetRequestAttributes(AuthzTestUser(), req)
+				attrs := getter.GetRequestAttributes(tCtx, AuthzTestUser(), req)
 
 				test.AssertAttributes(t, attrs)
 			})
@@ -125,6 +127,8 @@ func AuthzTestCases(fineGrained bool) []AuthzTestCase {
 		"/attach/{podNamespace}/{podID}/{uid}/{containerName}": {"proxy"},
 		"/checkpoint/{podNamespace}/{podID}/{containerName}":   {"checkpoint"},
 		"/configz": {"proxy"},
+		"/flagz":   {"configz"},
+		"/statusz": {"statusz"},
 		"/containerLogs/{podNamespace}/{podID}/{containerName}": {"proxy"},
 		"/debug/flags/v":                                     {"proxy"},
 		"/debug/pprof/{subpath:*}":                           {"proxy"},

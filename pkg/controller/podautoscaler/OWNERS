@@ -1,8 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
+  - adrianmoisey
   - gjtempleton
   - mwielgus
+  - omerap12
+  - raywainman
 approvers:
   - mwielgus
 emeritus_approvers:

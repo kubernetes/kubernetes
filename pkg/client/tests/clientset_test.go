@@ -91,7 +91,7 @@ func TestClientContentType(t *testing.T) {
 			contentType:       "",
 			expectedPath:      "/api/v1/namespaces/panda/pods",
 			expectContentType: "application/vnd.kubernetes.protobuf",
-			expectBody:        "k8s\x00\n\t\n\x02v1\x12\x03Pod\x12I\n\x17\n\asnorlax\x12\x00\x1a\x00\"\x00*\x002\x008\x00B\x00\x12\x1c\x1a\x002\x00B\x00J\x00R\x00X\x00`\x00h\x00\x82\x01\x00\x8a\x01\x00\x9a\x01\x00\xc2\x01\x00\x1a\x10\n\x00\x1a\x00\"\x00*\x002\x00J\x00Z\x00r\x00\x1a\x00\"\x00",
+			expectBody:        "k8s\x00\n\t\n\x02v1\x12\x03Pod\x12\x4c\n\x17\n\asnorlax\x12\x00\x1a\x00\"\x00*\x002\x008\x00B\x00\x12\x1c\x1a\x002\x00B\x00J\x00R\x00X\x00`\x00h\x00\x82\x01\x00\x8a\x01\x00\x9a\x01\x00\xc2\x01\x00\x1a\x13\n\x00\x1a\x00\"\x00*\x002\x00J\x00Z\x00r\x00\x88\x01\x00\x1a\x00\"\x00",
 		},
 		{
 			name:              "json",
@@ -99,7 +99,7 @@ func TestClientContentType(t *testing.T) {
 			contentType:       "application/json",
 			expectedPath:      "/api/v1/namespaces/panda/pods",
 			expectContentType: "application/json",
-			expectBody: `{"kind":"Pod","apiVersion":"v1","metadata":{"name":"snorlax","creationTimestamp":null},"spec":{"containers":null},"status":{}}
+			expectBody: `{"kind":"Pod","apiVersion":"v1","metadata":{"name":"snorlax"},"spec":{"containers":null},"status":{}}
 `,
 		},
 		{
@@ -116,7 +116,7 @@ func TestClientContentType(t *testing.T) {
 			contentType:       "application/json",
 			expectedPath:      "/apis/apps/v1/namespaces/panda/deployments/snorlax/scale",
 			expectContentType: "application/json",
-			expectBody: `{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"snorlax","creationTimestamp":null},"spec":{},"status":{"replicas":0}}
+			expectBody: `{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"snorlax"},"spec":{},"status":{"replicas":0}}
 `,
 		},
 		{
@@ -125,7 +125,7 @@ func TestClientContentType(t *testing.T) {
 			contentType:       "",
 			expectedPath:      "/api/v1/namespaces/panda/examples",
 			expectContentType: "application/json",
-			expectBody: `{"metadata":{"name":"snorlax","creationTimestamp":null},"spec":{"foo":"","bar":false},"status":{}}
+			expectBody: `{"metadata":{"name":"snorlax"},"spec":{"foo":"","bar":false},"status":{}}
 `,
 		},
 		{
@@ -134,7 +134,7 @@ func TestClientContentType(t *testing.T) {
 			contentType:       "application/json",
 			expectedPath:      "/api/v1/namespaces/panda/examples",
 			expectContentType: "application/json",
-			expectBody: `{"metadata":{"name":"snorlax","creationTimestamp":null},"spec":{"foo":"","bar":false},"status":{}}
+			expectBody: `{"metadata":{"name":"snorlax"},"spec":{"foo":"","bar":false},"status":{}}
 `,
 		},
 	}

@@ -29,10 +29,16 @@ import (
 
 // EvictionApplyConfiguration represents a declarative configuration of the Eviction type for use
 // with apply.
+//
+// Eviction evicts a pod from its node subject to certain policies and safety constraints.
+// This is a subresource of Pod.  A request to cause such an eviction is
+// created by POSTing to .../pods/<pod name>/evictions.
 type EvictionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// ObjectMeta describes the pod that is being evicted.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	DeleteOptions                    *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
+	// DeleteOptions may be provided
+	DeleteOptions *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
 }
 
 // Eviction constructs a declarative configuration of the Eviction type for use with
@@ -46,29 +52,14 @@ func Eviction(name, namespace string) *EvictionApplyConfiguration {
 	return b
 }
 
-// ExtractEviction extracts the applied configuration owned by fieldManager from
-// eviction. If no managedFields are found in eviction for fieldManager, a
-// EvictionApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractEvictionFrom extracts the applied configuration owned by fieldManager from
+// eviction for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // eviction must be a unmodified Eviction API object that was retrieved from the Kubernetes API.
-// ExtractEviction provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractEvictionFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractEviction(eviction *policyv1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
-	return extractEviction(eviction, fieldManager, "")
-}
-
-// ExtractEvictionStatus is the same as ExtractEviction except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractEvictionStatus(eviction *policyv1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
-	return extractEviction(eviction, fieldManager, "status")
-}
-
-func extractEviction(eviction *policyv1beta1.Eviction, fieldManager string, subresource string) (*EvictionApplyConfiguration, error) {
+func ExtractEvictionFrom(eviction *policyv1beta1.Eviction, fieldManager string, subresource string) (*EvictionApplyConfiguration, error) {
 	b := &EvictionApplyConfiguration{}
 	err := managedfields.ExtractInto(eviction, internal.Parser().Type("io.k8s.api.policy.v1beta1.Eviction"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,6 +72,22 @@ func extractEviction(eviction *policyv1beta1.Eviction, fieldManager string, subr
 	b.WithAPIVersion("policy/v1beta1")
 	return b, nil
 }
+
+// ExtractEviction extracts the applied configuration owned by fieldManager from
+// eviction. If no managedFields are found in eviction for fieldManager, a
+// EvictionApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// eviction must be a unmodified Eviction API object that was retrieved from the Kubernetes API.
+// ExtractEviction provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractEviction(eviction *policyv1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
+	return ExtractEvictionFrom(eviction, fieldManager, "")
+}
+
+func (b EvictionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -248,8 +255,24 @@ func (b *EvictionApplyConfiguration) WithDeleteOptions(value *v1.DeleteOptionsAp
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *EvictionApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *EvictionApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *EvictionApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *EvictionApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

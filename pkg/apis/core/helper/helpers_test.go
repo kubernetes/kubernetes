@@ -369,3 +369,48 @@ func TestIsServiceIPSet(t *testing.T) {
 		})
 	}
 }
+
+func TestHasInvalidLabelValueInNodeSelectorTerms(t *testing.T) {
+	testCases := []struct {
+		name   string
+		terms  []core.NodeSelectorTerm
+		expect bool
+	}{
+		{
+			name: "valid values",
+			terms: []core.NodeSelectorTerm{{
+				MatchExpressions: []core.NodeSelectorRequirement{{
+					Key:      "foo",
+					Operator: core.NodeSelectorOpIn,
+					Values:   []string{"far"},
+				}},
+			}},
+			expect: false,
+		},
+		{
+			name:   "empty terms",
+			terms:  []core.NodeSelectorTerm{},
+			expect: false,
+		},
+		{
+			name: "invalid label value",
+			terms: []core.NodeSelectorTerm{{
+				MatchExpressions: []core.NodeSelectorRequirement{{
+					Key:      "foo",
+					Operator: core.NodeSelectorOpIn,
+					Values:   []string{"-1"},
+				}},
+			}},
+			expect: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := HasInvalidLabelValueInNodeSelectorTerms(tc.terms)
+			if got != tc.expect {
+				t.Errorf("exepct %v, got %v", tc.expect, got)
+			}
+		})
+	}
+}

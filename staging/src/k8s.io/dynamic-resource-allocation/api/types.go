@@ -18,6 +18,7 @@ package api
 
 import (
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -29,12 +30,19 @@ type ResourceSlice struct {
 }
 
 type ResourceSliceSpec struct {
-	Driver       UniqueString
-	Pool         ResourcePool
-	NodeName     UniqueString
-	NodeSelector *v1.NodeSelector
-	AllNodes     bool
-	Devices      []Device
+	Driver                 UniqueString
+	Pool                   ResourcePool
+	NodeName               *string
+	NodeSelector           *v1.NodeSelector
+	AllNodes               bool
+	Devices                []Device
+	PerDeviceNodeSelection *bool
+	SharedCounters         []CounterSet
+}
+
+type CounterSet struct {
+	Name     UniqueString
+	Counters map[string]Counter
 }
 
 type ResourcePool struct {
@@ -43,13 +51,23 @@ type ResourcePool struct {
 	ResourceSliceCount int64
 }
 type Device struct {
-	Name  UniqueString
-	Basic *BasicDevice
+	Name                     UniqueString
+	Attributes               map[QualifiedName]DeviceAttribute
+	Capacity                 map[QualifiedName]DeviceCapacity
+	ConsumesCounters         []DeviceCounterConsumption
+	NodeName                 *string
+	NodeSelector             *v1.NodeSelector
+	AllNodes                 *bool
+	Taints                   []resourceapi.DeviceTaint
+	BindsToNode              bool
+	BindingConditions        []string
+	BindingFailureConditions []string
+	AllowMultipleAllocations *bool
 }
 
-type BasicDevice struct {
-	Attributes map[QualifiedName]DeviceAttribute
-	Capacity   map[QualifiedName]DeviceCapacity
+type DeviceCounterConsumption struct {
+	CounterSet UniqueString
+	Counters   map[string]Counter
 }
 
 type QualifiedName string
@@ -64,5 +82,37 @@ type DeviceAttribute struct {
 }
 
 type DeviceCapacity struct {
+	Value         resource.Quantity
+	RequestPolicy *CapacityRequestPolicy
+}
+
+type CapacityRequestPolicy struct {
+	Default     *resource.Quantity
+	ValidValues []resource.Quantity
+	ValidRange  *CapacityRequestPolicyRange
+}
+
+type CapacityRequestPolicyRange struct {
+	Min  *resource.Quantity
+	Max  *resource.Quantity
+	Step *resource.Quantity
+}
+
+type Counter struct {
 	Value resource.Quantity
 }
+
+type DeviceTaint struct {
+	Key       string
+	Value     string
+	Effect    DeviceTaintEffect
+	TimeAdded *metav1.Time
+}
+
+type DeviceTaintEffect string
+
+const (
+	DeviceTaintEffectNoSchedule DeviceTaintEffect = "NoSchedule"
+
+	DeviceTaintEffectNoExecute DeviceTaintEffect = "NoExecute"
+)

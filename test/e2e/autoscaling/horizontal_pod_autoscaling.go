@@ -25,7 +25,9 @@ import (
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
@@ -42,12 +44,11 @@ const (
 	memResource             = v1.ResourceMemory
 )
 
-// These tests don't seem to be running properly in parallel: issue: #20338.
 var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CPU)", func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityLevel = api.LevelBaseline
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "Deployment (Pod Resource)", func() {
+	f.Describe("Deployment (Pod Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUp(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, false, f)
 		})
@@ -59,7 +60,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 		})
 	})
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "Deployment (Container Resource)", func() {
+	f.Describe("Deployment (Container Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUpContainerResource(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, f)
 		})
@@ -68,7 +69,19 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 		})
 	})
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "ReplicaSet", func() {
+	f.Describe("Deployment (Pod-level Resources Resource Metric)", framework.WithFeatureGate(features.PodLevelResources), func() {
+		f.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
+			scaleUpPodLevelResources(ctx, "test-deployment-pod-level", e2eautoscaling.KindDeployment, autoscalingv2.ResourceMetricSourceType, f)
+		})
+	})
+
+	f.Describe("Deployment (Pod-level Resources ContainerResource Metric)", framework.WithFeatureGate(features.PodLevelResources), func() {
+		f.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
+			scaleUpPodLevelResources(ctx, "test-deployment-pod-level", e2eautoscaling.KindDeployment, autoscalingv2.ContainerResourceMetricSourceType, f)
+		})
+	})
+
+	f.Describe("ReplicaSet", func() {
 		ginkgo.It(titleUp, func(ctx context.Context) {
 			scaleUp(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
 		})
@@ -78,7 +91,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 	})
 
 	// These tests take ~20 minutes each.
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "ReplicationController", func() {
+	f.Describe("ReplicationController", func() {
 		ginkgo.It(titleUp+" and verify decision stability", func(ctx context.Context) {
 			scaleUp(ctx, "rc", e2eautoscaling.KindRC, cpuResource, utilizationMetricType, true, f)
 		})
@@ -102,7 +115,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 			}
 			st.run(ctx, "rc-light", e2eautoscaling.KindRC, f)
 		})
-		f.It(f.WithSlow(), "Should scale from 2 pods to 1 pod", func(ctx context.Context) {
+		f.It("Should scale from 2 pods to 1 pod", func(ctx context.Context) {
 			st := &HPAScaleTest{
 				initPods:         2,
 				initCPUTotal:     50,
@@ -118,7 +131,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 		})
 	})
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "ReplicaSet with idle sidecar (ContainerResource use case)", func() {
+	f.Describe("ReplicaSet with idle sidecar (ContainerResource use case)", func() {
 		// ContainerResource CPU autoscaling on idle sidecar
 		ginkgo.It(titleUp+" on a busy application with an idle sidecar container", func(ctx context.Context) {
 			scaleOnIdleSideCar(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
@@ -152,7 +165,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: Me
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityLevel = api.LevelBaseline
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "Deployment (Pod Resource)", func() {
+	f.Describe("Deployment (Pod Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUp(ctx, "test-deployment", e2eautoscaling.KindDeployment, memResource, utilizationMetricType, false, f)
 		})
@@ -161,7 +174,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: Me
 		})
 	})
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "Deployment (Container Resource)", func() {
+	f.Describe("Deployment (Container Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUpContainerResource(ctx, "test-deployment", e2eautoscaling.KindDeployment, memResource, utilizationMetricType, f)
 		})
@@ -203,7 +216,7 @@ func (st *HPAScaleTest) run(ctx context.Context, name string, kind schema.GroupV
 	} else if st.resourceType == memResource {
 		initMemTotal = st.initMemTotal
 	}
-	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perPodCPURequest, st.perPodMemRequest, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
+	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perPodCPURequest, st.perPodMemRequest, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle, nil)
 	ginkgo.DeferCleanup(rc.CleanUp)
 	hpa := e2eautoscaling.CreateResourceHorizontalPodAutoscaler(ctx, rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
 	ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
@@ -311,7 +324,7 @@ func (st *HPAContainerResourceScaleTest) run(ctx context.Context, name string, k
 	} else if st.resourceType == memResource {
 		initMemTotal = st.initMemTotal
 	}
-	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perContainerCPURequest, st.perContainerMemRequest, f.ClientSet, f.ScalesGetter, st.sidecarStatus, st.sidecarType)
+	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perContainerCPURequest, st.perContainerMemRequest, f.ClientSet, f.ScalesGetter, st.sidecarStatus, st.sidecarType, nil)
 	ginkgo.DeferCleanup(rc.CleanUp)
 	hpa := e2eautoscaling.CreateContainerResourceHorizontalPodAutoscaler(ctx, rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
 	ginkgo.DeferCleanup(e2eautoscaling.DeleteContainerResourceHPA, rc, hpa.Name)
@@ -412,9 +425,105 @@ func doNotScaleOnBusySidecar(ctx context.Context, name string, kind schema.Group
 	st.run(ctx, name, kind, f)
 }
 
+// HPAPodResourceScaleTest is a struct that defines the parameters for
+// a pod-level resource scaling test.
+type HPAPodResourceScaleTest struct {
+	initPods               int
+	initCPUTotal           int
+	metricSourceType       autoscalingv2.MetricSourceType
+	perPodRequests         *v1.ResourceRequirements
+	perContainerCPURequest int64
+	perContainerMemRequest int64
+	targetValue            int32
+	minPods                int32
+	maxPods                int32
+	firstScale             int
+	cpuBurst               int
+	secondScale            int32
+}
+
+// run executes the HPA pod-level resource scaling test.
+// It creates a resource consumer and an HPA, then verifies that the number of
+// replicas scales up to the expected number of pods based on the initial CPU
+// consumption.
+// It also optionally verifies a second scaling event based on a CPU burst.
+func (st *HPAPodResourceScaleTest) run(ctx context.Context, name string, kind schema.GroupVersionKind, f *framework.Framework) {
+	const timeToWait = 15 * time.Minute
+	resourceType := cpuResource
+	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name,
+		kind, st.initPods, st.initCPUTotal, 0, 0, st.perContainerCPURequest,
+		st.perContainerMemRequest, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable,
+		e2eautoscaling.Idle, st.perPodRequests)
+	ginkgo.DeferCleanup(rc.CleanUp)
+
+	createHPAFn := e2eautoscaling.CreateResourceHorizontalPodAutoscaler
+	if st.metricSourceType == autoscalingv2.ContainerResourceMetricSourceType {
+		createHPAFn = e2eautoscaling.CreateContainerResourceHorizontalPodAutoscaler
+	}
+	hpa := createHPAFn(ctx, rc, resourceType, utilizationMetricType,
+		st.targetValue, st.minPods, st.maxPods)
+	ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
+
+	rc.WaitForReplicas(ctx, st.firstScale, timeToWait)
+
+	if st.cpuBurst > 0 && st.secondScale > 0 {
+		rc.ConsumeCPU(st.cpuBurst)
+		rc.WaitForReplicas(ctx, int(st.secondScale), timeToWait)
+	}
+}
+
+// scaleUpPodLevelResources configures and runs a test that scales up a workload
+// that has pod-level resources set based on a Utilization metric type HPA.
+// It also handles the case where the metric source is ContainerResource,
+// adjusting the parameters accordingly.
+func scaleUpPodLevelResources(ctx context.Context, name string, kind schema.GroupVersionKind, metricSourceType autoscalingv2.MetricSourceType, f *framework.Framework) {
+	st := &HPAPodResourceScaleTest{
+		metricSourceType:       metricSourceType,
+		perPodRequests:         resourceRequirements(500, 500),
+		perContainerCPURequest: 0,
+		perContainerMemRequest: 0,
+		initCPUTotal:           250,
+		cpuBurst:               700,
+		targetValue:            20,
+		minPods:                1,
+		maxPods:                5,
+		initPods:               1,
+		firstScale:             3,
+		secondScale:            5,
+	}
+
+	if metricSourceType == autoscalingv2.ContainerResourceMetricSourceType {
+		// When pod-level resources are set and the HPA is configured on
+		// ContainerResource metric type, HPA considers the target container
+		// resource requests, instead of the pod-level resources during
+		// calculations.
+		// The values below make sure that HPA is autoscaling based on
+		// perContainerCPURequest instead of perPodRequests (HPA would not scale
+		// up if it was considering perPodRequests).
+		st.perContainerCPURequest = 250
+		st.perContainerMemRequest = 250
+		st.initCPUTotal = 125
+		st.cpuBurst = 350
+	}
+	st.run(ctx, name, kind, f)
+}
+
 func getTargetValueByType(averageValueTarget, averageUtilizationTarget int, targetType autoscalingv2.MetricTargetType) int32 {
 	if targetType == utilizationMetricType {
 		return int32(averageUtilizationTarget)
 	}
 	return int32(averageValueTarget)
+}
+
+func resourceRequirements(cpuMillis, memMb int64) *v1.ResourceRequirements {
+	return &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(cpuMillis, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(memMb*1024*1024, resource.BinarySI), // ResourceMemory is in bytes
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(cpuMillis, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(memMb*1024*1024, resource.BinarySI), // ResourceMemory is in bytes
+		},
+	}
 }

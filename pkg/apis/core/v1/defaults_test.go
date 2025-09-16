@@ -62,6 +62,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 	// Allowed: adding a new field `MyContainer *MyType` and defaulting a child of that type (e.g. `MyContainer.MyChildField`) if and only if MyContainer is non-nil
 	expectedDefaults := map[string]string{
 		".Spec.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.Containers[0].Env[0].ValueFrom.FileKeyRef.Optional":       "false",
 		".Spec.Containers[0].ImagePullPolicy":                            `"IfNotPresent"`,
 		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
 		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
@@ -105,6 +106,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Path":                                   `"/"`,
 		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme":                                 `"HTTP"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FileKeyRef.Optional":       "false",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ImagePullPolicy":                            `"IfNotPresent"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
@@ -129,6 +131,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePath":                     `"/dev/termination-log"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePolicy":                   `"File"`,
 		".Spec.InitContainers[0].Env[0].ValueFrom.FieldRef.APIVersion":                                     `"v1"`,
+		".Spec.InitContainers[0].Env[0].ValueFrom.FileKeyRef.Optional":                                     "false",
 		".Spec.InitContainers[0].ImagePullPolicy":                                                          `"IfNotPresent"`,
 		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Path":                                         `"/"`,
 		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Scheme":                                       `"HTTP"`,
@@ -251,6 +254,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 	// Allowed: adding a new field `MyContainer *MyType` and defaulting a child of that type (e.g. `MyContainer.MyChildField`) if and only if MyContainer is non-nil
 	expectedDefaults := map[string]string{
 		".Spec.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.Containers[0].Env[0].ValueFrom.FileKeyRef.Optional":       "false",
 		".Spec.Containers[0].ImagePullPolicy":                            `"IfNotPresent"`,
 		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
 		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
@@ -284,6 +288,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.DNSPolicy":          `"ClusterFirst"`,
 		".Spec.EnableServiceLinks": `true`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FileKeyRef.Optional":       "false",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ImagePullPolicy":                            `"IfNotPresent"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
@@ -305,6 +310,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePath":                     `"/dev/termination-log"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePolicy":                   `"File"`,
 		".Spec.InitContainers[0].Env[0].ValueFrom.FieldRef.APIVersion":                                     `"v1"`,
+		".Spec.InitContainers[0].Env[0].ValueFrom.FileKeyRef.Optional":                                     "false",
 		".Spec.InitContainers[0].ImagePullPolicy":                                                          `"IfNotPresent"`,
 		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Path":                                         `"/"`,
 		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Scheme":                                       `"HTTP"`,
@@ -1217,6 +1223,360 @@ func TestPodResourcesDefaults(t *testing.T) {
 							},
 							Limits: v1.ResourceList{
 								"ephemeral-storage": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod has cpu limit with hugepages requests=unset limits=unset, container hugepages requests=unset limits=set",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu": resource.MustParse("5m"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("2m"),
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("1m"),
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":                              resource.MustParse("3m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":                              resource.MustParse("5m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod has cpu request with hugepages requests=unset limits=unset, container hugepages requests=unset limits=set",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					"cpu": resource.MustParse("5m"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("2m"),
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("1m"),
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":                              resource.MustParse("5m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":                              resource.MustParse("5m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod hugepages requests=unset limits=set, container hugepages requests=unset limits=set",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu":                              resource.MustParse("5m"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("2m"),
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("1m"),
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":                              resource.MustParse("3m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":                              resource.MustParse("5m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod hugepages requests=set limits=set, container hugepages requests=unset limits=set",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu":                              resource.MustParse("5m"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+				Requests: v1.ResourceList{
+					"cpu":                              resource.MustParse("5m"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("2m"),
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("1m"),
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":                              resource.MustParse("5m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":                              resource.MustParse("5m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("4Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod hugepages requests=set limits=set, container hugepages requests=unset limits=unset",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu":                              resource.MustParse("5m"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+				Requests: v1.ResourceList{
+					"cpu":                              resource.MustParse("5m"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":                              resource.MustParse("5m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":                              resource.MustParse("5m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{},
+					},
+				},
+			},
+		}, {
+			name:                     "pod hugepages requests=unset limits=set, container hugepages requests=unset limits=set different hugepagesizes between pod and container level",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu":                              resource.MustParse("5m"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("2m"),
+							v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":                              resource.MustParse("1m"),
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":                              resource.MustParse("3m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+						v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":                              resource.MustParse("5m"),
+						v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+						v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("2m"),
+								v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":                              resource.MustParse("1m"),
+								v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
 							},
 						},
 					},
@@ -2977,218 +3337,6 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 
 			if !reflect.DeepEqual(svc.Spec.InternalTrafficPolicy, test.expectedInternalTrafficPolicy) {
 				t.Errorf("expected .spec.internalTrafficPolicy: %v got %v", test.expectedInternalTrafficPolicy, svc.Spec.InternalTrafficPolicy)
-			}
-		})
-	}
-}
-
-func TestSetDefaultResizePolicy(t *testing.T) {
-	// verify we default to NotRequired restart policy for resize when resources are specified
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-
-	for desc, tc := range map[string]struct {
-		testContainer        v1.Container
-		expectedResizePolicy []v1.ContainerResizePolicy
-	}{
-		"CPU and memory limits are specified": {
-			testContainer: v1.Container{
-				Resources: v1.ResourceRequirements{
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("100m"),
-						v1.ResourceMemory: resource.MustParse("200Mi"),
-					},
-				},
-			},
-			expectedResizePolicy: []v1.ContainerResizePolicy{
-				{
-					ResourceName:  v1.ResourceCPU,
-					RestartPolicy: v1.NotRequired,
-				},
-				{
-					ResourceName:  v1.ResourceMemory,
-					RestartPolicy: v1.NotRequired,
-				},
-			},
-		},
-		"CPU requests are specified": {
-			testContainer: v1.Container{
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse("100m"),
-					},
-				},
-			},
-			expectedResizePolicy: []v1.ContainerResizePolicy{
-				{
-					ResourceName:  v1.ResourceCPU,
-					RestartPolicy: v1.NotRequired,
-				},
-			},
-		},
-		"Memory limits are specified": {
-			testContainer: v1.Container{
-				Resources: v1.ResourceRequirements{
-					Limits: v1.ResourceList{
-						v1.ResourceMemory: resource.MustParse("200Mi"),
-					},
-				},
-			},
-			expectedResizePolicy: []v1.ContainerResizePolicy{
-				{
-					ResourceName:  v1.ResourceMemory,
-					RestartPolicy: v1.NotRequired,
-				},
-			},
-		},
-		"No resources are specified": {
-			testContainer:        v1.Container{Name: "besteffort"},
-			expectedResizePolicy: nil,
-		},
-		"CPU and memory limits are specified with restartContainer resize policy for memory": {
-			testContainer: v1.Container{
-				Resources: v1.ResourceRequirements{
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("100m"),
-						v1.ResourceMemory: resource.MustParse("200Mi"),
-					},
-				},
-				ResizePolicy: []v1.ContainerResizePolicy{
-					{
-						ResourceName:  v1.ResourceMemory,
-						RestartPolicy: v1.RestartContainer,
-					},
-				},
-			},
-			expectedResizePolicy: []v1.ContainerResizePolicy{
-				{
-					ResourceName:  v1.ResourceMemory,
-					RestartPolicy: v1.RestartContainer,
-				},
-				{
-					ResourceName:  v1.ResourceCPU,
-					RestartPolicy: v1.NotRequired,
-				},
-			},
-		},
-		"CPU requests and memory limits are specified with restartContainer resize policy for CPU": {
-			testContainer: v1.Container{
-				Resources: v1.ResourceRequirements{
-					Limits: v1.ResourceList{
-						v1.ResourceMemory: resource.MustParse("200Mi"),
-					},
-					Requests: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse("100m"),
-					},
-				},
-				ResizePolicy: []v1.ContainerResizePolicy{
-					{
-						ResourceName:  v1.ResourceCPU,
-						RestartPolicy: v1.RestartContainer,
-					},
-				},
-			},
-			expectedResizePolicy: []v1.ContainerResizePolicy{
-				{
-					ResourceName:  v1.ResourceCPU,
-					RestartPolicy: v1.RestartContainer,
-				},
-				{
-					ResourceName:  v1.ResourceMemory,
-					RestartPolicy: v1.NotRequired,
-				},
-			},
-		},
-		"CPU and memory requests are specified with restartContainer resize policy for both": {
-			testContainer: v1.Container{
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("100m"),
-						v1.ResourceMemory: resource.MustParse("200Mi"),
-					},
-				},
-				ResizePolicy: []v1.ContainerResizePolicy{
-					{
-						ResourceName:  v1.ResourceCPU,
-						RestartPolicy: v1.RestartContainer,
-					},
-					{
-						ResourceName:  v1.ResourceMemory,
-						RestartPolicy: v1.RestartContainer,
-					},
-				},
-			},
-			expectedResizePolicy: []v1.ContainerResizePolicy{
-				{
-					ResourceName:  v1.ResourceCPU,
-					RestartPolicy: v1.RestartContainer,
-				},
-				{
-					ResourceName:  v1.ResourceMemory,
-					RestartPolicy: v1.RestartContainer,
-				},
-			},
-		},
-		"Ephemeral storage limits are specified": {
-			testContainer: v1.Container{
-				Resources: v1.ResourceRequirements{
-					Limits: v1.ResourceList{
-						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
-					},
-				},
-			},
-			expectedResizePolicy: nil,
-		},
-		"Ephemeral storage requests and CPU limits are specified": {
-			testContainer: v1.Container{
-				Resources: v1.ResourceRequirements{
-					Limits: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse("100m"),
-					},
-					Requests: v1.ResourceList{
-						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
-					},
-				},
-			},
-			expectedResizePolicy: []v1.ContainerResizePolicy{
-				{
-					ResourceName:  v1.ResourceCPU,
-					RestartPolicy: v1.NotRequired,
-				},
-			},
-		},
-		"Ephemeral storage requests and limits, memory requests with restartContainer policy are specified": {
-			testContainer: v1.Container{
-				Resources: v1.ResourceRequirements{
-					Limits: v1.ResourceList{
-						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
-					},
-					Requests: v1.ResourceList{
-						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
-						v1.ResourceMemory:           resource.MustParse("200Mi"),
-					},
-				},
-				ResizePolicy: []v1.ContainerResizePolicy{
-					{
-						ResourceName:  v1.ResourceMemory,
-						RestartPolicy: v1.RestartContainer,
-					},
-				},
-			},
-			expectedResizePolicy: []v1.ContainerResizePolicy{
-				{
-					ResourceName:  v1.ResourceMemory,
-					RestartPolicy: v1.RestartContainer,
-				},
-			},
-		},
-	} {
-		t.Run(desc, func(t *testing.T) {
-			testPod := v1.Pod{}
-			testPod.Spec.Containers = append(testPod.Spec.Containers, tc.testContainer)
-			output := roundTrip(t, runtime.Object(&testPod))
-			pod2 := output.(*v1.Pod)
-			if !cmp.Equal(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) {
-				t.Errorf("expected resize policy %+v, but got %+v", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
 			}
 		})
 	}

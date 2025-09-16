@@ -17,13 +17,51 @@
 # Combining `performance` and `short` selects suitable workloads for a local
 # before/after comparisons with benchstat.
 
+# PublishResourceSlices measures how quickly the scheduler consumes ResourceSlices as they
+# get created by a DRA driver. The other tests don't include this part and instead start
+# the measurement only after the scheduler is up-to-date.
+#
+# Any cost associated with handling ResourceSlices gets amortized over multiple pod scheduling
+# cycles: the more pods get scheduled without changes to ResourceSlices, the less it matters
+# how long this takes.
+- name: PublishResourceSlices
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAPrioritizedList: false
+    DRAAdminAccess: false
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: startCollectingMetrics
+    namespaces: ["default"]
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      maxClaimsPerNode: 10
+  - name: 5000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 5000
+      nodesWithoutDRA: 0
+      maxClaimsPerNode: 10
+
 # SchedulingWithResourceClaimTemplate uses a ResourceClaimTemplate
 # and dynamically creates ResourceClaim instances for each pod. Node, pod and
 # device counts are chosen so that the cluster gets filled up completely.
 - name: SchedulingWithResourceClaimTemplate
   featureGates:
     DynamicResourceAllocation: true
-    # SchedulerQueueingHints: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -91,6 +129,23 @@
       measurePods: 1000
       maxClaimsPerNode: 10
   - name: 5000pods_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 40 # typically above 51
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 2500
+      measurePods: 2500
+      maxClaimsPerNode: 10
+  - name: 5000pods_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 56 # typically above 70
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -108,7 +163,6 @@
 - name: SteadyStateClusterResourceClaimTemplate
   featureGates:
     DynamicResourceAllocation: true
-    # SchedulerQueueingHints: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -138,30 +192,6 @@
     podTemplatePath: templates/pod-with-claim-template.yaml
     collectMetrics: true
   workloads:
-  - name: fast
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      # This testcase runs through all code paths without
-      # taking too long overall.
-      nodesWithDRA: 1
-      nodesWithoutDRA: 1
-      initClaims: 0
-      maxClaimsPerNode: 10
-      duration: 2s
-  - name: fast_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [integration-test, short]
-    params:
-      # This testcase runs through all code paths without
-      # taking too long overall.
-      nodesWithDRA: 1
-      nodesWithoutDRA: 1
-      initClaims: 0
-      maxClaimsPerNode: 10
-      duration: 2s
   - name: empty_100nodes
     params:
       nodesWithDRA: 100
@@ -177,6 +207,23 @@
       maxClaimsPerNode: 10
       duration: 10s
   - name: empty_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fempty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 64 # typically above 81
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: empty_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fempty_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 64 # typically above 81
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -199,6 +246,23 @@
       maxClaimsPerNode: 10
       duration: 10s
   - name: half_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fhalf_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 70 # typically over 78
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 2500
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: half_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fhalf_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 60 # typically over 75
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -221,6 +285,23 @@
       maxClaimsPerNode: 10
       duration: 10s
   - name: full_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Ffull_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 60 # typically over 75
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 4990
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: full_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Ffull_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 60 # typically over 75
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0

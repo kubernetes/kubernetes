@@ -236,6 +236,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 	}
+	if obj.MergeDefaultEvictionSettings == nil {
+		obj.MergeDefaultEvictionSettings = ptr.To(false)
+	}
 	if obj.EnableControllerAttachDetach == nil {
 		obj.EnableControllerAttachDetach = ptr.To(true)
 	}
@@ -308,6 +311,12 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
 		if obj.CrashLoopBackOff.MaxContainerRestartPeriod == nil {
 			obj.CrashLoopBackOff.MaxContainerRestartPeriod = &metav1.Duration{Duration: MaxContainerBackOff}
+		}
+	}
+
+	if localFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+		if obj.ImagePullCredentialsVerificationPolicy == "" {
+			obj.ImagePullCredentialsVerificationPolicy = kubeletconfigv1beta1.NeverVerifyPreloadedImages
 		}
 	}
 }

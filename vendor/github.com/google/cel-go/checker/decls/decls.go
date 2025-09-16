@@ -91,6 +91,17 @@ func NewFunction(name string,
 				Overloads: overloads}}}
 }
 
+// NewFunctionWithDoc creates a named function declaration with a description and one or more overloads.
+func NewFunctionWithDoc(name, doc string,
+	overloads ...*exprpb.Decl_FunctionDecl_Overload) *exprpb.Decl {
+	return &exprpb.Decl{
+		Name: name,
+		DeclKind: &exprpb.Decl_Function{
+			Function: &exprpb.Decl_FunctionDecl{
+				// Doc: desc,
+				Overloads: overloads}}}
+}
+
 // NewIdent creates a named identifier declaration with an optional literal
 // value.
 //
@@ -98,28 +109,37 @@ func NewFunction(name string,
 //
 // Deprecated: Use NewVar or NewConst instead.
 func NewIdent(name string, t *exprpb.Type, v *exprpb.Constant) *exprpb.Decl {
+	return newIdent(name, t, v, "")
+}
+
+func newIdent(name string, t *exprpb.Type, v *exprpb.Constant, desc string) *exprpb.Decl {
 	return &exprpb.Decl{
 		Name: name,
 		DeclKind: &exprpb.Decl_Ident{
 			Ident: &exprpb.Decl_IdentDecl{
 				Type:  t,
-				Value: v}}}
+				Value: v,
+				Doc:   desc}}}
 }
 
 // NewConst creates a constant identifier with a CEL constant literal value.
 func NewConst(name string, t *exprpb.Type, v *exprpb.Constant) *exprpb.Decl {
-	return NewIdent(name, t, v)
+	return newIdent(name, t, v, "")
 }
 
 // NewVar creates a variable identifier.
 func NewVar(name string, t *exprpb.Type) *exprpb.Decl {
-	return NewIdent(name, t, nil)
+	return newIdent(name, t, nil, "")
+}
+
+// NewVarWithDoc creates a variable identifier with a type and a description string.
+func NewVarWithDoc(name string, t *exprpb.Type, desc string) *exprpb.Decl {
+	return newIdent(name, t, nil, desc)
 }
 
 // NewInstanceOverload creates a instance function overload contract.
 // First element of argTypes is instance.
-func NewInstanceOverload(id string, argTypes []*exprpb.Type,
-	resultType *exprpb.Type) *exprpb.Decl_FunctionDecl_Overload {
+func NewInstanceOverload(id string, argTypes []*exprpb.Type, resultType *exprpb.Type) *exprpb.Decl_FunctionDecl_Overload {
 	return &exprpb.Decl_FunctionDecl_Overload{
 		OverloadId:         id,
 		ResultType:         resultType,
@@ -154,8 +174,7 @@ func NewObjectType(typeName string) *exprpb.Type {
 // NewOverload creates a function overload declaration which contains a unique
 // overload id as well as the expected argument and result types. Overloads
 // must be aggregated within a Function declaration.
-func NewOverload(id string, argTypes []*exprpb.Type,
-	resultType *exprpb.Type) *exprpb.Decl_FunctionDecl_Overload {
+func NewOverload(id string, argTypes []*exprpb.Type, resultType *exprpb.Type) *exprpb.Decl_FunctionDecl_Overload {
 	return &exprpb.Decl_FunctionDecl_Overload{
 		OverloadId:         id,
 		ResultType:         resultType,
@@ -231,7 +250,5 @@ func NewWrapperType(wrapped *exprpb.Type) *exprpb.Type {
 		// TODO: return an error
 		panic("Wrapped type must be a primitive")
 	}
-	return &exprpb.Type{
-		TypeKind: &exprpb.Type_Wrapper{
-			Wrapper: primitive}}
+	return &exprpb.Type{TypeKind: &exprpb.Type_Wrapper{Wrapper: primitive}}
 }

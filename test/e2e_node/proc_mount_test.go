@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -42,11 +41,11 @@ var _ = SIGDescribe("DefaultProcMount [LinuxOnly]", framework.WithNodeConformanc
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("will mask proc mounts by default", func(ctx context.Context) {
-		testProcMount(ctx, f, v1.DefaultProcMount, gomega.BeNumerically(">", 1), gomega.BeNumerically(">", 0))
+		testProcMount(ctx, f, v1.DefaultProcMount, true, gomega.BeNumerically(">", 1), gomega.BeNumerically(">", 0))
 	})
 })
 
-var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, nodefeature.UserNamespacesSupport, feature.UserNamespacesSupport, func() {
+var _ = SIGDescribe("ProcMount [LinuxOnly]", feature.ProcMountType, feature.UserNamespacesSupport, func() {
 	f := framework.NewDefaultFramework("proc-mount-baseline-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -77,7 +76,7 @@ var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, nodefeat
 	})
 })
 
-var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, nodefeature.UserNamespacesSupport, feature.UserNamespacesSupport, func() {
+var _ = SIGDescribe("ProcMount [LinuxOnly]", feature.ProcMountType, feature.UserNamespacesSupport, func() {
 	f := framework.NewDefaultFramework("proc-mount-privileged-test")
 
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -86,11 +85,11 @@ var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, nodefeat
 		if !supportsUserNS(ctx, f) {
 			e2eskipper.Skipf("runtime does not support user namespaces")
 		}
-		testProcMount(ctx, f, v1.UnmaskedProcMount, gomega.Equal(1), gomega.BeZero())
+		testProcMount(ctx, f, v1.UnmaskedProcMount, false, gomega.Equal(1), gomega.BeZero())
 	})
 })
 
-func testProcMount(ctx context.Context, f *framework.Framework, pmt v1.ProcMountType, expectedLines gomegatypes.GomegaMatcher, expectedReadOnly gomegatypes.GomegaMatcher) {
+func testProcMount(ctx context.Context, f *framework.Framework, pmt v1.ProcMountType, hostUsers bool, expectedLines gomegatypes.GomegaMatcher, expectedReadOnly gomegatypes.GomegaMatcher) {
 	ginkgo.By("creating a target pod")
 	podClient := e2epod.NewPodClient(f)
 	pod := podClient.CreateSync(ctx, &v1.Pod{
@@ -107,7 +106,7 @@ func testProcMount(ctx context.Context, f *framework.Framework, pmt v1.ProcMount
 					},
 				},
 			},
-			HostUsers: &falseVar,
+			HostUsers: &hostUsers,
 		},
 	})
 

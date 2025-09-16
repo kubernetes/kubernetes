@@ -47,22 +47,22 @@ func (t truncatingMAC) Size() int {
 func (t truncatingMAC) BlockSize() int { return t.hmac.BlockSize() }
 
 var macModes = map[string]*macMode{
-	"hmac-sha2-512-etm@openssh.com": {64, true, func(key []byte) hash.Hash {
+	HMACSHA512ETM: {64, true, func(key []byte) hash.Hash {
 		return hmac.New(sha512.New, key)
 	}},
-	"hmac-sha2-256-etm@openssh.com": {32, true, func(key []byte) hash.Hash {
+	HMACSHA256ETM: {32, true, func(key []byte) hash.Hash {
 		return hmac.New(sha256.New, key)
 	}},
-	"hmac-sha2-512": {64, false, func(key []byte) hash.Hash {
+	HMACSHA512: {64, false, func(key []byte) hash.Hash {
 		return hmac.New(sha512.New, key)
 	}},
-	"hmac-sha2-256": {32, false, func(key []byte) hash.Hash {
+	HMACSHA256: {32, false, func(key []byte) hash.Hash {
 		return hmac.New(sha256.New, key)
 	}},
-	"hmac-sha1": {20, false, func(key []byte) hash.Hash {
+	HMACSHA1: {20, false, func(key []byte) hash.Hash {
 		return hmac.New(sha1.New, key)
 	}},
-	"hmac-sha1-96": {20, false, func(key []byte) hash.Hash {
+	InsecureHMACSHA196: {20, false, func(key []byte) hash.Hash {
 		return truncatingMAC{12, hmac.New(sha1.New, key)}
 	}},
 }

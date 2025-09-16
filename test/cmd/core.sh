@@ -537,9 +537,9 @@ run_pod_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'changed-with-yaml:'
   ## Patch pod from JSON can change image
   # Command
-  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "registry.k8s.io/pause:3.10"}]}}'
+  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "registry.k8s.io/pause:3.10.1"}]}}'
   # Post-condition: valid-pod POD has expected image
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'registry.k8s.io/pause:3.10:'
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'registry.k8s.io/pause:3.10.1:'
 
   # pod has field for kubectl patch field manager
   output_message=$(kubectl get pod valid-pod -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
@@ -966,7 +966,7 @@ run_service_accounts_tests() {
   # Post-condition: secret exists and has expected values
   kube::test::get_object_assert 'serviceaccount/test-service-account --namespace=test-service-accounts' "{{$id_field}}" 'test-service-account'
   # Describe command should respect the chunk size parameter
-  kube::test::describe_resource_chunk_size_assert serviceaccounts secrets,events "--namespace=test-service-accounts"
+  kube::test::describe_resource_chunk_size_assert serviceaccounts events "--namespace=test-service-accounts"
   # Clean-up
   kubectl delete serviceaccount test-service-account --namespace=test-service-accounts
   # Clean up

@@ -29,7 +29,7 @@ import (
 type Program interface {
 	// Eval returns the result of an evaluation of the Ast and environment against the input vars.
 	//
-	// The vars value may either be an `interpreter.Activation` or a `map[string]any`.
+	// The vars value may either be an `Activation` or a `map[string]any`.
 	//
 	// If the `OptTrackState`, `OptTrackCost` or `OptExhaustiveEval` flags are used, the `details` response will
 	// be non-nil. Given this caveat on `details`, the return state from evaluation will be:
@@ -47,14 +47,39 @@ type Program interface {
 	// to support cancellation and timeouts. This method must be used in conjunction with the
 	// InterruptCheckFrequency() option for cancellation interrupts to be impact evaluation.
 	//
-	// The vars value may either be an `interpreter.Activation` or `map[string]any`.
+	// The vars value may either be an `Activation` or `map[string]any`.
 	//
 	// The output contract for `ContextEval` is otherwise identical to the `Eval` method.
 	ContextEval(context.Context, any) (ref.Val, *EvalDetails, error)
 }
 
+// Activation used to resolve identifiers by name and references by id.
+//
+// An Activation is the primary mechanism by which a caller supplies input into a CEL program.
+type Activation = interpreter.Activation
+
+// NewActivation returns an activation based on a map-based binding where the map keys are
+// expected to be qualified names used with ResolveName calls.
+//
+// The input `bindings` may either be of type `Activation` or `map[string]any`.
+//
+// Lazy bindings may be supplied within the map-based input in either of the following forms:
+// - func() any
+// - func() ref.Val
+//
+// The output of the lazy binding will overwrite the variable reference in the internal map.
+//
+// Values which are not represented as ref.Val types on input may be adapted to a ref.Val using
+// the types.Adapter configured in the environment.
+func NewActivation(bindings any) (Activation, error) {
+	return interpreter.NewActivation(bindings)
+}
+
+// PartialActivation extends the Activation interface with a set of unknown AttributePatterns.
+type PartialActivation = interpreter.PartialActivation
+
 // NoVars returns an empty Activation.
-func NoVars() interpreter.Activation {
+func NoVars() Activation {
 	return interpreter.EmptyActivation()
 }
 
@@ -64,10 +89,9 @@ func NoVars() interpreter.Activation {
 // This method relies on manually configured sets of missing attribute patterns. For a method which
 // infers the missing variables from the input and the configured environment, use Env.PartialVars().
 //
-// The `vars` value may either be an interpreter.Activation or any valid input to the
-// interpreter.NewActivation call.
+// The `vars` value may either be an Activation or any valid input to the NewActivation call.
 func PartialVars(vars any,
-	unknowns ...*interpreter.AttributePattern) (interpreter.PartialActivation, error) {
+	unknowns ...*AttributePatternType) (PartialActivation, error) {
 	return interpreter.NewPartialActivation(vars, unknowns...)
 }
 
@@ -84,12 +108,15 @@ func PartialVars(vars any,
 // fully qualified variable name may be `ns.app.a`, `ns.a`, or `a` per the CEL namespace resolution
 // rules. Pick the fully qualified variable name that makes sense within the container as the
 // AttributePattern `varName` argument.
+func AttributePattern(varName string) *AttributePatternType {
+	return interpreter.NewAttributePattern(varName)
+}
+
+// AttributePatternType represents a top-level variable with an optional set of qualifier patterns.
 //
 // See the interpreter.AttributePattern and interpreter.AttributeQualifierPattern for more info
 // about how to create and manipulate AttributePattern values.
-func AttributePattern(varName string) *interpreter.AttributePattern {
-	return interpreter.NewAttributePattern(varName)
-}
+type AttributePatternType = interpreter.AttributePattern
 
 // EvalDetails holds additional information observed during the Eval() call.
 type EvalDetails struct {
@@ -100,6 +127,9 @@ type EvalDetails struct {
 // State of the evaluation, non-nil if the OptTrackState or OptExhaustiveEval is specified
 // within EvalOptions.
 func (ed *EvalDetails) State() interpreter.EvalState {
+	if ed == nil {
+		return interpreter.NewEvalState()
+	}
 	return ed.state
 }
 
@@ -117,35 +147,22 @@ func (ed *EvalDetails) ActualCost() *uint64 {
 type prog struct {
 	*Env
 	evalOpts                EvalOption
-	defaultVars             interpreter.Activation
+	defaultVars             Activation
 	dispatcher              interpreter.Dispatcher
 	interpreter             interpreter.Interpreter
 	interruptCheckFrequency uint
 
 	// Intermediate state used to configure the InterpretableDecorator set provided
 	// to the initInterpretable call.
-	decorators         []interpreter.InterpretableDecorator
+	plannerOptions     []interpreter.PlannerOption
 	regexOptimizations []*interpreter.RegexOptimization
 
 	// Interpretable configured from an Ast and aggregate decorator set based on program options.
 	interpretable     interpreter.Interpretable
+	observable        *interpreter.ObservableInterpretable
 	callCostEstimator interpreter.ActualCostEstimator
 	costOptions       []interpreter.CostTrackerOption
 	costLimit         *uint64
-}
-
-func (p *prog) clone() *prog {
-	costOptsCopy := make([]interpreter.CostTrackerOption, len(p.costOptions))
-	copy(costOptsCopy, p.costOptions)
-
-	return &prog{
-		Env:                     p.Env,
-		evalOpts:                p.evalOpts,
-		defaultVars:             p.defaultVars,
-		dispatcher:              p.dispatcher,
-		interpreter:             p.interpreter,
-		interruptCheckFrequency: p.interruptCheckFrequency,
-	}
 }
 
 // newProgram creates a program instance with an environment, an ast, and an optional list of
@@ -159,10 +176,10 @@ func newProgram(e *Env, a *ast.AST, opts []ProgramOption) (Program, error) {
 	// Ensure the default attribute factory is set after the adapter and provider are
 	// configured.
 	p := &prog{
-		Env:         e,
-		decorators:  []interpreter.InterpretableDecorator{},
-		dispatcher:  disp,
-		costOptions: []interpreter.CostTrackerOption{},
+		Env:            e,
+		plannerOptions: []interpreter.PlannerOption{},
+		dispatcher:     disp,
+		costOptions:    []interpreter.CostTrackerOption{},
 	}
 
 	// Configure the program via the ProgramOption values.
@@ -200,74 +217,71 @@ func newProgram(e *Env, a *ast.AST, opts []ProgramOption) (Program, error) {
 	p.interpreter = interp
 
 	// Translate the EvalOption flags into InterpretableDecorator instances.
-	decorators := make([]interpreter.InterpretableDecorator, len(p.decorators))
-	copy(decorators, p.decorators)
+	plannerOptions := make([]interpreter.PlannerOption, len(p.plannerOptions))
+	copy(plannerOptions, p.plannerOptions)
 
 	// Enable interrupt checking if there's a non-zero check frequency
 	if p.interruptCheckFrequency > 0 {
-		decorators = append(decorators, interpreter.InterruptableEval())
+		plannerOptions = append(plannerOptions, interpreter.InterruptableEval())
 	}
 	// Enable constant folding first.
 	if p.evalOpts&OptOptimize == OptOptimize {
-		decorators = append(decorators, interpreter.Optimize())
+		plannerOptions = append(plannerOptions, interpreter.Optimize())
 		p.regexOptimizations = append(p.regexOptimizations, interpreter.MatchesRegexOptimization)
 	}
 	// Enable regex compilation of constants immediately after folding constants.
 	if len(p.regexOptimizations) > 0 {
-		decorators = append(decorators, interpreter.CompileRegexConstants(p.regexOptimizations...))
+		plannerOptions = append(plannerOptions, interpreter.CompileRegexConstants(p.regexOptimizations...))
 	}
 
 	// Enable exhaustive eval, state tracking and cost tracking last since they require a factory.
 	if p.evalOpts&(OptExhaustiveEval|OptTrackState|OptTrackCost) != 0 {
-		factory := func(state interpreter.EvalState, costTracker *interpreter.CostTracker) (Program, error) {
-			costTracker.Estimator = p.callCostEstimator
-			costTracker.Limit = p.costLimit
-			for _, costOpt := range p.costOptions {
-				err := costOpt(costTracker)
-				if err != nil {
-					return nil, err
-				}
-			}
-			// Limit capacity to guarantee a reallocation when calling 'append(decs, ...)' below. This
-			// prevents the underlying memory from being shared between factory function calls causing
-			// undesired mutations.
-			decs := decorators[:len(decorators):len(decorators)]
-			var observers []interpreter.EvalObserver
-
-			if p.evalOpts&(OptExhaustiveEval|OptTrackState) != 0 {
-				// EvalStateObserver is required for OptExhaustiveEval.
-				observers = append(observers, interpreter.EvalStateObserver(state))
-			}
-			if p.evalOpts&OptTrackCost == OptTrackCost {
-				observers = append(observers, interpreter.CostObserver(costTracker))
-			}
-
-			// Enable exhaustive eval over a basic observer since it offers a superset of features.
-			if p.evalOpts&OptExhaustiveEval == OptExhaustiveEval {
-				decs = append(decs, interpreter.ExhaustiveEval(), interpreter.Observe(observers...))
-			} else if len(observers) > 0 {
-				decs = append(decs, interpreter.Observe(observers...))
-			}
-
-			return p.clone().initInterpretable(a, decs)
+		costOptCount := len(p.costOptions)
+		if p.costLimit != nil {
+			costOptCount++
 		}
-		return newProgGen(factory)
+		costOpts := make([]interpreter.CostTrackerOption, 0, costOptCount)
+		costOpts = append(costOpts, p.costOptions...)
+		if p.costLimit != nil {
+			costOpts = append(costOpts, interpreter.CostTrackerLimit(*p.costLimit))
+		}
+		trackerFactory := func() (*interpreter.CostTracker, error) {
+			return interpreter.NewCostTracker(p.callCostEstimator, costOpts...)
+		}
+		var observers []interpreter.PlannerOption
+		if p.evalOpts&(OptExhaustiveEval|OptTrackState) != 0 {
+			// EvalStateObserver is required for OptExhaustiveEval.
+			observers = append(observers, interpreter.EvalStateObserver())
+		}
+		if p.evalOpts&OptTrackCost == OptTrackCost {
+			observers = append(observers, interpreter.CostObserver(interpreter.CostTrackerFactory(trackerFactory)))
+		}
+		// Enable exhaustive eval over a basic observer since it offers a superset of features.
+		if p.evalOpts&OptExhaustiveEval == OptExhaustiveEval {
+			plannerOptions = append(plannerOptions,
+				append([]interpreter.PlannerOption{interpreter.ExhaustiveEval()}, observers...)...)
+		} else if len(observers) > 0 {
+			plannerOptions = append(plannerOptions, observers...)
+		}
 	}
-	return p.initInterpretable(a, decorators)
+	return p.initInterpretable(a, plannerOptions)
 }
 
-func (p *prog) initInterpretable(a *ast.AST, decs []interpreter.InterpretableDecorator) (*prog, error) {
+func (p *prog) initInterpretable(a *ast.AST, plannerOptions []interpreter.PlannerOption) (*prog, error) {
 	// When the AST has been exprAST it contains metadata that can be used to speed up program execution.
-	interpretable, err := p.interpreter.NewInterpretable(a, decs...)
+	interpretable, err := p.interpreter.NewInterpretable(a, plannerOptions...)
 	if err != nil {
 		return nil, err
 	}
 	p.interpretable = interpretable
+	if oi, ok := interpretable.(*interpreter.ObservableInterpretable); ok {
+		p.observable = oi
+	}
 	return p, nil
 }
 
 // Eval implements the Program interface method.
-func (p *prog) Eval(input any) (v ref.Val, det *EvalDetails, err error) {
+func (p *prog) Eval(input any) (out ref.Val, det *EvalDetails, err error) {
 	// Configure error recovery for unexpected panics during evaluation. Note, the use of named
 	// return values makes it possible to modify the error response during the recovery
 	// function.
@@ -282,9 +296,9 @@ func (p *prog) Eval(input any) (v ref.Val, det *EvalDetails, err error) {
 		}
 	}()
 	// Build a hierarchical activation if there are default vars set.
-	var vars interpreter.Activation
+	var vars Activation
 	switch v := input.(type) {
-	case interpreter.Activation:
+	case Activation:
 		vars = v
 	case map[string]any:
 		vars = activationPool.Setup(v)
@@ -295,12 +309,24 @@ func (p *prog) Eval(input any) (v ref.Val, det *EvalDetails, err error) {
 	if p.defaultVars != nil {
 		vars = interpreter.NewHierarchicalActivation(p.defaultVars, vars)
 	}
-	v = p.interpretable.Eval(vars)
+	if p.observable != nil {
+		det = &EvalDetails{}
+		out = p.observable.ObserveEval(vars, func(observed any) {
+			switch o := observed.(type) {
+			case interpreter.EvalState:
+				det.state = o
+			case *interpreter.CostTracker:
+				det.costTracker = o
+			}
+		})
+	} else {
+		out = p.interpretable.Eval(vars)
+	}
 	// The output of an internal Eval may have a value (`v`) that is a types.Err. This step
 	// translates the CEL value to a Go error response. This interface does not quite match the
 	// RPC signature which allows for multiple errors to be returned, but should be sufficient.
-	if types.IsError(v) {
-		err = v.(*types.Err)
+	if types.IsError(out) {
+		err = out.(*types.Err)
 	}
 	return
 }
@@ -312,9 +338,9 @@ func (p *prog) ContextEval(ctx context.Context, input any) (ref.Val, *EvalDetail
 	}
 	// Configure the input, making sure to wrap Activation inputs in the special ctxActivation which
 	// exposes the #interrupted variable and manages rate-limited checks of the ctx.Done() state.
-	var vars interpreter.Activation
+	var vars Activation
 	switch v := input.(type) {
-	case interpreter.Activation:
+	case Activation:
 		vars = ctxActivationPool.Setup(v, ctx.Done(), p.interruptCheckFrequency)
 		defer ctxActivationPool.Put(vars)
 	case map[string]any:
@@ -328,90 +354,8 @@ func (p *prog) ContextEval(ctx context.Context, input any) (ref.Val, *EvalDetail
 	return p.Eval(vars)
 }
 
-// progFactory is a helper alias for marking a program creation factory function.
-type progFactory func(interpreter.EvalState, *interpreter.CostTracker) (Program, error)
-
-// progGen holds a reference to a progFactory instance and implements the Program interface.
-type progGen struct {
-	factory progFactory
-}
-
-// newProgGen tests the factory object by calling it once and returns a factory-based Program if
-// the test is successful.
-func newProgGen(factory progFactory) (Program, error) {
-	// Test the factory to make sure that configuration errors are spotted at config
-	tracker, err := interpreter.NewCostTracker(nil)
-	if err != nil {
-		return nil, err
-	}
-	_, err = factory(interpreter.NewEvalState(), tracker)
-	if err != nil {
-		return nil, err
-	}
-	return &progGen{factory: factory}, nil
-}
-
-// Eval implements the Program interface method.
-func (gen *progGen) Eval(input any) (ref.Val, *EvalDetails, error) {
-	// The factory based Eval() differs from the standard evaluation model in that it generates a
-	// new EvalState instance for each call to ensure that unique evaluations yield unique stateful
-	// results.
-	state := interpreter.NewEvalState()
-	costTracker, err := interpreter.NewCostTracker(nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	det := &EvalDetails{state: state, costTracker: costTracker}
-
-	// Generate a new instance of the interpretable using the factory configured during the call to
-	// newProgram(). It is incredibly unlikely that the factory call will generate an error given
-	// the factory test performed within the Program() call.
-	p, err := gen.factory(state, costTracker)
-	if err != nil {
-		return nil, det, err
-	}
-
-	// Evaluate the input, returning the result and the 'state' within EvalDetails.
-	v, _, err := p.Eval(input)
-	if err != nil {
-		return v, det, err
-	}
-	return v, det, nil
-}
-
-// ContextEval implements the Program interface method.
-func (gen *progGen) ContextEval(ctx context.Context, input any) (ref.Val, *EvalDetails, error) {
-	if ctx == nil {
-		return nil, nil, fmt.Errorf("context can not be nil")
-	}
-	// The factory based Eval() differs from the standard evaluation model in that it generates a
-	// new EvalState instance for each call to ensure that unique evaluations yield unique stateful
-	// results.
-	state := interpreter.NewEvalState()
-	costTracker, err := interpreter.NewCostTracker(nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	det := &EvalDetails{state: state, costTracker: costTracker}
-
-	// Generate a new instance of the interpretable using the factory configured during the call to
-	// newProgram(). It is incredibly unlikely that the factory call will generate an error given
-	// the factory test performed within the Program() call.
-	p, err := gen.factory(state, costTracker)
-	if err != nil {
-		return nil, det, err
-	}
-
-	// Evaluate the input, returning the result and the 'state' within EvalDetails.
-	v, _, err := p.ContextEval(ctx, input)
-	if err != nil {
-		return v, det, err
-	}
-	return v, det, nil
-}
-
 type ctxEvalActivation struct {
-	parent                  interpreter.Activation
+	parent                  Activation
 	interrupt               <-chan struct{}
 	interruptCheckCount     uint
 	interruptCheckFrequency uint
@@ -435,8 +379,13 @@ func (a *ctxEvalActivation) ResolveName(name string) (any, bool) {
 	return a.parent.ResolveName(name)
 }
 
-func (a *ctxEvalActivation) Parent() interpreter.Activation {
+func (a *ctxEvalActivation) Parent() Activation {
 	return a.parent
+}
+
+func (a *ctxEvalActivation) AsPartialActivation() (interpreter.PartialActivation, bool) {
+	pa, ok := a.parent.(interpreter.PartialActivation)
+	return pa, ok
 }
 
 func newCtxEvalActivationPool() *ctxEvalActivationPool {
@@ -454,7 +403,7 @@ type ctxEvalActivationPool struct {
 }
 
 // Setup initializes a pooled Activation with the ability check for context.Context cancellation
-func (p *ctxEvalActivationPool) Setup(vars interpreter.Activation, done <-chan struct{}, interruptCheckRate uint) *ctxEvalActivation {
+func (p *ctxEvalActivationPool) Setup(vars Activation, done <-chan struct{}, interruptCheckRate uint) *ctxEvalActivation {
 	a := p.Pool.Get().(*ctxEvalActivation)
 	a.parent = vars
 	a.interrupt = done
@@ -503,8 +452,8 @@ func (a *evalActivation) ResolveName(name string) (any, bool) {
 	}
 }
 
-// Parent implements the interpreter.Activation interface
-func (a *evalActivation) Parent() interpreter.Activation {
+// Parent implements the Activation interface
+func (a *evalActivation) Parent() Activation {
 	return nil
 }
 

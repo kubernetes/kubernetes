@@ -114,7 +114,7 @@ func (plugin *nfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *nfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter())
 }
 
 func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface) (volume.Mounter, error) {
@@ -138,7 +138,7 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 }
 
 func (plugin *nfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
 }
 
 func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {

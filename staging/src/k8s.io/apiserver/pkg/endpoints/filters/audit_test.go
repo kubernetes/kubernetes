@@ -18,24 +18,37 @@ package filters
 
 import (
 	"context"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+	"unsafe"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	"k8s.io/apiserver/plugin/pkg/audit/buffered"
+	"k8s.io/apiserver/plugin/pkg/audit/log"
+	"k8s.io/apiserver/plugin/pkg/audit/webhook"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/retry"
 )
 
 type fakeAuditSink struct {
@@ -76,7 +89,7 @@ func (s *fakeAuditSink) Pop(timeout time.Duration) (*auditinternal.Event, error)
 
 func TestConstructResponseWriter(t *testing.T) {
 	inner := &responsewriter.FakeResponseWriter{}
-	actual := decorateResponseWriter(context.Background(), inner, nil, nil, nil)
+	actual := decorateResponseWriter(context.Background(), inner, false)
 	switch v := actual.(type) {
 	case *auditResponseWriter:
 	default:
@@ -86,7 +99,7 @@ func TestConstructResponseWriter(t *testing.T) {
 		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 
-	actual = decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriterFlusherCloseNotifier{}, nil, nil, nil)
+	actual = decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriterFlusherCloseNotifier{}, false)
 	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 	if _, ok := actual.(http.CloseNotifier); !ok {
 		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
@@ -98,7 +111,7 @@ func TestConstructResponseWriter(t *testing.T) {
 		t.Errorf("Expected http.ResponseWriter not to implement http.Hijacker")
 	}
 
-	actual = decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriterFlusherCloseNotifierHijacker{}, nil, nil, nil)
+	actual = decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriterFlusherCloseNotifierHijacker{}, false)
 	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 	if _, ok := actual.(http.CloseNotifier); !ok {
 		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
@@ -112,37 +125,43 @@ func TestConstructResponseWriter(t *testing.T) {
 }
 
 func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
-	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, nil, nil)
+	ctx := audit.WithAuditContext(context.Background())
+	ac := audit.AuditContextFrom(ctx)
+	actual := decorateResponseWriter(ctx, &responsewriter.FakeResponseWriter{}, false)
 
 	// write status. This will not block because firstEventSentCh is nil
 	actual.WriteHeader(42)
-	if ev.ResponseStatus == nil {
+	if ac.GetEventResponseStatus() == nil {
 		t.Fatalf("Expected ResponseStatus to be non-nil")
 	}
-	if ev.ResponseStatus.Code != 42 {
-		t.Errorf("expected status code 42, got %d", ev.ResponseStatus.Code)
+	if ac.GetEventResponseStatus().Code != 42 {
+		t.Errorf("expected status code 42, got %d", ac.GetEventResponseStatus().Code)
 	}
 }
 
 func TestDecorateResponseWriterWithImplicitWrite(t *testing.T) {
-	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, nil, nil)
+	ctx := audit.WithAuditContext(context.Background())
+	ac := audit.AuditContextFrom(ctx)
+	actual := decorateResponseWriter(ctx, &responsewriter.FakeResponseWriter{}, false)
 
 	// write status. This will not block because firstEventSentCh is nil
 	actual.Write([]byte("foo"))
-	if ev.ResponseStatus == nil {
+	if ac.GetEventResponseStatus() == nil {
 		t.Fatalf("Expected ResponseStatus to be non-nil")
 	}
-	if ev.ResponseStatus.Code != 200 {
-		t.Errorf("expected status code 200, got %d", ev.ResponseStatus.Code)
+	if ac.GetEventResponseStatus().Code != 200 {
+		t.Errorf("expected status code 200, got %d", ac.GetEventResponseStatus().Code)
 	}
 }
 
 func TestDecorateResponseWriterChannel(t *testing.T) {
+	ctx := audit.WithAuditContext(context.Background())
 	sink := &fakeAuditSink{}
-	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, sink, nil)
+	auditContext := audit.AuditContextFrom(ctx)
+	if err := auditContext.Init(audit.RequestAuditConfig{}, sink); err != nil {
+		t.Fatal(err)
+	}
+	actual := decorateResponseWriter(ctx, &responsewriter.FakeResponseWriter{}, true)
 
 	done := make(chan struct{})
 	go func() {
@@ -164,8 +183,11 @@ func TestDecorateResponseWriterChannel(t *testing.T) {
 	}
 	t.Logf("Seen event with status %v", ev1.ResponseStatus)
 
-	if !reflect.DeepEqual(ev, ev1) {
-		t.Fatalf("ev1 and ev must be equal")
+	ev := getAuditContextEvent(auditContext)
+	if diff := cmp.Diff(ev, ev1, cmp.FilterPath(func(p cmp.Path) bool {
+		return p.String() == "StageTimestamp"
+	}, cmp.Ignore())); diff != "" {
+		t.Fatalf("ev1 and ev must be equal, diff: %s", diff)
 	}
 
 	<-done
@@ -176,6 +198,20 @@ func TestDecorateResponseWriterChannel(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+}
+
+func getAuditContextEvent(ac *audit.AuditContext) *auditinternal.Event {
+	// Get the reflect.Value of the AuditContext
+	val := reflect.ValueOf(ac).Elem()
+
+	// Access the unexported `event` field
+	eventField := val.FieldByName("event")
+
+	// Use unsafe to get a pointer to the field
+	eventPtr := unsafe.Pointer(eventField.UnsafeAddr())
+
+	// Cast the pointer to the correct type
+	return (*auditinternal.Event)(eventPtr)
 }
 
 type fakeHTTPHandler struct{}
@@ -204,7 +240,7 @@ func TestAudit(t *testing.T) {
 		{
 			"read-only empty",
 			shortRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(http.ResponseWriter, *http.Request) {},
@@ -226,7 +262,7 @@ func TestAudit(t *testing.T) {
 		{
 			"short running with auditID",
 			shortRunningPath,
-			"GET",
+			request.MethodGet,
 			uuid.New().String(),
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -250,7 +286,7 @@ func TestAudit(t *testing.T) {
 		{
 			"read-only panic",
 			shortRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -275,7 +311,7 @@ func TestAudit(t *testing.T) {
 		{
 			"writing empty",
 			shortRunningPath,
-			"PUT",
+			request.MethodPut,
 			"",
 			nil,
 			func(http.ResponseWriter, *http.Request) {},
@@ -297,7 +333,7 @@ func TestAudit(t *testing.T) {
 		{
 			"writing sleep",
 			shortRunningPath,
-			"PUT",
+			request.MethodPut,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -322,7 +358,7 @@ func TestAudit(t *testing.T) {
 		{
 			"writing 403+write",
 			shortRunningPath,
-			"PUT",
+			request.MethodPut,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -347,7 +383,7 @@ func TestAudit(t *testing.T) {
 		{
 			"writing panic",
 			shortRunningPath,
-			"PUT",
+			request.MethodPut,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -371,7 +407,7 @@ func TestAudit(t *testing.T) {
 		{
 			"writing write+panic",
 			shortRunningPath,
-			"PUT",
+			request.MethodPut,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -397,7 +433,7 @@ func TestAudit(t *testing.T) {
 		{
 			"empty longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(http.ResponseWriter, *http.Request) {},
@@ -425,7 +461,7 @@ func TestAudit(t *testing.T) {
 		{
 			"empty longrunning with audit id",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			uuid.New().String(),
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -455,7 +491,7 @@ func TestAudit(t *testing.T) {
 		{
 			"sleep longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(http.ResponseWriter, *http.Request) {
@@ -485,7 +521,7 @@ func TestAudit(t *testing.T) {
 		{
 			"sleep+403 longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -516,7 +552,7 @@ func TestAudit(t *testing.T) {
 		{
 			"write longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -546,7 +582,7 @@ func TestAudit(t *testing.T) {
 		{
 			"403+write longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -577,7 +613,7 @@ func TestAudit(t *testing.T) {
 		{
 			"panic longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -601,7 +637,7 @@ func TestAudit(t *testing.T) {
 		{
 			"write+panic longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -632,7 +668,7 @@ func TestAudit(t *testing.T) {
 		{
 			"omit RequestReceived",
 			shortRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			[]auditinternal.Stage{auditinternal.StageRequestReceived},
 			func(w http.ResponseWriter, req *http.Request) {
@@ -651,7 +687,7 @@ func TestAudit(t *testing.T) {
 		{
 			"emit Panic only",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			[]auditinternal.Stage{auditinternal.StageRequestReceived, auditinternal.StageResponseStarted, auditinternal.StageResponseComplete},
 			func(w http.ResponseWriter, req *http.Request) {
@@ -670,6 +706,7 @@ func TestAudit(t *testing.T) {
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
+			ctx := t.Context()
 			sink := &fakeAuditSink{}
 			fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, test.omitStages)
 			handler := WithAudit(http.HandlerFunc(test.handler), sink, fakeRuleEvaluator, func(r *http.Request, ri *request.RequestInfo) bool {
@@ -678,7 +715,7 @@ func TestAudit(t *testing.T) {
 			})
 			handler = WithAuditInit(handler)
 
-			req, _ := http.NewRequest(test.verb, test.path, nil)
+			req, _ := http.NewRequestWithContext(ctx, test.verb, test.path, nil)
 			req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
 			if test.auditID != "" {
 				req.Header.Add("Audit-ID", test.auditID)
@@ -741,15 +778,17 @@ func TestAudit(t *testing.T) {
 }
 
 func TestAuditNoPanicOnNilUser(t *testing.T) {
+	ctx := t.Context()
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	handler := WithAudit(&fakeHTTPHandler{}, &fakeAuditSink{}, fakeRuleEvaluator, nil)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequestWithContext(ctx, request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req = withTestContext(req, nil, nil)
 	req.RemoteAddr = "127.0.0.1"
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 }
 
 func TestAuditLevelNone(t *testing.T) {
+	ctx := t.Context()
 	sink := &fakeAuditSink{}
 	var handler http.Handler
 	handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -758,7 +797,7 @@ func TestAuditLevelNone(t *testing.T) {
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelNone, nil)
 	handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequestWithContext(ctx, request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
 
@@ -805,6 +844,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
+			ctx := t.Context()
 			sink := &fakeAuditSink{}
 			var handler http.Handler
 			handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -814,7 +854,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 			handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 			handler = WithAuditInit(handler)
 
-			req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+			req, _ := http.NewRequestWithContext(ctx, request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 			req.RemoteAddr = "127.0.0.1"
 			req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
 			if test.requestHeader != "" {
@@ -848,11 +888,130 @@ func withTestContext(req *http.Request, user user.Info, ae *auditinternal.Event)
 		ctx = request.WithUser(ctx, user)
 	}
 	if ae != nil {
-		ac := audit.AuditContextFrom(ctx)
-		ac.Event = *ae
+		ev := getAuditContextEvent(audit.AuditContextFrom(ctx))
+		*ev = *ae
 	}
 	if info, err := newTestRequestInfoResolver().NewRequestInfo(req); err == nil {
 		ctx = request.WithRequestInfo(ctx, info)
 	}
 	return req.WithContext(ctx)
+}
+
+type fakeAuditFile struct{}
+
+func (s fakeAuditFile) Write(p []byte) (n int, err error) {
+	time.Sleep(time.Duration(rand.Int63n(10000)))
+	return len(p), nil
+}
+
+type fakeAuditWebhookAuditBackend struct {
+}
+
+func (f fakeAuditWebhookAuditBackend) RoundTrip(r *http.Request) (*http.Response, error) {
+	time.Sleep(time.Duration(rand.Int63n(10000)))
+	return &http.Response{
+		StatusCode: http.StatusOK,
+	}, nil
+}
+
+// Test case for https://github.com/kubernetes/kubernetes/issues/120507
+// to test for race conditions in audit backends use the following command:
+// `go test ./ -race --run=TestAuditBackendRaceCondition -v`
+func TestAuditBackendRaceCondition(t *testing.T) {
+	defaultFakeLogBackend := log.NewBackend(fakeAuditFile{}, log.FormatJson, auditv1.SchemeGroupVersion)
+	testCases := []struct {
+		name           string
+		backendBuilder func() audit.Backend
+	}{
+		{
+			"log audit backend",
+			func() audit.Backend {
+				return defaultFakeLogBackend
+			},
+		},
+		{
+			"buffered audit backend",
+			func() audit.Backend {
+				backend := buffered.NewBackend(defaultFakeLogBackend, buffered.BatchConfig{
+					BufferSize:     10000,
+					MaxBatchSize:   1,
+					ThrottleEnable: false,
+					AsyncDelegate:  false,
+				})
+				err := backend.Run(wait.NeverStop)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return backend
+			},
+		},
+		{
+			name: "webhook audit backend",
+			backendBuilder: func() audit.Backend {
+				codecFactory := audit.Codecs
+				codec := codecFactory.LegacyCodec(auditv1.SchemeGroupVersion)
+				negotiatedSerializer := serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
+				client, err := rest.NewRESTClient(&url.URL{}, "/hello", rest.ClientContentConfig{
+					ContentType: "application/json",
+					Negotiator:  runtime.NewClientNegotiator(negotiatedSerializer, auditv1.SchemeGroupVersion),
+				}, flowcontrol.NewTokenBucketRateLimiter(100, 200), &http.Client{Transport: fakeAuditWebhookAuditBackend{}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return webhook.NewDynamicBackend(client, retry.DefaultBackoff)
+			},
+		},
+		{
+			"union audit backend",
+			func() audit.Backend {
+				return audit.Union(defaultFakeLogBackend, defaultFakeLogBackend)
+			},
+		},
+	}
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	longRunningCheck := func(r *http.Request, ri *request.RequestInfo) bool { return false }
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+			defer cancel()
+			for {
+				select {
+				case <-ctx.Done():
+					// finished the test
+					return
+				default:
+				}
+				serveStarted := make(chan struct{})
+				req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods/foo", nil)
+				req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
+				backend := tc.backendBuilder()
+				go func() {
+					<-serveStarted
+					for {
+						select {
+						case <-ctx.Done():
+							// finished the test
+							backend.Shutdown()
+							return
+						default:
+						}
+						audit.AddAuditAnnotations(req.Context(), "a", "b")
+					}
+				}()
+				realHandler := http.HandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
+					close(serveStarted)
+					// mock some business logic
+					time.Sleep(time.Millisecond)
+				})
+				handler := WithAudit(realHandler, backend, fakeRuleEvaluator, longRunningCheck)
+				handler = WithAuditInit(handler)
+				serveFinished := make(chan struct{})
+				go func() {
+					defer close(serveFinished)
+					handler.ServeHTTP(httptest.NewRecorder(), req)
+				}()
+				<-serveFinished
+			}
+		})
+	}
 }

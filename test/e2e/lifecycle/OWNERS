@@ -4,10 +4,14 @@ approvers:
   - neolit123
   - SataQiu
   - pacoxu
+  - carlory
+  - HirazawaUi
 reviewers:
   - neolit123
   - SataQiu
   - pacoxu
+  - carlory
+  - HirazawaUi
 labels:
   - sig/cluster-lifecycle
 emeritus_approvers:

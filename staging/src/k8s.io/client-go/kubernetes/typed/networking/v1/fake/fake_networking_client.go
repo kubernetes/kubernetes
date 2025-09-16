@@ -28,6 +28,10 @@ type FakeNetworkingV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeNetworkingV1) IPAddresses() v1.IPAddressInterface {
+	return newFakeIPAddresses(c)
+}
+
 func (c *FakeNetworkingV1) Ingresses(namespace string) v1.IngressInterface {
 	return newFakeIngresses(c, namespace)
 }
@@ -38,6 +42,10 @@ func (c *FakeNetworkingV1) IngressClasses() v1.IngressClassInterface {
 
 func (c *FakeNetworkingV1) NetworkPolicies(namespace string) v1.NetworkPolicyInterface {
 	return newFakeNetworkPolicies(c, namespace)
+}
+
+func (c *FakeNetworkingV1) ServiceCIDRs() v1.ServiceCIDRInterface {
+	return newFakeServiceCIDRs(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

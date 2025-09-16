@@ -61,21 +61,24 @@ type Stub struct {
 	endpoint           string                             // for testing
 
 	kubeletRestartWatcher *fsnotify.Watcher
+
+	pluginapi.UnsafeDevicePluginServer
+	watcherapi.UnsafeRegistrationServer
 }
 
 // stubGetPreferredAllocFunc is the function called when a getPreferredAllocation request is received from Kubelet
-type stubGetPreferredAllocFunc func(r *pluginapi.PreferredAllocationRequest, devs map[string]pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error)
+type stubGetPreferredAllocFunc func(r *pluginapi.PreferredAllocationRequest, devs map[string]*pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error)
 
-func defaultGetPreferredAllocFunc(r *pluginapi.PreferredAllocationRequest, devs map[string]pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
+func defaultGetPreferredAllocFunc(r *pluginapi.PreferredAllocationRequest, devs map[string]*pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
 	var response pluginapi.PreferredAllocationResponse
 
 	return &response, nil
 }
 
 // stubAllocFunc is the function called when an allocation request is received from Kubelet
-type stubAllocFunc func(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error)
+type stubAllocFunc func(r *pluginapi.AllocateRequest, devs map[string]*pluginapi.Device) (*pluginapi.AllocateResponse, error)
 
-func defaultAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
+func defaultAllocFunc(r *pluginapi.AllocateRequest, devs map[string]*pluginapi.Device) (*pluginapi.AllocateResponse, error) {
 	var response pluginapi.AllocateResponse
 
 	return &response, nil
@@ -357,10 +360,10 @@ func (m *Stub) Update(devs []*pluginapi.Device) {
 func (m *Stub) GetPreferredAllocation(ctx context.Context, r *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
 	klog.InfoS("GetPreferredAllocation", "request", r)
 
-	devs := make(map[string]pluginapi.Device)
+	devs := make(map[string]*pluginapi.Device)
 
 	for _, dev := range m.devs {
-		devs[dev.ID] = *dev
+		devs[dev.ID] = dev
 	}
 
 	return m.getPreferredAllocFunc(r, devs)
@@ -370,10 +373,10 @@ func (m *Stub) GetPreferredAllocation(ctx context.Context, r *pluginapi.Preferre
 func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	klog.InfoS("Allocate", "request", r)
 
-	devs := make(map[string]pluginapi.Device)
+	devs := make(map[string]*pluginapi.Device)
 
 	for _, dev := range m.devs {
-		devs[dev.ID] = *dev
+		devs[dev.ID] = dev
 	}
 
 	return m.allocFunc(r, devs)

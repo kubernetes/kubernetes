@@ -106,7 +106,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *c
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, "Image name to run.")
-	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only cronjob is supported).")
+	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only CronJob is supported).")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }

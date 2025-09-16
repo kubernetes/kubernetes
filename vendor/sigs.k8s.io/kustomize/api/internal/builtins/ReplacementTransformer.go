@@ -16,7 +16,7 @@ import (
 // Replace values in targets with values from a source
 type ReplacementTransformerPlugin struct {
 	ReplacementList []types.ReplacementField `json:"replacements,omitempty" yaml:"replacements,omitempty"`
-	Replacements    []types.Replacement      `json:"omitempty" yaml:"omitempty"`
+	replacements    []types.Replacement
 }
 
 func (p *ReplacementTransformerPlugin) Config(
@@ -49,19 +49,19 @@ func (p *ReplacementTransformerPlugin) Config(
 				if err := yaml.Unmarshal(content, &repl); err != nil {
 					return err
 				}
-				p.Replacements = append(p.Replacements, repl...)
+				p.replacements = append(p.replacements, repl...)
 			case reflect.Map:
 				repl := types.Replacement{}
 				if err := yaml.Unmarshal(content, &repl); err != nil {
 					return err
 				}
-				p.Replacements = append(p.Replacements, repl)
+				p.replacements = append(p.replacements, repl)
 			default:
 				return fmt.Errorf("unsupported replacement type encountered within replacement path: %v", items.Kind())
 			}
 		} else {
 			// replacement information is already loaded
-			p.Replacements = append(p.Replacements, r.Replacement)
+			p.replacements = append(p.replacements, r.Replacement)
 		}
 	}
 	return nil
@@ -69,7 +69,7 @@ func (p *ReplacementTransformerPlugin) Config(
 
 func (p *ReplacementTransformerPlugin) Transform(m resmap.ResMap) (err error) {
 	return m.ApplyFilter(replacement.Filter{
-		Replacements: p.Replacements,
+		Replacements: p.replacements,
 	})
 }
 

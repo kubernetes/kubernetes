@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// +k8s:openapi-model-package=io.k8s.apimachinery.pkg.runtime
+
 // Package runtime includes helper functions for working with API objects
 // that follow the kubernetes API object conventions, which are:
 //
@@ -48,4 +50,4 @@ limitations under the License.
 //
 // As a bonus, a few common types useful from all api objects and versions
 // are provided in types.go.
-package runtime // import "k8s.io/apimachinery/pkg/runtime"
+package runtime

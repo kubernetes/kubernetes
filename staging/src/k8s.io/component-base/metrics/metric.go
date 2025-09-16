@@ -99,7 +99,7 @@ func (r *lazyMetric) lazyInit(self kubeCollector, fqName string) {
 // Disclaimer:  disabling a metric via a CLI flag has higher precedence than
 // deprecation and will override show-hidden-metrics for the explicitly
 // disabled metric.
-func (r *lazyMetric) preprocessMetric(version semver.Version) {
+func (r *lazyMetric) preprocessMetric(currentVersion semver.Version) {
 	disabledMetricsLock.RLock()
 	defer disabledMetricsLock.RUnlock()
 	// disabling metrics is higher in precedence than showing hidden metrics
@@ -107,20 +107,18 @@ func (r *lazyMetric) preprocessMetric(version semver.Version) {
 		r.isHidden = true
 		return
 	}
-	selfVersion := r.self.DeprecatedVersion()
-	if selfVersion == nil {
+	deprecatedVersion := r.self.DeprecatedVersion()
+	if deprecatedVersion == nil {
 		return
 	}
 	r.markDeprecationOnce.Do(func() {
-		if selfVersion.LTE(version) {
-			r.isDeprecated = true
-		}
+		r.isDeprecated = isDeprecated(currentVersion, *deprecatedVersion)
 
-		if ShouldShowHidden() {
-			klog.Warningf("Hidden metrics (%s) have been manually overridden, showing this very deprecated metric.", r.fqName)
-			return
-		}
-		if shouldHide(&version, selfVersion) {
+		if shouldHide(r.stabilityLevel, &currentVersion, deprecatedVersion) {
+			if shouldShowHidden() {
+				klog.Warningf("Hidden metrics (%s) have been manually overridden, showing this very deprecated metric.", r.fqName)
+				return
+			}
 			// TODO(RainbowMango): Remove this log temporarily. https://github.com/kubernetes/kubernetes/issues/85369
 			// klog.Warningf("This metric has been deprecated for more than one release, hiding.")
 			r.isHidden = true
@@ -208,11 +206,6 @@ func (c *selfCollector) Describe(ch chan<- *prometheus.Desc) {
 
 func (c *selfCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- c.metric
-}
-
-// metricWithExemplar is an interface that knows how to attach an exemplar to certain supported metric types.
-type metricWithExemplar interface {
-	withExemplar(v float64)
 }
 
 // no-op vecs for convenience

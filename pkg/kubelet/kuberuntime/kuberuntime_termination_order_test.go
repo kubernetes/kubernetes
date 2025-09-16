@@ -125,7 +125,7 @@ func TestTerminationOrderingSidecarsInReverseOrder(t *testing.T) {
 	waitAndExit := func(name string) {
 		delay := int64(to.waitForTurn(name, 30))
 		delays.Store(name, delay)
-		time.Sleep(1 * time.Second)
+		time.Sleep(1250 * time.Millisecond)
 		to.containerTerminated(name)
 		wg.Done()
 	}

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
 )
 
 const (
@@ -52,16 +52,15 @@ type dbusInhibiter interface {
 	InhibitShutdown() (systemd.InhibitLock, error)
 	ReleaseInhibitLock(lock systemd.InhibitLock) error
 	ReloadLogindConf() error
-	MonitorShutdown() (<-chan bool, error)
+	MonitorShutdown(klog.Logger) (<-chan bool, error)
 	OverrideInhibitDelay(inhibitDelayMax time.Duration) error
 }
 
 // managerImpl has functions that can be used to interact with the Node Shutdown Manager.
 type managerImpl struct {
-	logger       klog.Logger
-	recorder     record.EventRecorder
-	nodeRef      *v1.ObjectReference
-	probeManager prober.Manager
+	logger   klog.Logger
+	recorder record.EventRecorder
+	nodeRef  *v1.ObjectReference
 
 	getPods        eviction.ActivePodsFunc
 	syncNodeStatus func()
@@ -94,7 +93,6 @@ func NewManager(conf *Config) Manager {
 
 	manager := &managerImpl{
 		logger:         conf.Logger,
-		probeManager:   conf.ProbeManager,
 		recorder:       conf.Recorder,
 		nodeRef:        conf.NodeRef,
 		getPods:        conf.GetPodsFunc,
@@ -194,15 +192,38 @@ func (m *managerImpl) start() (chan struct{}, error) {
 			return nil, err
 		}
 
-		// Read the current inhibitDelay again, if the override was successful, currentInhibitDelay will be equal to shutdownGracePeriodRequested.
-		updatedInhibitDelay, err := m.dbusCon.CurrentInhibitDelay()
+		// The ReloadLogindConf call is asynchronous. Poll with exponential backoff until the configuration is updated.
+		backoff := wait.Backoff{
+			Duration: 100 * time.Millisecond,
+			Factor:   2.0,
+			Steps:    5,
+		}
+		var updatedInhibitDelay time.Duration
+		attempt := 0
+		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+			attempt += 1
+			// Read the current inhibitDelay again, if the override was successful, currentInhibitDelay will be equal to shutdownGracePeriodRequested.
+			updatedInhibitDelay, err = m.dbusCon.CurrentInhibitDelay()
+			if err != nil {
+				return false, err
+			}
+			if periodRequested <= updatedInhibitDelay {
+				return true, nil
+			}
+			if attempt < backoff.Steps {
+				m.logger.V(3).Info("InhibitDelayMaxSec still less than requested, retrying", "attempt", attempt, "current", updatedInhibitDelay, "requested", periodRequested)
+			}
+			return false, nil
+		})
 		if err != nil {
-			return nil, err
+			if !wait.Interrupted(err) {
+				return nil, err
+			}
+			if periodRequested > updatedInhibitDelay {
+				return nil, fmt.Errorf("node shutdown manager was timed out after %d attempts waiting for logind InhibitDelayMaxSec to update to %v (ShutdownGracePeriod), current value is %v", attempt, periodRequested, updatedInhibitDelay)
+			}
 		}
 
-		if periodRequested > updatedInhibitDelay {
-			return nil, fmt.Errorf("node shutdown manager was unable to update logind InhibitDelayMaxSec to %v (ShutdownGracePeriod), current value of InhibitDelayMaxSec (%v) is less than requested ShutdownGracePeriod", periodRequested, updatedInhibitDelay)
-		}
 	}
 
 	err = m.acquireInhibitLock()
@@ -210,7 +231,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 		return nil, err
 	}
 
-	events, err := m.dbusCon.MonitorShutdown()
+	events, err := m.dbusCon.MonitorShutdown(m.logger)
 	if err != nil {
 		releaseErr := m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
 		if releaseErr != nil {

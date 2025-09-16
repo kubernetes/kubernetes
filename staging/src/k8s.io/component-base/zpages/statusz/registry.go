@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 
+	"k8s.io/component-base/compatibility"
 	compbasemetrics "k8s.io/component-base/metrics"
 	utilversion "k8s.io/component-base/version"
 )
@@ -32,11 +32,28 @@ type statuszRegistry interface {
 	goVersion() string
 	binaryVersion() *version.Version
 	emulationVersion() *version.Version
+	paths() []string
 }
 
-type registry struct{}
+type registry struct {
+	// componentGlobalsRegistry compatibility.ComponentGlobalsRegistry
+	effectiveVersion compatibility.EffectiveVersion
+	// listedPaths is an alphabetically sorted list of paths to be reported at /.
+	listedPaths []string
+}
 
-func (registry) processStartTime() time.Time {
+// Option is a function to configure registry.
+type Option func(reg *registry)
+
+// WithListedPaths returns an Option to configure the ListedPaths.
+func WithListedPaths(listedPaths []string) Option {
+	cpyListedPaths := make([]string, len(listedPaths))
+	copy(cpyListedPaths, listedPaths)
+
+	return func(reg *registry) { reg.listedPaths = cpyListedPaths }
+}
+
+func (*registry) processStartTime() time.Time {
 	start, err := compbasemetrics.GetProcessStart()
 	if err != nil {
 		klog.Errorf("Could not get process start time, %v", err)
@@ -45,23 +62,28 @@ func (registry) processStartTime() time.Time {
 	return time.Unix(int64(start), 0)
 }
 
-func (registry) goVersion() string {
+func (*registry) goVersion() string {
 	return utilversion.Get().GoVersion
 }
 
-func (registry) binaryVersion() *version.Version {
-	effectiveVer := featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent)
-	if effectiveVer != nil {
-		return effectiveVer.BinaryVersion()
+func (r *registry) binaryVersion() *version.Version {
+	if r.effectiveVersion != nil {
+		return r.effectiveVersion.BinaryVersion()
 	}
-
-	return utilversion.DefaultKubeEffectiveVersion().BinaryVersion()
+	return version.MustParse(utilversion.Get().String())
 }
 
-func (registry) emulationVersion() *version.Version {
-	effectiveVer := featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent)
-	if effectiveVer != nil {
-		return effectiveVer.EmulationVersion()
+func (r *registry) emulationVersion() *version.Version {
+	if r.effectiveVersion != nil {
+		return r.effectiveVersion.EmulationVersion()
+	}
+
+	return nil
+}
+
+func (r *registry) paths() []string {
+	if r.listedPaths != nil {
+		return r.listedPaths
 	}
 
 	return nil

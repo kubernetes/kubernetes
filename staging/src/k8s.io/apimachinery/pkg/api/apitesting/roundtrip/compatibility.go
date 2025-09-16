@@ -20,6 +20,7 @@ import (
 	"bytes"
 	gojson "encoding/json"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,7 +116,7 @@ func (c *CompatibilityTestOptions) Complete(t *testing.T) *CompatibilityTestOpti
 		c.TestDataDir = "testdata"
 	}
 	if c.TestDataDirCurrentVersion == "" {
-		c.TestDataDirCurrentVersion = filepath.Join(c.TestDataDir, "HEAD")
+		c.TestDataDirCurrentVersion = filepath.Join(c.TestDataDir, http.MethodHead)
 	}
 	if c.TestDataDirsPreviousVersions == nil {
 		dirs, err := filepath.Glob(filepath.Join(c.TestDataDir, "v*"))
@@ -199,7 +200,7 @@ func (c *CompatibilityTestOptions) Run(t *testing.T) {
 	for _, gvk := range c.Kinds {
 		t.Run(makeName(gvk), func(t *testing.T) {
 
-			t.Run("HEAD", func(t *testing.T) {
+			t.Run(http.MethodHead, func(t *testing.T) {
 				c.runCurrentVersionTest(t, gvk, usedHEADFixtures)
 			})
 

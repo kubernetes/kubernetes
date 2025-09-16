@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/aliases"
@@ -44,7 +44,7 @@ func TestWithValueFuzzer(t *testing.T) {
 		structs.Ttest{},
 	}
 
-	fuzzer := fuzz.New()
+	fuzzer := randfill.New()
 	fuzzer.NilChance(0.5)
 	fuzzer.NumElements(0, 2)
 	fuzzer.Funcs(interfaceFuzzers...)
@@ -55,7 +55,7 @@ func TestWithValueFuzzer(t *testing.T) {
 			for i := 0; i < N; i++ {
 				original := reflect.New(reflect.TypeOf(test)).Interface()
 
-				fuzzer.Fuzz(original)
+				fuzzer.Fill(original)
 
 				reflectCopy := ReflectDeepCopy(original)
 
@@ -149,7 +149,7 @@ func BenchmarkReflectDeepCopy(b *testing.B) {
 		},
 	}
 
-	fuzzer := fuzz.New()
+	fuzzer := randfill.New()
 	fuzzer.NilChance(0.5)
 	fuzzer.NumElements(0, 2)
 	fuzzer.Funcs(interfaceFuzzers...)

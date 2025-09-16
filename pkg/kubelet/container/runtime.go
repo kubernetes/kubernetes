@@ -33,6 +33,8 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -126,7 +128,7 @@ type Runtime interface {
 	// and store the resulting archive to the checkpoint directory.
 	CheckpointContainer(ctx context.Context, options *runtimeapi.CheckpointContainerRequest) error
 	// Generate pod status from the CRI event
-	GeneratePodStatus(event *runtimeapi.ContainerEventResponse) (*PodStatus, error)
+	GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *PodStatus
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
 	// This list should be static at startup: either the client and server restart together when
 	// adding or removing metrics descriptors, or they should not change.
@@ -136,7 +138,13 @@ type Runtime interface {
 	// ListPodSandboxMetrics retrieves the metrics for all pod sandboxes.
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
 	// GetContainerStatus returns the status for the container.
-	GetContainerStatus(ctx context.Context, id ContainerID) (*Status, error)
+	GetContainerStatus(ctx context.Context, podUID types.UID, id ContainerID) (*Status, error)
+	// GetContainerSwapBehavior reports whether a container could be swappable.
+	// This is used to decide whether to handle InPlacePodVerticalScaling for containers.
+	GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubelettypes.SwapBehavior
+	// IsPodResizeInProgress checks whether the given pod is in the process of resizing
+	// (allocated resources != actuated resources).
+	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
@@ -151,8 +159,11 @@ type StreamingRuntime interface {
 // ImageService interfaces allows to work with image service.
 type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
-	// secrets if necessary. It returns a reference (digest or ID) to the pulled image.
-	PullImage(ctx context.Context, image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
+	// secrets if necessary.
+	// It returns a reference (digest or ID) to the pulled image and the credentials
+	// that were used to pull the image. If the returned credentials are nil, the
+	// pull was anonymous.
+	PullImage(ctx context.Context, image ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error)
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(ctx context.Context, image ImageSpec) (string, error)
@@ -227,7 +238,10 @@ func BuildContainerID(typ, ID string) ContainerID {
 func ParseContainerID(containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		klog.ErrorS(err, "Parsing containerID failed")
+		// Use klog.TODO() because we currently do not have a proper logger to pass in.
+		// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
+		logger := klog.TODO()
+		logger.Error(err, "Parsing containerID failed")
 	}
 	return id
 }
@@ -317,6 +331,8 @@ type PodStatus struct {
 	IPs []string
 	// Status of containers in the pod.
 	ContainerStatuses []*Status
+	// Statuses of containers of the active sandbox in the pod.
+	ActiveContainerStatuses []*Status
 	// Status of the pod sandbox.
 	// Only for kuberuntime now, other runtime may keep it nil.
 	SandboxStatuses []*runtimeapi.PodSandboxStatus
@@ -378,6 +394,8 @@ type Status struct {
 	User *ContainerUser
 	// Mounts are the volume mounts of the container
 	Mounts []Mount
+	// StopSignal is used to show the container's effective stop signal in the Status
+	StopSignal *v1.Signal
 }
 
 // ContainerUser represents user identity information
@@ -472,6 +490,9 @@ type Mount struct {
 	Propagation runtimeapi.MountPropagation
 	// Image is set if an OCI volume as image ID or digest should get mounted (special case).
 	Image *runtimeapi.ImageSpec
+	// ImageSubPath is set if an image volume sub path should get mounted. This
+	// field is only required if the above Image is set.
+	ImageSubPath string
 }
 
 // ImageVolumes is a map of image specs by volume name.

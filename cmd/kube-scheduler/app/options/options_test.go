@@ -32,8 +32,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	basecompatibility "k8s.io/component-base/compatibility"
 	componentbaseconfig "k8s.io/component-base/config"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2/ktesting"
 	v1 "k8s.io/kube-scheduler/config/v1"
@@ -282,6 +282,8 @@ profiles:
 	defaultPodMaxBackoffSeconds := int64(10)
 	defaultPercentageOfNodesToScore := ptr.To[int32](0)
 
+	componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
+
 	testcases := []struct {
 		name             string
 		options          *Options
@@ -323,7 +325,7 @@ profiles:
 					AlwaysAllowGroups:            []string{"system:masters"},
 				},
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -375,7 +377,7 @@ profiles:
 					return cfg
 				}(),
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"componentconfig/v1alpha1\"",
 		},
@@ -384,7 +386,7 @@ profiles:
 			options: &Options{
 				ConfigFile:               unknownVersionConfig,
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"kubescheduler.config.k8s.io/unknown\"",
 		},
@@ -393,7 +395,7 @@ profiles:
 			options: &Options{
 				ConfigFile:               noVersionConfig,
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedError: "Object 'apiVersion' is missing",
 		},
@@ -430,7 +432,7 @@ profiles:
 					AlwaysAllowGroups:            []string{"system:masters"},
 				},
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -503,7 +505,7 @@ profiles:
 					AlwaysAllowGroups:            []string{"system:masters"},
 				},
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 				TypeMeta: metav1.TypeMeta{
@@ -548,7 +550,7 @@ profiles:
 			options: &Options{
 				ConfigFile:               pluginConfigFile,
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -629,6 +631,12 @@ profiles:
 								},
 							},
 							{
+								Name: "DynamicResources",
+								Args: &kubeschedulerconfig.DynamicResourcesArgs{
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+								},
+							},
+							{
 								Name: "NodeAffinity",
 								Args: &kubeschedulerconfig.NodeAffinityArgs{},
 							},
@@ -669,7 +677,7 @@ profiles:
 			options: &Options{
 				ConfigFile:               multiProfilesConfig,
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -739,6 +747,12 @@ profiles:
 								},
 							},
 							{
+								Name: "DynamicResources",
+								Args: &kubeschedulerconfig.DynamicResourcesArgs{
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+								},
+							},
+							{
 								Name: "InterPodAffinity",
 								Args: &kubeschedulerconfig.InterPodAffinityArgs{
 									HardPodAffinityWeight: 1,
@@ -784,7 +798,7 @@ profiles:
 			name: "no config",
 			options: &Options{
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedError: "no configuration has been provided",
 		},
@@ -793,7 +807,7 @@ profiles:
 			options: &Options{
 				ConfigFile:               unknownFieldConfig,
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedError: `unknown field "foo"`,
 			checkErrFn:    runtime.IsStrictDecodingError,
@@ -803,7 +817,7 @@ profiles:
 			options: &Options{
 				ConfigFile:               duplicateFieldConfig,
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedError: `key "leaderElect" already set`,
 			checkErrFn:    runtime.IsStrictDecodingError,
@@ -813,7 +827,7 @@ profiles:
 			options: &Options{
 				ConfigFile:               highThroughputProfileConfig,
 				Logs:                     logs.NewOptions(),
-				ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -876,6 +890,12 @@ profiles:
 								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
 									MinCandidateNodesPercentage: 10,
 									MinCandidateNodesAbsolute:   100,
+								},
+							},
+							{
+								Name: "DynamicResources",
+								Args: &kubeschedulerconfig.DynamicResourcesArgs{
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
 								},
 							},
 							{

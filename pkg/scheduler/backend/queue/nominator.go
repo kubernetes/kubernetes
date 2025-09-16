@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
 // nominator is a structure that stores pods nominated to run on nodes.
@@ -35,10 +35,10 @@ import (
 type nominator struct {
 	// nLock synchronizes all operations related to nominator.
 	// It should not be used anywhere else.
-	// Caution: DO NOT take ("SchedulingQueue.lock" or "activeQueue.lock") after taking "nLock".
-	// You should always take "SchedulingQueue.lock" and "activeQueue.lock" first,
+	// Caution: DO NOT take ("SchedulingQueue.lock" or "activeQueue.lock" or "backoffQueue.lock") after taking "nLock".
+	// You should always take "SchedulingQueue.lock" and "activeQueue.lock" and "backoffQueue.lock" first,
 	// otherwise the nominator could end up in deadlock.
-	// Correct locking order is: SchedulingQueue.lock > activeQueue.lock > nLock.
+	// Correct locking order is: SchedulingQueue.lock > activeQueue.lock = backoffQueue.lock > nLock.
 	nLock sync.RWMutex
 
 	// podLister is used to verify if the given pod is alive.
@@ -60,71 +60,71 @@ func newPodNominator(podLister listersv1.PodLister) *nominator {
 	}
 }
 
-// AddNominatedPod adds a pod to the nominated pods of the given node.
-// This is called during the preemption process after a node is nominated to run
-// the pod. We update the structure before sending a request to update the pod
-// object to avoid races with the following scheduling cycles.
-func (npm *nominator) AddNominatedPod(logger klog.Logger, pi *framework.PodInfo, nominatingInfo *framework.NominatingInfo) {
+// addNominatedPod adds a pod to the nominated pods of the given node.
+// This is called during the preemption process when a node is nominated to run
+// the pod. We update the nominator's structure before sending an API request to update the pod
+// object, to avoid races with the following scheduling cycles.
+func (npm *nominator) addNominatedPod(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *fwk.NominatingInfo) {
 	npm.nLock.Lock()
 	npm.addNominatedPodUnlocked(logger, pi, nominatingInfo)
 	npm.nLock.Unlock()
 }
 
-func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi *framework.PodInfo, nominatingInfo *framework.NominatingInfo) {
+func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *fwk.NominatingInfo) {
 	// Always delete the pod if it already exists, to ensure we never store more than
 	// one instance of the pod.
-	npm.deleteUnlocked(pi.Pod)
+	npm.deleteUnlocked(pi.GetPod())
 
 	var nodeName string
-	if nominatingInfo.Mode() == framework.ModeOverride {
+	if nominatingInfo.Mode() == fwk.ModeOverride {
 		nodeName = nominatingInfo.NominatedNodeName
-	} else if nominatingInfo.Mode() == framework.ModeNoop {
-		if pi.Pod.Status.NominatedNodeName == "" {
+	} else if nominatingInfo.Mode() == fwk.ModeNoop {
+		if pi.GetPod().Status.NominatedNodeName == "" {
 			return
 		}
-		nodeName = pi.Pod.Status.NominatedNodeName
+		nodeName = pi.GetPod().Status.NominatedNodeName
 	}
 
 	if npm.podLister != nil {
 		// If the pod was removed or if it was already scheduled, don't nominate it.
-		updatedPod, err := npm.podLister.Pods(pi.Pod.Namespace).Get(pi.Pod.Name)
+		updatedPod, err := npm.podLister.Pods(pi.GetPod().Namespace).Get(pi.GetPod().Name)
 		if err != nil {
-			logger.V(4).Info("Pod doesn't exist in podLister, aborted adding it to the nominator", "pod", klog.KObj(pi.Pod))
+			logger.V(4).Info("Pod doesn't exist in podLister, aborted adding it to the nominator", "pod", klog.KObj(pi.GetPod()))
 			return
 		}
 		if updatedPod.Spec.NodeName != "" {
-			logger.V(4).Info("Pod is already scheduled to a node, aborted adding it to the nominator", "pod", klog.KObj(pi.Pod), "node", updatedPod.Spec.NodeName)
+			logger.V(4).Info("Pod is already scheduled to a node, aborted adding it to the nominator", "pod", klog.KObj(pi.GetPod()), "node", updatedPod.Spec.NodeName)
 			return
 		}
 	}
 
-	npm.nominatedPodToNode[pi.Pod.UID] = nodeName
+	npm.nominatedPodToNode[pi.GetPod().UID] = nodeName
 	for _, np := range npm.nominatedPods[nodeName] {
-		if np.uid == pi.Pod.UID {
+		if np.uid == pi.GetPod().UID {
 			logger.V(4).Info("Pod already exists in the nominator", "pod", np.uid)
 			return
 		}
 	}
-	npm.nominatedPods[nodeName] = append(npm.nominatedPods[nodeName], podToRef(pi.Pod))
+	npm.nominatedPods[nodeName] = append(npm.nominatedPods[nodeName], podToRef(pi.GetPod()))
 }
 
 // UpdateNominatedPod updates the <oldPod> with <newPod>.
-func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo *framework.PodInfo) {
+func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo fwk.PodInfo) {
 	npm.nLock.Lock()
 	defer npm.nLock.Unlock()
 	// In some cases, an Update event with no "NominatedNode" present is received right
 	// after a node("NominatedNode") is reserved for this pod in memory.
 	// In this case, we need to keep reserving the NominatedNode when updating the pod pointer.
-	var nominatingInfo *framework.NominatingInfo
+	var nominatingInfo *fwk.NominatingInfo
 	// We won't fall into below `if` block if the Update event represents:
 	// (1) NominatedNode info is added
 	// (2) NominatedNode info is updated
 	// (3) NominatedNode info is removed
-	if nominatedNodeName(oldPod) == "" && nominatedNodeName(newPodInfo.Pod) == "" {
+	if nominatedNodeName(oldPod) == "" && nominatedNodeName(newPodInfo.GetPod()) == "" {
 		if nnn, ok := npm.nominatedPodToNode[oldPod.UID]; ok {
 			// This is the only case we should continue reserving the NominatedNode
-			nominatingInfo = &framework.NominatingInfo{
-				NominatingMode:    framework.ModeOverride,
+			nominatingInfo = &fwk.NominatingInfo{
+				NominatingMode:    fwk.ModeOverride,
 				NominatedNodeName: nnn,
 			}
 		}

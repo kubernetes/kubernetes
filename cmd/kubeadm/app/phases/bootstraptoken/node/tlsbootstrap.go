@@ -31,7 +31,7 @@ import (
 func AllowBootstrapTokensToPostCSRs(client clientset.Interface) error {
 	fmt.Println("[bootstrap-token] Configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials")
 
-	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
+	return apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: constants.NodeKubeletBootstrap,
 		},
@@ -53,7 +53,7 @@ func AllowBootstrapTokensToPostCSRs(client clientset.Interface) error {
 func AllowBootstrapTokensToGetNodes(client clientset.Interface) error {
 	fmt.Println("[bootstrap-token] Configured RBAC rules to allow Node Bootstrap tokens to get nodes")
 
-	if err := apiclient.CreateOrUpdateClusterRole(client, &rbac.ClusterRole{
+	if err := apiclient.CreateOrUpdate(client.RbacV1().ClusterRoles(), &rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: constants.GetNodesClusterRoleName,
 		},
@@ -68,7 +68,7 @@ func AllowBootstrapTokensToGetNodes(client clientset.Interface) error {
 		return err
 	}
 
-	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
+	return apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: constants.GetNodesClusterRoleName,
 		},
@@ -91,7 +91,7 @@ func AutoApproveNodeBootstrapTokens(client clientset.Interface) error {
 	fmt.Println("[bootstrap-token] Configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token")
 
 	// Always create this kubeadm-specific binding though
-	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
+	return apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: constants.NodeAutoApproveBootstrapClusterRoleBinding,
 		},
@@ -113,7 +113,7 @@ func AutoApproveNodeBootstrapTokens(client clientset.Interface) error {
 func AutoApproveNodeCertificateRotation(client clientset.Interface) error {
 	fmt.Println("[bootstrap-token] Configured RBAC rules to allow certificate rotation for all node client certificates in the cluster")
 
-	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
+	return apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: constants.NodeAutoApproveCertificateRotationClusterRoleBinding,
 		},

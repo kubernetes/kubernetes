@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package waitgroup implements SafeWaitGroup wrap of sync.WaitGroup.
 // Add with positive delta when waiting will fail, to prevent sync.WaitGroup race issue.
-package waitgroup // import "k8s.io/apimachinery/pkg/util/waitgroup"
+package waitgroup

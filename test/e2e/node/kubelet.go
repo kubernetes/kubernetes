@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -67,7 +68,7 @@ const (
 func getPodMatches(ctx context.Context, c clientset.Interface, nodeName string, podNamePrefix string, namespace string) sets.String {
 	matches := sets.NewString()
 	framework.Logf("Checking pods on node %v via /runningpods endpoint", nodeName)
-	runningPods, err := e2ekubelet.GetKubeletPods(ctx, c, nodeName)
+	runningPods, err := e2ekubelet.GetKubeletRunningPods(ctx, c, nodeName)
 	if err != nil {
 		framework.Logf("Error checking running pods on %v: %v", nodeName, err)
 		return matches
@@ -408,10 +409,7 @@ var _ = SIGDescribe("kubelet", func() {
 			})
 
 			ginkgo.AfterEach(func(ctx context.Context) {
-				err := e2epod.DeletePodWithWait(ctx, c, pod)
-				framework.ExpectNoError(err, "AfterEach: Failed to delete client pod ", pod.Name)
-				err = e2epod.DeletePodWithWait(ctx, c, nfsServerPod)
-				framework.ExpectNoError(err, "AfterEach: Failed to delete server pod ", nfsServerPod.Name)
+				e2epod.DeletePodsWithWait(ctx, c, []*v1.Pod{pod, nfsServerPod})
 			})
 
 			// execute It blocks from above table of tests
@@ -421,7 +419,7 @@ var _ = SIGDescribe("kubelet", func() {
 					pod = createPodUsingNfs(ctx, f, c, ns, nfsIP, t.podCmd)
 
 					ginkgo.By("Stop the NFS server")
-					e2evolume.StopNFSServer(f, nfsServerPod)
+					e2evolume.StopNFSServer(ctx, f, nfsServerPod)
 
 					ginkgo.By("Delete the pod mounted to the NFS volume -- expect failure")
 					err := e2epod.DeletePodWithWait(ctx, c, pod)
@@ -432,7 +430,7 @@ var _ = SIGDescribe("kubelet", func() {
 					checkPodCleanup(ctx, c, pod, false)
 
 					ginkgo.By("Restart the nfs server")
-					e2evolume.RestartNFSServer(f, nfsServerPod)
+					e2evolume.RestartNFSServer(ctx, f, nfsServerPod)
 
 					ginkgo.By("Verify that the deleted client pod is now cleaned up")
 					checkPodCleanup(ctx, c, pod, true)
@@ -642,7 +640,7 @@ var _ = SIGDescribe("kubelet", func() {
 	})
 })
 
-var _ = SIGDescribe("specific log stream", feature.PodLogsQuerySplitStreams, func() {
+var _ = SIGDescribe("specific log stream", feature.PodLogsQuerySplitStreams, framework.WithFeatureGate(features.PodLogsQuerySplitStreams), func() {
 	var (
 		c  clientset.Interface
 		ns string

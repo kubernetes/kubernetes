@@ -76,7 +76,7 @@ func warningsForPersistentVolumeSpecAndMeta(fieldPath *field.Path, pvSpec *api.P
 		termFldPath := fieldPath.Child("spec", "nodeAffinity", "required", "nodeSelectorTerms")
 		// use of deprecated node labels in node affinity
 		for i, term := range pvSpec.NodeAffinity.Required.NodeSelectorTerms {
-			warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term, termFldPath.Index(i))...)
+			warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term, false, termFldPath.Index(i))...)
 		}
 	}
 	// If we are on deprecated volume plugin

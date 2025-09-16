@@ -20,11 +20,20 @@ package v1
 
 // LifecycleHandlerApplyConfiguration represents a declarative configuration of the LifecycleHandler type for use
 // with apply.
+//
+// LifecycleHandler defines a specific action that should be taken in a lifecycle
+// hook. One and only one of the fields, except TCPSocket must be specified.
 type LifecycleHandlerApplyConfiguration struct {
-	Exec      *ExecActionApplyConfiguration      `json:"exec,omitempty"`
-	HTTPGet   *HTTPGetActionApplyConfiguration   `json:"httpGet,omitempty"`
+	// Exec specifies a command to execute in the container.
+	Exec *ExecActionApplyConfiguration `json:"exec,omitempty"`
+	// HTTPGet specifies an HTTP GET request to perform.
+	HTTPGet *HTTPGetActionApplyConfiguration `json:"httpGet,omitempty"`
+	// Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept
+	// for backward compatibility. There is no validation of this field and
+	// lifecycle hooks will fail at runtime when it is specified.
 	TCPSocket *TCPSocketActionApplyConfiguration `json:"tcpSocket,omitempty"`
-	Sleep     *SleepActionApplyConfiguration     `json:"sleep,omitempty"`
+	// Sleep represents a duration that the container should sleep.
+	Sleep *SleepActionApplyConfiguration `json:"sleep,omitempty"`
 }
 
 // LifecycleHandlerApplyConfiguration constructs a declarative configuration of the LifecycleHandler type for use with

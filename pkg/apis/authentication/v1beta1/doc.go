@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/api/authentication/v1beta1
 
-package v1beta1 // import "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
+package v1beta1

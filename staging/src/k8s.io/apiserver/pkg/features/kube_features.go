@@ -21,55 +21,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
 )
 
+// Every feature gate should have an entry here following this template:
+//
+// // owner: @username
+// MyFeature featuregate.Feature = "MyFeature"
+//
+// Feature gates should be listed in alphabetical, case-sensitive
+// (upper before any lower case character) order. This reduces the risk
+// of code conflicts because changes are more likely to be scattered
+// across the file.
 const (
-	// Every feature gate should add method here following this template:
-	//
-	// // owner: @username
-	// MyFeature featuregate.Feature = "MyFeature"
-	//
-	// Feature gates should be listed in alphabetical, case-sensitive
-	// (upper before any lower case character) order. This reduces the risk
-	// of code conflicts because changes are more likely to be scattered
-	// across the file.
-
-	// owner: @ivelichkovich, @tallclair
-	// stable: v1.30
-	// kep: https://kep.k8s.io/3716
-	//
-	// Enables usage of MatchConditions fields to use CEL expressions for matching on admission webhooks
-	AdmissionWebhookMatchConditions featuregate.Feature = "AdmissionWebhookMatchConditions"
-
-	// owner: @jefftree @alexzielenski
-	// stable: v1.30
-	//
-	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
-	// caching with ETags containing all APIResources known to the apiserver.
-	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
-
-	// owner: @vinayakankugoyal
-	// kep: https://kep.k8s.io/4633
-	//
-	// Allows us to enable anonymous auth for only certain apiserver endpoints.
-	AnonymousAuthConfigurableEndpoints featuregate.Feature = "AnonymousAuthConfigurableEndpoints"
-
-	// owner: @stlaz @tkashem @dgrisonnet
-	// kep: https://kep.k8s.io/3926
-	//
-	// Enables the cluster admin to identify resources that fail to
-	// decrypt or fail to be decoded into an object, and introduces
-	// a new delete option to allow deletion of such corrupt
-	// resources using the Kubernetes API only.
-	AllowUnsafeMalformedObjectDeletion featuregate.Feature = "AllowUnsafeMalformedObjectDeletion"
-
-	// owner: @smarterclayton
-	// stable: 1.29
-	//
-	// Allow API clients to retrieve resource lists in chunks rather than
-	// all at once.
-	APIListChunking featuregate.Feature = "APIListChunking"
-
 	// owner: @ilackams
 	//
 	// Enables compression of REST responses (GET and LIST only)
@@ -90,11 +54,43 @@ const (
 	// Enables serving watch requests in separate goroutines.
 	APIServingWithRoutine featuregate.Feature = "APIServingWithRoutine"
 
+	// owner: @jefftree
+	//
+	// Remove the v2beta1 apidiscovery.k8s.io/v2beta1 group version. Aggregated
+	// discovery implements its own handlers and follows a different lifecycle than
+	// traditional k8s resources.
+	AggregatedDiscoveryRemoveBetaType featuregate.Feature = "AggregatedDiscoveryRemoveBetaType"
+
+	// owner: @modulitos
+	//
+	// Allow user.DefaultInfo.UID to be set from x509 cert during cert auth.
+	AllowParsingUserUIDFromCertAuth featuregate.Feature = "AllowParsingUserUIDFromCertAuth"
+
+	// owner: @stlaz @tkashem @dgrisonnet
+	// kep: https://kep.k8s.io/3926
+	//
+	// Enables the cluster admin to identify resources that fail to
+	// decrypt or fail to be decoded into an object, and introduces
+	// a new delete option to allow deletion of such corrupt
+	// resources using the Kubernetes API only.
+	AllowUnsafeMalformedObjectDeletion featuregate.Feature = "AllowUnsafeMalformedObjectDeletion"
+
+	// owner: @vinayakankugoyal
+	// kep: https://kep.k8s.io/4633
+	//
+	// Allows us to enable anonymous auth for only certain apiserver endpoints.
+	AnonymousAuthConfigurableEndpoints featuregate.Feature = "AnonymousAuthConfigurableEndpoints"
+
 	// owner: @deads2k
 	// kep: https://kep.k8s.io/4601
 	//
 	// Allows authorization to use field and label selectors.
 	AuthorizeWithSelectors featuregate.Feature = "AuthorizeWithSelectors"
+
+	// owner: @serathius
+	//
+	// Replaces watch cache hashmap implementation with a btree based one, bringing performance improvements.
+	BtreeWatchCache featuregate.Feature = "BtreeWatchCache"
 
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
@@ -104,13 +100,14 @@ const (
 	CBORServingAndStorage featuregate.Feature = "CBORServingAndStorage"
 
 	// owner: @serathius
-	//
-	// Replaces watch cache hashmap implementation with a btree based one, bringing performance improvements.
-	BtreeWatchCache featuregate.Feature = "BtreeWatchCache"
-
-	// owner: @serathius
 	// Enables concurrent watch object decoding to avoid starving watch cache when conversion webhook is installed.
 	ConcurrentWatchObjectDecode featuregate.Feature = "ConcurrentWatchObjectDecode"
+
+	// owner: @serathius
+	// kep: http://kep.k8s.io/2340
+	//
+	// Allow the API server to serve consistent lists from cache
+	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
 
 	// owner: @jefftree
 	// kep: https://kep.k8s.io/4355
@@ -118,9 +115,11 @@ const (
 	// Enables coordinated leader election in the API server
 	CoordinatedLeaderElection featuregate.Feature = "CoordinatedLeaderElection"
 
+	// owner: @serathius
+	// kep: https://kep.k8s.io/4988
 	//
-	// Allows for updating watchcache resource version with progress notify events.
-	EfficientWatchResumption featuregate.Feature = "EfficientWatchResumption"
+	// Enabled cache inconsistency detection.
+	DetectCacheInconsistency featuregate.Feature = "DetectCacheInconsistency"
 
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
@@ -128,6 +127,12 @@ const (
 	//
 	// Enables KMS v1 API for encryption at rest.
 	KMSv1 featuregate.Feature = "KMSv1"
+
+	// owner: @serathius
+	// kep: https://kep.k8s.io/4988
+	//
+	// Enables generating snapshots of watch cache store and using them to serve LIST requests.
+	ListFromCacheSnapshot featuregate.Feature = "ListFromCacheSnapshot"
 
 	// owner: @alexzielenski, @cici37, @jiahuif, @jpbetz
 	// kep: https://kep.k8s.io/3962
@@ -142,12 +147,12 @@ const (
 	// in the spec returned from kube-apiserver.
 	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 
-	// owner: @caesarxuchao
-	// stable: 1.29
+	// owner: @stlaz
 	//
-	// Allow apiservers to show a count of remaining items in the response
-	// to a chunking list request.
-	RemainingItemCount featuregate.Feature = "RemainingItemCount"
+	// Enable kube-apiserver to accept UIDs via request header authentication.
+	// This will also make the kube-apiserver's API aggregator add UIDs via standard
+	// headers when forwarding requests to the servers serving the aggregated API.
+	RemoteRequestHeaderUID featuregate.Feature = "RemoteRequestHeaderUID"
 
 	// owner: @wojtek-t
 	//
@@ -155,11 +160,84 @@ const (
 	// overload.
 	ResilientWatchCacheInitialization featuregate.Feature = "ResilientWatchCacheInitialization"
 
-	// owner: @serathius
+	// owner: @jpbetz
+	// Resource create requests using generateName are retried automatically by the apiserver
+	// if the generated name conflicts with an existing resource name, up to a maximum number of 7 retries.
+	RetryGenerateName featuregate.Feature = "RetryGenerateName"
+
+	// owner: @cici37
 	//
 	// Allow watch cache to create a watch on a dedicated RPC.
 	// This prevents watch cache from being starved by other watches.
 	SeparateCacheWatchRPC featuregate.Feature = "SeparateCacheWatchRPC"
+
+	// owner: @serathius
+	//
+	// Enables APF to use size of objects for estimating request cost.
+	SizeBasedListCostEstimate featuregate.Feature = "SizeBasedListCostEstimate"
+
+	// owner: @caesarxuchao @roycaihw
+	//
+	// Enable the storage version API.
+	StorageVersionAPI featuregate.Feature = "StorageVersionAPI"
+
+	// owner: @caesarxuchao
+	//
+	// Allow apiservers to expose the storage version hash in the discovery
+	// document.
+	StorageVersionHash featuregate.Feature = "StorageVersionHash"
+
+	// owner: @serathius
+	// Allow API server JSON encoder to encode collections item by item, instead of all at once.
+	StreamingCollectionEncodingToJSON featuregate.Feature = "StreamingCollectionEncodingToJSON"
+
+	// owner: @serathius
+	// Allow API server Protobuf encoder to encode collections item by item, instead of all at once.
+	StreamingCollectionEncodingToProtobuf featuregate.Feature = "StreamingCollectionEncodingToProtobuf"
+
+	// owner: @cici37
+	//
+	// StrictCostEnforcementForVAP is used to apply strict CEL cost validation for ValidatingAdmissionPolicy.
+	// It will be set to off by default for certain time of period to prevent the impact on the existing users.
+	// It is strongly recommended to enable this feature gate as early as possible.
+	// The strict cost is specific for the extended libraries whose cost defined under k8s/apiserver/pkg/cel/library.
+	StrictCostEnforcementForVAP featuregate.Feature = "StrictCostEnforcementForVAP"
+
+	// owner: @cici37
+	//
+	// StrictCostEnforcementForWebhooks is used to apply strict CEL cost validation for matchConditions in Webhooks.
+	// It will be set to off by default for certain time of period to prevent the impact on the existing users.
+	// It is strongly recommended to enable this feature gate as early as possible.
+	// The strict cost is specific for the extended libraries whose cost defined under k8s/apiserver/pkg/cel/library.
+	StrictCostEnforcementForWebhooks featuregate.Feature = "StrictCostEnforcementForWebhooks"
+
+	// owner: @aramase, @enj, @nabokihms
+	// kep: https://kep.k8s.io/3331
+	//
+	// Enables Structured Authentication Configuration
+	StructuredAuthenticationConfiguration featuregate.Feature = "StructuredAuthenticationConfiguration"
+
+	// owner: @aramase, @enj, @nabokihms
+	// kep: https://kep.k8s.io/3331
+	//
+	// Enables Egress Selector in Structured Authentication Configuration
+	StructuredAuthenticationConfigurationEgressSelector featuregate.Feature = "StructuredAuthenticationConfigurationEgressSelector"
+
+	// owner: @palnabarun
+	// kep: https://kep.k8s.io/3221
+	//
+	// Enables Structured Authorization Configuration
+	StructuredAuthorizationConfiguration featuregate.Feature = "StructuredAuthorizationConfiguration"
+
+	// owner: @aramase
+	//
+	// Enables validation of service account UID in TokenRequest API.
+	//
+	// This feature gate is used to ensure that the UID provided in the TokenRequest
+	// matches the UID of the service account for which the token is being requested.
+	// It helps prevent misuse of the TokenRequest API by ensuring that tokens are only
+	// issued for the correct service account.
+	TokenRequestServiceAccountUIDValidation featuregate.Feature = "TokenRequestServiceAccountUIDValidation"
 
 	// owner: @enj
 	//
@@ -178,55 +256,6 @@ const (
 	// clients.
 	UnauthenticatedHTTP2DOSMitigation featuregate.Feature = "UnauthenticatedHTTP2DOSMitigation"
 
-	// owner: @jpbetz
-	// Resource create requests using generateName are retried automatically by the apiserver
-	// if the generated name conflicts with an existing resource name, up to a maximum number of 7 retries.
-	RetryGenerateName featuregate.Feature = "RetryGenerateName"
-
-	// owner: @cici37
-	//
-	// StrictCostEnforcementForVAP is used to apply strict CEL cost validation for ValidatingAdmissionPolicy.
-	// It will be set to off by default for certain time of period to prevent the impact on the existing users.
-	// It is strongly recommended to enable this feature gate as early as possible.
-	// The strict cost is specific for the extended libraries whose cost defined under k8s/apiserver/pkg/cel/library.
-	StrictCostEnforcementForVAP featuregate.Feature = "StrictCostEnforcementForVAP"
-
-	// owner: @cici37
-	//
-	// StrictCostEnforcementForWebhooks is used to apply strict CEL cost validation for matchConditions in Webhooks.
-	// It will be set to off by default for certain time of period to prevent the impact on the existing users.
-	// It is strongly recommended to enable this feature gate as early as possible.
-	// The strict cost is specific for the extended libraries whose cost defined under k8s/apiserver/pkg/cel/library.
-	StrictCostEnforcementForWebhooks featuregate.Feature = "StrictCostEnforcementForWebhooks"
-
-	// owner: @caesarxuchao @roycaihw
-	//
-	// Enable the storage version API.
-	StorageVersionAPI featuregate.Feature = "StorageVersionAPI"
-
-	// owner: @caesarxuchao
-	//
-	// Allow apiservers to expose the storage version hash in the discovery
-	// document.
-	StorageVersionHash featuregate.Feature = "StorageVersionHash"
-
-	// owner: @aramase, @enj, @nabokihms
-	// kep: https://kep.k8s.io/3331
-	//
-	// Enables Structured Authentication Configuration
-	StructuredAuthenticationConfiguration featuregate.Feature = "StructuredAuthenticationConfiguration"
-
-	// owner: @palnabarun
-	// kep: https://kep.k8s.io/3221
-	//
-	// Enables Structured Authorization Configuration
-	StructuredAuthorizationConfiguration featuregate.Feature = "StructuredAuthorizationConfiguration"
-
-	// owner: @wojtek-t
-	//
-	// Enables support for watch bookmark events.
-	WatchBookmark featuregate.Feature = "WatchBookmark"
-
 	// owner: @wojtek-t
 	//
 	// Enables post-start-hook for storage readiness
@@ -241,17 +270,11 @@ const (
 	//
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
-
-	// owner: @serathius
-	// kep: http://kep.k8s.io/2340
-	//
-	// Allow the API server to serve consistent lists from cache
-	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
 )
 
 func init() {
-	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
+	runtime.Must(zpagesfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
@@ -261,33 +284,6 @@ func init() {
 // Entries are alphabetized and separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
-	AdmissionWebhookMatchConditions: {
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
-	AggregatedDiscoveryEndpoint: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
-	AllowUnsafeMalformedObjectDeletion: {
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	AnonymousAuthConfigurableEndpoints: {
-		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	APIListChunking: {
-		{Version: version.MustParse("1.8"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.9"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	APIResponseCompression: {
 		{Version: version.MustParse("1.8"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
@@ -301,19 +297,41 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	APIServerTracing: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
 	},
 
 	APIServingWithRoutine: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	BtreeWatchCache: {
+	AggregatedDiscoveryRemoveBetaType: {
+		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
+	},
+
+	AllowParsingUserUIDFromCertAuth: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	AllowUnsafeMalformedObjectDeletion: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	AnonymousAuthConfigurableEndpoints: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	AuthorizeWithSelectors: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
+	},
+
+	BtreeWatchCache: {
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	CBORServingAndStorage: {
@@ -327,25 +345,32 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	ConsistentListFromCache: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	CoordinatedLeaderElection: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 	},
 
-	EfficientWatchResumption: {
-		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.21"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	DetectCacheInconsistency: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	KMSv1: {
+		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Deprecated},
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
+	ListFromCacheSnapshot: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	MutatingAdmissionPolicy: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	OpenAPIEnums: {
@@ -353,14 +378,14 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	RemainingItemCount: {
-		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	RemoteRequestHeaderUID: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	ResilientWatchCacheInitialization: {
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	RetryGenerateName: {
@@ -371,6 +396,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	SeparateCacheWatchRPC: {
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	SizeBasedListCostEstimate: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	StorageVersionAPI: {
@@ -380,6 +410,16 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	StorageVersionHash: {
 		{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.15"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	StreamingCollectionEncodingToJSON: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	StreamingCollectionEncodingToProtobuf: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	StrictCostEnforcementForVAP: {
@@ -395,6 +435,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	StructuredAuthenticationConfiguration: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA and LockToDefault in 1.34, remove in 1.37
+	},
+
+	StructuredAuthenticationConfigurationEgressSelector: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	StructuredAuthorizationConfiguration: {
@@ -403,15 +448,13 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	TokenRequestServiceAccountUIDValidation: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	UnauthenticatedHTTP2DOSMitigation: {
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	WatchBookmark: {
-		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.17"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	WatchCacheInitializationPostStartHook: {
@@ -420,14 +463,14 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	WatchFromStorageWithoutResourceVersion: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true},
 	},
 
 	WatchList: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		// switch this back to false because the json and proto streaming encoders appear to work better.
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 }
-
-// defaultKubernetesFeatureGates consists of legacy unversioned Kubernetes-specific feature keys.
-// Please do not add to this struct and use defaultVersionedKubernetesFeatureGates instead.
-var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}

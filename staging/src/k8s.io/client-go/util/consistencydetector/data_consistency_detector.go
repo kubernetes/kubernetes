@@ -19,17 +19,31 @@ package consistencydetector
 import (
 	"context"
 	"fmt"
+	"os"
+	"reflect"
 	"sort"
+	"strconv"
 	"time"
-
-	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
+
+var dataConsistencyDetectionForWatchListEnabled = false
+
+func init() {
+	dataConsistencyDetectionForWatchListEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_WATCHLIST_INCONSISTENCY_DETECTOR"))
+}
+
+// IsDataConsistencyDetectionForWatchListEnabled returns true when
+// the KUBE_WATCHLIST_INCONSISTENCY_DETECTOR environment variable was set during a binary startup.
+func IsDataConsistencyDetectionForWatchListEnabled() bool {
+	return dataConsistencyDetectionForWatchListEnabled
+}
 
 type RetrieveItemsFunc[U any] func() []U
 
@@ -75,8 +89,8 @@ func CheckDataConsistency[T runtime.Object, U any](ctx context.Context, identity
 	sort.Sort(byUID(listItems))
 	sort.Sort(byUID(retrievedItems))
 
-	if !cmp.Equal(listItems, retrievedItems) {
-		klog.Infof("previously received data for %s is different than received by the standard list api call against etcd, diff: %v", identity, cmp.Diff(listItems, retrievedItems))
+	if !reflect.DeepEqual(listItems, retrievedItems) {
+		klog.Infof("previously received data for %s is different than received by the standard list api call against etcd, diff: %v", identity, diff.Diff(listItems, retrievedItems))
 		msg := fmt.Sprintf("data inconsistency detected for %s, panicking!", identity)
 		panic(msg)
 	}

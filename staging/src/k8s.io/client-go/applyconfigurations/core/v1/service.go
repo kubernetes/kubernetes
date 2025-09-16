@@ -29,11 +29,23 @@ import (
 
 // ServiceApplyConfiguration represents a declarative configuration of the Service type for use
 // with apply.
+//
+// Service is a named abstraction of software service (for example, mysql) consisting of local port
+// (for example 3306) that the proxy listens on, and the selector that determines which pods
+// will answer requests sent through the proxy.
 type ServiceApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ServiceSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *ServiceStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the behavior of a service.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *ServiceSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the service.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *ServiceStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Service constructs a declarative configuration of the Service type for use with
@@ -47,29 +59,14 @@ func Service(name, namespace string) *ServiceApplyConfiguration {
 	return b
 }
 
-// ExtractService extracts the applied configuration owned by fieldManager from
-// service. If no managedFields are found in service for fieldManager, a
-// ServiceApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractServiceFrom extracts the applied configuration owned by fieldManager from
+// service for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // service must be a unmodified Service API object that was retrieved from the Kubernetes API.
-// ExtractService provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractServiceFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractService(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
-	return extractService(service, fieldManager, "")
-}
-
-// ExtractServiceStatus is the same as ExtractService except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractServiceStatus(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
-	return extractService(service, fieldManager, "status")
-}
-
-func extractService(service *corev1.Service, fieldManager string, subresource string) (*ServiceApplyConfiguration, error) {
+func ExtractServiceFrom(service *corev1.Service, fieldManager string, subresource string) (*ServiceApplyConfiguration, error) {
 	b := &ServiceApplyConfiguration{}
 	err := managedfields.ExtractInto(service, internal.Parser().Type("io.k8s.api.core.v1.Service"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +79,28 @@ func extractService(service *corev1.Service, fieldManager string, subresource st
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractService extracts the applied configuration owned by fieldManager from
+// service. If no managedFields are found in service for fieldManager, a
+// ServiceApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// service must be a unmodified Service API object that was retrieved from the Kubernetes API.
+// ExtractService provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractService(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
+	return ExtractServiceFrom(service, fieldManager, "")
+}
+
+// ExtractServiceStatus extracts the applied configuration owned by fieldManager from
+// service for the status subresource.
+func ExtractServiceStatus(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
+	return ExtractServiceFrom(service, fieldManager, "status")
+}
+
+func (b ServiceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -257,8 +276,24 @@ func (b *ServiceApplyConfiguration) WithStatus(value *ServiceStatusApplyConfigur
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ServiceApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ServiceApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ServiceApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ServiceApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

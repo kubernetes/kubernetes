@@ -29,16 +29,17 @@ import (
 	mathrand "math/rand/v2"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
-	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/test/e2e/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -56,14 +57,13 @@ const (
 	noSignerKey       = "no-signer"
 )
 
-// TODO: running the tests in parallel should be possible
-var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjection, framework.WithSerial(), func() {
+var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), framework.WithFeatureGate(features.ClusterTrustBundleProjection), func() {
 	f := framework.NewDefaultFramework("projected-clustertrustbundle")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	initCTBs, pemMapping := initCTBData()
 
-	ginkgo.JustBeforeEach(func(ctx context.Context) {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		cleanup := mustInitCTBs(ctx, f, initCTBs)
 		ginkgo.DeferCleanup(cleanup)
 	})
@@ -78,7 +78,7 @@ var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjec
 		}{
 			{
 				name:           "name of an existing CTB",
-				ctbName:        "test.test.signer-one.4",
+				ctbName:        "test.test.signer-one.4" + f.UniqueName,
 				expectedOutput: expectedRegexFromPEMs(initCTBs[4].Spec.TrustBundle),
 			},
 			{
@@ -145,10 +145,11 @@ var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjec
 			},
 		} {
 			ginkgo.It(tt.name, func(ctx context.Context) {
+				signerName := tt.signerName + f.UniqueName
 				pod := podForCTBProjection(v1.VolumeProjection{
 					ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
 						Path:          "trust-bundle.crt",
-						SignerName:    &tt.signerName,
+						SignerName:    &signerName,
 						LabelSelector: tt.selector,
 						Optional:      tt.optionalVolume,
 					},
@@ -172,7 +173,7 @@ var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjec
 				ctb: &v1.ClusterTrustBundleProjection{
 					Optional:   ptr.To(false),
 					Path:       "trust-bundle.crt",
-					SignerName: ptr.To(testSignerOneName),
+					SignerName: ptr.To(testSignerOneName + f.UniqueName),
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"signer.alive": "unknown",
@@ -238,14 +239,14 @@ var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjec
 		pod := podForCTBProjection(
 			v1.VolumeProjection{
 				ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
-					Name: ptr.To("test.test.signer-one.4"),
+					Name: ptr.To("test.test.signer-one.4" + f.UniqueName),
 					Path: "trust-anchors.pem",
 				},
 			},
 			v1.VolumeProjection{
 				ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
 					Path:       "trust-bundle.crt",
-					SignerName: ptr.To(testSignerOneName),
+					SignerName: ptr.To(testSignerOneName + f.UniqueName),
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"signer.alive": "false",
@@ -265,21 +266,21 @@ var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjec
 	ginkgo.It("should be able to mount a big number (>100) of CTBs", func(ctx context.Context) {
 		const numCTBs = 150
 
-		var initCTBs []*certificatesv1alpha1.ClusterTrustBundle
+		var initCTBs []*certificatesv1beta1.ClusterTrustBundle
 		var cleanups []func(ctx context.Context)
 		var projections []v1.VolumeProjection
 
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			for _, c := range cleanups {
 				c(ctx)
 			}
-		}()
+		})
 		for i := range numCTBs {
 			ctb := ctbForCA(fmt.Sprintf("test.test:signer-hundreds:%d", i), "test.test/signer-hundreds", mustMakeCAPEM(fmt.Sprintf("root%d", i)), nil)
 			initCTBs = append(initCTBs, ctb)
 			cleanups = append(cleanups, mustCreateCTB(ctx, f, ctb))
 			projections = append(projections, v1.VolumeProjection{ClusterTrustBundle: &v1.ClusterTrustBundleProjection{ // TODO: maybe mount them all to a single pod?
-				Name: ptr.To(fmt.Sprintf("test.test:signer-hundreds:%d", i)),
+				Name: ptr.To(fmt.Sprintf("test.test:signer-hundreds%s:%d", f.UniqueName, i)),
 				Path: fmt.Sprintf("trust-anchors-%d.pem", i),
 			},
 			})
@@ -367,7 +368,7 @@ var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjec
 			pod := podForCTBProjection(v1.VolumeProjection{
 				ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
 					Path:          "trust-anchors.pem",
-					SignerName:    ptr.To("test.test/signer-hundreds"),
+					SignerName:    ptr.To("test.test/signer-hundreds" + f.UniqueName),
 					LabelSelector: &metav1.LabelSelector{}, // == match everything
 				},
 			})
@@ -442,7 +443,7 @@ func podForCTBProjection(projectionSources ...v1.VolumeProjection) *v1.Pod {
 //	  "signer.alive=false": <set of all PEMs whose CTBs contain `signer.alive: false` labels>,
 //	  "no-signer": <set of all PEMs that appear in CTBs with no specific signers>,
 //	}
-func initCTBData() ([]*certificatesv1alpha1.ClusterTrustBundle, map[string]sets.Set[string]) {
+func initCTBData() ([]*certificatesv1beta1.ClusterTrustBundle, map[string]sets.Set[string]) {
 	var pemSets = map[string]sets.Set[string]{
 		testSignerOneName: sets.New[string](),
 		testSignerTwoName: sets.New[string](),
@@ -451,7 +452,7 @@ func initCTBData() ([]*certificatesv1alpha1.ClusterTrustBundle, map[string]sets.
 		noSignerKey:       sets.New[string](),
 	}
 
-	var ctbs []*certificatesv1alpha1.ClusterTrustBundle
+	var ctbs []*certificatesv1beta1.ClusterTrustBundle
 
 	for i := range 10 {
 		caPEM := mustMakeCAPEM(fmt.Sprintf("root%d", i))
@@ -486,24 +487,24 @@ func initCTBData() ([]*certificatesv1alpha1.ClusterTrustBundle, map[string]sets.
 	return ctbs, pemSets
 }
 
-func ctbForCA(ctbName, signerName, caPEM string, labels map[string]string) *certificatesv1alpha1.ClusterTrustBundle {
-	return &certificatesv1alpha1.ClusterTrustBundle{
+func ctbForCA(ctbName, signerName, caPEM string, labels map[string]string) *certificatesv1beta1.ClusterTrustBundle {
+	return &certificatesv1beta1.ClusterTrustBundle{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   ctbName,
 			Labels: labels,
 		},
-		Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
+		Spec: certificatesv1beta1.ClusterTrustBundleSpec{
 			SignerName:  signerName,
 			TrustBundle: caPEM,
 		},
 	}
 }
 
-func mustInitCTBs(ctx context.Context, f *framework.Framework, ctbs []*certificatesv1alpha1.ClusterTrustBundle) func(context.Context) {
+func mustInitCTBs(ctx context.Context, f *framework.Framework, ctbs []*certificatesv1beta1.ClusterTrustBundle) func(context.Context) {
 	cleanups := []func(context.Context){}
 	for _, ctb := range ctbs {
 		ctb := ctb
-		cleanups = append(cleanups, mustCreateCTB(ctx, f, ctb))
+		cleanups = append(cleanups, mustCreateCTB(ctx, f, ctb.DeepCopy()))
 	}
 
 	return func(ctx context.Context) {
@@ -513,13 +514,15 @@ func mustInitCTBs(ctx context.Context, f *framework.Framework, ctbs []*certifica
 	}
 }
 
-func mustCreateCTB(ctx context.Context, f *framework.Framework, ctb *certificatesv1alpha1.ClusterTrustBundle) func(context.Context) {
-	if _, err := f.ClientSet.CertificatesV1alpha1().ClusterTrustBundles().Create(ctx, ctb, metav1.CreateOptions{}); err != nil {
+func mustCreateCTB(ctx context.Context, f *framework.Framework, ctb *certificatesv1beta1.ClusterTrustBundle) func(context.Context) {
+	mutateCTBForTesting(ctb, f.UniqueName)
+
+	if _, err := f.ClientSet.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, ctb, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Error while creating ClusterTrustBundle: %v", err)
 	}
 
 	return func(ctx context.Context) {
-		if err := f.ClientSet.CertificatesV1alpha1().ClusterTrustBundles().Delete(ctx, ctb.Name, metav1.DeleteOptions{}); err != nil {
+		if err := f.ClientSet.CertificatesV1beta1().ClusterTrustBundles().Delete(ctx, ctb.Name, metav1.DeleteOptions{}); err != nil {
 			framework.Logf("failed to remove a cluster trust bundle: %v", err)
 		}
 	}
@@ -581,10 +584,28 @@ func getFileModeRegex(filePath string, mask *int32) string {
 	return fmt.Sprintf("(%s|%s)", linuxOutput, windowsOutput)
 }
 
-func ctbsToPEMs(ctbs []*certificatesv1alpha1.ClusterTrustBundle) []string {
+func ctbsToPEMs(ctbs []*certificatesv1beta1.ClusterTrustBundle) []string {
 	var certPEMs []string
 	for _, ctb := range ctbs {
 		certPEMs = append(certPEMs, ctb.Spec.TrustBundle)
 	}
 	return certPEMs
+}
+
+// mutateCTBForTesting mutates the .spec.signerName and .name so that the created cluster
+// objects are unique and the tests can run in parallel
+func mutateCTBForTesting(ctb *certificatesv1beta1.ClusterTrustBundle, uniqueName string) {
+	signer := ctb.Spec.SignerName
+	if len(signer) == 0 {
+		ctb.Name += uniqueName
+		return
+	}
+
+	newSigner := ctb.Spec.SignerName + uniqueName
+	ctb.Name = strings.Replace(ctb.Name, signerNameToCTBName(signer), signerNameToCTBName(newSigner), 1)
+	ctb.Spec.SignerName = newSigner
+}
+
+func signerNameToCTBName(signerName string) string {
+	return strings.ReplaceAll(signerName, "/", ":")
 }

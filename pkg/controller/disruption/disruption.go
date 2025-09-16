@@ -182,21 +182,24 @@ func NewDisruptionControllerInternal(ctx context.Context,
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
 				DelayingQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
-					Clock: clock,
-					Name:  "disruption",
+					Logger: &logger,
+					Clock:  clock,
+					Name:   "disruption",
 				}),
 			},
 		),
 		recheckQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
-			Clock: clock,
-			Name:  "disruption_recheck",
+			Logger: &logger,
+			Clock:  clock,
+			Name:   "disruption_recheck",
 		}),
 		stalePodDisruptionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
 				DelayingQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
-					Clock: clock,
-					Name:  "stale_pod_disruption",
+					Logger: &logger,
+					Clock:  clock,
+					Name:   "stale_pod_disruption",
 				}),
 			},
 		),
@@ -261,8 +264,10 @@ func NewDisruptionControllerInternal(ctx context.Context,
 // way to take advantage of listers with scale subresources, we use the workload
 // resources directly and only fall back to the scale subresource when needed.
 func (dc *DisruptionController) finders() []podControllerFinder {
-	return []podControllerFinder{dc.getPodReplicationController, dc.getPodDeployment, dc.getPodReplicaSet,
-		dc.getPodStatefulSet, dc.getScaleController}
+	return []podControllerFinder{
+		dc.getPodReplicationController, dc.getPodDeployment, dc.getPodReplicaSet,
+		dc.getPodStatefulSet, dc.getScaleController,
+	}
 }
 
 var (
@@ -463,7 +468,7 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 	logger.Info("Starting disruption controller")
 	defer logger.Info("Shutting down disruption controller")
 
-	if !cache.WaitForNamedCacheSync("disruption", ctx.Done(), dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
 		return
 	}
 
@@ -481,7 +486,6 @@ func (dc *DisruptionController) addDB(logger klog.Logger, obj interface{}) {
 }
 
 func (dc *DisruptionController) updateDB(logger klog.Logger, old, cur interface{}) {
-	// TODO(mml) ignore updates where 'old' is equivalent to 'cur'.
 	pdb := cur.(*policy.PodDisruptionBudget)
 	logger.V(4).Info("Update DB", "podDisruptionBudget", klog.KObj(pdb))
 	dc.enqueuePdb(logger, pdb)
@@ -642,7 +646,7 @@ func (dc *DisruptionController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("Error syncing PodDisruptionBudget %v, requeuing: %w", dKey, err)) //nolint:stylecheck
+	utilruntime.HandleErrorWithContext(ctx, err, "Error syncing PodDisruptionBudget, requeuing", "key", dKey)
 	dc.queue.AddRateLimited(dKey)
 
 	return true
@@ -787,8 +791,9 @@ func (dc *DisruptionController) syncStalePodDisruption(ctx context.Context, key 
 
 	newPod := pod.DeepCopy()
 	updated := apipod.UpdatePodCondition(&newPod.Status, &v1.PodCondition{
-		Type:   v1.DisruptionTarget,
-		Status: v1.ConditionFalse,
+		Type:               v1.DisruptionTarget,
+		ObservedGeneration: apipod.CalculatePodConditionObservedGeneration(&newPod.Status, newPod.Generation, v1.DisruptionTarget),
+		Status:             v1.ConditionFalse,
 	})
 	if !updated {
 		return nil

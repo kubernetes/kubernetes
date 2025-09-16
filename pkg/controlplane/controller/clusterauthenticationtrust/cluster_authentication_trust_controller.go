@@ -35,7 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -124,9 +126,6 @@ func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterA
 			// we have a filter, so any time we're called, we may as well queue. We only ever check one configmap
 			// so we don't have to be choosy about our key.
 			AddFunc: func(obj interface{}) {
-				c.queue.Add(keyFn())
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
 				c.queue.Add(keyFn())
 			},
 			DeleteFunc: func(obj interface{}) {
@@ -262,10 +261,13 @@ func getConfigMapDataFor(authenticationInfo ClusterAuthenticationInfo) (map[stri
 		if err != nil {
 			return nil, err
 		}
-		data["requestheader-uid-headers"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderUIDHeaders.Value())
-		if err != nil {
-			return nil, err
+		if utilfeature.DefaultFeatureGate.Enabled(features.RemoteRequestHeaderUID) && len(authenticationInfo.RequestHeaderUIDHeaders.Value()) > 0 {
+			data["requestheader-uid-headers"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderUIDHeaders.Value())
+			if err != nil {
+				return nil, err
+			}
 		}
+
 		data["requestheader-group-headers"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderGroupHeaders.Value())
 		if err != nil {
 			return nil, err
@@ -305,9 +307,12 @@ func getClusterAuthenticationInfoFor(data map[string]string) (ClusterAuthenticat
 	if err != nil {
 		return ClusterAuthenticationInfo{}, err
 	}
-	ret.RequestHeaderUIDHeaders, err = jsonDeserializeStringSlice(data["requestheader-uid-headers"])
-	if err != nil {
-		return ClusterAuthenticationInfo{}, err
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoteRequestHeaderUID) {
+		ret.RequestHeaderUIDHeaders, err = jsonDeserializeStringSlice(data["requestheader-uid-headers"])
+		if err != nil {
+			return ClusterAuthenticationInfo{}, err
+		}
 	}
 
 	if caBundle := data["requestheader-client-ca-file"]; len(caBundle) > 0 {

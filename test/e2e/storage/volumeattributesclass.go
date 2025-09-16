@@ -21,13 +21,12 @@ import (
 	"fmt"
 	"time"
 
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -36,12 +35,12 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = utils.SIGDescribe("VolumeAttributesClass", feature.VolumeAttributesClass, framework.WithFeatureGate(features.VolumeAttributesClass), func() {
+var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(features.VolumeAttributesClass), func() {
 
 	f := framework.NewDefaultFramework("csi-volumeattributesclass")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	/*
-		Release: v1.29
+		Release: v1.35
 		Testname: VolumeAttributesClass, lifecycle
 		Description: Creating a VolumeAttributesClass MUST succeed. Reading the VolumeAttributesClass MUST
 		succeed. Patching the VolumeAttributesClass MUST succeed with its new label found. Deleting
@@ -49,12 +48,12 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", feature.VolumeAttributesClass
 		MUST be created. Updating the VolumeAttributesClass MUST succeed with its new label found.
 		Deleting the VolumeAttributesClass via deleteCollection MUST succeed and it MUST be confirmed.
 	*/
-	framework.It("should run through the lifecycle of a VolumeAttributesClass", func(ctx context.Context) {
+	framework.ConformanceIt("should run through the lifecycle of a VolumeAttributesClass", func(ctx context.Context) {
 
-		vacClient := f.ClientSet.StorageV1beta1().VolumeAttributesClasses()
-		var initialVAC, replacementVAC *storagev1beta1.VolumeAttributesClass
+		vacClient := f.ClientSet.StorageV1().VolumeAttributesClasses()
+		var initialVAC, replacementVAC *storagev1.VolumeAttributesClass
 
-		initialVAC = &storagev1beta1.VolumeAttributesClass{
+		initialVAC = &storagev1.VolumeAttributesClass{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "VolumeAttributesClass",
 			},
@@ -89,7 +88,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", feature.VolumeAttributesClass
 
 		vacSelector := labels.Set{patchedVolumeAttributesClass.Name: "patched"}.AsSelector().String()
 		type state struct {
-			VolumeAttributesClasses []storagev1beta1.VolumeAttributesClass
+			VolumeAttributesClasses []storagev1.VolumeAttributesClass
 		}
 
 		err = framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*state, error) {
@@ -112,7 +111,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", feature.VolumeAttributesClass
 
 		ginkgo.By("Create a replacement VolumeAttributesClass")
 
-		replacementVAC = &storagev1beta1.VolumeAttributesClass{
+		replacementVAC = &storagev1.VolumeAttributesClass{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "VolumeAttributesClass",
 			},
@@ -129,7 +128,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", feature.VolumeAttributesClass
 		framework.ExpectNoError(err, "failed to create replacement VolumeAttributesClass")
 
 		ginkgo.By(fmt.Sprintf("Updating VolumeAttributesClass %q", replacementVolumeAttributesClass.Name))
-		var updatedVolumeAttributesClass *storagev1beta1.VolumeAttributesClass
+		var updatedVolumeAttributesClass *storagev1.VolumeAttributesClass
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			vac, err := vacClient.Get(ctx, replacementVolumeAttributesClass.Name, metav1.GetOptions{})

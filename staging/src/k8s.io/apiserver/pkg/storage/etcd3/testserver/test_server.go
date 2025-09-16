@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
 	"google.golang.org/grpc"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 )
 
 // getAvailablePort returns a TCP port that is available for binding.
@@ -79,6 +81,8 @@ func NewTestConfig(t testing.TB) *embed.Config {
 	return cfg
 }
 
+var autoPortLock sync.Mutex
+
 // RunEtcd starts an embedded etcd server with the provided config
 // (or NewTestConfig(t) if nil), and returns a client connected to the server.
 // The server is terminated when the test ends.
@@ -86,6 +90,9 @@ func RunEtcd(t testing.TB, cfg *embed.Config) *kubernetes.Client {
 	t.Helper()
 
 	if cfg == nil {
+		// if we have to autopick free ports, lock until we successfully start the server on the ports we chose
+		autoPortLock.Lock()
+		defer autoPortLock.Unlock()
 		cfg = NewTestConfig(t)
 	}
 
@@ -123,5 +130,7 @@ func RunEtcd(t testing.TB, cfg *embed.Config) *kubernetes.Client {
 	if err != nil {
 		t.Fatal(err)
 	}
+	client.KV = storagetesting.NewKVRecorder(client.KV)
+	client.Kubernetes = storagetesting.NewKubernetesRecorder(client.Kubernetes)
 	return client
 }

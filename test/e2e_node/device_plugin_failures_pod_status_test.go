@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -40,7 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/testdeviceplugin"
 )
 
-var _ = SIGDescribe("Device Plugin Failures Pod Status", nodefeature.ResourceHealthStatus, func() {
+var _ = SIGDescribe("Device Plugin Failures Pod Status", framework.WithFeatureGate(features.ResourceHealthStatus), func() {
 	f := framework.NewDefaultFramework("device-plugin-failures")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -129,7 +128,7 @@ var _ = SIGDescribe("Device Plugin Failures Pod Status", nodefeature.ResourceHea
 
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
-		devices := []kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
+		devices := []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
 		plugin := testdeviceplugin.NewDevicePlugin(nil)
 
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
@@ -189,7 +188,7 @@ var _ = SIGDescribe("Device Plugin Failures Pod Status", nodefeature.ResourceHea
 
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
-		devices := []kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
+		devices := []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
 		plugin := testdeviceplugin.NewDevicePlugin(nil)
 
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)

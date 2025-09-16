@@ -21,15 +21,21 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"path"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
+	resourcealpha "k8s.io/api/resource/v1alpha3"
+	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -45,6 +51,7 @@ import (
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -85,12 +92,13 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
-	// No alpha APIs (overrides api/all=true in https://github.com/kubernetes/kubernetes/blob/d647d19f6aef811bace300eec96a67644ff303d4/staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/testing/testserver.go#L136),
-	// except for DRA API group when needed.
-	runtimeConfig := []string{"api/alpha=false"}
+func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
+	var runtimeConfig []string
 	if enabledFeatures[features.DynamicResourceAllocation] {
-		runtimeConfig = append(runtimeConfig, "resource.k8s.io/v1alpha3=true")
+		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapi.SchemeGroupVersion))
+		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcev1beta2.SchemeGroupVersion))
+		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcev1beta1.SchemeGroupVersion))
+		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcealpha.SchemeGroupVersion))
 	}
 	customFlags := []string{
 		// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
@@ -128,7 +136,7 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
-	_, informerFactory := util.StartScheduler(tCtx, tCtx.Client(), cfg, config, outOfTreePluginRegistry)
+	scheduler, informerFactory := util.StartScheduler(tCtx, config, outOfTreePluginRegistry)
 	util.StartFakePVController(tCtx, tCtx.Client(), informerFactory)
 	runGC := util.CreateGCController(tCtx, tCtx, *cfg, informerFactory)
 	runNS := util.CreateNamespaceController(tCtx, tCtx, *cfg, informerFactory)
@@ -146,7 +154,7 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	go runNS()
 	go runResourceClaimController()
 
-	return informerFactory, tCtx
+	return scheduler, informerFactory, tCtx
 }
 
 func isAttempted(pod *v1.Pod) bool {
@@ -240,6 +248,11 @@ func makeBaseNode(nodeNamePrefix string) *v1.Node {
 				v1.ResourceCPU:    resource.MustParse("4"),
 				v1.ResourceMemory: resource.MustParse("32Gi"),
 			},
+			Allocatable: v1.ResourceList{
+				v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("32Gi"),
+			},
 			Phase: v1.NodeRunning,
 			Conditions: []v1.NodeCondition{
 				{Type: v1.NodeReady, Status: v1.ConditionTrue},
@@ -303,8 +316,8 @@ func dataFilename(destFile string) (string, error) {
 }
 
 type labelValues struct {
-	label  string
-	values []string
+	Label  string
+	Values []string
 }
 
 // metricsCollectorConfig is the config to be marshalled to YAML config file.
@@ -380,13 +393,13 @@ func uniqueLVCombos(lvs []*labelValues) []map[string]string {
 	results := make([]map[string]string, 0)
 
 	current := lvs[0]
-	for _, value := range current.values {
+	for _, value := range current.Values {
 		for _, combo := range remainingCombos {
 			newCombo := make(map[string]string, len(combo)+1)
 			for k, v := range combo {
 				newCombo[k] = v
 			}
-			newCombo[current.label] = value
+			newCombo[current.Label] = value
 			results = append(results, newCombo)
 		}
 	}
@@ -396,7 +409,10 @@ func uniqueLVCombos(lvs []*labelValues) []map[string]string {
 func collectHistogramVec(metric string, labels map[string]string, lvMap map[string]string) *DataItem {
 	vec, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, metric, lvMap)
 	if err != nil {
-		klog.Error(err)
+		// "metric ... not found" is pretty normal. Don't spam the output with it!
+		if !strings.HasSuffix(err.Error(), "not found") {
+			klog.Error(err)
+		}
 		return nil
 	}
 
@@ -619,23 +635,147 @@ func (tc *throughputCollector) collect() []DataItem {
 		progress: tc.progress,
 		start:    tc.start,
 	}
-	if length := len(tc.schedulingThroughputs); length > 0 {
-		sort.Float64s(tc.schedulingThroughputs)
-		sum := 0.0
-		for i := range tc.schedulingThroughputs {
-			sum += tc.schedulingThroughputs[i]
-		}
 
-		throughputSummary.Labels["Metric"] = "SchedulingThroughput"
-		throughputSummary.Data = map[string]float64{
-			"Average": sum / float64(length),
-			"Perc50":  tc.schedulingThroughputs[int(math.Ceil(float64(length*50)/100))-1],
-			"Perc90":  tc.schedulingThroughputs[int(math.Ceil(float64(length*90)/100))-1],
-			"Perc95":  tc.schedulingThroughputs[int(math.Ceil(float64(length*95)/100))-1],
-			"Perc99":  tc.schedulingThroughputs[int(math.Ceil(float64(length*99)/100))-1],
-		}
-		throughputSummary.Unit = "pods/s"
+	// tc.schedulingThroughputs can be empty if the scenario doesn't have
+	// enough number of pods and nodes to take more than throughputSampleInterval (i.e. 1 second).
+	length := len(tc.schedulingThroughputs)
+	if length == 0 {
+		klog.Warningf("Failed to measure SchedulingThroughput for %s. Increase pods and/or nodes to make scheduling take longer", tc.resultLabels["Name"])
+		return []DataItem{throughputSummary}
 	}
 
+	sort.Float64s(tc.schedulingThroughputs)
+	sum := 0.0
+	for i := range tc.schedulingThroughputs {
+		sum += tc.schedulingThroughputs[i]
+	}
+
+	throughputSummary.Labels["Metric"] = "SchedulingThroughput"
+	throughputSummary.Data = map[string]float64{
+		"Average": sum / float64(length),
+		"Perc50":  tc.schedulingThroughputs[int(math.Ceil(float64(length*50)/100))-1],
+		"Perc90":  tc.schedulingThroughputs[int(math.Ceil(float64(length*90)/100))-1],
+		"Perc95":  tc.schedulingThroughputs[int(math.Ceil(float64(length*95)/100))-1],
+		"Perc99":  tc.schedulingThroughputs[int(math.Ceil(float64(length*99)/100))-1],
+	}
+	throughputSummary.Unit = "pods/s"
+
 	return []DataItem{throughputSummary}
+}
+
+// memoryCollector collects memory usage metrics during the test
+type memoryCollector struct {
+	samples      []memorySample
+	resultLabels map[string]string
+	interval     time.Duration
+	mu           sync.RWMutex
+}
+
+type memorySample struct {
+	timestamp   time.Time
+	heapInuseMB float64
+}
+
+func newMemoryCollector(resultLabels map[string]string, interval time.Duration) *memoryCollector {
+	return &memoryCollector{
+		resultLabels: resultLabels,
+		interval:     interval,
+	}
+}
+
+func (mc *memoryCollector) init() error {
+	mc.collectSample()
+	return nil
+}
+
+func (mc *memoryCollector) run(tCtx ktesting.TContext) {
+	ticker := time.NewTicker(mc.interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-tCtx.Done():
+			return
+		case <-ticker.C:
+			mc.collectSample()
+		}
+	}
+}
+
+func (mc *memoryCollector) collectSample() {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	sample := memorySample{
+		timestamp:   time.Now(),
+		heapInuseMB: float64(m.HeapInuse) / 1024 / 1024,
+	}
+
+	mc.mu.Lock()
+	mc.samples = append(mc.samples, sample)
+	mc.mu.Unlock()
+}
+
+func (mc *memoryCollector) createMetricDataItem(values []float64, unit, metricName string) DataItem {
+	sort.Float64s(values)
+
+	sum := 0.0
+	for _, v := range values {
+		sum += v
+	}
+
+	labels := maps.Clone(mc.resultLabels)
+	labels["Metric"] = metricName
+
+	return DataItem{
+		Labels: labels,
+		Data: map[string]float64{
+			"Perc50":  values[int(math.Ceil(float64(len(values)*50)/100))-1],
+			"Perc90":  values[int(math.Ceil(float64(len(values)*90)/100))-1],
+			"Perc95":  values[int(math.Ceil(float64(len(values)*95)/100))-1],
+			"Perc99":  values[int(math.Ceil(float64(len(values)*99)/100))-1],
+			"Average": sum / float64(len(values)),
+			"Max":     values[len(values)-1],
+		},
+		Unit: unit,
+	}
+}
+
+func (mc *memoryCollector) collect() []DataItem {
+	mc.mu.RLock()
+	defer mc.mu.RUnlock()
+
+	length := len(mc.samples)
+	if length == 0 {
+		return nil
+	}
+
+	firstSample := mc.samples[0]
+	lastSample := firstSample
+	if length >= 2 {
+		lastSample = mc.samples[length-1]
+	}
+	durationMin := lastSample.timestamp.Sub(firstSample.timestamp).Minutes()
+	growthRateMBPerMin := 0.0
+	if durationMin > 0 {
+		growthRateMBPerMin = (lastSample.heapInuseMB - firstSample.heapInuseMB) / durationMin
+	}
+	growthItem := DataItem{
+		Labels: maps.Clone(mc.resultLabels),
+		Data: map[string]float64{
+			"GrowthRate": growthRateMBPerMin,
+		},
+		Unit: "MB/min",
+	}
+	growthItem.Labels["Metric"] = "memory_growth_rate"
+
+	heapValues := make([]float64, len(mc.samples))
+	for i, s := range mc.samples {
+		heapValues[i] = s.heapInuseMB
+	}
+
+	return []DataItem{
+		mc.createMetricDataItem(heapValues, "MB", "heap_memory_usage"),
+		growthItem,
+	}
 }

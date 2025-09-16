@@ -34,7 +34,7 @@ import (
 	"k8s.io/klog/v2"
 	api "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
@@ -64,6 +64,8 @@ type server struct {
 	cancel     context.CancelFunc
 	listenFunc func(network, address string) (net.Listener, error)
 	serveFunc  func(s *grpc.Server, lis net.Listener) error
+
+	api.UnsafeRegistrationServer
 }
 
 type notifyListener struct {
@@ -130,8 +132,8 @@ func (s *server) Start() error {
 	}
 
 	if selinux.GetEnabled() {
-		if err := selinux.SetFileLabel(s.socketDir, config.KubeletPluginsDirSELinuxLabel); err != nil {
-			klog.InfoS("Unprivileged containerized plugins might not work. Could not set selinux context on socket dir", "path", s.socketDir, "err", err)
+		if err := selinux.SetFileLabel(s.socketDir, kubeletconfig.KubeletPluginsDirSELinuxLabel); err != nil {
+			klog.ErrorS(err, "Unprivileged containerized plugins might not work. Could not set selinux context on socket dir", "path", s.socketDir)
 		}
 	}
 
@@ -233,7 +235,7 @@ func (s *server) Stop() error {
 
 	s.visitClients(func(r string, c Client) {
 		if err := s.disconnectClient(r, c); err != nil {
-			klog.InfoS("Error disconnecting device plugin client", "resourceName", r, "err", err)
+			klog.ErrorS(err, "Failed to disconnect device plugin client", "resourceName", r)
 		}
 	})
 
@@ -250,6 +252,7 @@ func (s *server) Stop() error {
 	// During kubelet termination, we do not need the registration server,
 	// and we consider the kubelet to be healthy even when it is down.
 	s.setHealthy()
+	klog.V(2).InfoS("Stopping device plugin registration server")
 
 	return nil
 }
@@ -264,18 +267,18 @@ func (s *server) Register(ctx context.Context, r *api.RegisterRequest) (*api.Emp
 
 	if !s.isVersionCompatibleWithPlugin(r.Version) {
 		err := fmt.Errorf(errUnsupportedVersion, r.Version, api.SupportedVersions)
-		klog.InfoS("Bad registration request from device plugin with resource", "resourceName", r.ResourceName, "err", err)
+		klog.ErrorS(err, "Bad registration request from device plugin with resource", "resourceName", r.ResourceName)
 		return &api.Empty{}, err
 	}
 
 	if !v1helper.IsExtendedResourceName(core.ResourceName(r.ResourceName)) {
 		err := fmt.Errorf(errInvalidResourceName, r.ResourceName)
-		klog.InfoS("Bad registration request from device plugin", "err", err)
+		klog.ErrorS(err, "Bad registration request from device plugin")
 		return &api.Empty{}, err
 	}
 
 	if err := s.connectClient(r.ResourceName, filepath.Join(s.socketDir, r.Endpoint)); err != nil {
-		klog.InfoS("Error connecting to device plugin client", "err", err)
+		klog.ErrorS(err, "Error connecting to device plugin client")
 		return &api.Empty{}, err
 	}
 

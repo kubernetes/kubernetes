@@ -20,8 +20,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +30,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
@@ -98,12 +97,12 @@ func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Durat
 			clusterinfoCM, lastError = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 			if lastError != nil {
 				if apierrors.IsForbidden(lastError) {
-					// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users
+					// If the request fails with a forbidden error, the cluster admin has not granted access to the cluster info configmap for anonymous clients.
 					// In that case, trust the cluster admin and do not refresh the cluster-info data
 					klog.Warningf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
 					return true, nil
 				}
-				klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, err)
+				klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, lastError)
 				return false, nil
 			}
 			return true, nil

@@ -28,9 +28,9 @@ import (
 	"unicode"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 	"github.com/spf13/pflag"
 	inf "gopkg.in/inf.v0"
+	"sigs.k8s.io/randfill"
 
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 )
@@ -827,12 +827,12 @@ func TestQuantityParseEmit(t *testing.T) {
 	}
 }
 
-var fuzzer = fuzz.New().Funcs(
-	func(q *Quantity, c fuzz.Continue) {
+var fuzzer = randfill.New().Funcs(
+	func(q *Quantity, c randfill.Continue) {
 		q.i = Zero
-		if c.RandBool() {
+		if c.Bool() {
 			q.Format = BinarySI
-			if c.RandBool() {
+			if c.Bool() {
 				dec := &inf.Dec{}
 				q.d = infDecAmount{Dec: dec}
 				dec.SetScale(0)
@@ -846,12 +846,12 @@ var fuzzer = fuzz.New().Funcs(
 			dec.SetUnscaled(c.Int63n(1024) << uint(10*c.Intn(5)))
 			return
 		}
-		if c.RandBool() {
+		if c.Bool() {
 			q.Format = DecimalSI
 		} else {
 			q.Format = DecimalExponent
 		}
-		if c.RandBool() {
+		if c.Bool() {
 			dec := &inf.Dec{}
 			q.d = infDecAmount{Dec: dec}
 			dec.SetScale(inf.Scale(c.Intn(4)))
@@ -897,7 +897,7 @@ func TestQuantityDeepCopy(t *testing.T) {
 func TestJSON(t *testing.T) {
 	for i := 0; i < 500; i++ {
 		q := &Quantity{}
-		fuzzer.Fuzz(q)
+		fuzzer.Fill(q)
 		b, err := json.Marshal(q)
 		if err != nil {
 			t.Errorf("error encoding %v: %v", q, err)
@@ -1801,7 +1801,7 @@ func TestQuantityUnmarshalCBOR(t *testing.T) {
 func TestQuantityRoundtripCBOR(t *testing.T) {
 	for i := 0; i < 500; i++ {
 		var initial, final Quantity
-		fuzzer.Fuzz(&initial)
+		fuzzer.Fill(&initial)
 		b, err := cbor.Marshal(initial)
 		if err != nil {
 			t.Errorf("error encoding %v: %v", initial, err)

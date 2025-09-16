@@ -26,9 +26,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 func TestMain(m *testing.M) {

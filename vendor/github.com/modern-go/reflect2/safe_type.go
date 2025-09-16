@@ -6,9 +6,11 @@ import (
 )
 
 type safeType struct {
-	reflect.Type
-	cfg *frozenConfig
+	Type reflect.Type
+	cfg  *frozenConfig
 }
+
+var _ Type = &safeType{}
 
 func (type2 *safeType) New() interface{} {
 	return reflect.New(type2.Type).Interface()
@@ -16,6 +18,22 @@ func (type2 *safeType) New() interface{} {
 
 func (type2 *safeType) UnsafeNew() unsafe.Pointer {
 	panic("does not support unsafe operation")
+}
+
+func (type2 *safeType) Kind() reflect.Kind {
+	return type2.Type.Kind()
+}
+
+func (type2 *safeType) Len() int {
+	return type2.Type.Len()
+}
+
+func (type2 *safeType) NumField() int {
+	return type2.Type.NumField()
+}
+
+func (type2 *safeType) String() string {
+	return type2.Type.String()
 }
 
 func (type2 *safeType) Elem() Type {

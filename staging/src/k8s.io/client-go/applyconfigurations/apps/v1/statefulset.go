@@ -29,11 +29,24 @@ import (
 
 // StatefulSetApplyConfiguration represents a declarative configuration of the StatefulSet type for use
 // with apply.
+//
+// StatefulSet represents a set of pods with consistent identities.
+// Identities are defined as:
+// - Network: A single stable DNS and hostname.
+// - Storage: As many VolumeClaims as requested.
+//
+// The StatefulSet guarantees that a given network identity will always
+// map to the same storage identity.
 type StatefulSetApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *StatefulSetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *StatefulSetStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the desired identities of pods in this set.
+	Spec *StatefulSetSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is the current status of Pods in this StatefulSet. This data
+	// may be out of date by some window of time.
+	Status *StatefulSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // StatefulSet constructs a declarative configuration of the StatefulSet type for use with
@@ -47,29 +60,14 @@ func StatefulSet(name, namespace string) *StatefulSetApplyConfiguration {
 	return b
 }
 
-// ExtractStatefulSet extracts the applied configuration owned by fieldManager from
-// statefulSet. If no managedFields are found in statefulSet for fieldManager, a
-// StatefulSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractStatefulSetFrom extracts the applied configuration owned by fieldManager from
+// statefulSet for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // statefulSet must be a unmodified StatefulSet API object that was retrieved from the Kubernetes API.
-// ExtractStatefulSet provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractStatefulSetFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractStatefulSet(statefulSet *appsv1.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
-	return extractStatefulSet(statefulSet, fieldManager, "")
-}
-
-// ExtractStatefulSetStatus is the same as ExtractStatefulSet except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractStatefulSetStatus(statefulSet *appsv1.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
-	return extractStatefulSet(statefulSet, fieldManager, "status")
-}
-
-func extractStatefulSet(statefulSet *appsv1.StatefulSet, fieldManager string, subresource string) (*StatefulSetApplyConfiguration, error) {
+func ExtractStatefulSetFrom(statefulSet *appsv1.StatefulSet, fieldManager string, subresource string) (*StatefulSetApplyConfiguration, error) {
 	b := &StatefulSetApplyConfiguration{}
 	err := managedfields.ExtractInto(statefulSet, internal.Parser().Type("io.k8s.api.apps.v1.StatefulSet"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +80,34 @@ func extractStatefulSet(statefulSet *appsv1.StatefulSet, fieldManager string, su
 	b.WithAPIVersion("apps/v1")
 	return b, nil
 }
+
+// ExtractStatefulSet extracts the applied configuration owned by fieldManager from
+// statefulSet. If no managedFields are found in statefulSet for fieldManager, a
+// StatefulSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// statefulSet must be a unmodified StatefulSet API object that was retrieved from the Kubernetes API.
+// ExtractStatefulSet provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractStatefulSet(statefulSet *appsv1.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
+	return ExtractStatefulSetFrom(statefulSet, fieldManager, "")
+}
+
+// ExtractStatefulSetScale extracts the applied configuration owned by fieldManager from
+// statefulSet for the scale subresource.
+func ExtractStatefulSetScale(statefulSet *appsv1.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
+	return ExtractStatefulSetFrom(statefulSet, fieldManager, "scale")
+}
+
+// ExtractStatefulSetStatus extracts the applied configuration owned by fieldManager from
+// statefulSet for the status subresource.
+func ExtractStatefulSetStatus(statefulSet *appsv1.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
+	return ExtractStatefulSetFrom(statefulSet, fieldManager, "status")
+}
+
+func (b StatefulSetApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -257,8 +283,24 @@ func (b *StatefulSetApplyConfiguration) WithStatus(value *StatefulSetStatusApply
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *StatefulSetApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *StatefulSetApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *StatefulSetApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *StatefulSetApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

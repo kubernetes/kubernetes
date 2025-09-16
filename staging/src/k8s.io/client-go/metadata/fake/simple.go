@@ -235,19 +235,19 @@ func (c *metadataResourceClient) Delete(ctx context.Context, name string, opts m
 	switch {
 	case len(c.namespace) == 0 && len(subresources) == 0:
 		_, err = c.client.Fake.
-			Invokes(testing.NewRootDeleteAction(c.resource, name), &metav1.Status{Status: "metadata delete fail"})
+			Invokes(testing.NewRootDeleteActionWithOptions(c.resource, name, opts), &metav1.Status{Status: "metadata delete fail"})
 
 	case len(c.namespace) == 0 && len(subresources) > 0:
 		_, err = c.client.Fake.
-			Invokes(testing.NewRootDeleteSubresourceAction(c.resource, strings.Join(subresources, "/"), name), &metav1.Status{Status: "metadata delete fail"})
+			Invokes(testing.NewRootDeleteSubresourceActionWithOptions(c.resource, strings.Join(subresources, "/"), name, opts), &metav1.Status{Status: "metadata delete fail"})
 
 	case len(c.namespace) > 0 && len(subresources) == 0:
 		_, err = c.client.Fake.
-			Invokes(testing.NewDeleteAction(c.resource, c.namespace, name), &metav1.Status{Status: "metadata delete fail"})
+			Invokes(testing.NewDeleteActionWithOptions(c.resource, c.namespace, name, opts), &metav1.Status{Status: "metadata delete fail"})
 
 	case len(c.namespace) > 0 && len(subresources) > 0:
 		_, err = c.client.Fake.
-			Invokes(testing.NewDeleteSubresourceAction(c.resource, strings.Join(subresources, "/"), c.namespace, name), &metav1.Status{Status: "metadata delete fail"})
+			Invokes(testing.NewDeleteSubresourceActionWithOptions(c.resource, strings.Join(subresources, "/"), c.namespace, name, opts), &metav1.Status{Status: "metadata delete fail"})
 	}
 
 	return err
@@ -354,6 +354,7 @@ func (c *metadataResourceClient) List(ctx context.Context, opts metav1.ListOptio
 }
 
 func (c *metadataResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	switch {
 	case len(c.namespace) == 0:
 		return c.client.Fake.
@@ -362,7 +363,6 @@ func (c *metadataResourceClient) Watch(ctx context.Context, opts metav1.ListOpti
 	case len(c.namespace) > 0:
 		return c.client.Fake.
 			InvokesWatch(testing.NewWatchAction(c.resource, c.namespace, opts))
-
 	}
 
 	panic("math broke")

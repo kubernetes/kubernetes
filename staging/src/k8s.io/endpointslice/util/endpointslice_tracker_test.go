@@ -23,6 +23,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 )
 
 func TestEndpointSliceTrackerUpdate(t *testing.T) {
@@ -125,8 +126,7 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 	epSlice1NewerGen.Generation = 2
 
 	epTerminatingSlice := epSlice1.DeepCopy()
-	now := metav1.Now()
-	epTerminatingSlice.DeletionTimestamp = &now
+	epTerminatingSlice.DeletionTimestamp = ptr.To(metav1.Now())
 
 	testCases := []struct {
 		name         string

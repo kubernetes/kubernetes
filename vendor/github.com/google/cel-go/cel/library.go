@@ -15,12 +15,13 @@
 package cel
 
 import (
+	"fmt"
 	"math"
-	"strconv"
-	"strings"
-	"time"
 
+	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/ast"
+	"github.com/google/cel-go/common/decls"
+	"github.com/google/cel-go/common/env"
 	"github.com/google/cel-go/common/operators"
 	"github.com/google/cel-go/common/overloads"
 	"github.com/google/cel-go/common/stdlib"
@@ -35,9 +36,11 @@ const (
 	optMapMacro                = "optMap"
 	optFlatMapMacro            = "optFlatMap"
 	hasValueFunc               = "hasValue"
+	unwrapOptFunc              = "unwrapOpt"
 	optionalNoneFunc           = "optional.none"
 	optionalOfFunc             = "optional.of"
 	optionalOfNonZeroValueFunc = "optional.ofNonZeroValue"
+	optionalUnwrapFunc         = "optional.unwrap"
 	valueFunc                  = "value"
 	unusedIterVar              = "#unused"
 )
@@ -68,6 +71,23 @@ type SingletonLibrary interface {
 	LibraryName() string
 }
 
+// LibraryAliaser generates a simple named alias for the library, for use during environment serialization.
+type LibraryAliaser interface {
+	LibraryAlias() string
+}
+
+// LibrarySubsetter provides the subset description associated with the library, nil if not subset.
+type LibrarySubsetter interface {
+	LibrarySubset() *env.LibrarySubset
+}
+
+// LibraryVersioner provides a version number for the library.
+//
+// If not implemented, the library version will be flagged as 'latest' during environment serialization.
+type LibraryVersioner interface {
+	LibraryVersion() uint32
+}
+
 // Lib creates an EnvOption out of a Library, allowing libraries to be provided as functional args,
 // and to be linked to each other.
 func Lib(l Library) EnvOption {
@@ -77,7 +97,7 @@ func Lib(l Library) EnvOption {
 			if e.HasLibrary(singleton.LibraryName()) {
 				return e, nil
 			}
-			e.libraries[singleton.LibraryName()] = true
+			e.libraries[singleton.LibraryName()] = singleton
 		}
 		var err error
 		for _, opt := range l.CompileOptions() {
@@ -91,26 +111,79 @@ func Lib(l Library) EnvOption {
 	}
 }
 
+// StdLibOption specifies a functional option for configuring the standard CEL library.
+type StdLibOption func(*stdLibrary) *stdLibrary
+
+// StdLibSubset configures the standard library to use a subset of its functions and macros.
+//
+// Since the StdLib is a singleton library, only the first instance of the StdLib() environment options
+// will be configured on the environment which means only the StdLibSubset() initially configured with
+// the library will be used.
+func StdLibSubset(subset *env.LibrarySubset) StdLibOption {
+	return func(lib *stdLibrary) *stdLibrary {
+		lib.subset = subset
+		return lib
+	}
+}
+
 // StdLib returns an EnvOption for the standard library of CEL functions and macros.
-func StdLib() EnvOption {
-	return Lib(stdLibrary{})
+func StdLib(opts ...StdLibOption) EnvOption {
+	lib := &stdLibrary{}
+	for _, o := range opts {
+		lib = o(lib)
+	}
+	return Lib(lib)
 }
 
 // stdLibrary implements the Library interface and provides functional options for the core CEL
 // features documented in the specification.
-type stdLibrary struct{}
+type stdLibrary struct {
+	subset *env.LibrarySubset
+}
 
 // LibraryName implements the SingletonLibrary interface method.
-func (stdLibrary) LibraryName() string {
+func (*stdLibrary) LibraryName() string {
 	return "cel.lib.std"
 }
 
+// LibraryAlias returns the simple name of the library.
+func (*stdLibrary) LibraryAlias() string {
+	return "stdlib"
+}
+
+// LibrarySubset returns the env.LibrarySubset definition associated with the CEL Library.
+func (lib *stdLibrary) LibrarySubset() *env.LibrarySubset {
+	return lib.subset
+}
+
 // CompileOptions returns options for the standard CEL function declarations and macros.
-func (stdLibrary) CompileOptions() []EnvOption {
+func (lib *stdLibrary) CompileOptions() []EnvOption {
+	funcs := stdlib.Functions()
+	macros := StandardMacros
+	if lib.subset != nil {
+		subMacros := []Macro{}
+		for _, m := range macros {
+			if lib.subset.SubsetMacro(m.Function()) {
+				subMacros = append(subMacros, m)
+			}
+		}
+		macros = subMacros
+		subFuncs := []*decls.FunctionDecl{}
+		for _, fn := range funcs {
+			if f, include := lib.subset.SubsetFunction(fn); include {
+				subFuncs = append(subFuncs, f)
+			}
+		}
+		funcs = subFuncs
+	}
 	return []EnvOption{
 		func(e *Env) (*Env, error) {
 			var err error
-			for _, fn := range stdlib.Functions() {
+			if err = lib.subset.Validate(); err != nil {
+				return nil, err
+			}
+			e.variables = append(e.variables, stdlib.Types()...)
+			for _, fn := range funcs {
 				existing, found := e.functions[fn.Name()]
 				if found {
 					fn, err = existing.Merge(fn)
@@ -122,16 +195,12 @@ func (stdLibrary) CompileOptions() []EnvOption {
 			}
 			return e, nil
 		},
-		func(e *Env) (*Env, error) {
-			e.variables = append(e.variables, stdlib.Types()...)
-			return e, nil
-		},
-		Macros(StandardMacros...),
+		Macros(macros...),
 	}
 }
 
 // ProgramOptions returns function implementations for the standard CEL functions.
-func (stdLibrary) ProgramOptions() []ProgramOption {
+func (*stdLibrary) ProgramOptions() []ProgramOption {
 	return []ProgramOption{}
 }
 
@@ -260,6 +329,36 @@ func (stdLibrary) ProgramOptions() []ProgramOption {
 // be expressed with `optMap`.
 //
 //	msg.?elements.optFlatMap(e, e[?0]) // return the first element if present.
+//
+// # First
+//
+// Introduced in version: 2
+//
+// Returns an optional with the first value from the right hand list, or
+// optional.None.
+//
+// [1, 2, 3].first().value() == 1
+//
+// # Last
+//
+// Introduced in version: 2
+//
+// Returns an optional with the last value from the right hand list, or
+// optional.None.
+//
+// [1, 2, 3].last().value() == 3
+//
+// This is syntactic sugar for msg.elements[msg.elements.size()-1].
+//
+// # Unwrap / UnwrapOpt
+//
+// Introduced in version: 2
+//
+// Returns a list of all the values that are not none in the input list of optional values.
+// Can be used as optional.unwrap(List[T]) or with postfix notation: List[T].unwrapOpt()
+//
+// optional.unwrap([optional.of(42), optional.none()]) == [42]
+// [optional.of(42), optional.none()].unwrapOpt() == [42]
 func OptionalTypes(opts ...OptionalTypesOption) EnvOption {
 	lib := &optionalLib{version: math.MaxUint32}
 	for _, opt := range opts {
@@ -292,8 +391,18 @@ func OptionalTypesVersion(version uint32) OptionalTypesOption {
 }
 
 // LibraryName implements the SingletonLibrary interface method.
-func (lib *optionalLib) LibraryName() string {
+func (*optionalLib) LibraryName() string {
 	return "cel.lib.optional"
+}
+
+// LibraryAlias returns the simple name of the library.
+func (*optionalLib) LibraryAlias() string {
+	return "optional"
+}
+
+// LibraryVersion returns the version of the library.
+func (lib *optionalLib) LibraryVersion() uint32 {
+	return lib.version
 }
 
 // CompileOptions implements the Library interface method.
@@ -303,6 +412,7 @@ func (lib *optionalLib) CompileOptions() []EnvOption {
 	optionalTypeV := OptionalType(paramTypeV)
 	listTypeV := ListType(paramTypeV)
 	mapTypeKV := MapType(paramTypeK, paramTypeV)
+	listOptionalTypeV := ListType(optionalTypeV)
 
 	opts := []EnvOption{
 		// Enable the optional syntax in the parser.
@@ -312,16 +422,29 @@ func (lib *optionalLib) CompileOptions() []EnvOption {
 		Types(types.OptionalType),
 
 		// Configure the optMap and optFlatMap macros.
-		Macros(ReceiverMacro(optMapMacro, 2, optMap)),
+		Macros(ReceiverMacro(optMapMacro, 2, optMap,
+			MacroDocs(`perform computation on the value if present and return the result as an optional`),
+			MacroExamples(
+				common.MultilineDescription(
+					`// sub with the prefix 'dev.cel' or optional.none()`,
+					`request.auth.tokens.?sub.optMap(id, 'dev.cel.' + id)`),
+				`optional.none().optMap(i, i * 2) // optional.none()`))),
 
 		// Global and member functions for working with optional values.
 		Function(optionalOfFunc,
+			FunctionDocs(`create a new optional_type(T) with a value where any value is considered valid`),
 			Overload("optional_of", []*Type{paramTypeV}, optionalTypeV,
+				OverloadExamples(`optional.of(1) // optional(1)`),
 				UnaryBinding(func(value ref.Val) ref.Val {
 					return types.OptionalOf(value)
 				}))),
 		Function(optionalOfNonZeroValueFunc,
+			FunctionDocs(`create a new optional_type(T) with a value, if the value is not a zero or empty value`),
 			Overload("optional_ofNonZeroValue", []*Type{paramTypeV}, optionalTypeV,
+				OverloadExamples(
+					`optional.ofNonZeroValue(null) // optional.none()`,
+					`optional.ofNonZeroValue("") // optional.none()`,
+					`optional.ofNonZeroValue("hello") // optional.of('hello')`),
 				UnaryBinding(func(value ref.Val) ref.Val {
 					v, isZeroer := value.(traits.Zeroer)
 					if !isZeroer || !v.IsZeroValue() {
@@ -330,18 +453,26 @@ func (lib *optionalLib) CompileOptions() []EnvOption {
 					return types.OptionalNone
 				}))),
 		Function(optionalNoneFunc,
+			FunctionDocs(`singleton value representing an optional without a value`),
 			Overload("optional_none", []*Type{}, optionalTypeV,
+				OverloadExamples(`optional.none()`),
 				FunctionBinding(func(values ...ref.Val) ref.Val {
 					return types.OptionalNone
 				}))),
 		Function(valueFunc,
+			FunctionDocs(`obtain the value contained by the optional, error if optional.none()`),
 			MemberOverload("optional_value", []*Type{optionalTypeV}, paramTypeV,
+				OverloadExamples(
+					`optional.of(1).value() // 1`,
+					`optional.none().value() // error`),
 				UnaryBinding(func(value ref.Val) ref.Val {
 					opt := value.(*types.Optional)
 					return opt.GetValue()
 				}))),
 		Function(hasValueFunc,
+			FunctionDocs(`determine whether the optional contains a value`),
 			MemberOverload("optional_hasValue", []*Type{optionalTypeV}, BoolType,
+				OverloadExamples(`optional.of({1: 2}).hasValue() // true`),
 				UnaryBinding(func(value ref.Val) ref.Val {
 					opt := value.(*types.Optional)
 					return types.Bool(opt.HasValue())
@@ -350,21 +481,43 @@ func (lib *optionalLib) CompileOptions() []EnvOption {
 		// Implementation of 'or' and 'orValue' are special-cased to support short-circuiting in the
 		// evaluation chain.
 		Function("or",
-			MemberOverload("optional_or_optional", []*Type{optionalTypeV, optionalTypeV}, optionalTypeV)),
+			FunctionDocs(`chain optional expressions together, picking the first valued optional expression`),
+			MemberOverload("optional_or_optional", []*Type{optionalTypeV, optionalTypeV}, optionalTypeV,
+				OverloadExamples(
+					`optional.none().or(optional.of(1)) // optional.of(1)`,
+					common.MultilineDescription(
+						`// either a value from the first list, a value from the second, or optional.none()`,
+						`[1, 2, 3][?x].or([3, 4, 5][?y])`)))),
 		Function("orValue",
-			MemberOverload("optional_orValue_value", []*Type{optionalTypeV, paramTypeV}, paramTypeV)),
+			FunctionDocs(`chain optional expressions together picking the first valued optional or the default value`),
+			MemberOverload("optional_orValue_value", []*Type{optionalTypeV, paramTypeV}, paramTypeV,
+				OverloadExamples(
+					common.MultilineDescription(
+						`// pick the value for the given key if the key exists, otherwise return 'you'`,
+						`{'hello': 'world', 'goodbye': 'cruel world'}[?greeting].orValue('you')`)))),
 
 		// OptSelect is handled specially by the type-checker, so the receiver's field type is used to determine the
 		// optput type.
 		Function(operators.OptSelect,
-			Overload("select_optional_field", []*Type{DynType, StringType}, optionalTypeV)),
+			FunctionDocs(`if the field is present create an optional of the field value, otherwise return optional.none()`),
+			Overload("select_optional_field", []*Type{DynType, StringType}, optionalTypeV,
+				OverloadExamples(
+					`msg.?field // optional.of(field) if non-empty, otherwise optional.none()`,
+					`msg.?field.?nested_field // optional.of(nested_field) if both field and nested_field are non-empty.`))),
 
 		// OptIndex is handled mostly like any other indexing operation on a list or map, so the type-checker can use
 		// these signatures to determine type-agreement without any special handling.
 		Function(operators.OptIndex,
-			Overload("list_optindex_optional_int", []*Type{listTypeV, IntType}, optionalTypeV),
+			FunctionDocs(`if the index is present create an optional of the field value, otherwise return optional.none()`),
+			Overload("list_optindex_optional_int", []*Type{listTypeV, IntType}, optionalTypeV,
+				OverloadExamples(`[1, 2, 3][?x] // element value if x is in the list size, else optional.none()`)),
 			Overload("optional_list_optindex_optional_int", []*Type{OptionalType(listTypeV), IntType}, optionalTypeV),
-			Overload("map_optindex_optional_value", []*Type{mapTypeKV, paramTypeK}, optionalTypeV),
+			Overload("map_optindex_optional_value", []*Type{mapTypeKV, paramTypeK}, optionalTypeV,
+				OverloadExamples(
+					`map_value[?key] // value at the key if present, else optional.none()`,
+					common.MultilineDescription(
+						`// map key-value if index is a valid map key, else optional.none()`,
+						`{0: 2, 2: 4, 6: 8}[?index]`))),
 			Overload("optional_map_optindex_optional_value", []*Type{OptionalType(mapTypeKV), paramTypeK}, optionalTypeV)),
 
 		// Index overloads to accommodate using an optional value as the operand.
@@ -373,8 +526,65 @@ func (lib *optionalLib) CompileOptions() []EnvOption {
 			Overload("optional_map_index_value", []*Type{OptionalType(mapTypeKV), paramTypeK}, optionalTypeV)),
 	}
 	if lib.version >= 1 {
-		opts = append(opts, Macros(ReceiverMacro(optFlatMapMacro, 2, optFlatMap)))
+		opts = append(opts, Macros(ReceiverMacro(optFlatMapMacro, 2, optFlatMap,
+			MacroDocs(`perform computation on the value if present and produce an optional value within the computation`),
+			MacroExamples(
+				common.MultilineDescription(
+					`// m = {'key': {}}`,
+					`m.?key.optFlatMap(k, k.?subkey) // optional.none()`),
+				common.MultilineDescription(
+					`// m = {'key': {'subkey': 'value'}}`,
+					`m.?key.optFlatMap(k, k.?subkey) // optional.of('value')`),
+			))))
 	}
+
+	if lib.version >= 2 {
+		opts = append(opts, Function("last",
+			FunctionDocs(`return the last value in a list if present, otherwise optional.none()`),
+			MemberOverload("list_last", []*Type{listTypeV}, optionalTypeV,
+				OverloadExamples(
+					`[].last() // optional.none()`,
+					`[1, 2, 3].last() ? optional.of(3)`),
+				UnaryBinding(func(v ref.Val) ref.Val {
+					list := v.(traits.Lister)
+					sz := list.Size().(types.Int)
+					if sz == types.IntZero {
+						return types.OptionalNone
+					}
+					return types.OptionalOf(list.Get(types.Int(sz - 1)))
+				}),
+			),
+		))
+
+		opts = append(opts, Function("first",
+			FunctionDocs(`return the first value in a list if present, otherwise optional.none()`),
+			MemberOverload("list_first", []*Type{listTypeV}, optionalTypeV,
+				OverloadExamples(
+					`[].first() // optional.none()`,
+					`[1, 2, 3].first() ? optional.of(1)`),
+				UnaryBinding(func(v ref.Val) ref.Val {
+					list := v.(traits.Lister)
+					sz := list.Size().(types.Int)
+					if sz == types.IntZero {
+						return types.OptionalNone
+					}
+					return types.OptionalOf(list.Get(types.Int(0)))
+				}),
+			),
+		))
+
+		opts = append(opts, Function(optionalUnwrapFunc,
+			FunctionDocs(`convert a list of optional values to a list containing only value which are not optional.none()`),
+			Overload("optional_unwrap", []*Type{listOptionalTypeV}, listTypeV,
+				OverloadExamples(`optional.unwrap([optional.of(1), optional.none()]) // [1]`),
+				UnaryBinding(optUnwrap))))
+		opts = append(opts, Function(unwrapOptFunc,
+			FunctionDocs(`convert a list of optional values to a list containing only value which are not optional.none()`),
+			MemberOverload("optional_unwrapOpt", []*Type{listOptionalTypeV}, listTypeV,
+				OverloadExamples(`[optional.of(1), optional.none()].unwrapOpt() // [1]`),
+				UnaryBinding(optUnwrap))))
+	}
+
 	return opts
 }
 
@@ -383,6 +593,11 @@ func (lib *optionalLib) ProgramOptions() []ProgramOption {
 	return []ProgramOption{
 		CustomDecorator(decorateOptionalOr),
 	}
+}
+
+// Version returns the current version of the library.
+func (lib *optionalLib) Version() uint32 {
+	return lib.version
 }
 
 func optMap(meh MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Expr, *Error) {
@@ -437,6 +652,23 @@ func optFlatMap(meh MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Exp
 		),
 		meh.NewCall(optionalNoneFunc),
 	), nil
+}
+
+func optUnwrap(value ref.Val) ref.Val {
+	list := value.(traits.Lister)
+	var unwrappedList []ref.Val
+	iter := list.Iterator()
+	for iter.HasNext() == types.True {
+		val := iter.Next()
+		opt, isOpt := val.(*types.Optional)
+		if !isOpt {
+			return types.WrapErr(fmt.Errorf("value %v is not optional", val))
+		}
+		if opt.HasValue() {
+			unwrappedList = append(unwrappedList, opt.GetValue())
+		}
+	}
+	return types.DefaultTypeAdapter.NativeToValue(unwrappedList)
 }
 
 func enableOptionalSyntax() EnvOption {
@@ -541,250 +773,99 @@ func (opt *evalOptionalOrValue) Eval(ctx interpreter.Activation) ref.Val {
 	return opt.rhs.Eval(ctx)
 }
 
-type timeUTCLibrary struct{}
+type timeLegacyLibrary struct{}
 
-func (timeUTCLibrary) CompileOptions() []EnvOption {
+func (timeLegacyLibrary) CompileOptions() []EnvOption {
 	return timeOverloadDeclarations
 }
 
-func (timeUTCLibrary) ProgramOptions() []ProgramOption {
+func (timeLegacyLibrary) ProgramOptions() []ProgramOption {
 	return []ProgramOption{}
 }
 
 // Declarations and functions which enable using UTC on time.Time inputs when the timezone is unspecified
 // in the CEL expression.
 var (
-	utcTZ = types.String("UTC")
-
 	timeOverloadDeclarations = []EnvOption{
-		Function(overloads.TimeGetHours,
-			MemberOverload(overloads.DurationToHours, []*Type{DurationType}, IntType,
-				UnaryBinding(types.DurationGetHours))),
-		Function(overloads.TimeGetMinutes,
-			MemberOverload(overloads.DurationToMinutes, []*Type{DurationType}, IntType,
-				UnaryBinding(types.DurationGetMinutes))),
-		Function(overloads.TimeGetSeconds,
-			MemberOverload(overloads.DurationToSeconds, []*Type{DurationType}, IntType,
-				UnaryBinding(types.DurationGetSeconds))),
-		Function(overloads.TimeGetMilliseconds,
-			MemberOverload(overloads.DurationToMilliseconds, []*Type{DurationType}, IntType,
-				UnaryBinding(types.DurationGetMilliseconds))),
 		Function(overloads.TimeGetFullYear,
 			MemberOverload(overloads.TimestampToYear, []*Type{TimestampType}, IntType,
 				UnaryBinding(func(ts ref.Val) ref.Val {
-					return timestampGetFullYear(ts, utcTZ)
+					t := ts.(types.Timestamp)
+					return t.Receive(overloads.TimeGetFullYear, overloads.TimestampToYear, []ref.Val{})
 				}),
-			),
-			MemberOverload(overloads.TimestampToYearWithTz, []*Type{TimestampType, StringType}, IntType,
-				BinaryBinding(timestampGetFullYear),
 			),
 		),
 		Function(overloads.TimeGetMonth,
 			MemberOverload(overloads.TimestampToMonth, []*Type{TimestampType}, IntType,
 				UnaryBinding(func(ts ref.Val) ref.Val {
-					return timestampGetMonth(ts, utcTZ)
+					t := ts.(types.Timestamp)
+					return t.Receive(overloads.TimeGetMonth, overloads.TimestampToMonth, []ref.Val{})
 				}),
-			),
-			MemberOverload(overloads.TimestampToMonthWithTz, []*Type{TimestampType, StringType}, IntType,
-				BinaryBinding(timestampGetMonth),
 			),
 		),
 		Function(overloads.TimeGetDayOfYear,
 			MemberOverload(overloads.TimestampToDayOfYear, []*Type{TimestampType}, IntType,
 				UnaryBinding(func(ts ref.Val) ref.Val {
-					return timestampGetDayOfYear(ts, utcTZ)
-				}),
-			),
-			MemberOverload(overloads.TimestampToDayOfYearWithTz, []*Type{TimestampType, StringType}, IntType,
-				BinaryBinding(func(ts, tz ref.Val) ref.Val {
-					return timestampGetDayOfYear(ts, tz)
+					t := ts.(types.Timestamp)
+					return t.Receive(overloads.TimeGetDayOfYear, overloads.TimestampToDayOfYear, []ref.Val{})
 				}),
 			),
 		),
 		Function(overloads.TimeGetDayOfMonth,
 			MemberOverload(overloads.TimestampToDayOfMonthZeroBased, []*Type{TimestampType}, IntType,
 				UnaryBinding(func(ts ref.Val) ref.Val {
-					return timestampGetDayOfMonthZeroBased(ts, utcTZ)
+					t := ts.(types.Timestamp)
+					return t.Receive(overloads.TimeGetDayOfMonth, overloads.TimestampToDayOfMonthZeroBased, []ref.Val{})
 				}),
-			),
-			MemberOverload(overloads.TimestampToDayOfMonthZeroBasedWithTz, []*Type{TimestampType, StringType}, IntType,
-				BinaryBinding(timestampGetDayOfMonthZeroBased),
 			),
 		),
 		Function(overloads.TimeGetDate,
 			MemberOverload(overloads.TimestampToDayOfMonthOneBased, []*Type{TimestampType}, IntType,
 				UnaryBinding(func(ts ref.Val) ref.Val {
-					return timestampGetDayOfMonthOneBased(ts, utcTZ)
+					t := ts.(types.Timestamp)
+					return t.Receive(overloads.TimeGetDate, overloads.TimestampToDayOfMonthOneBased, []ref.Val{})
 				}),
-			),
-			MemberOverload(overloads.TimestampToDayOfMonthOneBasedWithTz, []*Type{TimestampType, StringType}, IntType,
-				BinaryBinding(timestampGetDayOfMonthOneBased),
 			),
 		),
 		Function(overloads.TimeGetDayOfWeek,
 			MemberOverload(overloads.TimestampToDayOfWeek, []*Type{TimestampType}, IntType,
 				UnaryBinding(func(ts ref.Val) ref.Val {
-					return timestampGetDayOfWeek(ts, utcTZ)
+					t := ts.(types.Timestamp)
+					return t.Receive(overloads.TimeGetDayOfWeek, overloads.TimestampToDayOfWeek, []ref.Val{})
 				}),
-			),
-			MemberOverload(overloads.TimestampToDayOfWeekWithTz, []*Type{TimestampType, StringType}, IntType,
-				BinaryBinding(timestampGetDayOfWeek),
 			),
 		),
 		Function(overloads.TimeGetHours,
 			MemberOverload(overloads.TimestampToHours, []*Type{TimestampType}, IntType,
 				UnaryBinding(func(ts ref.Val) ref.Val {
-					return timestampGetHours(ts, utcTZ)
+					t := ts.(types.Timestamp)
+					return t.Receive(overloads.TimeGetHours, overloads.TimestampToHours, []ref.Val{})
 				}),
-			),
-			MemberOverload(overloads.TimestampToHoursWithTz, []*Type{TimestampType, StringType}, IntType,
-				BinaryBinding(timestampGetHours),
 			),
 		),
 		Function(overloads.TimeGetMinutes,
 			MemberOverload(overloads.TimestampToMinutes, []*Type{TimestampType}, IntType,
 				UnaryBinding(func(ts ref.Val) ref.Val {
-					return timestampGetMinutes(ts, utcTZ)
+					t := ts.(types.Timestamp)
+					return t.Receive(overloads.TimeGetMinutes, overloads.TimestampToMinutes, []ref.Val{})
 				}),
-			),
-			MemberOverload(overloads.TimestampToMinutesWithTz, []*Type{TimestampType, StringType}, IntType,
-				BinaryBinding(timestampGetMinutes),
 			),
 		),
 		Function(overloads.TimeGetSeconds,
 			MemberOverload(overloads.TimestampToSeconds, []*Type{TimestampType}, IntType,
 				UnaryBinding(func(ts ref.Val) ref.Val {
-					return timestampGetSeconds(ts, utcTZ)
+					t := ts.(types.Timestamp)
+					return t.Receive(overloads.TimeGetSeconds, overloads.TimestampToSeconds, []ref.Val{})
 				}),
-			),
-			MemberOverload(overloads.TimestampToSecondsWithTz, []*Type{TimestampType, StringType}, IntType,
-				BinaryBinding(timestampGetSeconds),
 			),
 		),
 		Function(overloads.TimeGetMilliseconds,
 			MemberOverload(overloads.TimestampToMilliseconds, []*Type{TimestampType}, IntType,
 				UnaryBinding(func(ts ref.Val) ref.Val {
-					return timestampGetMilliseconds(ts, utcTZ)
+					t := ts.(types.Timestamp)
+					return t.Receive(overloads.TimeGetMilliseconds, overloads.TimestampToMilliseconds, []ref.Val{})
 				}),
-			),
-			MemberOverload(overloads.TimestampToMillisecondsWithTz, []*Type{TimestampType, StringType}, IntType,
-				BinaryBinding(timestampGetMilliseconds),
 			),
 		),
 	}
 )
-
-func timestampGetFullYear(ts, tz ref.Val) ref.Val {
-	t, err := inTimeZone(ts, tz)
-	if err != nil {
-		return types.NewErr(err.Error())
-	}
-	return types.Int(t.Year())
-}
-
-func timestampGetMonth(ts, tz ref.Val) ref.Val {
-	t, err := inTimeZone(ts, tz)
-	if err != nil {
-		return types.NewErr(err.Error())
-	}
-	// CEL spec indicates that the month should be 0-based, but the Time value
-	// for Month() is 1-based.
-	return types.Int(t.Month() - 1)
-}
-
-func timestampGetDayOfYear(ts, tz ref.Val) ref.Val {
-	t, err := inTimeZone(ts, tz)
-	if err != nil {
-		return types.NewErr(err.Error())
-	}
-	return types.Int(t.YearDay() - 1)
-}
-
-func timestampGetDayOfMonthZeroBased(ts, tz ref.Val) ref.Val {
-	t, err := inTimeZone(ts, tz)
-	if err != nil {
-		return types.NewErr(err.Error())
-	}
-	return types.Int(t.Day() - 1)
-}
-
-func timestampGetDayOfMonthOneBased(ts, tz ref.Val) ref.Val {
-	t, err := inTimeZone(ts, tz)
-	if err != nil {
-		return types.NewErr(err.Error())
-	}
-	return types.Int(t.Day())
-}
-
-func timestampGetDayOfWeek(ts, tz ref.Val) ref.Val {
-	t, err := inTimeZone(ts, tz)
-	if err != nil {
-		return types.NewErr(err.Error())
-	}
-	return types.Int(t.Weekday())
-}
-
-func timestampGetHours(ts, tz ref.Val) ref.Val {
-	t, err := inTimeZone(ts, tz)
-	if err != nil {
-		return types.NewErr(err.Error())
-	}
-	return types.Int(t.Hour())
-}
-
-func timestampGetMinutes(ts, tz ref.Val) ref.Val {
-	t, err := inTimeZone(ts, tz)
-	if err != nil {
-		return types.NewErr(err.Error())
-	}
-	return types.Int(t.Minute())
-}
-
-func timestampGetSeconds(ts, tz ref.Val) ref.Val {
-	t, err := inTimeZone(ts, tz)
-	if err != nil {
-		return types.NewErr(err.Error())
-	}
-	return types.Int(t.Second())
-}
-
-func timestampGetMilliseconds(ts, tz ref.Val) ref.Val {
-	t, err := inTimeZone(ts, tz)
-	if err != nil {
-		return types.NewErr(err.Error())
-	}
-	return types.Int(t.Nanosecond() / 1000000)
-}
-
-func inTimeZone(ts, tz ref.Val) (time.Time, error) {
-	t := ts.(types.Timestamp)
-	val := string(tz.(types.String))
-	ind := strings.Index(val, ":")
-	if ind == -1 {
-		loc, err := time.LoadLocation(val)
-		if err != nil {
-			return time.Time{}, err
-		}
-		return t.In(loc), nil
-	}
-
-	// If the input is not the name of a timezone (for example, 'US/Central'), it should be a numerical offset from UTC
-	// in the format ^(+|-)(0[0-9]|1[0-4]):[0-5][0-9]$. The numerical input is parsed in terms of hours and minutes.
-	hr, err := strconv.Atoi(string(val[0:ind]))
-	if err != nil {
-		return time.Time{}, err
-	}
-	min, err := strconv.Atoi(string(val[ind+1:]))
-	if err != nil {
-		return time.Time{}, err
-	}
-	var offset int
-	if string(val[0]) == "-" {
-		offset = hr*60 - min
-	} else {
-		offset = hr*60 + min
-	}
-	secondsEastOfUTC := int((time.Duration(offset) * time.Minute).Seconds())
-	timezone := time.FixedZone("", secondsEastOfUTC)
-	return t.In(timezone), nil
-}

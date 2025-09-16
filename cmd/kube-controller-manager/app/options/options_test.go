@@ -34,7 +34,7 @@ import (
 
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	utilversion "k8s.io/component-base/version"
+	basecompatibility "k8s.io/component-base/compatibility"
 
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
@@ -137,7 +137,7 @@ var args = []string{
 	"--leader-elect=false",
 	"--leader-elect-lease-duration=30s",
 	"--leader-elect-renew-deadline=15s",
-	"--leader-elect-resource-lock=configmap",
+	"--leader-elect-resource-lock=leases",
 	"--leader-elect-retry-period=5s",
 	"--legacy-service-account-token-clean-up-period=8760h",
 	"--master=192.168.4.20",
@@ -193,7 +193,7 @@ func TestAddFlags(t *testing.T) {
 				},
 				ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					ResourceLock:      "configmap",
+					ResourceLock:      "leases",
 					LeaderElect:       false,
 					LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
@@ -447,10 +447,12 @@ func TestAddFlags(t *testing.T) {
 			AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
 			AlwaysAllowGroups:            []string{"system:masters"},
 		},
-		Master:                   "192.168.4.20",
-		Metrics:                  &metrics.Options{},
-		Logs:                     logs.NewOptions(),
-		ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
+		Master:                    "192.168.4.20",
+		ControllerShutdownTimeout: 10 * time.Second,
+		Metrics:                   &metrics.Options{},
+		Logs:                      logs.NewOptions(),
+		// ignores comparing ComponentGlobalsRegistry in this test.
+		ComponentGlobalsRegistry: s.ComponentGlobalsRegistry,
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -560,7 +562,7 @@ func TestApplyTo(t *testing.T) {
 				},
 				ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					ResourceLock:      "configmap",
+					ResourceLock:      "leases",
 					LeaderElect:       false,
 					LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
@@ -721,6 +723,7 @@ func TestApplyTo(t *testing.T) {
 				ConcurrentPolicySyncs: 9,
 			},
 		},
+		ControllerShutdownTimeout: 10 * time.Second,
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -736,27 +739,6 @@ func TestApplyTo(t *testing.T) {
 }
 
 func TestEmulatedVersion(t *testing.T) {
-	var cleanupAndSetupFunc = func() featuregate.FeatureGate {
-		componentGlobalsRegistry := featuregate.DefaultComponentGlobalsRegistry
-		componentGlobalsRegistry.Reset() // make sure this test have a clean state
-		t.Cleanup(func() {
-			componentGlobalsRegistry.Reset() // make sure this test doesn't leak a dirty state
-		})
-
-		verKube := utilversion.NewEffectiveVersion("1.32")
-		fg := featuregate.NewVersionedFeatureGate(version.MustParse("1.32"))
-		utilruntime.Must(fg.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
-			"kubeA": {
-				{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
-				{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
-			},
-			"kubeB": {
-				{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
-			},
-		}))
-		utilruntime.Must(componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, verKube, fg))
-		return fg
-	}
 
 	testcases := []struct {
 		name              string
@@ -808,9 +790,8 @@ func TestEmulatedVersion(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			fg := cleanupAndSetupFunc()
-
 			fs, s := setupControllerManagerFlagSet(t)
+			fg := s.ComponentGlobalsRegistry.FeatureGateFor(basecompatibility.DefaultKubeComponent)
 			err := fs.Parse(tc.flags)
 			checkTestError(t, err, false, "")
 			err = s.Validate([]string{""}, []string{""}, nil)
@@ -1557,6 +1538,22 @@ func setupControllerManagerFlagSet(t *testing.T) (*pflag.FlagSet, *KubeControlle
 	if err != nil {
 		t.Fatal(fmt.Errorf("NewKubeControllerManagerOptions failed with %w", err))
 	}
+
+	componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
+
+	verKube := basecompatibility.NewEffectiveVersionFromString("1.32", "1.31", "1.31")
+	fg := featuregate.NewVersionedFeatureGate(version.MustParse("1.32"))
+	utilruntime.Must(fg.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
+		"kubeA": {
+			{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
+		},
+		"kubeB": {
+			{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+		},
+	}))
+	utilruntime.Must(componentGlobalsRegistry.Register(basecompatibility.DefaultKubeComponent, verKube, fg))
+	s.ComponentGlobalsRegistry = componentGlobalsRegistry
 
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)

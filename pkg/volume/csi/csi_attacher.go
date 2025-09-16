@@ -350,25 +350,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		data[volDataKey.seLinuxMountContext] = deviceMounterArgs.SELinuxLabel
 	}
 
-	err = saveVolumeData(dataDir, volDataFileName, data)
-	defer func() {
-		// Only if there was an error and volume operation was considered
-		// finished, we should remove the directory.
-		if err != nil && volumetypes.IsOperationFinishedError(err) {
-			// clean up metadata
-			klog.Error(log("attacher.MountDevice failed: %v", err))
-			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
-				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", deviceMountPath, err))
-			}
-		}
-	}()
-
-	if err != nil {
-		errMsg := log("failed to save volume info data: %v", err)
-		klog.Error(errMsg)
-		return errors.New(errMsg)
-	}
-
 	if !stageUnstageSet {
 		klog.Info(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
 		// defer does *not* remove the metadata file and it's correct - UnmountDevice needs it there.
@@ -387,13 +368,23 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return volumetypes.NewTransientOperationFailure(log("attacher.MountDevice failed to determine if the node service has VOLUME_MOUNT_GROUP capability: %v", err))
 	}
 
+	err = saveVolumeData(dataDir, volDataFileName, data)
+	if err != nil {
+		errMsg := log("failed to save volume info data: %v", err)
+		klog.Error(errMsg)
+		if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
+			klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", deviceMountPath, err))
+		}
+		return errors.New(errMsg)
+	}
+
 	if driverSupportsCSIVolumeMountGroup {
 		klog.V(3).Infof("Driver %s supports applying FSGroup (has VOLUME_MOUNT_GROUP node capability). Delegating FSGroup application to the driver through NodeStageVolume.", csiSource.Driver)
 		nodeStageFSGroupArg = deviceMounterArgs.FsGroup
 	}
 
 	fsType := csiSource.FSType
-	err = csi.NodeStageVolume(ctx,
+	csiRPCError := csi.NodeStageVolume(ctx,
 		csiSource.VolumeHandle,
 		publishContext,
 		deviceMountPath,
@@ -404,12 +395,19 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		mountOptions,
 		nodeStageFSGroupArg)
 
-	if err != nil {
-		return err
+	if csiRPCError != nil {
+		if volumetypes.IsOperationFinishedError(csiRPCError) {
+			// clean up metadata
+			klog.Error(log("attacher.MountDevice failed: %v", csiRPCError))
+			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
+				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", deviceMountPath, err))
+			}
+		}
+		return csiRPCError
 	}
 
 	klog.V(4).Info(log("attacher.MountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))
-	return err
+	return nil
 }
 
 var _ volume.Detacher = &csiAttacher{}

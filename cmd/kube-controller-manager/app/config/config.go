@@ -21,11 +21,17 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	basecompatibility "k8s.io/component-base/compatibility"
+	"k8s.io/component-base/zpages/flagz"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	"time"
 )
 
 // Config is the main context object for the controller manager.
 type Config struct {
+	// Flagz is the Reader interface to get flags for the flagz page.
+	Flagz flagz.Reader
+
 	ComponentConfig kubectrlmgrconfig.KubeControllerManagerConfiguration
 
 	SecureServing *apiserver.SecureServingInfo
@@ -43,6 +49,11 @@ type Config struct {
 
 	EventBroadcaster record.EventBroadcaster
 	EventRecorder    record.EventRecorder
+
+	ControllerShutdownTimeout time.Duration
+
+	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
+	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
 }
 
 type completedConfig struct {

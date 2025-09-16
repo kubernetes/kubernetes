@@ -18,10 +18,10 @@ package scheduler
 
 import (
 	"context"
-	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -29,6 +29,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
@@ -39,6 +40,10 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
+
+var scheduleResultCmpOpts = []cmp.Option{
+	cmp.AllowUnexported(ScheduleResult{}),
+}
 
 func TestSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
@@ -320,7 +325,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			client := clientsetfake.NewClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			var extenders []framework.Extender
+			var extenders []fwk.Extender
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
@@ -328,7 +333,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, time.Duration(0))
+			cache := internalcache.New(ctx, time.Duration(0), nil)
 			for _, name := range test.nodes {
 				cache.AddNode(logger, createNode(name))
 			}
@@ -339,6 +344,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				runtime.WithInformerFactory(informerFactory),
 				runtime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				runtime.WithLogger(logger),
+				runtime.WithSnapshotSharedLister(emptySnapshot),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -365,8 +371,8 @@ func TestSchedulerWithExtenders(t *testing.T) {
 					return
 				}
 
-				if !reflect.DeepEqual(result, test.expectedResult) {
-					t.Errorf("Expected: %+v, Saw: %+v", test.expectedResult, result)
+				if diff := cmp.Diff(test.expectedResult, result, scheduleResultCmpOpts...); diff != "" {
+					t.Errorf("Unexpected result: (-want, +got):\n%s", diff)
 				}
 			}
 		})
@@ -480,8 +486,9 @@ func TestConvertToMetaVictims(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := convertToMetaVictims(tt.nodeNameToVictims); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("convertToMetaVictims() = %v, want %v", got, tt.want)
+			got := convertToMetaVictims(tt.nodeNameToVictims)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Unexpected convertToMetaVictims(): (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -494,7 +501,7 @@ func TestConvertToVictims(t *testing.T) {
 		nodeNameToMetaVictims map[string]*extenderv1.MetaVictims
 		nodeNames             []string
 		podsInNodeList        []*v1.Pod
-		nodeInfos             framework.NodeInfoLister
+		nodeInfos             fwk.NodeInfoLister
 		want                  map[string]*extenderv1.Victims
 		wantErr               bool
 	}{
@@ -546,7 +553,7 @@ func TestConvertToVictims(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// nodeInfos instantiations
-			nodeInfoList := make([]*framework.NodeInfo, 0, len(tt.nodeNames))
+			nodeInfoList := make([]fwk.NodeInfo, 0, len(tt.nodeNames))
 			for i, nm := range tt.nodeNames {
 				nodeInfo := framework.NewNodeInfo()
 				node := createNode(nm)
@@ -562,8 +569,8 @@ func TestConvertToVictims(t *testing.T) {
 				t.Errorf("convertToVictims() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("convertToVictims() got = %v, want %v", got, tt.want)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Unexpected convertToVictims(): (-want, +got):\n%s", diff)
 			}
 		})
 	}

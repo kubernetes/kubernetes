@@ -19,7 +19,7 @@ package fuzzer
 import (
 	"fmt"
 
-	"github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -33,9 +33,9 @@ import (
 // values in a Kubernetes context.
 func overrideMetaFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(j *runtime.Object, c fuzz.Continue) {
+		func(j *runtime.Object, c randfill.Continue) {
 			// TODO: uncomment when round trip starts from a versioned object
-			if true { //c.RandBool() {
+			if true { // c.Bool() {
 				*j = &runtime.Unknown{
 					// We do not set TypeMeta here because it is not carried through a round trip
 					Raw:         []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`),
@@ -44,15 +44,15 @@ func overrideMetaFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			} else {
 				types := []runtime.Object{&example.Pod{}}
 				t := types[c.Rand.Intn(len(types))]
-				c.Fuzz(t)
+				c.Fill(t)
 				*j = t
 			}
 		},
-		func(r *runtime.RawExtension, c fuzz.Continue) {
+		func(r *runtime.RawExtension, c randfill.Continue) {
 			// Pick an arbitrary type and fuzz it
 			types := []runtime.Object{&example.Pod{}}
 			obj := types[c.Rand.Intn(len(types))]
-			c.Fuzz(obj)
+			c.Fill(obj)
 
 			// Convert the object to raw bytes
 			bytes, err := runtime.Encode(apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), obj)
@@ -68,11 +68,11 @@ func overrideMetaFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 func exampleFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(s *example.PodSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(s)
+		func(s *example.PodSpec, c randfill.Continue) {
+			c.FillNoCustom(s)
 			// has a default value
 			ttl := int64(30)
-			if c.RandBool() {
+			if c.Bool() {
 				ttl = int64(c.Uint32())
 			}
 			s.TerminationGracePeriodSeconds = &ttl
@@ -81,11 +81,11 @@ func exampleFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.SchedulerName = "default-scheduler"
 			}
 		},
-		func(j *example.PodPhase, c fuzz.Continue) {
+		func(j *example.PodPhase, c randfill.Continue) {
 			statuses := []example.PodPhase{"Pending", "Running", "Succeeded", "Failed", "Unknown"}
 			*j = statuses[c.Rand.Intn(len(statuses))]
 		},
-		func(rp *example.RestartPolicy, c fuzz.Continue) {
+		func(rp *example.RestartPolicy, c randfill.Continue) {
 			policies := []example.RestartPolicy{"Always", "Never", "OnFailure"}
 			*rp = policies[c.Rand.Intn(len(policies))]
 		},

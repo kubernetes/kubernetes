@@ -35,6 +35,15 @@ func init() {
 
 // SetDefaultVerbosity can be called during init to modify the default
 // log verbosity of the program.
+//
+// Note that this immediately reconfigures the klog verbosity, already before
+// flag parsing. If the verbosity is non-zero and SetDefaultVerbosity is called
+// during init, then other init functions might start logging where normally
+// they wouldn't log anything. Should this occur, then the right fix is to
+// remove those log calls because logging during init is discouraged. It leads
+// to unpredictable output (init order is not specified) and/or is useless
+// (logging not initialized during init and thus conditional log output gets
+// omitted).
 func SetDefaultVerbosity(v int) {
 	f := flag.CommandLine.Lookup("v")
 	_ = f.Value.Set(fmt.Sprintf("%d", v))

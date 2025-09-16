@@ -161,6 +161,8 @@ type cache struct {
 	// keyFunc is used to make the key for objects stored in and retrieved from items, and
 	// should be deterministic.
 	keyFunc KeyFunc
+	// Called with every object put in the cache.
+	transformer TransformFunc
 }
 
 var _ Store = &cache{}
@@ -171,6 +173,12 @@ func (c *cache) Add(obj interface{}) error {
 	if err != nil {
 		return KeyError{obj, err}
 	}
+	if c.transformer != nil {
+		obj, err = c.transformer(obj)
+		if err != nil {
+			return fmt.Errorf("transforming: %w", err)
+		}
+	}
 	c.cacheStorage.Add(key, obj)
 	return nil
 }
@@ -180,6 +188,12 @@ func (c *cache) Update(obj interface{}) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
+	}
+	if c.transformer != nil {
+		obj, err = c.transformer(obj)
+		if err != nil {
+			return fmt.Errorf("transforming: %w", err)
+		}
 	}
 	c.cacheStorage.Update(key, obj)
 	return nil
@@ -267,6 +281,13 @@ func (c *cache) Replace(list []interface{}, resourceVersion string) error {
 		if err != nil {
 			return KeyError{item, err}
 		}
+
+		if c.transformer != nil {
+			item, err = c.transformer(item)
+			if err != nil {
+				return fmt.Errorf("transforming: %w", err)
+			}
+		}
 		items[key] = item
 	}
 	c.cacheStorage.Replace(items, resourceVersion)
@@ -278,12 +299,24 @@ func (c *cache) Resync() error {
 	return nil
 }
 
+type StoreOption = func(*cache)
+
+func WithTransformer(transformer TransformFunc) StoreOption {
+	return func(c *cache) {
+		c.transformer = transformer
+	}
+}
+
 // NewStore returns a Store implemented simply with a map and a lock.
-func NewStore(keyFunc KeyFunc) Store {
-	return &cache{
+func NewStore(keyFunc KeyFunc, opts ...StoreOption) Store {
+	c := &cache{
 		cacheStorage: NewThreadSafeStore(Indexers{}, Indices{}),
 		keyFunc:      keyFunc,
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // NewIndexer returns an Indexer implemented simply with a map and a lock.

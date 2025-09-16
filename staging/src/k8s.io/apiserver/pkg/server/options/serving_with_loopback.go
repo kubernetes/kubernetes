@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -49,9 +50,18 @@ func (s *SecureServingOptionsWithLoopback) ApplyTo(secureServingInfo **server.Se
 		return nil
 	}
 
+	// Set a validity period of approximately 3 years for the loopback certificate
+	// to avoid kube-apiserver disruptions due to certificate expiration.
+	// When this certificate expires, restarting kube-apiserver will automatically
+	// regenerate a new certificate with fresh validity dates.
+	maxAge := (3*365 + 1) * 24 * time.Hour
+
 	// create self-signed cert+key with the fake server.LoopbackClientServerNameOverride and
 	// let the server return it when the loopback client connects.
-	certPem, keyPem, err := certutil.GenerateSelfSignedCertKey(server.LoopbackClientServerNameOverride, nil, nil)
+	certPem, keyPem, err := certutil.GenerateSelfSignedCertKeyWithOptions(certutil.SelfSignedCertKeyOptions{
+		Host:   server.LoopbackClientServerNameOverride,
+		MaxAge: maxAge,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to generate self-signed certificate for loopback connection: %v", err)
 	}

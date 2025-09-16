@@ -22,7 +22,7 @@ package system
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -159,19 +159,10 @@ func (validator *packageValidator) validate(packageSpecs []PackageSpec, manager 
 	return nil, errs
 }
 
-// getKernelRelease returns the kernel release of the local machine.
-func getKernelRelease() (string, error) {
-	output, err := exec.Command("uname", "-r").Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to get kernel release: %w", err)
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
 // getOSDistro returns the OS distro of the local machine.
 func getOSDistro() (string, error) {
 	f := "/etc/lsb-release"
-	b, err := ioutil.ReadFile(f)
+	b, err := os.ReadFile(f)
 	if err != nil {
 		return "", fmt.Errorf("failed to read %q: %w", f, err)
 	}

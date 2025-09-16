@@ -31,5 +31,9 @@ func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) erro
 		return fmt.Errorf("invalid configuration: singleProcessOOMKill is only supported on linux")
 	}
 
+	if kc.UserNamespaces != nil {
+		return fmt.Errorf("invalid configuration: userNamespaces is only supported on linux")
+	}
+
 	return nil
 }

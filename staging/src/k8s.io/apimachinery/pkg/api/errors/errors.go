@@ -258,7 +258,8 @@ func NewApplyConflict(causes []metav1.StatusCause, message string) *StatusError 
 }
 
 // NewGone returns an error indicating the item no longer available at the server and no forwarding address is known.
-// DEPRECATED: Please use NewResourceExpired instead.
+//
+// Deprecated: Please use NewResourceExpired instead.
 func NewGone(message string) *StatusError {
 	return &StatusError{metav1.Status{
 		Status:  metav1.StatusFailure,
@@ -438,7 +439,7 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 	message := fmt.Sprintf("the server responded with the status code %d but did not return more information", code)
 	switch code {
 	case http.StatusConflict:
-		if verb == "POST" {
+		if verb == http.MethodPost {
 			reason = metav1.StatusReasonAlreadyExists
 		} else {
 			reason = metav1.StatusReasonConflict

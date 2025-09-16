@@ -36,6 +36,11 @@ var (
 )
 
 // PanicHandlers is a list of functions which will be invoked when a panic happens.
+//
+// The code invoking these handlers prepares a contextual logger so that
+// klog.FromContext(ctx) already skips over the panic handler itself and
+// several other intermediate functions, ideally such that the log output
+// is attributed to the code which triggered the panic.
 var PanicHandlers = []func(context.Context, interface{}){logPanic}
 
 // HandleCrash simply catches a crash and logs an error. Meant to be called via
@@ -45,7 +50,7 @@ var PanicHandlers = []func(context.Context, interface{}){logPanic}
 //
 // E.g., you can provide one or more additional handlers for something like shutting down go routines gracefully.
 //
-// Contextual logging: HandleCrashWithContext should be used instead of HandleCrash in code which supports contextual logging.
+// Contextual logging: HandleCrashWithContext or HandleCrashWithLogger should be used instead of HandleCrash in code which supports contextual logging.
 func HandleCrash(additionalHandlers ...func(interface{})) {
 	if r := recover(); r != nil {
 		additionalHandlersWithContext := make([]func(context.Context, interface{}), len(additionalHandlers))
@@ -74,10 +79,30 @@ func HandleCrashWithContext(ctx context.Context, additionalHandlers ...func(cont
 	}
 }
 
-// handleCrash is the common implementation of HandleCrash and HandleCrash.
+// HandleCrashWithLogger simply catches a crash and logs an error. Meant to be called via
+// defer.  Additional context-specific handlers can be provided, and will be
+// called in case of panic.  HandleCrash actually crashes, after calling the
+// handlers and logging the panic message.
+//
+// E.g., you can provide one or more additional handlers for something like shutting down go routines gracefully.
+func HandleCrashWithLogger(logger klog.Logger, additionalHandlers ...func(context.Context, interface{})) {
+	if r := recover(); r != nil {
+		ctx := klog.NewContext(context.Background(), logger)
+		handleCrash(ctx, r, additionalHandlers...)
+	}
+}
+
+// handleCrash is the common implementation of the HandleCrash* variants.
 // Having those call a common implementation ensures that the stack depth
 // is the same regardless through which path the handlers get invoked.
 func handleCrash(ctx context.Context, r any, additionalHandlers ...func(context.Context, interface{})) {
+	// We don't really know how many call frames to skip because the Go
+	// panic handler is between us and the code where the panic occurred.
+	// If it's one function (as in Go 1.21), then skipping four levels
+	// gets us to the function which called the `defer HandleCrashWithontext(...)`.
+	logger := klog.FromContext(ctx).WithCallDepth(4)
+	ctx = klog.NewContext(ctx, logger)
+
 	for _, fn := range PanicHandlers {
 		fn(ctx, r)
 	}
@@ -106,11 +131,7 @@ func logPanic(ctx context.Context, r interface{}) {
 	stacktrace := make([]byte, size)
 	stacktrace = stacktrace[:runtime.Stack(stacktrace, false)]
 
-	// We don't really know how many call frames to skip because the Go
-	// panic handler is between us and the code where the panic occurred.
-	// If it's one function (as in Go 1.21), then skipping four levels
-	// gets us to the function which called the `defer HandleCrashWithontext(...)`.
-	logger := klog.FromContext(ctx).WithCallDepth(4)
+	logger := klog.FromContext(ctx)
 
 	// For backwards compatibility, conversion to string
 	// is handled here instead of defering to the logging
@@ -128,15 +149,10 @@ func logPanic(ctx context.Context, r interface{}) {
 // should be packaged up into a testable and reusable object.
 var ErrorHandlers = []ErrorHandler{
 	logError,
-	func(_ context.Context, _ error, _ string, _ ...interface{}) {
-		(&rudimentaryErrorBackoff{
-			lastErrorTime: time.Now(),
-			// 1ms was the number folks were able to stomach as a global rate limit.
-			// If you need to log errors more than 1000 times a second you
-			// should probably consider fixing your code instead. :)
-			minPeriod: time.Millisecond,
-		}).OnError()
-	},
+	// 1ms was the number folks were able to stomach as a global rate limit.
+	// If you need to log errors more than 1000 times a second, you
+	// should probably consider fixing your code instead. :)
+	backoffError(1 * time.Millisecond),
 }
 
 type ErrorHandler func(ctx context.Context, err error, msg string, keysAndValues ...interface{})
@@ -176,12 +192,19 @@ func HandleError(err error) {
 // and key/value pairs.
 //
 // This variant should be used instead of HandleError because it supports
-// structured, contextual logging.
+// structured, contextual logging. Alternatively, [HandleErrorWithLogger] can
+// be used if a logger is available instead of a context.
 func HandleErrorWithContext(ctx context.Context, err error, msg string, keysAndValues ...interface{}) {
 	handleError(ctx, err, msg, keysAndValues...)
 }
 
-// handleError is the common implementation of HandleError and HandleErrorWithContext.
+// HandleErrorWithLogger is an alternative to [HandlerErrorWithContext] which accepts
+// a logger for contextual logging.
+func HandleErrorWithLogger(logger klog.Logger, err error, msg string, keysAndValues ...interface{}) {
+	handleError(klog.NewContext(context.Background(), logger), err, msg, keysAndValues...)
+}
+
+// handleError is the common implementation of the HandleError* variants.
 // Using this common implementation ensures that the stack depth
 // is the same regardless through which path the handlers get invoked.
 func handleError(ctx context.Context, err error, msg string, keysAndValues ...interface{}) {
@@ -196,6 +219,18 @@ func logError(ctx context.Context, err error, msg string, keysAndValues ...inter
 	logger := klog.FromContext(ctx).WithCallDepth(3)
 	logger = klog.LoggerWithName(logger, "UnhandledError")
 	logger.Error(err, msg, keysAndValues...) //nolint:logcheck // logcheck complains about unknown key/value pairs.
+}
+
+// backoffError blocks if it is called more often than the minPeriod.
+func backoffError(minPeriod time.Duration) ErrorHandler {
+	r := &rudimentaryErrorBackoff{
+		lastErrorTime: time.Now(),
+		minPeriod:     minPeriod,
+	}
+
+	return func(ctx context.Context, err error, msg string, keysAndValues ...interface{}) {
+		r.OnError()
+	}
 }
 
 type rudimentaryErrorBackoff struct {

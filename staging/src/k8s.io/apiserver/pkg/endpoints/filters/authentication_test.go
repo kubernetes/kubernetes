@@ -628,6 +628,7 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := func(t *testing.T, nextProto string, expectConnections uint64) {
+				ctx := t.Context()
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UnauthenticatedHTTP2DOSMitigation, !tc.skipHTTP2DOSMitigation)
 
 				var localAddrs atomic.Uint64 // indicates how many TCP connection set up
@@ -671,7 +672,7 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 				}
 
 				for i := 0; i < reqs; i++ {
-					req, err := http.NewRequest(http.MethodGet, s.URL, nil)
+					req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.URL, nil)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -701,5 +702,37 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 			// 	f(t, "http/1.1", 1)
 			// })
 		})
+	}
+}
+
+func TestAuthenticationLatencyTracked(t *testing.T) {
+	successHandlerCalled := false
+	handler := WithAuthentication(
+		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+			// latency annotations should be added by the time the success handler is called
+			annotations := genericapirequest.AuditAnnotationsFromLatencyTrackers(req.Context())
+			if annotations["apiserver.latency.k8s.io/authentication"] == "" {
+				t.Errorf("missing authentication latency annotation: %v", annotations)
+			}
+			successHandlerCalled = true
+		}),
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
+		}),
+		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+			t.Error("unexpected call to error handler")
+		}),
+		nil,
+		nil,
+	)
+	handler = WithLatencyTrackers(handler)
+	handler = WithRequestInfo(handler, &fakeRequestResolver{})
+	req, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	if !successHandlerCalled {
+		t.Fatal("no call to success handler")
 	}
 }

@@ -78,9 +78,9 @@ func TestFetchFromDocumentMap(t *testing.T) {
 	apiVersion: kubelet.config.k8s.io/v1beta1
 	kind: KubeletConfiguration
 	`)
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments([]byte(test))
+	gvkmap, err := kubeadmutil.SplitConfigDocuments([]byte(test))
 	if err != nil {
-		t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
+		t.Fatalf("unexpected failure of SplitConfigDocuments: %v", err)
 	}
 
 	clusterCfg := testClusterCfg()

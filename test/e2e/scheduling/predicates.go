@@ -37,7 +37,6 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eruntimeclass "k8s.io/kubernetes/test/e2e/framework/node/runtimeclass"
@@ -76,6 +75,8 @@ type pausePodConfig struct {
 	DeletionGracePeriodSeconds        *int64
 	TopologySpreadConstraints         []v1.TopologySpreadConstraint
 	SchedulingGates                   []v1.PodSchedulingGate
+	TerminationGracePeriodSeconds     *int64
+	PreStopHookSleepSeconds           *int64
 }
 
 var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
@@ -125,7 +126,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage resource requests of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
-	f.It("validates local ephemeral storage resource limits of pods that are allowed to run", feature.LocalStorageCapacityIsolation, func(ctx context.Context) {
+	f.It("validates local ephemeral storage resource limits of pods that are allowed to run", func(ctx context.Context) {
 
 		e2eskipper.SkipUnlessServerVersionGTE(localStorageVersion, f.ClientSet.Discovery())
 
@@ -1009,6 +1010,18 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	}
 	if conf.DeletionGracePeriodSeconds != nil {
 		pod.ObjectMeta.DeletionGracePeriodSeconds = conf.DeletionGracePeriodSeconds
+	}
+	if conf.TerminationGracePeriodSeconds != nil {
+		pod.Spec.TerminationGracePeriodSeconds = conf.TerminationGracePeriodSeconds
+	}
+	if conf.PreStopHookSleepSeconds != nil {
+		pod.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
+			PreStop: &v1.LifecycleHandler{
+				Sleep: &v1.SleepAction{
+					Seconds: *conf.PreStopHookSleepSeconds,
+				},
+			},
+		}
 	}
 	return pod
 }

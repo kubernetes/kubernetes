@@ -452,6 +452,7 @@ func autoConvert_v2_HPAScalingRules_To_autoscaling_HPAScalingRules(in *autoscali
 	out.StabilizationWindowSeconds = (*int32)(unsafe.Pointer(in.StabilizationWindowSeconds))
 	out.SelectPolicy = (*autoscaling.ScalingPolicySelect)(unsafe.Pointer(in.SelectPolicy))
 	out.Policies = *(*[]autoscaling.HPAScalingPolicy)(unsafe.Pointer(&in.Policies))
+	out.Tolerance = (*resource.Quantity)(unsafe.Pointer(in.Tolerance))
 	return nil
 }
 
@@ -464,6 +465,7 @@ func autoConvert_autoscaling_HPAScalingRules_To_v2_HPAScalingRules(in *autoscali
 	out.StabilizationWindowSeconds = (*int32)(unsafe.Pointer(in.StabilizationWindowSeconds))
 	out.SelectPolicy = (*autoscalingv2.ScalingPolicySelect)(unsafe.Pointer(in.SelectPolicy))
 	out.Policies = *(*[]autoscalingv2.HPAScalingPolicy)(unsafe.Pointer(&in.Policies))
+	out.Tolerance = (*resource.Quantity)(unsafe.Pointer(in.Tolerance))
 	return nil
 }
 

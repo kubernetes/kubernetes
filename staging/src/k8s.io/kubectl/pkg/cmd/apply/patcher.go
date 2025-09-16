@@ -23,8 +23,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/jonboulle/clockwork"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -61,7 +59,7 @@ const (
 // patchRetryBackOffPeriod is the period to back off when apply patch results in error.
 var patchRetryBackOffPeriod = 1 * time.Second
 
-var createPatchErrFormat = "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
+var createPatchErrFormat = "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor: %w"
 
 // Patcher defines options to patch OpenAPI objects.
 type Patcher struct {
@@ -120,13 +118,13 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "serializing current configuration from:\n%v\nfor:", obj)
+		return nil, nil, fmt.Errorf("serializing current configuration from:\n%v\nfor: %w", obj, err)
 	}
 
 	// Retrieve the original configuration of the object from the annotation.
 	original, err := util.GetOriginalConfiguration(obj)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "retrieving original configuration from:\n%v\nfor:", obj)
+		return nil, nil, fmt.Errorf("retrieving original configuration from:\n%v\nfor: %w", obj, err)
 	}
 
 	var patchType types.PatchType
@@ -178,17 +176,17 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 			patchType = types.StrategicMergePatchType
 			patch, err = p.buildStrategicMergeFromBuiltins(versionedObj, original, modified, current)
 			if err != nil {
-				return nil, nil, errors.Wrapf(err, createPatchErrFormat, original, modified, current)
+				return nil, nil, fmt.Errorf(createPatchErrFormat, original, modified, current, err)
 			}
 		} else {
 			if !runtime.IsNotRegisteredError(err) {
-				return nil, nil, errors.Wrapf(err, "getting instance of versioned object for %v:", p.Mapping.GroupVersionKind)
+				return nil, nil, fmt.Errorf("getting instance of versioned object for %v: %w", p.Mapping.GroupVersionKind, err)
 			}
 
 			patchType = types.MergePatchType
 			patch, err = p.buildMergePatch(original, modified, current)
 			if err != nil {
-				return nil, nil, errors.Wrapf(err, createPatchErrFormat, original, modified, current)
+				return nil, nil, fmt.Errorf(createPatchErrFormat, original, modified, current, err)
 			}
 		}
 	}
@@ -200,7 +198,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 	if p.ResourceVersion != nil {
 		patch, err = addResourceVersion(patch, *p.ResourceVersion)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "Failed to insert resourceVersion in patch")
+			return nil, nil, fmt.Errorf("failed to insert resourceVersion in patch: %w", err)
 		}
 	}
 

@@ -18,4 +18,4 @@ limitations under the License.
 // +groupName=apiserver.k8s.io
 
 // Package apiserver is the internal version of the API.
-package apiserver // import "k8s.io/apiserver/pkg/apis/apiserver"
+package apiserver

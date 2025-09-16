@@ -1,6 +1,7 @@
 package netlink
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -112,7 +113,9 @@ type XfrmState struct {
 	Statistics    XfrmStateStats
 	Mark          *XfrmMark
 	OutputMark    *XfrmMark
+	SADir         SADir
 	Ifid          int
+	Pcpunum       *uint32
 	Auth          *XfrmStateAlgo
 	Crypt         *XfrmStateAlgo
 	Aead          *XfrmStateAlgo
@@ -125,8 +128,8 @@ type XfrmState struct {
 }
 
 func (sa XfrmState) String() string {
-	return fmt.Sprintf("Dst: %v, Src: %v, Proto: %s, Mode: %s, SPI: 0x%x, ReqID: 0x%x, ReplayWindow: %d, Mark: %v, OutputMark: %v, Ifid: %d, Auth: %v, Crypt: %v, Aead: %v, Encap: %v, ESN: %t, DontEncapDSCP: %t, OSeqMayWrap: %t, Replay: %v",
-		sa.Dst, sa.Src, sa.Proto, sa.Mode, sa.Spi, sa.Reqid, sa.ReplayWindow, sa.Mark, sa.OutputMark, sa.Ifid, sa.Auth, sa.Crypt, sa.Aead, sa.Encap, sa.ESN, sa.DontEncapDSCP, sa.OSeqMayWrap, sa.Replay)
+	return fmt.Sprintf("Dst: %v, Src: %v, Proto: %s, Mode: %s, SPI: 0x%x, ReqID: 0x%x, ReplayWindow: %d, Mark: %v, OutputMark: %v, SADir: %d, Ifid: %d, Pcpunum: %d, Auth: %v, Crypt: %v, Aead: %v, Encap: %v, ESN: %t, DontEncapDSCP: %t, OSeqMayWrap: %t, Replay: %v",
+		sa.Dst, sa.Src, sa.Proto, sa.Mode, sa.Spi, sa.Reqid, sa.ReplayWindow, sa.Mark, sa.OutputMark, sa.SADir, sa.Ifid, *sa.Pcpunum, sa.Auth, sa.Crypt, sa.Aead, sa.Encap, sa.ESN, sa.DontEncapDSCP, sa.OSeqMayWrap, sa.Replay)
 }
 func (sa XfrmState) Print(stats bool) string {
 	if !stats {
@@ -332,9 +335,19 @@ func (h *Handle) xfrmStateAddOrUpdate(state *XfrmState, nlProto int) error {
 		req.AddData(out)
 	}
 
+	if state.SADir != 0 {
+		saDir := nl.NewRtAttr(nl.XFRMA_SA_DIR, nl.Uint8Attr(uint8(state.SADir)))
+		req.AddData(saDir)
+	}
+
 	if state.Ifid != 0 {
 		ifId := nl.NewRtAttr(nl.XFRMA_IF_ID, nl.Uint32Attr(uint32(state.Ifid)))
 		req.AddData(ifId)
+	}
+
+	if state.Pcpunum != nil {
+		pcpuNum := nl.NewRtAttr(nl.XFRMA_SA_PCPU, nl.Uint32Attr(uint32(*state.Pcpunum)))
+		req.AddData(pcpuNum)
 	}
 
 	_, err := req.Execute(unix.NETLINK_XFRM, 0)
@@ -382,6 +395,9 @@ func (h *Handle) XfrmStateDel(state *XfrmState) error {
 // XfrmStateList gets a list of xfrm states in the system.
 // Equivalent to: `ip [-4|-6] xfrm state show`.
 // The list can be filtered by ip family.
+//
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func XfrmStateList(family int) ([]XfrmState, error) {
 	return pkgHandle.XfrmStateList(family)
 }
@@ -389,12 +405,15 @@ func XfrmStateList(family int) ([]XfrmState, error) {
 // XfrmStateList gets a list of xfrm states in the system.
 // Equivalent to: `ip xfrm state show`.
 // The list can be filtered by ip family.
+//
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func (h *Handle) XfrmStateList(family int) ([]XfrmState, error) {
 	req := h.newNetlinkRequest(nl.XFRM_MSG_GETSA, unix.NLM_F_DUMP)
 
-	msgs, err := req.Execute(unix.NETLINK_XFRM, nl.XFRM_MSG_NEWSA)
-	if err != nil {
-		return nil, err
+	msgs, executeErr := req.Execute(unix.NETLINK_XFRM, nl.XFRM_MSG_NEWSA)
+	if executeErr != nil && !errors.Is(executeErr, ErrDumpInterrupted) {
+		return nil, executeErr
 	}
 
 	var res []XfrmState
@@ -407,7 +426,7 @@ func (h *Handle) XfrmStateList(family int) ([]XfrmState, error) {
 			return nil, err
 		}
 	}
-	return res, nil
+	return res, executeErr
 }
 
 // XfrmStateGet gets the xfrm state described by the ID, if found.
@@ -450,6 +469,11 @@ func (h *Handle) xfrmStateGetOrDelete(state *XfrmState, nlProto int) (*XfrmState
 	if state.Ifid != 0 {
 		ifId := nl.NewRtAttr(nl.XFRMA_IF_ID, nl.Uint32Attr(uint32(state.Ifid)))
 		req.AddData(ifId)
+	}
+
+	if state.Pcpunum != nil {
+		pcpuNum := nl.NewRtAttr(nl.XFRMA_SA_PCPU, nl.Uint32Attr(uint32(*state.Pcpunum)))
+		req.AddData(pcpuNum)
 	}
 
 	resType := nl.XFRM_MSG_NEWSA
@@ -574,8 +598,13 @@ func parseXfrmState(m []byte, family int) (*XfrmState, error) {
 			if state.OutputMark.Mask == 0xffffffff {
 				state.OutputMark.Mask = 0
 			}
+		case nl.XFRMA_SA_DIR:
+			state.SADir = SADir(attr.Value[0])
 		case nl.XFRMA_IF_ID:
 			state.Ifid = int(native.Uint32(attr.Value))
+		case nl.XFRMA_SA_PCPU:
+			pcpuNum := native.Uint32(attr.Value)
+			state.Pcpunum = &pcpuNum
 		case nl.XFRMA_REPLAY_VAL:
 			if state.Replay == nil {
 				state.Replay = new(XfrmReplayState)

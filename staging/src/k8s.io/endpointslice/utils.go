@@ -31,6 +31,7 @@ import (
 	endpointutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 // podToEndpoint returns an Endpoint object generated from a Pod, a Node, and a Service for a particular addressType.
@@ -60,8 +61,7 @@ func podToEndpoint(pod *v1.Pod, node *v1.Node, service *v1.Service, addressType 
 	}
 
 	if node != nil && node.Labels[v1.LabelTopologyZone] != "" {
-		zone := node.Labels[v1.LabelTopologyZone]
-		ep.Zone = &zone
+		ep.Zone = ptr.To(node.Labels[v1.LabelTopologyZone])
 	}
 
 	if endpointutil.ShouldSetHostname(pod, service) {
@@ -84,19 +84,16 @@ func getEndpointPorts(logger klog.Logger, service *v1.Service, pod *v1.Pod) []di
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 
-		portName := servicePort.Name
-		portProto := servicePort.Protocol
-		portNum, err := findPort(pod, servicePort)
+		portNum, err := FindPort(pod, servicePort)
 		if err != nil {
 			logger.V(4).Info("Failed to find port for service", "service", klog.KObj(service), "err", err)
 			continue
 		}
 
-		i32PortNum := int32(portNum)
 		endpointPorts = append(endpointPorts, discovery.EndpointPort{
-			Name:        &portName,
-			Port:        &i32PortNum,
-			Protocol:    &portProto,
+			Name:        ptr.To(servicePort.Name),
+			Port:        ptr.To(int32(portNum)),
+			Protocol:    ptr.To(servicePort.Protocol),
 			AppProtocol: servicePort.AppProtocol,
 		})
 	}
@@ -109,13 +106,15 @@ func getEndpointAddresses(podStatus v1.PodStatus, service *v1.Service, addressTy
 	addresses := []string{}
 
 	for _, podIP := range podStatus.PodIPs {
-		isIPv6PodIP := utilnet.IsIPv6String(podIP.IP)
+		// We parse and restringify the pod IP in case it is in an irregular format.
+		ip := utilnet.ParseIPSloppy(podIP.IP)
+		isIPv6PodIP := utilnet.IsIPv6(ip)
 		if isIPv6PodIP && addressType == discovery.AddressTypeIPv6 {
-			addresses = append(addresses, podIP.IP)
+			addresses = append(addresses, ip.String())
 		}
 
 		if !isIPv6PodIP && addressType == discovery.AddressTypeIPv4 {
-			addresses = append(addresses, podIP.IP)
+			addresses = append(addresses, ip.String())
 		}
 	}
 
@@ -375,17 +374,27 @@ func isServiceIPSet(service *v1.Service) bool {
 	return service.Spec.ClusterIP != v1.ClusterIPNone && service.Spec.ClusterIP != ""
 }
 
-// findPort locates the container port for the given pod and portName.  If the
+// FindPort locates the container port for the given pod and portName.  If the
 // targetPort is a number, use that.  If the targetPort is a string, look that
 // string up in all named ports in all containers in the target pod.  If no
 // match is found, fail.
-// copied from k8s.io/kubernetes/pkg/api/v1/pod
-func findPort(pod *v1.Pod, svcPort *v1.ServicePort) (int, error) {
+func FindPort(pod *v1.Pod, svcPort *v1.ServicePort) (int, error) {
 	portName := svcPort.TargetPort
 	switch portName.Type {
 	case intstr.String:
 		name := portName.StrVal
 		for _, container := range pod.Spec.Containers {
+			for _, port := range container.Ports {
+				if port.Name == name && port.Protocol == svcPort.Protocol {
+					return int(port.ContainerPort), nil
+				}
+			}
+		}
+		// also support sidecar container (initContainer with restartPolicy=Always)
+		for _, container := range pod.Spec.InitContainers {
+			if container.RestartPolicy == nil || *container.RestartPolicy != v1.ContainerRestartPolicyAlways {
+				continue
+			}
 			for _, port := range container.Ports {
 				if port.Name == name && port.Protocol == svcPort.Protocol {
 					return int(port.ContainerPort), nil

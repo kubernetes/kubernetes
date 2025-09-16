@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
@@ -42,6 +41,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 const etcdTimeout = 2 * time.Second
@@ -71,7 +71,7 @@ type etcdClient interface {
 	Endpoints() []string
 
 	// MemberList lists the current cluster membership.
-	MemberList(ctx context.Context) (*clientv3.MemberListResponse, error)
+	MemberList(ctx context.Context, opts ...clientv3.OpOption) (*clientv3.MemberListResponse, error)
 
 	// MemberAdd adds a new member into the cluster.
 	MemberAdd(ctx context.Context, peerAddrs []string) (*clientv3.MemberAddResponse, error)
@@ -249,7 +249,7 @@ func (c *Client) Sync() error {
 	// Syncs the list of endpoints
 	var cli etcdClient
 	var lastError error
-	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 		true, func(_ context.Context) (bool, error) {
 			var err error
 			cli, err = c.newEtcdClient(c.Endpoints)
@@ -289,7 +289,7 @@ func (c *Client) listMembers(timeout time.Duration) (*clientv3.MemberListRespons
 	var lastError error
 	var resp *clientv3.MemberListResponse
 	if timeout == 0 {
-		timeout = constants.EtcdAPICallTimeout
+		timeout = kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration
 	}
 	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, timeout,
 		true, func(_ context.Context) (bool, error) {
@@ -358,7 +358,7 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 		lastError   error
 		respMembers []*etcdserverpb.Member
 	)
-	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 		true, func(_ context.Context) (bool, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 			defer cancel()
@@ -447,7 +447,7 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 		respMembers []*etcdserverpb.Member
 		resp        *clientv3.MemberAddResponse
 	)
-	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 		true, func(_ context.Context) (bool, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 			defer cancel()
@@ -571,10 +571,19 @@ func (c *Client) MemberPromote(learnerID uint64) error {
 	var (
 		lastError error
 	)
-	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 		true, func(_ context.Context) (bool, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 			defer cancel()
+
+			isLearner, err := c.isLearner(learnerID)
+			if err != nil {
+				return false, err
+			}
+			if !isLearner {
+				klog.V(1).Infof("[etcd] Member %s was already promoted.", strconv.FormatUint(learnerID, 16))
+				return true, nil
+			}
 
 			_, err = cli.MemberPromote(ctx, learnerID)
 			if err == nil {
@@ -604,7 +613,7 @@ func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error)
 		// Gets the member status
 		var lastError error
 		var resp *clientv3.StatusResponse
-		err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+		err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 			true, func(_ context.Context) (bool, error) {
 				cli, err := c.newEtcdClient(c.Endpoints)
 				if err != nil {

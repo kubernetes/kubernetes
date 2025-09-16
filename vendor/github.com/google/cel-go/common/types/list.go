@@ -243,7 +243,7 @@ func (l *baseList) Equal(other ref.Val) ref.Val {
 func (l *baseList) Get(index ref.Val) ref.Val {
 	ind, err := IndexOrError(index)
 	if err != nil {
-		return ValOrErr(index, err.Error())
+		return ValOrErr(index, "%v", err)
 	}
 	if ind < 0 || ind >= l.size {
 		return NewErr("index '%d' out of range in list size '%d'", ind, l.Size())
@@ -297,6 +297,22 @@ func (l *baseList) String() string {
 	}
 	sb.WriteString("]")
 	return sb.String()
+}
+
+func formatList(l traits.Lister, sb *strings.Builder) {
+	sb.WriteString("[")
+	n, _ := l.Size().(Int)
+	for i := 0; i < int(n); i++ {
+		formatTo(sb, l.Get(Int(i)))
+		if i != int(n)-1 {
+			sb.WriteString(", ")
+		}
+	}
+	sb.WriteString("]")
+}
+
+func (l *baseList) format(sb *strings.Builder) {
+	formatList(l, sb)
 }
 
 // mutableList aggregates values into its internal storage. For use with internal CEL variables only.
@@ -427,7 +443,7 @@ func (l *concatList) Equal(other ref.Val) ref.Val {
 func (l *concatList) Get(index ref.Val) ref.Val {
 	ind, err := IndexOrError(index)
 	if err != nil {
-		return ValOrErr(index, err.Error())
+		return ValOrErr(index, "%v", err)
 	}
 	i := Int(ind)
 	if i < l.prevList.Size().(Int) {

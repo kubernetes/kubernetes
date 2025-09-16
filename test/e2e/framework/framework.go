@@ -544,6 +544,11 @@ func (f *Framework) ClientConfig() *rest.Config {
 	return ret
 }
 
+// SetClientConfig allows setting or updating the REST config in the Framework instance.
+func (f *Framework) SetClientConfig(config *rest.Config) {
+	f.clientConfig = rest.CopyConfig(config)
+}
+
 // KubeUser is a struct for managing kubernetes user info.
 type KubeUser struct {
 	Name string `yaml:"name"`

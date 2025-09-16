@@ -21,6 +21,8 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
@@ -45,11 +47,11 @@ import (
 type OperationExecutor interface {
 	// RegisterPlugin registers the given plugin using a handler in the plugin handler map.
 	// It then updates the actual state of the world to reflect that.
-	RegisterPlugin(socketPath string, UUID types.UID, pluginHandlers map[string]cache.PluginHandler, actualStateOfWorld ActualStateOfWorldUpdater) error
+	RegisterPlugin(ctx context.Context, socketPath string, UUID types.UID, pluginHandlers map[string]cache.PluginHandler, actualStateOfWorld ActualStateOfWorldUpdater) error
 
 	// UnregisterPlugin deregisters the given plugin using a handler in the given plugin handler map.
 	// It then updates the actual state of the world to reflect that.
-	UnregisterPlugin(pluginInfo cache.PluginInfo, actualStateOfWorld ActualStateOfWorldUpdater) error
+	UnregisterPlugin(ctx context.Context, pluginInfo cache.PluginInfo, actualStateOfWorld ActualStateOfWorldUpdater) error
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -68,7 +70,7 @@ type ActualStateOfWorldUpdater interface {
 	// AddPlugin add the given plugin in the cache if no existing plugin
 	// in the cache has the same socket path.
 	// An error will be returned if socketPath is empty.
-	AddPlugin(pluginInfo cache.PluginInfo) error
+	AddPlugin(ctx context.Context, pluginInfo cache.PluginInfo) error
 
 	// RemovePlugin deletes the plugin with the given socket path from the actual
 	// state of world.
@@ -93,22 +95,24 @@ func (oe *operationExecutor) IsOperationPending(socketPath string) bool {
 }
 
 func (oe *operationExecutor) RegisterPlugin(
+	ctx context.Context,
 	socketPath string,
 	pluginUUID types.UID,
 	pluginHandlers map[string]cache.PluginHandler,
 	actualStateOfWorld ActualStateOfWorldUpdater) error {
 	generatedOperation :=
-		oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, pluginUUID, pluginHandlers, actualStateOfWorld)
+		oe.operationGenerator.GenerateRegisterPluginFunc(ctx, socketPath, pluginUUID, pluginHandlers, actualStateOfWorld)
 
 	return oe.pendingOperations.Run(
 		socketPath, generatedOperation)
 }
 
 func (oe *operationExecutor) UnregisterPlugin(
+	ctx context.Context,
 	pluginInfo cache.PluginInfo,
 	actualStateOfWorld ActualStateOfWorldUpdater) error {
 	generatedOperation :=
-		oe.operationGenerator.GenerateUnregisterPluginFunc(pluginInfo, actualStateOfWorld)
+		oe.operationGenerator.GenerateUnregisterPluginFunc(ctx, pluginInfo, actualStateOfWorld)
 
 	return oe.pendingOperations.Run(
 		pluginInfo.SocketPath, generatedOperation)

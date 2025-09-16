@@ -17,9 +17,13 @@ limitations under the License.
 package rest
 
 import (
+	"context"
+	"errors"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/client-go/util/flowcontrol"
 )
@@ -76,4 +80,39 @@ func TestURLBackoffFunctionality(t *testing.T) {
 	if myBackoff.CalculateBackoff(parse("http://1.2.3.4:100")) == 0 {
 		t.Errorf("The final return code %v should have resulted in a backoff ! ", returnCodes[7])
 	}
+}
+
+func TestBackoffManagerNopContext(t *testing.T) {
+	mock := NewMockBackoffManager(t)
+
+	sleepDuration := 42 * time.Second
+	mock.On("Sleep", sleepDuration).Return()
+	url := &url.URL{}
+	mock.On("CalculateBackoff", url).Return(time.Second)
+	err := errors.New("fake error")
+	responseCode := 404
+	mock.On("UpdateBackoff", url, err, responseCode).Return()
+
+	ctx := context.Background()
+	wrapper := backoffManagerNopContext{BackoffManager: mock}
+	wrapper.SleepWithContext(ctx, sleepDuration)
+	wrapper.CalculateBackoffWithContext(ctx, url)
+	wrapper.UpdateBackoffWithContext(ctx, url, err, responseCode)
+}
+
+func TestNoBackoff(t *testing.T) {
+	var backoff NoBackoff
+	assert.Equal(t, 0*time.Second, backoff.CalculateBackoff(nil))
+	assert.Equal(t, 0*time.Second, backoff.CalculateBackoffWithContext(context.Background(), nil))
+
+	start := time.Now()
+	backoff.Sleep(0 * time.Second)
+	assert.WithinDuration(t, start, time.Now(), time.Minute /* pretty generous, but we don't want to flake */, time.Since(start), "backoff.Sleep")
+
+	// Cancel right away to prevent sleeping.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	start = time.Now()
+	backoff.SleepWithContext(ctx, 10*time.Minute)
+	assert.WithinDuration(t, start, time.Now(), time.Minute /* pretty generous, but we don't want to flake */, time.Since(start), "backoff.SleepWithContext")
 }

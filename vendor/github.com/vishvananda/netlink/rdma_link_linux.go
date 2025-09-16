@@ -3,6 +3,7 @@ package netlink
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 
@@ -17,6 +18,7 @@ type RdmaLinkAttrs struct {
 	FirmwareVersion string
 	NodeGuid        string
 	SysImageGuid    string
+	NumPorts        uint32
 }
 
 // Link represents a rdma device from netlink.
@@ -68,6 +70,11 @@ func executeOneGetRdmaLink(data []byte) (*RdmaLink, error) {
 			r := bytes.NewReader(value)
 			binary.Read(r, nl.NativeEndian(), &sysGuid)
 			link.Attrs.SysImageGuid = uint64ToGuidString(sysGuid)
+		case nl.RDMA_NLDEV_ATTR_PORT_INDEX:
+			var availablePort uint32
+			r := bytes.NewReader(value)
+			binary.Read(r, nl.NativeEndian(), &availablePort)
+			link.Attrs.NumPorts = availablePort
 		}
 		if (len % 4) != 0 {
 			// Skip pad bytes
@@ -85,19 +92,25 @@ func execRdmaSetLink(req *nl.NetlinkRequest) error {
 
 // RdmaLinkList gets a list of RDMA link devices.
 // Equivalent to: `rdma dev show`
+//
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func RdmaLinkList() ([]*RdmaLink, error) {
 	return pkgHandle.RdmaLinkList()
 }
 
 // RdmaLinkList gets a list of RDMA link devices.
 // Equivalent to: `rdma dev show`
+//
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func (h *Handle) RdmaLinkList() ([]*RdmaLink, error) {
 	proto := getProtoField(nl.RDMA_NL_NLDEV, nl.RDMA_NLDEV_CMD_GET)
 	req := h.newNetlinkRequest(proto, unix.NLM_F_ACK|unix.NLM_F_DUMP)
 
-	msgs, err := req.Execute(unix.NETLINK_RDMA, 0)
-	if err != nil {
-		return nil, err
+	msgs, executeErr := req.Execute(unix.NETLINK_RDMA, 0)
+	if executeErr != nil && !errors.Is(executeErr, ErrDumpInterrupted) {
+		return nil, executeErr
 	}
 
 	var res []*RdmaLink
@@ -109,17 +122,23 @@ func (h *Handle) RdmaLinkList() ([]*RdmaLink, error) {
 		res = append(res, link)
 	}
 
-	return res, nil
+	return res, executeErr
 }
 
 // RdmaLinkByName finds a link by name and returns a pointer to the object if
 // found and nil error, otherwise returns error code.
+//
+// If the returned error is [ErrDumpInterrupted], the result may be missing or
+// outdated and the caller should retry.
 func RdmaLinkByName(name string) (*RdmaLink, error) {
 	return pkgHandle.RdmaLinkByName(name)
 }
 
 // RdmaLinkByName finds a link by name and returns a pointer to the object if
 // found and nil error, otherwise returns error code.
+//
+// If the returned error is [ErrDumpInterrupted], the result may be missing or
+// outdated and the caller should retry.
 func (h *Handle) RdmaLinkByName(name string) (*RdmaLink, error) {
 	links, err := h.RdmaLinkList()
 	if err != nil {
@@ -288,6 +307,8 @@ func RdmaLinkDel(name string) error {
 }
 
 // RdmaLinkDel deletes an rdma link.
+//
+// If the returned error is [ErrDumpInterrupted], the caller should retry.
 func (h *Handle) RdmaLinkDel(name string) error {
 	link, err := h.RdmaLinkByName(name)
 	if err != nil {
@@ -307,6 +328,7 @@ func (h *Handle) RdmaLinkDel(name string) error {
 
 // RdmaLinkAdd adds an rdma link for the specified type to the network device.
 // Similar to: rdma link add NAME type TYPE netdev NETDEV
+//
 //	NAME - specifies the new name of the rdma link to add
 //	TYPE - specifies which rdma type to use.  Link types:
 //		rxe - Soft RoCE driver
@@ -328,4 +350,213 @@ func (h *Handle) RdmaLinkAdd(linkName string, linkType string, netdev string) er
 	req.AddData(nl.NewRtAttr(nl.RDMA_NLDEV_ATTR_NDEV_NAME, nl.ZeroTerminated(netdev)))
 	_, err := req.Execute(unix.NETLINK_RDMA, 0)
 	return err
+}
+
+// RdmaResource represents a rdma device resource tracking summaries
+type RdmaResource struct {
+	Index                      uint32
+	Name                       string
+	RdmaResourceSummaryEntries map[string]uint64
+}
+
+// RdmaResourceList list rdma resource tracking information
+// Returns all rdma devices resource tracking summary on success or returns error
+// otherwise.
+// Equivalent to: `rdma resource'
+func RdmaResourceList() ([]*RdmaResource, error) {
+	return pkgHandle.RdmaResourceList()
+}
+
+// RdmaResourceList list rdma resource tracking information
+// Returns all rdma devices resource tracking summary on success or returns error
+// otherwise.
+// Equivalent to: `rdma resource'
+func (h *Handle) RdmaResourceList() ([]*RdmaResource, error) {
+	proto := getProtoField(nl.RDMA_NL_NLDEV, nl.RDMA_NLDEV_CMD_RES_GET)
+	req := h.newNetlinkRequest(proto, unix.NLM_F_ACK|unix.NLM_F_DUMP)
+
+	msgs, err := req.Execute(unix.NETLINK_RDMA, 0)
+	if err != nil {
+		return nil, err
+	}
+	if len(msgs) == 0 {
+		return nil, fmt.Errorf("No valid response from kernel")
+	}
+	var rdmaResources []*RdmaResource
+	for _, msg := range msgs {
+		res, err := executeOneGetRdmaResourceList(msg)
+		if err != nil {
+			return nil, err
+		}
+		rdmaResources = append(rdmaResources, res)
+	}
+	return rdmaResources, nil
+}
+
+func parseRdmaCounters(counterType uint16, data []byte) (map[string]uint64, error) {
+	var counterKeyType, counterValueType uint16
+	switch counterType {
+	case nl.RDMA_NLDEV_ATTR_RES_SUMMARY_ENTRY:
+		counterKeyType = nl.RDMA_NLDEV_ATTR_RES_SUMMARY_ENTRY_NAME
+		counterValueType = nl.RDMA_NLDEV_ATTR_RES_SUMMARY_ENTRY_CURR
+	case nl.RDMA_NLDEV_ATTR_STAT_HWCOUNTER_ENTRY:
+		counterKeyType = nl.RDMA_NLDEV_ATTR_STAT_HWCOUNTER_ENTRY_NAME
+		counterValueType = nl.RDMA_NLDEV_ATTR_STAT_HWCOUNTER_ENTRY_VALUE
+	default:
+		return nil, fmt.Errorf("Invalid counter type: %d", counterType)
+	}
+	counters := make(map[string]uint64)
+	reader := bytes.NewReader(data)
+
+	for reader.Len() >= 4 {
+		_, attrType, _, value := parseNfAttrTLV(reader)
+		if attrType != counterType {
+			return nil, fmt.Errorf("Invalid resource summary entry type; %d", attrType)
+		}
+
+		summaryReader := bytes.NewReader(value)
+		for summaryReader.Len() >= 4 {
+			_, attrType, len, value := parseNfAttrTLV(summaryReader)
+			if attrType != counterKeyType {
+				return nil, fmt.Errorf("Invalid resource summary entry name type; %d", attrType)
+			}
+			name := string(value[0 : len-1])
+			// Skip pad bytes
+			if (len % 4) != 0 {
+				summaryReader.Seek(int64(4-(len%4)), seekCurrent)
+			}
+			_, attrType, len, value = parseNfAttrTLV(summaryReader)
+			if attrType != counterValueType {
+				return nil, fmt.Errorf("Invalid resource summary entry value type; %d", attrType)
+			}
+			counters[name] = native.Uint64(value)
+		}
+	}
+	return counters, nil
+}
+
+func executeOneGetRdmaResourceList(data []byte) (*RdmaResource, error) {
+	var res RdmaResource
+	reader := bytes.NewReader(data)
+	for reader.Len() >= 4 {
+		_, attrType, len, value := parseNfAttrTLV(reader)
+
+		switch attrType {
+		case nl.RDMA_NLDEV_ATTR_DEV_INDEX:
+			var Index uint32
+			r := bytes.NewReader(value)
+			binary.Read(r, nl.NativeEndian(), &Index)
+			res.Index = Index
+		case nl.RDMA_NLDEV_ATTR_DEV_NAME:
+			res.Name = string(value[0 : len-1])
+		case nl.RDMA_NLDEV_ATTR_RES_SUMMARY:
+			var err error
+			res.RdmaResourceSummaryEntries, err = parseRdmaCounters(nl.RDMA_NLDEV_ATTR_RES_SUMMARY_ENTRY, value)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if (len % 4) != 0 {
+			// Skip pad bytes
+			reader.Seek(int64(4-(len%4)), seekCurrent)
+		}
+	}
+	return &res, nil
+}
+
+// RdmaPortStatistic represents a rdma port statistic counter
+type RdmaPortStatistic struct {
+	PortIndex  uint32
+	Statistics map[string]uint64
+}
+
+// RdmaDeviceStatistic represents a rdma device statistic counter
+type RdmaDeviceStatistic struct {
+	RdmaPortStatistics []*RdmaPortStatistic
+}
+
+// RdmaStatistic get rdma device statistic counters
+// Returns rdma device statistic counters on success or returns error
+// otherwise.
+// Equivalent to: `rdma statistic show link [DEV]'
+func RdmaStatistic(link *RdmaLink) (*RdmaDeviceStatistic, error) {
+	return pkgHandle.RdmaStatistic(link)
+}
+
+// RdmaStatistic get rdma device statistic counters
+// Returns rdma device statistic counters on success or returns error
+// otherwise.
+// Equivalent to: `rdma statistic show link [DEV]'
+func (h *Handle) RdmaStatistic(link *RdmaLink) (*RdmaDeviceStatistic, error) {
+	rdmaLinkStatistic := make([]*RdmaPortStatistic, 0)
+	for portIndex := uint32(1); portIndex <= link.Attrs.NumPorts; portIndex++ {
+		portStatistic, err := h.RdmaPortStatisticList(link, portIndex)
+		if err != nil {
+			return nil, err
+		}
+		rdmaLinkStatistic = append(rdmaLinkStatistic, portStatistic)
+	}
+	return &RdmaDeviceStatistic{RdmaPortStatistics: rdmaLinkStatistic}, nil
+}
+
+// RdmaPortStatisticList get rdma device port statistic counters
+// Returns rdma device port statistic counters on success or returns error
+// otherwise.
+// Equivalent to: `rdma statistic show link [DEV/PORT]'
+func RdmaPortStatisticList(link *RdmaLink, port uint32) (*RdmaPortStatistic, error) {
+	return pkgHandle.RdmaPortStatisticList(link, port)
+}
+
+// RdmaPortStatisticList get rdma device port statistic counters
+// Returns rdma device port statistic counters on success or returns error
+// otherwise.
+// Equivalent to: `rdma statistic show link [DEV/PORT]'
+func (h *Handle) RdmaPortStatisticList(link *RdmaLink, port uint32) (*RdmaPortStatistic, error) {
+	proto := getProtoField(nl.RDMA_NL_NLDEV, nl.RDMA_NLDEV_CMD_STAT_GET)
+	req := h.newNetlinkRequest(proto, unix.NLM_F_ACK|unix.NLM_F_REQUEST)
+	b := make([]byte, 4)
+	native.PutUint32(b, link.Attrs.Index)
+	data := nl.NewRtAttr(nl.RDMA_NLDEV_ATTR_DEV_INDEX, b)
+	req.AddData(data)
+
+	b = make([]byte, 4)
+	native.PutUint32(b, port)
+	data = nl.NewRtAttr(nl.RDMA_NLDEV_ATTR_PORT_INDEX, b)
+	req.AddData(data)
+
+	msgs, err := req.Execute(unix.NETLINK_RDMA, 0)
+	if err != nil {
+		return nil, err
+	}
+	if len(msgs) != 1 {
+		return nil, fmt.Errorf("No valid response from kernel")
+	}
+	return executeOneGetRdmaPortStatistics(msgs[0])
+}
+
+func executeOneGetRdmaPortStatistics(data []byte) (*RdmaPortStatistic, error) {
+	var stat RdmaPortStatistic
+	reader := bytes.NewReader(data)
+	for reader.Len() >= 4 {
+		_, attrType, len, value := parseNfAttrTLV(reader)
+
+		switch attrType {
+		case nl.RDMA_NLDEV_ATTR_PORT_INDEX:
+			var Index uint32
+			r := bytes.NewReader(value)
+			binary.Read(r, nl.NativeEndian(), &Index)
+			stat.PortIndex = Index
+		case nl.RDMA_NLDEV_ATTR_STAT_HWCOUNTERS:
+			var err error
+			stat.Statistics, err = parseRdmaCounters(nl.RDMA_NLDEV_ATTR_STAT_HWCOUNTER_ENTRY, value)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if (len % 4) != 0 {
+			// Skip pad bytes
+			reader.Seek(int64(4-(len%4)), seekCurrent)
+		}
+	}
+	return &stat, nil
 }

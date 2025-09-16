@@ -30,41 +30,20 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaim{}, func(obj interface{}) { SetObjectDefaults_ResourceClaim(obj.(*resourcev1alpha3.ResourceClaim)) })
-	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaimList{}, func(obj interface{}) { SetObjectDefaults_ResourceClaimList(obj.(*resourcev1alpha3.ResourceClaimList)) })
-	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaimTemplate{}, func(obj interface{}) {
-		SetObjectDefaults_ResourceClaimTemplate(obj.(*resourcev1alpha3.ResourceClaimTemplate))
-	})
-	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaimTemplateList{}, func(obj interface{}) {
-		SetObjectDefaults_ResourceClaimTemplateList(obj.(*resourcev1alpha3.ResourceClaimTemplateList))
+	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.DeviceTaintRule{}, func(obj interface{}) { SetObjectDefaults_DeviceTaintRule(obj.(*resourcev1alpha3.DeviceTaintRule)) })
+	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.DeviceTaintRuleList{}, func(obj interface{}) {
+		SetObjectDefaults_DeviceTaintRuleList(obj.(*resourcev1alpha3.DeviceTaintRuleList))
 	})
 	return nil
 }
 
-func SetObjectDefaults_ResourceClaim(in *resourcev1alpha3.ResourceClaim) {
-	for i := range in.Spec.Devices.Requests {
-		a := &in.Spec.Devices.Requests[i]
-		SetDefaults_DeviceRequest(a)
-	}
+func SetObjectDefaults_DeviceTaintRule(in *resourcev1alpha3.DeviceTaintRule) {
+	SetDefaults_DeviceTaint(&in.Spec.Taint)
 }
 
-func SetObjectDefaults_ResourceClaimList(in *resourcev1alpha3.ResourceClaimList) {
+func SetObjectDefaults_DeviceTaintRuleList(in *resourcev1alpha3.DeviceTaintRuleList) {
 	for i := range in.Items {
 		a := &in.Items[i]
-		SetObjectDefaults_ResourceClaim(a)
-	}
-}
-
-func SetObjectDefaults_ResourceClaimTemplate(in *resourcev1alpha3.ResourceClaimTemplate) {
-	for i := range in.Spec.Spec.Devices.Requests {
-		a := &in.Spec.Spec.Devices.Requests[i]
-		SetDefaults_DeviceRequest(a)
-	}
-}
-
-func SetObjectDefaults_ResourceClaimTemplateList(in *resourcev1alpha3.ResourceClaimTemplateList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_ResourceClaimTemplate(a)
+		SetObjectDefaults_DeviceTaintRule(a)
 	}
 }

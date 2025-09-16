@@ -174,7 +174,7 @@ if [[ ${WHAT} == "" || ${WHAT} =~ .*kubeadm.* ]] ; then
   # build kubeadm
   make all -C "${KUBE_ROOT}" WHAT=cmd/kubeadm
   # unless the user sets KUBEADM_PATH, assume that "make all..." just built it
-  export KUBEADM_PATH="${KUBEADM_PATH:=$(kube::realpath "${KUBE_ROOT}")/_output/local/go/bin/kubeadm}"
+  export KUBEADM_PATH="${KUBEADM_PATH:="$(kube::util::find-binary kubeadm)"}"
   # invoke the tests
   make -C "${KUBE_ROOT}" test \
     WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd \

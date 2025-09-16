@@ -18,4 +18,4 @@ limitations under the License.
 // +groupName=example.dots.apiserver.code-generator.k8s.io
 // +groupGoName=ThirdExample
 
-package example3 // import "k8s.io/code-generator/examples/apiserver/apis/example3.io"
+package example3

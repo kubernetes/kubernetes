@@ -24,38 +24,74 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 )
 
+// MacroOpt defines a functional option for configuring macro behavior.
+type MacroOpt func(*macro) *macro
+
+// MacroDocs configures a list of strings into a multiline description for the macro.
+func MacroDocs(docs ...string) MacroOpt {
+	return func(m *macro) *macro {
+		m.doc = common.MultilineDescription(docs...)
+		return m
+	}
+}
+
+// MacroExamples configures a list of examples, either as a string or common.MultilineString,
+// into an example set to be provided with the macro Documentation() call.
+func MacroExamples(examples ...string) MacroOpt {
+	return func(m *macro) *macro {
+		m.examples = examples
+		return m
+	}
+}
+
 // NewGlobalMacro creates a Macro for a global function with the specified arg count.
-func NewGlobalMacro(function string, argCount int, expander MacroExpander) Macro {
-	return &macro{
+func NewGlobalMacro(function string, argCount int, expander MacroExpander, opts ...MacroOpt) Macro {
+	m := &macro{
 		function: function,
 		argCount: argCount,
 		expander: expander}
+	for _, opt := range opts {
+		m = opt(m)
+	}
+	return m
 }
 
 // NewReceiverMacro creates a Macro for a receiver function matching the specified arg count.
-func NewReceiverMacro(function string, argCount int, expander MacroExpander) Macro {
-	return &macro{
+func NewReceiverMacro(function string, argCount int, expander MacroExpander, opts ...MacroOpt) Macro {
+	m := &macro{
 		function:      function,
 		argCount:      argCount,
 		expander:      expander,
 		receiverStyle: true}
+	for _, opt := range opts {
+		m = opt(m)
+	}
+	return m
 }
 
 // NewGlobalVarArgMacro creates a Macro for a global function with a variable arg count.
-func NewGlobalVarArgMacro(function string, expander MacroExpander) Macro {
-	return &macro{
+func NewGlobalVarArgMacro(function string, expander MacroExpander, opts ...MacroOpt) Macro {
+	m := &macro{
 		function:    function,
 		expander:    expander,
 		varArgStyle: true}
+	for _, opt := range opts {
+		m = opt(m)
+	}
+	return m
 }
 
 // NewReceiverVarArgMacro creates a Macro for a receiver function matching a variable arg count.
-func NewReceiverVarArgMacro(function string, expander MacroExpander) Macro {
-	return &macro{
+func NewReceiverVarArgMacro(function string, expander MacroExpander, opts ...MacroOpt) Macro {
+	m := &macro{
 		function:      function,
 		expander:      expander,
 		receiverStyle: true,
 		varArgStyle:   true}
+	for _, opt := range opts {
+		m = opt(m)
+	}
+	return m
 }
 
 // Macro interface for describing the function signature to match and the MacroExpander to apply.
@@ -95,6 +131,8 @@ type macro struct {
 	varArgStyle   bool
 	argCount      int
 	expander      MacroExpander
+	doc           string
+	examples      []string
 }
 
 // Function returns the macro's function name (i.e. the function whose syntax it mimics).
@@ -123,6 +161,15 @@ func (m *macro) MacroKey() string {
 		return makeVarArgMacroKey(m.function, m.receiverStyle)
 	}
 	return makeMacroKey(m.function, m.argCount, m.receiverStyle)
+}
+
+// Documentation generates documentation and examples for the macro.
+func (m *macro) Documentation() *common.Doc {
+	examples := make([]*common.Doc, len(m.examples))
+	for i, ex := range m.examples {
+		examples[i] = common.NewExampleDoc(ex)
+	}
+	return common.NewMacroDoc(m.Function(), m.doc, examples...)
 }
 
 func makeMacroKey(name string, args int, receiverStyle bool) string {
@@ -225,6 +272,9 @@ type ExprHelper interface {
 	// NewAccuIdent returns an accumulator identifier for use with comprehension results.
 	NewAccuIdent() ast.Expr
 
+	// AccuIdentName returns the name of the accumulator identifier.
+	AccuIdentName() string
+
 	// NewCall creates a function call Expr value for a global (free) function.
 	NewCall(function string, args ...ast.Expr) ast.Expr
 
@@ -247,32 +297,139 @@ type ExprHelper interface {
 var (
 	// HasMacro expands "has(m.f)" which tests the presence of a field, avoiding the need to
 	// specify the field as a string.
-	HasMacro = NewGlobalMacro(operators.Has, 1, MakeHas)
+	HasMacro = NewGlobalMacro(operators.Has, 1, MakeHas,
+		MacroDocs(
+			`check a protocol buffer message for the presence of a field, or check a map`,
+			`for the presence of a string key.`,
+			`Only map accesses using the select notation are supported.`),
+		MacroExamples(
+			common.MultilineDescription(
+				`// true if the 'address' field exists in the 'user' message`,
+				`has(user.address)`),
+			common.MultilineDescription(
+				`// test whether the 'key_name' is set on the map which defines it`,
+				`has({'key_name': 'value'}.key_name) // true`),
+			common.MultilineDescription(
+				`// test whether the 'id' field is set to a non-default value on the Expr{} message literal`,
+				`has(Expr{}.id) // false`),
+		))
 
 	// AllMacro expands "range.all(var, predicate)" into a comprehension which ensures that all
 	// elements in the range satisfy the predicate.
-	AllMacro = NewReceiverMacro(operators.All, 2, MakeAll)
+	AllMacro = NewReceiverMacro(operators.All, 2, MakeAll,
+		MacroDocs(`tests whether all elements in the input list or all keys in a map`,
+			`satisfy the given predicate. The all macro behaves in a manner consistent with`,
+			`the Logical AND operator including in how it absorbs errors and short-circuits.`),
+		MacroExamples(
+			`[1, 2, 3].all(x, x > 0) // true`,
+			`[1, 2, 0].all(x, x > 0) // false`,
+			`['apple', 'banana', 'cherry'].all(fruit, fruit.size() > 3) // true`,
+			`[3.14, 2.71, 1.61].all(num, num < 3.0) // false`,
+			`{'a': 1, 'b': 2, 'c': 3}.all(key, key != 'b') // false`,
+			common.MultilineDescription(
+				`// an empty list or map as the range will result in a trivially true result`,
+				`[].all(x, x > 0) // true`),
+		))
 
 	// ExistsMacro expands "range.exists(var, predicate)" into a comprehension which ensures that
 	// some element in the range satisfies the predicate.
-	ExistsMacro = NewReceiverMacro(operators.Exists, 2, MakeExists)
+	ExistsMacro = NewReceiverMacro(operators.Exists, 2, MakeExists,
+		MacroDocs(`tests whether any value in the list or any key in the map`,
+			`satisfies the predicate expression. The exists macro behaves in a manner`,
+			`consistent with the Logical OR operator including in how it absorbs errors and`,
+			`short-circuits.`),
+		MacroExamples(
+			`[1, 2, 3].exists(i, i % 2 != 0) // true`,
+			`[0, -1, 5].exists(num, num < 0) // true`,
+			`{'x': 'foo', 'y': 'bar'}.exists(key, key.startsWith('z')) // false`,
+			common.MultilineDescription(
+				`// an empty list or map as the range will result in a trivially false result`,
+				`[].exists(i, i > 0) // false`),
+			common.MultilineDescription(
+				`// test whether a key name equalling 'iss' exists in the map and the`,
+				`// value contains the substring 'cel.dev'`,
+				`// tokens = {'sub': 'me', 'iss': 'https://issuer.cel.dev'}`,
+				`tokens.exists(k, k == 'iss' && tokens[k].contains('cel.dev'))`),
+		))
 
 	// ExistsOneMacro expands "range.exists_one(var, predicate)", which is true if for exactly one
 	// element in range the predicate holds.
-	ExistsOneMacro = NewReceiverMacro(operators.ExistsOne, 2, MakeExistsOne)
+	// Deprecated: Use ExistsOneMacroNew
+	ExistsOneMacro = NewReceiverMacro(operators.ExistsOne, 2, MakeExistsOne,
+		MacroDocs(`tests whether exactly one list element or map key satisfies`,
+			`the predicate expression. This macro does not short-circuit in order to remain`,
+			`consistent with logical operators being the only operators which can absorb`,
+			`errors within CEL.`),
+		MacroExamples(
+			`[1, 2, 2].exists_one(i, i < 2) // true`,
+			`{'a': 'hello', 'aa': 'hellohello'}.exists_one(k, k.startsWith('a')) // false`,
+			`[1, 2, 3, 4].exists_one(num, num % 2 == 0) // false`,
+			common.MultilineDescription(
+				`// ensure exactly one key in the map ends in @acme.co`,
+				`{'wiley@acme.co': 'coyote', 'aa@milne.co': 'bear'}.exists_one(k, k.endsWith('@acme.co')) // true`),
+		))
+
+	// ExistsOneMacroNew expands "range.existsOne(var, predicate)", which is true if for exactly one
+	// element in range the predicate holds.
+	ExistsOneMacroNew = NewReceiverMacro("existsOne", 2, MakeExistsOne,
+		MacroDocs(
+			`tests whether exactly one list element or map key satisfies the predicate`,
+			`expression. This macro does not short-circuit in order to remain consistent`,
+			`with logical operators being the only operators which can absorb errors`,
+			`within CEL.`),
+		MacroExamples(
+			`[1, 2, 2].existsOne(i, i < 2) // true`,
+			`{'a': 'hello', 'aa': 'hellohello'}.existsOne(k, k.startsWith('a')) // false`,
+			`[1, 2, 3, 4].existsOne(num, num % 2 == 0) // false`,
+			common.MultilineDescription(
+				`// ensure exactly one key in the map ends in @acme.co`,
+				`{'wiley@acme.co': 'coyote', 'aa@milne.co': 'bear'}.existsOne(k, k.endsWith('@acme.co')) // true`),
+		))
 
 	// MapMacro expands "range.map(var, function)" into a comprehension which applies the function
 	// to each element in the range to produce a new list.
-	MapMacro = NewReceiverMacro(operators.Map, 2, MakeMap)
+	MapMacro = NewReceiverMacro(operators.Map, 2, MakeMap,
+		MacroDocs("the three-argument form of map transforms all elements in the input range."),
+		MacroExamples(
+			`[1, 2, 3].map(x, x * 2) // [2, 4, 6]`,
+			`[5, 10, 15].map(x, x / 5) // [1, 2, 3]`,
+			`['apple', 'banana'].map(fruit, fruit.upperAscii()) // ['APPLE', 'BANANA']`,
+			common.MultilineDescription(
+				`// Combine all map key-value pairs into a list`,
+				`{'hi': 'you', 'howzit': 'bruv'}.map(k,`,
+				`    k + ":" + {'hi': 'you', 'howzit': 'bruv'}[k]) // ['hi:you', 'howzit:bruv']`),
+		))
 
 	// MapFilterMacro expands "range.map(var, predicate, function)" into a comprehension which
 	// first filters the elements in the range by the predicate, then applies the transform function
 	// to produce a new list.
-	MapFilterMacro = NewReceiverMacro(operators.Map, 3, MakeMap)
+	MapFilterMacro = NewReceiverMacro(operators.Map, 3, MakeMap,
+		MacroDocs(`the four-argument form of the map transforms only elements which satisfy`,
+			`the predicate which is equivalent to chaining the filter and three-argument`,
+			`map macros together.`),
+		MacroExamples(
+			common.MultilineDescription(
+				`// multiply only numbers divisible two, by 2`,
+				`[1, 2, 3, 4].map(num, num % 2 == 0, num * 2) // [4, 8]`),
+		))
 
 	// FilterMacro expands "range.filter(var, predicate)" into a comprehension which filters
 	// elements in the range, producing a new list from the elements that satisfy the predicate.
-	FilterMacro = NewReceiverMacro(operators.Filter, 2, MakeFilter)
+	FilterMacro = NewReceiverMacro(operators.Filter, 2, MakeFilter,
+		MacroDocs(`returns a list containing only the elements from the input list`,
+			`that satisfy the given predicate`),
+		MacroExamples(
+			`[1, 2, 3].filter(x, x > 1) // [2, 3]`,
+			`['cat', 'dog', 'bird', 'fish'].filter(pet, pet.size() == 3) // ['cat', 'dog']`,
+			`[{'a': 10, 'b': 5, 'c': 20}].map(m, m.filter(key, m[key] > 10)) // [['c']]`,
+			common.MultilineDescription(
+				`// filter a list to select only emails with the @cel.dev suffix`,
+				`['alice@buf.io', 'tristan@cel.dev'].filter(v, v.endsWith('@cel.dev')) // ['tristan@cel.dev']`),
+			common.MultilineDescription(
+				`// filter a map into a list, selecting only the values for keys that start with 'http-auth'`,
+				`{'http-auth-agent': 'secret', 'user-agent': 'mozilla'}.filter(k,`,
+				`     k.startsWith('http-auth')) // ['secret']`),
+		))
 
 	// AllMacros includes the list of all spec-supported macros.
 	AllMacros = []Macro{
@@ -280,6 +437,7 @@ var (
 		AllMacro,
 		ExistsMacro,
 		ExistsOneMacro,
+		ExistsOneMacroNew,
 		MapMacro,
 		MapFilterMacro,
 		FilterMacro,
@@ -291,6 +449,11 @@ var (
 
 // AccumulatorName is the traditional variable name assigned to the fold accumulator variable.
 const AccumulatorName = "__result__"
+
+// HiddenAccumulatorName is a proposed update to the default fold accumlator variable.
+// @result is not normally accessible from source, preventing accidental or intentional collisions
+// in user expressions.
+const HiddenAccumulatorName = "@result"
 
 type quantifierKind int
 
@@ -336,6 +499,10 @@ func MakeMap(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *common
 	if !found {
 		return nil, eh.NewError(args[0].ID(), "argument is not an identifier")
 	}
+	accu := eh.AccuIdentName()
+	if v == accu || v == AccumulatorName {
+		return nil, eh.NewError(args[0].ID(), "iteration variable overwrites accumulator variable")
+	}
 
 	var fn ast.Expr
 	var filter ast.Expr
@@ -355,7 +522,7 @@ func MakeMap(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *common
 	if filter != nil {
 		step = eh.NewCall(operators.Conditional, filter, step, eh.NewAccuIdent())
 	}
-	return eh.NewComprehension(target, v, AccumulatorName, init, condition, step, eh.NewAccuIdent()), nil
+	return eh.NewComprehension(target, v, accu, init, condition, step, eh.NewAccuIdent()), nil
 }
 
 // MakeFilter expands the input call arguments into a comprehension which produces a list which contains
@@ -366,13 +533,17 @@ func MakeFilter(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *com
 	if !found {
 		return nil, eh.NewError(args[0].ID(), "argument is not an identifier")
 	}
+	accu := eh.AccuIdentName()
+	if v == accu || v == AccumulatorName {
+		return nil, eh.NewError(args[0].ID(), "iteration variable overwrites accumulator variable")
+	}
 
 	filter := args[1]
 	init := eh.NewList()
 	condition := eh.NewLiteral(types.True)
 	step := eh.NewCall(operators.Add, eh.NewAccuIdent(), eh.NewList(args[0]))
 	step = eh.NewCall(operators.Conditional, filter, step, eh.NewAccuIdent())
-	return eh.NewComprehension(target, v, AccumulatorName, init, condition, step, eh.NewAccuIdent()), nil
+	return eh.NewComprehension(target, v, accu, init, condition, step, eh.NewAccuIdent()), nil
 }
 
 // MakeHas expands the input call arguments into a presence test, e.g. has(<operand>.field)
@@ -388,6 +559,10 @@ func makeQuantifier(kind quantifierKind, eh ExprHelper, target ast.Expr, args []
 	v, found := extractIdent(args[0])
 	if !found {
 		return nil, eh.NewError(args[0].ID(), "argument must be a simple name")
+	}
+	accu := eh.AccuIdentName()
+	if v == accu || v == AccumulatorName {
+		return nil, eh.NewError(args[0].ID(), "iteration variable overwrites accumulator variable")
 	}
 
 	var init ast.Expr
@@ -416,7 +591,7 @@ func makeQuantifier(kind quantifierKind, eh ExprHelper, target ast.Expr, args []
 	default:
 		return nil, eh.NewError(args[0].ID(), fmt.Sprintf("unrecognized quantifier '%v'", kind))
 	}
-	return eh.NewComprehension(target, v, AccumulatorName, init, condition, step, result), nil
+	return eh.NewComprehension(target, v, accu, init, condition, step, result), nil
 }
 
 func extractIdent(e ast.Expr) (string, bool) {

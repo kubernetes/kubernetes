@@ -684,14 +684,17 @@ func TestAddSpecialVerb(t *testing.T) {
 	testCases := map[string]struct {
 		verb     string
 		resource schema.GroupResource
+		isNew    bool
 	}{
 		"existing verb": {
 			verb:     "use",
 			resource: schema.GroupResource{Group: "my.custom.io", Resource: "one"},
+			isNew:    false,
 		},
 		"new verb": {
 			verb:     "new",
 			resource: schema.GroupResource{Group: "my.custom.io", Resource: "two"},
+			isNew:    true,
 		},
 	}
 
@@ -701,6 +704,16 @@ func TestAddSpecialVerb(t *testing.T) {
 			resources, ok := specialVerbs[tc.verb]
 			if !ok {
 				t.Errorf("missing expected verb: %s", tc.verb)
+			}
+
+			if tc.isNew {
+				if len(resources) != 1 {
+					t.Errorf("new verb should only contain one resource resources:%#v", resources)
+				}
+				if !reflect.DeepEqual(tc.resource, resources[0]) {
+					t.Errorf("miss expected resource:%#v", tc.resource)
+				}
+				return
 			}
 
 			for _, res := range resources {

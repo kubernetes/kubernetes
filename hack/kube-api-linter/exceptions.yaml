@@ -1,0 +1,2 @@
+# Exceptions for kube-api-linter.
+# Exceptions are used for kube-api-linter to ignore existing issues that cannot be fixed without breaking changes.

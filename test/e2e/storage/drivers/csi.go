@@ -54,7 +54,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -62,7 +61,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -120,6 +118,9 @@ func initHostPathCSIDriver(name string, capabilities map[storageframework.Capabi
 				NumPods:      10,
 				NumSnapshots: 10,
 			},
+			VolumeModifyStressTestOptions: &storageframework.VolumeModifyStressTestOptions{
+				NumPods: 10,
+			},
 			PerformanceTestOptions: &storageframework.PerformanceTestOptions{
 				ProvisioningOptions: &storageframework.PerformanceTestProvisioningOptions{
 					VolumeSize: "1Mi",
@@ -159,6 +160,9 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapMultiplePVsSameID:              true,
 		storageframework.CapFSResizeFromSourceNotSupported: true,
 		storageframework.CapVolumeGroupSnapshot:            true,
+		// There are extensive tests that NodeStage / NodePublish are called with -o context in csimock/csi_selinux_mount.go,
+		// but the csi-driver-hostpath can't physically make -o context to appear in the mount table that the CapSELinuxMount tests expect.
+		storageframework.CapSELinuxMount: false,
 
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`
@@ -216,8 +220,8 @@ func (h *hostpathCSIDriver) GetSnapshotClass(ctx context.Context, config *storag
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (h *hostpathCSIDriver) GetVolumeAttributesClass(_ context.Context, config *storageframework.PerTestConfig) *storagev1beta1.VolumeAttributesClass {
-	return storageframework.CopyVolumeAttributesClass(&storagev1beta1.VolumeAttributesClass{
+func (h *hostpathCSIDriver) GetVolumeAttributesClass(_ context.Context, config *storageframework.PerTestConfig) *storagev1.VolumeAttributesClass {
+	return storageframework.CopyVolumeAttributesClass(&storagev1.VolumeAttributesClass{
 		DriverName: config.GetUniqueDriverName(),
 		Parameters: map[string]string{
 			hostpathCSIDriverMutableParameterName: hostpathCSIDriverMutableParameterValue,
@@ -235,7 +239,6 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(ctx, f)
 	driverns := driverNamespace.Name
-	testns := f.Namespace.Name
 
 	ginkgo.By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
 	cancelLogging := utils.StartPodLogs(ctx, f, driverNamespace)
@@ -328,7 +331,6 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 	cleanupFunc := generateDriverCleanupFunc(
 		f,
 		h.driverInfo.Name,
-		testns,
 		driverns,
 		cancelLogging)
 	ginkgo.DeferCleanup(cleanupFunc)
@@ -338,27 +340,25 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 
 // mockCSI
 type mockCSIDriver struct {
-	driverInfo                    storageframework.DriverInfo
-	manifests                     []string
-	podInfo                       *bool
-	storageCapacity               *bool
-	attachable                    bool
-	attachLimit                   int
-	enableTopology                bool
-	enableNodeExpansion           bool
-	hooks                         Hooks
-	tokenRequests                 []storagev1.TokenRequest
-	requiresRepublish             *bool
-	fsGroupPolicy                 *storagev1.FSGroupPolicy
-	enableVolumeMountGroup        bool
-	enableNodeVolumeCondition     bool
-	embedded                      bool
-	calls                         MockCSICalls
-	embeddedCSIDriver             *mockdriver.CSIDriver
-	enableSELinuxMount            *bool
-	enableRecoverExpansionFailure bool
-	disableControllerExpansion    bool
-	enableHonorPVReclaimPolicy    bool
+	driverInfo                 storageframework.DriverInfo
+	manifests                  []string
+	podInfo                    *bool
+	storageCapacity            *bool
+	attachable                 bool
+	attachLimit                int
+	enableTopology             bool
+	enableNodeExpansion        bool
+	hooks                      Hooks
+	tokenRequests              []storagev1.TokenRequest
+	requiresRepublish          *bool
+	fsGroupPolicy              *storagev1.FSGroupPolicy
+	enableVolumeMountGroup     bool
+	enableNodeVolumeCondition  bool
+	embedded                   bool
+	calls                      MockCSICalls
+	embeddedCSIDriver          *mockdriver.CSIDriver
+	enableSELinuxMount         *bool
+	disableControllerExpansion bool
 
 	// Additional values set during PrepareTest
 	clientSet       clientset.Interface
@@ -392,24 +392,22 @@ type MockCSITestDriver interface {
 
 // CSIMockDriverOpts defines options used for csi driver
 type CSIMockDriverOpts struct {
-	RegisterDriver                bool
-	DisableAttach                 bool
-	PodInfo                       *bool
-	StorageCapacity               *bool
-	AttachLimit                   int
-	EnableTopology                bool
-	EnableResizing                bool
-	EnableNodeExpansion           bool
-	DisableControllerExpansion    bool
-	EnableSnapshot                bool
-	EnableVolumeMountGroup        bool
-	EnableNodeVolumeCondition     bool
-	TokenRequests                 []storagev1.TokenRequest
-	RequiresRepublish             *bool
-	FSGroupPolicy                 *storagev1.FSGroupPolicy
-	EnableSELinuxMount            *bool
-	EnableRecoverExpansionFailure bool
-	EnableHonorPVReclaimPolicy    bool
+	RegisterDriver             bool
+	DisableAttach              bool
+	PodInfo                    *bool
+	StorageCapacity            *bool
+	AttachLimit                int
+	EnableTopology             bool
+	EnableResizing             bool
+	EnableNodeExpansion        bool
+	DisableControllerExpansion bool
+	EnableSnapshot             bool
+	EnableVolumeMountGroup     bool
+	EnableNodeVolumeCondition  bool
+	TokenRequests              []storagev1.TokenRequest
+	RequiresRepublish          *bool
+	FSGroupPolicy              *storagev1.FSGroupPolicy
+	EnableSELinuxMount         *bool
 
 	// Embedded defines whether the CSI mock driver runs
 	// inside the cluster (false, the default) or just a proxy
@@ -551,24 +549,22 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
-		manifests:                     driverManifests,
-		podInfo:                       driverOpts.PodInfo,
-		storageCapacity:               driverOpts.StorageCapacity,
-		enableTopology:                driverOpts.EnableTopology,
-		attachable:                    !driverOpts.DisableAttach,
-		attachLimit:                   driverOpts.AttachLimit,
-		enableNodeExpansion:           driverOpts.EnableNodeExpansion,
-		enableNodeVolumeCondition:     driverOpts.EnableNodeVolumeCondition,
-		disableControllerExpansion:    driverOpts.DisableControllerExpansion,
-		tokenRequests:                 driverOpts.TokenRequests,
-		requiresRepublish:             driverOpts.RequiresRepublish,
-		fsGroupPolicy:                 driverOpts.FSGroupPolicy,
-		enableVolumeMountGroup:        driverOpts.EnableVolumeMountGroup,
-		enableSELinuxMount:            driverOpts.EnableSELinuxMount,
-		enableRecoverExpansionFailure: driverOpts.EnableRecoverExpansionFailure,
-		enableHonorPVReclaimPolicy:    driverOpts.EnableHonorPVReclaimPolicy,
-		embedded:                      driverOpts.Embedded,
-		hooks:                         driverOpts.Hooks,
+		manifests:                  driverManifests,
+		podInfo:                    driverOpts.PodInfo,
+		storageCapacity:            driverOpts.StorageCapacity,
+		enableTopology:             driverOpts.EnableTopology,
+		attachable:                 !driverOpts.DisableAttach,
+		attachLimit:                driverOpts.AttachLimit,
+		enableNodeExpansion:        driverOpts.EnableNodeExpansion,
+		enableNodeVolumeCondition:  driverOpts.EnableNodeVolumeCondition,
+		disableControllerExpansion: driverOpts.DisableControllerExpansion,
+		tokenRequests:              driverOpts.TokenRequests,
+		requiresRepublish:          driverOpts.RequiresRepublish,
+		fsGroupPolicy:              driverOpts.FSGroupPolicy,
+		enableVolumeMountGroup:     driverOpts.EnableVolumeMountGroup,
+		enableSELinuxMount:         driverOpts.EnableSELinuxMount,
+		embedded:                   driverOpts.Embedded,
+		hooks:                      driverOpts.Hooks,
 	}
 }
 
@@ -600,7 +596,6 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 	// Create secondary namespace which will be used for creating driver
 	m.driverNamespace = utils.CreateDriverNamespace(ctx, f)
 	driverns := m.driverNamespace.Name
-	testns := f.Namespace.Name
 
 	if m.embedded {
 		ginkgo.By("deploying csi mock proxy")
@@ -726,13 +721,6 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 		Features:          map[string][]string{},
 	}
 
-	if m.enableRecoverExpansionFailure {
-		o.Features["csi-resizer"] = []string{"RecoverVolumeExpansionFailure=true"}
-	}
-	if m.enableHonorPVReclaimPolicy {
-		o.Features["csi-provisioner"] = append(o.Features["csi-provisioner"], fmt.Sprintf("%s=true", features.HonorPVReclaimPolicy))
-	}
-
 	err = utils.CreateFromManifests(ctx, f, m.driverNamespace, func(item interface{}) error {
 		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
 			return err
@@ -762,7 +750,6 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 	driverCleanupFunc := generateDriverCleanupFunc(
 		f,
 		"mock",
-		testns,
 		driverns,
 		cancelLogging)
 
@@ -910,7 +897,7 @@ func (g *gcePDCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 }
 
 func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessProviderIs("gce", "gke")
+	e2eskipper.SkipUnlessProviderIs("gce")
 	if pattern.FsType == "xfs" {
 		e2eskipper.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 	}
@@ -942,16 +929,10 @@ func (g *gcePDCSIDriver) GetSnapshotClass(ctx context.Context, config *storagefr
 }
 
 func (g *gcePDCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
-	testns := f.Namespace.Name
 	cfg := &storageframework.PerTestConfig{
 		Driver:    g,
 		Prefix:    "gcepd",
 		Framework: f,
-	}
-
-	if framework.ProviderIs("gke") {
-		framework.Logf("The csi gce-pd driver is automatically installed in GKE. Skipping driver installation.")
-		return cfg
 	}
 
 	// Check if the cluster is already running gce-pd CSI Driver
@@ -1000,7 +981,6 @@ func (g *gcePDCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework
 	cleanupFunc := generateDriverCleanupFunc(
 		f,
 		"gce-pd",
-		testns,
 		driverns,
 		cancelLogging)
 	ginkgo.DeferCleanup(cleanupFunc)
@@ -1073,17 +1053,12 @@ func tryFunc(f func()) error {
 
 func generateDriverCleanupFunc(
 	f *framework.Framework,
-	driverName, testns, driverns string,
+	driverName, driverns string,
 	cancelLogging func()) func(ctx context.Context) {
 
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
 	cleanupFunc := func(ctx context.Context) {
-		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", testns))
-		// Delete the primary namespace but it's okay to fail here because this namespace will
-		// also be deleted by framework.Aftereach hook
-		_ = tryFunc(func() { f.DeleteNamespace(ctx, testns) })
-
 		ginkgo.By(fmt.Sprintf("uninstalling csi %s driver", driverName))
 		_ = tryFunc(cancelLogging)
 

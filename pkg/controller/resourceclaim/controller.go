@@ -25,27 +25,29 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	v1informers "k8s.io/client-go/informers/core/v1"
-	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
+	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/utils/ptr"
 )
 
@@ -71,8 +73,8 @@ const (
 
 // Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
 type Controller struct {
-	// adminAccessEnabled matches the DRAAdminAccess feature gate state.
-	adminAccessEnabled bool
+	// features defines the feature gates that are enabled.
+	features Features
 
 	// kubeClient is the kube API client used to communicate with the API
 	// server.
@@ -118,25 +120,31 @@ const (
 	podKeyPrefix   = "pod:"
 )
 
+// Features defines which features should be enabled in the controller.
+type Features struct {
+	AdminAccess     bool
+	PrioritizedList bool
+}
+
 // NewController creates a ResourceClaim controller.
 func NewController(
 	logger klog.Logger,
-	adminAccessEnabled bool,
+	features Features,
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
 	claimInformer resourceinformers.ResourceClaimInformer,
 	templateInformer resourceinformers.ResourceClaimTemplateInformer) (*Controller, error) {
 
 	ec := &Controller{
-		adminAccessEnabled: adminAccessEnabled,
-		kubeClient:         kubeClient,
-		podLister:          podInformer.Lister(),
-		podIndexer:         podInformer.Informer().GetIndexer(),
-		podSynced:          podInformer.Informer().HasSynced,
-		claimLister:        claimInformer.Lister(),
-		claimsSynced:       claimInformer.Informer().HasSynced,
-		templateLister:     templateInformer.Lister(),
-		templatesSynced:    templateInformer.Informer().HasSynced,
+		features:        features,
+		kubeClient:      kubeClient,
+		podLister:       podInformer.Lister(),
+		podIndexer:      podInformer.Informer().GetIndexer(),
+		podSynced:       podInformer.Informer().HasSynced,
+		claimLister:     claimInformer.Lister(),
+		claimsSynced:    claimInformer.Informer().HasSynced,
+		templateLister:  templateInformer.Lister(),
+		templatesSynced: templateInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resource_claim"},
@@ -144,9 +152,9 @@ func NewController(
 		deletedObjects: newUIDCache(maxUIDCacheEntries),
 	}
 
-	metrics.RegisterMetrics()
+	resourceclaimmetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
 
-	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ec.enqueuePod(logger, obj, false)
 		},
@@ -156,10 +164,10 @@ func NewController(
 		DeleteFunc: func(obj interface{}) {
 			ec.enqueuePod(logger, obj, true)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
-	if _, err := claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := claimInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			logger.V(6).Info("new claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, nil, obj)
@@ -172,7 +180,7 @@ func NewController(
 			logger.V(6).Info("deleted claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, obj, nil)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
 	if err := ec.podIndexer.AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
@@ -190,7 +198,7 @@ func NewController(
 	if err := claimInformerCache.AddIndexers(cache.Indexers{claimPodOwnerIndex: claimPodOwnerIndexFunc}); err != nil {
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
-	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(claimInformerCache, claimInformerCache,
+	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(logger, claimInformerCache, claimInformerCache,
 		// Very long time to live, unlikely to be needed because
 		// the informer cache should get updated soon.
 		time.Hour,
@@ -332,7 +340,7 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 }
 
 func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj interface{}) {
-	deleted := newObj != nil
+	deleted := newObj == nil
 	if d, ok := oldObj.(cache.DeletedFinalStateUnknown); ok {
 		oldObj = d.Obj
 	}
@@ -345,28 +353,9 @@ func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj in
 		return
 	}
 
-	// Maintain metrics based on what was observed.
-	switch {
-	case oldClaim == nil:
-		// Added.
-		metrics.NumResourceClaims.Inc()
-		if newClaim.Status.Allocation != nil {
-			metrics.NumAllocatedResourceClaims.Inc()
-		}
-	case newClaim == nil:
-		// Deleted.
-		metrics.NumResourceClaims.Dec()
-		if oldClaim.Status.Allocation != nil {
-			metrics.NumAllocatedResourceClaims.Dec()
-		}
-	default:
-		// Updated.
-		switch {
-		case oldClaim.Status.Allocation == nil && newClaim.Status.Allocation != nil:
-			metrics.NumAllocatedResourceClaims.Inc()
-		case oldClaim.Status.Allocation != nil && newClaim.Status.Allocation == nil:
-			metrics.NumAllocatedResourceClaims.Dec()
-		}
+	// Check if both the old and new claim are nil in case DeletedFinalStateUnknown.Obj can be nil.
+	if oldClaim == nil && newClaim == nil {
+		return
 	}
 
 	claim := newClaim
@@ -617,8 +606,12 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 			return fmt.Errorf("resource claim template %q: %v", *templateName, err)
 		}
 
-		if !ec.adminAccessEnabled && needsAdminAccess(template) {
+		if !ec.features.AdminAccess && needsAdminAccess(template) {
 			return errors.New("admin access is requested, but the feature is disabled")
+		}
+
+		if !ec.features.PrioritizedList && hasPrioritizedList(template) {
+			return errors.New("template includes a prioritized list of subrequests, but the feature is disabled")
 		}
 
 		// Create the ResourceClaim with pod as owner, with a generated name that uses
@@ -659,13 +652,14 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 			},
 			Spec: template.Spec.Spec,
 		}
-		metrics.ResourceClaimCreateAttempts.Inc()
+		metricLabel := getAdminAccessMetricLabel(claim)
 		claimName := claim.Name
-		claim, err = ec.kubeClient.ResourceV1beta1().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
+		claim, err = ec.kubeClient.ResourceV1().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 		if err != nil {
-			metrics.ResourceClaimCreateFailures.Inc()
+			resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", metricLabel).Inc()
 			return fmt.Errorf("create ResourceClaim %s: %v", claimName, err)
 		}
+		resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", metricLabel).Inc()
 		logger.V(4).Info("Created ResourceClaim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
 		ec.claimCache.Mutation(claim)
 	}
@@ -681,7 +675,16 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 
 func needsAdminAccess(claimTemplate *resourceapi.ResourceClaimTemplate) bool {
 	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
-		if ptr.Deref(request.AdminAccess, false) {
+		if request.Exactly != nil && ptr.Deref(request.Exactly.AdminAccess, false) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPrioritizedList(claimTemplate *resourceapi.ResourceClaimTemplate) bool {
+	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
+		if len(request.FirstAvailable) > 0 {
 			return true
 		}
 	}
@@ -730,7 +733,7 @@ func (ec *Controller) reserveForPod(ctx context.Context, pod *v1.Pod, claim *res
 			Name:     pod.Name,
 			UID:      pod.UID,
 		})
-	if _, err := ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+	if _, err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
 		return fmt.Errorf("reserve claim %s for pod: %w", klog.KObj(claim), err)
 	}
 	return nil
@@ -843,7 +846,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 			}
 		}
 
-		claim, err := ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		claim, err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -853,7 +856,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		builtinControllerFinalizer := slices.Index(claim.Finalizers, resourceapi.Finalizer)
 		if builtinControllerFinalizer >= 0 && claim.Status.Allocation == nil {
 			claim.Finalizers = slices.Delete(claim.Finalizers, builtinControllerFinalizer, builtinControllerFinalizer+1)
-			if _, err := ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{}); err != nil {
+			if _, err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{}); err != nil {
 				return err
 			}
 		}
@@ -865,14 +868,14 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 			// deleted. As above we then need to clear the allocation.
 			claim.Status.Allocation = nil
 			var err error
-			claim, err = ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+			claim, err = ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
 		}
 		// Whether it was allocated or not, remove the finalizer to unblock removal.
 		claim.Finalizers = slices.Delete(claim.Finalizers, builtinControllerFinalizer, builtinControllerFinalizer+1)
-		_, err := ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+		_, err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -893,7 +896,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 					// We are certain that the owning pod is not going to need
 					// the claim and therefore remove the claim.
 					logger.V(5).Info("deleting unused generated claim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
-					err := ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+					err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
 					if err != nil {
 						return fmt.Errorf("delete claim %s: %w", klog.KObj(claim), err)
 					}
@@ -971,4 +974,63 @@ func claimPodOwnerIndexFunc(obj interface{}) ([]string, error) {
 		}
 	}
 	return keys, nil
+}
+func getAdminAccessMetricLabel(claim *resourceapi.ResourceClaim) string {
+	if claim == nil {
+		return "false"
+	}
+	for _, request := range claim.Spec.Devices.Requests {
+		// Sub-requests in FirstAvailable don't have admin access.
+		if request.Exactly != nil && ptr.Deref(request.Exactly.AdminAccess, false) {
+			return "true"
+		}
+	}
+	return "false"
+}
+
+func newCustomCollector(rcLister resourcelisters.ResourceClaimLister, adminAccessFunc func(*resourceapi.ResourceClaim) string, logger klog.Logger) metrics.StableCollector {
+	return &customCollector{
+		rcLister:        rcLister,
+		adminAccessFunc: adminAccessFunc,
+		logger:          logger,
+	}
+}
+
+type customCollector struct {
+	metrics.BaseStableCollector
+	rcLister        resourcelisters.ResourceClaimLister
+	adminAccessFunc func(*resourceapi.ResourceClaim) string
+	logger          klog.Logger
+}
+
+var _ metrics.StableCollector = &customCollector{}
+
+func (collector *customCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
+	ch <- resourceclaimmetrics.NumResourceClaimsDesc
+}
+
+func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric) {
+	allocateMetrics := make(map[string]map[string]int)
+	rcList, err := collector.rcLister.List(labels.Everything())
+	if err != nil {
+		collector.logger.Error(err, "failed to list resource claims for metrics collection")
+		return
+	}
+	for _, rc := range rcList {
+		// Determine if the ResourceClaim is allocated
+		allocated := "false"
+		if rc.Status.Allocation != nil {
+			allocated = "true"
+		}
+		adminAccess := collector.adminAccessFunc(rc)
+		if allocateMetrics[allocated] == nil {
+			allocateMetrics[allocated] = make(map[string]int)
+		}
+		allocateMetrics[allocated][adminAccess]++
+	}
+	for allocated, adminAccessMap := range allocateMetrics {
+		for adminAccess, count := range adminAccessMap {
+			ch <- metrics.NewLazyConstMetric(resourceclaimmetrics.NumResourceClaimsDesc, metrics.GaugeValue, float64(count), allocated, adminAccess)
+		}
+	}
 }

@@ -42,6 +42,7 @@ var exceptionMetrics = []string{
 
 	// kube-apiserver
 	"aggregator_openapi_v2_regeneration_count",
+	"apiserver_admission_webhook_rejection_count", // counter metrics should have "_total" suffix,apiserver_admission_webhook_rejection_count:non-histogram and non-summary metrics should not have "_count" suffix
 	"apiserver_admission_step_admission_duration_seconds_summary",
 	"apiserver_current_inflight_requests",
 	"apiserver_longrunning_gauge",

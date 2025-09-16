@@ -62,18 +62,12 @@ type fakeLeases struct {
 
 var _ Leases = &fakeLeases{}
 
-func newFakeLeases(t *testing.T, s storage.Interface) *fakeLeases {
-	// use the same base key used by the controlplane, but add a random
-	// prefix so we can reuse the etcd instance for subtests independently.
-	// pkg/controlplane/instance.go:268:
-	// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
-	// ref: https://issues.k8s.io/114049
-	base := "/" + uuid.New().String() + "/masterleases/"
+func newFakeLeases(t *testing.T, baseKey string, s storage.Interface) *fakeLeases {
 	return &fakeLeases{
 		storageLeases{
 			storage:   s,
 			destroyFn: func() {},
-			baseKey:   base,
+			baseKey:   baseKey,
 			leaseTime: 1 * time.Minute, // avoid the lease to timeout on tests
 		},
 	}
@@ -95,12 +89,6 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
 	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
-
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, "")
-	if err != nil {
-		t.Fatalf("Error creating storage: %v", err)
-	}
-	t.Cleanup(dFunc)
 
 	reconcileTests := []struct {
 		testName      string
@@ -341,8 +329,19 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	}
 	for _, test := range reconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
-			fakeLeases := newFakeLeases(t, s)
-			err := fakeLeases.SetKeys(test.endpointKeys)
+			// use the same base key used by the controlplane, but add a random
+			// prefix so we can reuse the etcd instance for subtests independently.
+			// pkg/controlplane/instance.go:268:
+			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
+			// ref: https://issues.k8s.io/114049
+			baseKey := "/" + uuid.New().String() + "/masterleases/"
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+			if err != nil {
+				t.Fatalf("Error creating storage: %v", err)
+			}
+			t.Cleanup(dFunc)
+			fakeLeases := newFakeLeases(t, baseKey, s)
+			err = fakeLeases.SetKeys(test.endpointKeys)
 			if err != nil {
 				t.Errorf("unexpected error creating keys: %v", err)
 			}
@@ -420,8 +419,19 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	}
 	for _, test := range nonReconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
-			fakeLeases := newFakeLeases(t, s)
-			err := fakeLeases.SetKeys(test.endpointKeys)
+			// use the same base key used by the controlplane, but add a random
+			// prefix so we can reuse the etcd instance for subtests independently.
+			// pkg/controlplane/instance.go:268:
+			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
+			// ref: https://issues.k8s.io/114049
+			baseKey := "/" + uuid.New().String() + "/masterleases/"
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+			if err != nil {
+				t.Fatalf("Error creating storage: %v", err)
+			}
+			t.Cleanup(dFunc)
+			fakeLeases := newFakeLeases(t, baseKey, s)
+			err = fakeLeases.SetKeys(test.endpointKeys)
 			if err != nil {
 				t.Errorf("unexpected error creating keys: %v", err)
 			}
@@ -459,12 +469,6 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
 	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
-
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, "")
-	if err != nil {
-		t.Fatalf("Error creating storage: %v", err)
-	}
-	t.Cleanup(dFunc)
 
 	stopTests := []struct {
 		testName         string
@@ -530,8 +534,19 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	}
 	for _, test := range stopTests {
 		t.Run(test.testName, func(t *testing.T) {
-			fakeLeases := newFakeLeases(t, s)
-			err := fakeLeases.SetKeys(test.endpointKeys)
+			// use the same base key used by the controlplane, but add a random
+			// prefix so we can reuse the etcd instance for subtests independently.
+			// pkg/controlplane/instance.go:268:
+			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
+			// ref: https://issues.k8s.io/114049
+			baseKey := "/" + uuid.New().String() + "/masterleases/"
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, baseKey)
+			if err != nil {
+				t.Fatalf("Error creating storage: %v", err)
+			}
+			t.Cleanup(dFunc)
+			fakeLeases := newFakeLeases(t, baseKey, s)
+			err = fakeLeases.SetKeys(test.endpointKeys)
 			if err != nil {
 				t.Errorf("unexpected error creating keys: %v", err)
 			}
@@ -586,12 +601,6 @@ func TestApiserverShutdown(t *testing.T) {
 	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
 	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
 	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
-
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, "")
-	if err != nil {
-		t.Fatalf("Error creating storage: %v", err)
-	}
-	t.Cleanup(dFunc)
 
 	reconcileTests := []struct {
 		testName                string
@@ -651,8 +660,19 @@ func TestApiserverShutdown(t *testing.T) {
 	}
 	for _, test := range reconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
-			fakeLeases := newFakeLeases(t, s)
-			err := fakeLeases.SetKeys(test.endpointKeys)
+			// use the same base key used by the controlplane, but add a random
+			// prefix so we can reuse the etcd instance for subtests independently.
+			// pkg/controlplane/instance.go:268:
+			// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
+			// ref: https://issues.k8s.io/114049
+			baseKey := "/" + uuid.New().String() + "/masterleases/"
+			s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, baseKey)
+			if err != nil {
+				t.Fatalf("Error creating storage: %v", err)
+			}
+			t.Cleanup(dFunc)
+			fakeLeases := newFakeLeases(t, baseKey, s)
+			err = fakeLeases.SetKeys(test.endpointKeys)
 			if err != nil {
 				t.Errorf("unexpected error creating keys: %v", err)
 			}

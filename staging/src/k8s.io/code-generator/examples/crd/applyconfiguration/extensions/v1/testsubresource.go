@@ -38,6 +38,8 @@ func TestSubresource() *TestSubresourceApplyConfiguration {
 	return b
 }
 
+func (b TestSubresourceApplyConfiguration) IsApplyConfiguration() {}
+
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
@@ -60,4 +62,14 @@ func (b *TestSubresourceApplyConfiguration) WithAPIVersion(value string) *TestSu
 func (b *TestSubresourceApplyConfiguration) WithName(value string) *TestSubresourceApplyConfiguration {
 	b.Name = &value
 	return b
+}
+
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *TestSubresourceApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *TestSubresourceApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
 }

@@ -45,13 +45,11 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
-    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 5000
@@ -106,7 +104,6 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
@@ -176,7 +173,6 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
@@ -244,7 +240,6 @@
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
@@ -304,24 +299,22 @@
       initNodes: 5
       initPods: 20
       measurePods: 5
-  - name: 500Nodes
+  - name: 1000Nodes
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance, short]
-    threshold: 18
     params:
-      initNodes: 500
-      initPods: 2000
-      measurePods: 500
-  - name: 500Nodes_QueueingHintsEnabled
+      initNodes: 1000
+      initPods: 4000
+      measurePods: 1000
+  - name: 1000Nodes_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance, short]
-    threshold: 18
     params:
-      initNodes: 500
-      initPods: 2000
-      measurePods: 500
+      initNodes: 1000
+      initPods: 4000
+      measurePods: 1000
 # This test case always seems to fail.
 # https://github.com/kubernetes/kubernetes/issues/108308
 #

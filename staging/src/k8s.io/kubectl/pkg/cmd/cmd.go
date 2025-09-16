@@ -73,6 +73,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/version"
 	"k8s.io/kubectl/pkg/cmd/wait"
+	"k8s.io/kubectl/pkg/kuberc"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -81,8 +82,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/kustomize"
 )
-
-const kubectlCmdHeaders = "KUBECTL_COMMAND_HEADERS"
 
 type KubectlOptions struct {
 	PluginHandler PluginHandler
@@ -142,25 +141,23 @@ func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 				}
 			}
 		} else if err == nil {
-			if !cmdutil.CmdPluginAsSubcommand.IsDisabled() {
-				// Command exists(e.g. kubectl create), but it is not certain that
-				// subcommand also exists (e.g. kubectl create networkpolicy)
-				// we also have to eliminate kubectl create -f
-				if IsSubcommandPluginAllowed(foundCmd.Name()) && len(foundArgs) >= 1 && !strings.HasPrefix(foundArgs[0], "-") {
-					subcommand := foundArgs[0]
-					builtinSubcmdExist := false
-					for _, subcmd := range foundCmd.Commands() {
-						if subcmd.Name() == subcommand {
-							builtinSubcmdExist = true
-							break
-						}
+			// Command exists(e.g. kubectl create), but it is not certain that
+			// subcommand also exists (e.g. kubectl create networkpolicy)
+			// we also have to eliminate kubectl create -f
+			if IsSubcommandPluginAllowed(foundCmd.Name()) && len(foundArgs) >= 1 && !strings.HasPrefix(foundArgs[0], "-") {
+				subcommand := foundArgs[0]
+				builtinSubcmdExist := false
+				for _, subcmd := range foundCmd.Commands() {
+					if subcmd.Name() == subcommand {
+						builtinSubcmdExist = true
+						break
 					}
+				}
 
-					if !builtinSubcmdExist {
-						if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces, len(cmdPathPieces)-len(foundArgs)+1); err != nil {
-							fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
-							os.Exit(1)
-						}
+				if !builtinSubcmdExist {
+					if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces, len(cmdPathPieces)-len(foundArgs)+1); err != nil {
+						fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
+						os.Exit(1)
 					}
 				}
 			}
@@ -361,6 +358,11 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	flags.BoolVar(&warningsAsErrors, "warnings-as-errors", warningsAsErrors, "Treat warnings received from the server as errors and exit with a non-zero exit code")
 
+	pref := kuberc.NewPreferences()
+	if !cmdutil.KubeRC.IsDisabled() {
+		pref.AddFlags(flags)
+	}
+
 	kubeConfigFlags := o.ConfigFlags
 	if kubeConfigFlags == nil {
 		kubeConfigFlags = defaultConfigFlags().WithWarningPrinter(o.IOStreams)
@@ -383,6 +385,8 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Avoid import cycle by setting ValidArgsFunction here instead of in NewCmdGet()
 	getCmd := get.NewCmdGet("kubectl", f, o.IOStreams)
 	getCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
+	debugCmd := debug.NewCmdDebug(f, o.IOStreams)
+	debugCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
 
 	groups := templates.CommandGroups{
 		{
@@ -434,7 +438,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 				proxyCmd,
 				cp.NewCmdCp(f, o.IOStreams),
 				auth.NewCmdAuth(f, o.IOStreams),
-				debug.NewCmdDebug(f, o.IOStreams),
+				debugCmd,
 				events.NewCmdEvents(f, o.IOStreams),
 			},
 		},
@@ -490,6 +494,15 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Stop warning about normalization of flags. That makes it possible to
 	// add the klog flags later.
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
+
+	if !cmdutil.KubeRC.IsDisabled() {
+		_, err := pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
+		if err != nil {
+			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	return cmds
 }
 
@@ -507,12 +520,9 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 //
 //	https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
 func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags) {
-	// If the feature gate env var is set to "false", then do no add kubectl command headers.
-	if value, exists := os.LookupEnv(kubectlCmdHeaders); exists {
-		if value == "false" || value == "0" {
-			klog.V(5).Infoln("kubectl command headers turned off")
-			return
-		}
+	if cmdutil.CmdHeaders.IsDisabled() {
+		klog.V(5).Infoln("kubectl command headers turned off")
+		return
 	}
 	klog.V(5).Infoln("kubectl command headers turned on")
 	crt := &genericclioptions.CommandHeaderRoundTripper{}
@@ -565,4 +575,30 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
+}
+
+// GetLogVerbosity parses the provided command-line arguments to determine
+// the verbosity level for logging. Returns string representing the verbosity
+// level, or 0 if no verbosity flag is specified.
+func GetLogVerbosity(args []string) string {
+	for i, arg := range args {
+		if arg == "--" {
+			// flags after "--" does not represent any flag of
+			// the command. We should short cut the iteration in here.
+			break
+		}
+
+		if arg == "--v" || arg == "-v" {
+			if i+1 < len(args) {
+				return args[i+1]
+			}
+		} else if strings.Contains(arg, "--v=") || strings.Contains(arg, "-v=") {
+			parg := strings.Split(arg, "=")
+			if len(parg) > 1 && parg[1] != "" {
+				return parg[1]
+			}
+		}
+	}
+
+	return "0"
 }

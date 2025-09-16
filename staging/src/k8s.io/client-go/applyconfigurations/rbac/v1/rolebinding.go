@@ -29,11 +29,20 @@ import (
 
 // RoleBindingApplyConfiguration represents a declarative configuration of the RoleBinding type for use
 // with apply.
+//
+// RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace.
+// It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given
+// namespace only have effect in that namespace.
 type RoleBindingApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Subjects                             []SubjectApplyConfiguration `json:"subjects,omitempty"`
-	RoleRef                              *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`
+	// Subjects holds references to the objects the role applies to.
+	Subjects []SubjectApplyConfiguration `json:"subjects,omitempty"`
+	// RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
+	// If the RoleRef cannot be resolved, the Authorizer must return an error.
+	// This field is immutable.
+	RoleRef *RoleRefApplyConfiguration `json:"roleRef,omitempty"`
 }
 
 // RoleBinding constructs a declarative configuration of the RoleBinding type for use with
@@ -47,29 +56,14 @@ func RoleBinding(name, namespace string) *RoleBindingApplyConfiguration {
 	return b
 }
 
-// ExtractRoleBinding extracts the applied configuration owned by fieldManager from
-// roleBinding. If no managedFields are found in roleBinding for fieldManager, a
-// RoleBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractRoleBindingFrom extracts the applied configuration owned by fieldManager from
+// roleBinding for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // roleBinding must be a unmodified RoleBinding API object that was retrieved from the Kubernetes API.
-// ExtractRoleBinding provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractRoleBindingFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractRoleBinding(roleBinding *rbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
-	return extractRoleBinding(roleBinding, fieldManager, "")
-}
-
-// ExtractRoleBindingStatus is the same as ExtractRoleBinding except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractRoleBindingStatus(roleBinding *rbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
-	return extractRoleBinding(roleBinding, fieldManager, "status")
-}
-
-func extractRoleBinding(roleBinding *rbacv1.RoleBinding, fieldManager string, subresource string) (*RoleBindingApplyConfiguration, error) {
+func ExtractRoleBindingFrom(roleBinding *rbacv1.RoleBinding, fieldManager string, subresource string) (*RoleBindingApplyConfiguration, error) {
 	b := &RoleBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(roleBinding, internal.Parser().Type("io.k8s.api.rbac.v1.RoleBinding"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +76,22 @@ func extractRoleBinding(roleBinding *rbacv1.RoleBinding, fieldManager string, su
 	b.WithAPIVersion("rbac.authorization.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractRoleBinding extracts the applied configuration owned by fieldManager from
+// roleBinding. If no managedFields are found in roleBinding for fieldManager, a
+// RoleBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// roleBinding must be a unmodified RoleBinding API object that was retrieved from the Kubernetes API.
+// ExtractRoleBinding provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractRoleBinding(roleBinding *rbacv1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
+	return ExtractRoleBindingFrom(roleBinding, fieldManager, "")
+}
+
+func (b RoleBindingApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -262,8 +272,24 @@ func (b *RoleBindingApplyConfiguration) WithRoleRef(value *RoleRefApplyConfigura
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *RoleBindingApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *RoleBindingApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *RoleBindingApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *RoleBindingApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

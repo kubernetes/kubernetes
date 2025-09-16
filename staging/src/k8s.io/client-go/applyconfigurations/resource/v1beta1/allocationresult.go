@@ -19,14 +19,26 @@ limitations under the License.
 package v1beta1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // AllocationResultApplyConfiguration represents a declarative configuration of the AllocationResult type for use
 // with apply.
+//
+// AllocationResult contains attributes of an allocated resource.
 type AllocationResultApplyConfiguration struct {
-	Devices      *DeviceAllocationResultApplyConfiguration `json:"devices,omitempty"`
-	NodeSelector *v1.NodeSelectorApplyConfiguration        `json:"nodeSelector,omitempty"`
+	// Devices is the result of allocating devices.
+	Devices *DeviceAllocationResultApplyConfiguration `json:"devices,omitempty"`
+	// NodeSelector defines where the allocated resources are available. If
+	// unset, they are available everywhere.
+	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
+	// AllocationTimestamp stores the time when the resources were allocated.
+	// This field is not guaranteed to be set, in which case that time is unknown.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gate.
+	AllocationTimestamp *metav1.Time `json:"allocationTimestamp,omitempty"`
 }
 
 // AllocationResultApplyConfiguration constructs a declarative configuration of the AllocationResult type for use with
@@ -48,5 +60,13 @@ func (b *AllocationResultApplyConfiguration) WithDevices(value *DeviceAllocation
 // If called multiple times, the NodeSelector field is set to the value of the last call.
 func (b *AllocationResultApplyConfiguration) WithNodeSelector(value *v1.NodeSelectorApplyConfiguration) *AllocationResultApplyConfiguration {
 	b.NodeSelector = value
+	return b
+}
+
+// WithAllocationTimestamp sets the AllocationTimestamp field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllocationTimestamp field is set to the value of the last call.
+func (b *AllocationResultApplyConfiguration) WithAllocationTimestamp(value metav1.Time) *AllocationResultApplyConfiguration {
+	b.AllocationTimestamp = &value
 	return b
 }

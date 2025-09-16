@@ -21,8 +21,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingapiv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -35,11 +36,16 @@ const (
 	defaultIPv6CIDR = "2001:db8::/64"
 )
 
-func newController(t *testing.T, objects []*networkingapiv1beta1.ServiceCIDR) (*fake.Clientset, *Controller) {
-	client := fake.NewSimpleClientset()
+func newController(t *testing.T, cidrsFromFlags []string, objects ...*networkingapiv1.ServiceCIDR) (*fake.Clientset, *Controller) {
+	var runtimeObjects []runtime.Object
+	for _, cidr := range objects {
+		runtimeObjects = append(runtimeObjects, cidr)
+	}
+
+	client := fake.NewSimpleClientset(runtimeObjects...)
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	serviceCIDRInformer := informerFactory.Networking().V1beta1().ServiceCIDRs()
+	serviceCIDRInformer := informerFactory.Networking().V1().ServiceCIDRs()
 
 	store := serviceCIDRInformer.Informer().GetStore()
 	for _, obj := range objects {
@@ -47,12 +53,11 @@ func newController(t *testing.T, objects []*networkingapiv1beta1.ServiceCIDR) (*
 		if err != nil {
 			t.Fatal(err)
 		}
-
 	}
 	c := &Controller{
 		client:             client,
 		interval:           time.Second,
-		cidrs:              []string{defaultIPv4CIDR, defaultIPv6CIDR},
+		cidrs:              cidrsFromFlags,
 		eventRecorder:      record.NewFakeRecorder(100),
 		serviceCIDRLister:  serviceCIDRInformer.Lister(),
 		serviceCIDRsSynced: func() bool { return true },
@@ -64,7 +69,7 @@ func newController(t *testing.T, objects []*networkingapiv1beta1.ServiceCIDR) (*
 func TestControllerSync(t *testing.T) {
 	testCases := []struct {
 		name    string
-		cidrs   []*networkingapiv1beta1.ServiceCIDR
+		cidrs   []*networkingapiv1.ServiceCIDR
 		actions [][]string // verb and resource
 	}{
 		{
@@ -73,12 +78,12 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "existing default service CIDR update Ready condition",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: DefaultServiceCIDRName,
 					},
-					Spec: networkingapiv1beta1.ServiceCIDRSpec{
+					Spec: networkingapiv1.ServiceCIDRSpec{
 						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
 				},
@@ -87,12 +92,12 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "existing default service CIDR not matching cidrs",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: DefaultServiceCIDRName,
 					},
-					Spec: networkingapiv1beta1.ServiceCIDRSpec{
+					Spec: networkingapiv1.ServiceCIDRSpec{
 						CIDRs: []string{"fd00::/112"},
 					},
 				},
@@ -100,18 +105,18 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "existing default service CIDR not ready",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: DefaultServiceCIDRName,
 					},
-					Spec: networkingapiv1beta1.ServiceCIDRSpec{
+					Spec: networkingapiv1.ServiceCIDRSpec{
 						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
-					Status: networkingapiv1beta1.ServiceCIDRStatus{
+					Status: networkingapiv1.ServiceCIDRStatus{
 						Conditions: []metav1.Condition{
 							{
-								Type:   string(networkingapiv1beta1.ServiceCIDRConditionReady),
+								Type:   string(networkingapiv1.ServiceCIDRConditionReady),
 								Status: metav1.ConditionFalse,
 							},
 						},
@@ -121,13 +126,13 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "existing default service CIDR being deleted",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              DefaultServiceCIDRName,
 						DeletionTimestamp: ptr.To(metav1.Now()),
 					},
-					Spec: networkingapiv1beta1.ServiceCIDRSpec{
+					Spec: networkingapiv1.ServiceCIDRSpec{
 						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
 				},
@@ -135,12 +140,12 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "existing service CIDRs but not default",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "non-default-cidr",
 					},
-					Spec: networkingapiv1beta1.ServiceCIDRSpec{
+					Spec: networkingapiv1.ServiceCIDRSpec{
 						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
 				},
@@ -151,9 +156,191 @@ func TestControllerSync(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			client, controller := newController(t, tc.cidrs)
+			client, controller := newController(t, []string{defaultIPv4CIDR, defaultIPv6CIDR}, tc.cidrs...)
 			controller.sync()
 			expectAction(t, client.Actions(), tc.actions)
+		})
+	}
+}
+
+func TestControllerSyncConversions(t *testing.T) {
+	testCases := []struct {
+		name            string
+		controllerCIDRs []string
+		existingCIDR    *networkingapiv1.ServiceCIDR
+		expectedAction  [][]string // verb, resource, [subresource]
+	}{
+		{
+			name:            "flags match ServiceCIDRs",
+			controllerCIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+			existingCIDR: &networkingapiv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultServiceCIDRName,
+				},
+				Spec: networkingapiv1.ServiceCIDRSpec{
+					CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+				},
+				Status: networkingapiv1.ServiceCIDRStatus{}, // No conditions
+			},
+			expectedAction: [][]string{{"patch", "servicecidrs", "status"}},
+		},
+		{
+			name:            "existing Ready=False condition, cidrs match -> no patch",
+			controllerCIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+			existingCIDR: &networkingapiv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultServiceCIDRName,
+				},
+				Spec: networkingapiv1.ServiceCIDRSpec{
+					CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+				},
+				Status: networkingapiv1.ServiceCIDRStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   networkingapiv1.ServiceCIDRConditionReady,
+							Status: metav1.ConditionFalse,
+							Reason: "SomeReason",
+						},
+					},
+				},
+			},
+			expectedAction: [][]string{}, // No patch expected, just logs/events
+		},
+		{
+			name:            "existing Ready=True condition -> no patch",
+			controllerCIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+			existingCIDR: &networkingapiv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultServiceCIDRName,
+				},
+				Spec: networkingapiv1.ServiceCIDRSpec{
+					CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+				},
+				Status: networkingapiv1.ServiceCIDRStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   networkingapiv1.ServiceCIDRConditionReady,
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expectedAction: [][]string{},
+		},
+		{
+			name:            "ServiceCIDR being deleted -> no patch",
+			controllerCIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+			existingCIDR: &networkingapiv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              DefaultServiceCIDRName,
+					DeletionTimestamp: ptr.To(metav1.Now()),
+				},
+				Spec: networkingapiv1.ServiceCIDRSpec{
+					CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+				},
+				Status: networkingapiv1.ServiceCIDRStatus{},
+			},
+			expectedAction: [][]string{},
+		},
+		{
+			name:            "IPv4 to IPv4 IPv6 is ok",
+			controllerCIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+			existingCIDR: &networkingapiv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultServiceCIDRName,
+				},
+				Spec: networkingapiv1.ServiceCIDRSpec{
+					CIDRs: []string{defaultIPv4CIDR}, // Existing has both
+				},
+				Status: networkingapiv1.ServiceCIDRStatus{},
+			},
+			expectedAction: [][]string{{"update", "servicecidrs"}},
+		},
+		{
+			name:            "IPv4 to IPv6 IPv4 - switching primary IP family leaves in inconsistent state",
+			controllerCIDRs: []string{defaultIPv6CIDR, defaultIPv4CIDR},
+			existingCIDR: &networkingapiv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultServiceCIDRName,
+				},
+				Spec: networkingapiv1.ServiceCIDRSpec{
+					CIDRs: []string{defaultIPv4CIDR}, // Existing has both
+				},
+				Status: networkingapiv1.ServiceCIDRStatus{},
+			},
+			expectedAction: [][]string{},
+		},
+		{
+			name:            "IPv6 to IPv6 IPv4",
+			controllerCIDRs: []string{defaultIPv6CIDR, defaultIPv4CIDR},
+			existingCIDR: &networkingapiv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultServiceCIDRName,
+				},
+				Spec: networkingapiv1.ServiceCIDRSpec{
+					CIDRs: []string{defaultIPv6CIDR}, // Existing has both
+				},
+				Status: networkingapiv1.ServiceCIDRStatus{},
+			},
+			expectedAction: [][]string{{"update", "servicecidrs"}},
+		},
+		{
+			name:            "IPv6 to IPv4 IPv6 - switching primary IP family leaves in inconsistent state",
+			controllerCIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+			existingCIDR: &networkingapiv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultServiceCIDRName,
+				},
+				Spec: networkingapiv1.ServiceCIDRSpec{
+					CIDRs: []string{defaultIPv6CIDR}, // Existing has both
+				},
+				Status: networkingapiv1.ServiceCIDRStatus{},
+			},
+			expectedAction: [][]string{},
+		},
+		{
+			name:            "IPv6 IPv4 to IPv4 IPv6 - switching primary IP family leaves in inconsistent state",
+			controllerCIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+			existingCIDR: &networkingapiv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultServiceCIDRName,
+				},
+				Spec: networkingapiv1.ServiceCIDRSpec{
+					CIDRs: []string{defaultIPv6CIDR, defaultIPv4CIDR}, // Existing has both
+				},
+				Status: networkingapiv1.ServiceCIDRStatus{},
+			},
+			expectedAction: [][]string{},
+		},
+		{
+			name:            "IPv4 IPv6 to IPv4 - needs operator attention for the IPv6 remaining Services",
+			controllerCIDRs: []string{defaultIPv4CIDR},
+			existingCIDR: &networkingapiv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultServiceCIDRName,
+				},
+				Spec: networkingapiv1.ServiceCIDRSpec{
+					CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
+				},
+				Status: networkingapiv1.ServiceCIDRStatus{},
+			},
+			expectedAction: [][]string{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Initialize controller and client with the existing ServiceCIDR
+			client, controller := newController(t, tc.controllerCIDRs, tc.existingCIDR)
+
+			// Call the syncStatus method directly
+			err := controller.sync()
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			// Verify the expected actions
+			expectAction(t, client.Actions(), tc.expectedAction)
 		})
 	}
 }

@@ -182,6 +182,23 @@ Usage:
     kubectl exec test-agnhost -- /agnhost fake-gitserver
 ```
 
+### fake-registry-server
+
+Starts a fake OCI registry server that serves static image files. This can be used to test
+pulling images from a private (with `--private` flag) or public registry.
+
+Private registry has static credentials `user:password`
+
+Usage:
+
+```console
+kubectl exec test-agnhost -- /agnhost fake-registry-server [--private]
+```
+
+#### Adding new image to the registry
+
+Adding a new image requires a new version of agnhost. To add new image, add a new line 
+to `test/images/agnhost/fakeregistryserver/images.txt` in format `<image> <tag> <internal tag>`
 
 ### guestbook
 
@@ -392,6 +409,7 @@ Starts a HTTP(S) server on given port with the following endpoints:
 
 - `/`: Returns the request's timestamp.
 - `/clientip`: Returns the request's IP address.
+- `/serverport`: Returns the server port.
 - `/dial`: Creates a given number of requests to the given host and port using the given protocol,
   and returns a JSON with the fields `responses` (successful request responses) and `errors` (
   failed request responses). Returns `200 OK` status code if the last request succeeded,
@@ -527,6 +545,21 @@ Usage:
 
 ```console
     kubectl exec test-agnhost -- /agnhost pause
+```
+
+
+### podcertificatesigner
+
+Runs a controller that signs PodCertificateRequests addressed to the signer name specified in the `--signer-name` flag.  It generates a CA hierarchy in-memory at startup.
+
+```console
+    kubectl run test-agnhost \
+      --generator=run-pod/v1 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.40 \
+      --restart=Always \
+      -- \
+      podcertificatesigner \
+      --signer-name=agnhost.k8s.io/testsigner
 ```
 
 

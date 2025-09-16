@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +47,7 @@ type VolumeResource struct {
 	Pvc       *v1.PersistentVolumeClaim
 	Pv        *v1.PersistentVolume
 	Sc        *storagev1.StorageClass
+	Vac       *storagev1beta1.VolumeAttributesClass
 
 	Volume TestVolume
 }
@@ -220,7 +222,7 @@ func (r *VolumeResource) CleanupResource(ctx context.Context) error {
 				}
 
 				if pv != nil {
-					err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, 5*time.Second, f.Timeouts.PVDelete)
+					err = e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, pv.Name, 5*time.Second, f.Timeouts.PVDeleteSlow)
 					if err != nil {
 						cleanUpErrs = append(cleanUpErrs, fmt.Errorf(
 							"persistent Volume %v not deleted by dynamic provisioner: %w", pv.Name, err))

@@ -29,8 +29,8 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/randfill"
 )
 
 func TestConversionRoundTrip(t *testing.T) {
@@ -42,12 +42,12 @@ func TestConversionRoundTrip(t *testing.T) {
 	err = v2scheme.RegisterConversions(scheme)
 	require.NoError(t, err)
 
-	fuzzer := fuzz.NewWithSeed(2374375)
+	fuzzer := randfill.NewWithSeed(2374375)
 
 	// v2 -> v2beta1 -> v2
 	for i := 0; i < 100; i++ {
 		expected := &v2.APIGroupDiscoveryList{}
-		fuzzer.Fuzz(expected)
+		fuzzer.Fill(expected)
 		expected.TypeMeta = metav1.TypeMeta{
 			Kind:       "APIGroupDiscoveryList",
 			APIVersion: "apidiscovery.k8s.io/v2",
@@ -68,7 +68,7 @@ func TestConversionRoundTrip(t *testing.T) {
 	// v2beta1 -> v2 -> v2beta1
 	for i := 0; i < 100; i++ {
 		expected := &v2beta1.APIGroupDiscoveryList{}
-		fuzzer.Fuzz(expected)
+		fuzzer.Fill(expected)
 		expected.TypeMeta = metav1.TypeMeta{
 			Kind:       "APIGroupDiscoveryList",
 			APIVersion: "apidiscovery.k8s.io/v2beta1",

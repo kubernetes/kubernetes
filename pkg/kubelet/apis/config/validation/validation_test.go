@@ -17,6 +17,7 @@ limitations under the License.
 package validation_test
 
 import (
+	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -75,12 +76,19 @@ var (
 			"KubeletCrashLoopBackOffMax": true,
 		},
 		Logging: logsapi.LoggingConfiguration{
-			Format: "text",
+			Format:         "text",
+			FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: logsapi.LogFlushFreqDefault}},
 		},
 		ContainerRuntimeEndpoint:    "unix:///run/containerd/containerd.sock",
 		ContainerLogMaxWorkers:      1,
+		ContainerLogMaxFiles:        5,
 		ContainerLogMonitorInterval: metav1.Duration{Duration: 10 * time.Second},
-		SingleProcessOOMKill:        ptr.To(!kubeletutil.IsCgroup2UnifiedMode()),
+		SingleProcessOOMKill: func() *bool {
+			if goruntime.GOOS == "linux" {
+				return ptr.To(!kubeletutil.IsCgroup2UnifiedMode())
+			}
+			return nil
+		}(),
 		CrashLoopBackOff: kubeletconfig.CrashLoopBackOffConfig{
 			MaxContainerRestartPeriod: &metav1.Duration{Duration: 3 * time.Second},
 		},
@@ -375,14 +383,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		},
 		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\" or \"NoSwap\"",
 	}, {
-		name: "specify MemorySwap.SwapBehavior without enabling NodeSwap",
-		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"NodeSwap": false}
-			conf.MemorySwap.SwapBehavior = kubetypes.LimitedSwap
-			return conf
-		},
-		errMsg: "invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled",
-	}, {
 		name: "CrashLoopBackOff.MaxContainerRestartPeriod too low",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true}
@@ -562,19 +562,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: taint.TimeAdded is not nil",
 		}, {
-			name: "specify tracing with KubeletTracing disabled",
-			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				samplingRate := int32(99999)
-				conf.FeatureGates = map[string]bool{"KubeletTracing": false}
-				conf.Tracing = &tracingapi.TracingConfiguration{SamplingRatePerMillion: &samplingRate}
-				return conf
-			},
-			errMsg: "invalid configuration: tracing should not be configured if KubeletTracing feature flag is disabled.",
-		}, {
 			name: "specify tracing invalid sampling rate",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				samplingRate := int32(-1)
-				conf.FeatureGates = map[string]bool{"KubeletTracing": true}
 				conf.Tracing = &tracingapi.TracingConfiguration{SamplingRatePerMillion: &samplingRate}
 				return conf
 			},
@@ -583,7 +573,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			name: "specify tracing invalid endpoint",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				ep := "dn%2s://localhost:4317"
-				conf.FeatureGates = map[string]bool{"KubeletTracing": true}
 				conf.Tracing = &tracingapi.TracingConfiguration{Endpoint: &ep}
 				return conf
 			},
@@ -616,7 +605,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.EnableSystemLogQuery = true
 				return conf
 			},
-			errMsg: "invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler",
+			errMsg: "invalid configuration: NodeLogQuery feature gate is required for enableSystemLogQuery",
 		}, {
 			name: "enableSystemLogQuery is enabled without enableSystemLogHandler",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
@@ -701,6 +690,13 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: `invalid configuration: pod logs path "/🧪" mut contains ASCII characters only`,
 		}, {
+			name: "invalid containerLogMaxFiles",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ContainerLogMaxFiles = 1
+				return conf
+			},
+			errMsg: "invalid configuration: containerLogMaxFiles must be greater than 1",
+		}, {
 			name: "invalid ContainerRuntimeEndpoint",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				conf.ContainerRuntimeEndpoint = ""
@@ -714,6 +710,39 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: "logging.format: Invalid value: \"invalid\": Unsupported log format",
+		}, {
+			name: "invalid imagePullCredentialsVerificationPolicy configuration",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"KubeletEnsureSecretPulledImages": true}
+				conf.ImagePullCredentialsVerificationPolicy = "invalid"
+				return conf
+			},
+			errMsg: `option "invalid" specified for imagePullCredentialsVerificationPolicy. Valid options are "NeverVerify", "NeverVerifyPreloadedImages", "NeverVerifyAllowlistedImages" or "AlwaysVerify"]`,
+		}, {
+			name: "invalid PreloadedImagesVerificationAllowlist configuration - featuregate enabled",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"KubeletEnsureSecretPulledImages": true}
+				conf.ImagePullCredentialsVerificationPolicy = string(kubeletconfig.NeverVerify)
+				conf.PreloadedImagesVerificationAllowlist = []string{"test.test/repo"}
+				return conf
+			},
+			errMsg: "can't set `preloadedImagesVerificationAllowlist` if `imagePullCredentialsVertificationPolicy` is not \"NeverVerifyAllowlistedImages\"]",
+		}, {
+			name: "invalid PreloadedImagesVerificationAllowlist configuration - featuregate disabled",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"KubeletEnsureSecretPulledImages": false}
+				conf.ImagePullCredentialsVerificationPolicy = string(kubeletconfig.NeverVerify)
+				return conf
+			},
+			errMsg: "invalid configuration: `imagePullCredentialsVerificationPolicy` must not be set if KubeletEnsureSecretPulledImages feature gate is not enabled",
+		}, {
+			name: "invalid PreloadedImagesVerificationAllowlist configuration",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"KubeletEnsureSecretPulledImages": false}
+				conf.PreloadedImagesVerificationAllowlist = []string{"test.test/repo"}
+				return conf
+			},
+			errMsg: "invalid configuration: `preloadedImagesVerificationAllowlist` must not be set if KubeletEnsureSecretPulledImages feature gate is not enabled",
 		}, {
 			name: "invalid FeatureGate",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

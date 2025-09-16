@@ -43,12 +43,14 @@ import (
 type containerManagerStub struct {
 	shouldResetExtendedResourceCapacity bool
 	extendedPluginResources             v1.ResourceList
+	memoryManager                       memorymanager.Manager
 }
 
 var _ ContainerManager = &containerManagerStub{}
 
-func (cm *containerManagerStub) Start(_ context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
+func (cm *containerManagerStub) Start(ctx context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
 	klog.V(2).InfoS("Starting stub container manager")
+	cm.memoryManager = memorymanager.NewFakeManager(ctx)
 	return nil
 }
 
@@ -125,7 +127,7 @@ func (cm *containerManagerStub) UpdatePluginResources(*schedulerframework.NodeIn
 }
 
 func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), memorymanager.NewFakeManager(), topologymanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), cm.memoryManager, topologymanager.NewFakeManager()}
 }
 
 func (cm *containerManagerStub) GetPodCgroupRoot() string {
@@ -193,6 +195,14 @@ func (cm *containerManagerStub) UpdateAllocatedResourcesStatus(pod *v1.Pod, stat
 
 func (cm *containerManagerStub) Updates() <-chan resourceupdates.Update {
 	return nil
+}
+
+func (cm *containerManagerStub) PodHasExclusiveCPUs(pod *v1.Pod) bool {
+	return false
+}
+
+func (cm *containerManagerStub) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
+	return false
 }
 
 func NewStubContainerManager() ContainerManager {

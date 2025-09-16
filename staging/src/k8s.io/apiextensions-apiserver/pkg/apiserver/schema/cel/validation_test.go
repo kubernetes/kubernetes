@@ -277,7 +277,7 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1.lowerAscii() == 'rook takes 👑'",
 
 				"'%d %s %f %s %s'.format([1, 'abc', 1.0, duration('1m'), timestamp('2000-01-01T00:00:00.000Z')]) == '1 abc 1.000000 60s 2000-01-01T00:00:00Z'",
-				"'%e'.format([3.14]) == '3.140000 × 10⁰⁰'",
+				"'%e'.format([3.14]) == '3.140000×10⁰⁰'",
 				"'%o %o %o'.format([7, 8, 9]) == '7 10 11'",
 				"'%b %b %b'.format([7, 8, 9]) == '111 1000 1001'",
 			},
@@ -427,6 +427,52 @@ func TestValidationExpressions(t *testing.T) {
 			errors: map[string]string{
 				// Mixed type lists are not allowed since we have HomogeneousAggregateLiterals enabled
 				"[1, 'a', false].filter(x, string(x) == 'a')": "compilation failed: ERROR: <input>:1:5: expected type 'int' but found 'string'",
+			},
+		},
+		{name: "ext lists version 3",
+			obj:    objs([]interface{}{1, 2, 3}, []interface{}{1, 2, 3}),
+			schema: schemas(listType(&integerType), listType(&integerType)),
+			valid: []string{
+				`lists.range(4) == [0,1,2,3]`,
+				`lists.range(0) == []`,
+				`[5,1,2,3].reverse() == [3,2,1,5]`,
+				`[].reverse() == []`,
+				`[1].reverse() == [1]`,
+				`['are', 'you', 'as', 'bored', 'as', 'I', 'am'].reverse() == ['am', 'I', 'as', 'bored', 'as', 'you', 'are']`,
+				`[false, true, true].reverse().reverse() == [false, true, true]`,
+				`[1,2,3,4].slice(0, 4) == [1,2,3,4]`,
+				`[1,2,3,4].slice(0, 0) == []`,
+				`[1,2,3,4].slice(1, 1) == []`,
+				`[1,2,3,4].slice(4, 4) == []`,
+				`[1,2,3,4].slice(1, 3) == [2, 3]`,
+				`dyn([]).flatten() == []`,
+				`dyn([1,2,3,4]).flatten() == [1,2,3,4]`,
+				`[].sort() == []`,
+				`[1].sort() == [1]`,
+				`[4, 3, 2, 1].sort() == [1, 2, 3, 4]`,
+				`["d", "a", "b", "c"].sort() == ["a", "b", "c", "d"]`,
+				`[].sortBy(e, e) == []`,
+				`["a"].sortBy(e, e) == ["a"]`,
+				`[-3, 1, -5, -2, 4].sortBy(e, -(e * e)) == [-5, 4, -3, -2, 1]`,
+				`[-3, 1, -5, -2, 4].map(e, e * 2).sortBy(e, -(e * e)) == [-10, 8, -6, -4, 2]`,
+				`lists.range(3).sortBy(e, -e) == [2, 1, 0]`,
+				`["a", "c", "b", "first"].sortBy(e, e == "first" ? "" : e) == ["first", "a", "b", "c"]`,
+				`[{'name': 'foo'}, {'name': 'bar'}, {'name': 'baz'}].sortBy(e, e.name) == [{'name': 'bar'}, {'name': 'baz'}, {'name': 'foo'}]`,
+				`[].distinct() == []`,
+				`[1].distinct() == [1]`,
+				`[-2, 5, -2, 1, 1, 5, -2, 1].distinct() == [-2, 5, 1]`,
+				`['c', 'a', 'a', 'b', 'a', 'b', 'c', 'c'].distinct() == ['c', 'a', 'b']`,
+				`[[1], [1], [2]].distinct() == [[1], [2]]`,
+				`[{'name': 'a'}, {'name': 'b'}, {'name': 'a'}].distinct() == [{'name': 'a'}, {'name': 'b'}]`,
+				`[[1],[2],[3,4]].flatten() == [1,2,3,4]`,
+			},
+			errors: map[string]string{
+				`[1,2,3,4].slice(3, 0) != [1,2]`:                  "cannot slice(3, 0), start index must be less than or equal to end index",
+				`[1,2,3,4].slice(0, 10) != [1,2]`:                 "cannot slice(0, 10), list is length 4",
+				`[1,2,3,4].slice(-5, 10) != [1,2]`:                "cannot slice(-5, 10), negative indexes not supported",
+				`[1,2,3,4].slice(-5, -3) != [1,2]`:                "cannot slice(-5, -3), negative indexes not supported",
+				`[[1],[2],[3,4]].flatten(-1) == [1,2,3,4]`:        "level must be non-negative evaluating rule: [[1],[2],[3,4]].flatten(-1) == [1,2,3,4]",
+				`["d", 3, 2, "c"].sort() == ["a", "b", "c", "d"]`: "expected type 'string' but found 'int'",
 			},
 		},
 		{name: "string lists",
@@ -2317,7 +2363,7 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 			schema: objectTypePtr(map[string]schema.Structural{
 				"f/2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2"),
 			}),
-			errors: []string{"Invalid value: \"object\": failed rule: self.m == 2"},
+			errors: []string{"Invalid value: failed rule: self.m == 2"},
 		},
 		// unescapable field names that are not accessed by the CEL rule are allowed and should not impact CEL rule validation
 		{name: "invalid rule under unescapable field name",
@@ -2351,7 +2397,7 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 			schema: objectTypePtr(map[string]schema.Structural{
 				"a@b": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2"),
 			}),
-			errors: []string{"Invalid value: \"object\": failed rule: self.m == 2"},
+			errors: []string{"Invalid value: failed rule: self.m == 2"},
 		},
 		{name: "matchExpressions - 'values' must be specified when 'operator' is 'In' or 'NotIn'",
 			obj: map[string]interface{}{
@@ -2650,8 +2696,8 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 				},
 			},
 			errors: []string{
-				`root.myProperty[key]: Invalid value: "string": must be value2 or not value`,
-				`root.myProperty[key2]: Invalid value: "string": len must be 5`,
+				`root.myProperty[key]: Invalid value: "value": must be value2 or not value`,
+				`root.myProperty[key2]: Invalid value: "value2": len must be 5`,
 			},
 			schema: &schema.Structural{
 				Generic: schema.Generic{
@@ -2696,8 +2742,8 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 				"key2": "value2",
 			},
 			errors: []string{
-				`root.key: Invalid value: "string": must be value2 or not value`,
-				`root.key2: Invalid value: "string": len must be 5`,
+				`root.key: Invalid value: "value": must be value2 or not value`,
+				`root.key2: Invalid value: "value2": len must be 5`,
 			},
 			schema: &schema.Structural{
 				Generic: schema.Generic{
@@ -3878,7 +3924,7 @@ func TestRatcheting(t *testing.T) {
 						type: string
 						x-kubernetes-validations:
 						- rule: self == "bar"
-						  message: "gotta be baz"
+						  message: "gotta be bar"
 				`),
 			oldObj: mustUnstructured(`
 				foo: baz
@@ -3887,7 +3933,7 @@ func TestRatcheting(t *testing.T) {
 				foo: baz
 			`),
 			warnings: []string{
-				`root.foo: Invalid value: "string": gotta be baz`,
+				`root.foo: Invalid value: "baz": gotta be bar`,
 			},
 		},
 		{
@@ -3914,7 +3960,7 @@ func TestRatcheting(t *testing.T) {
 				- bar: bar
 			`),
 			warnings: []string{
-				`root[0].bar: Invalid value: "string": gotta be baz`,
+				`root[0].bar: Invalid value: "bar": gotta be baz`,
 			},
 		},
 		{
@@ -3940,7 +3986,7 @@ func TestRatcheting(t *testing.T) {
 				- 2
 			`),
 			warnings: []string{
-				`root[1]: Invalid value: "number": gotta be odd`,
+				`root[1]: Invalid value: 2: gotta be odd`,
 			},
 		},
 		{
@@ -3974,7 +4020,7 @@ func TestRatcheting(t *testing.T) {
 				- 2
 			`),
 			warnings: []string{
-				`root.setArray[2]: Invalid value: "number": gotta be odd`,
+				`root.setArray[2]: Invalid value: 2: gotta be odd`,
 			},
 		},
 		{
@@ -4009,8 +4055,8 @@ func TestRatcheting(t *testing.T) {
 				  value: baz
 			`),
 			warnings: []string{
-				`root[0].value: Invalid value: "string": gotta be baz`,
-				`root[1].value: Invalid value: "string": gotta be baz`,
+				`root[0].value: Invalid value: "notbaz": gotta be baz`,
+				`root[1].value: Invalid value: "notbaz": gotta be baz`,
 			},
 		},
 		{
@@ -4043,7 +4089,7 @@ func TestRatcheting(t *testing.T) {
 				  value: notbaz
 			`),
 			warnings: []string{
-				`root[1].value: Invalid value: "string": gotta be baz`,
+				`root[1].value: Invalid value: "notbaz": gotta be baz`,
 			},
 		},
 		{
@@ -4085,8 +4131,8 @@ func TestRatcheting(t *testing.T) {
 						bar: notbaz
 			`),
 			warnings: []string{
-				`root.mapField.foo: Invalid value: "string": gotta be baz`,
-				`root.mapField.mapField.bar: Invalid value: "string": gotta be nested baz`,
+				`root.mapField.foo: Invalid value: "notbaz": gotta be baz`,
+				`root.mapField.mapField.bar: Invalid value: "notbaz": gotta be nested baz`,
 			},
 		},
 		{
@@ -4136,11 +4182,11 @@ func TestRatcheting(t *testing.T) {
 			`),
 			errors: []string{
 				// Didn't get ratcheted because we changed its value from baz to notbaz
-				`root.mapField.foo: Invalid value: "string": gotta be baz`,
+				`root.mapField.foo: Invalid value: "notbaz": gotta be baz`,
 			},
 			warnings: []string{
 				// Ratcheted because its value remained the same, even though it is invalid
-				`root.mapField.mapField.bar: Invalid value: "string": gotta be baz`,
+				`root.mapField.mapField.bar: Invalid value: "notbaz": gotta be baz`,
 			},
 		},
 		{
@@ -4173,7 +4219,7 @@ func TestRatcheting(t *testing.T) {
 				- bar: bar
 			`),
 			warnings: []string{
-				`root.atomicArray[0].bar: Invalid value: "string": gotta be baz`,
+				`root.atomicArray[0].bar: Invalid value: "bar": gotta be baz`,
 			},
 		},
 		{
@@ -4201,7 +4247,7 @@ func TestRatcheting(t *testing.T) {
 				- bar: baz
 			`),
 			errors: []string{
-				`root[0].bar: Invalid value: "string": gotta be baz`,
+				`root[0].bar: Invalid value: "bar": gotta be baz`,
 			},
 		},
 		{
@@ -4222,7 +4268,7 @@ func TestRatcheting(t *testing.T) {
 				foo: bar
 			`),
 			errors: []string{
-				`root.foo: Invalid value: "string": gotta be baz`,
+				`root.foo: Invalid value: "bar": gotta be baz`,
 			},
 		},
 		{
@@ -4249,7 +4295,7 @@ func TestRatcheting(t *testing.T) {
 				bar: invalid
 			`),
 			errors: []string{
-				`root.foo: Invalid value: "object": gotta be baz`,
+				`root.foo: Invalid value: gotta be baz`,
 			},
 		},
 		{
@@ -4305,8 +4351,8 @@ func TestRatcheting(t *testing.T) {
 				kind: Baz
 			`),
 			errors: []string{
-				`root.apiVersion: Invalid value: "string": failed rule: self == "v1"`,
-				`root.kind: Invalid value: "string": failed rule: self == "Pod"`,
+				`root.apiVersion: Invalid value: "v2": failed rule: self == "v1"`,
+				`root.kind: Invalid value: "Baz": failed rule: self == "Pod"`,
 			},
 		},
 		{
@@ -4374,12 +4420,12 @@ func TestRatcheting(t *testing.T) {
 				  otherField: newValue3
 			`),
 			warnings: []string{
-				`root.subField.apiVersion: Invalid value: "string": failed rule: self == "v1"`,
-				`root.subField.kind: Invalid value: "string": failed rule: self == "Pod"`,
-				`root.list[0].apiVersion: Invalid value: "string": failed rule: self == "v1"`,
-				`root.list[0].kind: Invalid value: "string": failed rule: self == "Pod"`,
-				`root.list[1].apiVersion: Invalid value: "string": failed rule: self == "v1"`,
-				`root.list[1].kind: Invalid value: "string": failed rule: self == "Pod"`,
+				`root.subField.apiVersion: Invalid value: "v2": failed rule: self == "v1"`,
+				`root.subField.kind: Invalid value: "Baz": failed rule: self == "Pod"`,
+				`root.list[0].apiVersion: Invalid value: "v2": failed rule: self == "v1"`,
+				`root.list[0].kind: Invalid value: "Baz": failed rule: self == "Pod"`,
+				`root.list[1].apiVersion: Invalid value: "v3": failed rule: self == "v1"`,
+				`root.list[1].kind: Invalid value: "Bar": failed rule: self == "Pod"`,
 			},
 		},
 	}

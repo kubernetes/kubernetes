@@ -18,9 +18,11 @@ package emptydir
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	"os"
 	"path/filepath"
+
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -31,8 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	usernamespacefeature "k8s.io/kubernetes/pkg/kubelet/userns"
 	"k8s.io/kubernetes/pkg/volume"
@@ -82,7 +84,7 @@ func (plugin *emptyDirPlugin) GetPluginName() string {
 func (plugin *emptyDirPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	volumeSource, _ := getVolumeSource(spec)
 	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference an EmptyDir volume type")
+		return "", fmt.Errorf("spec does not reference an emptyDir volume type")
 	}
 
 	// Return user defined volume name, since this is an ephemeral volume type
@@ -106,18 +108,12 @@ func (plugin *emptyDirPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bo
 }
 
 func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(plugin.GetPluginName()), &realMountDetector{plugin.host.GetMounter(plugin.GetPluginName())})
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
 }
 
 func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec *volume.Spec, pod *v1.Pod) *resource.Quantity {
-	// if feature is disabled, continue the default behavior of linux host default
-	sizeLimit := &resource.Quantity{}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SizeMemoryBackedVolumes) {
-		return sizeLimit
-	}
-
 	// size limit defaults to node allocatable (pods can't consume more memory than all pods)
-	sizeLimit = nodeAllocatableMemory
+	sizeLimit := nodeAllocatableMemory
 	zero := resource.MustParse("0")
 
 	// determine pod resource allocation
@@ -170,7 +166,7 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 
 func (plugin *emptyDirPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(plugin.GetPluginName()), &realMountDetector{plugin.host.GetMounter(plugin.GetPluginName())})
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
 }
 
 func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Unmounter, error) {
@@ -278,7 +274,8 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
 
-	volume.SetVolumeOwnership(ed, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(ed.plugin, nil))
+	ownershipChanger := volume.NewVolumeOwnership(ed, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(ed.plugin, nil))
+	_ = ownershipChanger.ChangePermissions()
 
 	// If setting up the quota fails, just log a message but don't actually error out.
 	// We'll use the old du mechanism in this case, at least until we support
@@ -403,10 +400,19 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 		}
 	}
 
+	podLevelAndContainerLevelRequests := []v1.ResourceList{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		podLevelAndContainerLevelRequests = append(podLevelAndContainerLevelRequests, pod.Spec.Resources.Requests)
+	}
+
 	// In some rare cases init containers can also consume Huge pages
 	for _, container := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
-		// We can take request because limit and requests must match.
-		for requestName := range container.Resources.Requests {
+		podLevelAndContainerLevelRequests = append(podLevelAndContainerLevelRequests, container.Resources.Requests)
+	}
+
+	// We can take request because limit and requests must match.
+	for _, resourceList := range podLevelAndContainerLevelRequests {
+		for requestName := range resourceList {
 			if !v1helper.IsHugePageResourceName(requestName) {
 				continue
 			}
@@ -436,7 +442,6 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 	}
 
 	return fmt.Sprintf("%s=%s", hugePagesPageSizeMountOption, pageSize.String()), nil
-
 }
 
 // setupDir creates the directory with the default permissions specified by the perm constant.

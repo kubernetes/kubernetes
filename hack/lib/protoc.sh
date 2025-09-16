@@ -32,7 +32,8 @@ PROTOC_VERSION=23.4
 # $1: Full path to the directory where the api.proto file is
 function kube::protoc::generate_proto() {
   kube::golang::setup_env
-  GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
+  go -C "${KUBE_ROOT}/hack/tools" install google.golang.org/protobuf/cmd/protoc-gen-go
+  go -C "${KUBE_ROOT}/hack/tools" install google.golang.org/grpc/cmd/protoc-gen-go-grpc
 
   kube::protoc::check_protoc
 
@@ -57,23 +58,17 @@ function kube::protoc::check_protoc() {
 # $1: Full path to the directory where the api.proto file is
 function kube::protoc::protoc() {
   local package=${1}
-  gogopath=$(dirname "$(kube::util::find-binary "protoc-gen-gogo")")
 
-  (
-    cd "${package}"
-
-    # This invocation of --gogo_out produces its output in the current
-    # directory (despite gogo docs saying it would be source-relative, it
-    # isn't).  The inputs to this function do not all have a common root, so
-    # this works best for all inputs.
-    PATH="${gogopath}:${PATH}" protoc \
-      --proto_path="$(pwd -P)" \
-      --proto_path="${KUBE_ROOT}/vendor" \
-      --proto_path="${KUBE_ROOT}/staging/src" \
-      --proto_path="${KUBE_ROOT}/third_party/protobuf" \
-      --gogo_out=paths=source_relative,plugins=grpc:. \
-      api.proto
-  )
+  protoc \
+    --proto_path="$(pwd -P)" \
+    --proto_path="${KUBE_ROOT}/vendor" \
+    --proto_path="${KUBE_ROOT}/staging/src" \
+    --proto_path="${KUBE_ROOT}/third_party/protobuf" \
+    --go_out=. \
+    --go_opt=paths=source_relative \
+    --go-grpc_out=. \
+    --go-grpc_opt=paths=source_relative \
+    "${package}"/api.proto
 }
 
 # Formats $1/api.pb.go, adds the boilerplate comments and run gofmt on it
@@ -81,12 +76,14 @@ function kube::protoc::protoc() {
 function kube::protoc::format() {
   local package=${1}
 
-  # Update boilerplate for the generated file.
-  cat hack/boilerplate/boilerplate.generatego.txt "${package}/api.pb.go" > tmpfile && mv tmpfile "${package}/api.pb.go"
-
   # Run gofmt to clean up the generated code.
   kube::golang::setup_env
-  gofmt -s -w "${package}/api.pb.go"
+
+  # Update boilerplate for the generated files.
+  for file in "${package}"/api*.pb.go ; do
+    cat hack/boilerplate/boilerplate.generatego.txt "${file}" > tmpfile && mv tmpfile "${file}"
+    gofmt -s -w "${file}"
+  done
 }
 
 # Compares the contents of $1 and $2
@@ -101,19 +98,20 @@ function kube::protoc::diff() {
 }
 
 function kube::protoc::install() {
+  local os
+  local arch
+  local download_folder
+  local download_file
+  local third_party_dir
+
+  os=$(kube::util::host_os)
+  arch=$(kube::util::host_arch)
+  download_folder="protoc-v${PROTOC_VERSION}-${os}-${arch}"
+  download_file="${download_folder}.zip"
+  third_party_dir="${KUBE_ROOT}/third_party"
   # run in a subshell to isolate caller from directory changes
   (
-    local os
-    local arch
-    local download_folder
-    local download_file
-
-    os=$(kube::util::host_os)
-    arch=$(kube::util::host_arch)
-    download_folder="protoc-v${PROTOC_VERSION}-${os}-${arch}"
-    download_file="${download_folder}.zip"
-
-    cd "${KUBE_ROOT}/third_party" || return 1
+    cd "${third_party_dir}" || return 1
     if [[ $(readlink protoc) != "${download_folder}" ]]; then
       local url
       if [[ ${os} == "darwin" ]]; then
@@ -136,8 +134,12 @@ function kube::protoc::install() {
       rm "${download_file}"
     fi
     kube::log::info "protoc v${PROTOC_VERSION} installed. To use:"
-    kube::log::info "export PATH=\"$(pwd)/protoc:\${PATH}\""
+    kube::log::info "export PATH=\"${third_party_dir}/protoc:\${PATH}\""
   )
+  # export updated PATH so install-protoc.sh can be sourced
+  # CLI callers will need to use the export indicated above
+  PATH="${third_party_dir}/protoc:${PATH}"
+  export PATH
 }
 
 # Marker function to indicate protoc.sh has been fully sourced

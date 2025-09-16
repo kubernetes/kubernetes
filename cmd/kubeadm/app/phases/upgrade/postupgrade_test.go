@@ -20,11 +20,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,14 +32,11 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 func TestMoveFiles(t *testing.T) {
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
-	os.Chmod(tmpdir, 0766)
+	tmpdir := t.TempDir()
 
 	certPath := filepath.Join(tmpdir, constants.APIServerCertName)
 	certFile, err := os.OpenFile(certPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
@@ -74,9 +68,7 @@ func TestMoveFiles(t *testing.T) {
 }
 
 func TestRollbackFiles(t *testing.T) {
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
-	os.Chmod(tmpdir, 0766)
+	tmpdir := t.TempDir()
 
 	subDir := filepath.Join(tmpdir, "expired")
 	if err := os.Mkdir(subDir, 0766); err != nil {
@@ -114,26 +106,15 @@ func TestRollbackFiles(t *testing.T) {
 }
 
 func TestWriteKubeletConfigFiles(t *testing.T) {
-	// exit early if the user doesn't have root permission as the test needs to create /etc/kubernetes directory
-	// while the permission should be granted to the user.
-	isPrivileged := preflight.IsPrivilegedUserCheck{}
-	if _, err := isPrivileged.Check(); err != nil {
-		return
-	}
+	tempDir := t.TempDir()
 	testCases := []struct {
-		name       string
-		dryrun     bool
-		patchesDir string
-		errPattern string
-		cfg        *kubeadmapi.InitConfiguration
+		name          string
+		patchesDir    string
+		expectedError bool
+		cfg           *kubeadmapi.InitConfiguration
 	}{
-		// Be careful that if the dryrun is set to false and the test is run on a live cluster, the kubelet config file might be overwritten.
-		// However, you should be able to find the original config file in /etc/kubernetes/tmp/kubeadm-kubelet-configxxx folder.
-		// The test haven't clean up the temporary file created under /etc/kubernetes/tmp/ as that could be accidentally delete other files in
-		// that folder as well which might be unexpected.
 		{
-			name:   "write kubelet config file successfully",
-			dryrun: true,
+			name: "write kubelet config file successfully",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					ComponentConfigs: kubeadmapi.ComponentConfigMap{
@@ -143,16 +124,14 @@ func TestWriteKubeletConfigFiles(t *testing.T) {
 			},
 		},
 		{
-			name:       "aggregate errs: no kubelet config file and cannot read config file",
-			dryrun:     true,
-			errPattern: missingKubeletConfig,
-			cfg:        &kubeadmapi.InitConfiguration{},
+			name:          "aggregate errs: no kubelet config file and cannot read config file",
+			expectedError: true,
+			cfg:           &kubeadmapi.InitConfiguration{},
 		},
 		{
-			name:       "only one err: patch dir does not exist",
-			dryrun:     true,
-			patchesDir: "Bogus",
-			errPattern: "could not list patch files for path \"Bogus\"",
+			name:          "only one err: patch dir does not exist",
+			patchesDir:    "Bogus",
+			expectedError: true,
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					ComponentConfigs: kubeadmapi.ComponentConfigMap{
@@ -163,14 +142,9 @@ func TestWriteKubeletConfigFiles(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		err := WriteKubeletConfigFiles(tc.cfg, tc.patchesDir, tc.dryrun, os.Stdout)
-		if err != nil && tc.errPattern != "" {
-			if match, _ := regexp.MatchString(tc.errPattern, err.Error()); !match {
-				t.Fatalf("Expected error contains %q, got %v", tc.errPattern, err.Error())
-			}
-		}
-		if err == nil && len(tc.errPattern) != 0 {
-			t.Fatalf("WriteKubeletConfigFiles didn't return error expected %s", tc.errPattern)
+		err := WriteKubeletConfigFiles(tc.cfg, tempDir, tempDir, tc.patchesDir, true, os.Stdout)
+		if (err != nil) != tc.expectedError {
+			t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, err != nil, err)
 		}
 	}
 }

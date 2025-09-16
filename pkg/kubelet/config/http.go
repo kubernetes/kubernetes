@@ -43,7 +43,7 @@ type sourceURL struct {
 }
 
 // NewSourceURL specifies the URL where to read the Pod configuration from, then watches it for changes.
-func NewSourceURL(url string, header http.Header, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
+func NewSourceURL(logger klog.Logger, url string, header http.Header, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	config := &sourceURL{
 		url:      url,
 		header:   header,
@@ -54,35 +54,35 @@ func NewSourceURL(url string, header http.Header, nodeName types.NodeName, perio
 		// read the manifest URL passed to kubelet.
 		client: &http.Client{Timeout: 10 * time.Second},
 	}
-	klog.V(1).InfoS("Watching URL", "URL", url)
-	go wait.Until(config.run, period, wait.NeverStop)
+	logger.V(1).Info("Watching URL", "URL", url)
+	go wait.Until(func() { config.run(logger) }, period, wait.NeverStop)
 }
 
-func (s *sourceURL) run() {
-	if err := s.extractFromURL(); err != nil {
+func (s *sourceURL) run(logger klog.Logger) {
+	if err := s.extractFromURL(logger); err != nil {
 		// Don't log this multiple times per minute. The first few entries should be
 		// enough to get the point across.
 		if s.failureLogs < 3 {
-			klog.InfoS("Failed to read pods from URL", "err", err)
+			logger.Info("Failed to read pods from URL", "err", err)
 		} else if s.failureLogs == 3 {
-			klog.InfoS("Failed to read pods from URL. Dropping verbosity of this message to V(4)", "err", err)
+			logger.Info("Failed to read pods from URL. Dropping verbosity of this message to V(4)", "err", err)
 		} else {
-			klog.V(4).InfoS("Failed to read pods from URL", "err", err)
+			logger.V(4).Info("Failed to read pods from URL", "err", err)
 		}
 		s.failureLogs++
 	} else {
 		if s.failureLogs > 0 {
-			klog.InfoS("Successfully read pods from URL")
+			logger.Info("Successfully read pods from URL")
 			s.failureLogs = 0
 		}
 	}
 }
 
-func (s *sourceURL) applyDefaults(pod *api.Pod) error {
-	return applyDefaults(pod, s.url, false, s.nodeName)
+func (s *sourceURL) applyDefaults(logger klog.Logger, pod *api.Pod) error {
+	return applyDefaults(logger, pod, s.url, false, s.nodeName)
 }
 
-func (s *sourceURL) extractFromURL() error {
+func (s *sourceURL) extractFromURL(logger klog.Logger) error {
 	req, err := http.NewRequest("GET", s.url, nil)
 	if err != nil {
 		return err
@@ -112,7 +112,7 @@ func (s *sourceURL) extractFromURL() error {
 	s.data = data
 
 	// First try as it is a single pod.
-	parsed, pod, singlePodErr := tryDecodeSinglePod(data, s.applyDefaults)
+	parsed, pod, singlePodErr := tryDecodeSinglePod(logger, data, s.applyDefaults)
 	if parsed {
 		if singlePodErr != nil {
 			// It parsed but could not be used.
@@ -123,7 +123,7 @@ func (s *sourceURL) extractFromURL() error {
 	}
 
 	// That didn't work, so try a list of pods.
-	parsed, podList, multiPodErr := tryDecodePodList(data, s.applyDefaults)
+	parsed, podList, multiPodErr := tryDecodePodList(logger, data, s.applyDefaults)
 	if parsed {
 		if multiPodErr != nil {
 			// It parsed but could not be used.

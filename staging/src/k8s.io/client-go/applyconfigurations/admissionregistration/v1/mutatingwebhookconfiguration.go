@@ -29,10 +29,14 @@ import (
 
 // MutatingWebhookConfigurationApplyConfiguration represents a declarative configuration of the MutatingWebhookConfiguration type for use
 // with apply.
+//
+// MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
 type MutatingWebhookConfigurationApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Webhooks                             []MutatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
+	// Webhooks is a list of webhooks and the affected resources and operations.
+	Webhooks []MutatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
 }
 
 // MutatingWebhookConfiguration constructs a declarative configuration of the MutatingWebhookConfiguration type for use with
@@ -45,29 +49,14 @@ func MutatingWebhookConfiguration(name string) *MutatingWebhookConfigurationAppl
 	return b
 }
 
-// ExtractMutatingWebhookConfiguration extracts the applied configuration owned by fieldManager from
-// mutatingWebhookConfiguration. If no managedFields are found in mutatingWebhookConfiguration for fieldManager, a
-// MutatingWebhookConfigurationApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractMutatingWebhookConfigurationFrom extracts the applied configuration owned by fieldManager from
+// mutatingWebhookConfiguration for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // mutatingWebhookConfiguration must be a unmodified MutatingWebhookConfiguration API object that was retrieved from the Kubernetes API.
-// ExtractMutatingWebhookConfiguration provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractMutatingWebhookConfigurationFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
-	return extractMutatingWebhookConfiguration(mutatingWebhookConfiguration, fieldManager, "")
-}
-
-// ExtractMutatingWebhookConfigurationStatus is the same as ExtractMutatingWebhookConfiguration except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractMutatingWebhookConfigurationStatus(mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
-	return extractMutatingWebhookConfiguration(mutatingWebhookConfiguration, fieldManager, "status")
-}
-
-func extractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, fieldManager string, subresource string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+func ExtractMutatingWebhookConfigurationFrom(mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, fieldManager string, subresource string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
 	b := &MutatingWebhookConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(mutatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1.MutatingWebhookConfiguration"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +68,22 @@ func extractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admission
 	b.WithAPIVersion("admissionregistration.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractMutatingWebhookConfiguration extracts the applied configuration owned by fieldManager from
+// mutatingWebhookConfiguration. If no managedFields are found in mutatingWebhookConfiguration for fieldManager, a
+// MutatingWebhookConfigurationApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// mutatingWebhookConfiguration must be a unmodified MutatingWebhookConfiguration API object that was retrieved from the Kubernetes API.
+// ExtractMutatingWebhookConfiguration provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+	return ExtractMutatingWebhookConfigurationFrom(mutatingWebhookConfiguration, fieldManager, "")
+}
+
+func (b MutatingWebhookConfigurationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -251,8 +256,24 @@ func (b *MutatingWebhookConfigurationApplyConfiguration) WithWebhooks(values ...
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *MutatingWebhookConfigurationApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *MutatingWebhookConfigurationApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *MutatingWebhookConfigurationApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *MutatingWebhookConfigurationApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

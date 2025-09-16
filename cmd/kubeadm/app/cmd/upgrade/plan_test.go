@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/diff"
+
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
@@ -570,7 +571,7 @@ _____________________________________________________________________
 				t.Errorf("failed ToPrinter, err: %+v", err)
 			}
 
-			plan := genUpgradePlan(rt.upgrades, rt.versionStates)
+			plan := genUpgradePlan(rt.upgrades, rt.versionStates, true)
 			if err := printer.PrintObj(plan, rt.buf); err != nil {
 				t.Errorf("unexpected error when print object: %v", err)
 			}
@@ -814,7 +815,7 @@ _____________________________________________________________________
 				t.Errorf("failed ToPrinter, err: %+v", err)
 			}
 
-			plan := genUpgradePlan(upgrades, versionStates)
+			plan := genUpgradePlan(upgrades, versionStates, true)
 			if err := printer.PrintObj(plan, rt.buf); err != nil {
 				t.Errorf("unexpected error when print object: %v", err)
 			}
@@ -822,7 +823,7 @@ _____________________________________________________________________
 			actual := rt.buf.String()
 			if actual != rt.expected {
 
-				t.Errorf("failed PrintUpgradePlan:\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff:\n%s", rt.expected, actual, diff.StringDiff(actual, rt.expected))
+				t.Errorf("failed PrintUpgradePlan:\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff:\n%s", rt.expected, actual, diff.Diff(actual, rt.expected))
 			}
 		})
 	}

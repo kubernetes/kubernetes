@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/klog/v2/ktesting"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -335,26 +336,26 @@ func TestHTTPProxy(t *testing.T) {
 }
 
 func TestCreateBackoffManager(t *testing.T) {
-
+	_, ctx := ktesting.NewTestContext(t)
 	theUrl, _ := url.Parse("http://localhost")
 
 	// 1 second base backoff + duration of 2 seconds -> exponential backoff for requests.
 	t.Setenv(envBackoffBase, "1")
 	t.Setenv(envBackoffDuration, "2")
 	backoff := readExpBackoffConfig()
-	backoff.UpdateBackoff(theUrl, nil, 500)
-	backoff.UpdateBackoff(theUrl, nil, 500)
-	if backoff.CalculateBackoff(theUrl)/time.Second != 2 {
+	backoff.UpdateBackoffWithContext(ctx, theUrl, nil, 500)
+	backoff.UpdateBackoffWithContext(ctx, theUrl, nil, 500)
+	if backoff.CalculateBackoffWithContext(ctx, theUrl)/time.Second != 2 {
 		t.Errorf("Backoff env not working.")
 	}
 
 	// 0 duration -> no backoff.
 	t.Setenv(envBackoffBase, "1")
 	t.Setenv(envBackoffDuration, "0")
-	backoff.UpdateBackoff(theUrl, nil, 500)
-	backoff.UpdateBackoff(theUrl, nil, 500)
+	backoff.UpdateBackoffWithContext(ctx, theUrl, nil, 500)
+	backoff.UpdateBackoffWithContext(ctx, theUrl, nil, 500)
 	backoff = readExpBackoffConfig()
-	if backoff.CalculateBackoff(theUrl)/time.Second != 0 {
+	if backoff.CalculateBackoffWithContext(ctx, theUrl)/time.Second != 0 {
 		t.Errorf("Zero backoff duration, but backoff still occurring.")
 	}
 
@@ -362,9 +363,9 @@ func TestCreateBackoffManager(t *testing.T) {
 	t.Setenv(envBackoffBase, "")
 	t.Setenv(envBackoffDuration, "")
 	backoff = readExpBackoffConfig()
-	backoff.UpdateBackoff(theUrl, nil, 500)
-	backoff.UpdateBackoff(theUrl, nil, 500)
-	if backoff.CalculateBackoff(theUrl)/time.Second != 0 {
+	backoff.UpdateBackoffWithContext(ctx, theUrl, nil, 500)
+	backoff.UpdateBackoffWithContext(ctx, theUrl, nil, 500)
+	if backoff.CalculateBackoffWithContext(ctx, theUrl)/time.Second != 0 {
 		t.Errorf("Backoff should have been 0.")
 	}
 

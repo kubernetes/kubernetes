@@ -24,13 +24,59 @@ import (
 
 // ResourceSliceSpecApplyConfiguration represents a declarative configuration of the ResourceSliceSpec type for use
 // with apply.
+//
+// ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
 type ResourceSliceSpecApplyConfiguration struct {
-	Driver       *string                            `json:"driver,omitempty"`
-	Pool         *ResourcePoolApplyConfiguration    `json:"pool,omitempty"`
-	NodeName     *string                            `json:"nodeName,omitempty"`
+	// Driver identifies the DRA driver providing the capacity information.
+	// A field selector can be used to list only ResourceSlice
+	// objects with a certain driver name.
+	//
+	// Must be a DNS subdomain and should end with a DNS domain owned by the
+	// vendor of the driver. This field is immutable.
+	Driver *string `json:"driver,omitempty"`
+	// Pool describes the pool that this ResourceSlice belongs to.
+	Pool *ResourcePoolApplyConfiguration `json:"pool,omitempty"`
+	// NodeName identifies the node which provides the resources in this pool.
+	// A field selector can be used to list only ResourceSlice
+	// objects belonging to a certain node.
+	//
+	// This field can be used to limit access from nodes to ResourceSlices with
+	// the same node name. It also indicates to autoscalers that adding
+	// new nodes of the same type as some old node might also make new
+	// resources available.
+	//
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
+	// This field is immutable.
+	NodeName *string `json:"nodeName,omitempty"`
+	// NodeSelector defines which nodes have access to the resources in the pool,
+	// when that pool is not limited to a single node.
+	//
+	// Must use exactly one term.
+	//
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
 	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
-	AllNodes     *bool                              `json:"allNodes,omitempty"`
-	Devices      []DeviceApplyConfiguration         `json:"devices,omitempty"`
+	// AllNodes indicates that all nodes have access to the resources in the pool.
+	//
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
+	AllNodes *bool `json:"allNodes,omitempty"`
+	// Devices lists some or all of the devices in this pool.
+	//
+	// Must not have more than 128 entries.
+	Devices []DeviceApplyConfiguration `json:"devices,omitempty"`
+	// PerDeviceNodeSelection defines whether the access from nodes to
+	// resources in the pool is set on the ResourceSlice level or on each
+	// device. If it is set to true, every device defined the ResourceSlice
+	// must specify this individually.
+	//
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
+	PerDeviceNodeSelection *bool `json:"perDeviceNodeSelection,omitempty"`
+	// SharedCounters defines a list of counter sets, each of which
+	// has a name and a list of counters available.
+	//
+	// The names of the SharedCounters must be unique in the ResourceSlice.
+	//
+	// The maximum number of SharedCounters is 32.
+	SharedCounters []CounterSetApplyConfiguration `json:"sharedCounters,omitempty"`
 }
 
 // ResourceSliceSpecApplyConfiguration constructs a declarative configuration of the ResourceSliceSpec type for use with
@@ -88,6 +134,27 @@ func (b *ResourceSliceSpecApplyConfiguration) WithDevices(values ...*DeviceApply
 			panic("nil value passed to WithDevices")
 		}
 		b.Devices = append(b.Devices, *values[i])
+	}
+	return b
+}
+
+// WithPerDeviceNodeSelection sets the PerDeviceNodeSelection field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PerDeviceNodeSelection field is set to the value of the last call.
+func (b *ResourceSliceSpecApplyConfiguration) WithPerDeviceNodeSelection(value bool) *ResourceSliceSpecApplyConfiguration {
+	b.PerDeviceNodeSelection = &value
+	return b
+}
+
+// WithSharedCounters adds the given value to the SharedCounters field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the SharedCounters field.
+func (b *ResourceSliceSpecApplyConfiguration) WithSharedCounters(values ...*CounterSetApplyConfiguration) *ResourceSliceSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithSharedCounters")
+		}
+		b.SharedCounters = append(b.SharedCounters, *values[i])
 	}
 	return b
 }

@@ -78,7 +78,7 @@ func (sp *subpath) PrepareSafeSubpath(subPath Subpath) (newHostPath string, clea
 	return newHostPath, cleanupAction, err
 }
 
-// This implementation is shared between Linux and NsEnter
+// safeOpenSubPath opens subpath and returns its fd.
 func safeOpenSubPath(mounter mount.Interface, subpath Subpath) (int, error) {
 	if !mount.PathWithinBase(subpath.Path, subpath.VolumePath) {
 		return -1, fmt.Errorf("subpath %q not within volume path %q", subpath.Path, subpath.VolumePath)
@@ -92,11 +92,6 @@ func safeOpenSubPath(mounter mount.Interface, subpath Subpath) (int, error) {
 
 // prepareSubpathTarget creates target for bind-mount of subpath. It returns
 // "true" when the target already exists and something is mounted there.
-// Given Subpath must have all paths with already resolved symlinks and with
-// paths relevant to kubelet (when it runs in a container).
-// This function is called also by NsEnterMounter. It works because
-// /var/lib/kubelet is mounted from the host into the container with Kubelet as
-// /var/lib/kubelet too.
 func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, string, error) {
 	// Early check for already bind-mounted subpath.
 	bindPathTarget := getSubpathBindTarget(subpath)
@@ -237,7 +232,7 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 	return bindPathTarget, nil
 }
 
-// This implementation is shared between Linux and NsEnter
+// doCleanSubPaths tears down the subpath bind mounts for a pod
 func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) error {
 	// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/*
 	subPathDir := filepath.Join(podDir, containerSubPathDirectoryName, volumeName)
@@ -372,9 +367,7 @@ func removeEmptyDirs(baseDir, endDir string) error {
 	return nil
 }
 
-// This implementation is shared between Linux and NsEnterMounter. Both pathname
-// and base must be either already resolved symlinks or thet will be resolved in
-// kubelet's mount namespace (in case it runs containerized).
+// doSafeMakeDir creates a directory at pathname, but only if it is within base.
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	klog.V(4).Infof("Creating directory %q within base %q", pathname, base)
 
@@ -523,7 +516,6 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 	return pathname, []string{}, nil
 }
 
-// This implementation is shared between Linux and NsEnterMounter
 // Open path and return its fd.
 // Symlinks are disallowed (pathname must already resolve symlinks),
 // and the path must be within the base directory.

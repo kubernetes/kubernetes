@@ -19,7 +19,6 @@ package iscsi
 import (
 	"os"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
@@ -42,7 +41,9 @@ type diskManager interface {
 // utility to mount a disk based filesystem
 // globalPDPath: global mount path like, /var/lib/kubelet/plugins/kubernetes.io/iscsi/{ifaceName}/{portal-some_iqn-lun-lun_id}
 // volPath: pod volume dir path like, /var/lib/kubelet/pods/{podUID}/volumes/kubernetes.io~iscsi/{volumeName}
-func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
+func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter mount.Interface, mounterArgs volume.MounterArgs) error {
+	fsGroup := mounterArgs.FsGroup
+	fsGroupChangePolicy := mounterArgs.FSGroupChangePolicy
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil && !os.IsNotExist(err) {
 		klog.Errorf("cannot validate mountpoint: %s", volPath)
@@ -96,7 +97,9 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(&b, volPath, fsGroup, fsGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
+		// This code requires larger refactor to monitor progress of ownership change
+		ownershipChanger := volume.NewVolumeOwnership(&b, volPath, fsGroup, fsGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
+		_ = ownershipChanger.ChangePermissions()
 	}
 
 	return nil

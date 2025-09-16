@@ -499,8 +499,7 @@ func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBui
 }
 
 // ResyncPeriod returns a function which generates a duration each time it is
-// invoked; this is so that multiple controllers don't get into lock-step and all
-// hammer the apiserver with list requests simultaneously.
+// invoked; this is because that multiple controllers don't get into lock-step.
 func ResyncPeriod(c *cloudcontrollerconfig.CompletedConfig) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1

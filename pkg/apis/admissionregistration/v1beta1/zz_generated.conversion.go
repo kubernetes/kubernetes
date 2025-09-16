@@ -24,13 +24,13 @@ package v1beta1
 import (
 	unsafe "unsafe"
 
-	apiadmissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
-	admissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
+	apisadmissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 )
 
 func init() {
@@ -40,6 +40,16 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*admissionregistrationv1beta1.ApplyConfiguration)(nil), (*admissionregistration.ApplyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ApplyConfiguration_To_admissionregistration_ApplyConfiguration(a.(*admissionregistrationv1beta1.ApplyConfiguration), b.(*admissionregistration.ApplyConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.ApplyConfiguration)(nil), (*admissionregistrationv1beta1.ApplyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_ApplyConfiguration_To_v1beta1_ApplyConfiguration(a.(*admissionregistration.ApplyConfiguration), b.(*admissionregistrationv1beta1.ApplyConfiguration), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*admissionregistrationv1beta1.AuditAnnotation)(nil), (*admissionregistration.AuditAnnotation)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_AuditAnnotation_To_admissionregistration_AuditAnnotation(a.(*admissionregistrationv1beta1.AuditAnnotation), b.(*admissionregistration.AuditAnnotation), scope)
 	}); err != nil {
@@ -60,6 +70,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistrationv1beta1.JSONPatch)(nil), (*admissionregistration.JSONPatch)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_JSONPatch_To_admissionregistration_JSONPatch(a.(*admissionregistrationv1beta1.JSONPatch), b.(*admissionregistration.JSONPatch), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.JSONPatch)(nil), (*admissionregistrationv1beta1.JSONPatch)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_JSONPatch_To_v1beta1_JSONPatch(a.(*admissionregistration.JSONPatch), b.(*admissionregistrationv1beta1.JSONPatch), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*admissionregistrationv1beta1.MatchCondition)(nil), (*admissionregistration.MatchCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_MatchCondition_To_admissionregistration_MatchCondition(a.(*admissionregistrationv1beta1.MatchCondition), b.(*admissionregistration.MatchCondition), scope)
 	}); err != nil {
@@ -77,6 +97,66 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*admissionregistration.MatchResources)(nil), (*admissionregistrationv1beta1.MatchResources)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_admissionregistration_MatchResources_To_v1beta1_MatchResources(a.(*admissionregistration.MatchResources), b.(*admissionregistrationv1beta1.MatchResources), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistrationv1beta1.MutatingAdmissionPolicy)(nil), (*admissionregistration.MutatingAdmissionPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_MutatingAdmissionPolicy_To_admissionregistration_MutatingAdmissionPolicy(a.(*admissionregistrationv1beta1.MutatingAdmissionPolicy), b.(*admissionregistration.MutatingAdmissionPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.MutatingAdmissionPolicy)(nil), (*admissionregistrationv1beta1.MutatingAdmissionPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_MutatingAdmissionPolicy_To_v1beta1_MutatingAdmissionPolicy(a.(*admissionregistration.MutatingAdmissionPolicy), b.(*admissionregistrationv1beta1.MutatingAdmissionPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistrationv1beta1.MutatingAdmissionPolicyBinding)(nil), (*admissionregistration.MutatingAdmissionPolicyBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_MutatingAdmissionPolicyBinding_To_admissionregistration_MutatingAdmissionPolicyBinding(a.(*admissionregistrationv1beta1.MutatingAdmissionPolicyBinding), b.(*admissionregistration.MutatingAdmissionPolicyBinding), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.MutatingAdmissionPolicyBinding)(nil), (*admissionregistrationv1beta1.MutatingAdmissionPolicyBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_MutatingAdmissionPolicyBinding_To_v1beta1_MutatingAdmissionPolicyBinding(a.(*admissionregistration.MutatingAdmissionPolicyBinding), b.(*admissionregistrationv1beta1.MutatingAdmissionPolicyBinding), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList)(nil), (*admissionregistration.MutatingAdmissionPolicyBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_MutatingAdmissionPolicyBindingList_To_admissionregistration_MutatingAdmissionPolicyBindingList(a.(*admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList), b.(*admissionregistration.MutatingAdmissionPolicyBindingList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.MutatingAdmissionPolicyBindingList)(nil), (*admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_MutatingAdmissionPolicyBindingList_To_v1beta1_MutatingAdmissionPolicyBindingList(a.(*admissionregistration.MutatingAdmissionPolicyBindingList), b.(*admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistrationv1beta1.MutatingAdmissionPolicyBindingSpec)(nil), (*admissionregistration.MutatingAdmissionPolicyBindingSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_MutatingAdmissionPolicyBindingSpec_To_admissionregistration_MutatingAdmissionPolicyBindingSpec(a.(*admissionregistrationv1beta1.MutatingAdmissionPolicyBindingSpec), b.(*admissionregistration.MutatingAdmissionPolicyBindingSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.MutatingAdmissionPolicyBindingSpec)(nil), (*admissionregistrationv1beta1.MutatingAdmissionPolicyBindingSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_MutatingAdmissionPolicyBindingSpec_To_v1beta1_MutatingAdmissionPolicyBindingSpec(a.(*admissionregistration.MutatingAdmissionPolicyBindingSpec), b.(*admissionregistrationv1beta1.MutatingAdmissionPolicyBindingSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistrationv1beta1.MutatingAdmissionPolicyList)(nil), (*admissionregistration.MutatingAdmissionPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_MutatingAdmissionPolicyList_To_admissionregistration_MutatingAdmissionPolicyList(a.(*admissionregistrationv1beta1.MutatingAdmissionPolicyList), b.(*admissionregistration.MutatingAdmissionPolicyList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.MutatingAdmissionPolicyList)(nil), (*admissionregistrationv1beta1.MutatingAdmissionPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_MutatingAdmissionPolicyList_To_v1beta1_MutatingAdmissionPolicyList(a.(*admissionregistration.MutatingAdmissionPolicyList), b.(*admissionregistrationv1beta1.MutatingAdmissionPolicyList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistrationv1beta1.MutatingAdmissionPolicySpec)(nil), (*admissionregistration.MutatingAdmissionPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_MutatingAdmissionPolicySpec_To_admissionregistration_MutatingAdmissionPolicySpec(a.(*admissionregistrationv1beta1.MutatingAdmissionPolicySpec), b.(*admissionregistration.MutatingAdmissionPolicySpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.MutatingAdmissionPolicySpec)(nil), (*admissionregistrationv1beta1.MutatingAdmissionPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_MutatingAdmissionPolicySpec_To_v1beta1_MutatingAdmissionPolicySpec(a.(*admissionregistration.MutatingAdmissionPolicySpec), b.(*admissionregistrationv1beta1.MutatingAdmissionPolicySpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -107,6 +187,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*admissionregistration.MutatingWebhookConfigurationList)(nil), (*admissionregistrationv1beta1.MutatingWebhookConfigurationList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_admissionregistration_MutatingWebhookConfigurationList_To_v1beta1_MutatingWebhookConfigurationList(a.(*admissionregistration.MutatingWebhookConfigurationList), b.(*admissionregistrationv1beta1.MutatingWebhookConfigurationList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistrationv1beta1.Mutation)(nil), (*admissionregistration.Mutation)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Mutation_To_admissionregistration_Mutation(a.(*admissionregistrationv1beta1.Mutation), b.(*admissionregistration.Mutation), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*admissionregistration.Mutation)(nil), (*admissionregistrationv1beta1.Mutation)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_Mutation_To_v1beta1_Mutation(a.(*admissionregistration.Mutation), b.(*admissionregistrationv1beta1.Mutation), scope)
 	}); err != nil {
 		return err
 	}
@@ -293,6 +383,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	return nil
 }
 
+func autoConvert_v1beta1_ApplyConfiguration_To_admissionregistration_ApplyConfiguration(in *admissionregistrationv1beta1.ApplyConfiguration, out *admissionregistration.ApplyConfiguration, s conversion.Scope) error {
+	out.Expression = in.Expression
+	return nil
+}
+
+// Convert_v1beta1_ApplyConfiguration_To_admissionregistration_ApplyConfiguration is an autogenerated conversion function.
+func Convert_v1beta1_ApplyConfiguration_To_admissionregistration_ApplyConfiguration(in *admissionregistrationv1beta1.ApplyConfiguration, out *admissionregistration.ApplyConfiguration, s conversion.Scope) error {
+	return autoConvert_v1beta1_ApplyConfiguration_To_admissionregistration_ApplyConfiguration(in, out, s)
+}
+
+func autoConvert_admissionregistration_ApplyConfiguration_To_v1beta1_ApplyConfiguration(in *admissionregistration.ApplyConfiguration, out *admissionregistrationv1beta1.ApplyConfiguration, s conversion.Scope) error {
+	out.Expression = in.Expression
+	return nil
+}
+
+// Convert_admissionregistration_ApplyConfiguration_To_v1beta1_ApplyConfiguration is an autogenerated conversion function.
+func Convert_admissionregistration_ApplyConfiguration_To_v1beta1_ApplyConfiguration(in *admissionregistration.ApplyConfiguration, out *admissionregistrationv1beta1.ApplyConfiguration, s conversion.Scope) error {
+	return autoConvert_admissionregistration_ApplyConfiguration_To_v1beta1_ApplyConfiguration(in, out, s)
+}
+
 func autoConvert_v1beta1_AuditAnnotation_To_admissionregistration_AuditAnnotation(in *admissionregistrationv1beta1.AuditAnnotation, out *admissionregistration.AuditAnnotation, s conversion.Scope) error {
 	out.Key = in.Key
 	out.ValueExpression = in.ValueExpression
@@ -335,6 +445,26 @@ func autoConvert_admissionregistration_ExpressionWarning_To_v1beta1_ExpressionWa
 // Convert_admissionregistration_ExpressionWarning_To_v1beta1_ExpressionWarning is an autogenerated conversion function.
 func Convert_admissionregistration_ExpressionWarning_To_v1beta1_ExpressionWarning(in *admissionregistration.ExpressionWarning, out *admissionregistrationv1beta1.ExpressionWarning, s conversion.Scope) error {
 	return autoConvert_admissionregistration_ExpressionWarning_To_v1beta1_ExpressionWarning(in, out, s)
+}
+
+func autoConvert_v1beta1_JSONPatch_To_admissionregistration_JSONPatch(in *admissionregistrationv1beta1.JSONPatch, out *admissionregistration.JSONPatch, s conversion.Scope) error {
+	out.Expression = in.Expression
+	return nil
+}
+
+// Convert_v1beta1_JSONPatch_To_admissionregistration_JSONPatch is an autogenerated conversion function.
+func Convert_v1beta1_JSONPatch_To_admissionregistration_JSONPatch(in *admissionregistrationv1beta1.JSONPatch, out *admissionregistration.JSONPatch, s conversion.Scope) error {
+	return autoConvert_v1beta1_JSONPatch_To_admissionregistration_JSONPatch(in, out, s)
+}
+
+func autoConvert_admissionregistration_JSONPatch_To_v1beta1_JSONPatch(in *admissionregistration.JSONPatch, out *admissionregistrationv1beta1.JSONPatch, s conversion.Scope) error {
+	out.Expression = in.Expression
+	return nil
+}
+
+// Convert_admissionregistration_JSONPatch_To_v1beta1_JSONPatch is an autogenerated conversion function.
+func Convert_admissionregistration_JSONPatch_To_v1beta1_JSONPatch(in *admissionregistration.JSONPatch, out *admissionregistrationv1beta1.JSONPatch, s conversion.Scope) error {
+	return autoConvert_admissionregistration_JSONPatch_To_v1beta1_JSONPatch(in, out, s)
 }
 
 func autoConvert_v1beta1_MatchCondition_To_admissionregistration_MatchCondition(in *admissionregistrationv1beta1.MatchCondition, out *admissionregistration.MatchCondition, s conversion.Scope) error {
@@ -427,6 +557,230 @@ func Convert_admissionregistration_MatchResources_To_v1beta1_MatchResources(in *
 	return autoConvert_admissionregistration_MatchResources_To_v1beta1_MatchResources(in, out, s)
 }
 
+func autoConvert_v1beta1_MutatingAdmissionPolicy_To_admissionregistration_MutatingAdmissionPolicy(in *admissionregistrationv1beta1.MutatingAdmissionPolicy, out *admissionregistration.MutatingAdmissionPolicy, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_MutatingAdmissionPolicySpec_To_admissionregistration_MutatingAdmissionPolicySpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_MutatingAdmissionPolicy_To_admissionregistration_MutatingAdmissionPolicy is an autogenerated conversion function.
+func Convert_v1beta1_MutatingAdmissionPolicy_To_admissionregistration_MutatingAdmissionPolicy(in *admissionregistrationv1beta1.MutatingAdmissionPolicy, out *admissionregistration.MutatingAdmissionPolicy, s conversion.Scope) error {
+	return autoConvert_v1beta1_MutatingAdmissionPolicy_To_admissionregistration_MutatingAdmissionPolicy(in, out, s)
+}
+
+func autoConvert_admissionregistration_MutatingAdmissionPolicy_To_v1beta1_MutatingAdmissionPolicy(in *admissionregistration.MutatingAdmissionPolicy, out *admissionregistrationv1beta1.MutatingAdmissionPolicy, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_admissionregistration_MutatingAdmissionPolicySpec_To_v1beta1_MutatingAdmissionPolicySpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_admissionregistration_MutatingAdmissionPolicy_To_v1beta1_MutatingAdmissionPolicy is an autogenerated conversion function.
+func Convert_admissionregistration_MutatingAdmissionPolicy_To_v1beta1_MutatingAdmissionPolicy(in *admissionregistration.MutatingAdmissionPolicy, out *admissionregistrationv1beta1.MutatingAdmissionPolicy, s conversion.Scope) error {
+	return autoConvert_admissionregistration_MutatingAdmissionPolicy_To_v1beta1_MutatingAdmissionPolicy(in, out, s)
+}
+
+func autoConvert_v1beta1_MutatingAdmissionPolicyBinding_To_admissionregistration_MutatingAdmissionPolicyBinding(in *admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, out *admissionregistration.MutatingAdmissionPolicyBinding, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_MutatingAdmissionPolicyBindingSpec_To_admissionregistration_MutatingAdmissionPolicyBindingSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_MutatingAdmissionPolicyBinding_To_admissionregistration_MutatingAdmissionPolicyBinding is an autogenerated conversion function.
+func Convert_v1beta1_MutatingAdmissionPolicyBinding_To_admissionregistration_MutatingAdmissionPolicyBinding(in *admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, out *admissionregistration.MutatingAdmissionPolicyBinding, s conversion.Scope) error {
+	return autoConvert_v1beta1_MutatingAdmissionPolicyBinding_To_admissionregistration_MutatingAdmissionPolicyBinding(in, out, s)
+}
+
+func autoConvert_admissionregistration_MutatingAdmissionPolicyBinding_To_v1beta1_MutatingAdmissionPolicyBinding(in *admissionregistration.MutatingAdmissionPolicyBinding, out *admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_admissionregistration_MutatingAdmissionPolicyBindingSpec_To_v1beta1_MutatingAdmissionPolicyBindingSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_admissionregistration_MutatingAdmissionPolicyBinding_To_v1beta1_MutatingAdmissionPolicyBinding is an autogenerated conversion function.
+func Convert_admissionregistration_MutatingAdmissionPolicyBinding_To_v1beta1_MutatingAdmissionPolicyBinding(in *admissionregistration.MutatingAdmissionPolicyBinding, out *admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, s conversion.Scope) error {
+	return autoConvert_admissionregistration_MutatingAdmissionPolicyBinding_To_v1beta1_MutatingAdmissionPolicyBinding(in, out, s)
+}
+
+func autoConvert_v1beta1_MutatingAdmissionPolicyBindingList_To_admissionregistration_MutatingAdmissionPolicyBindingList(in *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList, out *admissionregistration.MutatingAdmissionPolicyBindingList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]admissionregistration.MutatingAdmissionPolicyBinding, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_MutatingAdmissionPolicyBinding_To_admissionregistration_MutatingAdmissionPolicyBinding(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+// Convert_v1beta1_MutatingAdmissionPolicyBindingList_To_admissionregistration_MutatingAdmissionPolicyBindingList is an autogenerated conversion function.
+func Convert_v1beta1_MutatingAdmissionPolicyBindingList_To_admissionregistration_MutatingAdmissionPolicyBindingList(in *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList, out *admissionregistration.MutatingAdmissionPolicyBindingList, s conversion.Scope) error {
+	return autoConvert_v1beta1_MutatingAdmissionPolicyBindingList_To_admissionregistration_MutatingAdmissionPolicyBindingList(in, out, s)
+}
+
+func autoConvert_admissionregistration_MutatingAdmissionPolicyBindingList_To_v1beta1_MutatingAdmissionPolicyBindingList(in *admissionregistration.MutatingAdmissionPolicyBindingList, out *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]admissionregistrationv1beta1.MutatingAdmissionPolicyBinding, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_MutatingAdmissionPolicyBinding_To_v1beta1_MutatingAdmissionPolicyBinding(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+// Convert_admissionregistration_MutatingAdmissionPolicyBindingList_To_v1beta1_MutatingAdmissionPolicyBindingList is an autogenerated conversion function.
+func Convert_admissionregistration_MutatingAdmissionPolicyBindingList_To_v1beta1_MutatingAdmissionPolicyBindingList(in *admissionregistration.MutatingAdmissionPolicyBindingList, out *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingList, s conversion.Scope) error {
+	return autoConvert_admissionregistration_MutatingAdmissionPolicyBindingList_To_v1beta1_MutatingAdmissionPolicyBindingList(in, out, s)
+}
+
+func autoConvert_v1beta1_MutatingAdmissionPolicyBindingSpec_To_admissionregistration_MutatingAdmissionPolicyBindingSpec(in *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingSpec, out *admissionregistration.MutatingAdmissionPolicyBindingSpec, s conversion.Scope) error {
+	out.PolicyName = in.PolicyName
+	out.ParamRef = (*admissionregistration.ParamRef)(unsafe.Pointer(in.ParamRef))
+	if in.MatchResources != nil {
+		in, out := &in.MatchResources, &out.MatchResources
+		*out = new(admissionregistration.MatchResources)
+		if err := Convert_v1beta1_MatchResources_To_admissionregistration_MatchResources(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.MatchResources = nil
+	}
+	return nil
+}
+
+// Convert_v1beta1_MutatingAdmissionPolicyBindingSpec_To_admissionregistration_MutatingAdmissionPolicyBindingSpec is an autogenerated conversion function.
+func Convert_v1beta1_MutatingAdmissionPolicyBindingSpec_To_admissionregistration_MutatingAdmissionPolicyBindingSpec(in *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingSpec, out *admissionregistration.MutatingAdmissionPolicyBindingSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_MutatingAdmissionPolicyBindingSpec_To_admissionregistration_MutatingAdmissionPolicyBindingSpec(in, out, s)
+}
+
+func autoConvert_admissionregistration_MutatingAdmissionPolicyBindingSpec_To_v1beta1_MutatingAdmissionPolicyBindingSpec(in *admissionregistration.MutatingAdmissionPolicyBindingSpec, out *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingSpec, s conversion.Scope) error {
+	out.PolicyName = in.PolicyName
+	out.ParamRef = (*admissionregistrationv1beta1.ParamRef)(unsafe.Pointer(in.ParamRef))
+	if in.MatchResources != nil {
+		in, out := &in.MatchResources, &out.MatchResources
+		*out = new(admissionregistrationv1beta1.MatchResources)
+		if err := Convert_admissionregistration_MatchResources_To_v1beta1_MatchResources(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.MatchResources = nil
+	}
+	return nil
+}
+
+// Convert_admissionregistration_MutatingAdmissionPolicyBindingSpec_To_v1beta1_MutatingAdmissionPolicyBindingSpec is an autogenerated conversion function.
+func Convert_admissionregistration_MutatingAdmissionPolicyBindingSpec_To_v1beta1_MutatingAdmissionPolicyBindingSpec(in *admissionregistration.MutatingAdmissionPolicyBindingSpec, out *admissionregistrationv1beta1.MutatingAdmissionPolicyBindingSpec, s conversion.Scope) error {
+	return autoConvert_admissionregistration_MutatingAdmissionPolicyBindingSpec_To_v1beta1_MutatingAdmissionPolicyBindingSpec(in, out, s)
+}
+
+func autoConvert_v1beta1_MutatingAdmissionPolicyList_To_admissionregistration_MutatingAdmissionPolicyList(in *admissionregistrationv1beta1.MutatingAdmissionPolicyList, out *admissionregistration.MutatingAdmissionPolicyList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]admissionregistration.MutatingAdmissionPolicy, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_MutatingAdmissionPolicy_To_admissionregistration_MutatingAdmissionPolicy(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+// Convert_v1beta1_MutatingAdmissionPolicyList_To_admissionregistration_MutatingAdmissionPolicyList is an autogenerated conversion function.
+func Convert_v1beta1_MutatingAdmissionPolicyList_To_admissionregistration_MutatingAdmissionPolicyList(in *admissionregistrationv1beta1.MutatingAdmissionPolicyList, out *admissionregistration.MutatingAdmissionPolicyList, s conversion.Scope) error {
+	return autoConvert_v1beta1_MutatingAdmissionPolicyList_To_admissionregistration_MutatingAdmissionPolicyList(in, out, s)
+}
+
+func autoConvert_admissionregistration_MutatingAdmissionPolicyList_To_v1beta1_MutatingAdmissionPolicyList(in *admissionregistration.MutatingAdmissionPolicyList, out *admissionregistrationv1beta1.MutatingAdmissionPolicyList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]admissionregistrationv1beta1.MutatingAdmissionPolicy, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_MutatingAdmissionPolicy_To_v1beta1_MutatingAdmissionPolicy(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+// Convert_admissionregistration_MutatingAdmissionPolicyList_To_v1beta1_MutatingAdmissionPolicyList is an autogenerated conversion function.
+func Convert_admissionregistration_MutatingAdmissionPolicyList_To_v1beta1_MutatingAdmissionPolicyList(in *admissionregistration.MutatingAdmissionPolicyList, out *admissionregistrationv1beta1.MutatingAdmissionPolicyList, s conversion.Scope) error {
+	return autoConvert_admissionregistration_MutatingAdmissionPolicyList_To_v1beta1_MutatingAdmissionPolicyList(in, out, s)
+}
+
+func autoConvert_v1beta1_MutatingAdmissionPolicySpec_To_admissionregistration_MutatingAdmissionPolicySpec(in *admissionregistrationv1beta1.MutatingAdmissionPolicySpec, out *admissionregistration.MutatingAdmissionPolicySpec, s conversion.Scope) error {
+	out.ParamKind = (*admissionregistration.ParamKind)(unsafe.Pointer(in.ParamKind))
+	if in.MatchConstraints != nil {
+		in, out := &in.MatchConstraints, &out.MatchConstraints
+		*out = new(admissionregistration.MatchResources)
+		if err := Convert_v1beta1_MatchResources_To_admissionregistration_MatchResources(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.MatchConstraints = nil
+	}
+	out.Variables = *(*[]admissionregistration.Variable)(unsafe.Pointer(&in.Variables))
+	out.Mutations = *(*[]admissionregistration.Mutation)(unsafe.Pointer(&in.Mutations))
+	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
+	out.MatchConditions = *(*[]admissionregistration.MatchCondition)(unsafe.Pointer(&in.MatchConditions))
+	out.ReinvocationPolicy = admissionregistration.ReinvocationPolicyType(in.ReinvocationPolicy)
+	return nil
+}
+
+// Convert_v1beta1_MutatingAdmissionPolicySpec_To_admissionregistration_MutatingAdmissionPolicySpec is an autogenerated conversion function.
+func Convert_v1beta1_MutatingAdmissionPolicySpec_To_admissionregistration_MutatingAdmissionPolicySpec(in *admissionregistrationv1beta1.MutatingAdmissionPolicySpec, out *admissionregistration.MutatingAdmissionPolicySpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_MutatingAdmissionPolicySpec_To_admissionregistration_MutatingAdmissionPolicySpec(in, out, s)
+}
+
+func autoConvert_admissionregistration_MutatingAdmissionPolicySpec_To_v1beta1_MutatingAdmissionPolicySpec(in *admissionregistration.MutatingAdmissionPolicySpec, out *admissionregistrationv1beta1.MutatingAdmissionPolicySpec, s conversion.Scope) error {
+	out.ParamKind = (*admissionregistrationv1beta1.ParamKind)(unsafe.Pointer(in.ParamKind))
+	if in.MatchConstraints != nil {
+		in, out := &in.MatchConstraints, &out.MatchConstraints
+		*out = new(admissionregistrationv1beta1.MatchResources)
+		if err := Convert_admissionregistration_MatchResources_To_v1beta1_MatchResources(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.MatchConstraints = nil
+	}
+	out.Variables = *(*[]admissionregistrationv1beta1.Variable)(unsafe.Pointer(&in.Variables))
+	out.Mutations = *(*[]admissionregistrationv1beta1.Mutation)(unsafe.Pointer(&in.Mutations))
+	out.FailurePolicy = (*admissionregistrationv1beta1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
+	out.MatchConditions = *(*[]admissionregistrationv1beta1.MatchCondition)(unsafe.Pointer(&in.MatchConditions))
+	out.ReinvocationPolicy = admissionregistrationv1.ReinvocationPolicyType(in.ReinvocationPolicy)
+	return nil
+}
+
+// Convert_admissionregistration_MutatingAdmissionPolicySpec_To_v1beta1_MutatingAdmissionPolicySpec is an autogenerated conversion function.
+func Convert_admissionregistration_MutatingAdmissionPolicySpec_To_v1beta1_MutatingAdmissionPolicySpec(in *admissionregistration.MutatingAdmissionPolicySpec, out *admissionregistrationv1beta1.MutatingAdmissionPolicySpec, s conversion.Scope) error {
+	return autoConvert_admissionregistration_MutatingAdmissionPolicySpec_To_v1beta1_MutatingAdmissionPolicySpec(in, out, s)
+}
+
 func autoConvert_v1beta1_MutatingWebhook_To_admissionregistration_MutatingWebhook(in *admissionregistrationv1beta1.MutatingWebhook, out *admissionregistration.MutatingWebhook, s conversion.Scope) error {
 	out.Name = in.Name
 	if err := Convert_v1beta1_WebhookClientConfig_To_admissionregistration_WebhookClientConfig(&in.ClientConfig, &out.ClientConfig, s); err != nil {
@@ -436,7 +790,7 @@ func autoConvert_v1beta1_MutatingWebhook_To_admissionregistration_MutatingWebhoo
 		in, out := &in.Rules, &out.Rules
 		*out = make([]admissionregistration.RuleWithOperations, len(*in))
 		for i := range *in {
-			if err := admissionregistrationv1.Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := apisadmissionregistrationv1.Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -467,9 +821,9 @@ func autoConvert_admissionregistration_MutatingWebhook_To_v1beta1_MutatingWebhoo
 	}
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]apiadmissionregistrationv1.RuleWithOperations, len(*in))
+		*out = make([]admissionregistrationv1.RuleWithOperations, len(*in))
 		for i := range *in {
-			if err := admissionregistrationv1.Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := apisadmissionregistrationv1.Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -483,7 +837,7 @@ func autoConvert_admissionregistration_MutatingWebhook_To_v1beta1_MutatingWebhoo
 	out.SideEffects = (*admissionregistrationv1beta1.SideEffectClass)(unsafe.Pointer(in.SideEffects))
 	out.TimeoutSeconds = (*int32)(unsafe.Pointer(in.TimeoutSeconds))
 	out.AdmissionReviewVersions = *(*[]string)(unsafe.Pointer(&in.AdmissionReviewVersions))
-	out.ReinvocationPolicy = (*admissionregistrationv1beta1.ReinvocationPolicyType)(unsafe.Pointer(in.ReinvocationPolicy))
+	out.ReinvocationPolicy = (*admissionregistrationv1.ReinvocationPolicyType)(unsafe.Pointer(in.ReinvocationPolicy))
 	out.MatchConditions = *(*[]admissionregistrationv1beta1.MatchCondition)(unsafe.Pointer(&in.MatchConditions))
 	return nil
 }
@@ -577,9 +931,33 @@ func Convert_admissionregistration_MutatingWebhookConfigurationList_To_v1beta1_M
 	return autoConvert_admissionregistration_MutatingWebhookConfigurationList_To_v1beta1_MutatingWebhookConfigurationList(in, out, s)
 }
 
+func autoConvert_v1beta1_Mutation_To_admissionregistration_Mutation(in *admissionregistrationv1beta1.Mutation, out *admissionregistration.Mutation, s conversion.Scope) error {
+	out.PatchType = admissionregistration.PatchType(in.PatchType)
+	out.ApplyConfiguration = (*admissionregistration.ApplyConfiguration)(unsafe.Pointer(in.ApplyConfiguration))
+	out.JSONPatch = (*admissionregistration.JSONPatch)(unsafe.Pointer(in.JSONPatch))
+	return nil
+}
+
+// Convert_v1beta1_Mutation_To_admissionregistration_Mutation is an autogenerated conversion function.
+func Convert_v1beta1_Mutation_To_admissionregistration_Mutation(in *admissionregistrationv1beta1.Mutation, out *admissionregistration.Mutation, s conversion.Scope) error {
+	return autoConvert_v1beta1_Mutation_To_admissionregistration_Mutation(in, out, s)
+}
+
+func autoConvert_admissionregistration_Mutation_To_v1beta1_Mutation(in *admissionregistration.Mutation, out *admissionregistrationv1beta1.Mutation, s conversion.Scope) error {
+	out.PatchType = admissionregistrationv1beta1.PatchType(in.PatchType)
+	out.ApplyConfiguration = (*admissionregistrationv1beta1.ApplyConfiguration)(unsafe.Pointer(in.ApplyConfiguration))
+	out.JSONPatch = (*admissionregistrationv1beta1.JSONPatch)(unsafe.Pointer(in.JSONPatch))
+	return nil
+}
+
+// Convert_admissionregistration_Mutation_To_v1beta1_Mutation is an autogenerated conversion function.
+func Convert_admissionregistration_Mutation_To_v1beta1_Mutation(in *admissionregistration.Mutation, out *admissionregistrationv1beta1.Mutation, s conversion.Scope) error {
+	return autoConvert_admissionregistration_Mutation_To_v1beta1_Mutation(in, out, s)
+}
+
 func autoConvert_v1beta1_NamedRuleWithOperations_To_admissionregistration_NamedRuleWithOperations(in *admissionregistrationv1beta1.NamedRuleWithOperations, out *admissionregistration.NamedRuleWithOperations, s conversion.Scope) error {
 	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
-	if err := admissionregistrationv1.Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&in.RuleWithOperations, &out.RuleWithOperations, s); err != nil {
+	if err := apisadmissionregistrationv1.Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&in.RuleWithOperations, &out.RuleWithOperations, s); err != nil {
 		return err
 	}
 	return nil
@@ -592,7 +970,7 @@ func Convert_v1beta1_NamedRuleWithOperations_To_admissionregistration_NamedRuleW
 
 func autoConvert_admissionregistration_NamedRuleWithOperations_To_v1beta1_NamedRuleWithOperations(in *admissionregistration.NamedRuleWithOperations, out *admissionregistrationv1beta1.NamedRuleWithOperations, s conversion.Scope) error {
 	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
-	if err := admissionregistrationv1.Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(&in.RuleWithOperations, &out.RuleWithOperations, s); err != nil {
+	if err := apisadmissionregistrationv1.Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(&in.RuleWithOperations, &out.RuleWithOperations, s); err != nil {
 		return err
 	}
 	return nil
@@ -966,7 +1344,7 @@ func autoConvert_v1beta1_ValidatingWebhook_To_admissionregistration_ValidatingWe
 		in, out := &in.Rules, &out.Rules
 		*out = make([]admissionregistration.RuleWithOperations, len(*in))
 		for i := range *in {
-			if err := admissionregistrationv1.Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := apisadmissionregistrationv1.Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -996,9 +1374,9 @@ func autoConvert_admissionregistration_ValidatingWebhook_To_v1beta1_ValidatingWe
 	}
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]apiadmissionregistrationv1.RuleWithOperations, len(*in))
+		*out = make([]admissionregistrationv1.RuleWithOperations, len(*in))
 		for i := range *in {
-			if err := admissionregistrationv1.Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := apisadmissionregistrationv1.Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}

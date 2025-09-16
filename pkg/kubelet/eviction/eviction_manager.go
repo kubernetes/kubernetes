@@ -418,17 +418,18 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		gracePeriodOverride := int64(immediateEvictionGracePeriodSeconds)
 		if !isHardEvictionThreshold(thresholdToReclaim) {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
-			if pod.Spec.TerminationGracePeriodSeconds != nil && !utilfeature.DefaultFeatureGate.Enabled(features.AllowOverwriteTerminationGracePeriodSeconds) {
+			if pod.Spec.TerminationGracePeriodSeconds != nil {
 				gracePeriodOverride = min(m.config.MaxPodGracePeriodSeconds, *pod.Spec.TerminationGracePeriodSeconds)
 			}
 		}
 
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
 		condition := &v1.PodCondition{
-			Type:    v1.DisruptionTarget,
-			Status:  v1.ConditionTrue,
-			Reason:  v1.PodReasonTerminationByKubelet,
-			Message: message,
+			Type:               v1.DisruptionTarget,
+			ObservedGeneration: pod.Generation,
+			Status:             v1.ConditionTrue,
+			Reason:             v1.PodReasonTerminationByKubelet,
+			Message:            message,
 		}
 		if m.evictPod(pod, gracePeriodOverride, message, annotations, condition) {
 			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
@@ -618,6 +619,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 		status.Reason = Reason
 		status.Message = evictMsg
 		if condition != nil {
+			condition.ObservedGeneration = podutil.CalculatePodConditionObservedGeneration(status, pod.Generation, v1.DisruptionTarget)
 			podutil.UpdatePodCondition(status, condition)
 		}
 	})

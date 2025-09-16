@@ -17,7 +17,9 @@ limitations under the License.
 package cacher
 
 import (
+	"math"
 	"strings"
+	"time"
 )
 
 // hasPathPrefix returns true if the string matches pathPrefix exactly, or if is prefixed with pathPrefix at a path segment boundary
@@ -43,4 +45,12 @@ func hasPathPrefix(s, pathPrefix string) bool {
 		return true
 	}
 	return false
+}
+
+// calculateRetryAfterForUnreadyCache calculates the retry duration based on the cache downtime.
+func calculateRetryAfterForUnreadyCache(downtime time.Duration) int {
+	factor := 0.06
+	result := math.Exp(factor * downtime.Seconds())
+	result = math.Min(30, math.Max(1, result))
+	return int(result)
 }

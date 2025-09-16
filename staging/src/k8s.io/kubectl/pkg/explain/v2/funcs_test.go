@@ -57,11 +57,13 @@ func TestFuncs(t *testing.T) {
 			Expect:   "[this is a slash separated thing]",
 		},
 		{
-			Name:     "realign line breaks",
+			// TODO: we should find a way to both realign line breaks and not break yaml texts in descriptions
+			// example from https://github.com/kubernetes-sigs/cluster-api/blob/f495466327aa340ad8c36182eb4e2797e7e35bef/config/crd/bases/cluster.x-k8s.io_machinedrainrules.yaml#L89
+			Name:     "make sure explain doesnt break current descriptions",
 			FuncName: "wrap",
 			Source:   `{{wrap 76 .}}`,
-			Context:  "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus pulvinar in libero id sagittis. \nAliquam sem enim, vehicula et urna ac, vehicula ullamcorper sem. Morbi turpis arcu, aliquet at \neros quis, sodales dignissim eros. \nQuisque ut lectus quis magna maximus elementum a nec felis. \nNulla ultricies pulvinar quam, id tincidunt.",
-			Expect:   "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus pulvinar in\nlibero id sagittis. Aliquam sem enim, vehicula et urna ac, vehicula\nullamcorper sem. Morbi turpis arcu, aliquet at eros quis, sodales dignissim\neros. Quisque ut lectus quis magna maximus elementum a nec felis. Nulla\nultricies pulvinar quam, id tincidunt.",
+			Context:  "machines defines to which Machines this MachineDrainRule should be applied.\nIf machines is not set, the MachineDrainRule applies to all Machines in the Namespace.\nIf machines contains multiple selectors, the results are ORed.\nWithin a single Machine selector the results of selector and clusterSelector are ANDed.\nMachines will be selected from all Clusters in the Namespace unless otherwise restricted with the clusterSelector.\nExample: Selects control plane Machines in all Clusters or Machines with label \"os\" == \"linux\" in Clusters with label \"stage\" == \"production\".\n - selector:\n   matchExpressions:\n   - key: cluster.x-k8s.io/control-plane\n     operator: Exists\n - selector:\n   matchLabels:\n     os: linux\n   clusterSelector:\n     matchExpressions:\n     - key: stage\n       operator: In\n       values:\n       - production",
+			Expect:   "machines defines to which Machines this MachineDrainRule should be applied.\nIf machines is not set, the MachineDrainRule applies to all Machines in the\nNamespace.\nIf machines contains multiple selectors, the results are ORed.\nWithin a single Machine selector the results of selector and clusterSelector\nare ANDed.\nMachines will be selected from all Clusters in the Namespace unless\notherwise restricted with the clusterSelector.\nExample: Selects control plane Machines in all Clusters or Machines with\nlabel \"os\" == \"linux\" in Clusters with label \"stage\" == \"production\".\n - selector:\n   matchExpressions:\n   - key: cluster.x-k8s.io/control-plane\n     operator: Exists\n - selector:\n   matchLabels:\n     os: linux\n   clusterSelector:\n     matchExpressions:\n     - key: stage\n       operator: In\n       values:\n       - production",
 		},
 		{
 			Name:     "basic",

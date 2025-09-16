@@ -840,6 +840,10 @@ func afterHeadIM(p *parser) bool {
 
 	p.parseImpliedToken(StartTagToken, a.Body, a.Body.String())
 	p.framesetOK = true
+	if p.tok.Type == ErrorToken {
+		// Stop parsing.
+		return true
+	}
 	return false
 }
 
@@ -920,7 +924,7 @@ func inBodyIM(p *parser) bool {
 			p.addElement()
 			p.im = inFramesetIM
 			return true
-		case a.Address, a.Article, a.Aside, a.Blockquote, a.Center, a.Details, a.Dialog, a.Dir, a.Div, a.Dl, a.Fieldset, a.Figcaption, a.Figure, a.Footer, a.Header, a.Hgroup, a.Main, a.Menu, a.Nav, a.Ol, a.P, a.Section, a.Summary, a.Ul:
+		case a.Address, a.Article, a.Aside, a.Blockquote, a.Center, a.Details, a.Dialog, a.Dir, a.Div, a.Dl, a.Fieldset, a.Figcaption, a.Figure, a.Footer, a.Header, a.Hgroup, a.Main, a.Menu, a.Nav, a.Ol, a.P, a.Search, a.Section, a.Summary, a.Ul:
 			p.popUntil(buttonScope, a.P)
 			p.addElement()
 		case a.H1, a.H2, a.H3, a.H4, a.H5, a.H6:
@@ -1031,7 +1035,7 @@ func inBodyIM(p *parser) bool {
 			if p.tok.DataAtom == a.Input {
 				for _, t := range p.tok.Attr {
 					if t.Key == "type" {
-						if strings.ToLower(t.Val) == "hidden" {
+						if strings.EqualFold(t.Val, "hidden") {
 							// Skip setting framesetOK = false
 							return true
 						}
@@ -1132,7 +1136,7 @@ func inBodyIM(p *parser) bool {
 				return false
 			}
 			return true
-		case a.Address, a.Article, a.Aside, a.Blockquote, a.Button, a.Center, a.Details, a.Dialog, a.Dir, a.Div, a.Dl, a.Fieldset, a.Figcaption, a.Figure, a.Footer, a.Header, a.Hgroup, a.Listing, a.Main, a.Menu, a.Nav, a.Ol, a.Pre, a.Section, a.Summary, a.Ul:
+		case a.Address, a.Article, a.Aside, a.Blockquote, a.Button, a.Center, a.Details, a.Dialog, a.Dir, a.Div, a.Dl, a.Fieldset, a.Figcaption, a.Figure, a.Footer, a.Header, a.Hgroup, a.Listing, a.Main, a.Menu, a.Nav, a.Ol, a.Pre, a.Search, a.Section, a.Summary, a.Ul:
 			p.popUntil(defaultScope, p.tok.DataAtom)
 		case a.Form:
 			if p.oe.contains(a.Template) {
@@ -1459,7 +1463,7 @@ func inTableIM(p *parser) bool {
 			return inHeadIM(p)
 		case a.Input:
 			for _, t := range p.tok.Attr {
-				if t.Key == "type" && strings.ToLower(t.Val) == "hidden" {
+				if t.Key == "type" && strings.EqualFold(t.Val, "hidden") {
 					p.addElement()
 					p.oe.pop()
 					return true

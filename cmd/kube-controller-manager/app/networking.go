@@ -23,7 +23,6 @@ import (
 	"context"
 
 	"k8s.io/component-base/featuregate"
-	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/features"
@@ -31,20 +30,28 @@ import (
 
 func newServiceCIDRsControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.ServiceCIDRController,
-		initFunc: startServiceCIDRsController,
+		name:        names.ServiceCIDRController,
+		constructor: newServiceCIDRsController,
 		requiredFeatureGates: []featuregate.Feature{
 			features.MultiCIDRServiceAllocator,
-		}}
+		},
+	}
 }
-func startServiceCIDRsController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	go servicecidrs.NewController(
-		ctx,
-		controllerContext.InformerFactory.Networking().V1beta1().ServiceCIDRs(),
-		controllerContext.InformerFactory.Networking().V1beta1().IPAddresses(),
-		controllerContext.ClientBuilder.ClientOrDie("service-cidrs-controller"),
-	).Run(ctx, 5)
-	// TODO use component config
-	return nil, true, nil
 
+func newServiceCIDRsController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.NewClient("service-cidrs-controller")
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO use component config
+	scc := servicecidrs.NewController(
+		ctx,
+		controllerContext.InformerFactory.Networking().V1().ServiceCIDRs(),
+		controllerContext.InformerFactory.Networking().V1().IPAddresses(),
+		client,
+	)
+	return newControllerLoop(func(ctx context.Context) {
+		scc.Run(ctx, 5)
+	}, controllerName), nil
 }

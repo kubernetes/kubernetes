@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +56,8 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			MasqueradeAll: true,
 		},
 		Logging: logsapi.LoggingConfiguration{
-			Format: "text",
+			Format:         "text",
+			FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: logsapi.LogFlushFreqDefault}},
 		},
 	}
 	newPath := field.NewPath("KubeProxyConfiguration")
@@ -172,7 +175,8 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 		"invalid logging format": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.Logging = logsapi.LoggingConfiguration{
-					Format: "unsupported format",
+					Format:         "unsupported format",
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: logsapi.LogFlushFreqDefault}},
 				}
 			},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("logging.format"), "unsupported format", "Unsupported log format")},
@@ -517,7 +521,10 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			errs := validateClientConnectionConfiguration(testCase.ccc, newPath)
-			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+			cmpOpts := []cmp.Option{cmpopts.IgnoreFields(field.Error{}, "Origin"), cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() })}
+			if diff := cmp.Diff(testCase.expectedErrs, errs, cmpOpts...); diff != "" {
+				t.Errorf("did not get expected validation errors (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }

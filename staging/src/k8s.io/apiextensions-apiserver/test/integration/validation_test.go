@@ -18,6 +18,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/utils/ptr"
 )
 
 func TestForProperValidationErrors(t *testing.T) {
@@ -104,7 +106,7 @@ func newNoxuValidationCRDs() []*apiextensionsv1.CustomResourceDefinition {
 			"beta": {
 				Description: "Minimum value of beta is 10",
 				Type:        "number",
-				Minimum:     float64Ptr(10),
+				Minimum:     ptr.To[float64](10),
 			},
 			"gamma": {
 				Description: "Gamma is restricted to foo, bar and baz",
@@ -777,15 +779,16 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 			}
 
 			// CR is now accepted
-			err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-				_, err := noxuResourceClient.Create(context.TODO(), instanceToCreate, metav1.CreateOptions{})
-				if _, isStatus := err.(*apierrors.StatusError); isStatus {
-					if apierrors.IsInvalid(err) {
+			err = wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
+				_, createErr := noxuResourceClient.Create(ctx, instanceToCreate, metav1.CreateOptions{})
+				var statusErr *apierrors.StatusError
+				if errors.As(createErr, &statusErr) {
+					if apierrors.IsInvalid(createErr) {
 						return false, nil
 					}
 				}
-				if err != nil {
-					return false, err
+				if createErr != nil {
+					return false, createErr
 				}
 				return true, nil
 			})
@@ -839,7 +842,7 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 				t.Fatalf("unexpected non-error: uniqueItems cannot be set to true")
 			}
 
-			validationSchema.OpenAPIV3Schema.Ref = strPtr("#/definition/zeta")
+			validationSchema.OpenAPIV3Schema.Ref = ptr.To("#/definition/zeta")
 			validationSchema.OpenAPIV3Schema.Properties["zeta"] = apiextensionsv1.JSONSchemaProps{
 				Type:        "array",
 				UniqueItems: false,
@@ -925,8 +928,8 @@ spec:
 	// wait for condition with violations
 	t.Log("Waiting for NonStructuralSchema condition")
 	var cond *apiextensionsv1.CustomResourceDefinitionCondition
-	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -963,8 +966,8 @@ spec:
 
 	// wait for condition to go away
 	t.Log("Wait for condition to disappear")
-	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -1529,8 +1532,8 @@ properties:
 			if len(tst.expectedViolations) == 0 {
 				// wait for condition to not appear
 				var cond *apiextensionsv1.CustomResourceDefinitionCondition
-				err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-					obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), betaCRD.Name, metav1.GetOptions{})
+				err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
+					obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, betaCRD.Name, metav1.GetOptions{})
 					if err != nil {
 						return false, err
 					}
@@ -1540,7 +1543,7 @@ properties:
 					}
 					return true, nil
 				})
-				if err != wait.ErrWaitTimeout {
+				if !errors.Is(err, context.DeadlineExceeded) {
 					t.Fatalf("expected no NonStructuralSchema condition, but got one: %v", cond)
 				}
 				return
@@ -1548,8 +1551,8 @@ properties:
 
 			// wait for condition to appear with the given violations
 			var cond *apiextensionsv1.CustomResourceDefinitionCondition
-			err = wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-				obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), betaCRD.Name, metav1.GetOptions{})
+			err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
+				obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, betaCRD.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}
@@ -1607,14 +1610,6 @@ func toValidationJSON(yml string) string {
 		panic(err)
 	}
 	return fmt.Sprintf("{\"openAPIV3Schema\": %s}", string(bs))
-}
-
-func float64Ptr(f float64) *float64 {
-	return &f
-}
-
-func strPtr(str string) *string {
-	return &str
 }
 
 func TestNonStructuralSchemaConditionForCRDV1(t *testing.T) {

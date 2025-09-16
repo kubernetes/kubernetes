@@ -18,12 +18,11 @@ package imagelocality
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
@@ -37,10 +36,10 @@ const (
 
 // ImageLocality is a score plugin that favors nodes that already have requested pod container's images.
 type ImageLocality struct {
-	handle framework.Handle
+	handle fwk.Handle
 }
 
-var _ framework.ScorePlugin = &ImageLocality{}
+var _ fwk.ScorePlugin = &ImageLocality{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.ImageLocality
@@ -51,15 +50,10 @@ func (pl *ImageLocality) Name() string {
 }
 
 // Score invoked at the score extension point.
-func (pl *ImageLocality) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
-	if err != nil {
-		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
-	}
-
+func (pl *ImageLocality) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	nodeInfos, err := pl.handle.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
-		return 0, framework.AsStatus(err)
+		return 0, fwk.AsStatus(err)
 	}
 	totalNumNodes := len(nodeInfos)
 
@@ -70,12 +64,12 @@ func (pl *ImageLocality) Score(ctx context.Context, state *framework.CycleState,
 }
 
 // ScoreExtensions of the Score plugin.
-func (pl *ImageLocality) ScoreExtensions() framework.ScoreExtensions {
+func (pl *ImageLocality) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, h fwk.Handle) (fwk.Plugin, error) {
 	return &ImageLocality{handle: h}, nil
 }
 
@@ -89,21 +83,21 @@ func calculatePriority(sumScores int64, numContainers int) int64 {
 		sumScores = maxThreshold
 	}
 
-	return framework.MaxNodeScore * (sumScores - minThreshold) / (maxThreshold - minThreshold)
+	return fwk.MaxNodeScore * (sumScores - minThreshold) / (maxThreshold - minThreshold)
 }
 
 // sumImageScores returns the sum of image scores of all the containers that are already on the node.
 // Each image receives a raw score of its size, scaled by scaledImageScore. The raw scores are later used to calculate
 // the final score.
-func sumImageScores(nodeInfo *framework.NodeInfo, pod *v1.Pod, totalNumNodes int) int64 {
+func sumImageScores(nodeInfo fwk.NodeInfo, pod *v1.Pod, totalNumNodes int) int64 {
 	var sum int64
 	for _, container := range pod.Spec.InitContainers {
-		if state, ok := nodeInfo.ImageStates[normalizedImageName(container.Image)]; ok {
+		if state, ok := nodeInfo.GetImageStates()[normalizedImageName(container.Image)]; ok {
 			sum += scaledImageScore(state, totalNumNodes)
 		}
 	}
 	for _, container := range pod.Spec.Containers {
-		if state, ok := nodeInfo.ImageStates[normalizedImageName(container.Image)]; ok {
+		if state, ok := nodeInfo.GetImageStates()[normalizedImageName(container.Image)]; ok {
 			sum += scaledImageScore(state, totalNumNodes)
 		}
 	}
@@ -114,7 +108,7 @@ func sumImageScores(nodeInfo *framework.NodeInfo, pod *v1.Pod, totalNumNodes int
 // The size of the image is used as the base score, scaled by a factor which considers how much nodes the image has "spread" to.
 // This heuristic aims to mitigate the undesirable "node heating problem", i.e., pods get assigned to the same or
 // a few nodes due to image locality.
-func scaledImageScore(imageState *framework.ImageStateSummary, totalNumNodes int) int64 {
+func scaledImageScore(imageState *fwk.ImageStateSummary, totalNumNodes int) int64 {
 	spread := float64(imageState.NumNodes) / float64(totalNumNodes)
 	return int64(float64(imageState.Size) * spread)
 }

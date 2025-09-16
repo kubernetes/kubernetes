@@ -33,7 +33,6 @@
         },
         "template": {
             "metadata": {
-                "creationTimestamp": null,
                 "labels": {
                     "app": "nginx"
                 }

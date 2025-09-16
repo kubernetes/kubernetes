@@ -41,6 +41,7 @@ type MetricsClient interface {
 	// GetResourceMetric gets the given resource metric (and an associated oldest timestamp)
 	// for the specified named container in all pods matching the specified selector in the given namespace and when
 	// the container is an empty string it returns the sum of all the container metrics.
+	// Missing metrics will not error and callers should rely on Pod status to filter metrics info returned from this interface.
 	GetResourceMetric(ctx context.Context, resource v1.ResourceName, namespace string, selector labels.Selector, container string) (PodMetricsInfo, time.Time, error)
 
 	// GetRawMetric gets the given metric (and an associated oldest timestamp)

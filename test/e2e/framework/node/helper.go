@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -187,10 +188,15 @@ func AddExtendedResource(ctx context.Context, clientSet clientset.Interface, nod
 	extendedResourceList := v1.ResourceList{
 		extendedResource: extendedResourceQuantity,
 	}
-	patchPayload, err := json.Marshal(v1.Node{
-		Status: v1.NodeStatus{
-			Capacity:    extendedResourceList,
-			Allocatable: extendedResourceList,
+
+	// This is a workaround for the fact that we shouldn't marshal a Node struct to JSON
+	// because it wipes out some fields from node status like the daemonEndpoints and
+	// nodeInfo which should not be changed at this time. We need to use a map instead.
+	// See https://github.com/kubernetes/kubernetes/issues/131229
+	patchPayload, err := json.Marshal(map[string]any{
+		"status": map[string]any{
+			"capacity":    extendedResourceList,
+			"allocatable": extendedResourceList,
 		},
 	})
 	framework.ExpectNoError(err, "Failed to marshal node JSON")
@@ -204,10 +210,15 @@ func RemoveExtendedResource(ctx context.Context, clientSet clientset.Interface, 
 	extendedResource := v1.ResourceName(extendedResourceName)
 
 	ginkgo.By("Removing a custom resource")
-	node, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
-	delete(node.Status.Capacity, extendedResource)
-	delete(node.Status.Allocatable, extendedResource)
-	_, err = clientSet.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		node, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get node %s: %w", nodeName, err)
+		}
+		delete(node.Status.Capacity, extendedResource)
+		delete(node.Status.Allocatable, extendedResource)
+		_, err = clientSet.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+		return err
+	})
 	framework.ExpectNoError(err)
 }

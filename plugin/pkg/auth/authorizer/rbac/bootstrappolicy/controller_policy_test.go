@@ -18,6 +18,7 @@ package bootstrappolicy
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -88,6 +89,18 @@ func TestControllerRoleLabel(t *testing.T) {
 		}
 		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
 			t.Errorf("ClusterRoleBinding: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+		}
+	}
+}
+
+func TestControllerRoleVerbsConsistency(t *testing.T) {
+	roles := ControllerRoles()
+	for _, role := range roles {
+		for _, rule := range role.Rules {
+			verbs := rule.Verbs
+			if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") {
+				t.Errorf("The ClusterRole %s has Verb `List` but does not have Verb `Watch`.", role.Name)
+			}
 		}
 	}
 }

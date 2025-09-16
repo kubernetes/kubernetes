@@ -26,8 +26,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	utilpointer "k8s.io/utils/pointer"
 	kjson "sigs.k8s.io/json"
+
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/utils/ptr"
 
 	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 
@@ -76,7 +79,7 @@ func TestRoundTrip(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		// fuzz internal types
 		internal := &apiextensions.JSONSchemaProps{}
-		f.Fuzz(internal)
+		f.Fill(internal)
 
 		// internal -> go-openapi
 		openAPITypes := &kubeopenapispec.Schema{}
@@ -158,6 +161,7 @@ type failingObject struct {
 func TestValidateCustomResource(t *testing.T) {
 	tests := []struct {
 		name           string
+		compatVersion  *version.Version
 		schema         apiextensions.JSONSchemaProps
 		objects        []interface{}
 		oldObjects     []interface{}
@@ -459,7 +463,7 @@ func TestValidateCustomResource(t *testing.T) {
 					object:    map[string]interface{}{"field": "y"},
 					oldObject: map[string]interface{}{"field": "x"},
 					expectErrs: []string{
-						`field: Invalid value: "string": failed rule: self == oldSelf`,
+						`field: Invalid value: "y": failed rule: self == oldSelf`,
 					}},
 			},
 		},
@@ -507,7 +511,7 @@ func TestValidateCustomResource(t *testing.T) {
 					object:    map[string]interface{}{"field": []interface{}{map[string]interface{}{"k1": "a", "k2": "b", "v1": 0.9}}},
 					oldObject: map[string]interface{}{"field": []interface{}{map[string]interface{}{"k1": "a", "k2": "b", "v1": 1.0}}},
 					expectErrs: []string{
-						`field[0].v1: Invalid value: "number": failed rule: self >= oldSelf`,
+						`field[0].v1: Invalid value: 0.9: failed rule: self >= oldSelf`,
 					}},
 			},
 		},
@@ -546,7 +550,7 @@ func TestValidateCustomResource(t *testing.T) {
 				{
 					object: map[string]interface{}{"field": []interface{}{map[string]interface{}{"x": "y"}}},
 					expectErrs: []string{
-						`field[0].x: Invalid value: "string": failed rule: self == 'x'`,
+						`field[0].x: Invalid value: "y": failed rule: self == 'x'`,
 					}},
 			},
 		},
@@ -556,7 +560,7 @@ func TestValidateCustomResource(t *testing.T) {
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:          "object",
-						MaxProperties: utilpointer.Int64(2),
+						MaxProperties: ptr.To[int64](2),
 					},
 				},
 			},
@@ -572,7 +576,7 @@ func TestValidateCustomResource(t *testing.T) {
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:     "array",
-						MaxItems: utilpointer.Int64(2),
+						MaxItems: ptr.To[int64](2),
 					},
 				},
 			},
@@ -588,7 +592,7 @@ func TestValidateCustomResource(t *testing.T) {
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:      "string",
-						MaxLength: utilpointer.Int64(2),
+						MaxLength: ptr.To[int64](2),
 					},
 				},
 			},
@@ -598,10 +602,49 @@ func TestValidateCustomResource(t *testing.T) {
 				}},
 			},
 		},
+		{name: "k8sLongName",
+			compatVersion: version.MajorMinor(1, 34),
+			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"fieldX": {
+						Type:   "string",
+						Format: "k8s-long-name",
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"fieldX": "a.-"}, expectErrs: []string{
+					`fieldX: Invalid value: "a.-": fieldX in body must be of type k8s-long-name: "a.-"`,
+				}},
+			},
+		},
+		{name: "k8sShortName",
+			compatVersion: version.MajorMinor(1, 34),
+			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"fieldX": {
+						Type:   "string",
+						Format: "k8s-short-name",
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"fieldX": "a-"}, expectErrs: []string{
+					`fieldX: Invalid value: "a-": fieldX in body must be of type k8s-short-name: "a-"`,
+				}},
+			},
+		},
 	}
 	for _, tt := range tests {
+		compatVersion := tt.compatVersion
+		if compatVersion == nil {
+			compatVersion = environment.DefaultCompatibilityVersion()
+		}
+
 		t.Run(tt.name, func(t *testing.T) {
-			validator, _, err := NewSchemaValidator(&tt.schema)
+			validator, _, err := NewSchemaValidatorForVersion(&tt.schema, compatVersion)
 			if err != nil {
 				t.Fatal(err)
 			}

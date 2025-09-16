@@ -50,11 +50,14 @@ kube::test::find_go_packages() {
             -e '^k8s.io/kubernetes/third_party(/.*)?$' \
             -e '^k8s.io/kubernetes/cmd/kubeadm/test(/.*)?$' \
             -e '^k8s.io/kubernetes/test/e2e$' \
+            -e '^k8s.io/kubernetes/test/e2e_dra$' \
             -e '^k8s.io/kubernetes/test/e2e_node(/.*)?$' \
             -e '^k8s.io/kubernetes/test/e2e_kubeadm(/.*)?$' \
             -e '^k8s.io/.*/test/integration(/.*)?$'
   )
 }
+
+set -x
 
 # TODO: This timeout should really be lower, this is a *long* time to test one
 # package, however pkg/api/testing in particular will fail with a lower timeout
@@ -81,6 +84,10 @@ fi
 # Set to 'y' to keep the verbose stdout from tests when KUBE_JUNIT_REPORT_DIR is
 # set.
 KUBE_KEEP_VERBOSE_TEST_OUTPUT=${KUBE_KEEP_VERBOSE_TEST_OUTPUT:-n}
+# Set to 'false' to disable reduction of the JUnit file to only the top level tests.
+KUBE_PRUNE_JUNIT_TESTS=${KUBE_PRUNE_JUNIT_TESTS:-true}
+
+set +x
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -137,7 +144,8 @@ testargs=()
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
 # gotestsum --format value
-gotestsum_format=standard-quiet
+# "standard-quiet" let's some stderr log messages through, "pkgname-and-test-fails" is similar and doesn't (https://github.com/kubernetes/kubernetes/issues/130934#issuecomment-2739957840).
+gotestsum_format=pkgname-and-test-fails
 if [[ -n "${FULL_LOG:-}" ]] ; then
   gotestsum_format=standard-verbose
 fi
@@ -180,7 +188,7 @@ junitFilenamePrefix() {
 installTools() {
   if ! command -v gotestsum >/dev/null 2>&1; then
     kube::log::status "gotestsum not found; installing from ./hack/tools"
-    go -C "${KUBE_ROOT}/hack/tools" install gotest.tools/gotestsum
+    GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install gotest.tools/gotestsum
   fi
 
   if ! command -v prune-junit-xml >/dev/null 2>&1; then
@@ -221,7 +229,7 @@ runTests() {
   fi
 
   kube::log::status "Running tests ${cover_msg} ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
-  gotestsum --format="${gotestsum_format}" \
+  kube::log::run gotestsum --format="${gotestsum_format}" \
             --jsonfile="${jsonfile}" \
             --junitfile="${junit_filename_prefix:+"${junit_filename_prefix}.xml"}" \
             --raw-command \
@@ -234,7 +242,7 @@ runTests() {
     && rc=$? || rc=$?
 
   if [[ -n "${junit_filename_prefix}" ]]; then
-    prune-junit-xml "${junit_filename_prefix}.xml"
+    prune-junit-xml -prune-tests="${KUBE_PRUNE_JUNIT_TESTS}" "${junit_filename_prefix}.xml"
   fi
 
   if [[ ${KUBE_COVER} =~ ^[yY]$ ]]; then

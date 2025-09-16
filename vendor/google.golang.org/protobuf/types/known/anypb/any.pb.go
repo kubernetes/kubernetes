@@ -122,6 +122,7 @@ import (
 	reflect "reflect"
 	strings "strings"
 	sync "sync"
+	unsafe "unsafe"
 )
 
 // `Any` contains an arbitrary serialized protocol buffer message along with a
@@ -210,10 +211,7 @@ import (
 //	  "value": "1.212s"
 //	}
 type Any struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// A URL/resource name that uniquely identifies the type of the serialized
 	// protocol buffer message. This string must contain at least
 	// one "/" character. The last segment of the URL's path must represent
@@ -244,7 +242,9 @@ type Any struct {
 	// used with implementation specific semantics.
 	TypeUrl string `protobuf:"bytes,1,opt,name=type_url,json=typeUrl,proto3" json:"type_url,omitempty"`
 	// Must be a valid serialized protocol buffer of the above specified type.
-	Value []byte `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	Value         []byte `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 // New marshals src into a new Any instance.
@@ -412,32 +412,22 @@ func (x *Any) GetValue() []byte {
 
 var File_google_protobuf_any_proto protoreflect.FileDescriptor
 
-var file_google_protobuf_any_proto_rawDesc = []byte{
-	0x0a, 0x19, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
-	0x66, 0x2f, 0x61, 0x6e, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0f, 0x67, 0x6f, 0x6f,
-	0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x22, 0x36, 0x0a, 0x03,
-	0x41, 0x6e, 0x79, 0x12, 0x19, 0x0a, 0x08, 0x74, 0x79, 0x70, 0x65, 0x5f, 0x75, 0x72, 0x6c, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x74, 0x79, 0x70, 0x65, 0x55, 0x72, 0x6c, 0x12, 0x14,
-	0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x76,
-	0x61, 0x6c, 0x75, 0x65, 0x42, 0x76, 0x0a, 0x13, 0x63, 0x6f, 0x6d, 0x2e, 0x67, 0x6f, 0x6f, 0x67,
-	0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x42, 0x08, 0x41, 0x6e, 0x79,
-	0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x2c, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e,
-	0x67, 0x6f, 0x6c, 0x61, 0x6e, 0x67, 0x2e, 0x6f, 0x72, 0x67, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x62, 0x75, 0x66, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2f, 0x6b, 0x6e, 0x6f, 0x77, 0x6e, 0x2f,
-	0x61, 0x6e, 0x79, 0x70, 0x62, 0xa2, 0x02, 0x03, 0x47, 0x50, 0x42, 0xaa, 0x02, 0x1e, 0x47, 0x6f,
-	0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x57, 0x65,
-	0x6c, 0x6c, 0x4b, 0x6e, 0x6f, 0x77, 0x6e, 0x54, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x33,
-}
+const file_google_protobuf_any_proto_rawDesc = "" +
+	"\n" +
+	"\x19google/protobuf/any.proto\x12\x0fgoogle.protobuf\"6\n" +
+	"\x03Any\x12\x19\n" +
+	"\btype_url\x18\x01 \x01(\tR\atypeUrl\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\fR\x05valueBv\n" +
+	"\x13com.google.protobufB\bAnyProtoP\x01Z,google.golang.org/protobuf/types/known/anypb\xa2\x02\x03GPB\xaa\x02\x1eGoogle.Protobuf.WellKnownTypesb\x06proto3"
 
 var (
 	file_google_protobuf_any_proto_rawDescOnce sync.Once
-	file_google_protobuf_any_proto_rawDescData = file_google_protobuf_any_proto_rawDesc
+	file_google_protobuf_any_proto_rawDescData []byte
 )
 
 func file_google_protobuf_any_proto_rawDescGZIP() []byte {
 	file_google_protobuf_any_proto_rawDescOnce.Do(func() {
-		file_google_protobuf_any_proto_rawDescData = protoimpl.X.CompressGZIP(file_google_protobuf_any_proto_rawDescData)
+		file_google_protobuf_any_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_google_protobuf_any_proto_rawDesc), len(file_google_protobuf_any_proto_rawDesc)))
 	})
 	return file_google_protobuf_any_proto_rawDescData
 }
@@ -463,7 +453,7 @@ func file_google_protobuf_any_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_google_protobuf_any_proto_rawDesc,
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_google_protobuf_any_proto_rawDesc), len(file_google_protobuf_any_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   1,
 			NumExtensions: 0,
@@ -474,7 +464,6 @@ func file_google_protobuf_any_proto_init() {
 		MessageInfos:      file_google_protobuf_any_proto_msgTypes,
 	}.Build()
 	File_google_protobuf_any_proto = out.File
-	file_google_protobuf_any_proto_rawDesc = nil
 	file_google_protobuf_any_proto_goTypes = nil
 	file_google_protobuf_any_proto_depIdxs = nil
 }

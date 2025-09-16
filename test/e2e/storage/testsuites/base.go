@@ -86,6 +86,8 @@ var CSISuites = append(BaseSuites,
 	InitPvcDeletionPerformanceTestSuite,
 	InitReadWriteOncePodTestSuite,
 	InitVolumeModifyTestSuite,
+	InitVolumeModifyStressTestSuite,
+	InitSELinuxMountTestSuite,
 )
 
 func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) opCounts {
@@ -113,7 +115,7 @@ func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) op
 }
 
 func getVolumeOpCounts(ctx context.Context, c clientset.Interface, config *rest.Config, pluginName string) opCounts {
-	if !framework.ProviderIs("gce", "gke", "aws") {
+	if !framework.ProviderIs("gce", "aws") {
 		return opCounts{}
 	}
 

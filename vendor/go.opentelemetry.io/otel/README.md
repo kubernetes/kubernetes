@@ -1,9 +1,12 @@
 # OpenTelemetry-Go
 
-[![CI](https://github.com/open-telemetry/opentelemetry-go/workflows/ci/badge.svg)](https://github.com/open-telemetry/opentelemetry-go/actions?query=workflow%3Aci+branch%3Amain)
+[![ci](https://github.com/open-telemetry/opentelemetry-go/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/open-telemetry/opentelemetry-go/actions/workflows/ci.yml)
 [![codecov.io](https://codecov.io/gh/open-telemetry/opentelemetry-go/coverage.svg?branch=main)](https://app.codecov.io/gh/open-telemetry/opentelemetry-go?branch=main)
 [![PkgGoDev](https://pkg.go.dev/badge/go.opentelemetry.io/otel)](https://pkg.go.dev/go.opentelemetry.io/otel)
 [![Go Report Card](https://goreportcard.com/badge/go.opentelemetry.io/otel)](https://goreportcard.com/report/go.opentelemetry.io/otel)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/open-telemetry/opentelemetry-go/badge)](https://scorecard.dev/viewer/?uri=github.com/open-telemetry/opentelemetry-go)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9996/badge)](https://www.bestpractices.dev/projects/9996)
+[![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/opentelemetry-go.svg)](https://issues.oss-fuzz.com/issues?q=project:opentelemetry-go)
 [![Slack](https://img.shields.io/badge/slack-@cncf/otel--go-brightgreen.svg?logo=slack)](https://cloud-native.slack.com/archives/C01NPAXACKT)
 
 OpenTelemetry-Go is the [Go](https://golang.org/) implementation of [OpenTelemetry](https://opentelemetry.io/).
@@ -47,20 +50,22 @@ stop ensuring compatibility with these versions in the following manner:
 
 Currently, this project supports the following environments.
 
-| OS      | Go Version | Architecture |
-|---------|------------|--------------|
-| Ubuntu  | 1.22       | amd64        |
-| Ubuntu  | 1.21       | amd64        |
-| Ubuntu  | 1.22       | 386          |
-| Ubuntu  | 1.21       | 386          |
-| Linux   | 1.22       | arm64        |
-| Linux   | 1.21       | arm64        |
-| MacOS   | 1.22       | amd64        |
-| MacOS   | 1.21       | amd64        |
-| Windows | 1.22       | amd64        |
-| Windows | 1.21       | amd64        |
-| Windows | 1.22       | 386          |
-| Windows | 1.21       | 386          |
+| OS       | Go Version | Architecture |
+|----------|------------|--------------|
+| Ubuntu   | 1.24       | amd64        |
+| Ubuntu   | 1.23       | amd64        |
+| Ubuntu   | 1.24       | 386          |
+| Ubuntu   | 1.23       | 386          |
+| Ubuntu   | 1.24       | arm64        |
+| Ubuntu   | 1.23       | arm64        |
+| macOS 13 | 1.24       | amd64        |
+| macOS 13 | 1.23       | amd64        |
+| macOS    | 1.24       | arm64        |
+| macOS    | 1.23       | arm64        |
+| Windows  | 1.24       | amd64        |
+| Windows  | 1.23       | amd64        |
+| Windows  | 1.24       | 386          |
+| Windows  | 1.23       | 386          |
 
 While this project should work for other systems, no compatibility guarantees
 are made for those systems currently.
@@ -87,8 +92,8 @@ If you need to extend the telemetry an instrumentation library provides or want
 to build your own instrumentation for your application directly you will need
 to use the
 [Go otel](https://pkg.go.dev/go.opentelemetry.io/otel)
-package. The included [examples](./example/) are a good way to see some
-practical uses of this process.
+package. The [examples](https://github.com/open-telemetry/opentelemetry-go-contrib/tree/main/examples)
+are a good way to see some practical uses of this process.
 
 ### Export
 

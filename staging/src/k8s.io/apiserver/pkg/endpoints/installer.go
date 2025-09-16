@@ -26,8 +26,10 @@ import (
 	"unicode"
 
 	restful "github.com/emicklei/go-restful/v3"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -42,6 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	utilwarning "k8s.io/apiserver/pkg/endpoints/warning"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -62,9 +65,9 @@ type APIInstaller struct {
 	minRequestTimeout time.Duration
 }
 
-// Struct capturing information about an action ("GET", "POST", "WATCH", "PROXY", etc).
+// Struct capturing information about an action (MethodGet, MethodPost, MethodWatch, MethodProxy, etc).
 type action struct {
-	Verb          string               // Verb identifying the action ("GET", "POST", "WATCH", "PROXY", etc).
+	Verb          string               // Verb identifying the action (MethodGet, MethodPost, MethodWatch, MethodProxy, etc).
 	Path          string               // The path of the action
 	Params        []*restful.Parameter // List of parameters associated with the action.
 	Namer         handlers.ScopeNamer
@@ -175,17 +178,17 @@ type documentable interface {
 
 // toDiscoveryKubeVerb maps an action.Verb to the logical kube verb, used for discovery
 var toDiscoveryKubeVerb = map[string]string{
-	"CONNECT":          "", // do not list in discovery.
-	"DELETE":           "delete",
-	"DELETECOLLECTION": "deletecollection",
-	"GET":              "get",
-	"LIST":             "list",
-	"PATCH":            "patch",
-	"POST":             "create",
-	"PROXY":            "proxy",
-	"PUT":              "update",
-	"WATCH":            "watch",
-	"WATCHLIST":        "watch",
+	request.MethodConnect:          "", // do not list in discovery.
+	request.MethodDelete:           "delete",
+	request.MethodDeleteCollection: "deletecollection",
+	request.MethodGet:              "get",
+	request.MethodList:             "list",
+	request.MethodPatch:            "patch",
+	request.MethodPost:             "create",
+	request.MethodProxy:            "proxy",
+	request.MethodPut:              "update",
+	request.MethodWatch:            "watch",
+	request.MethodWatchList:        "watch",
 }
 
 // Install handlers for API resources.
@@ -520,24 +523,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		// Add actions at the resource path: /api/apiVersion/resource
-		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
-		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
+		actions = appendIf(actions, action{request.MethodList, resourcePath, resourceParams, namer, false}, isLister)
+		actions = appendIf(actions, action{request.MethodPost, resourcePath, resourceParams, namer, false}, isCreater)
+		actions = appendIf(actions, action{request.MethodDeleteCollection, resourcePath, resourceParams, namer, false}, isCollectionDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
+		actions = appendIf(actions, action{request.MethodWatchList, "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
 
 		// Add actions at the item path: /api/apiVersion/resource/{name}
-		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false}, isGetter)
+		actions = appendIf(actions, action{request.MethodGet, itemPath, nameParams, namer, false}, isGetter)
 		if getSubpath {
-			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false}, isGetter)
+			actions = appendIf(actions, action{request.MethodGet, itemPath + "/{path:*}", proxyParams, namer, false}, isGetter)
 		}
-		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
-		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isGracefulDeleter)
+		actions = appendIf(actions, action{request.MethodPut, itemPath, nameParams, namer, false}, isUpdater)
+		actions = appendIf(actions, action{request.MethodPatch, itemPath, nameParams, namer, false}, isPatcher)
+		actions = appendIf(actions, action{request.MethodDelete, itemPath, nameParams, namer, false}, isGracefulDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
-		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
+		actions = appendIf(actions, action{request.MethodWatch, "watch/" + itemPath, nameParams, namer, false}, isWatcher)
+		actions = appendIf(actions, action{request.MethodConnect, itemPath, nameParams, namer, false}, isConnecter)
+		actions = appendIf(actions, action{request.MethodConnect, itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
 	default:
 		namespaceParamName := "namespaces"
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -565,31 +568,31 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			ClusterScoped: false,
 		}
 
-		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
-		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
+		actions = appendIf(actions, action{request.MethodList, resourcePath, resourceParams, namer, false}, isLister)
+		actions = appendIf(actions, action{request.MethodPost, resourcePath, resourceParams, namer, false}, isCreater)
+		actions = appendIf(actions, action{request.MethodDeleteCollection, resourcePath, resourceParams, namer, false}, isCollectionDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
+		actions = appendIf(actions, action{request.MethodWatchList, "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
 
-		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false}, isGetter)
+		actions = appendIf(actions, action{request.MethodGet, itemPath, nameParams, namer, false}, isGetter)
 		if getSubpath {
-			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false}, isGetter)
+			actions = appendIf(actions, action{request.MethodGet, itemPath + "/{path:*}", proxyParams, namer, false}, isGetter)
 		}
-		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
-		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isGracefulDeleter)
+		actions = appendIf(actions, action{request.MethodPut, itemPath, nameParams, namer, false}, isUpdater)
+		actions = appendIf(actions, action{request.MethodPatch, itemPath, nameParams, namer, false}, isPatcher)
+		actions = appendIf(actions, action{request.MethodDelete, itemPath, nameParams, namer, false}, isGracefulDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
-		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
+		actions = appendIf(actions, action{request.MethodWatch, "watch/" + itemPath, nameParams, namer, false}, isWatcher)
+		actions = appendIf(actions, action{request.MethodConnect, itemPath, nameParams, namer, false}, isConnecter)
+		actions = appendIf(actions, action{request.MethodConnect, itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
 
 		// list or post across namespace.
 		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
 		if !isSubresource {
-			actions = appendIf(actions, action{"LIST", resource, params, namer, true}, isLister)
+			actions = appendIf(actions, action{request.MethodList, resource, params, namer, true}, isLister)
 			// DEPRECATED in 1.11
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true}, allowWatchList)
+			actions = appendIf(actions, action{request.MethodWatchList, "watch/" + resource, params, namer, true}, allowWatchList)
 		}
 	}
 
@@ -740,7 +743,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			requestScope = "resource"
 			operationSuffix = operationSuffix + "WithPath"
 		}
-		if strings.Contains(action.Path, "/{name}") || action.Verb == "POST" {
+		if strings.Contains(action.Path, "/{name}") || action.Verb == request.MethodPost {
 			requestScope = "resource"
 		}
 		if action.AllNamespaces {
@@ -794,7 +797,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 
 		switch action.Verb {
-		case "GET": // Get a resource.
+		case request.MethodGet: // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
 				handler = restfulGetResourceWithOptions(getterWithOptions, reqScope, isSubresource)
@@ -817,7 +820,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("read"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Operation("read"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				Writes(producedObject)
@@ -828,7 +831,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		case "LIST": // List all resources of a kind.
+		case request.MethodList: // List all resources of a kind.
 			doc := "list objects of kind " + kind
 			if isSubresource {
 				doc = "list " + subresource + " of objects of kind " + kind
@@ -838,7 +841,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("list"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Operation("list"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), allMediaTypes...)...).
 				Returns(http.StatusOK, "OK", versionedList).
 				Writes(versionedList)
@@ -861,7 +864,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		case "PUT": // Update a resource.
+		case request.MethodPut: // Update a resource.
 			doc := "replace the specified " + kind
 			if isSubresource {
 				doc = "replace " + subresource + " of the specified " + kind
@@ -871,7 +874,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.PUT(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("replace"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Operation("replace"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
@@ -884,7 +887,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		case "PATCH": // Partially update a resource
+		case request.MethodPatch: // Partially update a resource
 			doc := "partially update the specified " + kind
 			if isSubresource {
 				doc = "partially update " + subresource + " of the specified " + kind
@@ -904,7 +907,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 				Consumes(supportedTypes...).
-				Operation("patch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Operation("patch"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				// Patch can return 201 when a server side apply is requested
@@ -916,7 +919,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		case "POST": // Create a resource.
+		case request.MethodPost: // Create a resource.
 			var handler restful.RouteFunction
 			if isNamedCreater {
 				handler = restfulCreateNamedResource(namedCreater, reqScope, admit)
@@ -933,7 +936,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.POST(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("create"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Operation("create"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
@@ -947,7 +950,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		case "DELETE": // Delete a resource.
+		case request.MethodDelete: // Delete a resource.
 			article := GetArticleForNoun(kind, " ")
 			doc := "delete" + article + kind
 			if isSubresource {
@@ -962,7 +965,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Operation("delete"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(deleteReturnType).
 				Returns(http.StatusOK, "OK", deleteReturnType).
@@ -976,7 +979,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		case "DELETECOLLECTION":
+		case request.MethodDeleteCollection:
 			doc := "delete collection of " + kind
 			if isSubresource {
 				doc = "delete collection of " + subresource + " of a " + kind
@@ -986,7 +989,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Operation("deletecollection"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(versionedStatus).
 				Returns(http.StatusOK, "OK", versionedStatus)
@@ -1003,7 +1006,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		// deprecated in 1.11
-		case "WATCH": // Watch a resource.
+		case request.MethodWatch: // Watch a resource.
 			doc := "watch changes to an object of kind " + kind
 			if isSubresource {
 				doc = "watch changes to " + subresource + " of an object of kind " + kind
@@ -1014,7 +1017,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("watch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Operation("watch"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(allMediaTypes...).
 				Returns(http.StatusOK, "OK", versionedWatchEvent).
 				Writes(versionedWatchEvent)
@@ -1024,7 +1027,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		// deprecated in 1.11
-		case "WATCHLIST": // Watch all resources of a kind.
+		case request.MethodWatchList: // Watch all resources of a kind.
 			doc := "watch individual changes to a list of " + kind
 			if isSubresource {
 				doc = "watch individual changes to a list of " + subresource + " of " + kind
@@ -1035,7 +1038,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List"+operationSuffix).
+				Operation("watch"+namespaced+kind+cases.Title(language.English).String(subresource)+"List"+operationSuffix).
 				Produces(allMediaTypes...).
 				Returns(http.StatusOK, "OK", versionedWatchEvent).
 				Writes(versionedWatchEvent)
@@ -1044,7 +1047,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		case "CONNECT":
+		case request.MethodConnect:
 			for _, method := range connecter.ConnectMethods() {
 				connectProducedObject := storageMeta.ProducesObject(method)
 				if connectProducedObject == nil {
@@ -1059,7 +1062,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				route := ws.Method(method).Path(action.Path).
 					To(handler).
 					Doc(doc).
-					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource) + operationSuffix).
+					Operation("connect" + cases.Title(language.English).String(strings.ToLower(method)) + namespaced + kind + cases.Title(language.English).String(subresource) + operationSuffix).
 					Produces("*/*").
 					Consumes("*/*").
 					Writes(connectProducedObject)

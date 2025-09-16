@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/operationexecutor"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -132,7 +133,7 @@ func (d *DummyImpl) RegisterPlugin(pluginName string, endpoint string, versions 
 }
 
 // DeRegisterPlugin is a dummy implementation
-func (d *DummyImpl) DeRegisterPlugin(pluginName string) {
+func (d *DummyImpl) DeRegisterPlugin(pluginName, endpoint string) {
 }
 
 // Calls Run()
@@ -170,6 +171,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 func Test_Run_Positive_Register(t *testing.T) {
 	defer cleanup(t)
 
+	tCtx := ktesting.Init(t)
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	di := NewDummyImpl()
@@ -192,11 +194,12 @@ func Test_Run_Positive_Register(t *testing.T) {
 	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
-	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+	require.NoError(t, p.Serve(tCtx, "v1beta1", "v1beta2"))
 	defer func() {
-		require.NoError(t, p.Stop())
+		require.NoError(t, p.Stop(tCtx))
 	}()
-	dsw.AddOrUpdatePlugin(socketPath)
+	require.NoError(t, dsw.AddOrUpdatePlugin(tCtx, socketPath))
+
 	plugins := dsw.GetPluginsToRegister()
 	waitForRegistration(t, socketPath, plugins[0].UUID, asw)
 
@@ -218,6 +221,7 @@ func Test_Run_Positive_Register(t *testing.T) {
 func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	defer cleanup(t)
 
+	tCtx := ktesting.Init(t)
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	di := NewDummyImpl()
@@ -241,8 +245,8 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
-	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
-	dsw.AddOrUpdatePlugin(socketPath)
+	require.NoError(t, p.Serve(tCtx, "v1beta1", "v1beta2"))
+	require.NoError(t, dsw.AddOrUpdatePlugin(tCtx, socketPath))
 	plugins := dsw.GetPluginsToRegister()
 	waitForRegistration(t, socketPath, plugins[0].UUID, asw)
 
@@ -274,6 +278,7 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 func Test_Run_Positive_ReRegister(t *testing.T) {
 	defer cleanup(t)
 
+	tCtx := ktesting.Init(t)
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	di := NewDummyImpl()
@@ -297,13 +302,13 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 	socketPath := filepath.Join(socketDir, "plugin2.sock")
 	pluginName := fmt.Sprintf("example-plugin2")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
-	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
-	dsw.AddOrUpdatePlugin(socketPath)
+	require.NoError(t, p.Serve(tCtx, "v1beta1", "v1beta2"))
+	require.NoError(t, dsw.AddOrUpdatePlugin(tCtx, socketPath))
 	plugins := dsw.GetPluginsToRegister()
 	waitForRegistration(t, socketPath, plugins[0].UUID, asw)
 
 	// Add the plugin again to update the timestamp
-	dsw.AddOrUpdatePlugin(socketPath)
+	require.NoError(t, dsw.AddOrUpdatePlugin(tCtx, socketPath))
 	// This should trigger a deregistration and a regitration
 	// The process of unregistration and reregistration can happen so fast that
 	// we are not able to catch it with waitForUnregistration, so here we are checking

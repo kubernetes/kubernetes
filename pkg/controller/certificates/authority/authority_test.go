@@ -22,8 +22,10 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"math/big"
 	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
@@ -31,7 +33,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	capi "k8s.io/api/certificates/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestCertificateAuthority(t *testing.T) {
@@ -237,7 +238,7 @@ func TestCertificateAuthority(t *testing.T) {
 					"Version",
 					"MaxPathLen",
 				),
-				diff.IgnoreUnset(),
+				ignoreUnset(),
 				cmp.Transformer("RoundTime", func(x time.Time) time.Time {
 					return x.Truncate(time.Second)
 				}),
@@ -249,6 +250,44 @@ func TestCertificateAuthority(t *testing.T) {
 				t.Errorf("unexpected diff: %v", cmp.Diff(*cert, test.want, opts))
 			}
 		})
+	}
+}
+
+// ignoreUnset is an option that ignores fields that are unset on the right
+// hand side of a comparison. This is useful in testing to assert that an
+// object is a derivative.
+func ignoreUnset() cmp.Option {
+	return cmp.Options{
+		// ignore unset fields in v2
+		cmp.FilterPath(func(path cmp.Path) bool {
+			_, v2 := path.Last().Values()
+			switch v2.Kind() {
+			case reflect.Slice, reflect.Map:
+				if v2.IsNil() || v2.Len() == 0 {
+					return true
+				}
+			case reflect.String:
+				if v2.Len() == 0 {
+					return true
+				}
+			case reflect.Interface, reflect.Pointer:
+				if v2.IsNil() {
+					return true
+				}
+			}
+			return false
+		}, cmp.Ignore()),
+		// ignore map entries that aren't set in v2
+		cmp.FilterPath(func(path cmp.Path) bool {
+			switch i := path.Last().(type) {
+			case cmp.MapIndex:
+				if _, v2 := i.Values(); !v2.IsValid() {
+					fmt.Println("E")
+					return true
+				}
+			}
+			return false
+		}, cmp.Ignore()),
 	}
 }
 

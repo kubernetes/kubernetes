@@ -21,6 +21,7 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -28,12 +29,12 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -62,19 +63,11 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
 				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
 			}
-
+			ginkgo.DeferCleanup(func() error {
+				return resetCRIProxyInjector(e2eCriProxy)
+			})
 			testpods = prepareAndCleanup(ctx, f)
 			gomega.Expect(len(testpods)).To(gomega.BeNumerically("<=", 5))
-		})
-
-		ginkgo.AfterEach(func(ctx context.Context) {
-			err := resetCRIProxyInjector(e2eCriProxy)
-			framework.ExpectNoError(err)
-
-			ginkgo.By("cleanup pods")
-			for _, pod := range testpods {
-				deletePodSyncByName(ctx, f, pod.Name)
-			}
 		})
 
 		ginkgo.It("should pull immediately if no more than 5 pods", func(ctx context.Context) {
@@ -106,7 +99,8 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 			framework.ExpectNoError(err)
 
 			for _, testpod := range testpods {
-				_ = e2epod.NewPodClient(f).Create(ctx, testpod)
+				pod := e2epod.NewPodClient(f).Create(ctx, testpod)
+				ginkgo.DeferCleanup(deletePodSyncByName, f, pod.Name)
 			}
 
 			imagePulled, podStartTime, podEndTime, err := getPodImagePullDurations(ctx, f, testpods)
@@ -145,19 +139,11 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
 				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
 			}
-
+			ginkgo.DeferCleanup(func() error {
+				return resetCRIProxyInjector(e2eCriProxy)
+			})
 			testpods = prepareAndCleanup(ctx, f)
 			gomega.Expect(len(testpods)).To(gomega.BeNumerically("<=", 5))
-		})
-
-		ginkgo.AfterEach(func(ctx context.Context) {
-			err := resetCRIProxyInjector(e2eCriProxy)
-			framework.ExpectNoError(err)
-
-			ginkgo.By("cleanup pods")
-			for _, pod := range testpods {
-				deletePodSyncByName(ctx, f, pod.Name)
-			}
 		})
 
 		ginkgo.It("should be waiting more", func(ctx context.Context) {
@@ -196,7 +182,9 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 
 			var pods []*v1.Pod
 			for _, testpod := range testpods {
-				pods = append(pods, e2epod.NewPodClient(f).Create(ctx, testpod))
+				pod := e2epod.NewPodClient(f).Create(ctx, testpod)
+				ginkgo.DeferCleanup(deletePodSyncByName, f, pod.Name)
+				pods = append(pods, pod)
 			}
 			for _, pod := range pods {
 				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Running", 2*time.Minute, func(pod *v1.Pod) (bool, error) {
@@ -230,6 +218,48 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 		})
 
 	})
+
+	ginkgo.It("Image pull retry backs off on error.", func(ctx context.Context) {
+		if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
+			ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
+		}
+
+		// inject PullImage failed to trigger backoff
+		expectedErr := fmt.Errorf("PullImage failed")
+		err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+			if apiName == criproxy.PullImage {
+				return expectedErr
+			}
+			return nil
+		})
+		framework.ExpectNoError(err)
+
+		pod := e2epod.NewPodClient(f).Create(ctx, newPullImageAlwaysPod())
+		podErr := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "ImagePullBackOff", 1*time.Minute, func(pod *v1.Pod) (bool, error) {
+			if len(pod.Status.ContainerStatuses) > 0 && pod.Status.Reason == images.ErrImagePullBackOff.Error() {
+				return true, nil
+			}
+			return false, nil
+		})
+		gomega.Expect(podErr).To(gomega.HaveOccurred())
+
+		eventMsg, err := getFailedToPullImageMsg(ctx, f, pod.Name)
+		framework.ExpectNoError(err)
+		isExpectedErrMsg := strings.Contains(eventMsg, expectedErr.Error())
+		gomega.Expect(isExpectedErrMsg).To(gomega.BeTrueBecause("we injected an exception into the PullImage interface of the cri proxy"))
+
+		// Hard wait 30 seconds for image pulls to repeatedly back off.
+		time.Sleep(30 * time.Second)
+
+		e, err := getImagePullAttempts(ctx, f, pod.Name)
+		framework.ExpectNoError(err)
+		// 3 would take 10s best case.
+		gomega.Expect(e.Count).Should(gomega.BeNumerically(">=", 3))
+		// 7 would take 310s best case, if the infra went slow.
+		gomega.Expect(e.Count).Should(gomega.BeNumerically("<=", 7))
+
+	})
+
 })
 
 func getPodImagePullDurations(ctx context.Context, f *framework.Framework, testpods []*v1.Pod) (map[string]*pulledStruct, map[string]metav1.Time, map[string]metav1.Time, error) {
@@ -274,8 +304,8 @@ func checkPodPullingOverlap(podStartTime map[string]metav1.Time, podEndTime map[
 
 func prepareAndCleanup(ctx context.Context, f *framework.Framework) (testpods []*v1.Pod) {
 	// cuda images are > 2Gi and it will reduce the flaky rate
-	image1 := imageutils.GetE2EImage(imageutils.Httpd)
-	image2 := imageutils.GetE2EImage(imageutils.HttpdNew)
+	image1 := imageutils.GetE2EImage(imageutils.AgnhostPrev)
+	image2 := imageutils.GetE2EImage(imageutils.Agnhost)
 	node := getNodeName(ctx, f)
 
 	testpod := &v1.Pod{
@@ -327,7 +357,7 @@ type pulledStruct struct {
 func getDurationsFromPulledEventMsg(msg string) (*pulledStruct, error) {
 	splits := strings.Split(msg, " ")
 	if len(splits) != 13 {
-		return nil, errors.Errorf("pull event message should be spilted to 13: %d", len(splits))
+		return nil, fmt.Errorf("pull event message should be spilted to 13: %d", len(splits))
 	}
 	pulledDuration, err := time.ParseDuration(splits[5])
 	if err != nil {
@@ -342,4 +372,19 @@ func getDurationsFromPulledEventMsg(msg string) (*pulledStruct, error) {
 		pulledDuration:               pulledDuration,
 		pulledIncludeWaitingDuration: pulledIncludeWaitingDuration,
 	}, nil
+}
+
+func getImagePullAttempts(ctx context.Context, f *framework.Framework, podName string) (v1.Event, error) {
+	event := v1.Event{}
+	e, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return event, err
+	}
+
+	for _, event := range e.Items {
+		if event.InvolvedObject.Name == podName && event.Reason == kubeletevents.PullingImage {
+			return event, nil
+		}
+	}
+	return event, nil
 }

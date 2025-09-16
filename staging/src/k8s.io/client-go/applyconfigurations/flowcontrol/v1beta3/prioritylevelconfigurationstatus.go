@@ -20,7 +20,10 @@ package v1beta3
 
 // PriorityLevelConfigurationStatusApplyConfiguration represents a declarative configuration of the PriorityLevelConfigurationStatus type for use
 // with apply.
+//
+// PriorityLevelConfigurationStatus represents the current state of a "request-priority".
 type PriorityLevelConfigurationStatusApplyConfiguration struct {
+	// `conditions` is the current state of "request-priority".
 	Conditions []PriorityLevelConfigurationConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 

@@ -29,10 +29,14 @@ import (
 
 // ValidatingWebhookConfigurationApplyConfiguration represents a declarative configuration of the ValidatingWebhookConfiguration type for use
 // with apply.
+//
+// ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
 type ValidatingWebhookConfigurationApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Webhooks                             []ValidatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
+	// Webhooks is a list of webhooks and the affected resources and operations.
+	Webhooks []ValidatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
 }
 
 // ValidatingWebhookConfiguration constructs a declarative configuration of the ValidatingWebhookConfiguration type for use with
@@ -45,29 +49,14 @@ func ValidatingWebhookConfiguration(name string) *ValidatingWebhookConfiguration
 	return b
 }
 
-// ExtractValidatingWebhookConfiguration extracts the applied configuration owned by fieldManager from
-// validatingWebhookConfiguration. If no managedFields are found in validatingWebhookConfiguration for fieldManager, a
-// ValidatingWebhookConfigurationApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractValidatingWebhookConfigurationFrom extracts the applied configuration owned by fieldManager from
+// validatingWebhookConfiguration for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // validatingWebhookConfiguration must be a unmodified ValidatingWebhookConfiguration API object that was retrieved from the Kubernetes API.
-// ExtractValidatingWebhookConfiguration provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractValidatingWebhookConfigurationFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractValidatingWebhookConfiguration(validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
-	return extractValidatingWebhookConfiguration(validatingWebhookConfiguration, fieldManager, "")
-}
-
-// ExtractValidatingWebhookConfigurationStatus is the same as ExtractValidatingWebhookConfiguration except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractValidatingWebhookConfigurationStatus(validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
-	return extractValidatingWebhookConfiguration(validatingWebhookConfiguration, fieldManager, "status")
-}
-
-func extractValidatingWebhookConfiguration(validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string, subresource string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
+func ExtractValidatingWebhookConfigurationFrom(validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string, subresource string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
 	b := &ValidatingWebhookConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1.ValidatingWebhookConfiguration"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +68,22 @@ func extractValidatingWebhookConfiguration(validatingWebhookConfiguration *admis
 	b.WithAPIVersion("admissionregistration.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractValidatingWebhookConfiguration extracts the applied configuration owned by fieldManager from
+// validatingWebhookConfiguration. If no managedFields are found in validatingWebhookConfiguration for fieldManager, a
+// ValidatingWebhookConfigurationApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// validatingWebhookConfiguration must be a unmodified ValidatingWebhookConfiguration API object that was retrieved from the Kubernetes API.
+// ExtractValidatingWebhookConfiguration provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractValidatingWebhookConfiguration(validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
+	return ExtractValidatingWebhookConfigurationFrom(validatingWebhookConfiguration, fieldManager, "")
+}
+
+func (b ValidatingWebhookConfigurationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -251,8 +256,24 @@ func (b *ValidatingWebhookConfigurationApplyConfiguration) WithWebhooks(values .
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ValidatingWebhookConfigurationApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ValidatingWebhookConfigurationApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ValidatingWebhookConfigurationApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ValidatingWebhookConfigurationApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

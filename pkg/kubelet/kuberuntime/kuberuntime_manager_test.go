@@ -22,17 +22,19 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -42,16 +44,22 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
+	crierror "k8s.io/cri-api/pkg/errors"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	cmtesting "k8s.io/kubernetes/pkg/kubelet/cm/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	imagetypes "k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -60,12 +68,15 @@ var (
 	containerRestartPolicyAlways       = v1.ContainerRestartPolicyAlways
 )
 
-func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
-	return customTestRuntimeManager(&credentialprovider.BasicDockerKeyring{})
+func createTestRuntimeManager(ctx context.Context) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+	return createTestRuntimeManagerWithErrors(ctx, nil)
 }
 
-func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+func createTestRuntimeManagerWithErrors(ctx context.Context, errors map[string][]error) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
 	fakeRuntimeService := apitest.NewFakeRuntimeService()
+	if errors != nil {
+		fakeRuntimeService.Errors = errors
+	}
 	fakeImageService := apitest.NewFakeImageService()
 	// Only an empty machineInfo is needed here, because in unit test all containers are besteffort,
 	// data in machineInfo is not used. If burstable containers are used in unit test in the future,
@@ -75,7 +86,7 @@ func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*
 		MemoryCapacity: uint64(memoryCapacityQuantity.Value()),
 	}
 	osInterface := &containertest.FakeOS{}
-	manager, err := newFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, keyring, noopoteltrace.NewTracerProvider().Tracer(""))
+	manager, err := newFakeKubeRuntimeManager(ctx, fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, noopoteltrace.NewTracerProvider().Tracer(""))
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
@@ -130,7 +141,8 @@ func makeAndSetFakePod(t *testing.T, m *kubeGenericRuntimeManager, fakeRuntime *
 
 // makeFakePodSandbox creates a fake pod sandbox based on a sandbox template.
 func makeFakePodSandbox(t *testing.T, m *kubeGenericRuntimeManager, template sandboxTemplate) *apitest.FakePodSandbox {
-	config, err := m.generatePodSandboxConfig(template.pod, template.attempt)
+	tCtx := ktesting.Init(t)
+	config, err := m.generatePodSandboxConfig(tCtx, template.pod, template.attempt)
 	assert.NoError(t, err, "generatePodSandboxConfig for sandbox template %+v", template)
 
 	podSandboxID := apitest.BuildSandboxName(config.Metadata)
@@ -154,7 +166,9 @@ func makeFakePodSandbox(t *testing.T, m *kubeGenericRuntimeManager, template san
 			Ip: ip,
 		})
 	}
-	podSandBoxStatus.Network.AdditionalIps = additionalPodIPs
+	if len(additionalPodIPs) > 0 {
+		podSandBoxStatus.Network.AdditionalIps = additionalPodIPs
+	}
 	return podSandBoxStatus
 
 }
@@ -171,11 +185,11 @@ func makeFakePodSandboxes(t *testing.T, m *kubeGenericRuntimeManager, templates 
 
 // makeFakeContainer creates a fake container based on a container template.
 func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template containerTemplate) *apitest.FakeContainer {
-	ctx := context.Background()
-	sandboxConfig, err := m.generatePodSandboxConfig(template.pod, template.sandboxAttempt)
+	tCtx := ktesting.Init(t)
+	sandboxConfig, err := m.generatePodSandboxConfig(tCtx, template.pod, template.sandboxAttempt)
 	assert.NoError(t, err, "generatePodSandboxConfig for container template %+v", template)
 
-	containerConfig, _, err := m.generateContainerConfig(ctx, template.container, template.pod, template.attempt, "", template.container.Image, []string{}, nil, nil)
+	containerConfig, _, err := m.generateContainerConfig(tCtx, template.container, template.pod, template.attempt, "", template.container.Image, []string{}, nil, nil)
 	assert.NoError(t, err, "generateContainerConfig for container template %+v", template)
 
 	podSandboxID := apitest.BuildSandboxName(sandboxConfig.Metadata)
@@ -287,22 +301,24 @@ func verifyContainerStatuses(t *testing.T, runtime *apitest.FakeRuntimeService, 
 }
 
 func TestNewKubeRuntimeManager(t *testing.T) {
-	_, _, _, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, _, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 }
 
 func TestVersion(t *testing.T) {
-	ctx := context.Background()
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
-	version, err := m.Version(ctx)
+	version, err := m.Version(tCtx)
 	assert.NoError(t, err)
 	assert.Equal(t, kubeRuntimeAPIVersion, version.String())
 }
 
 func TestContainerRuntimeType(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	runtimeType := m.Type()
@@ -310,8 +326,8 @@ func TestContainerRuntimeType(t *testing.T) {
 }
 
 func TestGetPodStatus(t *testing.T) {
-	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	containers := []v1.Container{
@@ -340,7 +356,7 @@ func TestGetPodStatus(t *testing.T) {
 	// Set fake sandbox and faked containers to fakeRuntime.
 	makeAndSetFakePod(t, m, fakeRuntime, pod)
 
-	podStatus, err := m.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
 	assert.Equal(t, pod.UID, podStatus.ID)
 	assert.Equal(t, pod.Name, podStatus.Name)
@@ -349,8 +365,8 @@ func TestGetPodStatus(t *testing.T) {
 }
 
 func TestStopContainerWithNotFoundError(t *testing.T) {
-	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	containers := []v1.Container{
@@ -379,17 +395,17 @@ func TestStopContainerWithNotFoundError(t *testing.T) {
 	// Set fake sandbox and faked containers to fakeRuntime.
 	makeAndSetFakePod(t, m, fakeRuntime, pod)
 	fakeRuntime.InjectError("StopContainer", status.Error(codes.NotFound, "No such container"))
-	podStatus, err := m.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	require.NoError(t, err)
 	p := kubecontainer.ConvertPodStatusToRunningPod("", podStatus)
 	gracePeriod := int64(1)
-	err = m.KillPod(ctx, pod, p, &gracePeriod)
+	err = m.KillPod(tCtx, pod, p, &gracePeriod)
 	require.NoError(t, err)
 }
 
 func TestGetPodStatusWithNotFoundError(t *testing.T) {
-	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	containers := []v1.Container{
@@ -418,7 +434,7 @@ func TestGetPodStatusWithNotFoundError(t *testing.T) {
 	// Set fake sandbox and faked containers to fakeRuntime.
 	makeAndSetFakePod(t, m, fakeRuntime, pod)
 	fakeRuntime.InjectError("ContainerStatus", status.Error(codes.NotFound, "No such container"))
-	podStatus, err := m.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	require.NoError(t, err)
 	require.Equal(t, pod.UID, podStatus.ID)
 	require.Equal(t, pod.Name, podStatus.Name)
@@ -427,8 +443,8 @@ func TestGetPodStatusWithNotFoundError(t *testing.T) {
 }
 
 func TestGetPods(t *testing.T) {
-	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	pod := &v1.Pod{
@@ -458,7 +474,7 @@ func TestGetPods(t *testing.T) {
 	containers := make([]*kubecontainer.Container, len(fakeContainers))
 	for i := range containers {
 		fakeContainer := fakeContainers[i]
-		c, err := m.toKubeContainer(&runtimeapi.Container{
+		c, err := m.toKubeContainer(tCtx, &runtimeapi.Container{
 			Id:          fakeContainer.Id,
 			Metadata:    fakeContainer.Metadata,
 			State:       fakeContainer.State,
@@ -496,7 +512,7 @@ func TestGetPods(t *testing.T) {
 		},
 	}
 
-	actual, err := m.GetPods(ctx, false)
+	actual, err := m.GetPods(tCtx, false)
 	assert.NoError(t, err)
 
 	if !verifyPods(expected, actual) {
@@ -505,8 +521,8 @@ func TestGetPods(t *testing.T) {
 }
 
 func TestGetPodsSorted(t *testing.T) {
-	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}
@@ -523,7 +539,7 @@ func TestGetPodsSorted(t *testing.T) {
 	}
 	fakeRuntime.SetFakeSandboxes(fakeSandboxes)
 
-	actual, err := m.GetPods(ctx, false)
+	actual, err := m.GetPods(tCtx, false)
 	assert.NoError(t, err)
 
 	assert.Len(t, actual, 3)
@@ -535,8 +551,8 @@ func TestGetPodsSorted(t *testing.T) {
 }
 
 func TestKillPod(t *testing.T) {
-	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	pod := &v1.Pod{
@@ -574,7 +590,7 @@ func TestKillPod(t *testing.T) {
 	containers := make([]*kubecontainer.Container, len(fakeContainers))
 	for i := range containers {
 		fakeContainer := fakeContainers[i]
-		c, err := m.toKubeContainer(&runtimeapi.Container{
+		c, err := m.toKubeContainer(tCtx, &runtimeapi.Container{
 			Id:       fakeContainer.Id,
 			Metadata: fakeContainer.Metadata,
 			State:    fakeContainer.State,
@@ -602,7 +618,7 @@ func TestKillPod(t *testing.T) {
 		},
 	}
 
-	err = m.KillPod(ctx, pod, runningPod, nil)
+	err = m.KillPod(tCtx, pod, runningPod, nil)
 	assert.NoError(t, err)
 	assert.Len(t, fakeRuntime.Containers, 3)
 	assert.Len(t, fakeRuntime.Sandboxes, 1)
@@ -615,7 +631,8 @@ func TestKillPod(t *testing.T) {
 }
 
 func TestSyncPod(t *testing.T) {
-	fakeRuntime, fakeImage, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	containers := []v1.Container{
@@ -642,7 +659,7 @@ func TestSyncPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(context.Background(), pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	assert.Len(t, fakeRuntime.Containers, 2)
 	assert.Len(t, fakeImage.Images, 2)
@@ -656,7 +673,8 @@ func TestSyncPod(t *testing.T) {
 }
 
 func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	containers := []v1.Container{
@@ -702,7 +720,7 @@ func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(context.Background(), pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	assert.Equal(t, exceptSysctls, pod.Spec.SecurityContext.Sysctls)
 	for _, sandbox := range fakeRuntime.Sandboxes {
@@ -714,8 +732,8 @@ func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
 }
 
 func TestPruneInitContainers(t *testing.T) {
-	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	init1 := makeTestContainer("init1", "busybox")
@@ -741,10 +759,10 @@ func TestPruneInitContainers(t *testing.T) {
 	}
 	fakes := makeFakeContainers(t, m, templates)
 	fakeRuntime.SetFakeContainers(fakes)
-	podStatus, err := m.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
 
-	m.pruneInitContainersBeforeStart(ctx, pod, podStatus)
+	m.pruneInitContainersBeforeStart(tCtx, pod, podStatus)
 	expectedContainers := sets.New[string](fakes[0].Id, fakes[2].Id)
 	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
 		t.Errorf("expected %v, got %v", expectedContainers, actual)
@@ -752,8 +770,8 @@ func TestPruneInitContainers(t *testing.T) {
 }
 
 func TestSyncPodWithInitContainers(t *testing.T) {
-	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	initContainers := []v1.Container{
@@ -790,9 +808,9 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
 
 	// 1. should only create the init container.
-	podStatus, err := m.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(context.Background(), pod, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected := []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
@@ -800,24 +818,25 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	verifyContainerStatuses(t, fakeRuntime, expected, "start only the init container")
 
 	// 2. should not create app container because init container is still running.
-	podStatus, err = m.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(context.Background(), pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	verifyContainerStatuses(t, fakeRuntime, expected, "init container still running; do nothing")
 
 	// 3. should create all app containers because init container finished.
 	// Stop init container instance 0.
-	sandboxIDs, err := m.getSandboxIDByPodUID(ctx, pod.UID, nil)
+	sandboxIDs, err := m.getSandboxIDByPodUID(tCtx, pod.UID, nil)
 	require.NoError(t, err)
 	sandboxID := sandboxIDs[0]
 	initID0, err := fakeRuntime.GetContainerID(sandboxID, initContainers[0].Name, 0)
 	require.NoError(t, err)
-	fakeRuntime.StopContainer(ctx, initID0, 0)
+	err = fakeRuntime.StopContainer(tCtx, initID0, 0)
+	require.NoError(t, err)
 	// Sync again.
-	podStatus, err = m.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(ctx, pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
@@ -828,11 +847,12 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 
 	// 4. should restart the init container if needed to create a new podsandbox
 	// Stop the pod sandbox.
-	fakeRuntime.StopPodSandbox(ctx, sandboxID)
+	err = fakeRuntime.StopPodSandbox(tCtx, sandboxID)
+	require.NoError(t, err)
 	// Sync again.
-	podStatus, err = m.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(ctx, pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		// The first init container instance is purged and no longer visible.
@@ -927,7 +947,8 @@ func makeBasePodAndStatus() (*v1.Pod, *kubecontainer.PodStatus) {
 }
 
 func TestComputePodActions(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	// Creating a pair reference pod and status for the test cases to refer
@@ -1207,8 +1228,8 @@ func TestComputePodActions(t *testing.T) {
 		if test.mutateStatusFn != nil {
 			test.mutateStatusFn(status)
 		}
-		ctx := context.Background()
-		actions := m.computePodActions(ctx, pod, status)
+		tCtx := ktesting.Init(t)
+		actions := m.computePodActions(tCtx, pod, status)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
@@ -1260,21 +1281,16 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 			actual.ContainersToKill[k] = info
 		}
 	}
+	if expected.ContainersToUpdate == nil && actual.ContainersToUpdate != nil {
+		// No need to distinguish empty and nil maps for the test.
+		expected.ContainersToUpdate = map[v1.ResourceName][]containerToUpdateInfo{}
+	}
 	assert.Equal(t, expected, actual, desc)
 }
 
 func TestComputePodActionsWithInitContainers(t *testing.T) {
-	t.Run("sidecar containers disabled", func(t *testing.T) {
-		testComputePodActionsWithInitContainers(t, false)
-	})
-	t.Run("sidecar containers enabled", func(t *testing.T) {
-		testComputePodActionsWithInitContainers(t, true)
-	})
-}
-
-func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnabled bool) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	// Creating a pair reference pod and status for the test cases to refer
@@ -1303,11 +1319,10 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 				status.ContainerStatuses = nil
 			},
 			actions: podActions{
-				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				NextInitContainerToStart: &basePod.Spec.InitContainers[0],
-				InitContainersToStart:    []int{0},
-				ContainersToStart:        []int{},
-				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{0},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
 		"initialization in progress; do nothing": {
@@ -1323,14 +1338,13 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
 			},
 			actions: podActions{
-				KillPod:                  true,
-				CreateSandbox:            true,
-				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				Attempt:                  uint32(1),
-				NextInitContainerToStart: &basePod.Spec.InitContainers[0],
-				InitContainersToStart:    []int{0},
-				ContainersToStart:        []int{},
-				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				KillPod:               true,
+				CreateSandbox:         true,
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				Attempt:               uint32(1),
+				InitContainersToStart: []int{0},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
 		"initialization failed; restart the last init container if RestartPolicy == Always": {
@@ -1339,11 +1353,10 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 				status.ContainerStatuses[2].ExitCode = 137
 			},
 			actions: podActions{
-				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				NextInitContainerToStart: &basePod.Spec.InitContainers[2],
-				InitContainersToStart:    []int{2},
-				ContainersToStart:        []int{},
-				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
 		"initialization failed; restart the last init container if RestartPolicy == OnFailure": {
@@ -1352,11 +1365,10 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 				status.ContainerStatuses[2].ExitCode = 137
 			},
 			actions: podActions{
-				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				NextInitContainerToStart: &basePod.Spec.InitContainers[2],
-				InitContainersToStart:    []int{2},
-				ContainersToStart:        []int{},
-				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
 		"initialization failed; kill pod if RestartPolicy == Never": {
@@ -1377,11 +1389,10 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 				status.ContainerStatuses[2].State = kubecontainer.ContainerStateUnknown
 			},
 			actions: podActions{
-				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				NextInitContainerToStart: &basePod.Spec.InitContainers[2],
-				InitContainersToStart:    []int{2},
-				ContainersToStart:        []int{},
-				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{2}),
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{2}),
 			},
 		},
 		"init container state unknown; kill and recreate the last init container if RestartPolicy == OnFailure": {
@@ -1390,11 +1401,10 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 				status.ContainerStatuses[2].State = kubecontainer.ContainerStateUnknown
 			},
 			actions: podActions{
-				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				NextInitContainerToStart: &basePod.Spec.InitContainers[2],
-				InitContainersToStart:    []int{2},
-				ContainersToStart:        []int{},
-				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{2}),
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{2}),
 			},
 		},
 		"init container state unknown; kill pod if RestartPolicy == Never": {
@@ -1430,14 +1440,13 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 				status.ContainerStatuses = []*kubecontainer.Status{}
 			},
 			actions: podActions{
-				KillPod:                  true,
-				CreateSandbox:            true,
-				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				Attempt:                  uint32(1),
-				NextInitContainerToStart: &basePod.Spec.InitContainers[0],
-				InitContainersToStart:    []int{0},
-				ContainersToStart:        []int{},
-				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				KillPod:               true,
+				CreateSandbox:         true,
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				Attempt:               uint32(1),
+				InitContainersToStart: []int{0},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
 		"Pod sandbox not ready, init container failed, and RestartPolicy == OnFailure; create a new pod sandbox": {
@@ -1447,14 +1456,13 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 				status.ContainerStatuses[2].ExitCode = 137
 			},
 			actions: podActions{
-				KillPod:                  true,
-				CreateSandbox:            true,
-				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				Attempt:                  uint32(1),
-				NextInitContainerToStart: &basePod.Spec.InitContainers[0],
-				InitContainersToStart:    []int{0},
-				ContainersToStart:        []int{},
-				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				KillPod:               true,
+				CreateSandbox:         true,
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				Attempt:               uint32(1),
+				InitContainersToStart: []int{0},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
 		"some of the init container statuses are missing but the last init container is running, don't restart preceding ones": {
@@ -1476,37 +1484,26 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 				status.ContainerStatuses[2].State = kubecontainer.ContainerStateCreated
 			},
 			actions: podActions{
-				KillPod:                  false,
-				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				NextInitContainerToStart: &basePod.Spec.InitContainers[2],
-				InitContainersToStart:    []int{2},
-				ContainersToStart:        []int{},
-				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				KillPod:               false,
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
 	} {
-		pod, status := makeBasePodAndStatusWithInitContainers()
-		if test.mutatePodFn != nil {
-			test.mutatePodFn(pod)
-		}
-		if test.mutateStatusFn != nil {
-			test.mutateStatusFn(status)
-		}
-		ctx := context.Background()
-		actions := m.computePodActions(ctx, pod, status)
-		handleRestartableInitContainers := sidecarContainersEnabled && kubelettypes.HasRestartableInitContainer(pod)
-		if !handleRestartableInitContainers {
-			// If sidecar containers are disabled or the pod does not have any
-			// restartable init container, we should not see any
-			// InitContainersToStart in the actions.
-			test.actions.InitContainersToStart = nil
-		} else {
-			// If sidecar containers are enabled and the pod has any
-			// restartable init container, we should not see any
-			// NextInitContainerToStart in the actions.
-			test.actions.NextInitContainerToStart = nil
-		}
-		verifyActions(t, &test.actions, &actions, desc)
+		t.Run(desc, func(t *testing.T) {
+			pod, status := makeBasePodAndStatusWithInitContainers()
+			if test.mutatePodFn != nil {
+				test.mutatePodFn(pod)
+			}
+			if test.mutateStatusFn != nil {
+				test.mutateStatusFn(status)
+			}
+			tCtx := ktesting.Init(t)
+			actions := m.computePodActions(tCtx, pod, status)
+			verifyActions(t, &test.actions, &actions, desc)
+		})
 	}
 }
 
@@ -1549,8 +1546,8 @@ func makeBasePodAndStatusWithInitContainers() (*v1.Pod, *kubecontainer.PodStatus
 }
 
 func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	// Creating a pair reference pod and status for the test cases to refer
@@ -1910,8 +1907,8 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 		if test.mutateStatusFn != nil {
 			test.mutateStatusFn(pod, status)
 		}
-		ctx := context.Background()
-		actions := m.computePodActions(ctx, pod, status)
+		tCtx := ktesting.Init(t)
+		actions := m.computePodActions(tCtx, pod, status)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
@@ -1969,17 +1966,8 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 	TestComputePodActions(t)
 	TestComputePodActionsWithInitContainers(t)
 
-	t.Run("sidecar containers disabled", func(t *testing.T) {
-		testComputePodActionsWithInitAndEphemeralContainers(t, false)
-	})
-	t.Run("sidecar containers enabled", func(t *testing.T) {
-		testComputePodActionsWithInitAndEphemeralContainers(t, true)
-	})
-}
-
-func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarContainersEnabled bool) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	basePod, baseStatus := makeBasePodAndStatusWithInitAndEphemeralContainers()
@@ -2055,14 +2043,13 @@ func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarCo
 				status.ContainerStatuses[0].ExitCode = 137
 			},
 			actions: podActions{
-				KillPod:                  true,
-				CreateSandbox:            true,
-				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				Attempt:                  uint32(1),
-				NextInitContainerToStart: &basePod.Spec.InitContainers[0],
-				InitContainersToStart:    []int{0},
-				ContainersToStart:        []int{},
-				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				KillPod:               true,
+				CreateSandbox:         true,
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				Attempt:               uint32(1),
+				InitContainersToStart: []int{0},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
 		"Kill pod and do not restart ephemeral container if the pod sandbox is dead": {
@@ -2071,14 +2058,13 @@ func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarCo
 				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
 			},
 			actions: podActions{
-				KillPod:                  true,
-				CreateSandbox:            true,
-				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				Attempt:                  uint32(1),
-				NextInitContainerToStart: &basePod.Spec.InitContainers[0],
-				InitContainersToStart:    []int{0},
-				ContainersToStart:        []int{},
-				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+				KillPod:               true,
+				CreateSandbox:         true,
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				Attempt:               uint32(1),
+				InitContainersToStart: []int{0},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
 		"Kill pod if all containers exited except ephemeral container": {
@@ -2108,7 +2094,149 @@ func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarCo
 			actions: noAction,
 		},
 	} {
-		pod, status := makeBasePodAndStatusWithInitAndEphemeralContainers()
+		t.Run(desc, func(t *testing.T) {
+			pod, status := makeBasePodAndStatusWithInitAndEphemeralContainers()
+			if test.mutatePodFn != nil {
+				test.mutatePodFn(pod)
+			}
+			if test.mutateStatusFn != nil {
+				test.mutateStatusFn(status)
+			}
+			tCtx := ktesting.Init(t)
+			actions := m.computePodActions(tCtx, pod, status)
+			verifyActions(t, &test.actions, &actions, desc)
+		})
+	}
+}
+
+func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
+	// Make sure existing test cases pass with feature enabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	TestComputePodActions(t)
+	TestComputePodActionsWithInitContainers(t)
+
+	var (
+		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
+	)
+	ctx := context.Background()
+	_, _, m, err := createTestRuntimeManager(ctx)
+	require.NoError(t, err)
+
+	// Creating a pair reference pod and status for the test cases to refer
+	// the specific fields.
+	basePod, baseStatus := makeBasePodAndStatus()
+	noAction := podActions{
+		SandboxID:         baseStatus.SandboxStatuses[0].Id,
+		ContainersToStart: []int{},
+		ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+	}
+
+	for desc, test := range map[string]struct {
+		mutatePodFn    func(*v1.Pod)
+		mutateStatusFn func(*kubecontainer.PodStatus)
+		actions        podActions
+		resetStatusFn  func(*kubecontainer.PodStatus)
+	}{
+		"restart exited containers if RestartPolicy == Always": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].RestartPolicy = &containerRestartPolicyAlways
+				pod.Spec.Containers[1].RestartPolicy = &containerRestartPolicyAlways
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// The first container completed, restart it,
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 0
+
+				// The second container exited with failure, restart it,
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[1].ExitCode = 111
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{0, 1},
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+			},
+		},
+		"restart failed containers if RestartPolicy == OnFailure": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].RestartPolicy = &containerRestartPolicyOnFailure
+				pod.Spec.Containers[1].RestartPolicy = &containerRestartPolicyOnFailure
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// The first container completed, don't restart it,
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 0
+
+				// The second container exited with failure, restart it,
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[1].ExitCode = 111
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{1},
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+			},
+		},
+		"restart created but not started containers if RestartPolicy == OnFailure": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].RestartPolicy = &containerRestartPolicyOnFailure
+				pod.Spec.Containers[1].RestartPolicy = &containerRestartPolicyOnFailure
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// The first container completed, don't restart it.
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 0
+
+				// The second container was created, but never started.
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateCreated
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{1},
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+			},
+		},
+		"don't restart containers if RestartPolicy == Never": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].RestartPolicy = &containerRestartPolicyNever
+				pod.Spec.Containers[1].RestartPolicy = &containerRestartPolicyNever
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// Don't restart any containers.
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 0
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[1].ExitCode = 111
+			},
+			actions: noAction,
+		},
+		"Kill pod and recreate all containers (except for the succeeded one) if the pod sandbox is dead": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[1].RestartPolicy = &containerRestartPolicyOnFailure
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[1].ExitCode = 0
+			},
+			actions: podActions{
+				KillPod:           true,
+				CreateSandbox:     true,
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				Attempt:           uint32(1),
+				ContainersToStart: []int{0, 2},
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+			},
+		},
+	} {
+		pod, status := makeBasePodAndStatus()
 		if test.mutatePodFn != nil {
 			test.mutatePodFn(pod)
 		}
@@ -2117,25 +2245,16 @@ func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarCo
 		}
 		ctx := context.Background()
 		actions := m.computePodActions(ctx, pod, status)
-		handleRestartableInitContainers := sidecarContainersEnabled && kubelettypes.HasRestartableInitContainer(pod)
-		if !handleRestartableInitContainers {
-			// If sidecar containers are disabled or the pod does not have any
-			// restartable init container, we should not see any
-			// InitContainersToStart in the actions.
-			test.actions.InitContainersToStart = nil
-		} else {
-			// If sidecar containers are enabled and the pod has any
-			// restartable init container, we should not see any
-			// NextInitContainerToStart in the actions.
-			test.actions.NextInitContainerToStart = nil
-		}
 		verifyActions(t, &test.actions, &actions, desc)
+		if test.resetStatusFn != nil {
+			test.resetStatusFn(status)
+		}
 	}
 }
 
 func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
-	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 	fakeRuntime.ErrorOnSandboxCreate = true
 
@@ -2163,9 +2282,9 @@ func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	// GetPodStatus and the following SyncPod will not return errors in the
 	// case where the pod has been deleted. We are not adding any pods into
 	// the fakePodProvider so they are 'deleted'.
-	podStatus, err := m.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(context.Background(), pod, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
 	// This will return an error if the pod has _not_ been deleted.
 	assert.NoError(t, result.Error())
 }
@@ -2200,12 +2319,11 @@ func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontain
 
 func TestComputePodActionsForPodResize(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
 
-	cpu1m := resource.MustParse("1m")
-	cpu2m := resource.MustParse("2m")
 	cpu100m := resource.MustParse("100m")
 	cpu200m := resource.MustParse("200m")
 	mem100M := resource.MustParse("100Mi")
@@ -2215,22 +2333,28 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	cpuPolicyRestartRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer}
 	memPolicyRestartRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer}
 
+	setupActuatedResources := func(pod *v1.Pod, container *v1.Container, actuatedResources v1.ResourceRequirements) {
+		actuatedContainer := container.DeepCopy()
+		actuatedContainer.Resources = actuatedResources
+		require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
+	}
+
 	for desc, test := range map[string]struct {
-		setupFn                 func(*v1.Pod, *kubecontainer.PodStatus)
+		setupFn                 func(*v1.Pod)
 		getExpectedPodActionsFn func(*v1.Pod, *kubecontainer.PodStatus) *podActions
 	}{
 		"Update container CPU and memory resources": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[1]
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu200m.DeepCopy()),
-						MemoryLimit: ptr.To(mem200M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu200m.DeepCopy(),
+						v1.ResourceMemory: mem200M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[1].Name)
@@ -2241,7 +2365,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceMemory: {
 							{
-								apiContainerIdx: 1,
+								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: containerResources{
 									memoryLimit: mem100M.Value(),
@@ -2255,7 +2379,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						},
 						v1.ResourceCPU: {
 							{
-								apiContainerIdx: 1,
+								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: containerResources{
 									memoryLimit: mem100M.Value(),
@@ -2273,17 +2397,17 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container CPU resources": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[1]
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu200m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu200m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[1].Name)
@@ -2294,7 +2418,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceCPU: {
 							{
-								apiContainerIdx: 1,
+								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: containerResources{
 									memoryLimit: mem100M.Value(),
@@ -2312,17 +2436,17 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container memory resources": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[2]
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu200m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu200m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[2].Name)
@@ -2333,7 +2457,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceMemory: {
 							{
-								apiContainerIdx: 2,
+								container:       &pod.Spec.Containers[2],
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: containerResources{
 									memoryLimit: mem200M.Value(),
@@ -2351,16 +2475,16 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Nothing when spec.Resources and status.Resources are equal": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[1]
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu200m},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit: ptr.To(cpu200m.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: cpu200m.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				pa := podActions{
@@ -2372,37 +2496,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				return &pa
 			},
 		},
-		"Nothing when spec.Resources and status.Resources are equivalent": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+		"Nothing when spec.Resources and status.Resources are equal (besteffort)": {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[1]
-				c.Resources = v1.ResourceRequirements{} // best effort pod
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPURequest: ptr.To(cpu2m.DeepCopy()),
-					}
-				}
-			},
-			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
-				pa := podActions{
-					SandboxID:          podStatus.SandboxStatuses[0].Id,
-					ContainersToKill:   getKillMap(pod, podStatus, []int{}),
-					ContainersToStart:  []int{},
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
-				}
-				return &pa
-			},
-		},
-		"Update container CPU resources to equivalent value": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
-				c := &pod.Spec.Containers[1]
-				c.Resources = v1.ResourceRequirements{
-					Requests: v1.ResourceList{v1.ResourceCPU: cpu1m},
-				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPURequest: ptr.To(cpu2m.DeepCopy()),
-					}
-				}
+				c.Resources = v1.ResourceRequirements{}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				pa := podActions{
@@ -2415,18 +2513,18 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container CPU and memory resources with Restart policy for CPU": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[0]
 				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired}
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu100m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu100m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[0].Name)
@@ -2446,18 +2544,18 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container CPU and memory resources with Restart policy for memory": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[2]
 				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired}
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu100m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu100m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[2].Name)
@@ -2477,18 +2575,18 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container memory resources with Restart policy for CPU": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[1]
 				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired}
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu100m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu100m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[1].Name)
@@ -2499,7 +2597,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceMemory: {
 							{
-								apiContainerIdx: 1,
+								container:       &pod.Spec.Containers[1],
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: containerResources{
 									memoryLimit: mem200M.Value(),
@@ -2517,18 +2615,18 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container CPU resources with Restart policy for memory": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[2]
 				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired}
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem100M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu100m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu100m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[2].Name)
@@ -2539,7 +2637,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceCPU: {
 							{
-								apiContainerIdx: 2,
+								container:       &pod.Spec.Containers[2],
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: containerResources{
 									memoryLimit: mem100M.Value(),
@@ -2556,6 +2654,96 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				return &pa
 			},
 		},
+		"Update container memory (requests only) with RestartContainer policy for memory": {
+			setupFn: func(pod *v1.Pod) {
+				c := &pod.Spec.Containers[2]
+				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired}
+				c.Resources = v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu200m.DeepCopy(),
+						v1.ResourceMemory: mem200M.DeepCopy(),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    cpu100m.DeepCopy(),
+						v1.ResourceMemory: mem200M.DeepCopy(),
+					},
+				})
+			},
+			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
+				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[2].Name)
+				killMap := make(map[kubecontainer.ContainerID]containerToKillInfo)
+				killMap[kcs.ID] = containerToKillInfo{
+					container: &pod.Spec.Containers[2],
+					name:      pod.Spec.Containers[2].Name,
+				}
+				pa := podActions{
+					SandboxID:          podStatus.SandboxStatuses[0].Id,
+					ContainersToStart:  []int{2},
+					ContainersToKill:   killMap,
+					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
+					UpdatePodResources: true,
+				}
+				return &pa
+			},
+		},
+		"Update container memory (requests only) with RestartNotRequired policy for memory": {
+			setupFn: func(pod *v1.Pod) {
+				c := &pod.Spec.Containers[2]
+				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartNotRequired}
+				c.Resources = v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu200m.DeepCopy(),
+						v1.ResourceMemory: mem200M.DeepCopy(),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    cpu100m.DeepCopy(),
+						v1.ResourceMemory: mem200M.DeepCopy(),
+					},
+				})
+			},
+			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
+				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[2].Name)
+				killMap := make(map[kubecontainer.ContainerID]containerToKillInfo)
+				killMap[kcs.ID] = containerToKillInfo{
+					container: &pod.Spec.Containers[2],
+					name:      pod.Spec.Containers[2].Name,
+				}
+				pa := podActions{
+					SandboxID:         podStatus.SandboxStatuses[0].Id,
+					ContainersToStart: []int{},
+					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
+					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+						v1.ResourceMemory: {
+							{
+								container:       &pod.Spec.Containers[2],
+								kubeContainerID: kcs.ID,
+								desiredContainerResources: containerResources{
+									memoryLimit:   mem200M.Value(),
+									memoryRequest: mem100M.Value(),
+									cpuLimit:      cpu200m.MilliValue(),
+									cpuRequest:    cpu100m.MilliValue(),
+								},
+								currentContainerResources: &containerResources{
+									memoryLimit:   mem200M.Value(),
+									memoryRequest: mem200M.Value(),
+									cpuLimit:      cpu200m.MilliValue(),
+									cpuRequest:    cpu100m.MilliValue(),
+								},
+							},
+						},
+					},
+				}
+				return &pa
+			},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			pod, status := makeBasePodAndStatus()
@@ -2564,8 +2752,9 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				pod.Spec.Containers[idx].ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartNotRequired}
 			}
 			if test.setupFn != nil {
-				test.setupFn(pod, status)
+				test.setupFn(pod)
 			}
+			t.Cleanup(func() { _ = m.actuatedState.RemovePod(pod.UID) })
 
 			for idx := range pod.Spec.Containers {
 				// compute hash
@@ -2574,17 +2763,18 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				}
 			}
 
-			ctx := context.Background()
+			tCtx := ktesting.Init(t)
 			expectedActions := test.getExpectedPodActionsFn(pod, status)
-			actions := m.computePodActions(ctx, pod, status)
+			actions := m.computePodActions(tCtx, pod, status)
 			verifyActions(t, expectedActions, &actions, desc)
 		})
 	}
 }
 
 func TestUpdatePodContainerResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
 
@@ -2613,7 +2803,7 @@ func TestUpdatePodContainerResources(t *testing.T) {
 	res300m350Mi := v1.ResourceList{v1.ResourceCPU: cpu300m, v1.ResourceMemory: mem350M}
 	res350m350Mi := v1.ResourceList{v1.ResourceCPU: cpu350m, v1.ResourceMemory: mem350M}
 
-	pod, _ := makeBasePodAndStatus()
+	pod, _ := makeBasePodAndStatusWithRestartableInitContainers()
 	makeAndSetFakePod(t, m, fakeRuntime, pod)
 
 	for dsc, tc := range map[string]struct {
@@ -2660,47 +2850,65 @@ func TestUpdatePodContainerResources(t *testing.T) {
 			expectedCurrentRequests: []v1.ResourceList{res100m150Mi, res200m250Mi, res300m350Mi},
 		},
 	} {
-		var containersToUpdate []containerToUpdateInfo
-		for idx := range pod.Spec.Containers {
-			// default resize policy when pod resize feature is enabled
-			pod.Spec.Containers[idx].Resources = tc.apiSpecResources[idx]
-			pod.Status.ContainerStatuses[idx].Resources = &tc.apiStatusResources[idx]
-			cInfo := containerToUpdateInfo{
-				apiContainerIdx: idx,
-				kubeContainerID: kubecontainer.ContainerID{},
-				desiredContainerResources: containerResources{
-					memoryLimit:   tc.apiSpecResources[idx].Limits.Memory().Value(),
-					memoryRequest: tc.apiSpecResources[idx].Requests.Memory().Value(),
-					cpuLimit:      tc.apiSpecResources[idx].Limits.Cpu().MilliValue(),
-					cpuRequest:    tc.apiSpecResources[idx].Requests.Cpu().MilliValue(),
-				},
-				currentContainerResources: &containerResources{
-					memoryLimit:   tc.apiStatusResources[idx].Limits.Memory().Value(),
-					memoryRequest: tc.apiStatusResources[idx].Requests.Memory().Value(),
-					cpuLimit:      tc.apiStatusResources[idx].Limits.Cpu().MilliValue(),
-					cpuRequest:    tc.apiStatusResources[idx].Requests.Cpu().MilliValue(),
-				},
+		for _, allSideCarCtrs := range []bool{false, true} {
+			var containersToUpdate []containerToUpdateInfo
+			containerToUpdateInfo := func(container *v1.Container, idx int) containerToUpdateInfo {
+				return containerToUpdateInfo{
+					container:       container,
+					kubeContainerID: kubecontainer.ContainerID{},
+					desiredContainerResources: containerResources{
+						memoryLimit:   tc.apiSpecResources[idx].Limits.Memory().Value(),
+						memoryRequest: tc.apiSpecResources[idx].Requests.Memory().Value(),
+						cpuLimit:      tc.apiSpecResources[idx].Limits.Cpu().MilliValue(),
+						cpuRequest:    tc.apiSpecResources[idx].Requests.Cpu().MilliValue(),
+					},
+					currentContainerResources: &containerResources{
+						memoryLimit:   tc.apiStatusResources[idx].Limits.Memory().Value(),
+						memoryRequest: tc.apiStatusResources[idx].Requests.Memory().Value(),
+						cpuLimit:      tc.apiStatusResources[idx].Limits.Cpu().MilliValue(),
+						cpuRequest:    tc.apiStatusResources[idx].Requests.Cpu().MilliValue(),
+					},
+				}
 			}
-			containersToUpdate = append(containersToUpdate, cInfo)
-		}
-		fakeRuntime.Called = []string{}
-		err := m.updatePodContainerResources(pod, tc.resourceName, containersToUpdate)
-		require.NoError(t, err, dsc)
 
-		if tc.invokeUpdateResources {
-			assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources", dsc)
-		}
-		for idx := range pod.Spec.Containers {
-			assert.Equal(t, tc.expectedCurrentLimits[idx].Memory().Value(), containersToUpdate[idx].currentContainerResources.memoryLimit, dsc)
-			assert.Equal(t, tc.expectedCurrentRequests[idx].Memory().Value(), containersToUpdate[idx].currentContainerResources.memoryRequest, dsc)
-			assert.Equal(t, tc.expectedCurrentLimits[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuLimit, dsc)
-			assert.Equal(t, tc.expectedCurrentRequests[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuRequest, dsc)
+			if allSideCarCtrs {
+				for idx := range pod.Spec.InitContainers {
+					// default resize policy when pod resize feature is enabled
+					pod.Spec.InitContainers[idx].Resources = tc.apiSpecResources[idx]
+					pod.Status.ContainerStatuses[idx].Resources = &tc.apiStatusResources[idx]
+					cinfo := containerToUpdateInfo(&pod.Spec.InitContainers[idx], idx)
+					containersToUpdate = append(containersToUpdate, cinfo)
+				}
+			} else {
+				for idx := range pod.Spec.Containers {
+					// default resize policy when pod resize feature is enabled
+					pod.Spec.Containers[idx].Resources = tc.apiSpecResources[idx]
+					pod.Status.ContainerStatuses[idx].Resources = &tc.apiStatusResources[idx]
+					cinfo := containerToUpdateInfo(&pod.Spec.Containers[idx], idx)
+					containersToUpdate = append(containersToUpdate, cinfo)
+				}
+			}
+
+			fakeRuntime.Called = []string{}
+			err := m.updatePodContainerResources(tCtx, pod, tc.resourceName, containersToUpdate)
+			require.NoError(t, err, dsc)
+
+			if tc.invokeUpdateResources {
+				assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources", dsc)
+			}
+			for idx := range len(containersToUpdate) {
+				assert.Equal(t, tc.expectedCurrentLimits[idx].Memory().Value(), containersToUpdate[idx].currentContainerResources.memoryLimit, dsc)
+				assert.Equal(t, tc.expectedCurrentRequests[idx].Memory().Value(), containersToUpdate[idx].currentContainerResources.memoryRequest, dsc)
+				assert.Equal(t, tc.expectedCurrentLimits[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuLimit, dsc)
+				assert.Equal(t, tc.expectedCurrentRequests[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuRequest, dsc)
+			}
 		}
 	}
 }
 
 func TestToKubeContainerImageVolumes(t *testing.T) {
-	_, _, manager, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, manager, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	const (
@@ -2721,8 +2929,8 @@ func TestToKubeContainerImageVolumes(t *testing.T) {
 		"empty volumes": {},
 		"multiple volumes": {
 			pullResults: imageVolumePulls{
-				volume1: imageVolumePullResult{spec: imageSpec1},
-				volume2: imageVolumePullResult{spec: imageSpec2},
+				volume1: imageVolumePullResult{spec: &imageSpec1},
+				volume2: imageVolumePullResult{spec: &imageSpec2},
 			},
 			container: &v1.Container{
 				VolumeMounts: []v1.VolumeMount{
@@ -2737,7 +2945,7 @@ func TestToKubeContainerImageVolumes(t *testing.T) {
 		},
 		"not matching volume": {
 			pullResults: imageVolumePulls{
-				"different": imageVolumePullResult{spec: imageSpec1},
+				"different": imageVolumePullResult{spec: &imageSpec1},
 			},
 			container: &v1.Container{
 				VolumeMounts: []v1.VolumeMount{{Name: volume1}},
@@ -2756,7 +2964,7 @@ func TestToKubeContainerImageVolumes(t *testing.T) {
 			expectedError: errTest,
 		},
 	} {
-		imageVolumes, err := manager.toKubeContainerImageVolumes(tc.pullResults, tc.container, &v1.Pod{}, syncResult)
+		imageVolumes, err := manager.toKubeContainerImageVolumes(tCtx, tc.pullResults, tc.container, &v1.Pod{}, syncResult)
 		if tc.expectedError != nil {
 			require.EqualError(t, err, tc.expectedError.Error())
 		} else {
@@ -2767,9 +2975,10 @@ func TestToKubeContainerImageVolumes(t *testing.T) {
 }
 
 func TestGetImageVolumes(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
 
-	_, _, manager, err := createTestRuntimeManager()
+	_, _, manager, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	const (
@@ -2780,6 +2989,14 @@ func TestGetImageVolumes(t *testing.T) {
 	)
 	imageSpec1 := runtimeapi.ImageSpec{Image: image1, UserSpecifiedImage: image1}
 	imageSpec2 := runtimeapi.ImageSpec{Image: image2, UserSpecifiedImage: image2}
+
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      "test-pod",
+			Namespace: "test-namespace",
+			Uid:       "test-uid",
+		},
+	}
 
 	for desc, tc := range map[string]struct {
 		pod                      *v1.Pod
@@ -2796,8 +3013,8 @@ func TestGetImageVolumes(t *testing.T) {
 				{Name: volume2, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: image2, PullPolicy: v1.PullAlways}}},
 			}}},
 			expectedImageVolumePulls: imageVolumePulls{
-				volume1: imageVolumePullResult{spec: imageSpec1},
-				volume2: imageVolumePullResult{spec: imageSpec2},
+				volume1: imageVolumePullResult{spec: &imageSpec1},
+				volume2: imageVolumePullResult{spec: &imageSpec2},
 			},
 		},
 		"different than image volumes": {
@@ -2812,17 +3029,907 @@ func TestGetImageVolumes(t *testing.T) {
 				{Name: volume2, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "image", PullPolicy: v1.PullNever}}}, // fails
 			}}},
 			expectedImageVolumePulls: imageVolumePulls{
-				volume1: imageVolumePullResult{spec: imageSpec1},
+				volume1: imageVolumePullResult{spec: &imageSpec1},
 				volume2: imageVolumePullResult{err: imagetypes.ErrImageNeverPull, msg: `Container image "image" is not present with pull policy of Never`},
 			},
 		},
 	} {
-		imageVolumePulls, err := manager.getImageVolumes(context.TODO(), tc.pod, nil, nil)
+
+		imageVolumePulls, err := manager.getImageVolumes(tCtx, tc.pod, podSandboxConfig, nil)
 		if tc.expectedError != nil {
 			require.EqualError(t, err, tc.expectedError.Error())
 		} else {
 			require.NoError(t, err, desc)
 		}
 		assert.Equal(t, tc.expectedImageVolumePulls, imageVolumePulls)
+	}
+}
+
+func TestDoPodResizeAction(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("unsupported OS")
+	}
+
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	metrics.Register()
+	metrics.PodResizeDurationMilliseconds.Reset()
+
+	for i, tc := range []struct {
+		testName                  string
+		currentResources          containerResources
+		desiredResources          containerResources
+		updatedResources          []v1.ResourceName
+		otherContainersHaveLimits bool
+		runtimeErrors             map[string][]error
+		expectedError             string
+		expectedErrorMessage      string
+		expectPodCgroupUpdates    int
+	}{
+		{
+			testName: "Increase cpu and memory requests and limits, with computed pod limits",
+			currentResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 200, cpuLimit: 200,
+				memoryRequest: 200, memoryLimit: 200,
+			},
+			otherContainersHaveLimits: true,
+			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates:    3, // cpu req, cpu lim, mem lim
+		},
+		{
+			testName: "Increase cpu and memory requests and limits, with computed pod limits and set a runtime error",
+			currentResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 200, cpuLimit: 200,
+				memoryRequest: 200, memoryLimit: 200,
+			},
+			otherContainersHaveLimits: true,
+			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates:    1,
+			runtimeErrors:             map[string][]error{"UpdateContainerResources": {fmt.Errorf("error updating container resources")}},
+			expectedError:             "ResizePodInPlaceError",
+			expectedErrorMessage:      "error updating container resources",
+		},
+		{
+			testName: "Increase cpu and memory requests and limits, without computed pod limits",
+			currentResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 200, cpuLimit: 200,
+				memoryRequest: 200, memoryLimit: 200,
+			},
+			// If some containers don't have limits, pod level limits are not applied
+			otherContainersHaveLimits: false,
+			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates:    1, // cpu req, cpu lim, mem lim
+		},
+		{
+			testName: "Increase cpu and memory requests only",
+			currentResources: containerResources{
+				cpuRequest: 100, cpuLimit: 200,
+				memoryRequest: 100, memoryLimit: 200,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 150, cpuLimit: 200,
+				memoryRequest: 150, memoryLimit: 200,
+			},
+			updatedResources:       []v1.ResourceName{v1.ResourceCPU},
+			expectPodCgroupUpdates: 1, // cpu req
+		},
+		{
+			testName: "Resize memory request no limits",
+			currentResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 200,
+			},
+			// Memory request resize doesn't generate an update action.
+			updatedResources: []v1.ResourceName{},
+		},
+		{
+			testName: "Resize cpu request no limits",
+			currentResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest:    200,
+				memoryRequest: 100,
+			},
+			updatedResources:       []v1.ResourceName{v1.ResourceCPU},
+			expectPodCgroupUpdates: 1, // cpu req
+		},
+		{
+			testName: "Add limits",
+			currentResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			updatedResources:       []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates: 0,
+		},
+		{
+			testName: "Add limits and pod limits",
+			currentResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			otherContainersHaveLimits: true,
+			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates:    2, // cpu lim, memory lim
+		},
+	} {
+		t.Run(tc.testName, func(t *testing.T) {
+			_, _, m, err := createTestRuntimeManagerWithErrors(tCtx, tc.runtimeErrors)
+			require.NoError(t, err)
+			m.cpuCFSQuota = true // Enforce CPU Limits
+
+			mockCM := cmtesting.NewMockContainerManager(t)
+			mockCM.EXPECT().PodHasExclusiveCPUs(mock.Anything).Return(false).Maybe()
+			mockCM.EXPECT().ContainerHasExclusiveCPUs(mock.Anything, mock.Anything).Return(false).Maybe()
+			m.containerManager = mockCM
+			mockPCM := cmtesting.NewMockPodContainerManager(t)
+			mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
+
+			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{
+				Memory: ptr.To(tc.currentResources.memoryLimit),
+			}, nil).Maybe()
+			mockPCM.EXPECT().GetPodCgroupMemoryUsage(mock.Anything).Return(0, nil).Maybe()
+			// Set up mock pod cgroup config
+			podCPURequest := tc.currentResources.cpuRequest
+			podCPULimit := tc.currentResources.cpuLimit
+			if tc.otherContainersHaveLimits {
+				podCPURequest += 200
+				podCPULimit += 200
+			}
+			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
+				CPUShares: ptr.To(cm.MilliCPUToShares(podCPURequest)),
+				CPUQuota:  ptr.To(cm.MilliCPUToQuota(podCPULimit, cm.QuotaPeriod)),
+			}, nil).Maybe()
+			if tc.expectPodCgroupUpdates > 0 {
+				mockPCM.EXPECT().SetPodCgroupConfig(mock.Anything, mock.Anything).Return(nil).Times(tc.expectPodCgroupUpdates)
+			}
+
+			pod, kps := makeBasePodAndStatus()
+			// pod spec and allocated resources are already updated as desired when doPodResizeAction() is called.
+			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredResources.cpuRequest, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryRequest, resource.DecimalSI),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredResources.cpuLimit, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryLimit, resource.DecimalSI),
+				},
+			}
+			if tc.otherContainersHaveLimits {
+				resourceList := v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100M"),
+				}
+				resources := v1.ResourceRequirements{
+					Requests: resourceList,
+					Limits:   resourceList,
+				}
+				pod.Spec.Containers[1].Resources = resources
+				pod.Spec.Containers[2].Resources = resources
+			}
+
+			m.runtimeHelper = &containertest.FakeRuntimeHelper{
+				PodStats: map[types.UID]*statsapi.PodStats{
+					pod.UID: {
+						PodRef: statsapi.PodReference{
+							Name:      pod.Name,
+							Namespace: pod.Namespace,
+							UID:       string(pod.UID),
+						},
+						Memory: &statsapi.MemoryStats{
+							UsageBytes: ptr.To[uint64](20),
+						},
+						Containers: []statsapi.ContainerStats{{
+							Name: pod.Spec.Containers[0].Name,
+							Memory: &statsapi.MemoryStats{
+								UsageBytes: ptr.To[uint64](10),
+							},
+						}},
+					}},
+			}
+
+			updateInfo := containerToUpdateInfo{
+				container:                 &pod.Spec.Containers[0],
+				kubeContainerID:           kps.ContainerStatuses[0].ID,
+				desiredContainerResources: tc.desiredResources,
+				currentContainerResources: &tc.currentResources,
+			}
+			containersToUpdate := make(map[v1.ResourceName][]containerToUpdateInfo)
+			for _, r := range tc.updatedResources {
+				containersToUpdate[r] = []containerToUpdateInfo{updateInfo}
+			}
+
+			actions := podActions{
+				ContainersToUpdate: containersToUpdate,
+			}
+			resizeResult := m.doPodResizeAction(tCtx, pod, kps, actions)
+
+			if tc.expectedError != "" {
+				require.Error(t, resizeResult.Error)
+				require.EqualError(t, resizeResult.Error, tc.expectedError)
+				require.Equal(t, tc.expectedErrorMessage, resizeResult.Message)
+			} else {
+				require.NoError(t, resizeResult.Error, resizeResult.Message)
+			}
+
+			mock.AssertExpectationsForObjects(t, mockPCM)
+
+			testutil.AssertHistogramTotalCount(t, "kubelet_pod_resize_duration_milliseconds", map[string]string{}, i+1)
+		})
+	}
+	metrics.PodResizeDurationMilliseconds.Reset()
+}
+
+func TestValidatePodResizeAction(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("unsupported OS")
+	}
+
+	for _, tc := range []struct {
+		testName                               string
+		currentResources, desiredResources     containerResources
+		currentPodMemLimit, desiredPodMemLimit *int64
+		containerMemoryUsage, podMemoryUsage   *uint64
+		expectedError                          bool
+	}{
+		{
+			testName: "Resize memory request no limits",
+			currentResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 200,
+			},
+			expectedError: false,
+		},
+		{
+			testName: "Add container limits, low usage",
+			currentResources: containerResources{
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			containerMemoryUsage: ptr.To[uint64](10),
+			podMemoryUsage:       ptr.To[uint64](10),
+			expectedError:        false,
+		},
+		{
+			testName: "Add container limits, high usage",
+			currentResources: containerResources{
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			containerMemoryUsage: ptr.To[uint64](200),
+			podMemoryUsage:       ptr.To[uint64](200),
+			expectedError:        true,
+		},
+		{
+			testName: "Add container limits, missing container usage",
+			currentResources: containerResources{
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			podMemoryUsage: ptr.To[uint64](10),
+			expectedError:  true,
+		},
+		{
+			testName: "Add container limits, missing pod usage",
+			currentResources: containerResources{
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			containerMemoryUsage: ptr.To[uint64](10),
+			expectedError:        false,
+		},
+		{
+			testName: "Increase container limits",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 200,
+			},
+			expectedError: false,
+		},
+		{
+			testName: "Decrease container limits, low usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 200,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			containerMemoryUsage: ptr.To[uint64](20),
+			podMemoryUsage:       ptr.To[uint64](20),
+			expectedError:        false,
+		},
+		{
+			testName: "Decrease container limits, high usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 200,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			containerMemoryUsage: ptr.To[uint64](150),
+			podMemoryUsage:       ptr.To[uint64](150),
+			expectedError:        true,
+		},
+		{
+			testName: "Add pod limit, low usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](20),
+			podMemoryUsage:       ptr.To[uint64](20),
+			expectedError:        false,
+		},
+		{
+			testName: "Add pod limit, high usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](20),
+			podMemoryUsage:       ptr.To[uint64](200),
+			expectedError:        true,
+		},
+		{
+			testName: "Increase pod limits",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			currentPodMemLimit:   ptr.To[int64](100),
+			desiredPodMemLimit:   ptr.To[int64](200),
+			containerMemoryUsage: ptr.To[uint64](20),
+			podMemoryUsage:       ptr.To[uint64](20),
+			expectedError:        false,
+		},
+		{
+			testName: "Decrease pod limits, low usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			currentPodMemLimit:   ptr.To[int64](200),
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](20),
+			podMemoryUsage:       ptr.To[uint64](20),
+			expectedError:        false,
+		},
+		{
+			testName: "Decrease pod limits, high usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			currentPodMemLimit:   ptr.To[int64](200),
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](50),
+			podMemoryUsage:       ptr.To[uint64](150),
+			expectedError:        true,
+		},
+		{
+			testName: "Decrease pod limits, missing usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			currentPodMemLimit:   ptr.To[int64](200),
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](50),
+			podMemoryUsage:       nil,
+			expectedError:        true,
+		},
+	} {
+		t.Run(tc.testName, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			pod, kps := makeBasePodAndStatus()
+			// pod spec and allocated resources are already updated as desired when doPodResizeAction() is called.
+			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredResources.cpuRequest, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryRequest, resource.DecimalSI),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredResources.cpuLimit, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryLimit, resource.DecimalSI),
+				},
+			}
+
+			updateInfo := containerToUpdateInfo{
+				container:                 &pod.Spec.Containers[0],
+				kubeContainerID:           kps.ContainerStatuses[0].ID,
+				desiredContainerResources: tc.desiredResources,
+				currentContainerResources: &tc.currentResources,
+			}
+			containersToUpdate := map[v1.ResourceName][]containerToUpdateInfo{
+				v1.ResourceMemory: {updateInfo},
+			}
+
+			actions := podActions{
+				ContainersToUpdate: containersToUpdate,
+			}
+
+			podStats := &statsapi.PodStats{
+				PodRef: statsapi.PodReference{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					UID:       string(pod.UID),
+				},
+				Memory: &statsapi.MemoryStats{
+					UsageBytes: tc.podMemoryUsage,
+				},
+			}
+			for _, container := range pod.Spec.Containers {
+				podStats.Containers = append(podStats.Containers, statsapi.ContainerStats{
+					Name: container.Name,
+					Memory: &statsapi.MemoryStats{
+						UsageBytes: tc.containerMemoryUsage,
+					},
+				})
+			}
+			m.runtimeHelper = &containertest.FakeRuntimeHelper{
+				PodStats: map[types.UID]*statsapi.PodStats{pod.UID: podStats},
+			}
+
+			currentPodResources := &cm.ResourceConfig{Memory: tc.currentPodMemLimit}
+			desiredPodResources := &cm.ResourceConfig{Memory: tc.desiredPodMemLimit}
+
+			err = m.validatePodResizeAction(tCtx, pod, kps, currentPodResources, desiredPodResources, actions)
+
+			if tc.expectedError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestIncrementImageVolumeMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
+	legacyregistry.MustRegister(metrics.ImageVolumeRequestedTotal)
+	legacyregistry.MustRegister(metrics.ImageVolumeMountedSucceedTotal)
+	legacyregistry.MustRegister(metrics.ImageVolumeMountedErrorsTotal)
+
+	testCases := map[string]struct {
+		err          error
+		msg          string
+		volumeMounts []v1.VolumeMount
+		imageVolumes kubecontainer.ImageVolumes
+		wants        string
+	}{
+		"without error": {
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+				{Name: "mount2"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+				"mount2": {Image: "image2"},
+				"mount3": {Image: "image3"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 2
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 3
+			`,
+		},
+		"with error": {
+			err: ErrCreateContainer,
+			msg: crierror.ErrImageVolumeMountFailed.Error(),
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+				{Name: "mount2"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+				"mount2": {Image: "image2"},
+				"mount3": {Image: "image3"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 2
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 0
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 3
+			`,
+		},
+		"with unknown CRI error from message": {
+			err: ErrCreateContainer,
+			msg: "",
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+				{Name: "mount2"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+				"mount2": {Image: "image2"},
+				"mount3": {Image: "image3"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 2
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 3
+			`,
+		},
+		"without used volume": {
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 0
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 0
+			`,
+		},
+	}
+
+	// Run tests.
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			metrics.ImageVolumeRequestedTotal.Reset()
+			metrics.ImageVolumeMountedErrorsTotal.Reset()
+			metrics.ImageVolumeMountedSucceedTotal.Reset()
+
+			// Call the function.
+			incrementImageVolumeMetrics(tc.err, tc.msg, &v1.Container{VolumeMounts: tc.volumeMounts}, tc.imageVolumes)
+
+			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants),
+				"kubelet_"+metrics.ImageVolumeRequestedTotalKey,
+				"kubelet_"+metrics.ImageVolumeMountedSucceedTotalKey,
+				"kubelet_"+metrics.ImageVolumeMountedErrorsTotalKey,
+			); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+func TestIsPodResizeInProgress(t *testing.T) {
+	type testResources struct {
+		cpuReq, cpuLim, memReq, memLim int64
+	}
+	type testContainer struct {
+		allocated               testResources
+		actuated                *testResources
+		nonSidecarInit, sidecar bool
+		isRunning               bool
+		unstarted               bool // Whether the container is missing from the pod status
+	}
+
+	tests := []struct {
+		name            string
+		containers      []testContainer
+		expectHasResize bool
+	}{{
+		name: "simple running container",
+		containers: []testContainer{{
+			allocated: testResources{100, 100, 100, 100},
+			actuated:  &testResources{100, 100, 100, 100},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "simple unstarted container",
+		containers: []testContainer{{
+			allocated: testResources{100, 100, 100, 100},
+			unstarted: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "simple resized container/cpu req",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{150, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "simple resized container/cpu limit",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 300, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "simple resized container/mem req",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 150, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "simple resized container/cpu+mem req",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{150, 200, 150, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "simple resized container/mem limit",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 300},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "terminated resized container",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{200, 200, 100, 200},
+			isRunning: false,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "non-sidecar init container",
+		containers: []testContainer{{
+			allocated:      testResources{100, 200, 100, 200},
+			nonSidecarInit: true,
+			isRunning:      true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "non-resized sidecar",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			sidecar:   true,
+			isRunning: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "resized sidecar",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{200, 200, 100, 200},
+			sidecar:   true,
+			isRunning: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "several containers and a resize",
+		containers: []testContainer{{
+			allocated:      testResources{100, 200, 100, 200},
+			nonSidecarInit: true,
+			isRunning:      true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			unstarted: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{200, 200, 100, 200}, // Resized
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "several containers",
+		containers: []testContainer{{
+			allocated: testResources{cpuReq: 100, cpuLim: 200},
+			actuated:  &testResources{cpuReq: 100, cpuLim: 200},
+			sidecar:   true,
+			isRunning: true,
+		}, {
+			allocated: testResources{memReq: 100, memLim: 200},
+			actuated:  &testResources{memReq: 100, memLim: 200},
+			isRunning: true,
+		}, {
+			allocated: testResources{cpuReq: 200, memReq: 100},
+			actuated:  &testResources{cpuReq: 200, memReq: 100},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "best-effort pod",
+		containers: []testContainer{{
+			allocated: testResources{},
+			actuated:  &testResources{},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "burstable pod/not resizing",
+		containers: []testContainer{{
+			allocated: testResources{cpuReq: 100},
+			actuated:  &testResources{cpuReq: 100},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "burstable pod/resized",
+		containers: []testContainer{{
+			allocated: testResources{cpuReq: 100},
+			actuated:  &testResources{cpuReq: 500},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}}
+
+	mkRequirements := func(r testResources) v1.ResourceRequirements {
+		res := v1.ResourceRequirements{
+			Requests: v1.ResourceList{},
+			Limits:   v1.ResourceList{},
+		}
+		if r.cpuReq != 0 {
+			res.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(r.cpuReq, resource.DecimalSI)
+		}
+		if r.cpuLim != 0 {
+			res.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(r.cpuLim, resource.DecimalSI)
+		}
+		if r.memReq != 0 {
+			res.Requests[v1.ResourceMemory] = *resource.NewQuantity(r.memReq, resource.DecimalSI)
+		}
+		if r.memLim != 0 {
+			res.Limits[v1.ResourceMemory] = *resource.NewQuantity(r.memLim, resource.DecimalSI)
+		}
+		return res
+	}
+	mkContainer := func(index int, c testContainer) v1.Container {
+		container := v1.Container{
+			Name:      fmt.Sprintf("c%d", index),
+			Resources: mkRequirements(c.allocated),
+		}
+		if c.sidecar {
+			container.RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
+		}
+		return container
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					UID:  "12345",
+				},
+			}
+			podStatus := &kubecontainer.PodStatus{
+				ID:   pod.UID,
+				Name: pod.Name,
+			}
+
+			for i, c := range test.containers {
+				// Add the container to the pod
+				container := mkContainer(i, c)
+				if c.nonSidecarInit || c.sidecar {
+					pod.Spec.InitContainers = append(pod.Spec.InitContainers, container)
+				} else {
+					pod.Spec.Containers = append(pod.Spec.Containers, container)
+				}
+
+				// Add the container to the pod status, if it's started.
+				if !test.containers[i].unstarted {
+					cs := kubecontainer.Status{
+						Name: container.Name,
+					}
+					if test.containers[i].isRunning {
+						cs.State = kubecontainer.ContainerStateRunning
+					} else {
+						cs.State = kubecontainer.ContainerStateExited
+					}
+					podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, &cs)
+				}
+
+				// Register the actuated container (if needed)
+				if c.actuated != nil {
+					actuatedContainer := container.DeepCopy()
+					actuatedContainer.Resources = mkRequirements(*c.actuated)
+					require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
+
+					fetched, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
+					require.True(t, found)
+					assert.Equal(t, actuatedContainer.Resources, fetched)
+				} else {
+					_, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
+					require.False(t, found)
+				}
+			}
+
+			resizeInProgress := m.IsPodResizeInProgress(pod, podStatus)
+			assert.Equal(t, test.expectHasResize, resizeInProgress)
+		})
 	}
 }

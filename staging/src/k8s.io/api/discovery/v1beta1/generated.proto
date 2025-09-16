@@ -114,6 +114,13 @@ message EndpointHints {
   // enable topology aware routing. May contain a maximum of 8 entries.
   // +listType=atomic
   repeated ForZone forZones = 1;
+
+  // forNodes indicates the node(s) this endpoint should be consumed by when
+  // using topology aware routing. May contain a maximum of 8 entries.
+  // This is an Alpha feature and is only used when the PreferSameTrafficDistribution
+  // feature gate is enabled.
+  // +listType=atomic
+  repeated ForNode forNodes = 2;
 }
 
 // EndpointPort represents a Port used by an EndpointSlice
@@ -187,6 +194,12 @@ message EndpointSliceList {
 
   // items is the list of endpoint slices
   repeated EndpointSlice items = 2;
+}
+
+// ForNode provides information about which nodes should consume this endpoint.
+message ForNode {
+  // name represents the name of the node.
+  optional string name = 1;
 }
 
 // ForZone provides information about which zones should consume this endpoint.

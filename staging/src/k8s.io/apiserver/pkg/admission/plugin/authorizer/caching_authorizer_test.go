@@ -26,9 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func mustParseLabelSelector(str string) labels.Requirements {
@@ -41,8 +38,6 @@ func mustParseLabelSelector(str string) labels.Requirements {
 }
 
 func TestCachingAuthorizer(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
-
 	type result struct {
 		decision authorizer.Decision
 		reason   string

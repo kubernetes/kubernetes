@@ -29,10 +29,20 @@ import (
 
 // IngressClassApplyConfiguration represents a declarative configuration of the IngressClass type for use
 // with apply.
+//
+// IngressClass represents the class of the Ingress, referenced by the Ingress
+// Spec. The `ingressclass.kubernetes.io/is-default-class` annotation can be
+// used to indicate that an IngressClass should be considered default. When a
+// single IngressClass resource has this annotation set to true, new Ingress
+// resources without a class specified will be assigned this default class.
 type IngressClassApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *IngressClassSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec is the desired state of the IngressClass.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *IngressClassSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // IngressClass constructs a declarative configuration of the IngressClass type for use with
@@ -45,29 +55,14 @@ func IngressClass(name string) *IngressClassApplyConfiguration {
 	return b
 }
 
-// ExtractIngressClass extracts the applied configuration owned by fieldManager from
-// ingressClass. If no managedFields are found in ingressClass for fieldManager, a
-// IngressClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractIngressClassFrom extracts the applied configuration owned by fieldManager from
+// ingressClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // ingressClass must be a unmodified IngressClass API object that was retrieved from the Kubernetes API.
-// ExtractIngressClass provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractIngressClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractIngressClass(ingressClass *networkingv1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
-	return extractIngressClass(ingressClass, fieldManager, "")
-}
-
-// ExtractIngressClassStatus is the same as ExtractIngressClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractIngressClassStatus(ingressClass *networkingv1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
-	return extractIngressClass(ingressClass, fieldManager, "status")
-}
-
-func extractIngressClass(ingressClass *networkingv1.IngressClass, fieldManager string, subresource string) (*IngressClassApplyConfiguration, error) {
+func ExtractIngressClassFrom(ingressClass *networkingv1.IngressClass, fieldManager string, subresource string) (*IngressClassApplyConfiguration, error) {
 	b := &IngressClassApplyConfiguration{}
 	err := managedfields.ExtractInto(ingressClass, internal.Parser().Type("io.k8s.api.networking.v1.IngressClass"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +74,22 @@ func extractIngressClass(ingressClass *networkingv1.IngressClass, fieldManager s
 	b.WithAPIVersion("networking.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractIngressClass extracts the applied configuration owned by fieldManager from
+// ingressClass. If no managedFields are found in ingressClass for fieldManager, a
+// IngressClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// ingressClass must be a unmodified IngressClass API object that was retrieved from the Kubernetes API.
+// ExtractIngressClass provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractIngressClass(ingressClass *networkingv1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
+	return ExtractIngressClassFrom(ingressClass, fieldManager, "")
+}
+
+func (b IngressClassApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -246,8 +257,24 @@ func (b *IngressClassApplyConfiguration) WithSpec(value *IngressClassSpecApplyCo
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *IngressClassApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *IngressClassApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *IngressClassApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *IngressClassApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

@@ -23,12 +23,16 @@ import (
 	"k8s.io/component-base/featuregate"
 )
 
+// Every feature gate should have an entry here following this template:
+//
+// // owner: @username
+// MyFeature() bool
+//
+// Feature gates should be listed in alphabetical, case-sensitive
+// (upper before any lower case character) order. This reduces the risk
+// of code conflicts because changes are more likely to be scattered
+// across the file.
 const (
-	// Every feature gate should add method here following this template:
-	//
-	// // owner: @username
-	// MyFeature() bool
-
 	// owner: @alexzielenski
 	//
 	// Ignores errors raised on unchanged fields of Custom Resources
@@ -56,6 +60,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	CRDValidationRatcheting: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.33"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
 	},
 	CustomResourceFieldSelectors: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},

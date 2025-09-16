@@ -160,9 +160,7 @@ var cidrLibraryDecls = map[string][]cel.FunctionOpt{
 }
 
 func (*cidrs) CompileOptions() []cel.EnvOption {
-	options := []cel.EnvOption{cel.Types(apiservercel.CIDRType),
-		cel.Variable(apiservercel.CIDRType.TypeName(), types.NewTypeTypeWithParam(apiservercel.CIDRType)),
-	}
+	options := []cel.EnvOption{cel.Types(apiservercel.CIDRType)}
 	for name, overloads := range cidrLibraryDecls {
 		options = append(options, cel.Function(name, overloads...))
 	}
@@ -231,8 +229,7 @@ func cidrContainsCIDR(arg ref.Val, other ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
 
-	equalMasked := cidr.Prefix.Masked() == netip.PrefixFrom(containsCIDR.Prefix.Addr(), cidr.Prefix.Bits())
-	return types.Bool(equalMasked && cidr.Prefix.Bits() <= containsCIDR.Prefix.Bits())
+	return types.Bool(cidr.Overlaps(containsCIDR.Prefix) && cidr.Prefix.Bits() <= containsCIDR.Prefix.Bits())
 }
 
 func prefixLength(arg ref.Val) ref.Val {

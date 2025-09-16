@@ -587,7 +587,10 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 				return
 			}
 			output, err := json.Marshal(body)
-			require.NoError(t, err)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
 			// Content-type is "unaggregated" discovery format -- no resources returned.
 			w.Header().Set("Content-Type", discovery.AcceptV1)
 			w.WriteHeader(http.StatusOK)
@@ -1116,7 +1119,10 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 				return
 			}
 			output, err := json.Marshal(agg)
-			require.NoError(t, err)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
 			// Content-type is "aggregated" discovery format.
 			w.Header().Set("Content-Type", discovery.AcceptV2)
 			w.WriteHeader(http.StatusOK)
@@ -1414,9 +1420,12 @@ func TestMemCacheAggregatedServerGroups(t *testing.T) {
 				return
 			}
 			output, err := json.Marshal(agg)
-			require.NoError(t, err)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
 			// Content-type is "aggregated" discovery format.
-			w.Header().Set("Content-Type", discovery.AcceptV2Beta1)
+			w.Header().Set("Content-Type", discovery.AcceptV2)
 			w.WriteHeader(http.StatusOK)
 			w.Write(output)
 		}))

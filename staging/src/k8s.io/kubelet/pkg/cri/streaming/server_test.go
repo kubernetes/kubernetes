@@ -348,7 +348,10 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 	go func() {
 		defer wg.Done()
 		exec, err := remotecommand.NewSPDYExecutor(&restclient.Config{}, "POST", reqURL)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+			return
+		}
 
 		opts := remotecommand.StreamOptions{
 			Stdin:  stdinR,
@@ -356,7 +359,9 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 			Stderr: stderrW,
 			Tty:    false,
 		}
-		require.NoError(t, exec.StreamWithContext(context.Background(), opts))
+		if err = exec.StreamWithContext(context.Background(), opts); err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}()
 
 	go func() {

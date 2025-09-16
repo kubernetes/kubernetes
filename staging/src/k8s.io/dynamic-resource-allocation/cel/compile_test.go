@@ -17,24 +17,34 @@ limitations under the License.
 package cel
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 var testcases = map[string]struct {
-	expression         string
-	driver             string
-	attributes         map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	capacity           map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
-	expectCompileError string
-	expectMatchError   string
-	expectMatch        bool
+	// environment.StoredExpressions is the default (= all CEL fields and features from the current version available).
+	// environment.NewExpressions can be used to enforce that only fields and features from the previous version are available.
+	envType *environment.Type
+	// The feature gate only has an effect in combination with environment.NewExpressions.
+	enableConsumableCapacity bool
+	expression               string
+	driver                   string
+	allowMultipleAllocations *bool
+	attributes               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+	capacity                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+	expectCompileError       string
+	expectMatchError         string
+	expectMatch              bool
 
 	// There's no good way to verify that the cost of an expression
 	// really is what it should be other than eye-balling it. The
@@ -147,6 +157,14 @@ var testcases = map[string]struct {
 		expectMatch: true,
 		expectCost:  6,
 	},
+	"version_v": {
+		// Relaxed parsing with v prefix.
+		expression:  `device.attributes["dra.example.com"].name.isGreaterThan(semver("v0.0.1", true)) && isSemver("v1.0.0", true)`,
+		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValue: ptr.To("1.0.0")}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  7,
+	},
 	"quantity": {
 		expression:  `device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
 		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Value: resource.MustParse("1Mi")}},
@@ -203,6 +221,48 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		expectMatch: true,
 		expectCost:  12,
 	},
+	"check_attribute_domains": {
+		expression:  `device.attributes.exists_one(x, x == "dra.example.com")`,
+		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"services": {StringValue: ptr.To("some_example_value")}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  164,
+	},
+	"check_attribute_ids": {
+		expression:  `device.attributes["dra.example.com"].exists_one(x, x == "services")`,
+		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"services": {StringValue: ptr.To("some_example_value")}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  133,
+	},
+	"split_attribute": {
+		expression:  `device.attributes["dra.example.com"].services.split("example").size() >= 2`,
+		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"services": {StringValue: ptr.To("some_example_value")}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  19,
+	},
+	"regexp_attribute": {
+		expression:  `device.attributes["dra.example.com"].services.matches("[^a]?sym")`,
+		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"services": {StringValue: ptr.To("asymetric")}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  18,
+	},
+	"check_capacity_domains": {
+		expression:  `device.capacity.exists_one(x, x == "dra.example.com")`,
+		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("1Mi")}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  164,
+	},
+	"check_capacity_ids": {
+		expression:  `device.capacity["dra.example.com"].exists_one(x, x == "memory")`,
+		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("1Mi")}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  133,
+	},
 	"expensive": {
 		// The worst-case is based on the maximum number of
 		// attributes and the maximum attribute name length.
@@ -214,21 +274,67 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 			attribute := resourceapi.DeviceAttribute{
 				StringValue: ptr.To("abc"),
 			}
-			// If the cost estimate was accurate, using exactly as many attributes
-			// as allowed at most should exceed the limit. In practice, the estimate
-			// is an upper bound and significantly more attributes are needed before
-			// the runtime cost becomes too large.
-			for i := 0; i < 1000*resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
+			for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
 				suffix := fmt.Sprintf("-%d", i)
 				name := prefix + strings.Repeat("x", resourceapi.DeviceMaxIDLength-len(suffix)) + suffix
 				attributes[resourceapi.QualifiedName(name)] = attribute
 			}
 			return attributes
 		}(),
-		expression:       `device.attributes["dra.example.com"].map(s, s.lowerAscii()).map(s, s.size()).sum() == 0`,
+		// From https://github.com/kubernetes/kubernetes/blob/50fc400f178d2078d0ca46aee955ee26375fc437/test/integration/apiserver/cel/validatingadmissionpolicy_test.go#L2150.
+		expression:       `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(x, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z3, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z4, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z5, int('1'.find('[0-9]*')) < 100)))))))`,
 		driver:           "dra.example.com",
 		expectMatchError: "actual cost limit exceeded",
-		expectCost:       18446744073709551615, // Exceeds limit!
+		expectCost:       85555551, // Exceed limit!
+	},
+	"allow_multiple_allocations": {
+		enableConsumableCapacity: true,
+		expression:               `device.allowMultipleAllocations == true`,
+		allowMultipleAllocations: ptr.To(true),
+		driver:                   "dra.example.com",
+		expectMatch:              true,
+		expectCost:               3,
+	},
+	"allow_multiple_allocations_default": {
+		enableConsumableCapacity: true,
+		expression:               `device.allowMultipleAllocations == false`,
+		allowMultipleAllocations: nil,
+		driver:                   "dra.example.com",
+		expectMatch:              true,
+		expectCost:               3,
+	},
+	"allow_multiple_allocations_false": {
+		enableConsumableCapacity: true,
+		expression:               `device.allowMultipleAllocations == false`,
+		allowMultipleAllocations: ptr.To(false),
+		driver:                   "dra.example.com",
+		expectMatch:              true,
+		expectCost:               3,
+	},
+	"allow_multiple_allocations_new": {
+		enableConsumableCapacity: true,
+		envType:                  ptr.To(environment.NewExpressions),
+		expression:               `device.allowMultipleAllocations == false`,
+		allowMultipleAllocations: ptr.To(false),
+		driver:                   "dra.example.com",
+		expectMatch:              true,
+		expectCost:               3,
+	},
+	"allow_multiple_allocations_enabled": {
+		envType:                  ptr.To(environment.NewExpressions),
+		enableConsumableCapacity: true,
+		expression:               `device.allowMultipleAllocations == false`,
+		allowMultipleAllocations: ptr.To(false),
+		driver:                   "dra.example.com",
+		expectMatch:              true,
+		expectCost:               3,
+	},
+	"allow_multiple_allocations_disabled": {
+		envType:                  ptr.To(environment.NewExpressions),
+		enableConsumableCapacity: false,
+		expression:               `device.allowMultipleAllocations == false`,
+		driver:                   "dra.example.com",
+		expectCompileError:       `undefined field 'allowMultipleAllocations'`,
 	},
 }
 
@@ -236,52 +342,100 @@ func TestCEL(t *testing.T) {
 	for name, scenario := range testcases {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			result := GetCompiler().CompileCELExpression(scenario.expression, Options{})
+			result := GetCompiler(Features{EnableConsumableCapacity: scenario.enableConsumableCapacity}).CompileCELExpression(scenario.expression, Options{EnvType: scenario.envType})
 			if scenario.expectCompileError != "" && result.Error == nil {
-				t.Fatalf("expected compile error %q, got none", scenario.expectCompileError)
+				t.Fatalf("FAILURE: expected compile error %q, got none", scenario.expectCompileError)
 			}
 			if result.Error != nil {
 				if scenario.expectCompileError == "" {
-					t.Fatalf("unexpected compile error: %v", result.Error)
+					t.Fatalf("FAILURE: unexpected compile error: %v", result.Error)
 				}
 				if !strings.Contains(result.Error.Error(), scenario.expectCompileError) {
-					t.Fatalf("expected compile error to contain %q, but got instead: %v", scenario.expectCompileError, result.Error)
+					t.Fatalf("FAILURE: expected compile error to contain %q, but got instead: %v", scenario.expectCompileError, result.Error)
 				}
 				return
 			}
 			if scenario.expectCompileError != "" {
-				t.Fatalf("expected compile error %q, got none", scenario.expectCompileError)
+				t.Fatalf("FAILURE: expected compile error %q, got none", scenario.expectCompileError)
 			}
 			if expect, actual := scenario.expectCost, result.MaxCost; expect != actual {
-				t.Errorf("expected CEL cost %d, got %d instead", expect, actual)
+				t.Errorf("ERROR: expected CEL cost %d, got %d instead (%.0f%% of limit %d)", expect, actual, float64(actual)*100.0/float64(resourceapi.CELSelectorExpressionMaxCost), resourceapi.CELSelectorExpressionMaxCost)
 			}
 
-			match, details, err := result.DeviceMatches(ctx, Device{Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver})
+			match, details, err := result.DeviceMatches(ctx, Device{
+				AllowMultipleAllocations: scenario.allowMultipleAllocations, Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver,
+			})
 			// details.ActualCost can be called for nil details, no need to check.
 			actualCost := ptr.Deref(details.ActualCost(), 0)
 			if scenario.expectCost > 0 {
-				t.Logf("actual cost %d, %d%% of worst-case estimate", actualCost, actualCost*100/scenario.expectCost)
+				t.Logf("actual cost %d, %d%% of worst-case estimate %d", actualCost, actualCost*100/scenario.expectCost, scenario.expectCost)
 			} else {
 				t.Logf("actual cost %d, expected zero costs", actualCost)
-				if actualCost > 0 {
-					t.Errorf("expected zero costs for (presumably) constant expression %q, got instead %d", scenario.expression, actualCost)
-				}
+			}
+			if actualCost > result.MaxCost {
+				t.Errorf("ERROR: cost estimate %d underestimated the evaluation cost of %d", result.MaxCost, actualCost)
 			}
 
 			if err != nil {
 				if scenario.expectMatchError == "" {
-					t.Fatalf("unexpected evaluation error: %v", err)
+					t.Fatalf("FAILURE: unexpected evaluation error: %v", err)
 				}
 				if !strings.Contains(err.Error(), scenario.expectMatchError) {
-					t.Fatalf("expected evaluation error to contain %q, but got instead: %v", scenario.expectMatchError, err)
+					t.Fatalf("FAILURE: expected evaluation error to contain %q, but got instead: %v", scenario.expectMatchError, err)
 				}
 				return
 			}
 			if scenario.expectMatchError != "" {
-				t.Fatalf("expected match error %q, got none", scenario.expectMatchError)
+				t.Fatalf("FAILURE: expected match error %q, got none", scenario.expectMatchError)
 			}
 			if match != scenario.expectMatch {
-				t.Fatalf("expected result %v, got %v", scenario.expectMatch, match)
+				t.Fatalf("FAILURE: expected result %v, got %v", scenario.expectMatch, match)
+			}
+		})
+	}
+}
+
+func TestInterrupt(t *testing.T) {
+	for _, name := range []string{"timeout", "deadline", "cancel"} {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			// Adapted from https://github.com/kubernetes/kubernetes/blob/e0859f91b7d269bb7e2f43e23d202ccccaf34c0c/staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/validation_test.go#L3006
+			expression := `device.attributes["dra.example.com"].map(key, device.attributes["dra.example.com"][key] * 20).filter(e, e > 50).exists(e, e == 60)`
+			result := GetCompiler(Features{}).CompileCELExpression(expression, Options{})
+			if result.Error != nil {
+				t.Fatalf("unexpected compile error: %v", result.Error)
+			}
+			switch name {
+			case "timeout":
+				c, cancel := context.WithTimeout(ctx, time.Nanosecond)
+				defer cancel()
+				ctx = c
+			case "deadline":
+				c, cancel := context.WithDeadline(ctx, time.Now())
+				defer cancel()
+				ctx = c
+			case "cancel":
+				c, cancel := context.WithCancel(ctx)
+				cancel()
+				ctx = c
+			}
+			device := Device{
+				Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute),
+			}
+			for i := int64(0); i < 1000; i++ {
+				device.Attributes[resourceapi.QualifiedName(fmt.Sprintf("dra.example.com/attr%d", i))] = resourceapi.DeviceAttribute{
+					IntValue: ptr.To(i),
+				}
+			}
+			_, _, err := result.DeviceMatches(ctx, device)
+			if ctx.Err() != nil {
+				if !errors.Is(err, ctx.Err()) {
+					t.Fatalf("expected %v, got error: %v", ctx.Err(), err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
 			}
 		})
 	}
@@ -294,7 +448,7 @@ func BenchmarkDeviceMatches(b *testing.B) {
 		}
 		b.Run(name, func(b *testing.B) {
 			_, ctx := ktesting.NewTestContext(b)
-			result := GetCompiler().CompileCELExpression(scenario.expression, Options{})
+			result := GetCompiler(Features{}).CompileCELExpression(scenario.expression, Options{})
 			if result.Error != nil {
 				b.Fatalf("unexpected compile error: %s", result.Error.Error())
 			}
@@ -305,7 +459,9 @@ func BenchmarkDeviceMatches(b *testing.B) {
 				// here also includes additional preparations
 				// in result.DeviceMatches and thus cannot be
 				// used.
-				match, _, err := result.DeviceMatches(ctx, Device{Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver})
+				match, _, err := result.DeviceMatches(ctx, Device{
+					AllowMultipleAllocations: scenario.allowMultipleAllocations, Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver,
+				})
 				if err != nil {
 					if scenario.expectMatchError == "" {
 						b.Fatalf("unexpected evaluation error: %v", err)

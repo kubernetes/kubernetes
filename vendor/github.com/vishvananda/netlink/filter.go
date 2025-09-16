@@ -231,6 +231,35 @@ func NewCsumAction() *CsumAction {
 	}
 }
 
+type VlanAct int8
+
+type VlanAction struct {
+	ActionAttrs
+	Action VlanAct
+	VlanID uint16
+}
+
+const (
+	TCA_VLAN_ACT_POP  VlanAct = 1
+	TCA_VLAN_ACT_PUSH VlanAct = 2
+)
+
+func (action *VlanAction) Type() string {
+	return "vlan"
+}
+
+func (action *VlanAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewVlanAction() *VlanAction {
+	return &VlanAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
+}
+
 type MirredAct uint8
 
 func (a MirredAct) String() string {
@@ -366,6 +395,29 @@ func NewPoliceAction() *PoliceAction {
 		LinkLayer:       1, // ETHERNET
 		ExceedAction:    TC_POLICE_RECLASSIFY,
 		NotExceedAction: TC_POLICE_OK,
+	}
+}
+
+type SampleAction struct {
+	ActionAttrs
+	Group     uint32
+	Rate      uint32
+	TruncSize uint32
+}
+
+func (action *SampleAction) Type() string {
+	return "sample"
+}
+
+func (action *SampleAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewSampleAction() *SampleAction {
+	return &SampleAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
 	}
 }
 

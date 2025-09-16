@@ -38,6 +38,12 @@ func DefaultUpdateFilter() func(resource schema.GroupVersionResource, oldObj, ne
 			if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && hasResourcesChanged(oldPod, newPod) {
 				return true
 			}
+
+			// when scope changed
+			if core.IsTerminating(oldPod) != core.IsTerminating(newPod) {
+				return true
+			}
+
 			return core.QuotaV1Pod(oldPod, clock.RealClock{}) && !core.QuotaV1Pod(newPod, clock.RealClock{})
 		case schema.GroupResource{Resource: "services"}:
 			oldService := oldObj.(*v1.Service)

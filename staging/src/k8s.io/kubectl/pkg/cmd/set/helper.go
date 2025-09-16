@@ -19,7 +19,7 @@ package set
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -139,7 +139,7 @@ func findEnv(env []v1.EnvVar, name string) (v1.EnvVar, bool) {
 // If a variable is both added and removed, the removal takes precedence.
 func updateEnv(existing []v1.EnvVar, env []v1.EnvVar, remove []string) []v1.EnvVar {
 	out := []v1.EnvVar{}
-	covered := sets.NewString(remove...)
+	covered := sets.New[string](remove...)
 	for _, e := range existing {
 		if covered.Has(e.Name) {
 			continue

@@ -61,7 +61,7 @@ func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 		return fmt.Errorf("error checking path: %w", pathErr)
 	}
 
-	notmnt, err := isNotMounted(d.plugin.host.GetMounter(d.plugin.GetPluginName()), deviceMountPath)
+	notmnt, err := isNotMounted(d.plugin.host.GetMounter(), deviceMountPath)
 	if err != nil {
 		if mount.IsCorruptedMnt(err) {
 			notmnt = false // Corrupted error is assumed to be mounted.

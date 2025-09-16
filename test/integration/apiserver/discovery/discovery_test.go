@@ -39,13 +39,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	kubernetes "k8s.io/client-go/kubernetes"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregator "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	aggregatorclientsetscheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
@@ -185,8 +182,6 @@ func setup(t *testing.T) (context.Context, testClientSet, context.CancelFunc) {
 }
 
 func TestReadinessAggregatedAPIServiceDiscovery(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
-
 	// Keep any goroutines spawned from running past the execution of this test
 	ctx, client, cleanup := setup(t)
 	defer cleanup()
@@ -217,7 +212,9 @@ func TestReadinessAggregatedAPIServiceDiscovery(t *testing.T) {
 		}
 	}))
 	go func() {
-		require.NoError(t, service.Run(ctx))
+		if err := service.Run(ctx); err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}()
 	require.NoError(t, service.WaitForReady(ctx))
 
@@ -282,8 +279,6 @@ func unregisterAPIService(ctx context.Context, client aggregator.Interface, gv m
 }
 
 func TestAggregatedAPIServiceDiscovery(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
-
 	// Keep any goroutines spawned from running past the execution of this test
 	ctx, client, cleanup := setup(t)
 	defer cleanup()
@@ -306,7 +301,9 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 		}
 	}))
 	go func() {
-		require.NoError(t, service.Run(ctx))
+		if err := service.Run(ctx); err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}()
 	require.NoError(t, service.WaitForReady(ctx))
 
@@ -382,8 +379,6 @@ func runTestCases(t *testing.T, cases []testCase) {
 
 // Declarative tests targeting CRD integration
 func TestCRD(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
-
 	runTestCases(t, []testCase{
 		{
 			// Show that when a CRD is added it gets included on the discovery doc
@@ -393,7 +388,6 @@ func TestCRD(t *testing.T) {
 				applyCRD(makeCRDSpec(stableGroup, "Foo", false, []string{"v1", "v1alpha1", "v1beta1", "v2"})),
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
 			},
 		},
 		{
@@ -403,7 +397,6 @@ func TestCRD(t *testing.T) {
 				applyCRD(makeCRDSpec(stableGroup, "Foo", false, []string{"v1", "v1alpha1", "v1beta1", "v2"})),
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
 				deleteObject{
 					GroupVersionResource: metav1.GroupVersionResource(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions")),
 					Name:                 "foos.stable.example.com",
@@ -471,7 +464,6 @@ func TestCRD(t *testing.T) {
 				// Wait for GV to appear in both discovery documents
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV2, stableV1alpha1}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 
 				applyAPIService(
 					apiregistrationv1.APIServiceSpec{
@@ -490,13 +482,11 @@ func TestCRD(t *testing.T) {
 				// We should now have stable v1 available
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV1}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV1}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV1}),
 
 				// The CRD group-versions not served by the aggregated
 				// apiservice should still be availablee
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV2, stableV1alpha1}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 
 				// Remove API service. Show we have switched to CRD
 				deleteObject{
@@ -507,11 +497,9 @@ func TestCRD(t *testing.T) {
 				// Show that we still have stable v1 since it is in the CRD
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV2, stableV1alpha1}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 
 				waitForAbsentGroupVersionsV1([]metav1.GroupVersion{stableV1}),
 				waitForAbsentGroupVersionsV2([]metav1.GroupVersion{stableV1}),
-				waitForAbsentGroupVersionsV2Beta1([]metav1.GroupVersion{stableV1}),
 			},
 		},
 		{
@@ -622,8 +610,6 @@ func TestCRD(t *testing.T) {
 }
 
 func TestFreshness(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
-
 	requireStaleGVs := func(gvs ...metav1.GroupVersion) inlineAction {
 		return inlineAction(func(ctx context.Context, client testClient) error {
 			document, err := FetchV2Discovery(ctx, client)
@@ -712,8 +698,6 @@ func TestFreshness(t *testing.T) {
 // Shows a group for which multiple APIServices specify a GroupPriorityMinimum,
 // it is sorted the same in both versions of discovery
 func TestGroupPriority(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
-
 	makeApiServiceSpec := func(gv metav1.GroupVersion, groupPriorityMin, versionPriority int) apiregistrationv1.APIServiceSpec {
 		return apiregistrationv1.APIServiceSpec{
 			Group:                 gv.Group,

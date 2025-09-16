@@ -22,7 +22,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -66,9 +65,9 @@ func (k *KernelValidator) Validate(spec SysSpec) ([]error, []error) {
 		return nil, []error{fmt.Errorf("failed to get kernel release: %w", err)}
 	}
 	k.kernelRelease = release
-	var errs []error
-	if err = k.validateKernelVersion(spec.KernelSpec); err != nil {
-		errs = append(errs, err)
+	var errs, warns []error
+	if warn := k.validateKernelVersion(spec.KernelSpec); warn != nil {
+		warns = append(warns, warn)
 	}
 	// only validate kernel config when necessary (currently no kernel config for windows)
 	if len(spec.KernelSpec.Required) > 0 || len(spec.KernelSpec.Forbidden) > 0 || len(spec.KernelSpec.Optional) > 0 {
@@ -76,7 +75,7 @@ func (k *KernelValidator) Validate(spec SysSpec) ([]error, []error) {
 			errs = append(errs, err)
 		}
 	}
-	return nil, errs
+	return warns, errs
 }
 
 // validateKernelVersion validates the kernel version.
@@ -198,7 +197,7 @@ func (k *KernelValidator) getKernelConfigReader() (io.Reader, error) {
 			}
 			// Buffer the whole file, so that we can close the file and unload
 			// kernel config module in this function.
-			b, err := ioutil.ReadFile(path)
+			b, err := os.ReadFile(path)
 			if err != nil {
 				return nil, err
 			}

@@ -58,7 +58,6 @@ import (
 	flowcontrolv1beta2 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
-	networkingv1alpha1 "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
 	nodev1 "k8s.io/client-go/kubernetes/typed/node/v1"
 	nodev1alpha1 "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
@@ -68,8 +67,10 @@ import (
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	rbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
+	resourcev1 "k8s.io/client-go/kubernetes/typed/resource/v1"
 	resourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/client-go/kubernetes/typed/resource/v1beta1"
+	resourcev1beta2 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 	schedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
 	schedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
 	schedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
@@ -118,7 +119,6 @@ type Interface interface {
 	FlowcontrolV1beta2() flowcontrolv1beta2.FlowcontrolV1beta2Interface
 	FlowcontrolV1beta3() flowcontrolv1beta3.FlowcontrolV1beta3Interface
 	NetworkingV1() networkingv1.NetworkingV1Interface
-	NetworkingV1alpha1() networkingv1alpha1.NetworkingV1alpha1Interface
 	NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface
 	NodeV1() nodev1.NodeV1Interface
 	NodeV1alpha1() nodev1alpha1.NodeV1alpha1Interface
@@ -128,6 +128,8 @@ type Interface interface {
 	RbacV1() rbacv1.RbacV1Interface
 	RbacV1beta1() rbacv1beta1.RbacV1beta1Interface
 	RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface
+	ResourceV1() resourcev1.ResourceV1Interface
+	ResourceV1beta2() resourcev1beta2.ResourceV1beta2Interface
 	ResourceV1beta1() resourcev1beta1.ResourceV1beta1Interface
 	ResourceV1alpha3() resourcev1alpha3.ResourceV1alpha3Interface
 	SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface
@@ -177,7 +179,6 @@ type Clientset struct {
 	flowcontrolV1beta2            *flowcontrolv1beta2.FlowcontrolV1beta2Client
 	flowcontrolV1beta3            *flowcontrolv1beta3.FlowcontrolV1beta3Client
 	networkingV1                  *networkingv1.NetworkingV1Client
-	networkingV1alpha1            *networkingv1alpha1.NetworkingV1alpha1Client
 	networkingV1beta1             *networkingv1beta1.NetworkingV1beta1Client
 	nodeV1                        *nodev1.NodeV1Client
 	nodeV1alpha1                  *nodev1alpha1.NodeV1alpha1Client
@@ -187,6 +188,8 @@ type Clientset struct {
 	rbacV1                        *rbacv1.RbacV1Client
 	rbacV1beta1                   *rbacv1beta1.RbacV1beta1Client
 	rbacV1alpha1                  *rbacv1alpha1.RbacV1alpha1Client
+	resourceV1                    *resourcev1.ResourceV1Client
+	resourceV1beta2               *resourcev1beta2.ResourceV1beta2Client
 	resourceV1beta1               *resourcev1beta1.ResourceV1beta1Client
 	resourceV1alpha3              *resourcev1alpha3.ResourceV1alpha3Client
 	schedulingV1alpha1            *schedulingv1alpha1.SchedulingV1alpha1Client
@@ -373,11 +376,6 @@ func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
 	return c.networkingV1
 }
 
-// NetworkingV1alpha1 retrieves the NetworkingV1alpha1Client
-func (c *Clientset) NetworkingV1alpha1() networkingv1alpha1.NetworkingV1alpha1Interface {
-	return c.networkingV1alpha1
-}
-
 // NetworkingV1beta1 retrieves the NetworkingV1beta1Client
 func (c *Clientset) NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface {
 	return c.networkingV1beta1
@@ -421,6 +419,16 @@ func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
 // RbacV1alpha1 retrieves the RbacV1alpha1Client
 func (c *Clientset) RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface {
 	return c.rbacV1alpha1
+}
+
+// ResourceV1 retrieves the ResourceV1Client
+func (c *Clientset) ResourceV1() resourcev1.ResourceV1Interface {
+	return c.resourceV1
+}
+
+// ResourceV1beta2 retrieves the ResourceV1beta2Client
+func (c *Clientset) ResourceV1beta2() resourcev1beta2.ResourceV1beta2Interface {
+	return c.resourceV1beta2
 }
 
 // ResourceV1beta1 retrieves the ResourceV1beta1Client
@@ -652,10 +660,6 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
-	cs.networkingV1alpha1, err = networkingv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
-	if err != nil {
-		return nil, err
-	}
 	cs.networkingV1beta1, err = networkingv1beta1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -689,6 +693,14 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 		return nil, err
 	}
 	cs.rbacV1alpha1, err = rbacv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
+	cs.resourceV1, err = resourcev1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
+	cs.resourceV1beta2, err = resourcev1beta2.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -784,7 +796,6 @@ func New(c rest.Interface) *Clientset {
 	cs.flowcontrolV1beta2 = flowcontrolv1beta2.New(c)
 	cs.flowcontrolV1beta3 = flowcontrolv1beta3.New(c)
 	cs.networkingV1 = networkingv1.New(c)
-	cs.networkingV1alpha1 = networkingv1alpha1.New(c)
 	cs.networkingV1beta1 = networkingv1beta1.New(c)
 	cs.nodeV1 = nodev1.New(c)
 	cs.nodeV1alpha1 = nodev1alpha1.New(c)
@@ -794,6 +805,8 @@ func New(c rest.Interface) *Clientset {
 	cs.rbacV1 = rbacv1.New(c)
 	cs.rbacV1beta1 = rbacv1beta1.New(c)
 	cs.rbacV1alpha1 = rbacv1alpha1.New(c)
+	cs.resourceV1 = resourcev1.New(c)
+	cs.resourceV1beta2 = resourcev1beta2.New(c)
 	cs.resourceV1beta1 = resourcev1beta1.New(c)
 	cs.resourceV1alpha3 = resourcev1alpha3.New(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.New(c)

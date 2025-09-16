@@ -28,21 +28,27 @@ type Cache struct {
 	compileMutex keymutex.KeyMutex
 	cacheMutex   sync.RWMutex
 	cache        *lru.Cache
+	compiler     *compiler
 }
 
 // NewCache creates a cache. The maximum number of entries determines
 // how many entries are cached at most before dropping the oldest
 // entry.
-func NewCache(maxCacheEntries int) *Cache {
+//
+// The features are used to get a suitable compiler.
+func NewCache(maxCacheEntries int, features Features) *Cache {
 	return &Cache{
 		compileMutex: keymutex.NewHashed(0),
 		cache:        lru.New(maxCacheEntries),
+		compiler:     GetCompiler(features),
 	}
 }
 
 // GetOrCompile checks whether the cache already has a compilation result
 // and returns that if available. Otherwise it compiles, stores successful
 // results and returns the new result.
+//
+// Cost estimation is disabled.
 func (c *Cache) GetOrCompile(expression string) CompilationResult {
 	// Compiling a CEL expression is expensive enough that it is cheaper
 	// to lock a mutex than doing it several times in parallel.
@@ -55,7 +61,7 @@ func (c *Cache) GetOrCompile(expression string) CompilationResult {
 		return *cached
 	}
 
-	expr := GetCompiler().CompileCELExpression(expression, Options{})
+	expr := c.compiler.CompileCELExpression(expression, Options{DisableCostEstimation: true})
 	if expr.Error == nil {
 		c.add(expression, &expr)
 	}
@@ -76,4 +82,23 @@ func (c *Cache) get(expression string) *CompilationResult {
 		return nil
 	}
 	return expr.(*CompilationResult)
+}
+
+func (c *Cache) Check(expression string) CompilationResult {
+	// Compiling a CEL expression is expensive enough that it is cheaper
+	// to lock a mutex than doing it several times in parallel.
+	c.compileMutex.LockKey(expression)
+	//nolint:errcheck // Only returns an error for unknown keys, which isn't the case here.
+	defer c.compileMutex.UnlockKey(expression)
+
+	cached := c.get(expression)
+	if cached != nil {
+		return *cached
+	}
+
+	expr := c.compiler.CompileCELExpression(expression, Options{DisableCostEstimation: true})
+	if expr.Error == nil {
+		c.add(expression, &expr)
+	}
+	return expr
 }

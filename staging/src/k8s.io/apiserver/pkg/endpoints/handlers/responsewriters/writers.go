@@ -157,6 +157,9 @@ const (
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
 	// if the client requests it.
 	defaultGzipThresholdBytes = 128 * 1024
+	// Use the length of the first write to recognize streaming implementations.
+	// When streaming JSON first write is "{", while Kubernetes protobuf starts unique 4 byte header.
+	firstWriteStreamingThresholdBytes = 4
 )
 
 // negotiateContentEncoding returns a supported client-requested content encoding for the
@@ -192,34 +195,62 @@ type deferredResponseWriter struct {
 	statusCode      int
 	contentEncoding string
 
-	hasWritten bool
-	hw         http.ResponseWriter
-	w          io.Writer
+	hasBuffered bool
+	buffer      []byte
+	hasWritten  bool
+	hw          http.ResponseWriter
+	w           io.Writer
+	// totalBytes is the number of bytes written to `w` and does not include buffered bytes
+	totalBytes int
+	// lastWriteErr holds the error result (if any) of the last write attempt to `w`
+	lastWriteErr error
 
 	ctx context.Context
 }
 
 func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
-	ctx := w.ctx
-	span := tracing.SpanFromContext(ctx)
-	// This Step usually wraps in-memory object serialization.
-	span.AddEvent("About to start writing response", attribute.Int("size", len(p)))
+	switch {
+	case w.hasWritten:
+		// already written, cannot buffer
+		return w.unbufferedWrite(p)
 
-	firstWrite := !w.hasWritten
-	defer func() {
-		if err != nil {
-			span.AddEvent("Write call failed",
-				attribute.String("writer", fmt.Sprintf("%T", w.w)),
-				attribute.Int("size", len(p)),
-				attribute.Bool("firstWrite", firstWrite),
-				attribute.String("err", err.Error()))
-		} else {
-			span.AddEvent("Write call succeeded",
-				attribute.String("writer", fmt.Sprintf("%T", w.w)),
-				attribute.Int("size", len(p)),
-				attribute.Bool("firstWrite", firstWrite))
+	case w.contentEncoding != "gzip":
+		// non-gzip, no need to buffer
+		return w.unbufferedWrite(p)
+
+	case !w.hasBuffered && len(p) > defaultGzipThresholdBytes:
+		// not yet buffered, first write is long enough to trigger gzip, no need to buffer
+		return w.unbufferedWrite(p)
+
+	case !w.hasBuffered && len(p) > firstWriteStreamingThresholdBytes:
+		// not yet buffered, first write is longer than expected for streaming scenarios that would require buffering, no need to buffer
+		return w.unbufferedWrite(p)
+
+	default:
+		if !w.hasBuffered {
+			w.hasBuffered = true
+			// Start at 80 bytes to avoid rapid reallocation of the buffer.
+			// The minimum size of a 0-item serialized list object is 80 bytes:
+			// {"kind":"List","apiVersion":"v1","metadata":{"resourceVersion":"1"},"items":[]}\n
+			w.buffer = make([]byte, 0, max(80, len(p)))
 		}
+		w.buffer = append(w.buffer, p...)
+		var err error
+		if len(w.buffer) > defaultGzipThresholdBytes {
+			// we've accumulated enough to trigger gzip, write and clear buffer
+			_, err = w.unbufferedWrite(w.buffer)
+			w.buffer = nil
+		}
+		return len(p), err
+	}
+}
+
+func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
+	defer func() {
+		w.totalBytes += n
+		w.lastWriteErr = err
 	}()
+
 	if w.hasWritten {
 		return w.w.Write(p)
 	}
@@ -240,16 +271,45 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 		w.w = hw
 	}
 
+	span := tracing.SpanFromContext(w.ctx)
+	span.AddEvent("About to start writing response",
+		attribute.String("writer", fmt.Sprintf("%T", w.w)),
+		attribute.Int("size", len(p)),
+	)
+
 	header.Set("Content-Type", w.mediaType)
 	hw.WriteHeader(w.statusCode)
 	return w.w.Write(p)
 }
 
-func (w *deferredResponseWriter) Close() error {
+func (w *deferredResponseWriter) Close() (err error) {
+	defer func() {
+		if !w.hasWritten {
+			return
+		}
+
+		span := tracing.SpanFromContext(w.ctx)
+
+		if w.lastWriteErr != nil {
+			span.AddEvent("Write call failed",
+				attribute.Int("size", w.totalBytes),
+				attribute.String("err", w.lastWriteErr.Error()))
+		} else {
+			span.AddEvent("Write call succeeded",
+				attribute.Int("size", w.totalBytes))
+		}
+	}()
+
 	if !w.hasWritten {
-		return nil
+		if !w.hasBuffered {
+			return nil
+		}
+		// never reached defaultGzipThresholdBytes, no need to do the gzip writer cleanup
+		_, err := w.unbufferedWrite(w.buffer)
+		w.buffer = nil
+		return err
 	}
-	var err error
+
 	switch t := w.w.(type) {
 	case *gzip.Writer:
 		err = t.Close()

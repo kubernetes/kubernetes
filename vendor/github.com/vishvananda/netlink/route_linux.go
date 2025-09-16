@@ -3,6 +3,7 @@ package netlink
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -269,6 +270,7 @@ type SEG6LocalEncap struct {
 	Action   int
 	Segments []net.IP // from SRH in seg6_local_lwt
 	Table    int      // table id for End.T and End.DT6
+	VrfTable int      // vrftable id for END.DT4 and END.DT6
 	InAddr   net.IP
 	In6Addr  net.IP
 	Iif      int
@@ -304,6 +306,9 @@ func (e *SEG6LocalEncap) Decode(buf []byte) error {
 		case nl.SEG6_LOCAL_TABLE:
 			e.Table = int(native.Uint32(attr.Value[0:4]))
 			e.Flags[nl.SEG6_LOCAL_TABLE] = true
+		case nl.SEG6_LOCAL_VRFTABLE:
+			e.VrfTable = int(native.Uint32(attr.Value[0:4]))
+			e.Flags[nl.SEG6_LOCAL_VRFTABLE] = true
 		case nl.SEG6_LOCAL_NH4:
 			e.InAddr = net.IP(attr.Value[0:4])
 			e.Flags[nl.SEG6_LOCAL_NH4] = true
@@ -360,6 +365,15 @@ func (e *SEG6LocalEncap) Encode() ([]byte, error) {
 		native.PutUint32(attr[4:], uint32(e.Table))
 		res = append(res, attr...)
 	}
+
+	if e.Flags[nl.SEG6_LOCAL_VRFTABLE] {
+		attr := make([]byte, 8)
+		native.PutUint16(attr, 8)
+		native.PutUint16(attr[2:], nl.SEG6_LOCAL_VRFTABLE)
+		native.PutUint32(attr[4:], uint32(e.VrfTable))
+		res = append(res, attr...)
+	}
+
 	if e.Flags[nl.SEG6_LOCAL_NH4] {
 		attr := make([]byte, 4)
 		native.PutUint16(attr, 8)
@@ -412,6 +426,11 @@ func (e *SEG6LocalEncap) String() string {
 	if e.Flags[nl.SEG6_LOCAL_TABLE] {
 		strs = append(strs, fmt.Sprintf("table %d", e.Table))
 	}
+
+	if e.Flags[nl.SEG6_LOCAL_VRFTABLE] {
+		strs = append(strs, fmt.Sprintf("vrftable %d", e.VrfTable))
+	}
+
 	if e.Flags[nl.SEG6_LOCAL_NH4] {
 		strs = append(strs, fmt.Sprintf("nh4 %s", e.InAddr))
 	}
@@ -476,7 +495,7 @@ func (e *SEG6LocalEncap) Equal(x Encap) bool {
 	if !e.InAddr.Equal(o.InAddr) || !e.In6Addr.Equal(o.In6Addr) {
 		return false
 	}
-	if e.Action != o.Action || e.Table != o.Table || e.Iif != o.Iif || e.Oif != o.Oif || e.bpf != o.bpf {
+	if e.Action != o.Action || e.Table != o.Table || e.Iif != o.Iif || e.Oif != o.Oif || e.bpf != o.bpf || e.VrfTable != o.VrfTable {
 		return false
 	}
 	return true
@@ -1071,6 +1090,10 @@ func (h *Handle) prepareRouteReq(route *Route, req *nl.NetlinkRequest, msg *nl.R
 	if route.MTU > 0 {
 		b := nl.Uint32Attr(uint32(route.MTU))
 		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_MTU, b))
+		if route.MTULock {
+			b := nl.Uint32Attr(uint32(1 << unix.RTAX_MTU))
+			metrics = append(metrics, nl.NewRtAttr(unix.RTAX_LOCK, b))
+		}
 	}
 	if route.Window > 0 {
 		b := nl.Uint32Attr(uint32(route.Window))
@@ -1115,6 +1138,10 @@ func (h *Handle) prepareRouteReq(route *Route, req *nl.NetlinkRequest, msg *nl.R
 	if route.RtoMin > 0 {
 		b := nl.Uint32Attr(uint32(route.RtoMin))
 		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_RTO_MIN, b))
+		if route.RtoMinLock {
+			b := nl.Uint32Attr(uint32(1 << unix.RTAX_RTO_MIN))
+			metrics = append(metrics, nl.NewRtAttr(unix.RTAX_LOCK, b))
+		}
 	}
 	if route.InitRwnd > 0 {
 		b := nl.Uint32Attr(uint32(route.InitRwnd))
@@ -1163,6 +1190,9 @@ func (h *Handle) prepareRouteReq(route *Route, req *nl.NetlinkRequest, msg *nl.R
 // RouteList gets a list of routes in the system.
 // Equivalent to: `ip route show`.
 // The list can be filtered by link and ip family.
+//
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func RouteList(link Link, family int) ([]Route, error) {
 	return pkgHandle.RouteList(link, family)
 }
@@ -1170,6 +1200,9 @@ func RouteList(link Link, family int) ([]Route, error) {
 // RouteList gets a list of routes in the system.
 // Equivalent to: `ip route show`.
 // The list can be filtered by link and ip family.
+//
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func (h *Handle) RouteList(link Link, family int) ([]Route, error) {
 	routeFilter := &Route{}
 	if link != nil {
@@ -1188,6 +1221,9 @@ func RouteListFiltered(family int, filter *Route, filterMask uint64) ([]Route, e
 
 // RouteListFiltered gets a list of routes in the system filtered with specified rules.
 // All rules must be defined in RouteFilter struct
+//
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func (h *Handle) RouteListFiltered(family int, filter *Route, filterMask uint64) ([]Route, error) {
 	var res []Route
 	err := h.RouteListFilteredIter(family, filter, filterMask, func(route Route) (cont bool) {
@@ -1202,17 +1238,22 @@ func (h *Handle) RouteListFiltered(family int, filter *Route, filterMask uint64)
 
 // RouteListFilteredIter passes each route that matches the filter to the given iterator func.  Iteration continues
 // until all routes are loaded or the func returns false.
+//
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func RouteListFilteredIter(family int, filter *Route, filterMask uint64, f func(Route) (cont bool)) error {
 	return pkgHandle.RouteListFilteredIter(family, filter, filterMask, f)
 }
 
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func (h *Handle) RouteListFilteredIter(family int, filter *Route, filterMask uint64, f func(Route) (cont bool)) error {
 	req := h.newNetlinkRequest(unix.RTM_GETROUTE, unix.NLM_F_DUMP)
 	rtmsg := &nl.RtMsg{}
 	rtmsg.Family = uint8(family)
 
 	var parseErr error
-	err := h.routeHandleIter(filter, req, rtmsg, func(m []byte) bool {
+	executeErr := h.routeHandleIter(filter, req, rtmsg, func(m []byte) bool {
 		msg := nl.DeserializeRtMsg(m)
 		if family != FAMILY_ALL && msg.Family != uint8(family) {
 			// Ignore routes not matching requested family
@@ -1270,13 +1311,13 @@ func (h *Handle) RouteListFilteredIter(family int, filter *Route, filterMask uin
 		}
 		return f(route)
 	})
-	if err != nil {
-		return err
+	if executeErr != nil && !errors.Is(executeErr, ErrDumpInterrupted) {
+		return executeErr
 	}
 	if parseErr != nil {
 		return parseErr
 	}
-	return nil
+	return executeErr
 }
 
 // deserializeRoute decodes a binary netlink message into a Route struct
@@ -1425,6 +1466,9 @@ func deserializeRoute(m []byte) (Route, error) {
 				switch metric.Attr.Type {
 				case unix.RTAX_MTU:
 					route.MTU = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_LOCK:
+					route.MTULock = native.Uint32(metric.Value[0:4]) == uint32(1<<unix.RTAX_MTU)
+					route.RtoMinLock = native.Uint32(metric.Value[0:4]) == uint32(1<<unix.RTAX_RTO_MIN)
 				case unix.RTAX_WINDOW:
 					route.Window = int(native.Uint32(metric.Value[0:4]))
 				case unix.RTAX_RTT:
@@ -1518,6 +1562,7 @@ type RouteGetOptions struct {
 	Iif      string
 	IifIndex int
 	Oif      string
+	OifIndex int
 	VrfName  string
 	SrcAddr  net.IP
 	UID      *uint32
@@ -1597,14 +1642,20 @@ func (h *Handle) RouteGetWithOptions(destination net.IP, options *RouteGetOption
 			req.AddData(nl.NewRtAttr(unix.RTA_IIF, b))
 		}
 
+		oifIndex := uint32(0)
 		if len(options.Oif) > 0 {
 			link, err := h.LinkByName(options.Oif)
 			if err != nil {
 				return nil, err
 			}
+			oifIndex = uint32(link.Attrs().Index)
+		} else if options.OifIndex > 0 {
+			oifIndex = uint32(options.OifIndex)
+		}
 
+		if oifIndex > 0 {
 			b := make([]byte, 4)
-			native.PutUint32(b, uint32(link.Attrs().Index))
+			native.PutUint32(b, oifIndex)
 
 			req.AddData(nl.NewRtAttr(unix.RTA_OIF, b))
 		}
@@ -1684,6 +1735,10 @@ type RouteSubscribeOptions struct {
 // RouteSubscribeWithOptions work like RouteSubscribe but enable to
 // provide additional options to modify the behavior. Currently, the
 // namespace can be provided as well as an error callback.
+//
+// When options.ListExisting is true, options.ErrorCallback may be
+// called with [ErrDumpInterrupted] to indicate that results from
+// the initial dump of links may be inconsistent or incomplete.
 func RouteSubscribeWithOptions(ch chan<- RouteUpdate, done <-chan struct{}, options RouteSubscribeOptions) error {
 	if options.Namespace == nil {
 		none := netns.None()
@@ -1743,6 +1798,9 @@ func routeSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- RouteUpdate, done <
 				continue
 			}
 			for _, m := range msgs {
+				if m.Header.Flags&unix.NLM_F_DUMP_INTR != 0 && cberr != nil {
+					cberr(ErrDumpInterrupted)
+				}
 				if m.Header.Type == unix.NLMSG_DONE {
 					continue
 				}

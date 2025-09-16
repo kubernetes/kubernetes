@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-	yaml "sigs.k8s.io/yaml/goyaml.v2"
+	yaml "go.yaml.in/yaml/v2"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
@@ -43,7 +43,6 @@ import (
 
 	// define and freeze constants
 	_ "k8s.io/kubernetes/test/e2e/feature"
-	_ "k8s.io/kubernetes/test/e2e/nodefeature"
 
 	// test sources
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"

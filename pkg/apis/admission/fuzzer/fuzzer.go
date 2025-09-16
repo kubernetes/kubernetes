@@ -17,7 +17,7 @@ limitations under the License.
 package fuzzer
 
 import (
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +27,7 @@ import (
 // Funcs returns the fuzzer functions for the admission api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(s *runtime.RawExtension, c fuzz.Continue) {
+		func(s *runtime.RawExtension, c randfill.Continue) {
 			u := &unstructured.Unstructured{Object: map[string]interface{}{
 				"apiVersion": "unknown.group/unknown",
 				"kind":       "Something",

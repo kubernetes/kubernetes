@@ -900,6 +900,7 @@ func autoConvert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(in *extension
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
+	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
 	out.Conditions = *(*[]apps.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil
@@ -917,6 +918,7 @@ func autoConvert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(in *apps.Depl
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
+	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
 	out.Conditions = *(*[]extensionsv1beta1.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil
@@ -1737,6 +1739,7 @@ func autoConvert_v1beta1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *extension
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
+	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
 	out.ObservedGeneration = in.ObservedGeneration
 	out.Conditions = *(*[]apps.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
@@ -1752,6 +1755,7 @@ func autoConvert_apps_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(in *apps.Repl
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
+	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
 	out.ObservedGeneration = in.ObservedGeneration
 	out.Conditions = *(*[]extensionsv1beta1.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
 	return nil

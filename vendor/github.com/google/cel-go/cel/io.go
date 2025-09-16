@@ -62,7 +62,7 @@ func AstToCheckedExpr(a *Ast) (*exprpb.CheckedExpr, error) {
 	if !a.IsChecked() {
 		return nil, fmt.Errorf("cannot convert unchecked ast")
 	}
-	return ast.ToProto(a.impl)
+	return ast.ToProto(a.NativeRep())
 }
 
 // ParsedExprToAst converts a parsed expression proto message to an Ast.
@@ -99,15 +99,23 @@ func AstToParsedExpr(a *Ast) (*exprpb.ParsedExpr, error) {
 // Note, the conversion may not be an exact replica of the original expression, but will produce
 // a string that is semantically equivalent and whose textual representation is stable.
 func AstToString(a *Ast) (string, error) {
-	return parser.Unparse(a.impl.Expr(), a.impl.SourceInfo())
+	return ExprToString(a.NativeRep().Expr(), a.NativeRep().SourceInfo())
 }
 
-// RefValueToValue converts between ref.Val and api.expr.Value.
+// ExprToString converts an AST Expr node back to a string using macro call tracking metadata from
+// source info if any macros are encountered within the expression.
+func ExprToString(e ast.Expr, info *ast.SourceInfo) (string, error) {
+	return parser.Unparse(e, info)
+}
+
+// RefValueToValue converts between ref.Val and google.api.expr.v1alpha1.Value.
 // The result Value is the serialized proto form. The ref.Val must not be error or unknown.
 func RefValueToValue(res ref.Val) (*exprpb.Value, error) {
 	return ValueAsAlphaProto(res)
 }
 
+// ValueAsAlphaProto converts between ref.Val and google.api.expr.v1alpha1.Value.
+// The result Value is the serialized proto form. The ref.Val must not be error or unknown.
 func ValueAsAlphaProto(res ref.Val) (*exprpb.Value, error) {
 	canonical, err := ValueAsProto(res)
 	if err != nil {
@@ -118,6 +126,57 @@ func ValueAsAlphaProto(res ref.Val) (*exprpb.Value, error) {
 	return alpha, err
 }
 
+// RefValToExprValue converts between ref.Val and google.api.expr.v1alpha1.ExprValue.
+// The result ExprValue is the serialized proto form.
+func RefValToExprValue(res ref.Val) (*exprpb.ExprValue, error) {
+	return ExprValueAsAlphaProto(res)
+}
+
+// ExprValueAsAlphaProto converts between ref.Val and google.api.expr.v1alpha1.ExprValue.
+// The result ExprValue is the serialized proto form.
+func ExprValueAsAlphaProto(res ref.Val) (*exprpb.ExprValue, error) {
+	canonical, err := ExprValueAsProto(res)
+	if err != nil {
+		return nil, err
+	}
+	alpha := &exprpb.ExprValue{}
+	err = convertProto(canonical, alpha)
+	return alpha, err
+}
+
+// ExprValueAsProto converts between ref.Val and cel.expr.ExprValue.
+// The result ExprValue is the serialized proto form.
+func ExprValueAsProto(res ref.Val) (*celpb.ExprValue, error) {
+	switch res := res.(type) {
+	case *types.Unknown:
+		return &celpb.ExprValue{
+			Kind: &celpb.ExprValue_Unknown{
+				Unknown: &celpb.UnknownSet{
+					Exprs: res.IDs(),
+				},
+			}}, nil
+	case *types.Err:
+		return &celpb.ExprValue{
+			Kind: &celpb.ExprValue_Error{
+				Error: &celpb.ErrorSet{
+					// Keeping the error code as UNKNOWN since there's no error codes associated with
+					// Cel-Go runtime errors.
+					Errors: []*celpb.Status{{Code: 2, Message: res.Error()}},
+				},
+			},
+		}, nil
+	default:
+		val, err := ValueAsProto(res)
+		if err != nil {
+			return nil, err
+		}
+		return &celpb.ExprValue{
+			Kind: &celpb.ExprValue_Value{Value: val}}, nil
+	}
+}
+
+// ValueAsProto converts between ref.Val and cel.expr.Value.
+// The result Value is the serialized proto form. The ref.Val must not be error or unknown.
 func ValueAsProto(res ref.Val) (*celpb.Value, error) {
 	switch res.Type() {
 	case types.BoolType:
@@ -205,11 +264,12 @@ var (
 	anyPbType = reflect.TypeOf(&anypb.Any{})
 )
 
-// ValueToRefValue converts between exprpb.Value and ref.Val.
+// ValueToRefValue converts between google.api.expr.v1alpha1.Value and ref.Val.
 func ValueToRefValue(adapter types.Adapter, v *exprpb.Value) (ref.Val, error) {
 	return AlphaProtoAsValue(adapter, v)
 }
 
+// AlphaProtoAsValue converts between google.api.expr.v1alpha1.Value and ref.Val.
 func AlphaProtoAsValue(adapter types.Adapter, v *exprpb.Value) (ref.Val, error) {
 	canonical := &celpb.Value{}
 	if err := convertProto(v, canonical); err != nil {
@@ -218,6 +278,7 @@ func AlphaProtoAsValue(adapter types.Adapter, v *exprpb.Value) (ref.Val, error) 
 	return ProtoAsValue(adapter, canonical)
 }
 
+// ProtoAsValue converts between cel.expr.Value and ref.Val.
 func ProtoAsValue(adapter types.Adapter, v *celpb.Value) (ref.Val, error) {
 	switch v.Kind.(type) {
 	case *celpb.Value_NullValue:

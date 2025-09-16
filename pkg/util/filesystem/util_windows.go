@@ -46,20 +46,21 @@ const (
 // Note that due to the retry logic inside, it could take up to 4 seconds
 // to determine whether or not the file path supplied is a Unix domain socket
 func IsUnixDomainSocket(filePath string) (bool, error) {
-	// Due to the absence of golang support for os.ModeSocket in Windows (https://github.com/golang/go/issues/33357)
-	// we need to dial the file and check if we receive an error to determine if a file is Unix Domain Socket file.
-
 	// Note that querrying for the Reparse Points (https://docs.microsoft.com/en-us/windows/win32/fileio/reparse-points)
 	// for the file (using FSCTL_GET_REPARSE_POINT) and checking for reparse tag: reparseTagSocket
 	// does NOT work in 1809 if the socket file is created within a bind mounted directory by a container
 	// and the FSCTL is issued in the host by the kubelet.
 
 	// If the file does not exist, it cannot be a Unix domain socket.
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	if info, err := os.Stat(filePath); os.IsNotExist(err) {
 		return false, fmt.Errorf("File %s not found. Err: %v", filePath, err)
+	} else if err == nil && info.Mode()&os.ModeSocket != 0 { // Use os.ModeSocket (introduced in Go 1.23 on Windows)
+		klog.V(6).InfoS("File identified as a Unix domain socket", "filePath", filePath)
+		return true, nil
 	}
-
 	klog.V(6).InfoS("Function IsUnixDomainSocket starts", "filePath", filePath)
+	// Due to the absence of golang support for os.ModeSocket in Windows (https://github.com/golang/go/issues/33357)
+	// we need to dial the file and check if we receive an error to determine if a file is Unix Domain Socket file.
 	// As detailed in https://github.com/kubernetes/kubernetes/issues/104584 we cannot rely
 	// on the Unix Domain socket working on the very first try, hence the potential need to
 	// dial multiple times
@@ -94,14 +95,21 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 // permissions once the directory is created.
 func MkdirAll(path string, perm os.FileMode) error {
 	klog.V(6).InfoS("Function MkdirAll starts", "path", path, "perm", perm)
+	if _, err := os.Stat(path); err == nil {
+		// Path already exists: nothing to do.
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("error checking path %s: %w", path, err)
+	}
+
 	err := os.MkdirAll(path, perm)
 	if err != nil {
-		return fmt.Errorf("Error creating directory %s: %v", path, err)
+		return fmt.Errorf("error creating directory %s: %w", path, err)
 	}
 
 	err = Chmod(path, perm)
 	if err != nil {
-		return fmt.Errorf("Error setting permissions for directory %s: %v", path, err)
+		return fmt.Errorf("error setting permissions for directory %s: %w", path, err)
 	}
 
 	return nil

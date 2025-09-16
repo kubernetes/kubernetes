@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package resourceconfig contains the resource config related helper functions.
-package resourceconfig // import "k8s.io/apiserver/pkg/server/resourceconfig"
+package resourceconfig

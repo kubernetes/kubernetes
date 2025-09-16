@@ -19,7 +19,7 @@ package testing
 import (
 	"fmt"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -51,9 +51,9 @@ import (
 // values in a Kubernetes context.
 func overrideGenericFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(j *runtime.Object, c fuzz.Continue) {
+		func(j *runtime.Object, c randfill.Continue) {
 			// TODO: uncomment when round trip starts from a versioned object
-			if true { //c.RandBool() {
+			if true { // c.Bool() {
 				*j = &runtime.Unknown{
 					// We do not set TypeMeta here because it is not carried through a round trip
 					Raw:         []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`),
@@ -62,15 +62,15 @@ func overrideGenericFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			} else {
 				types := []runtime.Object{&api.Pod{}, &api.ReplicationController{}}
 				t := types[c.Rand.Intn(len(types))]
-				c.Fuzz(t)
+				c.Fill(t)
 				*j = t
 			}
 		},
-		func(r *runtime.RawExtension, c fuzz.Continue) {
+		func(r *runtime.RawExtension, c randfill.Continue) {
 			// Pick an arbitrary type and fuzz it
 			types := []runtime.Object{&api.Pod{}, &apps.Deployment{}, &api.Service{}}
 			obj := types[c.Rand.Intn(len(types))]
-			c.Fuzz(obj)
+			c.Fill(obj)
 
 			var codec runtime.Codec
 			switch obj.(type) {

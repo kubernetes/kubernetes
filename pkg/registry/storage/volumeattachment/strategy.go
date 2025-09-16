@@ -23,10 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"k8s.io/kubernetes/pkg/features"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // volumeAttachmentStrategy implements behavior for VolumeAttachment objects
@@ -97,8 +99,7 @@ func (volumeAttachmentStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 func (volumeAttachmentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newVolumeAttachmentObj := obj.(*storage.VolumeAttachment)
 	oldVolumeAttachmentObj := old.(*storage.VolumeAttachment)
-	errorList := validation.ValidateVolumeAttachment(newVolumeAttachmentObj)
-	return append(errorList, validation.ValidateVolumeAttachmentUpdate(newVolumeAttachmentObj, oldVolumeAttachmentObj)...)
+	return validation.ValidateVolumeAttachmentUpdate(newVolumeAttachmentObj, oldVolumeAttachmentObj)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -139,4 +140,18 @@ func (volumeAttachmentStatusStrategy) PrepareForUpdate(ctx context.Context, obj,
 
 	newVolumeAttachment.Spec = oldVolumeAttachment.Spec
 	metav1.ResetObjectMetaForStatus(&newVolumeAttachment.ObjectMeta, &oldVolumeAttachment.ObjectMeta)
+
+	if !feature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+		// Only clear ErrorCode field if it isn't set in the old object
+		if newVolumeAttachment.Status.AttachError != nil {
+			if oldVolumeAttachment.Status.AttachError == nil || oldVolumeAttachment.Status.AttachError.ErrorCode == nil {
+				newVolumeAttachment.Status.AttachError.ErrorCode = nil
+			}
+		}
+		if newVolumeAttachment.Status.DetachError != nil {
+			if oldVolumeAttachment.Status.DetachError == nil || oldVolumeAttachment.Status.DetachError.ErrorCode == nil {
+				newVolumeAttachment.Status.DetachError.ErrorCode = nil
+			}
+		}
+	}
 }

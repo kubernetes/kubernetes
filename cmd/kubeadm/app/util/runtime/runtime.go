@@ -23,13 +23,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	criapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // defaultKnownCRISockets holds the set of known CRI endpoints
@@ -42,6 +42,7 @@ var defaultKnownCRISockets = []string{
 // ContainerRuntime is an interface for working with container runtimes
 type ContainerRuntime interface {
 	Connect() error
+	Close()
 	SetImpl(impl)
 	IsRunning() error
 	ListKubeContainers() ([]string, error)
@@ -91,6 +92,20 @@ func (runtime *CRIRuntime) Connect() error {
 	runtime.imageService = imageService
 
 	return nil
+}
+
+// Close closes the connections to the runtime and image services.
+func (runtime *CRIRuntime) Close() {
+	if runtime.runtimeService != nil {
+		if err := runtime.runtimeService.Close(); err != nil {
+			klog.Warningf("failed to close runtime service: %v", err)
+		}
+	}
+	if runtime.imageService != nil {
+		if err := runtime.imageService.Close(); err != nil {
+			klog.Warningf("failed to close image service: %v", err)
+		}
+	}
 }
 
 // IsRunning checks if runtime is running.
@@ -291,6 +306,10 @@ func (runtime *CRIRuntime) SandboxImage() (string, error) {
 
 	if err := json.Unmarshal([]byte(infoConfig), &c); err != nil {
 		return "", errors.Wrap(err, "failed to unmarshal CRI info config")
+	}
+
+	if c.SandboxImage == "" {
+		return "", errors.New("no 'sandboxImage' field in CRI info config")
 	}
 
 	return c.SandboxImage, nil

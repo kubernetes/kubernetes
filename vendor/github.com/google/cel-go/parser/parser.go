@@ -17,6 +17,7 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -40,6 +41,7 @@ type Parser struct {
 // NewParser builds and returns a new Parser using the provided options.
 func NewParser(opts ...Option) (*Parser, error) {
 	p := &Parser{}
+	p.enableHiddenAccumulatorName = true
 	for _, opt := range opts {
 		if err := opt(&p.options); err != nil {
 			return nil, err
@@ -88,7 +90,11 @@ func mustNewParser(opts ...Option) *Parser {
 // Parse parses the expression represented by source and returns the result.
 func (p *Parser) Parse(source common.Source) (*ast.AST, *common.Errors) {
 	errs := common.NewErrors(source)
-	fac := ast.NewExprFactory()
+	accu := AccumulatorName
+	if p.enableHiddenAccumulatorName {
+		accu = HiddenAccumulatorName
+	}
+	fac := ast.NewExprFactoryWithAccumulator(accu)
 	impl := parser{
 		errors:                           &parseErrors{errs},
 		exprFactory:                      fac,
@@ -101,6 +107,7 @@ func (p *Parser) Parse(source common.Source) (*ast.AST, *common.Errors) {
 		populateMacroCalls:               p.populateMacroCalls,
 		enableOptionalSyntax:             p.enableOptionalSyntax,
 		enableVariadicOperatorASTs:       p.enableVariadicOperatorASTs,
+		enableIdentEscapeSyntax:          p.enableIdentEscapeSyntax,
 	}
 	buf, ok := source.(runes.Buffer)
 	if !ok {
@@ -141,6 +148,27 @@ var reservedIds = map[string]struct{}{
 	"var":       {},
 	"void":      {},
 	"while":     {},
+}
+
+func unescapeIdent(in string) (string, error) {
+	if len(in) <= 2 {
+		return "", errors.New("invalid escaped identifier: underflow")
+	}
+	return in[1 : len(in)-1], nil
+}
+
+// normalizeIdent returns the interpreted identifier.
+func (p *parser) normalizeIdent(ctx gen.IEscapeIdentContext) (string, error) {
+	switch ident := ctx.(type) {
+	case *gen.SimpleIdentifierContext:
+		return ident.GetId().GetText(), nil
+	case *gen.EscapedIdentifierContext:
+		if !p.enableIdentEscapeSyntax {
+			return "", errors.New("unsupported syntax: '`'")
+		}
+		return unescapeIdent(ident.GetId().GetText())
+	}
+	return "", errors.New("unsupported ident kind")
 }
 
 // Parse converts a source input a parsed expression.
@@ -296,6 +324,7 @@ type parser struct {
 	populateMacroCalls               bool
 	enableOptionalSyntax             bool
 	enableVariadicOperatorASTs       bool
+	enableIdentEscapeSyntax          bool
 }
 
 var _ gen.CELVisitor = (*parser)(nil)
@@ -369,8 +398,10 @@ func (p *parser) Visit(tree antlr.ParseTree) any {
 		return out
 	case *gen.LogicalNotContext:
 		return p.VisitLogicalNot(tree)
-	case *gen.IdentOrGlobalCallContext:
-		return p.VisitIdentOrGlobalCall(tree)
+	case *gen.IdentContext:
+		return p.VisitIdent(tree)
+	case *gen.GlobalCallContext:
+		return p.VisitGlobalCall(tree)
 	case *gen.SelectContext:
 		p.checkAndIncrementRecursionDepth()
 		out := p.VisitSelect(tree)
@@ -538,7 +569,10 @@ func (p *parser) VisitSelect(ctx *gen.SelectContext) any {
 	if ctx.GetId() == nil || ctx.GetOp() == nil {
 		return p.helper.newExpr(ctx)
 	}
-	id := ctx.GetId().GetText()
+	id, err := p.normalizeIdent(ctx.GetId())
+	if err != nil {
+		p.reportError(ctx.GetId(), "%v", err)
+	}
 	if ctx.GetOpt() != nil {
 		if !p.enableOptionalSyntax {
 			return p.reportError(ctx.GetOp(), "unsupported syntax '.?'")
@@ -622,12 +656,14 @@ func (p *parser) VisitIFieldInitializerList(ctx gen.IFieldInitializerListContext
 			p.reportError(optField, "unsupported syntax '?'")
 			continue
 		}
+
 		// The field may be empty due to a prior error.
-		id := optField.IDENTIFIER()
-		if id == nil {
-			return []ast.EntryExpr{}
+		fieldName, err := p.normalizeIdent(optField.EscapeIdent())
+		if err != nil {
+			p.reportError(ctx, "%v", err)
+			continue
 		}
-		fieldName := id.GetText()
+
 		value := p.Visit(vals[i]).(ast.Expr)
 		field := p.helper.newObjectField(initID, fieldName, value, optional)
 		result[i] = field
@@ -635,8 +671,8 @@ func (p *parser) VisitIFieldInitializerList(ctx gen.IFieldInitializerListContext
 	return result
 }
 
-// Visit a parse tree produced by CELParser#IdentOrGlobalCall.
-func (p *parser) VisitIdentOrGlobalCall(ctx *gen.IdentOrGlobalCallContext) any {
+// Visit a parse tree produced by CELParser#Ident.
+func (p *parser) VisitIdent(ctx *gen.IdentContext) any {
 	identName := ""
 	if ctx.GetLeadingDot() != nil {
 		identName = "."
@@ -651,11 +687,28 @@ func (p *parser) VisitIdentOrGlobalCall(ctx *gen.IdentOrGlobalCallContext) any {
 		return p.reportError(ctx, "reserved identifier: %s", id)
 	}
 	identName += id
-	if ctx.GetOp() != nil {
-		opID := p.helper.id(ctx.GetOp())
-		return p.globalCallOrMacro(opID, identName, p.visitExprList(ctx.GetArgs())...)
-	}
 	return p.helper.newIdent(ctx.GetId(), identName)
+}
+
+// Visit a parse tree produced by CELParser#GlobalCallContext.
+func (p *parser) VisitGlobalCall(ctx *gen.GlobalCallContext) any {
+	identName := ""
+	if ctx.GetLeadingDot() != nil {
+		identName = "."
+	}
+	// Handle the error case where no valid identifier is specified.
+	if ctx.GetId() == nil {
+		return p.helper.newExpr(ctx)
+	}
+	// Handle reserved identifiers.
+	id := ctx.GetId().GetText()
+	if _, ok := reservedIds[id]; ok {
+		return p.reportError(ctx, "reserved identifier: %s", id)
+	}
+	identName += id
+	opID := p.helper.id(ctx.GetOp())
+	return p.globalCallOrMacro(opID, identName, p.visitExprList(ctx.GetArgs())...)
+
 }
 
 // Visit a parse tree produced by CELParser#CreateList.
@@ -756,7 +809,7 @@ func (p *parser) VisitDouble(ctx *gen.DoubleContext) any {
 
 // Visit a parse tree produced by CELParser#String.
 func (p *parser) VisitString(ctx *gen.StringContext) any {
-	s := p.unquote(ctx, ctx.GetText(), false)
+	s := p.unquote(ctx, ctx.GetTok().GetText(), false)
 	return p.helper.newLiteralString(ctx, s)
 }
 
@@ -922,7 +975,7 @@ func (p *parser) expandMacro(exprID int64, function string, target ast.Expr, arg
 			loc = p.helper.getLocation(exprID)
 		}
 		p.helper.deleteID(exprID)
-		return p.reportError(loc, err.Message), true
+		return p.reportError(loc, "%s", err.Message), true
 	}
 	// A nil value from the macro indicates that the macro implementation decided that
 	// an expansion should not be performed.

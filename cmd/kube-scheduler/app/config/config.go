@@ -26,11 +26,16 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
+	basecompatibility "k8s.io/component-base/compatibility"
+	"k8s.io/component-base/zpages/flagz"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 // Config has all the context to run a Scheduler
 type Config struct {
+	// Flagz is the Reader interface to get flags for flagz page.
+	Flagz flagz.Reader
+
 	// ComponentConfig is the scheduler server's configuration object.
 	ComponentConfig kubeschedulerconfig.KubeSchedulerConfiguration
 
@@ -57,6 +62,9 @@ type Config struct {
 	// value, the pod will be moved from unschedulablePods to backoffQ or activeQ.
 	// If this value is empty, the default value (5min) will be used.
 	PodMaxInUnschedulablePodsDuration time.Duration
+
+	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
+	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
 }
 
 type completedConfig struct {

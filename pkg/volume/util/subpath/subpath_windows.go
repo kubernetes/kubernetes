@@ -29,7 +29,6 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	"k8s.io/utils/nsenter"
 )
 
 // MaxPathLength is the maximum length of Windows path. Normally, it is 260, but if long path is enable,
@@ -41,12 +40,6 @@ type subpath struct{}
 // New returns a subpath.Interface for the current system
 func New(mount.Interface) Interface {
 	return &subpath{}
-}
-
-// NewNSEnter is to satisfy the compiler for having NewSubpathNSEnter exist for all
-// OS choices. however, NSEnter is only valid on Linux
-func NewNSEnter(mounter mount.Interface, ne *nsenter.Nsenter, rootDir string) Interface {
-	return nil
 }
 
 // isDriveLetterPath returns true if the given path is empty or it ends with ":" or ":\" or ":\\"
@@ -208,6 +201,12 @@ func lockAndCheckSubPathWithoutSymlink(volumePath, subPath string) ([]uintptr, e
 			break
 		}
 
+		// go1.23 behavior change: https://github.com/golang/go/issues/63703#issuecomment-2535941458
+		if stat.Mode()&os.ModeIrregular != 0 {
+			errorResult = fmt.Errorf("subpath %q is an unexpected irregular file after EvalSymlinks", currentFullPath)
+			break
+		}
+
 		if !mount.PathWithinBase(currentFullPath, volumePath) {
 			errorResult = fmt.Errorf("SubPath %q not within volume path %q", currentFullPath, volumePath)
 			break
@@ -341,6 +340,10 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		}
 		if stat.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("subpath %q is an unexpected symlink after Mkdir", currentPath)
+		}
+		// go1.23 behavior change: https://github.com/golang/go/issues/63703#issuecomment-2535941458
+		if stat.Mode()&os.ModeIrregular != 0 {
+			return fmt.Errorf("subpath %q is an unexpected irregular file after Mkdir", currentPath)
 		}
 	}
 

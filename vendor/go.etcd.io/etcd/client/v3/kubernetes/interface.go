@@ -36,8 +36,9 @@ type Interface interface {
 	// If opts.Revision is non-zero, the key-value pairs are retrieved at the specified revision.
 	// If the required revision has been compacted, the request will fail with ErrCompacted.
 	// If opts.Limit is greater than zero, the number of returned key-value pairs is bounded by the limit.
-	// If opts.Continue is not empty, the listing will start from the key immediately after the one specified by Continue.
-	// The Continue value should be the last key returned in a previous paginated ListResponse.
+	// If opts.Continue is not empty, the listing will start from the key
+	// specified by it. When paginating, the Continue value should be set
+	// to the last observed key with "\x00" appended to it.
 	List(ctx context.Context, prefix string, opts ListOptions) (ListResponse, error)
 
 	// Count returns the number of keys with the specified prefix.
@@ -74,8 +75,9 @@ type ListOptions struct {
 	// 0 means no limitation.
 	Limit int64
 
-	// Continue is a key from which to resume the List operation, excluding the given key.
-	// It should be set to the last key from a previous ListResponse when paginating.
+	// Continue is a key from which to resume the List operation.
+	// It should be set to the last key from a previous ListResponse
+	// with "\x00" appended to it when paginating.
 	Continue string
 }
 

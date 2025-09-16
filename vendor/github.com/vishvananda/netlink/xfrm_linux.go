@@ -48,6 +48,14 @@ const (
 	XFRM_MODE_MAX
 )
 
+// SADir is an enum representing an ipsec template direction.
+type SADir uint8
+
+const (
+	XFRM_SA_DIR_IN SADir = iota + 1
+	XFRM_SA_DIR_OUT
+)
+
 func (m Mode) String() string {
 	switch m {
 	case XFRM_MODE_TRANSPORT:

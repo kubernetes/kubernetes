@@ -18,13 +18,13 @@ package tainttoleration
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -59,7 +59,7 @@ func TestTaintTolerationScore(t *testing.T) {
 		name         string
 		pod          *v1.Pod
 		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
+		expectedList fwk.NodeScoreList
 	}{
 		// basic test case
 		{
@@ -82,8 +82,8 @@ func TestTaintTolerationScore(t *testing.T) {
 					Effect: v1.TaintEffectPreferNoSchedule,
 				}}),
 			},
-			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: framework.MaxNodeScore},
+			expectedList: []fwk.NodeScore{
+				{Name: "nodeA", Score: fwk.MaxNodeScore},
 				{Name: "nodeB", Score: 0},
 			},
 		},
@@ -124,10 +124,10 @@ func TestTaintTolerationScore(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: framework.MaxNodeScore},
-				{Name: "nodeB", Score: framework.MaxNodeScore},
-				{Name: "nodeC", Score: framework.MaxNodeScore},
+			expectedList: []fwk.NodeScore{
+				{Name: "nodeA", Score: fwk.MaxNodeScore},
+				{Name: "nodeB", Score: fwk.MaxNodeScore},
+				{Name: "nodeC", Score: fwk.MaxNodeScore},
 			},
 		},
 		// the count of taints on a node that are not tolerated by pod, matters.
@@ -160,8 +160,8 @@ func TestTaintTolerationScore(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: framework.MaxNodeScore},
+			expectedList: []fwk.NodeScore{
+				{Name: "nodeA", Score: fwk.MaxNodeScore},
 				{Name: "nodeB", Score: 50},
 				{Name: "nodeC", Score: 0},
 			},
@@ -203,9 +203,9 @@ func TestTaintTolerationScore(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: framework.MaxNodeScore},
-				{Name: "nodeB", Score: framework.MaxNodeScore},
+			expectedList: []fwk.NodeScore{
+				{Name: "nodeA", Score: fwk.MaxNodeScore},
+				{Name: "nodeB", Score: fwk.MaxNodeScore},
 				{Name: "nodeC", Score: 0},
 			},
 		},
@@ -224,8 +224,8 @@ func TestTaintTolerationScore(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: framework.MaxNodeScore},
+			expectedList: []fwk.NodeScore{
+				{Name: "nodeA", Score: fwk.MaxNodeScore},
 				{Name: "nodeB", Score: 0},
 			},
 		},
@@ -244,27 +244,28 @@ func TestTaintTolerationScore(t *testing.T) {
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
-			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
+			nodeInfos := tf.BuildNodeInfos(test.nodes)
+			status := p.(fwk.PreScorePlugin).PreScore(ctx, state, test.pod, nodeInfos)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
-			var gotList framework.NodeScoreList
-			for _, n := range test.nodes {
-				nodeName := n.ObjectMeta.Name
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeName)
+			var gotList fwk.NodeScoreList
+			for _, nodeInfo := range nodeInfos {
+				nodeName := nodeInfo.Node().Name
+				score, status := p.(fwk.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
-				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
+				gotList = append(gotList, fwk.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status = p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(ctx, state, test.pod, gotList)
+			status = p.(fwk.ScorePlugin).ScoreExtensions().NormalizeScore(ctx, state, test.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
 
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
+				t.Errorf("Unexpected NodeScoreList (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -275,13 +276,13 @@ func TestTaintTolerationFilter(t *testing.T) {
 		name       string
 		pod        *v1.Pod
 		node       *v1.Node
-		wantStatus *framework.Status
+		wantStatus *fwk.Status
 	}{
 		{
 			name: "A pod having no tolerations can't be scheduled onto a node with nonempty taints",
 			pod:  podWithTolerations("pod1", []v1.Toleration{}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				"node(s) had untolerated taint {dedicated: user1}"),
 		},
 		{
@@ -293,7 +294,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 			name: "A pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				"node(s) had untolerated taint {dedicated: user1}"),
 		},
 		{
@@ -317,7 +318,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 				"can't be scheduled onto the node",
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "PreferNoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "foo", Value: "bar", Effect: "NoSchedule"}}),
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				"node(s) had untolerated taint {foo: bar}"),
 		},
 		{
@@ -348,9 +349,9 @@ func TestTaintTolerationFilter(t *testing.T) {
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
-			gotStatus := p.(framework.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			gotStatus := p.(fwk.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -362,47 +363,47 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 		pod          *v1.Pod
 		oldObj       interface{}
 		newObj       interface{}
-		expectedHint framework.QueueingHint
+		expectedHint fwk.QueueingHint
 		wantErr      bool
 	}{
 		{
 			name:         "backoff-wrong-new-object",
 			newObj:       "not-a-node",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			wantErr:      true,
 		},
 		{
 			name:         "backoff-wrong-old-object",
 			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
 			oldObj:       "not-a-node",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			wantErr:      true,
 		},
 		{
 			name:         "skip-queue-on-untoleratedtaint-node-added",
 			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "queue-on-toleratedtaint-node-added",
 			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user2", Effect: "NoSchedule"}}),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name:         "skip-unrelated-change",
 			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}, {Key: "dedicated", Value: "user3", Effect: "NoSchedule"}}),
 			oldObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "queue-on-taint-change",
 			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user2", Effect: "NoSchedule"}}),
 			oldObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 	}
 
@@ -425,20 +426,20 @@ func Test_isSchedulableAfterPodTolerationChange(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"backoff-wrong-new-object": {
 			pod:          &v1.Pod{},
 			newObj:       "not-a-pod",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"backoff-wrong-old-object": {
 			pod:          &v1.Pod{},
 			oldObj:       "not-a-pod",
 			newObj:       &v1.Pod{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"skip-updates-other-pod": {
@@ -469,7 +470,7 @@ func Test_isSchedulableAfterPodTolerationChange(t *testing.T) {
 					},
 				},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"queue-on-toleration-added": {
@@ -497,7 +498,7 @@ func Test_isSchedulableAfterPodTolerationChange(t *testing.T) {
 					},
 				},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 	}

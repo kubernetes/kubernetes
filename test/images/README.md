@@ -95,7 +95,8 @@ It can be used by anyone, but if you need to build your own, you can read more a
 
 For Windows, in order to spawn process-isolated containers, the container OS version should closely match
 the host OS version. For this reason, we build test images for different Windows OS Versions: 1809 (Windows Server 2019)
-and ltsc2022 (Windows Server 2022). In order to add support for a new Windows OS version, a new entry for that OS version will have
+, ltsc2022 (Windows Server 2022), and ltsc2025 (Windows Server 2025).
+In order to add support for a new Windows OS version, a new entry for that OS version will have
 to be first added to the `windows-servercore-cache` and `busybox` images, followed by the rest of the images.
 These images are then used by the rest of the E2E test images as a cache / base image.
 
@@ -210,7 +211,7 @@ sudo chmod o+x /etc/docker
 ```
 
 A few images have been mirrored from dockerhub into the `gcr.io/k8s-staging-e2e-test-images` registry
-(`busybox`,`httpd`, `httpd-new`, `nginx`, `nginx-new`, `perl`), and they
+(`busybox`, `nginx`, `nginx-new`, `perl`), and they
 only have a noop Dockerfile. However, due to an [issue](https://github.com/kubernetes/test-infra/issues/20884),
 the same SHA cannot be pushed twice. A small change to them is required in order to generate a new SHA,
 which can then be pushed and promoted.

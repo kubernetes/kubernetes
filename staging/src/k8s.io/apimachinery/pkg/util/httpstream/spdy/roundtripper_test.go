@@ -321,7 +321,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error creating request: %s", err)
 			}
-			req, err := http.NewRequest("GET", server.URL, nil)
+			req, err := http.NewRequest(http.MethodGet, server.URL, nil)
 			if err != nil {
 				t.Fatalf("error creating request: %s", err)
 			}
@@ -612,7 +612,7 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 			))
 			defer server.Close()
 
-			req, err := http.NewRequest("GET", server.URL, nil)
+			req, err := http.NewRequest(http.MethodGet, server.URL, nil)
 			if err != nil {
 				t.Fatalf("error creating request: %s", err)
 			}
@@ -778,7 +778,7 @@ func TestRoundTripPassesContextToDialer(t *testing.T) {
 		t.Run(u, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 			require.NoError(t, err)
 			spdyTransport, err := NewRoundTripper(&tls.Config{})
 			if err != nil {

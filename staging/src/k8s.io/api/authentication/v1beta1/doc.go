@@ -19,5 +19,6 @@ limitations under the License.
 // +groupName=authentication.k8s.io
 // +k8s:openapi-gen=true
 // +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-package=io.k8s.api.authentication.v1beta1
 
-package v1beta1 // import "k8s.io/api/authentication/v1beta1"
+package v1beta1

@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package route contains code for syncing cloud routing rules with
 // the list of registered nodes.
-package route // import "k8s.io/cloud-provider/controllers/route"
+package route

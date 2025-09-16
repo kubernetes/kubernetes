@@ -22,15 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/utils/ptr"
 )
-
-type topologyPair struct {
-	key   string
-	value string
-}
 
 // topologySpreadConstraint is an internal version for v1.TopologySpreadConstraint
 // and where the selector is parsed.
@@ -146,17 +141,17 @@ func mergeLabelSetWithSelector(matchLabels labels.Set, s labels.Selector) labels
 	return mergedSelector
 }
 
-func countPodsMatchSelector(podInfos []*framework.PodInfo, selector labels.Selector, ns string) int {
+func countPodsMatchSelector(podInfos []fwk.PodInfo, selector labels.Selector, ns string) int {
 	if selector.Empty() {
 		return 0
 	}
 	count := 0
 	for _, p := range podInfos {
 		// Bypass terminating Pod (see #87621).
-		if p.Pod.DeletionTimestamp != nil || p.Pod.Namespace != ns {
+		if p.GetPod().DeletionTimestamp != nil || p.GetPod().Namespace != ns {
 			continue
 		}
-		if selector.Matches(labels.Set(p.Pod.Labels)) {
+		if selector.Matches(labels.Set(p.GetPod().Labels)) {
 			count++
 		}
 	}

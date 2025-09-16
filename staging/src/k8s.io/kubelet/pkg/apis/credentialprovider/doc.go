@@ -17,4 +17,4 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +groupName=credentialprovider.kubelet.k8s.io
 
-package credentialprovider // import "k8s.io/kubelet/pkg/apis/credentialprovider"
+package credentialprovider

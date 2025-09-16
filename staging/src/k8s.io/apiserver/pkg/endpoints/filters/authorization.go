@@ -71,6 +71,7 @@ func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 		authorized, reason, err := a.Authorize(ctx, attributes)
 
 		authorizationFinish := time.Now()
+		request.TrackAuthorizationLatency(ctx, authorizationFinish.Sub(authorizationStart))
 		defer func() {
 			metrics(ctx, authorized, err, authorizationStart, authorizationFinish)
 		}()

@@ -29,10 +29,16 @@ import (
 
 // LimitRangeApplyConfiguration represents a declarative configuration of the LimitRange type for use
 // with apply.
+//
+// LimitRange sets resource usage limits for each kind of resource in a Namespace.
 type LimitRangeApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *LimitRangeSpecApplyConfiguration `json:"spec,omitempty"`
+	// Spec defines the limits enforced.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *LimitRangeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // LimitRange constructs a declarative configuration of the LimitRange type for use with
@@ -46,29 +52,14 @@ func LimitRange(name, namespace string) *LimitRangeApplyConfiguration {
 	return b
 }
 
-// ExtractLimitRange extracts the applied configuration owned by fieldManager from
-// limitRange. If no managedFields are found in limitRange for fieldManager, a
-// LimitRangeApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractLimitRangeFrom extracts the applied configuration owned by fieldManager from
+// limitRange for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // limitRange must be a unmodified LimitRange API object that was retrieved from the Kubernetes API.
-// ExtractLimitRange provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractLimitRangeFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractLimitRange(limitRange *corev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
-	return extractLimitRange(limitRange, fieldManager, "")
-}
-
-// ExtractLimitRangeStatus is the same as ExtractLimitRange except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractLimitRangeStatus(limitRange *corev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
-	return extractLimitRange(limitRange, fieldManager, "status")
-}
-
-func extractLimitRange(limitRange *corev1.LimitRange, fieldManager string, subresource string) (*LimitRangeApplyConfiguration, error) {
+func ExtractLimitRangeFrom(limitRange *corev1.LimitRange, fieldManager string, subresource string) (*LimitRangeApplyConfiguration, error) {
 	b := &LimitRangeApplyConfiguration{}
 	err := managedfields.ExtractInto(limitRange, internal.Parser().Type("io.k8s.api.core.v1.LimitRange"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,6 +72,22 @@ func extractLimitRange(limitRange *corev1.LimitRange, fieldManager string, subre
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractLimitRange extracts the applied configuration owned by fieldManager from
+// limitRange. If no managedFields are found in limitRange for fieldManager, a
+// LimitRangeApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// limitRange must be a unmodified LimitRange API object that was retrieved from the Kubernetes API.
+// ExtractLimitRange provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractLimitRange(limitRange *corev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
+	return ExtractLimitRangeFrom(limitRange, fieldManager, "")
+}
+
+func (b LimitRangeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -248,8 +255,24 @@ func (b *LimitRangeApplyConfiguration) WithSpec(value *LimitRangeSpecApplyConfig
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *LimitRangeApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *LimitRangeApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *LimitRangeApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *LimitRangeApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

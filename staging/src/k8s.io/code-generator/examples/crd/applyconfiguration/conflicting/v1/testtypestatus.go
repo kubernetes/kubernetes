@@ -18,10 +18,15 @@ limitations under the License.
 
 package v1
 
+import (
+	v1alpha2 "k8s.io/code-generator/examples/crd/apis/gateway-api/v1alpha2"
+)
+
 // TestTypeStatusApplyConfiguration represents a declarative configuration of the TestTypeStatus type for use
 // with apply.
 type TestTypeStatusApplyConfiguration struct {
-	Blah *string `json:"blah,omitempty"`
+	Blah                  *string `json:"blah,omitempty"`
+	v1alpha2.PolicyStatus `json:",inline"`
 }
 
 // TestTypeStatusApplyConfiguration constructs a declarative configuration of the TestTypeStatus type for use with
@@ -35,5 +40,15 @@ func TestTypeStatus() *TestTypeStatusApplyConfiguration {
 // If called multiple times, the Blah field is set to the value of the last call.
 func (b *TestTypeStatusApplyConfiguration) WithBlah(value string) *TestTypeStatusApplyConfiguration {
 	b.Blah = &value
+	return b
+}
+
+// WithAncestors adds the given value to the Ancestors field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Ancestors field.
+func (b *TestTypeStatusApplyConfiguration) WithAncestors(values ...v1alpha2.PolicyAncestorStatus) *TestTypeStatusApplyConfiguration {
+	for i := range values {
+		b.PolicyStatus.Ancestors = append(b.PolicyStatus.Ancestors, values[i])
+	}
 	return b
 }

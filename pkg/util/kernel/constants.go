@@ -44,10 +44,6 @@ const TCPFinTimeoutNamespacedKernelVersion = "4.6"
 // (ref: https://github.com/torvalds/linux/commit/35dfb013149f74c2be1ff9c78f14e6a3cd1539d1)
 const IPVSConnReuseModeFixedKernelVersion = "5.9"
 
-// UserNamespacesSupportKernelVersion is the kernel version where idmap for tmpfs support was added
-// (ref: https://github.com/torvalds/linux/commit/05e6295f7b5e05f09e369a3eb2882ec5b40fff20)
-const UserNamespacesSupportKernelVersion = "6.3"
-
 const TmpfsNoswapSupportKernelVersion = "6.4"
 
 // NFTablesKubeProxyKernelVersion is the lowest kernel version kube-proxy supports using

@@ -114,6 +114,15 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		storage[resource+"/status"] = volumeAttachmentStorage.Status
 	}
 
+	// register volumeattributesclasses
+	if resource := "volumeattributesclasses"; apiResourceConfigSource.ResourceEnabled(storageapiv1.SchemeGroupVersion.WithResource(resource)) {
+		volumeAttributesClassStorage, err := volumeattributesclassstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = volumeAttributesClassStorage
+	}
+
 	// register csinodes
 	if resource := "csinodes"; apiResourceConfigSource.ResourceEnabled(storageapiv1.SchemeGroupVersion.WithResource(resource)) {
 		csiNodeStorage, err := csinodestore.NewStorage(restOptionsGetter)

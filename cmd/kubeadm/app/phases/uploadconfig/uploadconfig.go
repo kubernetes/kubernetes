@@ -59,7 +59,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 		return err
 	}
 
-	err = apiclient.CreateOrMutateConfigMap(client, &v1.ConfigMap{
+	err = apiclient.CreateOrMutate(client.CoreV1().ConfigMaps(metav1.NamespaceSystem), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeadmConfigConfigMap,
 			Namespace: metav1.NamespaceSystem,
@@ -78,7 +78,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	}
 
 	// Ensure that the NodesKubeadmConfigClusterRoleName exists
-	err = apiclient.CreateOrUpdateRole(client, &rbac.Role{
+	err = apiclient.CreateOrUpdate(client.RbacV1().Roles(metav1.NamespaceSystem), &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      NodesKubeadmConfigClusterRoleName,
 			Namespace: metav1.NamespaceSystem,
@@ -99,7 +99,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	// Binds the NodesKubeadmConfigClusterRoleName to all the bootstrap tokens
 	// that are members of the system:bootstrappers:kubeadm:default-node-token group
 	// and to all nodes
-	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
+	return apiclient.CreateOrUpdate(client.RbacV1().RoleBindings(metav1.NamespaceSystem), &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      NodesKubeadmConfigClusterRoleName,
 			Namespace: metav1.NamespaceSystem,

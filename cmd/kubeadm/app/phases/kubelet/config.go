@@ -22,8 +22,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
 )
 
@@ -110,7 +109,7 @@ func ApplyPatchesToConfig(cfg *kubeadmapi.ClusterConfiguration, patchesDir strin
 		}
 	}
 
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(kubeletBytes)
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(kubeletBytes)
 	if err != nil {
 		return err
 	}
@@ -151,7 +150,7 @@ func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inte
 		componentconfigs.SignConfigMap(configMap)
 	}
 
-	if err := apiclient.CreateOrUpdateConfigMap(client, configMap); err != nil {
+	if err := apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(configMap.GetNamespace()), configMap); err != nil {
 		return err
 	}
 
@@ -163,7 +162,7 @@ func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inte
 
 // createConfigMapRBACRules creates the RBAC rules for exposing the base kubelet ConfigMap in the kube-system namespace to unauthenticated users
 func createConfigMapRBACRules(client clientset.Interface) error {
-	if err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
+	if err := apiclient.CreateOrUpdate(client.RbacV1().Roles(metav1.NamespaceSystem), &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeletBaseConfigMapRole,
 			Namespace: metav1.NamespaceSystem,
@@ -180,7 +179,7 @@ func createConfigMapRBACRules(client clientset.Interface) error {
 		return err
 	}
 
-	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
+	return apiclient.CreateOrUpdate(client.RbacV1().RoleBindings(metav1.NamespaceSystem), &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeletBaseConfigMapRole,
 			Namespace: metav1.NamespaceSystem,

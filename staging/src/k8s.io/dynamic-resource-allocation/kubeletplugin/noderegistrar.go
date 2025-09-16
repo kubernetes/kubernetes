@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
+	"k8s.io/klog/v2"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
@@ -30,17 +31,15 @@ type nodeRegistrar struct {
 }
 
 // startRegistrar returns a running instance.
-//
-// The context is only used for additional values, cancellation is ignored.
-func startRegistrar(valueCtx context.Context, grpcVerbosity int, interceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, driverName string, supportedServices []string, endpoint string, pluginRegistrationEndpoint endpoint) (*nodeRegistrar, error) {
+func startRegistrar(logger klog.Logger, grpcVerbosity int, interceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, driverName string, supportedServices []string, draEndpointPath string, pluginRegistrationEndpoint endpoint, errHandler func(ctx context.Context, err error)) (*nodeRegistrar, error) {
 	n := &nodeRegistrar{
 		registrationServer: registrationServer{
 			driverName:        driverName,
-			endpoint:          endpoint,
+			draEndpointPath:   draEndpointPath,
 			supportedVersions: supportedServices, // DRA uses this field to describe provided services (e.g. "v1beta1.DRAPlugin").
 		},
 	}
-	s, err := startGRPCServer(valueCtx, grpcVerbosity, interceptors, streamInterceptors, pluginRegistrationEndpoint, func(grpcServer *grpc.Server) {
+	s, err := startGRPCServer(logger, grpcVerbosity, interceptors, streamInterceptors, pluginRegistrationEndpoint, errHandler, func(grpcServer *grpc.Server) {
 		registerapi.RegisterRegistrationServer(grpcServer, n)
 	})
 	if err != nil {

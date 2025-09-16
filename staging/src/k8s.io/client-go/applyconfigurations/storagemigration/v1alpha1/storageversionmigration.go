@@ -29,11 +29,18 @@ import (
 
 // StorageVersionMigrationApplyConfiguration represents a declarative configuration of the StorageVersionMigration type for use
 // with apply.
+//
+// StorageVersionMigration represents a migration of stored data to the latest
+// storage version.
 type StorageVersionMigrationApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *StorageVersionMigrationSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *StorageVersionMigrationStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the migration.
+	Spec *StorageVersionMigrationSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status of the migration.
+	Status *StorageVersionMigrationStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // StorageVersionMigration constructs a declarative configuration of the StorageVersionMigration type for use with
@@ -46,29 +53,14 @@ func StorageVersionMigration(name string) *StorageVersionMigrationApplyConfigura
 	return b
 }
 
-// ExtractStorageVersionMigration extracts the applied configuration owned by fieldManager from
-// storageVersionMigration. If no managedFields are found in storageVersionMigration for fieldManager, a
-// StorageVersionMigrationApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractStorageVersionMigrationFrom extracts the applied configuration owned by fieldManager from
+// storageVersionMigration for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // storageVersionMigration must be a unmodified StorageVersionMigration API object that was retrieved from the Kubernetes API.
-// ExtractStorageVersionMigration provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractStorageVersionMigrationFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractStorageVersionMigration(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string) (*StorageVersionMigrationApplyConfiguration, error) {
-	return extractStorageVersionMigration(storageVersionMigration, fieldManager, "")
-}
-
-// ExtractStorageVersionMigrationStatus is the same as ExtractStorageVersionMigration except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractStorageVersionMigrationStatus(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string) (*StorageVersionMigrationApplyConfiguration, error) {
-	return extractStorageVersionMigration(storageVersionMigration, fieldManager, "status")
-}
-
-func extractStorageVersionMigration(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string, subresource string) (*StorageVersionMigrationApplyConfiguration, error) {
+func ExtractStorageVersionMigrationFrom(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string, subresource string) (*StorageVersionMigrationApplyConfiguration, error) {
 	b := &StorageVersionMigrationApplyConfiguration{}
 	err := managedfields.ExtractInto(storageVersionMigration, internal.Parser().Type("io.k8s.api.storagemigration.v1alpha1.StorageVersionMigration"), fieldManager, b, subresource)
 	if err != nil {
@@ -80,6 +72,28 @@ func extractStorageVersionMigration(storageVersionMigration *storagemigrationv1a
 	b.WithAPIVersion("storagemigration.k8s.io/v1alpha1")
 	return b, nil
 }
+
+// ExtractStorageVersionMigration extracts the applied configuration owned by fieldManager from
+// storageVersionMigration. If no managedFields are found in storageVersionMigration for fieldManager, a
+// StorageVersionMigrationApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// storageVersionMigration must be a unmodified StorageVersionMigration API object that was retrieved from the Kubernetes API.
+// ExtractStorageVersionMigration provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractStorageVersionMigration(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string) (*StorageVersionMigrationApplyConfiguration, error) {
+	return ExtractStorageVersionMigrationFrom(storageVersionMigration, fieldManager, "")
+}
+
+// ExtractStorageVersionMigrationStatus extracts the applied configuration owned by fieldManager from
+// storageVersionMigration for the status subresource.
+func ExtractStorageVersionMigrationStatus(storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, fieldManager string) (*StorageVersionMigrationApplyConfiguration, error) {
+	return ExtractStorageVersionMigrationFrom(storageVersionMigration, fieldManager, "status")
+}
+
+func (b StorageVersionMigrationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -255,8 +269,24 @@ func (b *StorageVersionMigrationApplyConfiguration) WithStatus(value *StorageVer
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *StorageVersionMigrationApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *StorageVersionMigrationApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *StorageVersionMigrationApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *StorageVersionMigrationApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

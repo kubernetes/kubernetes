@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-var supportedQoSComputeResources = sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
+var supportedQoSComputeResources = sets.New[string](string(core.ResourceCPU), string(core.ResourceMemory))
 
 func isSupportedQoSComputeResource(name core.ResourceName) bool {
 	return supportedQoSComputeResources.Has(string(name))

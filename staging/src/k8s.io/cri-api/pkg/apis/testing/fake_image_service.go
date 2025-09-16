@@ -114,7 +114,7 @@ func NewFakeImageService() *FakeImageService {
 func (r *FakeImageService) makeFakeImage(image *runtimeapi.ImageSpec) *runtimeapi.Image {
 	return &runtimeapi.Image{
 		Id:       image.Image,
-		Size_:    r.FakeImageSize,
+		Size:     r.FakeImageSize,
 		Spec:     image,
 		RepoTags: []string{image.Image},
 		Pinned:   r.Pinned[image.Image],
@@ -253,4 +253,17 @@ func (r *FakeImageService) AssertImagePulledWithAuth(t *testing.T, image *runtim
 type pulledImage struct {
 	imageSpec  *runtimeapi.ImageSpec
 	authConfig *runtimeapi.AuthConfig
+}
+
+// Close will shutdown the internal gRPC client connection.
+func (r *FakeImageService) Close() error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "Close")
+	if err := r.popError("Close"); err != nil {
+		return err
+	}
+
+	return nil
 }

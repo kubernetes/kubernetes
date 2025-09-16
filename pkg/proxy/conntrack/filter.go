@@ -96,6 +96,6 @@ func (f *conntrackFilter) MatchConntrackFlow(flow *netlink.ConntrackFlow) bool {
 	}
 
 	// appending a new line to the flow makes klog print multiline log which is easier to debug and understand.
-	klog.V(4).InfoS("Deleting conntrack entry", "flow", flow.String()+"\n")
+	klog.V(5).InfoS("Deleting conntrack entry", "flow", flow.String()+"\n")
 	return true
 }

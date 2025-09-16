@@ -17,4 +17,4 @@ limitations under the License.
 // Package namespace defines the utilities that are used by the webhook
 // plugin to decide if a webhook should be applied to an object based on its
 // namespace.
-package namespace // import "k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
+package namespace

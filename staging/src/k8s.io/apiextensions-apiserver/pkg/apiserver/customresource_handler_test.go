@@ -58,6 +58,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/storage/cacher"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/tools/cache"
@@ -484,6 +485,10 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		t.Fatal(err)
 	}
 
+	if enableWatchCache {
+		storageConfig.EventsHistoryWindow = cacher.DefaultEventFreshDuration
+	}
+
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 	restOptionsGetter := generic.RESTOptions{
@@ -673,7 +678,6 @@ unknown: foo`
 	"apiVersion": "stable.example.com/v1beta1",
 	"kind": "MultiVersion",
 	"metadata": {
-		"creationTimestamp": null,
 		"generation": 1,
 		"name": "my-mv"
 	},
@@ -690,7 +694,6 @@ unknown: foo`
 	"apiVersion": "stable.example.com/v1beta1",
 	"kind": "MultiVersion",
 	"metadata": {
-		"creationTimestamp": null,
 		"generation": 1,
 		"name": "my-mv"
 	},

@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	goruntime "runtime"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -46,6 +48,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
+	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
@@ -56,6 +59,9 @@ import (
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
+	"k8s.io/component-base/zpages/statusz"
 	"k8s.io/klog/v2"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
@@ -68,6 +74,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
 
+const (
+	kubeScheduler = "kube-scheduler"
+)
+
 func init() {
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
@@ -78,10 +88,6 @@ type Option func(runtime.Registry) error
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
-	// explicitly register (if not already registered) the kube effective version and feature gate in DefaultComponentGlobalsRegistry,
-	// which will be used in NewOptions.
-	_, _ = featuregate.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
-		featuregate.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 	opts := options.NewOptions()
 
 	cmd := &cobra.Command{
@@ -132,7 +138,7 @@ for more information about scheduling and the kube-scheduler component.`,
 // runCommand runs the scheduler.
 func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Option) error {
 	verflag.PrintAndExitIfRequested()
-	fg := opts.ComponentGlobalsRegistry.FeatureGateFor(featuregate.DefaultKubeComponent)
+	fg := opts.ComponentGlobalsRegistry.FeatureGateFor(basecompatibility.DefaultKubeComponent)
 	// Activate logging as soon as possible, after that
 	// show flags with the final logging configuration.
 	if err := logsapi.ValidateAndApply(opts.Logs, fg); err != nil {
@@ -155,6 +161,9 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 	}
 	// add feature enablement metrics
 	fg.(featuregate.MutableFeatureGate).AddMetrics()
+	// add component version metrics
+	opts.ComponentGlobalsRegistry.AddMetrics()
+
 	return Run(ctx, cc, sched)
 }
 
@@ -205,16 +214,16 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 			return nil
 		default:
 		}
-		return fmt.Errorf("waiting for handlers to sync")
+		return fmt.Errorf("handlers are not fully synchronized")
 	})
 	readyzChecks = append(readyzChecks, handlerSyncCheck)
 
 	if cc.LeaderElection != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
-		binaryVersion, err := semver.ParseTolerant(featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent).BinaryVersion().String())
+		binaryVersion, err := semver.ParseTolerant(cc.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).BinaryVersion().String())
 		if err != nil {
 			return err
 		}
-		emulationVersion, err := semver.ParseTolerant(featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent).EmulationVersion().String())
+		emulationVersion, err := semver.ParseTolerant(cc.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).EmulationVersion().String())
 		if err != nil {
 			return err
 		}
@@ -224,7 +233,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 			cc.Client,
 			metav1.NamespaceSystem,
 			cc.LeaderElection.Lock.Identity(),
-			"kube-scheduler",
+			kubeScheduler,
 			binaryVersion.FinalizeVersion(),
 			emulationVersion.FinalizeVersion(),
 			coordinationv1.OldestEmulationVersion,
@@ -236,13 +245,24 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		go leaseCandidate.Run(ctx)
 	}
 
-	// Start up the healthz server.
+	// Start up the server for endpoints.
+	gracefulShutdownSecureServer := func() {}
 	if cc.SecureServing != nil {
-		handler := buildHandlerChain(newHealthEndpointsAndMetricsHandler(&cc.ComponentConfig, cc.InformerFactory, isLeader, checks, readyzChecks), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
-		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
-		if _, _, err := cc.SecureServing.Serve(handler, 0, ctx.Done()); err != nil {
+		handler := buildHandlerChain(newEndpointsHandler(&cc.ComponentConfig, cc.InformerFactory, isLeader, checks, readyzChecks, cc.Flagz), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
+		internalStopCh := make(chan struct{})
+		shutdownTimeout := 5 * time.Second
+		stoppedCh, listenerStoppedCh, err := cc.SecureServing.Serve(handler, shutdownTimeout, internalStopCh)
+		if err != nil {
 			// fail early for secure handlers, removing the old error loop from above
+			close(internalStopCh)
 			return fmt.Errorf("failed to start secure server: %v", err)
+		}
+		gracefulShutdownSecureServer = func() {
+			close(internalStopCh)
+			<-listenerStoppedCh
+			logger.Info("[graceful-termination] secure server has stopped listening")
+			<-stoppedCh
+			logger.Info("[graceful-termination] secure server is exiting")
 		}
 	}
 
@@ -263,7 +283,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 
 		// Wait for all handlers to sync (all items in the initial list delivered) before scheduling.
 		if err := sched.WaitForHandlersSync(ctx); err != nil {
-			logger.Error(err, "waiting for handlers to sync")
+			logger.Error(err, "handlers are not fully synchronized")
 		}
 
 		close(handlerSyncReadyCh)
@@ -288,6 +308,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 				sched.Run(ctx)
 			},
 			OnStoppedLeading: func() {
+				gracefulShutdownSecureServer()
 				select {
 				case <-ctx.Done():
 					// We were asked to terminate. Exit 0.
@@ -313,6 +334,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	// Leader election is disabled, so runCommand inline until done.
 	close(waitingForLeader)
 	sched.Run(ctx)
+	gracefulShutdownSecureServer()
 	return fmt.Errorf("finished without leader elect")
 }
 
@@ -344,11 +366,11 @@ func installMetricHandler(pathRecorderMux *mux.PathRecorderMux, informers inform
 	})
 }
 
-// newHealthEndpointsAndMetricsHandler creates an API health server from the config, and will also
-// embed the metrics handler.
+// newEndpointsHandler creates an API health server from the config, and will also
+// embed the metrics handler and z-pages handler.
 // TODO: healthz check is deprecated, please use livez and readyz instead. Will be removed in the future.
-func newHealthEndpointsAndMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, informers informers.SharedInformerFactory, isLeader func() bool, healthzChecks, readyzChecks []healthz.HealthChecker) http.Handler {
-	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
+func newEndpointsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, informers informers.SharedInformerFactory, isLeader func() bool, healthzChecks, readyzChecks []healthz.HealthChecker, flagReader flagz.Reader) http.Handler {
+	pathRecorderMux := mux.NewPathRecorderMux(kubeScheduler)
 	healthz.InstallHandler(pathRecorderMux, healthzChecks...)
 	healthz.InstallLivezHandler(pathRecorderMux)
 	healthz.InstallReadyzHandler(pathRecorderMux, readyzChecks...)
@@ -362,6 +384,17 @@ func newHealthEndpointsAndMetricsHandler(config *kubeschedulerconfig.KubeSchedul
 		}
 		routes.DebugFlags{}.Install(pathRecorderMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		if flagReader != nil {
+			flagz.Install(pathRecorderMux, kubeScheduler, flagReader)
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
+		statusz.Install(pathRecorderMux, kubeScheduler, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), statusz.WithListedPaths(pathRecorderMux.ListedPaths())))
+	}
+
 	return pathRecorderMux
 }
 

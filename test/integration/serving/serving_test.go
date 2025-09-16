@@ -22,22 +22,29 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path"
 	"strings"
 	"testing"
 
+	"reflect"
+
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudctrlmgrtesting "k8s.io/cloud-provider/app/testing"
 	"k8s.io/cloud-provider/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 type componentTester interface {
@@ -187,30 +194,30 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 		{"/healthz without authn/authz", []string{
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/healthz", true, false, intPtr(http.StatusOK)},
+		}, "/healthz", true, false, ptr.To(http.StatusOK)},
 		{"/metrics without authn/authz", []string{
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/metrics", true, false, intPtr(http.StatusForbidden)},
+		}, "/metrics", true, false, ptr.To(http.StatusForbidden)},
 		{"authorization skipped for /healthz with authn/authz", []string{
 			"--authentication-kubeconfig", kubeconfig,
 			"--authorization-kubeconfig", kubeconfig,
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/healthz", false, false, intPtr(http.StatusOK)},
+		}, "/healthz", false, false, ptr.To(http.StatusOK)},
 		{"authorization skipped for /healthz with BROKEN authn/authz", []string{
 			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
 			"--authentication-kubeconfig", brokenKubeconfig,
 			"--authorization-kubeconfig", brokenKubeconfig,
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/healthz", false, false, intPtr(http.StatusOK)},
+		}, "/healthz", false, false, ptr.To(http.StatusOK)},
 		{"not authorized /metrics with BROKEN authn/authz", []string{
 			"--authentication-kubeconfig", kubeconfig,
 			"--authorization-kubeconfig", brokenKubeconfig,
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/metrics", false, false, intPtr(http.StatusInternalServerError)},
+		}, "/metrics", false, false, ptr.To(http.StatusInternalServerError)},
 		{"always-allowed /metrics with BROKEN authn/authz", []string{
 			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
 			"--authentication-kubeconfig", brokenKubeconfig,
@@ -218,7 +225,7 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 			"--authorization-always-allow-paths", "/healthz,/metrics",
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/metrics", false, false, intPtr(http.StatusOK)},
+		}, "/metrics", false, false, ptr.To(http.StatusOK)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -280,12 +287,193 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 	}
 }
 
-func intPtr(x int) *int {
-	return &x
-}
-
 func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
 	return &fake.Cloud{
 		DisableRoutes: true, // disable routes for server tests, otherwise --cluster-cidr is required
 	}, nil
+}
+
+func TestKubeControllerManagerServingStatusz(t *testing.T) {
+
+	// authenticate to apiserver via bearer token
+	token := "flwqkenfjasasdfmwerasd" // Fake token for testing.
+	tokenFile, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tokenFile.WriteString(fmt.Sprintf(`
+%s,system:kube-controller-manager,system:kube-controller-manager,""
+`, token)); err != nil {
+		t.Fatal(err)
+	}
+	if err = tokenFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// start apiserver
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--token-auth-file", tokenFile.Name(),
+		"--authorization-mode", "RBAC",
+	}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	// create kubeconfig for the apiserver
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = apiserverConfig.WriteString(fmt.Sprintf(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+    certificate-authority: %s
+  name: integration
+contexts:
+- context:
+    cluster: integration
+    user: controller-manager
+  name: default-context
+current-context: default-context
+users:
+- name: controller-manager
+  user:
+    token: %s
+`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile, token)); err != nil {
+		t.Fatal(err)
+	}
+	if err = apiserverConfig.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name           string
+		flags          []string
+		path           string
+		anonymous      bool // to use the token or not
+		wantErr        bool
+		wantSecureCode *int
+		wantPaths      []string
+	}{
+		{
+			name: "serving /statusz",
+			flags: []string{
+				"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
+				"--authentication-kubeconfig", apiserverConfig.Name(),
+				"--authorization-kubeconfig", apiserverConfig.Name(),
+				"--authorization-always-allow-paths", "/statusz",
+				"--kubeconfig", apiserverConfig.Name(),
+				"--leader-elect=false",
+			},
+			path:           "/statusz",
+			anonymous:      false,
+			wantErr:        false,
+			wantSecureCode: ptr.To(http.StatusOK),
+			wantPaths:      []string{"/configz", "/healthz", "/metrics"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+			_, ctx := ktesting.NewTestContext(t)
+			secureOptions, secureInfo, tearDownFn, err := kubeControllerManagerTester{}.StartTestServer(ctx, append(append([]string{}, tt.flags...), []string{}...))
+			if tearDownFn != nil {
+				defer tearDownFn()
+			}
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("StartTestServer() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil {
+				return
+			}
+
+			if want, got := tt.wantSecureCode != nil, secureInfo != nil; want != got {
+				t.Errorf("SecureServing enabled: expected=%v got=%v", want, got)
+			} else if want {
+				// only interested on the port, because we are using always localhost
+				_, port, err := net.SplitHostPort(secureInfo.Listener.Addr().String())
+				if err != nil {
+					t.Fatalf("could not get host and port from %s : %v", secureInfo.Listener.Addr().String(), err)
+				}
+				// use IPv4 because the self-signed cert does not support [::]
+				url := fmt.Sprintf("https://127.0.0.1:%s%s", port, tt.path)
+
+				// read self-signed server cert disk
+				pool := x509.NewCertPool()
+				serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
+				serverCert, err := os.ReadFile(serverCertPath)
+				if err != nil {
+					t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
+				}
+				pool.AppendCertsFromPEM(serverCert)
+				tr := &http.Transport{
+					TLSClientConfig: &tls.Config{
+						RootCAs: pool,
+					},
+				}
+
+				client := &http.Client{Transport: tr}
+				req, err := http.NewRequest(http.MethodGet, url, nil)
+				req.Header.Set("Accept", "text/plain")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !tt.anonymous {
+					req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+				}
+				r, err := client.Do(req)
+				if err != nil {
+					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
+				}
+
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Fatalf("failed to read response body: %v", err)
+				}
+				defer func() {
+					if err := r.Body.Close(); err != nil {
+						t.Fatalf("Error closing response body: %v", err)
+					}
+				}()
+
+				if got, expected := r.StatusCode, *tt.wantSecureCode; got != expected {
+					t.Fatalf("expected http %d at %s of component, got: %d", expected, tt.path, got)
+				}
+
+				bodyStr := string(body)
+
+				if !strings.Contains(bodyStr, "Paths") {
+					t.Error("response does not contain Paths section")
+				}
+
+				var foundPathsRaw []string
+				for _, line := range strings.Split(bodyStr, "\n") {
+					if strings.HasPrefix(line, "Paths") {
+						parts := strings.Fields(line)
+						if len(parts) > 1 {
+							foundPathsRaw = parts[1:] // Skip "Paths" label
+						}
+						break
+					}
+				}
+
+				expectedPaths := tt.wantPaths
+
+				foundPathsSet := make(map[string]struct{})
+				for _, p := range foundPathsRaw {
+					foundPathsSet[p] = struct{}{}
+				}
+
+				expectedPathsSet := make(map[string]struct{})
+				for _, p := range expectedPaths {
+					expectedPathsSet[p] = struct{}{}
+				}
+
+				if !reflect.DeepEqual(foundPathsSet, expectedPathsSet) {
+					t.Errorf("path mismatch:\n- want: %v\n- got:  %v", expectedPaths, foundPathsRaw)
+				}
+			}
+		})
+	}
 }

@@ -47,9 +47,9 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	basecompatibility "k8s.io/component-base/compatibility"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/tracing"
-	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )
@@ -124,7 +124,7 @@ func TestNewWithDelegate(t *testing.T) {
 	delegateConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	delegateConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	delegateConfig.LoopbackClientConfig = &rest.Config{}
-	delegateConfig.EffectiveVersion = utilversion.NewEffectiveVersion("")
+	delegateConfig.EffectiveVersion = basecompatibility.NewEffectiveVersionFromString("", "", "")
 	clientset := fake.NewSimpleClientset()
 	if clientset == nil {
 		t.Fatal("unable to create fake client set")
@@ -157,7 +157,7 @@ func TestNewWithDelegate(t *testing.T) {
 	wrappingConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}
-	wrappingConfig.EffectiveVersion = utilversion.NewEffectiveVersion("")
+	wrappingConfig.EffectiveVersion = basecompatibility.NewEffectiveVersionFromString("", "", "")
 
 	wrappingConfig.HealthzChecks = append(wrappingConfig.HealthzChecks, healthz.NamedCheck("wrapping-health", func(r *http.Request) error {
 		return fmt.Errorf("wrapping failed healthcheck")
@@ -351,8 +351,8 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		}
 
 		// confirm that we have an audit event
-		ae := audit.AuditEventFrom(r.Context())
-		if ae == nil {
+		ac := audit.AuditContextFrom(r.Context())
+		if ac == nil {
 			t.Error("unexpected nil audit event")
 		}
 
@@ -376,11 +376,15 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 	}
 	// these should all be the same because the handler chain mutates the event in place
 	want := map[string]string{"pandas": "are awesome", "dogs": "are okay"}
+	foundResponseComplete := false
 	for _, event := range backend.events {
+		if event.Stage == auditinternal.StageRequestReceived {
+			continue
+		}
 		if event.Stage != auditinternal.StageResponseComplete {
 			t.Errorf("expected event stage to be complete, got: %s", event.Stage)
 		}
-
+		foundResponseComplete = true
 		for wantK, wantV := range want {
 			gotV, ok := event.Annotations[wantK]
 			if !ok {
@@ -391,6 +395,9 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 				t.Errorf("expected the annotation value to match, key: %q, want: %q got: %q", wantK, wantV, gotV)
 			}
 		}
+	}
+	if !foundResponseComplete {
+		t.Errorf("expected to find %s in events", auditinternal.StageResponseComplete)
 	}
 }
 
@@ -434,7 +441,7 @@ func TestNewFeatureGatedSerializer(t *testing.T) {
 		}
 	})))
 	config.ExternalAddress = "192.168.10.4:443"
-	config.EffectiveVersion = utilversion.NewEffectiveVersion("")
+	config.EffectiveVersion = basecompatibility.NewEffectiveVersionFromString("", "", "")
 	config.LoopbackClientConfig = &rest.Config{}
 
 	if _, err := config.Complete(nil).New("test", NewEmptyDelegate()); err != nil {

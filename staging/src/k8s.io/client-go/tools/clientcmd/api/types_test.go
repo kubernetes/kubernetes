@@ -35,7 +35,6 @@ func Example_emptyConfig() {
 	// clusters: {}
 	// contexts: {}
 	// current-context: ""
-	// preferences: {}
 	// users: {}
 }
 

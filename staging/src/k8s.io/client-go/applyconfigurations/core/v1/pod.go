@@ -29,11 +29,23 @@ import (
 
 // PodApplyConfiguration represents a declarative configuration of the Pod type for use
 // with apply.
+//
+// Pod is a collection of containers that can run on a host. This resource is created
+// by clients and scheduled onto hosts.
 type PodApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *PodSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *PodStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the pod.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *PodSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the pod.
+	// This data may not be up to date.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *PodStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Pod constructs a declarative configuration of the Pod type for use with
@@ -47,29 +59,14 @@ func Pod(name, namespace string) *PodApplyConfiguration {
 	return b
 }
 
-// ExtractPod extracts the applied configuration owned by fieldManager from
-// pod. If no managedFields are found in pod for fieldManager, a
-// PodApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractPodFrom extracts the applied configuration owned by fieldManager from
+// pod for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // pod must be a unmodified Pod API object that was retrieved from the Kubernetes API.
-// ExtractPod provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractPodFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractPod(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
-	return extractPod(pod, fieldManager, "")
-}
-
-// ExtractPodStatus is the same as ExtractPod except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractPodStatus(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
-	return extractPod(pod, fieldManager, "status")
-}
-
-func extractPod(pod *corev1.Pod, fieldManager string, subresource string) (*PodApplyConfiguration, error) {
+func ExtractPodFrom(pod *corev1.Pod, fieldManager string, subresource string) (*PodApplyConfiguration, error) {
 	b := &PodApplyConfiguration{}
 	err := managedfields.ExtractInto(pod, internal.Parser().Type("io.k8s.api.core.v1.Pod"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +79,40 @@ func extractPod(pod *corev1.Pod, fieldManager string, subresource string) (*PodA
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractPod extracts the applied configuration owned by fieldManager from
+// pod. If no managedFields are found in pod for fieldManager, a
+// PodApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// pod must be a unmodified Pod API object that was retrieved from the Kubernetes API.
+// ExtractPod provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractPod(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return ExtractPodFrom(pod, fieldManager, "")
+}
+
+// ExtractPodEphemeralcontainers extracts the applied configuration owned by fieldManager from
+// pod for the ephemeralcontainers subresource.
+func ExtractPodEphemeralcontainers(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return ExtractPodFrom(pod, fieldManager, "ephemeralcontainers")
+}
+
+// ExtractPodResize extracts the applied configuration owned by fieldManager from
+// pod for the resize subresource.
+func ExtractPodResize(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return ExtractPodFrom(pod, fieldManager, "resize")
+}
+
+// ExtractPodStatus extracts the applied configuration owned by fieldManager from
+// pod for the status subresource.
+func ExtractPodStatus(pod *corev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	return ExtractPodFrom(pod, fieldManager, "status")
+}
+
+func (b PodApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -257,8 +288,24 @@ func (b *PodApplyConfiguration) WithStatus(value *PodStatusApplyConfiguration) *
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *PodApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *PodApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *PodApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *PodApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

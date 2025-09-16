@@ -26,16 +26,17 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // FitPredicate is a function type which is used in fake extender.
-type FitPredicate func(pod *v1.Pod, node *framework.NodeInfo) *framework.Status
+type FitPredicate func(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status
 
 // PriorityFunc is a function type which is used in fake extender.
-type PriorityFunc func(pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.NodeScoreList, error)
+type PriorityFunc func(pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.NodeScoreList, error)
 
 // PriorityConfig is used in fake extender to perform Prioritize function.
 type PriorityConfig struct {
@@ -44,67 +45,67 @@ type PriorityConfig struct {
 }
 
 // ErrorPredicateExtender implements FitPredicate function to always return error status.
-func ErrorPredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Error, "some error")
+func ErrorPredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
+	return fwk.NewStatus(fwk.Error, "some error")
 }
 
 // FalsePredicateExtender implements FitPredicate function to always return unschedulable status.
-func FalsePredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("pod is unschedulable on the node %q", node.Node().Name))
+func FalsePredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
+	return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("pod is unschedulable on the node %q", node.Node().Name))
 }
 
 // TruePredicateExtender implements FitPredicate function to always return success status.
-func TruePredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Success)
+func TruePredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
+	return fwk.NewStatus(fwk.Success)
 }
 
 // Node1PredicateExtender implements FitPredicate function to return true
 // when the given node's name is "node1"; otherwise return false.
-func Node1PredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
+func Node1PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 	if node.Node().Name == "node1" {
-		return framework.NewStatus(framework.Success)
+		return fwk.NewStatus(fwk.Success)
 	}
-	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
+	return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 }
 
 // Node2PredicateExtender implements FitPredicate function to return true
 // when the given node's name is "node2"; otherwise return false.
-func Node2PredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
+func Node2PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 	if node.Node().Name == "node2" {
-		return framework.NewStatus(framework.Success)
+		return fwk.NewStatus(fwk.Success)
 	}
-	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
+	return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 }
 
 // ErrorPrioritizerExtender implements PriorityFunc function to always return error.
-func ErrorPrioritizerExtender(pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.NodeScoreList, error) {
-	return &framework.NodeScoreList{}, fmt.Errorf("some error")
+func ErrorPrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.NodeScoreList, error) {
+	return &fwk.NodeScoreList{}, fmt.Errorf("some error")
 }
 
 // Node1PrioritizerExtender implements PriorityFunc function to give score 10
 // if the given node's name is "node1"; otherwise score 1.
-func Node1PrioritizerExtender(pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.NodeScoreList, error) {
-	result := framework.NodeScoreList{}
+func Node1PrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.NodeScoreList, error) {
+	result := fwk.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
 		if node.Node().Name == "node1" {
 			score = 10
 		}
-		result = append(result, framework.NodeScore{Name: node.Node().Name, Score: int64(score)})
+		result = append(result, fwk.NodeScore{Name: node.Node().Name, Score: int64(score)})
 	}
 	return &result, nil
 }
 
 // Node2PrioritizerExtender implements PriorityFunc function to give score 10
 // if the given node's name is "node2"; otherwise score 1.
-func Node2PrioritizerExtender(pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.NodeScoreList, error) {
-	result := framework.NodeScoreList{}
+func Node2PrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.NodeScoreList, error) {
+	result := fwk.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
 		if node.Node().Name == "node2" {
 			score = 10
 		}
-		result = append(result, framework.NodeScore{Name: node.Node().Name, Score: int64(score)})
+		result = append(result, fwk.NodeScore{Name: node.Node().Name, Score: int64(score)})
 	}
 	return &result, nil
 }
@@ -113,7 +114,7 @@ type node2PrioritizerPlugin struct{}
 
 // NewNode2PrioritizerPlugin returns a factory function to build node2PrioritizerPlugin.
 func NewNode2PrioritizerPlugin() frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &node2PrioritizerPlugin{}, nil
 	}
 }
@@ -124,16 +125,16 @@ func (pl *node2PrioritizerPlugin) Name() string {
 }
 
 // Score return score 100 if the given nodeName is "node2"; otherwise return score 10.
-func (pl *node2PrioritizerPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (pl *node2PrioritizerPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	score := 10
-	if nodeName == "node2" {
+	if nodeInfo.Node().Name == "node2" {
 		score = 100
 	}
 	return int64(score), nil
 }
 
 // ScoreExtensions returns nil.
-func (pl *node2PrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
+func (pl *node2PrioritizerPlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
@@ -146,7 +147,7 @@ type FakeExtender struct {
 	Prioritizers     []PriorityConfig
 	Weight           int64
 	NodeCacheCapable bool
-	FilteredNodes    []*framework.NodeInfo
+	FilteredNodes    []fwk.NodeInfo
 	UnInterested     bool
 	Ignorable        bool
 	Binder           func() error
@@ -181,7 +182,7 @@ func (f *FakeExtender) SupportsPreemption() bool {
 func (f *FakeExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeNameToVictims map[string]*extenderv1.Victims,
-	nodeInfos framework.NodeInfoLister,
+	nodeInfos fwk.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
 	nodeNameToVictimsCopy := map[string]*extenderv1.Victims{}
 	// We don't want to change the original nodeNameToVictims
@@ -221,7 +222,7 @@ func (f *FakeExtender) ProcessPreemption(
 // 1. More victim pods (if any) amended by preemption phase of extender.
 // 2. Number of violating victim (used to calculate PDB).
 // 3. Fits or not after preemption phase on extender's side.
-func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1.Pod, node *framework.NodeInfo) ([]*v1.Pod, int, bool, error) {
+func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1.Pod, node fwk.NodeInfo) ([]*v1.Pod, int, bool, error) {
 	// If a extender support preemption but have no cached node info, let's run filter to make sure
 	// default scheduler's decision still stand with given pod and node.
 	if !f.NodeCacheCapable {
@@ -237,7 +238,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 
 	// Otherwise, as a extender support preemption and have cached node info, we will assume cachedNodeNameToInfo is available
 	// and get cached node info by given node name.
-	nodeInfoCopy := f.CachedNodeNameToInfo[node.Node().Name].Snapshot()
+	nodeInfoCopy := f.CachedNodeNameToInfo[node.Node().Name].SnapshotConcrete()
 
 	var potentialVictims []*v1.Pod
 
@@ -250,10 +251,10 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 	// As the first step, remove all the lower priority pods from the node and
 	// check if the given pod can be scheduled.
 	podPriority := corev1helpers.PodPriority(pod)
-	for _, p := range nodeInfoCopy.Pods {
-		if corev1helpers.PodPriority(p.Pod) < podPriority {
-			potentialVictims = append(potentialVictims, p.Pod)
-			if err := removePod(p.Pod); err != nil {
+	for _, p := range nodeInfoCopy.GetPods() {
+		if corev1helpers.PodPriority(p.GetPod()) < podPriority {
+			potentialVictims = append(potentialVictims, p.GetPod())
+			if err := removePod(p.GetPod()); err != nil {
 				return nil, 0, false, err
 			}
 		}
@@ -301,28 +302,28 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 
 // runPredicate run predicates of extender one by one for given pod and node.
 // Returns: fits or not.
-func (f *FakeExtender) runPredicate(pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
+func (f *FakeExtender) runPredicate(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 	for _, predicate := range f.Predicates {
 		status := predicate(pod, node)
 		if !status.IsSuccess() {
 			return status
 		}
 	}
-	return framework.NewStatus(framework.Success)
+	return fwk.NewStatus(fwk.Success)
 }
 
 // Filter implements the extender Filter function.
-func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*framework.NodeInfo) ([]*framework.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
-	var filtered []*framework.NodeInfo
+func (f *FakeExtender) Filter(pod *v1.Pod, nodes []fwk.NodeInfo) ([]fwk.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
+	var filtered []fwk.NodeInfo
 	failedNodesMap := extenderv1.FailedNodesMap{}
 	failedAndUnresolvableMap := extenderv1.FailedNodesMap{}
 	for _, node := range nodes {
 		status := f.runPredicate(pod, node)
 		if status.IsSuccess() {
 			filtered = append(filtered, node)
-		} else if status.Code() == framework.Unschedulable {
+		} else if status.Code() == fwk.Unschedulable {
 			failedNodesMap[node.Node().Name] = fmt.Sprintf("FakeExtender: node %q failed", node.Node().Name)
-		} else if status.Code() == framework.UnschedulableAndUnresolvable {
+		} else if status.Code() == fwk.UnschedulableAndUnresolvable {
 			failedAndUnresolvableMap[node.Node().Name] = fmt.Sprintf("FakeExtender: node %q failed and unresolvable", node.Node().Name)
 		} else {
 			return nil, nil, nil, status.AsError()
@@ -337,7 +338,7 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*framework.NodeInfo) ([]*fram
 }
 
 // Prioritize implements the extender Prioritize function.
-func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []*framework.NodeInfo) (*extenderv1.HostPriorityList, int64, error) {
+func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []fwk.NodeInfo) (*extenderv1.HostPriorityList, int64, error) {
 	result := extenderv1.HostPriorityList{}
 	combinedScores := map[string]int64{}
 	for _, prioritizer := range f.Prioritizers {
@@ -399,4 +400,4 @@ func (f *FakeExtender) IsInterested(pod *v1.Pod) bool {
 	return !f.UnInterested
 }
 
-var _ framework.Extender = &FakeExtender{}
+var _ fwk.Extender = &FakeExtender{}

@@ -64,9 +64,9 @@ func TestForbidden(t *testing.T) {
 		contentType string
 	}{
 		{`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"forbidden: User \"NAME\" cannot GET path \"/whatever\"","reason":"Forbidden","details":{},"code":403}
-`, authorizer.AttributesRecord{User: u, Verb: "GET", Path: "/whatever"}, "", "application/json"},
+`, authorizer.AttributesRecord{User: u, Verb: request.MethodGet, Path: "/whatever"}, "", "application/json"},
 		{`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"forbidden: User \"NAME\" cannot GET path \"/\u0026lt;script\u0026gt;\"","reason":"Forbidden","details":{},"code":403}
-`, authorizer.AttributesRecord{User: u, Verb: "GET", Path: "/<script>"}, "", "application/json"},
+`, authorizer.AttributesRecord{User: u, Verb: request.MethodGet, Path: "/<script>"}, "", "application/json"},
 		{`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"pod is forbidden: User \"NAME\" cannot get resource \"pod\" in API group \"\" at the cluster scope","reason":"Forbidden","details":{"kind":"pod"},"code":403}
 `, authorizer.AttributesRecord{User: u, Verb: "get", Resource: "pod", ResourceRequest: true}, "", "application/json"},
 		{`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"pod \"mypod\" is forbidden: User \"NAME\" cannot get resource \"pod\" in API group \"\" at the cluster scope","reason":"Forbidden","details":{"name":"mypod","kind":"pod"},"code":403}

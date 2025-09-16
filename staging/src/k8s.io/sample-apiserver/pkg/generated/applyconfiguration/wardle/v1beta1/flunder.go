@@ -27,6 +27,8 @@ import (
 
 // FlunderApplyConfiguration represents a declarative configuration of the Flunder type for use
 // with apply.
+//
+// Flunder is an example type with a spec and a status.
 type FlunderApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
@@ -44,6 +46,8 @@ func Flunder(name, namespace string) *FlunderApplyConfiguration {
 	b.WithAPIVersion("wardle.example.com/v1beta1")
 	return b
 }
+
+func (b FlunderApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -219,8 +223,24 @@ func (b *FlunderApplyConfiguration) WithStatus(value wardlev1beta1.FlunderStatus
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *FlunderApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *FlunderApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *FlunderApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *FlunderApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

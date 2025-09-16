@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -86,7 +85,7 @@ APIs.`,
 
 			ctx := genericapiserver.SetupSignalContext()
 
-			completedOptions, err := s.Complete(ctx, cliflag.NamedFlagSets{FlagSets: map[string]*pflag.FlagSet{"sample_generic_controlplane": fs}}, []string{}, []net.IP{})
+			completedOptions, err := s.Complete(ctx, []string{}, []net.IP{})
 			if err != nil {
 				return err
 			}

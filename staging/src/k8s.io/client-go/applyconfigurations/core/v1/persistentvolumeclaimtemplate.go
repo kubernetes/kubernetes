@@ -26,9 +26,19 @@ import (
 
 // PersistentVolumeClaimTemplateApplyConfiguration represents a declarative configuration of the PersistentVolumeClaimTemplate type for use
 // with apply.
+//
+// PersistentVolumeClaimTemplate is used to produce
+// PersistentVolumeClaim objects as part of an EphemeralVolumeSource.
 type PersistentVolumeClaimTemplateApplyConfiguration struct {
+	// May contain labels and annotations that will be copied into the PVC
+	// when creating it. No other fields are allowed and will be rejected during
+	// validation.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty"`
+	// The specification for the PersistentVolumeClaim. The entire content is
+	// copied unchanged into the PVC that gets created from this
+	// template. The same fields as in a PersistentVolumeClaim
+	// are also valid here.
+	Spec *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // PersistentVolumeClaimTemplateApplyConfiguration constructs a declarative configuration of the PersistentVolumeClaimTemplate type for use with
@@ -191,4 +201,10 @@ func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithSpec(value *Persis
 func (b *PersistentVolumeClaimTemplateApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *PersistentVolumeClaimTemplateApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

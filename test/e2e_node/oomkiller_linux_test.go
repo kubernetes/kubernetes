@@ -31,7 +31,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "github.com/opencontainers/cgroups"
 	"k8s.io/utils/ptr"
 )
 

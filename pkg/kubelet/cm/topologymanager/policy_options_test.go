@@ -74,7 +74,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			policyOptions: map[string]string{
 				MaxAllowableNUMANodes: "8",
 			},
-			expectedErr: fmt.Errorf("Topology Manager Policy Beta-level Options not enabled,"),
+			expectedErr: fmt.Errorf("topology manager policy beta-level options not enabled,"),
 		},
 		{
 			description: "return empty TopologyManagerOptions",
@@ -117,7 +117,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			policyOptions: map[string]string{
 				fancyBetaOption: "true",
 			},
-			expectedErr: fmt.Errorf("Topology Manager Policy Beta-level Options not enabled,"),
+			expectedErr: fmt.Errorf("topology manager policy beta-level options not enabled,"),
 		},
 		{
 			description:       "test alpha options success",
@@ -136,7 +136,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			policyOptions: map[string]string{
 				fancyAlphaOption: "true",
 			},
-			expectedErr: fmt.Errorf("Topology Manager Policy Alpha-level Options not enabled,"),
+			expectedErr: fmt.Errorf("topology manager policy alpha-level options not enabled,"),
 		},
 	}
 

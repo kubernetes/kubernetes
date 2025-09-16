@@ -20,17 +20,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"runtime"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 	v1 "k8s.io/api/core/v1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage/cacher"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -108,7 +118,9 @@ func TestAPIServerMetrics(t *testing.T) {
 	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
 	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
 
-	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	flags := framework.DefaultTestServerFlags()
+	flags = append(flags, fmt.Sprintf("--runtime-config=%s=true", networkingv1beta1.SchemeGroupVersion))
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 	defer s.TearDownFn()
 
 	// Make a request to the apiserver to ensure there's at least one data point
@@ -119,7 +131,7 @@ func TestAPIServerMetrics(t *testing.T) {
 	}
 
 	// Make a request to a deprecated API to ensure there's at least one data point
-	if _, err := client.FlowcontrolV1beta3().FlowSchemas().List(context.TODO(), metav1.ListOptions{}); err != nil {
+	if _, err := client.NetworkingV1beta1().ServiceCIDRs().List(context.TODO(), metav1.ListOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -615,4 +627,110 @@ func sampleExistsInSamples(s *model.Sample, samples model.Samples) bool {
 		}
 	}
 	return false
+}
+
+func TestWatchCacheConsistencyCheckMetrics(t *testing.T) {
+	period := time.Second
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DetectCacheInconsistency, true)
+	clean := overrideConsistencyCheckerTimings(period)
+	defer clean()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	rt, err := restclient.TransportFor(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+"/metrics", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// wait 3 periods to for 2 scrape cycles (takes 1-1.5 period) and require 2 successes
+	delay := 3 * period
+	time.Sleep(delay)
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	statuses, err := parseConsistencyCheckMetric(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resourceSuccesses := 0
+	for status, count := range statuses {
+		switch status.status {
+		case "success":
+			if count >= 2 {
+				resourceSuccesses++
+			}
+		case "failure":
+			t.Errorf("Failure checking consistency of resource %q", status.resource)
+		case "error":
+			t.Errorf("Error when checking consistency of resource %q", status.resource)
+		default:
+			t.Errorf("Unknown status of resource %q, status: %q", status.resource, status.status)
+		}
+	}
+	if resourceSuccesses <= 10 {
+		t.Errorf("Expected at least 10 resources with success, got: %d", resourceSuccesses)
+	}
+}
+
+func overrideConsistencyCheckerTimings(period time.Duration) func() {
+	tmpPeriod := cacher.ConsistencyCheckPeriod
+	cacher.ConsistencyCheckPeriod = period
+	return func() {
+		cacher.ConsistencyCheckPeriod = tmpPeriod
+	}
+}
+
+func parseConsistencyCheckMetric(r io.Reader) (map[consistencyCheckStatus]float64, error) {
+	statuses := map[consistencyCheckStatus]float64{}
+	metric, err := parseMetric(r, "apiserver_storage_consistency_checks_total")
+	if err != nil {
+		return statuses, err
+	}
+	for _, m := range metric.GetMetric() {
+		status := consistencyCheckStatus{}
+		for _, label := range m.GetLabel() {
+			switch label.GetName() {
+			case "resource":
+				status.resource = label.GetValue()
+			case "group":
+				status.group = label.GetValue()
+			case "status":
+				status.status = label.GetValue()
+			default:
+				return statuses, fmt.Errorf("Unknown label: %v", label.GetName())
+			}
+		}
+		statuses[status] = m.GetCounter().GetValue()
+	}
+	return statuses, nil
+}
+
+type consistencyCheckStatus struct {
+	group    string
+	resource string
+	status   string
+}
+
+func parseMetric(r io.Reader, name string) (*dto.MetricFamily, error) {
+	parser := expfmt.NewTextParser(model.UTF8Validation)
+	mfs, err := parser.TextToMetricFamilies(r)
+	if err != nil {
+		return nil, err
+	}
+	for metricName, metric := range mfs {
+		if metricName == name {
+			return metric, nil
+		}
+	}
+	return nil, fmt.Errorf("Metric not found %q", name)
 }

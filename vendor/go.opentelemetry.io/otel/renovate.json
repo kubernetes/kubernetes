@@ -1,7 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:best-practices",
+    "helpers:pinGitHubActionDigestsToSemver"
   ],
   "ignorePaths": [],
   "labels": ["Skip Changelog", "dependencies"],
@@ -15,9 +16,19 @@
       "enabled": true
     },
     {
-      "matchFileNames": ["internal/tools/**"],
-      "matchManagers": ["gomod"],
-      "matchDepTypes": ["indirect"],
+      "matchPackageNames": ["go.opentelemetry.io/build-tools/**"],
+      "groupName": "build-tools"
+    },
+    {
+      "matchPackageNames": ["google.golang.org/genproto/googleapis/**"],
+      "groupName": "googleapis"
+    },
+    {
+      "matchPackageNames": ["golang.org/x/**"],
+      "groupName": "golang.org/x"
+    },
+    {
+      "matchPackageNames": ["go.opentelemetry.io/otel/sdk/log/logtest"],
       "enabled": false
     }
   ]

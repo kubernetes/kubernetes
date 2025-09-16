@@ -24,14 +24,15 @@ set -o nounset
 set -o pipefail
 
 ### Hardcoded constants
-DEFAULT_CNI_VERSION='v1.6.0'
-DEFAULT_CNI_HASH='3d9f34a43e0550d9f4f28c724e25bc5cfcfc601c329586bafe4910c3c72f918055151066e71e14e157276138e358344a1d815d957646df43a86d3673ab2849c3'
-DEFAULT_NPD_VERSION='v0.8.20'
-DEFAULT_NPD_HASH_AMD64='09029b62f8023885f3a856c20b5fafecabb880806467848ae25f578c4ee6afacd97c85a0c2d0c582c8d79d3716c83d0e7d324073c5816ae5a812812a6f21450b'
-DEFAULT_NPD_HASH_ARM64='233f7e4451de920b7ce8b0ac0e46da1a07ef559e628a75746ce7927492a1886ebd007875f76462d2d0bf3b1dc807a7e8321108cafbd7db9eee39c0e2cfb6c051'
-DEFAULT_CRICTL_VERSION='v1.31.1'
-DEFAULT_CRICTL_AMD64_SHA512='831ee7b3589197dbee399973793e0750e9870cd963e0d6c57eca9231fbc366c2e683855cdcabede33acdb56c15161cc9d40d5a01ec2de8cfee21ba8aa8adba54'
-DEFAULT_CRICTL_ARM64_SHA512='4d12cf190c03d03d86a1a10b93abbbcb4857d013b62a601b17d767d2397d3e17f7c93d3d32b54cc1ac80262c0837afa5f34c88a58bf52d93e5cfc330dd83218c'
+DEFAULT_CNI_VERSION='v1.8.0'
+# CNI HASH for amd64 sha512
+DEFAULT_CNI_HASH='a2696f937b3433eee4a0de44a0994190166b108f2b29adf9f7005fa4fbfff56e78cbe8a2fe2607d99d4bcc0d4a8183e0c27fa748c2f8fb08ae40b62f198fd45b'
+DEFAULT_NPD_VERSION='v0.8.21'
+DEFAULT_NPD_HASH_AMD64='2805ee1da97e06a4b209c198f21763e8687c499687f1b712e4e8e767a75aee4385c9d7fc54f0b190610ea693293a09eded6661ecf15af7af3e787475540fae71'
+DEFAULT_NPD_HASH_ARM64='e2291bbb06d4e831267c2b2a316a668bdff36a502e89826a355cd7f3beeba804e62a2b59a8ec666f4e83042032a379aba9592bcbddf0d57c5a81b3bc1913517c'
+DEFAULT_CRICTL_VERSION='v1.34.0'
+DEFAULT_CRICTL_AMD64_SHA512='6b5669fe6c0dbcb8d0e0910529a4559e22154ef7f524fa15f3e13dfced6bea2c90a531d99786ac8b24fb4cc9ead1ef294387b52a230ba6fdf83278ab9dbd6133'
+DEFAULT_CRICTL_ARM64_SHA512='b2daa7f6b559cd32da6d3bcb82b356561c0bc2ffcf7dc5084547fbae6cb8570a96cf01c9bfaa6d868cf92d1c1fbbced2a32bf7e0328f62c420c180a86314278d'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
 AUTH_PROVIDER_GCP_HASH_LINUX_AMD64="${AUTH_PROVIDER_GCP_HASH_LINUX_AMD64:-156058e5b3994cba91c23831774033e0d505d6d8b80f43541ef6af91b320fd9dfaabe42ec8a8887b51d87104c2b57e1eb895649d681575ffc80dd9aee8e563db}"
 AUTH_PROVIDER_GCP_HASH_LINUX_ARM64="${AUTH_PROVIDER_GCP_HASH_LINUX_ARM64:-1aa3b0bea10a9755231989ffc150cbfa770f1d96932db7535473f7bfeb1108bafdae80202ae738d59495982512e716ff7366d5f414d0e76dd50519f98611f9ab}"
@@ -253,7 +254,7 @@ function install-gci-mounter-tools {
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}"
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
-  download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
+  download-or-bust "${mounter_tar_sha}" "https://dl.k8s.io/gci-mounter/mounter.tar"
   cp "${KUBE_HOME}/kubernetes/server/bin/mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
@@ -373,7 +374,7 @@ EOF
   fi
 
   echo "Downloading crictl"
-  local -r crictl_path="https://storage.googleapis.com/k8s-artifacts-cri-tools/release/${crictl_version}"
+  local -r crictl_path="https://github.com/kubernetes-sigs/cri-tools/releases/download/${crictl_version}"
   download-or-bust "${crictl_hash}" "${crictl_path}/${crictl}"
   tar xf "${crictl}"
   mv crictl "${KUBE_BIN}/crictl"

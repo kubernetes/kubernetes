@@ -94,6 +94,7 @@ aliases:
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
     - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
+    - xmudrii # RelEng subproject lead / Release Manager
   release-managers:
     - cpanato
     - jeremyrickard
@@ -103,6 +104,9 @@ aliases:
     - saschagrunert
     - Verolop
     - xmudrii
+  release-team-subproject-leads:
+    - gracenng # Release Team subproject lead
+    - katcosgrove # Release Team subproject lead
   build-image-approvers:
     - BenTheElder
     - cblecker
@@ -114,7 +118,7 @@ aliases:
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
     - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
-    - xmudrii # Release Manager
+    - xmudrii # RelEng subproject lead / Release Manager
   build-image-reviewers:
     - BenTheElder
     - cblecker
@@ -126,7 +130,7 @@ aliases:
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
     - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
-    - xmudrii # Release Manager
+    - xmudrii # RelEng subproject lead / Release Manager
   sig-storage-approvers:
     - gnufied
     - jsafrane
@@ -146,6 +150,7 @@ aliases:
     - mauriciopoppe
     - msau42
     - saikat-royc
+    - sunnylovestiramisu
     - xing-yang
   # emeritus:
   # - chrishenzie
@@ -154,12 +159,14 @@ aliases:
   # - rootfs
   # - verult
   sig-scheduling-maintainers:
-    - alculquicondor
-    - Huang-Wei
     - ahg-g
+    - dom4ha
+    - Huang-Wei
     - kerthcet
+    - macsko
     - sanposhiho
   # emeritus:
+  # - alculquicondor
   # - damemi
   # - bsalamat
   # - k82cn
@@ -169,8 +176,10 @@ aliases:
     - AxeZhan
     - damemi
     - denkensk
+    - dom4ha
     - macsko
     - sanposhiho
+    - utam0k
     - kerthcet
   # emeritus:
   # - adtac
@@ -207,10 +216,13 @@ aliases:
     - seans3
     - soltysh
   sig-testing-reviewers:
+    - aojea
     - bentheelder
     - cblecker
-    - spiffxp
     - dims
+    - pohly
+  # emeritus:
+  # - spiffxp
   sig-node-approvers:
     - Random-Liu
     - dchen1107
@@ -238,6 +250,7 @@ aliases:
     - dims
     - endocrimes
     - feiskyer
+    - HirazawaUi
     - mtaufen
     - sjenning
     - wzshiming
@@ -258,29 +271,26 @@ aliases:
     - kannon92
     - ffromani
     - tallclair
+    - natasha41575
   sig-network-approvers:
-    - andrewsykim
     - aojea
     - bowei
-    - caseydavenport
     - danwinship
-    - dcbw
-    - freehan
-    - khenidak
-    - mrhohn
     - robscott
     - thockin
+  # emeritus:
+  # - andrewsykim
+  # - caseydavenport
+  # - dcbw
+  # - freehan
+  # - khenidak
+  # - mrhohn
   sig-network-reviewers:
-    - andrewsykim
+    - adrianmoisey
     - aojea
     - aroradaman
     - bowei
-    - caseydavenport
     - danwinship
-    - dcbw
-    - freehan
-    - khenidak
-    - mrhohn
     - robscott
     - thockin
     - tnqn
@@ -304,7 +314,9 @@ aliases:
 
   sig-autoscaling-maintainers:
     - gjtempleton
-    - MaciekPytel
+    - jackfrancis
+    - raywainman
+    - towca
   sig-instrumentation-approvers:
     - logicalhan
     - dashpole
@@ -312,6 +324,7 @@ aliases:
     - serathius
     - dgrisonnet
     - rexagod
+    - richabanker
   sig-instrumentation-reviewers:
     - dashpole
     - s-urbaniak
@@ -323,6 +336,7 @@ aliases:
     - pohly
     - mengjiao-liu
     - rexagod
+    - richabanker
   # sig-instrumentation-emeritus
   # - brancz
   # - DirectXMan12
@@ -359,7 +373,6 @@ aliases:
     - liggitt
     - smarterclayton
   sig-cluster-lifecycle-leads:
-    - CecileRobertMichon
     - fabriziopandini
     - justinsb
     - neolit123
@@ -368,8 +381,7 @@ aliases:
     - smarterclayton
     - thockin
   sig-network-api-reviewers:
-    - andrewsykim
-    - caseydavenport
+    - aojea
     - danwinship
     - thockin
   sig-scheduling-api-approvers:
@@ -437,6 +449,7 @@ aliases:
   sig-cloud-provider-api-reviewers:
     - elmiko
     - cheftako
+    - joelspeed
     - dims
   # sig-cluster-lifecycle-api-reviewers:
   #   -
@@ -448,6 +461,7 @@ aliases:
     - palnabarun
     - kaslin
     - MadhavJivrajani
+    - mfahlandt
     - Priyankasaggu11929
   sig-docs-approvers:
     - jimangel
@@ -462,17 +476,22 @@ aliases:
   sig-scalability-approvers:
     - marseel
     - mborsz
+    - mengqiy
+    - shyamjvs
     - wojtek-t
   # emeritus:
   # - mm4tt
   sig-scalability-reviewers:
     - marseel
     - mborsz
+    - mengqiy
+    - shyamjvs
     - wojtek-t
   # emeritus:
   # - mm4tt
-  sig-scheduling-api-reviewers:
-    - alculquicondor
+  # sig-scheduling-api-reviewers:
+  # emeritus:
+  # - alculquicondor
   sig-storage-api-reviewers:
     - deads2k
     - saad-ali
@@ -526,6 +545,7 @@ aliases:
     - mrunalp # Node
     - msau42 # Storage
     - rexagod # Instrumentation
+    - richabanker # Instrumentation
     - saad-ali # Storage
     - sergeykanzhelev # Node
     - shaneutt # Network
@@ -539,5 +559,6 @@ aliases:
   conformance-behavior-approvers:
     - smarterclayton
     - johnbelamaric
-    - spiffxp
     - dims
+  # emeritus:
+  # - spiffpx

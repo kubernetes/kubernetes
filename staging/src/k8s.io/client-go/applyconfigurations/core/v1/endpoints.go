@@ -29,10 +29,38 @@ import (
 
 // EndpointsApplyConfiguration represents a declarative configuration of the Endpoints type for use
 // with apply.
+//
+// Endpoints is a collection of endpoints that implement the actual service. Example:
+//
+// Name: "mysvc",
+// Subsets: [
+// {
+// Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+// Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+// },
+// {
+// Addresses: [{"ip": "10.10.3.3"}],
+// Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
+// },
+// ]
+//
+// Endpoints is a legacy API and does not contain information about all Service features.
+// Use discoveryv1.EndpointSlice for complete information about Service endpoints.
+//
+// Deprecated: This API is deprecated in v1.33+. Use discoveryv1.EndpointSlice.
 type EndpointsApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Subsets                              []EndpointSubsetApplyConfiguration `json:"subsets,omitempty"`
+	// The set of all endpoints is the union of all subsets. Addresses are placed into
+	// subsets according to the IPs they share. A single address with multiple ports,
+	// some of which are ready and some of which are not (because they come from
+	// different containers) will result in the address being displayed in different
+	// subsets for the different ports. No address will appear in both Addresses and
+	// NotReadyAddresses in the same subset.
+	// Sets of addresses and ports that comprise a service.
+	Subsets []EndpointSubsetApplyConfiguration `json:"subsets,omitempty"`
 }
 
 // Endpoints constructs a declarative configuration of the Endpoints type for use with
@@ -46,29 +74,14 @@ func Endpoints(name, namespace string) *EndpointsApplyConfiguration {
 	return b
 }
 
-// ExtractEndpoints extracts the applied configuration owned by fieldManager from
-// endpoints. If no managedFields are found in endpoints for fieldManager, a
-// EndpointsApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractEndpointsFrom extracts the applied configuration owned by fieldManager from
+// endpoints for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // endpoints must be a unmodified Endpoints API object that was retrieved from the Kubernetes API.
-// ExtractEndpoints provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractEndpointsFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractEndpoints(endpoints *corev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
-	return extractEndpoints(endpoints, fieldManager, "")
-}
-
-// ExtractEndpointsStatus is the same as ExtractEndpoints except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractEndpointsStatus(endpoints *corev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
-	return extractEndpoints(endpoints, fieldManager, "status")
-}
-
-func extractEndpoints(endpoints *corev1.Endpoints, fieldManager string, subresource string) (*EndpointsApplyConfiguration, error) {
+func ExtractEndpointsFrom(endpoints *corev1.Endpoints, fieldManager string, subresource string) (*EndpointsApplyConfiguration, error) {
 	b := &EndpointsApplyConfiguration{}
 	err := managedfields.ExtractInto(endpoints, internal.Parser().Type("io.k8s.api.core.v1.Endpoints"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,6 +94,22 @@ func extractEndpoints(endpoints *corev1.Endpoints, fieldManager string, subresou
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractEndpoints extracts the applied configuration owned by fieldManager from
+// endpoints. If no managedFields are found in endpoints for fieldManager, a
+// EndpointsApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// endpoints must be a unmodified Endpoints API object that was retrieved from the Kubernetes API.
+// ExtractEndpoints provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractEndpoints(endpoints *corev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
+	return ExtractEndpointsFrom(endpoints, fieldManager, "")
+}
+
+func (b EndpointsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -253,8 +282,24 @@ func (b *EndpointsApplyConfiguration) WithSubsets(values ...*EndpointSubsetApply
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *EndpointsApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *EndpointsApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *EndpointsApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *EndpointsApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

@@ -145,6 +145,17 @@ func (c *checker) checkSelect(e ast.Expr) {
 func (c *checker) checkOptSelect(e ast.Expr) {
 	// Collect metadata related to the opt select call packaged by the parser.
 	call := e.AsCall()
+	if len(call.Args()) != 2 || call.IsMemberFunction() {
+		t := ""
+		if call.IsMemberFunction() {
+			t = " member call with"
+		}
+		c.errors.notAnOptionalFieldSelectionCall(e.ID(), c.location(e),
+			fmt.Sprintf(
+				"incorrect signature.%s argument count: %d", t, len(call.Args())))
+		return
+	}
+
 	operand := call.Args()[0]
 	field := call.Args()[1]
 	fieldName, isString := maybeUnwrapString(field)
@@ -529,9 +540,15 @@ func (c *checker) checkComprehension(e ast.Expr) {
 		c.isAssignable(types.DynType, rangeType)
 		// Set the range iteration variable to type DYN as well.
 		varType = types.DynType
+		if comp.HasIterVar2() {
+			var2Type = types.DynType
+		}
 	default:
 		c.errors.notAComprehensionRange(comp.IterRange().ID(), c.location(comp.IterRange()), rangeType)
 		varType = types.ErrorType
+		if comp.HasIterVar2() {
+			var2Type = types.ErrorType
+		}
 	}
 
 	// Create a block scope for the loop.

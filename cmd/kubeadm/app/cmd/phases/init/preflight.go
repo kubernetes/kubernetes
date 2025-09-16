@@ -19,14 +19,13 @@ package phases
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	utilsexec "k8s.io/utils/exec"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 var (
@@ -62,6 +61,10 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	fmt.Println("[preflight] Running pre-flight checks")
+	// First, check if we're root separately from the other preflight checks and fail fast.
+	if err := preflight.RunRootCheckOnly(data.IgnorePreflightErrors()); err != nil {
+		return err
+	}
 	if err := preflight.RunInitNodeChecks(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors(), false, false); err != nil {
 		return err
 	}

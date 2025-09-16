@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package routes holds a collection of optional genericapiserver http handlers.
-package routes // import "k8s.io/apiserver/pkg/server/routes"
+package routes

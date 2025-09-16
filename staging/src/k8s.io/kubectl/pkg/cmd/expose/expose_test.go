@@ -694,7 +694,6 @@ func TestExposeOverride(t *testing.T) {
 			expected: `apiVersion: v1
 kind: Service
 metadata:
-  creationTimestamp: null
   labels:
     svc: test
   name: foo
@@ -717,7 +716,6 @@ status:
 			expected: `apiVersion: v1
 kind: Service
 metadata:
-  creationTimestamp: null
   labels:
     svc: test
   name: foo
@@ -745,7 +743,6 @@ status:
 			expected: `apiVersion: v1
 kind: Service
 metadata:
-  creationTimestamp: null
   labels:
     svc: test
   name: foo
@@ -773,7 +770,6 @@ status:
 			expected: `apiVersion: v1
 kind: Service
 metadata:
-  creationTimestamp: null
   labels:
     svc: test
   name: foo

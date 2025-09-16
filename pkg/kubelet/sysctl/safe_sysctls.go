@@ -17,6 +17,7 @@ limitations under the License.
 package sysctl
 
 import (
+	"context"
 	goruntime "runtime"
 
 	"k8s.io/apimachinery/pkg/util/version"
@@ -75,18 +76,19 @@ var safeSysctls = []sysctl{
 // A sysctl is called safe iff
 // - it is namespaced in the container or the pod
 // - it is isolated, i.e. has no influence on any other pod on the same node.
-func SafeSysctlAllowlist() []string {
+func SafeSysctlAllowlist(ctx context.Context) []string {
 	if goruntime.GOOS != "linux" {
 		return nil
 	}
 
-	return getSafeSysctlAllowlist(utilkernel.GetVersion)
+	return getSafeSysctlAllowlist(ctx, utilkernel.GetVersion)
 }
 
-func getSafeSysctlAllowlist(getVersion func() (*version.Version, error)) []string {
+func getSafeSysctlAllowlist(ctx context.Context, getVersion func() (*version.Version, error)) []string {
+	logger := klog.FromContext(ctx)
 	kernelVersion, err := getVersion()
 	if err != nil {
-		klog.ErrorS(err, "failed to get kernel version, unable to determine which sysctls are available")
+		logger.Error(err, "failed to get kernel version, unable to determine which sysctls are available")
 	}
 
 	var safeSysctlAllowlist []string
@@ -99,7 +101,7 @@ func getSafeSysctlAllowlist(getVersion func() (*version.Version, error)) []strin
 		if kernelVersion != nil && kernelVersion.AtLeast(version.MustParseGeneric(sc.kernel)) {
 			safeSysctlAllowlist = append(safeSysctlAllowlist, sc.name)
 		} else {
-			klog.InfoS("kernel version is too old, dropping the sysctl from safe sysctl list", "kernelVersion", kernelVersion, "sysctl", sc.name)
+			logger.Info("kernel version is too old, dropping the sysctl from safe sysctl list", "kernelVersion", kernelVersion, "sysctl", sc.name)
 		}
 	}
 	return safeSysctlAllowlist

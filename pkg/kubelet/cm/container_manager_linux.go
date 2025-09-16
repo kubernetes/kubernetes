@@ -27,9 +27,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
-	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/cgroups"
+	"github.com/opencontainers/cgroups/manager"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
@@ -63,6 +62,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -132,10 +132,12 @@ type containerManagerImpl struct {
 	memoryManager memorymanager.Manager
 	// Interface for Topology resource co-ordination
 	topologyManager topologymanager.Manager
-	// Interface for Dynamic Resource Allocation management.
-	draManager dra.Manager
+	// Implementation of Dynamic Resource Allocation (DRA).
+	draManager *dra.Manager
 	// kubeClient is the interface to the Kubernetes API server. May be nil if the kubelet is running in standalone mode.
 	kubeClient clientset.Interface
+	// resourceUpdates is a channel that provides resource updates.
+	resourceUpdates chan resourceupdates.Update
 }
 
 type features struct {
@@ -311,10 +313,11 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// Initialize DRA manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		klog.InfoS("Creating Dynamic Resource Allocation (DRA) manager")
-		cm.draManager, err = dra.NewManagerImpl(kubeClient, nodeConfig.KubeletRootDir, nodeConfig.NodeName)
+		cm.draManager, err = dra.NewManager(klog.TODO(), kubeClient, nodeConfig.KubeletRootDir)
 		if err != nil {
 			return nil, err
 		}
+		metrics.RegisterCollectors(cm.draManager.NewMetricsCollector())
 	}
 	cm.kubeClient = kubeClient
 
@@ -336,10 +339,11 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	cm.topologyManager.AddHintProvider(cm.cpuManager)
 
 	cm.memoryManager, err = memorymanager.NewManager(
-		nodeConfig.ExperimentalMemoryManagerPolicy,
+		context.TODO(),
+		nodeConfig.MemoryManagerPolicy,
 		machineInfo,
 		cm.GetNodeAllocatableReservation(),
-		nodeConfig.ExperimentalMemoryManagerReservedMemory,
+		nodeConfig.MemoryManagerReservedMemory,
 		nodeConfig.KubeletRootDir,
 		cm.topologyManager,
 	)
@@ -348,6 +352,39 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 	cm.topologyManager.AddHintProvider(cm.memoryManager)
+
+	// Create a single channel for all resource updates. This channel is consumed
+	// by the Kubelet's main sync loop.
+	cm.resourceUpdates = make(chan resourceupdates.Update, 10)
+
+	// Start goroutines to fan-in updates from the various sub-managers
+	// (e.g., device manager, DRA manager) into the single updates channel.
+	var wg sync.WaitGroup
+	sources := map[string]<-chan resourceupdates.Update{}
+	if cm.deviceManager != nil {
+		sources["deviceManager"] = cm.deviceManager.Updates()
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatus) {
+			sources["draManager"] = cm.draManager.Updates()
+		}
+	}
+
+	for name, ch := range sources {
+		wg.Add(1)
+		go func(name string, c <-chan resourceupdates.Update) {
+			defer wg.Done()
+			for v := range c {
+				klog.V(4).InfoS("Container Manager: forwarding resource update", "source", name, "pods", v.PodUIDs)
+				cm.resourceUpdates <- v
+			}
+		}(name, ch)
+	}
+
+	go func() {
+		wg.Wait()
+		close(cm.resourceUpdates)
+	}()
 
 	return cm, nil
 }
@@ -365,12 +402,21 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			enforceCPULimits:  cm.EnforceCPULimits,
 			// cpuCFSQuotaPeriod is in microseconds. NodeConfig.CPUCFSQuotaPeriod is time.Duration (measured in nano seconds).
 			// Convert (cm.CPUCFSQuotaPeriod) [nanoseconds] / time.Microsecond (1000) to get cpuCFSQuotaPeriod in microseconds.
-			cpuCFSQuotaPeriod: uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
+			cpuCFSQuotaPeriod:   uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
+			podContainerManager: cm,
 		}
 	}
 	return &podContainerManagerNoop{
 		cgroupRoot: cm.cgroupRoot,
 	}
+}
+
+func (cm *containerManagerImpl) PodHasExclusiveCPUs(pod *v1.Pod) bool {
+	return podHasExclusiveCPUs(cm.cpuManager, pod)
+}
+
+func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
+	return containerHasExclusiveCPUs(cm.cpuManager, pod, container)
 }
 
 func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
@@ -379,10 +425,10 @@ func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLi
 
 // Create a cgroup container manager.
 func createManager(containerName string) (cgroups.Manager, error) {
-	cg := &configs.Cgroup{
+	cg := &cgroups.Cgroup{
 		Parent: "/",
 		Name:   containerName,
-		Resources: &configs.Resources{
+		Resources: &cgroups.Resources{
 			SkipDevices: true,
 		},
 		Systemd: false,
@@ -581,7 +627,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	}
 
 	// Initialize memory manager
-	err = cm.memoryManager.Start(memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
+	err = cm.memoryManager.Start(ctx, memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
 	if err != nil {
 		return fmt.Errorf("start memory manager error: %w", err)
 	}
@@ -944,7 +990,9 @@ func (cm *containerManagerImpl) GetMemory(podUID, containerName string) []*podre
 		return []*podresourcesapi.ContainerMemory{}
 	}
 
-	return containerMemoryFromBlock(cm.memoryManager.GetMemory(podUID, containerName))
+	// This is tempporary as part of migration of memory manager to Contextual logging.
+	// Direct context to be passed when container manager is migrated.
+	return containerMemoryFromBlock(cm.memoryManager.GetMemory(context.TODO(), podUID, containerName))
 }
 
 func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
@@ -952,7 +1000,9 @@ func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.Contai
 		return []*podresourcesapi.ContainerMemory{}
 	}
 
-	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory())
+	// This is tempporary as part of migration of memory manager to Contextual logging.
+	// Direct context to be passed when container manager is migrated.
+	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory(context.TODO()))
 }
 
 func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
@@ -975,7 +1025,7 @@ func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.C
 					cdiDevices = append(cdiDevices, &podresourcesapi.CDIDevice{Name: cdiDeviceID})
 				}
 				resources := &podresourcesapi.ClaimResource{
-					CDIDevices: cdiDevices,
+					CdiDevices: cdiDevices,
 					DriverName: driverName,
 					PoolName:   device.PoolName,
 					DeviceName: device.DeviceName,
@@ -1007,7 +1057,7 @@ func containerMemoryFromBlock(blocks []memorymanagerstate.Block) []*podresources
 	for _, b := range blocks {
 		containerMemory := podresourcesapi.ContainerMemory{
 			MemoryType: string(b.Type),
-			Size_:      b.Size,
+			Size:       b.Size,
 			Topology: &podresourcesapi.TopologyInfo{
 				Nodes: []*podresourcesapi.NUMANode{},
 			},
@@ -1040,10 +1090,14 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, stat
 	// For now we only support Device Plugin
 	cm.deviceManager.UpdateAllocatedResourcesStatus(pod, status)
 
-	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources which is planned for the next iteration of a KEP.
+	// Update DRA resources if the feature is enabled and the manager exists
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatus) {
+			cm.draManager.UpdateAllocatedResourcesStatus(pod, status)
+		}
+	}
 }
 
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
-	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources, for now only use device plugin updates. DRA support is planned for the next iteration of a KEP.
-	return cm.deviceManager.Updates()
+	return cm.resourceUpdates
 }

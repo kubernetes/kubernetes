@@ -18,6 +18,7 @@ package cel
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 
@@ -32,7 +33,7 @@ func TestCacheSemantic(t *testing.T) {
 	// compilation leads to different pointers, so the entries can be
 	// compared by value to figure out whether an entry was cached or
 	// compiled anew.
-	cache := NewCache(2)
+	cache := NewCache(2, Features{})
 
 	// Successful compilations get cached.
 	resultTrue := cache.GetOrCompile("true")
@@ -73,6 +74,11 @@ func TestCacheSemantic(t *testing.T) {
 	if resultFalse == resultFalseAgain {
 		t.Fatal("result of compiling `false` should have been evicted from the cache")
 	}
+
+	// Cost estimation must be off (not needed by scheduler).
+	if resultFalseAgain.MaxCost != math.MaxUint64 {
+		t.Error("cost estimation should have been disabled, was enabled")
+	}
 }
 
 func TestCacheConcurrency(t *testing.T) {
@@ -84,7 +90,7 @@ func TestCacheConcurrency(t *testing.T) {
 	// without benchmarking.
 	numWorkers := 10
 
-	cache := NewCache(2)
+	cache := NewCache(2, Features{})
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
 	for i := 0; i < numWorkers; i++ {

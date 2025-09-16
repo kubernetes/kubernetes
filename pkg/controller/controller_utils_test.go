@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -54,7 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -81,7 +82,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 			ResourceVersion: "18",
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(int32(replicas)),
+			Replicas: ptr.To[int32](int32(replicas)),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -143,7 +144,7 @@ func newReplicaSet(name string, replicas int, rsUuid types.UID) *apps.ReplicaSet
 			ResourceVersion: "18",
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: pointer.Int32(int32(replicas)),
+			Replicas: ptr.To[int32](int32(replicas)),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -431,6 +432,128 @@ func TestCountTerminatingPods(t *testing.T) {
 
 	terminatingList := FilterTerminatingPods(podPointers)
 	assert.Len(t, terminatingList, int(2))
+}
+
+func TestClaimedPodFiltering(t *testing.T) {
+	rsUUID := uuid.NewUUID()
+
+	type podData struct {
+		podName         string
+		ownerReferences []metav1.OwnerReference
+		labels          map[string]string
+	}
+
+	type test struct {
+		name         string
+		pods         []podData
+		wantPodNames []string
+	}
+
+	tests := []test{
+		{
+			name: "Filters claimed pods",
+			pods: []podData{
+				// single owner reference
+				{podName: "claimed-1", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "wrong-selector-1", labels: map[string]string{"foo": "baz"}, ownerReferences: []metav1.OwnerReference{
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "non-controller-1", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: rsUUID, Controller: nil},
+				}},
+				{podName: "other-controller-1", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(true)},
+				}},
+				{podName: "other-workload-1", labels: map[string]string{"foo": "bee"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(true)},
+				}},
+				{podName: "standalone-pod-1", labels: map[string]string{"foo": "beetle"}, ownerReferences: []metav1.OwnerReference{}},
+				// additional controller owner reference set to controller=false
+				{podName: "claimed-2", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "wrong-selector-2", labels: map[string]string{"foo": "baz"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "non-controller-2", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+					{UID: rsUUID, Controller: ptr.To(false)},
+				}},
+				{podName: "other-controller-2", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+					{UID: uuid.NewUUID(), Controller: ptr.To(true)},
+				}},
+				{podName: "other-workload-1", labels: map[string]string{"foo": "bee"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+					{UID: uuid.NewUUID(), Controller: ptr.To(true)},
+				}},
+				{podName: "standalone-pod-1", labels: map[string]string{"foo": "beetle"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+				}},
+				// additional controller owner reference set to controller=nil
+				{podName: "claimed-3", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "wrong-selector-3", labels: nil, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "non-controller-3", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+					{UID: rsUUID, Controller: nil},
+				}},
+				{podName: "other-controller-3", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+					{UID: uuid.NewUUID(), Controller: ptr.To(true)},
+				}},
+				{podName: "other-workload-1", labels: map[string]string{"foo": "bee"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+				}},
+				{podName: "standalone-pod-1", labels: map[string]string{"foo": "beetle"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+				}},
+			},
+			wantPodNames: []string{"claimed-1", "claimed-2", "claimed-3"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
+			rs := newReplicaSet("test-claim", 3, rsUUID)
+			var pods []*v1.Pod
+			for _, p := range test.pods {
+				pods = append(pods, &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            p.podName,
+						Namespace:       rs.Namespace,
+						Labels:          p.labels,
+						OwnerReferences: p.ownerReferences,
+					},
+					Status: v1.PodStatus{Phase: v1.PodRunning},
+				})
+			}
+
+			selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+			if err != nil {
+				t.Fatalf("Couldn't get selector for object %#v: %v", rs, err)
+			}
+			got := FilterClaimedPods(rs, selector, pods)
+			gotNames := sets.NewString()
+			for _, pod := range got {
+				gotNames.Insert(pod.Name)
+			}
+
+			if diff := cmp.Diff(test.wantPodNames, gotNames.List()); diff != "" {
+				t.Errorf("Active pod names (-want,+got):\n%s", diff)
+			}
+		})
+	}
 }
 
 func TestActivePodFiltering(t *testing.T) {
@@ -753,6 +876,244 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 			}
 			if podsWithRanks.Less(1, 0) {
 				t.Errorf("expected pod %q with rank %v not to be less than %v with rank %v", podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1], podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0])
+			}
+		})
+	}
+}
+
+func TestNextPodAvailabilityCheck(t *testing.T) {
+	newPodWithReadyCond := func(now metav1.Time, ready bool, beforeSec int) *v1.Pod {
+		conditionStatus := v1.ConditionFalse
+		if ready {
+			conditionStatus = v1.ConditionTrue
+		}
+		return &v1.Pod{
+			Status: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:               v1.PodReady,
+						LastTransitionTime: metav1.NewTime(now.Add(-1 * time.Duration(beforeSec) * time.Second)),
+						Status:             conditionStatus,
+					},
+				},
+			},
+		}
+	}
+
+	now := metav1.Now()
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		minReadySeconds int32
+		expected        *time.Duration
+	}{
+		{
+			name:            "not ready",
+			pod:             newPodWithReadyCond(now, false, 0),
+			minReadySeconds: 0,
+			expected:        nil,
+		},
+		{
+			name:            "no minReadySeconds defined",
+			pod:             newPodWithReadyCond(now, true, 0),
+			minReadySeconds: 0,
+			expected:        nil,
+		},
+		{
+			name: "lastTransitionTime is zero",
+			pod: func() *v1.Pod {
+				pod := newPodWithReadyCond(now, true, 0)
+				pod.Status.Conditions[0].LastTransitionTime = metav1.Time{}
+				return pod
+			}(),
+			minReadySeconds: 1,
+			expected:        nil,
+		},
+		{
+			name:            "just became ready - available in 1s",
+			pod:             newPodWithReadyCond(now, true, 0),
+			minReadySeconds: 1,
+			expected:        ptr.To(time.Second),
+		},
+		{
+			name:            "ready for 20s - available in 10s",
+			pod:             newPodWithReadyCond(now, true, 20),
+			minReadySeconds: 30,
+			expected:        ptr.To(10 * time.Second),
+		},
+		{
+			name:            "available",
+			pod:             newPodWithReadyCond(now, true, 51),
+			minReadySeconds: 50,
+			expected:        nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nextAvailable := nextPodAvailabilityCheck(test.pod, test.minReadySeconds, now.Time)
+			if !ptr.Equal(nextAvailable, test.expected) {
+				t.Errorf("expected next pod availability check: %v, got: %v", test.expected, nextAvailable)
+			}
+		})
+	}
+}
+
+func TestFindMinNextPodAvailabilitySimpleCheck(t *testing.T) {
+	now := metav1.Now()
+
+	pod := func(name string, ready bool, beforeSec int) *v1.Pod {
+		p := testutil.NewPod(name, "node0")
+		if ready {
+			p.Status.Conditions[0].LastTransitionTime = metav1.NewTime(now.Add(-1 * time.Duration(beforeSec) * time.Second))
+		} else {
+			p.Status.Conditions[0].Status = v1.ConditionFalse
+		}
+		return p
+	}
+
+	tests := []struct {
+		name            string
+		pods            []*v1.Pod
+		minReadySeconds int32
+		expected        *time.Duration
+		expectedPod     *string
+	}{
+		{
+			name:            "no pods",
+			pods:            nil,
+			minReadySeconds: 0,
+			expected:        nil,
+			expectedPod:     nil,
+		},
+		{
+			name: "unready pods",
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", false, 0),
+			},
+			minReadySeconds: 0,
+			expected:        nil,
+			expectedPod:     nil,
+		},
+		{
+			name: "ready pods with no minReadySeconds",
+			pods: []*v1.Pod{
+				pod("pod1", true, 0),
+				pod("pod2", true, 0),
+			},
+			minReadySeconds: 0,
+			expected:        nil,
+			expectedPod:     nil,
+		},
+		{
+			name: "unready and ready pods should find min next availability check",
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", true, 2),
+				pod("pod3", true, 0),
+				pod("pod4", true, 4),
+				pod("pod5", false, 0),
+			},
+			minReadySeconds: 10,
+			expected:        ptr.To(6 * time.Second),
+			expectedPod:     ptr.To("pod4"),
+		},
+		{
+			name: "unready and available pods do not require min next availability check", // only after pods become ready we can schedule one
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", true, 15),
+				pod("pod3", true, 11),
+				pod("pod4", true, 10),
+				pod("pod5", false, 0),
+			},
+			minReadySeconds: 10,
+			expected:        nil,
+			expectedPod:     nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nextAvailable, checkPod := findMinNextPodAvailabilitySimpleCheck(test.pods, test.minReadySeconds, now.Time)
+			var checkPodName *string
+			if checkPod != nil {
+				checkPodName = ptr.To(checkPod.Name)
+			}
+			if !ptr.Equal(nextAvailable, test.expected) {
+				t.Errorf("expected next min pod availability check: %v, got: %v", test.expected, nextAvailable)
+			}
+			if !ptr.Equal(checkPodName, test.expectedPod) {
+				t.Errorf("expected next min pod availability check for pod: %v, got: %v", test.expectedPod, checkPodName)
+			}
+
+			// using the same now for status evaluation and the clock should return the same result as findMinNextPodAvailabilitySimpleCheck
+			nextAvailable = FindMinNextPodAvailabilityCheck(test.pods, test.minReadySeconds, now.Time, testingclock.NewFakeClock(now.Time))
+
+			if !ptr.Equal(nextAvailable, test.expected) {
+				t.Errorf("expected next min pod availability check when status evaluation and clock is now: %v, got: %v", test.expected, nextAvailable)
+			}
+		})
+	}
+}
+
+func TestFindMinNextPodAvailability(t *testing.T) {
+	now := metav1.Now()
+
+	pod := func(name string, ready bool, beforeSec int) *v1.Pod {
+		p := testutil.NewPod(name, "node0")
+		if ready {
+			p.Status.Conditions[0].LastTransitionTime = metav1.NewTime(now.Add(-1 * time.Duration(beforeSec) * time.Second))
+		} else {
+			p.Status.Conditions[0].Status = v1.ConditionFalse
+		}
+		return p
+	}
+
+	tests := []struct {
+		name                         string
+		pods                         []*v1.Pod
+		minReadySeconds              int32
+		statusEvaluationDelaySeconds int
+		expected                     *time.Duration
+	}{
+		{
+			name: "unready and ready pods should find min next availability check considering status evaluation/update delay",
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", true, 2),
+				pod("pod3", true, 0),
+				pod("pod4", true, 4),
+				pod("pod5", false, 0),
+			},
+			minReadySeconds:              10,
+			statusEvaluationDelaySeconds: 2, // total is 4+2 since the pod4 became ready
+			expected:                     ptr.To(4 * time.Second),
+		},
+		{
+			name: "unready and ready pods should find min next availability check even if the status evaluation delay is longer than minReadySeconds",
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", true, 2),
+				pod("pod3", true, 0),
+				pod("pod4", true, 4),
+				pod("pod5", false, 0),
+			},
+			minReadySeconds:              10,
+			statusEvaluationDelaySeconds: 7, // total is 4+7 since the pod4 became ready
+			expected:                     ptr.To(0 * time.Second),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			oldNow := now.Time
+			newNow := testingclock.NewFakePassiveClock(now.Add(time.Duration(test.statusEvaluationDelaySeconds) * time.Second))
+			nextAvailable := FindMinNextPodAvailabilityCheck(test.pods, test.minReadySeconds, oldNow, newNow)
+
+			if !ptr.Equal(nextAvailable, test.expected) {
+				t.Errorf("expected next min pod availability check: %v, got: %v", test.expected, nextAvailable)
 			}
 		})
 	}
@@ -1234,5 +1595,99 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		assert.Equal(t, test.requestCount, test.nodeHandler.RequestCount,
 			"%s: unexpected request count: expected %+v, got %+v",
 			test.name, test.requestCount, test.nodeHandler.RequestCount)
+	}
+}
+
+func TestFilterPodsByOwner(t *testing.T) {
+	newPod := func(name, ns string, owner *metav1.OwnerReference) *v1.Pod {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: ns,
+			},
+		}
+		if owner != nil {
+			pod.OwnerReferences = append(pod.OwnerReferences, *owner)
+		}
+		return pod
+	}
+
+	cases := map[string]struct {
+		owner        *metav1.ObjectMeta
+		allPods      []*v1.Pod
+		wantPodsKeys sets.Set[string]
+	}{
+		"multiple Pods, some are owned by the owner": {
+			owner: &metav1.ObjectMeta{
+				Namespace: "ns1",
+				UID:       "abc",
+			},
+			allPods: []*v1.Pod{
+				newPod("a", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Controller: ptr.To(true),
+				}),
+				newPod("b", "ns1", &metav1.OwnerReference{
+					UID:        "def",
+					Controller: ptr.To(true),
+				}),
+				newPod("c", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Controller: ptr.To(true),
+				}),
+			},
+			wantPodsKeys: sets.New("ns1/a", "ns1/c"),
+		},
+		"orphan Pods in multiple namespaces": {
+			owner: &metav1.ObjectMeta{
+				Namespace: "ns1",
+			},
+			allPods: []*v1.Pod{
+				newPod("a", "ns1", nil),
+				newPod("b", "ns2", nil),
+			},
+			wantPodsKeys: sets.New("ns1/a"),
+		},
+		"owned Pods and orphan Pods in the owner's namespace": {
+			owner: &metav1.ObjectMeta{
+				Namespace: "ns1",
+				UID:       "abc",
+			},
+			allPods: []*v1.Pod{
+				newPod("a", "ns1", nil),
+				newPod("b", "ns2", nil),
+				newPod("c", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Controller: ptr.To(true),
+				}),
+			},
+			wantPodsKeys: sets.New("ns1/a", "ns1/c"),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset()
+			sharedInformers := informers.NewSharedInformerFactory(fakeClient, 0)
+			podInformer := sharedInformers.Core().V1().Pods()
+
+			err := AddPodControllerUIDIndexer(podInformer.Informer())
+			if err != nil {
+				t.Fatalf("failed to register indexer: %v", err)
+			}
+			podIndexer := podInformer.Informer().GetIndexer()
+			for _, pod := range tc.allPods {
+				if err := podIndexer.Add(pod); err != nil {
+					t.Fatalf("failed adding Pod to indexer: %v", err)
+				}
+			}
+			gotPods, _ := FilterPodsByOwner(podIndexer, tc.owner)
+			gotPodKeys := sets.New[string]()
+			for _, pod := range gotPods {
+				gotPodKeys.Insert(pod.Namespace + "/" + pod.Name)
+			}
+			if diff := cmp.Diff(tc.wantPodsKeys, gotPodKeys); diff != "" {
+				t.Errorf("unexpected pods returned, diff=%s", diff)
+			}
+		})
 	}
 }

@@ -63,9 +63,9 @@ func (c *Container) Extend(opts ...ContainerOption) (*Container, error) {
 	}
 	// Copy the name and aliases of the existing container.
 	ext := &Container{name: c.Name()}
-	if len(c.aliasSet()) > 0 {
-		aliasSet := make(map[string]string, len(c.aliasSet()))
-		for k, v := range c.aliasSet() {
+	if len(c.AliasSet()) > 0 {
+		aliasSet := make(map[string]string, len(c.AliasSet()))
+		for k, v := range c.AliasSet() {
 			aliasSet[k] = v
 		}
 		ext.aliases = aliasSet
@@ -133,8 +133,8 @@ func (c *Container) ResolveCandidateNames(name string) []string {
 	return append(candidates, name)
 }
 
-// aliasSet returns the alias to fully-qualified name mapping stored in the container.
-func (c *Container) aliasSet() map[string]string {
+// AliasSet returns the alias to fully-qualified name mapping stored in the container.
+func (c *Container) AliasSet() map[string]string {
 	if c == nil || c.aliases == nil {
 		return noAliases
 	}
@@ -160,7 +160,7 @@ func (c *Container) findAlias(name string) (string, bool) {
 		simple = name[0:dot]
 		qualifier = name[dot:]
 	}
-	alias, found := c.aliasSet()[simple]
+	alias, found := c.AliasSet()[simple]
 	if !found {
 		return "", false
 	}
@@ -264,7 +264,7 @@ func aliasAs(kind, qualifiedName, alias string) ContainerOption {
 			return nil, fmt.Errorf("%s must refer to a valid qualified name: %s",
 				kind, qualifiedName)
 		}
-		aliasRef, found := c.aliasSet()[alias]
+		aliasRef, found := c.AliasSet()[alias]
 		if found {
 			return nil, fmt.Errorf(
 				"%s collides with existing reference: name=%s, %s=%s, existing=%s",

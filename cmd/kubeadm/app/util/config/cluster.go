@@ -26,12 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	authv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -46,9 +43,9 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
@@ -60,7 +57,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	}
 	_, _ = printer.Printf("[%s] Reading configuration from the %q ConfigMap in namespace %q...\n",
 		logPrefix, constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-	_, _ = printer.Printf("[%s] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n", logPrefix)
+	_, _ = printer.Printf("[%s] Use 'kubeadm init phase upload-config kubeadm --config your-config-file' to re-upload it.\n", logPrefix)
 
 	// Fetch the actual config from cluster
 	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane, skipComponentConfigs)
@@ -176,30 +173,18 @@ func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, node
 		return errors.Wrap(err, "failed to get corresponding node")
 	}
 
-	var (
-		criSocket              string
-		ok                     bool
-		missingAnnotationError = errors.Errorf("node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
-	)
-	if features.Enabled(clusterCfg.FeatureGates, features.NodeLocalCRISocket) {
-		_, err = os.Stat(filepath.Join(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName))
+	criSocket, ok := node.Annotations[constants.AnnotationKubeadmCRISocket]
+	if !ok {
+		configFilePath := filepath.Join(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
+		_, err := os.Stat(configFilePath)
 		if os.IsNotExist(err) {
-			criSocket, ok = node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
-			if !ok {
-				return missingAnnotationError
-			}
-		} else {
-			kubeletConfig, err := readKubeletConfig(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
-			if err != nil {
-				return errors.Wrapf(err, "node %q does not have a kubelet instance configuration", nodeName)
-			}
-			criSocket = kubeletConfig.ContainerRuntimeEndpoint
+			return errors.Errorf("node %s doesn't have %s annotation, or kubelet instance config %s", nodeName, constants.AnnotationKubeadmCRISocket, configFilePath)
 		}
-	} else {
-		criSocket, ok = node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
-		if !ok {
-			return missingAnnotationError
+		kubeletConfig, err := readKubeletConfig(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
+		if err != nil {
+			return errors.Wrapf(err, "could not read kubelet instance configuration on node %q", nodeName)
 		}
+		criSocket = kubeletConfig.ContainerRuntimeEndpoint
 	}
 
 	// returns the nodeRegistration attributes
@@ -214,7 +199,7 @@ func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, node
 
 // getNodeNameFromKubeletConfig gets the node name from a kubelet config file
 // TODO: in future we want to switch to a more canonical way for doing this e.g. by having this
-// information in the local kubelet config.yaml
+// information in the local kubelet config configuration file.
 func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 	// loads the kubelet.conf file
 	config, err := clientcmd.LoadFromFile(fileName)
@@ -279,14 +264,11 @@ func getAPIEndpoint(client clientset.Interface, nodeName string, apiEndpoint *ku
 
 func getAPIEndpointWithRetry(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint,
 	interval, timeout time.Duration) error {
-	var err error
-	var errs []error
-
-	if err = getAPIEndpointFromPodAnnotation(client, nodeName, apiEndpoint, interval, timeout); err == nil {
-		return nil
+	err := getAPIEndpointFromPodAnnotation(client, nodeName, apiEndpoint, interval, timeout)
+	if err != nil {
+		return errors.WithMessagef(err, "could not retrieve API endpoints for node %q using pod annotations", nodeName)
 	}
-	errs = append(errs, errors.WithMessagef(err, "could not retrieve API endpoints for node %q using pod annotations", nodeName))
-	return errorsutil.NewAggregate(errs)
+	return nil
 }
 
 func getAPIEndpointFromPodAnnotation(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint,

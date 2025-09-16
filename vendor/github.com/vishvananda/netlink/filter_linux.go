@@ -54,22 +54,30 @@ func (filter *U32) Type() string {
 
 type Flower struct {
 	FilterAttrs
-	DestIP        net.IP
-	DestIPMask    net.IPMask
-	SrcIP         net.IP
-	SrcIPMask     net.IPMask
-	EthType       uint16
-	EncDestIP     net.IP
-	EncDestIPMask net.IPMask
-	EncSrcIP      net.IP
-	EncSrcIPMask  net.IPMask
-	EncDestPort   uint16
-	EncKeyId      uint32
-	SkipHw        bool
-	SkipSw        bool
-	IPProto       *nl.IPProto
-	DestPort      uint16
-	SrcPort       uint16
+	ClassId         uint32
+	DestIP          net.IP
+	DestIPMask      net.IPMask
+	SrcIP           net.IP
+	SrcIPMask       net.IPMask
+	EthType         uint16
+	EncDestIP       net.IP
+	EncDestIPMask   net.IPMask
+	EncSrcIP        net.IP
+	EncSrcIPMask    net.IPMask
+	EncDestPort     uint16
+	EncKeyId        uint32
+	SrcMac          net.HardwareAddr
+	DestMac         net.HardwareAddr
+	VlanId          uint16
+	SkipHw          bool
+	SkipSw          bool
+	IPProto         *nl.IPProto
+	DestPort        uint16
+	SrcPort         uint16
+	SrcPortRangeMin uint16
+	SrcPortRangeMax uint16
+	DstPortRangeMin uint16
+	DstPortRangeMax uint16
 
 	Actions []Action
 }
@@ -135,6 +143,15 @@ func (filter *Flower) encode(parent *nl.RtAttr) error {
 	if filter.EncKeyId != 0 {
 		parent.AddRtAttr(nl.TCA_FLOWER_KEY_ENC_KEY_ID, htonl(filter.EncKeyId))
 	}
+	if filter.SrcMac != nil {
+		parent.AddRtAttr(nl.TCA_FLOWER_KEY_ETH_SRC, filter.SrcMac)
+	}
+	if filter.DestMac != nil {
+		parent.AddRtAttr(nl.TCA_FLOWER_KEY_ETH_DST, filter.DestMac)
+	}
+	if filter.VlanId != 0 {
+		parent.AddRtAttr(nl.TCA_FLOWER_KEY_VLAN_ID, nl.Uint16Attr(filter.VlanId))
+	}
 	if filter.IPProto != nil {
 		ipproto := *filter.IPProto
 		parent.AddRtAttr(nl.TCA_FLOWER_KEY_IP_PROTO, ipproto.Serialize())
@@ -158,6 +175,19 @@ func (filter *Flower) encode(parent *nl.RtAttr) error {
 				parent.AddRtAttr(nl.TCA_FLOWER_KEY_SCTP_DST, htons(filter.DestPort))
 			}
 		}
+	}
+	if filter.SrcPortRangeMin != 0 && filter.SrcPortRangeMax != 0 {
+		parent.AddRtAttr(nl.TCA_FLOWER_KEY_PORT_SRC_MIN, htons(filter.SrcPortRangeMin))
+		parent.AddRtAttr(nl.TCA_FLOWER_KEY_PORT_SRC_MAX, htons(filter.SrcPortRangeMax))
+	}
+
+	if filter.DstPortRangeMin != 0 && filter.DstPortRangeMax != 0 {
+		parent.AddRtAttr(nl.TCA_FLOWER_KEY_PORT_DST_MIN, htons(filter.DstPortRangeMin))
+		parent.AddRtAttr(nl.TCA_FLOWER_KEY_PORT_DST_MAX, htons(filter.DstPortRangeMax))
+	}
+
+	if filter.ClassId != 0 {
+		parent.AddRtAttr(nl.TCA_FLOWER_CLASSID, nl.Uint32Attr(filter.ClassId))
 	}
 
 	var flags uint32 = 0
@@ -201,6 +231,13 @@ func (filter *Flower) decode(data []syscall.NetlinkRouteAttr) error {
 			filter.EncDestPort = ntohs(datum.Value)
 		case nl.TCA_FLOWER_KEY_ENC_KEY_ID:
 			filter.EncKeyId = ntohl(datum.Value)
+		case nl.TCA_FLOWER_KEY_ETH_SRC:
+			filter.SrcMac = datum.Value
+		case nl.TCA_FLOWER_KEY_ETH_DST:
+			filter.DestMac = datum.Value
+		case nl.TCA_FLOWER_KEY_VLAN_ID:
+			filter.VlanId = native.Uint16(datum.Value[0:2])
+			filter.EthType = unix.ETH_P_8021Q
 		case nl.TCA_FLOWER_KEY_IP_PROTO:
 			val := new(nl.IPProto)
 			*val = nl.IPProto(datum.Value[0])
@@ -228,6 +265,16 @@ func (filter *Flower) decode(data []syscall.NetlinkRouteAttr) error {
 			if skipHw != 0 {
 				filter.SkipHw = true
 			}
+		case nl.TCA_FLOWER_KEY_PORT_SRC_MIN:
+			filter.SrcPortRangeMin = ntohs(datum.Value)
+		case nl.TCA_FLOWER_KEY_PORT_SRC_MAX:
+			filter.SrcPortRangeMax = ntohs(datum.Value)
+		case nl.TCA_FLOWER_KEY_PORT_DST_MIN:
+			filter.DstPortRangeMin = ntohs(datum.Value)
+		case nl.TCA_FLOWER_KEY_PORT_DST_MAX:
+			filter.DstPortRangeMax = ntohs(datum.Value)
+		case nl.TCA_FLOWER_CLASSID:
+			filter.ClassId = native.Uint32(datum.Value)
 		}
 	}
 	return nil
@@ -405,14 +452,20 @@ func (h *Handle) filterModify(filter Filter, proto, flags int) error {
 
 // FilterList gets a list of filters in the system.
 // Equivalent to: `tc filter show`.
+//
 // Generally returns nothing if link and parent are not specified.
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func FilterList(link Link, parent uint32) ([]Filter, error) {
 	return pkgHandle.FilterList(link, parent)
 }
 
 // FilterList gets a list of filters in the system.
 // Equivalent to: `tc filter show`.
+//
 // Generally returns nothing if link and parent are not specified.
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func (h *Handle) FilterList(link Link, parent uint32) ([]Filter, error) {
 	req := h.newNetlinkRequest(unix.RTM_GETTFILTER, unix.NLM_F_DUMP)
 	msg := &nl.TcMsg{
@@ -426,9 +479,9 @@ func (h *Handle) FilterList(link Link, parent uint32) ([]Filter, error) {
 	}
 	req.AddData(msg)
 
-	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWTFILTER)
-	if err != nil {
-		return nil, err
+	msgs, executeErr := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWTFILTER)
+	if executeErr != nil && !errors.Is(executeErr, ErrDumpInterrupted) {
+		return nil, executeErr
 	}
 
 	var res []Filter
@@ -516,7 +569,7 @@ func (h *Handle) FilterList(link Link, parent uint32) ([]Filter, error) {
 		}
 	}
 
-	return res, nil
+	return res, executeErr
 }
 
 func toTcGen(attrs *ActionAttrs, tcgen *nl.TcGen) {
@@ -616,6 +669,22 @@ func EncodeActions(attr *nl.RtAttr, actions []Action) error {
 			}
 			toTcGen(action.Attrs(), &mirred.TcGen)
 			aopts.AddRtAttr(nl.TCA_MIRRED_PARMS, mirred.Serialize())
+		case *VlanAction:
+			table := attr.AddRtAttr(tabIndex, nil)
+			tabIndex++
+			table.AddRtAttr(nl.TCA_ACT_KIND, nl.ZeroTerminated("vlan"))
+			aopts := table.AddRtAttr(nl.TCA_ACT_OPTIONS, nil)
+			vlan := nl.TcVlan{
+				Action: int32(action.Action),
+			}
+			toTcGen(action.Attrs(), &vlan.TcGen)
+			aopts.AddRtAttr(nl.TCA_VLAN_PARMS, vlan.Serialize())
+			if action.Action == TCA_VLAN_ACT_PUSH && action.VlanID == 0 {
+				return fmt.Errorf("vlan id is required for push action")
+			}
+			if action.VlanID != 0 {
+				aopts.AddRtAttr(nl.TCA_VLAN_PUSH_VLAN_ID, nl.Uint16Attr(action.VlanID))
+			}
 		case *TunnelKeyAction:
 			table := attr.AddRtAttr(tabIndex, nil)
 			tabIndex++
@@ -699,6 +768,17 @@ func EncodeActions(attr *nl.RtAttr, actions []Action) error {
 			aopts.AddRtAttr(nl.TCA_ACT_BPF_PARMS, gen.Serialize())
 			aopts.AddRtAttr(nl.TCA_ACT_BPF_FD, nl.Uint32Attr(uint32(action.Fd)))
 			aopts.AddRtAttr(nl.TCA_ACT_BPF_NAME, nl.ZeroTerminated(action.Name))
+		case *SampleAction:
+			table := attr.AddRtAttr(tabIndex, nil)
+			tabIndex++
+			table.AddRtAttr(nl.TCA_ACT_KIND, nl.ZeroTerminated("sample"))
+			aopts := table.AddRtAttr(nl.TCA_ACT_OPTIONS, nil)
+			gen := nl.TcGen{}
+			toTcGen(action.Attrs(), &gen)
+			aopts.AddRtAttr(nl.TCA_ACT_SAMPLE_PARMS, gen.Serialize())
+			aopts.AddRtAttr(nl.TCA_ACT_SAMPLE_RATE, nl.Uint32Attr(action.Rate))
+			aopts.AddRtAttr(nl.TCA_ACT_SAMPLE_PSAMPLE_GROUP, nl.Uint32Attr(action.Group))
+			aopts.AddRtAttr(nl.TCA_ACT_SAMPLE_TRUNC_SIZE, nl.Uint32Attr(action.TruncSize))
 		case *GenericAction:
 			table := attr.AddRtAttr(tabIndex, nil)
 			tabIndex++
@@ -711,6 +791,7 @@ func EncodeActions(attr *nl.RtAttr, actions []Action) error {
 			table := attr.AddRtAttr(tabIndex, nil)
 			tabIndex++
 			pedit := nl.TcPedit{}
+			toTcGen(action.Attrs(), &pedit.Sel.TcGen)
 			if action.SrcMacAddr != nil {
 				pedit.SetEthSrc(action.SrcMacAddr)
 			}
@@ -784,8 +865,12 @@ func parseActions(tables []syscall.NetlinkRouteAttr) ([]Action, error) {
 					action = &ConnmarkAction{}
 				case "csum":
 					action = &CsumAction{}
+				case "sample":
+					action = &SampleAction{}
 				case "gact":
 					action = &GenericAction{}
+				case "vlan":
+					action = &VlanAction{}
 				case "tunnel_key":
 					action = &TunnelKeyAction{}
 				case "skbedit":
@@ -816,7 +901,17 @@ func parseActions(tables []syscall.NetlinkRouteAttr) ([]Action, error) {
 							tcTs := nl.DeserializeTcf(adatum.Value)
 							actionTimestamp = toTimeStamp(tcTs)
 						}
-
+					case "vlan":
+						switch adatum.Attr.Type {
+						case nl.TCA_VLAN_PARMS:
+							vlan := *nl.DeserializeTcVlan(adatum.Value)
+							action.(*VlanAction).ActionAttrs = ActionAttrs{}
+							toAttrs(&vlan.TcGen, action.Attrs())
+							action.(*VlanAction).Action = VlanAct(vlan.Action)
+						case nl.TCA_VLAN_PUSH_VLAN_ID:
+							vlanId := native.Uint16(adatum.Value[0:2])
+							action.(*VlanAction).VlanID = vlanId
+						}
 					case "tunnel_key":
 						switch adatum.Attr.Type {
 						case nl.TCA_TUNNEL_KEY_PARMS:
@@ -895,6 +990,18 @@ func parseActions(tables []syscall.NetlinkRouteAttr) ([]Action, error) {
 						case nl.TCA_CSUM_TM:
 							tcTs := nl.DeserializeTcf(adatum.Value)
 							actionTimestamp = toTimeStamp(tcTs)
+						}
+					case "sample":
+						switch adatum.Attr.Type {
+						case nl.TCA_ACT_SAMPLE_PARMS:
+							gen := *nl.DeserializeTcGen(adatum.Value)
+							toAttrs(&gen, action.Attrs())
+						case nl.TCA_ACT_SAMPLE_RATE:
+							action.(*SampleAction).Rate = native.Uint32(adatum.Value[0:4])
+						case nl.TCA_ACT_SAMPLE_PSAMPLE_GROUP:
+							action.(*SampleAction).Group = native.Uint32(adatum.Value[0:4])
+						case nl.TCA_ACT_SAMPLE_TRUNC_SIZE:
+							action.(*SampleAction).TruncSize = native.Uint32(adatum.Value[0:4])
 						}
 					case "gact":
 						switch adatum.Attr.Type {

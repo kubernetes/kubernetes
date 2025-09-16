@@ -17,150 +17,165 @@ package rafthttp
 import "github.com/prometheus/client_golang/prometheus"
 
 var (
-	activePeers = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "active_peers",
-		Help:      "The current number of active peer connections.",
-	},
+	activePeers = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "active_peers",
+			Help:      "The current number of active peer connections.",
+		},
 		[]string{"Local", "Remote"},
 	)
 
-	disconnectedPeers = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "disconnected_peers_total",
-		Help:      "The total number of disconnected peers.",
-	},
+	disconnectedPeers = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "disconnected_peers_total",
+			Help:      "The total number of disconnected peers.",
+		},
 		[]string{"Local", "Remote"},
 	)
 
-	sentBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "peer_sent_bytes_total",
-		Help:      "The total number of bytes sent to peers.",
-	},
+	sentBytes = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "peer_sent_bytes_total",
+			Help:      "The total number of bytes sent to peers.",
+		},
 		[]string{"To"},
 	)
 
-	receivedBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "peer_received_bytes_total",
-		Help:      "The total number of bytes received from peers.",
-	},
+	receivedBytes = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "peer_received_bytes_total",
+			Help:      "The total number of bytes received from peers.",
+		},
 		[]string{"From"},
 	)
 
-	sentFailures = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "peer_sent_failures_total",
-		Help:      "The total number of send failures from peers.",
-	},
+	sentFailures = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "peer_sent_failures_total",
+			Help:      "The total number of send failures from peers.",
+		},
 		[]string{"To"},
 	)
 
-	recvFailures = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "peer_received_failures_total",
-		Help:      "The total number of receive failures from peers.",
-	},
+	recvFailures = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "peer_received_failures_total",
+			Help:      "The total number of receive failures from peers.",
+		},
 		[]string{"From"},
 	)
 
-	snapshotSend = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "snapshot_send_success",
-		Help:      "Total number of successful snapshot sends",
-	},
+	snapshotSend = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "snapshot_send_success",
+			Help:      "Total number of successful snapshot sends",
+		},
 		[]string{"To"},
 	)
 
-	snapshotSendInflights = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "snapshot_send_inflights_total",
-		Help:      "Total number of inflight snapshot sends",
-	},
+	snapshotSendInflights = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "snapshot_send_inflights_total",
+			Help:      "Total number of inflight snapshot sends",
+		},
 		[]string{"To"},
 	)
 
-	snapshotSendFailures = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "snapshot_send_failures",
-		Help:      "Total number of snapshot send failures",
-	},
+	snapshotSendFailures = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "snapshot_send_failures",
+			Help:      "Total number of snapshot send failures",
+		},
 		[]string{"To"},
 	)
 
-	snapshotSendSeconds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "snapshot_send_total_duration_seconds",
-		Help:      "Total latency distributions of v3 snapshot sends",
+	snapshotSendSeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "snapshot_send_total_duration_seconds",
+			Help:      "Total latency distributions of v3 snapshot sends",
 
-		// lowest bucket start of upper bound 0.1 sec (100 ms) with factor 2
-		// highest bucket start of 0.1 sec * 2^9 == 51.2 sec
-		Buckets: prometheus.ExponentialBuckets(0.1, 2, 10),
-	},
+			// lowest bucket start of upper bound 0.1 sec (100 ms) with factor 2
+			// highest bucket start of 0.1 sec * 2^9 == 51.2 sec
+			Buckets: prometheus.ExponentialBuckets(0.1, 2, 10),
+		},
 		[]string{"To"},
 	)
 
-	snapshotReceive = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "snapshot_receive_success",
-		Help:      "Total number of successful snapshot receives",
-	},
+	snapshotReceive = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "snapshot_receive_success",
+			Help:      "Total number of successful snapshot receives",
+		},
 		[]string{"From"},
 	)
 
-	snapshotReceiveInflights = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "snapshot_receive_inflights_total",
-		Help:      "Total number of inflight snapshot receives",
-	},
+	snapshotReceiveInflights = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "snapshot_receive_inflights_total",
+			Help:      "Total number of inflight snapshot receives",
+		},
 		[]string{"From"},
 	)
 
-	snapshotReceiveFailures = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "snapshot_receive_failures",
-		Help:      "Total number of snapshot receive failures",
-	},
+	snapshotReceiveFailures = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "snapshot_receive_failures",
+			Help:      "Total number of snapshot receive failures",
+		},
 		[]string{"From"},
 	)
 
-	snapshotReceiveSeconds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "snapshot_receive_total_duration_seconds",
-		Help:      "Total latency distributions of v3 snapshot receives",
+	snapshotReceiveSeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "snapshot_receive_total_duration_seconds",
+			Help:      "Total latency distributions of v3 snapshot receives",
 
-		// lowest bucket start of upper bound 0.1 sec (100 ms) with factor 2
-		// highest bucket start of 0.1 sec * 2^9 == 51.2 sec
-		Buckets: prometheus.ExponentialBuckets(0.1, 2, 10),
-	},
+			// lowest bucket start of upper bound 0.1 sec (100 ms) with factor 2
+			// highest bucket start of 0.1 sec * 2^9 == 51.2 sec
+			Buckets: prometheus.ExponentialBuckets(0.1, 2, 10),
+		},
 		[]string{"From"},
 	)
 
-	rttSec = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "etcd",
-		Subsystem: "network",
-		Name:      "peer_round_trip_time_seconds",
-		Help:      "Round-Trip-Time histogram between peers",
+	rttSec = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "etcd",
+			Subsystem: "network",
+			Name:      "peer_round_trip_time_seconds",
+			Help:      "Round-Trip-Time histogram between peers",
 
-		// lowest bucket start of upper bound 0.0001 sec (0.1 ms) with factor 2
-		// highest bucket start of 0.0001 sec * 2^15 == 3.2768 sec
-		Buckets: prometheus.ExponentialBuckets(0.0001, 2, 16),
-	},
+			// lowest bucket start of upper bound 0.0001 sec (0.1 ms) with factor 2
+			// highest bucket start of 0.0001 sec * 2^15 == 3.2768 sec
+			Buckets: prometheus.ExponentialBuckets(0.0001, 2, 16),
+		},
 		[]string{"To"},
 	)
 )

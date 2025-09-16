@@ -20,11 +20,16 @@ import (
 	"regexp"
 
 	"github.com/google/cel-go/common/ast"
+	"github.com/google/cel-go/common/env"
 	"github.com/google/cel-go/common/overloads"
 )
 
 const (
-	homogeneousValidatorName = "cel.lib.std.validate.types.homogeneous"
+	durationValidatorName     = "cel.validator.duration"
+	regexValidatorName        = "cel.validator.matches"
+	timestampValidatorName    = "cel.validator.timestamp"
+	homogeneousValidatorName  = "cel.validator.homogeneous_literals"
+	nestingLimitValidatorName = "cel.validator.comprehension_nesting_limit"
 
 	// HomogeneousAggregateLiteralExemptFunctions is the ValidatorConfig key used to configure
 	// the set of function names which are exempt from homogeneous type checks. The expected type
@@ -35,6 +40,35 @@ const (
 	// clauses; however, all other uses of a mixed element type list, would be unexpected.
 	HomogeneousAggregateLiteralExemptFunctions = homogeneousValidatorName + ".exempt"
 )
+
+var (
+	astValidatorFactories = map[string]ASTValidatorFactory{
+		nestingLimitValidatorName: func(val *env.Validator) (ASTValidator, error) {
+			if limit, found := val.ConfigValue("limit"); found {
+				if val, isInt := limit.(int); isInt {
+					return ValidateComprehensionNestingLimit(val), nil
+				}
+				return nil, fmt.Errorf("invalid validator: %s unsupported limit type: %v", nestingLimitValidatorName, limit)
+			}
+			return nil, fmt.Errorf("invalid validator: %s missing limit", nestingLimitValidatorName)
+		},
+		durationValidatorName: func(*env.Validator) (ASTValidator, error) {
+			return ValidateDurationLiterals(), nil
+		},
+		regexValidatorName: func(*env.Validator) (ASTValidator, error) {
+			return ValidateRegexLiterals(), nil
+		},
+		timestampValidatorName: func(*env.Validator) (ASTValidator, error) {
+			return ValidateTimestampLiterals(), nil
+		},
+		homogeneousValidatorName: func(*env.Validator) (ASTValidator, error) {
+			return ValidateHomogeneousAggregateLiterals(), nil
+		},
+	}
+)
+
+// ASTValidatorFactory creates an ASTValidator as configured by the input map
+type ASTValidatorFactory func(*env.Validator) (ASTValidator, error)
 
 // ASTValidators configures a set of ASTValidator instances into the target environment.
 //
@@ -68,6 +102,18 @@ type ASTValidator interface {
 	// See individual validators for more information on their configuration keys and configuration
 	// properties.
 	Validate(*Env, ValidatorConfig, *ast.AST, *Issues)
+}
+
+// ConfigurableASTValidator supports conversion of an object to an `env.Validator` instance used for
+// YAML serialization.
+type ConfigurableASTValidator interface {
+	// ToConfig converts the internal configuration of an ASTValidator into an env.Validator instance
+	// which minimally must include the validator name, but may also include a map[string]any config
+	// object to be serialized to YAML. The string keys represent the configuration parameter name,
+	// and the any value must mirror the internally supported type associated with the config key.
+	//
+	// Note: only primitive CEL types are supported by CEL validators at this time.
+	ToConfig() *env.Validator
 }
 
 // ValidatorConfig provides an accessor method for querying validator configuration state.
@@ -196,7 +242,12 @@ type formatValidator struct {
 
 // Name returns the unique name of this function format validator.
 func (v formatValidator) Name() string {
-	return fmt.Sprintf("cel.lib.std.validate.functions.%s", v.funcName)
+	return fmt.Sprintf("cel.validator.%s", v.funcName)
+}
+
+// ToConfig converts the ASTValidator to an env.Validator specifying the validator name.
+func (v formatValidator) ToConfig() *env.Validator {
+	return env.NewValidator(v.Name())
 }
 
 // Validate searches the AST for uses of a given function name with a constant argument and performs a check
@@ -240,6 +291,11 @@ type homogeneousAggregateLiteralValidator struct{}
 // Name returns the unique name of the homogeneous type validator.
 func (homogeneousAggregateLiteralValidator) Name() string {
 	return homogeneousValidatorName
+}
+
+// ToConfig converts the ASTValidator to an env.Validator specifying the validator name.
+func (v homogeneousAggregateLiteralValidator) ToConfig() *env.Validator {
+	return env.NewValidator(v.Name())
 }
 
 // Validate validates that all lists and map literals have homogeneous types, i.e. don't contain dyn types.
@@ -336,10 +392,18 @@ type nestingLimitValidator struct {
 	limit int
 }
 
+// Name returns the name of the nesting limit validator.
 func (v nestingLimitValidator) Name() string {
-	return "cel.lib.std.validate.comprehension_nesting_limit"
+	return nestingLimitValidatorName
 }
 
+// ToConfig converts the ASTValidator to an env.Validator specifying the validator name and the nesting limit
+// as an integer value: {"limit": int}
+func (v nestingLimitValidator) ToConfig() *env.Validator {
+	return env.NewValidator(v.Name()).SetConfig(map[string]any{"limit": v.limit})
+}
+
+// Validate implements the ASTValidator interface method.
 func (v nestingLimitValidator) Validate(e *Env, _ ValidatorConfig, a *ast.AST, iss *Issues) {
 	root := ast.NavigateAST(a)
 	comprehensions := ast.MatchDescendants(root, ast.KindMatcher(ast.ComprehensionKind))

@@ -29,12 +29,32 @@ import (
 
 // ServiceAccountApplyConfiguration represents a declarative configuration of the ServiceAccount type for use
 // with apply.
+//
+// ServiceAccount binds together:
+// * a name, understood by users, and perhaps by peripheral systems, for an identity
+// * a principal that can be authenticated and authorized
+// * a set of secrets
 type ServiceAccountApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Secrets                              []ObjectReferenceApplyConfiguration      `json:"secrets,omitempty"`
-	ImagePullSecrets                     []LocalObjectReferenceApplyConfiguration `json:"imagePullSecrets,omitempty"`
-	AutomountServiceAccountToken         *bool                                    `json:"automountServiceAccountToken,omitempty"`
+	// Secrets is a list of the secrets in the same namespace that pods running using this ServiceAccount are allowed to use.
+	// Pods are only limited to this list if this service account has a "kubernetes.io/enforce-mountable-secrets" annotation set to "true".
+	// The "kubernetes.io/enforce-mountable-secrets" annotation is deprecated since v1.32.
+	// Prefer separate namespaces to isolate access to mounted secrets.
+	// This field should not be used to find auto-generated service account token secrets for use outside of pods.
+	// Instead, tokens can be requested directly using the TokenRequest API, or service account token secrets can be manually created.
+	// More info: https://kubernetes.io/docs/concepts/configuration/secret
+	Secrets []ObjectReferenceApplyConfiguration `json:"secrets,omitempty"`
+	// ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images
+	// in pods that reference this ServiceAccount. ImagePullSecrets are distinct from Secrets because Secrets
+	// can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
+	// More info: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+	ImagePullSecrets []LocalObjectReferenceApplyConfiguration `json:"imagePullSecrets,omitempty"`
+	// AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
+	// Can be overridden at the pod level.
+	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty"`
 }
 
 // ServiceAccount constructs a declarative configuration of the ServiceAccount type for use with
@@ -48,29 +68,14 @@ func ServiceAccount(name, namespace string) *ServiceAccountApplyConfiguration {
 	return b
 }
 
-// ExtractServiceAccount extracts the applied configuration owned by fieldManager from
-// serviceAccount. If no managedFields are found in serviceAccount for fieldManager, a
-// ServiceAccountApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractServiceAccountFrom extracts the applied configuration owned by fieldManager from
+// serviceAccount for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // serviceAccount must be a unmodified ServiceAccount API object that was retrieved from the Kubernetes API.
-// ExtractServiceAccount provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractServiceAccountFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
-	return extractServiceAccount(serviceAccount, fieldManager, "")
-}
-
-// ExtractServiceAccountStatus is the same as ExtractServiceAccount except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractServiceAccountStatus(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
-	return extractServiceAccount(serviceAccount, fieldManager, "status")
-}
-
-func extractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager string, subresource string) (*ServiceAccountApplyConfiguration, error) {
+func ExtractServiceAccountFrom(serviceAccount *corev1.ServiceAccount, fieldManager string, subresource string) (*ServiceAccountApplyConfiguration, error) {
 	b := &ServiceAccountApplyConfiguration{}
 	err := managedfields.ExtractInto(serviceAccount, internal.Parser().Type("io.k8s.api.core.v1.ServiceAccount"), fieldManager, b, subresource)
 	if err != nil {
@@ -83,6 +88,28 @@ func extractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager s
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+
+// ExtractServiceAccount extracts the applied configuration owned by fieldManager from
+// serviceAccount. If no managedFields are found in serviceAccount for fieldManager, a
+// ServiceAccountApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// serviceAccount must be a unmodified ServiceAccount API object that was retrieved from the Kubernetes API.
+// ExtractServiceAccount provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractServiceAccount(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+	return ExtractServiceAccountFrom(serviceAccount, fieldManager, "")
+}
+
+// ExtractServiceAccountToken extracts the applied configuration owned by fieldManager from
+// serviceAccount for the token subresource.
+func ExtractServiceAccountToken(serviceAccount *corev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+	return ExtractServiceAccountFrom(serviceAccount, fieldManager, "token")
+}
+
+func (b ServiceAccountApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -276,8 +303,24 @@ func (b *ServiceAccountApplyConfiguration) WithAutomountServiceAccountToken(valu
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ServiceAccountApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ServiceAccountApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ServiceAccountApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ServiceAccountApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

@@ -82,7 +82,7 @@ func maskTrailingDash(name string) string {
 func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, IsNegativeErrorMsg))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, IsNegativeErrorMsg).WithOrigin("minimum"))
 	}
 	return allErrs
 }

@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // statefulSetStrategy implements verification logic for Replication StatefulSets.
@@ -118,20 +118,9 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 //	    newSvc.Spec.MyFeature = nil
 //	}
 func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.StatefulSet) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		if oldSS == nil || oldSS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
-			newSS.Spec.PersistentVolumeClaimRetentionPolicy = nil
-		}
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) && !maxUnavailableInUse(oldSS) {
 		if newSS.Spec.UpdateStrategy.RollingUpdate != nil {
 			newSS.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
-		}
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
-		if oldSS == nil || oldSS.Spec.Ordinals == nil {
-			// Reset Spec.Ordinals to the default value (nil).
-			newSS.Spec.Ordinals = nil
 		}
 	}
 }
@@ -149,6 +138,10 @@ func (statefulSetStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Obj
 	warnings := pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newStatefulSet.Spec.Template, nil)
 	for i, pvc := range newStatefulSet.Spec.VolumeClaimTemplates {
 		warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec", "volumeClaimTemplates").Index(i), pvc.Spec)...)
+	}
+
+	if newStatefulSet.Spec.RevisionHistoryLimit != nil && *newStatefulSet.Spec.RevisionHistoryLimit < 0 {
+		warnings = append(warnings, "spec.revisionHistoryLimit: a negative value retains all historical revisions; a value >= 0 is recommended")
 	}
 	return warnings
 }
@@ -181,6 +174,9 @@ func (statefulSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 	}
 	for i, pvc := range newStatefulSet.Spec.VolumeClaimTemplates {
 		warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec", "volumeClaimTemplates").Index(i).Child("Spec"), pvc.Spec)...)
+	}
+	if newStatefulSet.Spec.RevisionHistoryLimit != nil && *newStatefulSet.Spec.RevisionHistoryLimit < 0 {
+		warnings = append(warnings, "spec.revisionHistoryLimit: a negative value retains all historical revisions; a value >= 0 is recommended")
 	}
 
 	return warnings

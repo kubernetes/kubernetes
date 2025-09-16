@@ -19,7 +19,6 @@ import (
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/internal/strs"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
 // Edition is an Enum for proto2.Edition
@@ -32,6 +31,7 @@ const (
 	EditionProto2      Edition = 998
 	EditionProto3      Edition = 999
 	Edition2023        Edition = 1000
+	Edition2024        Edition = 1001
 	EditionUnsupported Edition = 100000
 )
 
@@ -77,31 +77,48 @@ type (
 		Locations SourceLocations
 	}
 
+	// EditionFeatures is a frequently-instantiated struct, so please take care
+	// to minimize padding when adding new fields to this struct (add them in
+	// the right place/order).
 	EditionFeatures struct {
+		// StripEnumPrefix determines if the plugin generates enum value
+		// constants as-is, with their prefix stripped, or both variants.
+		StripEnumPrefix int
+
 		// IsFieldPresence is true if field_presence is EXPLICIT
 		// https://protobuf.dev/editions/features/#field_presence
 		IsFieldPresence bool
+
 		// IsFieldPresence is true if field_presence is LEGACY_REQUIRED
 		// https://protobuf.dev/editions/features/#field_presence
 		IsLegacyRequired bool
+
 		// IsOpenEnum is true if enum_type is OPEN
 		// https://protobuf.dev/editions/features/#enum_type
 		IsOpenEnum bool
+
 		// IsPacked is true if repeated_field_encoding is PACKED
 		// https://protobuf.dev/editions/features/#repeated_field_encoding
 		IsPacked bool
+
 		// IsUTF8Validated is true if utf_validation is VERIFY
 		// https://protobuf.dev/editions/features/#utf8_validation
 		IsUTF8Validated bool
+
 		// IsDelimitedEncoded is true if message_encoding is DELIMITED
 		// https://protobuf.dev/editions/features/#message_encoding
 		IsDelimitedEncoded bool
+
 		// IsJSONCompliant is true if json_format is ALLOW
 		// https://protobuf.dev/editions/features/#json_format
 		IsJSONCompliant bool
+
 		// GenerateLegacyUnmarshalJSON determines if the plugin generates the
 		// UnmarshalJSON([]byte) error method for enums.
 		GenerateLegacyUnmarshalJSON bool
+		// APILevel controls which API (Open, Hybrid or Opaque) should be used
+		// for generated code (.pb.go files).
+		APILevel int
 	}
 )
 
@@ -257,7 +274,6 @@ type (
 		Kind             protoreflect.Kind
 		StringName       stringName
 		IsProto3Optional bool // promoted from google.protobuf.FieldDescriptorProto
-		IsWeak           bool // promoted from google.protobuf.FieldOptions
 		IsLazy           bool // promoted from google.protobuf.FieldOptions
 		Default          defaultValue
 		ContainingOneof  protoreflect.OneofDescriptor // must be consistent with Message.Oneofs.Fields
@@ -351,7 +367,7 @@ func (fd *Field) IsPacked() bool {
 	return fd.L1.EditionFeatures.IsPacked
 }
 func (fd *Field) IsExtension() bool { return false }
-func (fd *Field) IsWeak() bool      { return fd.L1.IsWeak }
+func (fd *Field) IsWeak() bool      { return false }
 func (fd *Field) IsLazy() bool      { return fd.L1.IsLazy }
 func (fd *Field) IsList() bool      { return fd.Cardinality() == protoreflect.Repeated && !fd.IsMap() }
 func (fd *Field) IsMap() bool       { return fd.Message() != nil && fd.Message().IsMapEntry() }
@@ -378,11 +394,6 @@ func (fd *Field) Enum() protoreflect.EnumDescriptor {
 	return fd.L1.Enum
 }
 func (fd *Field) Message() protoreflect.MessageDescriptor {
-	if fd.L1.IsWeak {
-		if d, _ := protoregistry.GlobalFiles.FindDescriptorByName(fd.L1.Message.FullName()); d != nil {
-			return d.(protoreflect.MessageDescriptor)
-		}
-	}
 	return fd.L1.Message
 }
 func (fd *Field) IsMapEntry() bool {

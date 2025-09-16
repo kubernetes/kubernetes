@@ -17,10 +17,12 @@ limitations under the License.
 package nodeunschedulable
 
 import (
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -32,7 +34,7 @@ func TestNodeUnschedulable(t *testing.T) {
 		name       string
 		pod        *v1.Pod
 		node       *v1.Node
-		wantStatus *framework.Status
+		wantStatus *fwk.Status
 	}{
 		{
 			name: "Does not schedule pod to unschedulable node (node.Spec.Unschedulable==true)",
@@ -42,7 +44,7 @@ func TestNodeUnschedulable(t *testing.T) {
 					Unschedulable: true,
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonUnschedulable),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonUnschedulable),
 		},
 		{
 			name: "Schedule pod to normal node",
@@ -81,9 +83,9 @@ func TestNodeUnschedulable(t *testing.T) {
 		if err != nil {
 			t.Fatalf("creating plugin: %v", err)
 		}
-		gotStatus := p.(framework.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
-		if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-			t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+		gotStatus := p.(fwk.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
+		if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+			t.Errorf("status does not match (-want,+got):\n%s", diff)
 		}
 	}
 }
@@ -93,14 +95,14 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 		name           string
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		{
 			name:         "error-wrong-new-object",
 			pod:          &v1.Pod{},
 			newObj:       "not-a-node",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		{
@@ -112,7 +114,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 				},
 			},
 			oldObj:       "not-a-node",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		{
@@ -123,7 +125,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 					Unschedulable: true,
 				},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "queue-on-schedulable-node-added",
@@ -133,7 +135,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 					Unschedulable: false,
 				},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "skip-unrelated-change-unschedulable-true",
@@ -154,7 +156,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 					Unschedulable: true,
 				},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "skip-unrelated-change-unschedulable-false",
@@ -175,7 +177,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 					Unschedulable: false,
 				},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "queue-on-unschedulable-field-change",
@@ -190,7 +192,7 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 					Unschedulable: true,
 				},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 	}
 
@@ -214,14 +216,14 @@ func TestIsSchedulableAfterPodTolerationChange(t *testing.T) {
 		name           string
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		{
 			name:         "error-wrong-new-object",
 			pod:          &v1.Pod{},
 			newObj:       "not-a-pod",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		{
@@ -229,7 +231,7 @@ func TestIsSchedulableAfterPodTolerationChange(t *testing.T) {
 			pod:          &v1.Pod{},
 			newObj:       &v1.Pod{},
 			oldObj:       "not-a-pod",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		{
@@ -237,21 +239,21 @@ func TestIsSchedulableAfterPodTolerationChange(t *testing.T) {
 			pod:          st.MakePod().UID("uid").Obj(),
 			newObj:       st.MakePod().UID("different-uid").Toleration(v1.TaintNodeUnschedulable).Obj(),
 			oldObj:       st.MakePod().UID("different-uid").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "queue-when-the-unsched-pod-gets-toleration",
 			pod:          st.MakePod().UID("uid").Obj(),
 			newObj:       st.MakePod().UID("uid").Toleration(v1.TaintNodeUnschedulable).Obj(),
 			oldObj:       st.MakePod().UID("uid").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name:         "skip-when-the-unsched-pod-gets-unrelated-toleration",
 			pod:          st.MakePod().UID("uid").Obj(),
 			newObj:       st.MakePod().UID("uid").Toleration("unrelated-key").Obj(),
 			oldObj:       st.MakePod().UID("uid").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 	}
 

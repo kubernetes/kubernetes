@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -42,24 +41,19 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
 var (
-	iptablesCleanupInstructions = dedent.Dedent(`
-		The reset process does not reset or clean up iptables rules or IPVS tables.
-		If you wish to reset iptables, you must do so manually by using the "iptables" command.
+	manualCleanupInstructions = dedent.Dedent(`
+		The reset process does not perform cleanup of CNI plugin configuration,
+		network filtering rules and kubeconfig files.
 
-		If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
-		to reset your system's IPVS tables.
+		For information on how to perform this cleanup manually, please see:
+		    https://k8s.io/docs/reference/setup-tools/kubeadm/kubeadm-reset/
 
-		The reset process does not clean your kubeconfig files and you must remove them manually.
-		Please, check the contents of the $HOME/.kube/config file.
-	`)
-
-	cniCleanupInstructions = dedent.Dedent(`
-		The reset process does not clean CNI configuration. To do so, you must remove /etc/cni/net.d
 	`)
 )
 
@@ -234,10 +228,7 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 				return err
 			}
 
-			// output help text instructing user how to remove cni folders
-			fmt.Print(cniCleanupInstructions)
-			// Output help text instructing user how to remove iptables rules
-			fmt.Print(iptablesCleanupInstructions)
+			fmt.Print(manualCleanupInstructions)
 			return nil
 		},
 	}

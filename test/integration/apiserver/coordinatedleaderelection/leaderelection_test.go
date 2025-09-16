@@ -23,6 +23,7 @@ import (
 	"time"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	v1beta1 "k8s.io/api/coordination/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -36,25 +37,26 @@ import (
 )
 
 func TestCoordinatedLeaderElectionLeaseTransfer(t *testing.T) {
-	// Reset the coordinated leader election variables after the test
-	defaultLeaseDuration := leaderelection.LeaseDuration
-	defaultRenewDeadline := leaderelection.RenewDeadline
-	defaultRetryPeriod := leaderelection.RetryPeriod
-	defer func() {
-		leaderelection.LeaseDuration = defaultLeaseDuration
-		leaderelection.RenewDeadline = defaultRenewDeadline
-		leaderelection.RetryPeriod = defaultRetryPeriod
-	}()
-
 	// Use shorter interval for lease duration in integration test
-	leaderelection.LeaseDuration = 5 * time.Second
-	leaderelection.RenewDeadline = 3 * time.Second
-	leaderelection.RetryPeriod = 2 * time.Second
+	timers := leaderelection.LeaderElectionTimers{
+		LeaseDuration: 5 * time.Second,
+		RenewDeadline: 3 * time.Second,
+		// RetryPeriod is intentionally set low because integration tests
+		// have a 10s timeout limit for wait.Poll(...) operations.
+		// This test forces an apiserver to give up its lease and enter a state of
+		// backoff when attempting to acquire the lease. Given the default JitterFactor of 1.2
+		// the maximum delay in renewal is 1 * (1 + 1.2) = 2.2s
+		// providing multiple renewal chances to minimize test flake.
+		RetryPeriod: 1 * time.Second,
+	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 	etcd := framework.SharedEtcd()
 
-	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, etcd)
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
+	// Set the timers on the apiserver .
+	flags = append(flags, fmt.Sprintf("--coordinated-leadership-lease-duration=%s", timers.LeaseDuration.String()), fmt.Sprintf("--coordinated-leadership-renew-deadline=%s", timers.RenewDeadline.String()), fmt.Sprintf("--coordinated-leadership-retry-period=%s", timers.RetryPeriod.String()))
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), flags, etcd)
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -83,7 +85,7 @@ func TestCoordinatedLeaderElectionLeaseTransfer(t *testing.T) {
 
 	leaseName := *lease.Spec.HolderIdentity
 
-	server2 := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, etcd)
+	server2 := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), flags, etcd)
 	vap := &admissionregistrationv1.ValidatingAdmissionPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: "cle-block-renewal"},
 		Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
@@ -138,6 +140,20 @@ func TestCoordinatedLeaderElectionLeaseTransfer(t *testing.T) {
 
 	// Shutdown the second apiserver
 	server2.TearDownFn()
+
+	// Forcefully expire the lease so the transition will be faster. Waiting the full duration could cause flakes.
+	// This must be done before the VAP on the first apiserver is removed to avoid conflicts in updating.
+	lease, err = clientset.CoordinationV1().Leases("kube-system").Get(ctx, "leader-election-controller", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lease.Spec.HolderIdentity != nil && *lease.Spec.HolderIdentity != leaseName {
+		lease.Spec.RenewTime = &metav1.MicroTime{Time: time.Now().Add(-30 * time.Second)}
+		_, err = clientset.CoordinationV1().Leases("kube-system").Update(ctx, lease, metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	// Allow writes again from the first apiserver
 	err = clientset.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete(ctx, vap.Name, metav1.DeleteOptions{})

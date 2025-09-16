@@ -17,7 +17,9 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"errors"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"sync"
 	"time"
 
@@ -71,15 +73,14 @@ type Config struct {
 	// resync.
 	ShouldResync ShouldResyncFunc
 
-	// If true, when Process() returns an error, re-enqueue the object.
-	// TODO: add interface to let you inject a delay/backoff or drop
-	//       the object completely if desired. Pass the object in
-	//       question to this interface as a parameter.  This is probably moot
-	//       now that this functionality appears at a higher level.
-	RetryOnError bool
-
 	// Called whenever the ListAndWatch drops the connection with an error.
+	//
+	// Contextual logging: WatchErrorHandlerWithContext should be used instead of WatchErrorHandler in code which supports contextual logging.
 	WatchErrorHandler WatchErrorHandler
+
+	// Called whenever the ListAndWatch drops the connection with an error
+	// and WatchErrorHandler is not set.
+	WatchErrorHandlerWithContext WatchErrorHandlerWithContext
 
 	// WatchListPageSize is the requested chunk size of initial and relist watch lists.
 	WatchListPageSize int64
@@ -104,12 +105,21 @@ type controller struct {
 // Controller is a low-level controller that is parameterized by a
 // Config and used in sharedIndexInformer.
 type Controller interface {
-	// Run does two things.  One is to construct and run a Reflector
+	// RunWithContext does two things.  One is to construct and run a Reflector
 	// to pump objects/notifications from the Config's ListerWatcher
 	// to the Config's Queue and possibly invoke the occasional Resync
 	// on that Queue.  The other is to repeatedly Pop from the Queue
 	// and process with the Config's ProcessFunc.  Both of these
-	// continue until `stopCh` is closed.
+	// continue until the context is canceled.
+	//
+	// It's an error to call RunWithContext more than once.
+	// RunWithContext blocks; call via go.
+	RunWithContext(ctx context.Context)
+
+	// Run does the same as RunWithContext with a stop channel instead of
+	// a context.
+	//
+	// Contextual logging: RunWithcontext should be used instead of Run in code which supports contextual logging.
 	Run(stopCh <-chan struct{})
 
 	// HasSynced delegates to the Config's Queue
@@ -129,13 +139,16 @@ func New(c *Config) Controller {
 	return ctlr
 }
 
-// Run begins processing items, and will continue until a value is sent down stopCh or it is closed.
-// It's an error to call Run more than once.
-// Run blocks; call via go.
+// Run implements [Controller.Run].
 func (c *controller) Run(stopCh <-chan struct{}) {
-	defer utilruntime.HandleCrash()
+	c.RunWithContext(wait.ContextForChannel(stopCh))
+}
+
+// RunWithContext implements [Controller.RunWithContext].
+func (c *controller) RunWithContext(ctx context.Context) {
+	defer utilruntime.HandleCrashWithContext(ctx)
 	go func() {
-		<-stopCh
+		<-ctx.Done()
 		c.config.Queue.Close()
 	}()
 	r := NewReflectorWithOptions(
@@ -152,7 +165,11 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 	r.ShouldResync = c.config.ShouldResync
 	r.WatchListPageSize = c.config.WatchListPageSize
 	if c.config.WatchErrorHandler != nil {
-		r.watchErrorHandler = c.config.WatchErrorHandler
+		r.watchErrorHandler = func(_ context.Context, r *Reflector, err error) {
+			c.config.WatchErrorHandler(r, err)
+		}
+	} else if c.config.WatchErrorHandlerWithContext != nil {
+		r.watchErrorHandler = c.config.WatchErrorHandlerWithContext
 	}
 
 	c.reflectorMutex.Lock()
@@ -161,9 +178,9 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 
 	var wg wait.Group
 
-	wg.StartWithChannel(stopCh, r.Run)
+	wg.StartWithContext(ctx, r.RunWithContext)
 
-	wait.Until(c.processLoop, time.Second, stopCh)
+	wait.UntilWithContext(ctx, c.processLoop, time.Second)
 	wg.Wait()
 }
 
@@ -185,21 +202,17 @@ func (c *controller) LastSyncResourceVersion() string {
 // TODO: Consider doing the processing in parallel. This will require a little thought
 // to make sure that we don't end up processing the same object multiple times
 // concurrently.
-//
-// TODO: Plumb through the stopCh here (and down to the queue) so that this can
-// actually exit when the controller is stopped. Or just give up on this stuff
-// ever being stoppable. Converting this whole package to use Context would
-// also be helpful.
-func (c *controller) processLoop() {
+func (c *controller) processLoop(ctx context.Context) {
 	for {
-		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
-		if err != nil {
-			if err == ErrFIFOClosed {
-				return
-			}
-			if c.config.RetryOnError {
-				// This is the safe way to re-enqueue.
-				c.config.Queue.AddIfNotPresent(obj)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			_, err := c.config.Pop(PopProcessFunc(c.config.Process))
+			if err != nil {
+				if errors.Is(err, ErrFIFOClosed) {
+					return
+				}
 			}
 		}
 	}
@@ -582,11 +595,17 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-		KnownObjects:          clientState,
-		EmitDeltaTypeReplaced: true,
-		Transformer:           options.Transform,
-	})
+
+	var fifo Queue
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
+		fifo = NewRealFIFO(MetaNamespaceKeyFunc, clientState, options.Transform)
+	} else {
+		fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+			KnownObjects:          clientState,
+			EmitDeltaTypeReplaced: true,
+			Transformer:           options.Transform,
+		})
+	}
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -594,7 +613,6 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 		ObjectType:       options.ObjectType,
 		FullResyncPeriod: options.ResyncPeriod,
 		MinWatchTimeout:  options.MinWatchTimeout,
-		RetryOnError:     false,
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {

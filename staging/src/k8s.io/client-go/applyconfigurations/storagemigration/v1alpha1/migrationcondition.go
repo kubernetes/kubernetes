@@ -26,12 +26,19 @@ import (
 
 // MigrationConditionApplyConfiguration represents a declarative configuration of the MigrationCondition type for use
 // with apply.
+//
+// Describes the state of a migration at a certain point.
 type MigrationConditionApplyConfiguration struct {
-	Type           *storagemigrationv1alpha1.MigrationConditionType `json:"type,omitempty"`
-	Status         *v1.ConditionStatus                              `json:"status,omitempty"`
-	LastUpdateTime *metav1.Time                                     `json:"lastUpdateTime,omitempty"`
-	Reason         *string                                          `json:"reason,omitempty"`
-	Message        *string                                          `json:"message,omitempty"`
+	// Type of the condition.
+	Type *storagemigrationv1alpha1.MigrationConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	Status *v1.ConditionStatus `json:"status,omitempty"`
+	// The last time this condition was updated.
+	LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // MigrationConditionApplyConfiguration constructs a declarative configuration of the MigrationCondition type for use with

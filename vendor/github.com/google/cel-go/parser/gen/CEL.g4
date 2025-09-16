@@ -52,13 +52,14 @@ unary
 
 member
     : primary                                                       # PrimaryExpr
-    | member op='.' (opt='?')? id=IDENTIFIER                        # Select
+    | member op='.' (opt='?')? id=escapeIdent                       # Select
     | member op='.' id=IDENTIFIER open='(' args=exprList? ')'       # MemberCall
     | member op='[' (opt='?')? index=expr ']'                       # Index
     ;
 
 primary
-    : leadingDot='.'? id=IDENTIFIER (op='(' args=exprList? ')')?    # IdentOrGlobalCall
+    : leadingDot='.'? id=IDENTIFIER                                # Ident
+    | leadingDot='.'? id=IDENTIFIER (op='(' args=exprList? ')')     # GlobalCall
     | '(' e=expr ')'                                                # Nested
     | op='[' elems=listInit? ','? ']'                               # CreateList
     | op='{' entries=mapInitializerList? ','? '}'                   # CreateStruct
@@ -80,12 +81,17 @@ fieldInitializerList
     ;
 
 optField
-    : (opt='?')? IDENTIFIER
+    : (opt='?')? escapeIdent
     ;
 
 mapInitializerList
     : keys+=optExpr cols+=':' values+=expr (',' keys+=optExpr cols+=':' values+=expr)*
     ;
+
+escapeIdent
+    : id=IDENTIFIER      # SimpleIdentifier
+    | id=ESC_IDENTIFIER  # EscapedIdentifier
+;
 
 optExpr
     : (opt='?')? e=expr
@@ -198,3 +204,4 @@ STRING
 BYTES : ('b' | 'B') STRING;
 
 IDENTIFIER : (LETTER | '_') ( LETTER | DIGIT | '_')*;
+ESC_IDENTIFIER : '`' (LETTER | DIGIT | '_' | '.' | '-' | '/' | ' ')+ '`';

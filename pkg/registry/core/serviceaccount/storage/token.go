@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	authenticationtokenjwt "k8s.io/apiserver/pkg/authentication/token/jwt"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
@@ -56,20 +57,21 @@ func (r *TokenREST) Destroy() {
 }
 
 type TokenREST struct {
-	svcaccts              rest.Getter
-	pods                  rest.Getter
-	secrets               rest.Getter
-	nodes                 rest.Getter
-	issuer                token.TokenGenerator
-	auds                  authenticator.Audiences
-	audsSet               sets.String
-	maxExpirationSeconds  int64
-	extendExpiration      bool
-	isTokenSignerExternal bool
+	svcaccts                     rest.Getter
+	pods                         rest.Getter
+	secrets                      rest.Getter
+	nodes                        rest.Getter
+	issuer                       token.TokenGenerator
+	auds                         authenticator.Audiences
+	audsSet                      sets.String
+	maxExpirationSeconds         int64
+	extendExpiration             bool
+	maxExtendedExpirationSeconds int64
 }
 
 var _ = rest.NamedCreater(&TokenREST{})
 var _ = rest.GroupVersionKindProvider(&TokenREST{})
+var _ = rest.SubresourceObjectMetaPreserver(&TokenREST{})
 
 var gvk = schema.GroupVersionKind{
 	Group:   authenticationapiv1.SchemeGroupVersion.Group,
@@ -103,6 +105,14 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 	svcacct := svcacctObj.(*api.ServiceAccount)
 
+	if len(req.UID) > 0 && req.UID != svcacct.UID {
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.TokenRequestServiceAccountUIDValidation) {
+			return nil, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, name, fmt.Errorf("the UID in the token request (%s) does not match the UID of the service account (%s)", req.UID, svcacct.UID))
+		} else {
+			audit.AddAuditAnnotation(ctx, "authentication.k8s.io/token-request-uid-mismatch", fmt.Sprintf("the UID in the token request (%s) does not match the UID of the service account (%s)", req.UID, svcacct.UID))
+		}
+	}
+
 	// Default unset spec audiences to API server audiences based on server config
 	if len(req.Spec.Audiences) == 0 {
 		req.Spec.Audiences = r.auds
@@ -113,6 +123,11 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 	if len(req.Namespace) == 0 {
 		req.Namespace = svcacct.Namespace
+	}
+	if len(req.UID) == 0 {
+		req.UID = svcacct.UID
+	} else if req.UID != svcacct.UID {
+		warning.AddWarning(ctx, "", fmt.Sprintf("the UID in the token request (%s) does not match the UID of the service account (%s) but TokenRequestServiceAccountUIDValidation is not enabled. In the future, this will return a conflict error", req.UID, svcacct.UID))
 	}
 
 	// Save current time before building the token, to make sure the expiration
@@ -218,13 +233,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	exp := req.Spec.ExpirationSeconds
 	if r.extendExpiration && pod != nil && req.Spec.ExpirationSeconds == token.WarnOnlyBoundTokenExpirationSeconds && r.isKubeAudiences(req.Spec.Audiences) {
 		warnAfter = exp
-		// If token issuer is external-jwt-signer, then choose the smaller of
-		// ExpirationExtensionSeconds and max token lifetime supported by external signer.
-		if r.isTokenSignerExternal {
-			exp = min(r.maxExpirationSeconds, token.ExpirationExtensionSeconds)
-		} else {
-			exp = token.ExpirationExtensionSeconds
-		}
+		exp = r.maxExtendedExpirationSeconds
 	}
 
 	sc, pc, err := token.Claims(*svcacct, pod, secret, node, exp, warnAfter, req.Spec.Audiences)
@@ -271,4 +280,10 @@ func newContext(ctx context.Context, resource, name, namespace string, gvk schem
 func (r *TokenREST) isKubeAudiences(tokenAudience []string) bool {
 	// tokenAudiences must be a strict subset of apiserver audiences
 	return r.audsSet.HasAll(tokenAudience...)
+}
+
+// PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate indicates that the
+// TokenRequest's UID should be preserved when creating subresources
+func (r *TokenREST) PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate() bool {
+	return true
 }

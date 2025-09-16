@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/utils/clock"
-	testingclock "k8s.io/utils/clock/testing"
 )
 
 type backoffEntry struct {
@@ -49,7 +48,7 @@ type Backoff struct {
 	maxJitterFactor float64
 }
 
-func NewFakeBackOff(initial, max time.Duration, tc *testingclock.FakeClock) *Backoff {
+func NewFakeBackOff(initial, max time.Duration, tc clock.Clock) *Backoff {
 	return newBackoff(tc, initial, max, 0.0)
 }
 
@@ -57,7 +56,7 @@ func NewBackOff(initial, max time.Duration) *Backoff {
 	return NewBackOffWithJitter(initial, max, 0.0)
 }
 
-func NewFakeBackOffWithJitter(initial, max time.Duration, tc *testingclock.FakeClock, maxJitterFactor float64) *Backoff {
+func NewFakeBackOffWithJitter(initial, max time.Duration, tc clock.Clock, maxJitterFactor float64) *Backoff {
 	return newBackoff(tc, initial, max, maxJitterFactor)
 }
 

@@ -63,7 +63,7 @@ type Builder struct {
 	// message declarations in "flattened ordering".
 	//
 	// Dependencies are Go types for enums or messages referenced by
-	// message fields (excluding weak fields), for parent extended messages of
+	// message fields, for parent extended messages of
 	// extension fields, for enums or messages referenced by extension fields,
 	// and for input and output messages referenced by service methods.
 	// Dependencies must come after declarations, but the ordering of
