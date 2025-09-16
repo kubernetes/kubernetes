@@ -101,8 +101,9 @@ func (s *resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, claim, rest.WithTakeover(takeover))
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover)
+		const validationIdentifier = "resourceclaim_create"
+		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, claim, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover, validationIdentifier)
 		if takeover {
 			allErrs = append(allErrs.RemoveCoveredByDeclarative(), declarativeErrs...)
 		}
@@ -138,8 +139,9 @@ func (s *resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old run
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newClaim, oldClaim, rest.WithTakeover(takeover))
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errorList, declarativeErrs, takeover)
+		const validationIdentifier = "resourceclaim_update"
+		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newClaim, oldClaim, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errorList, declarativeErrs, takeover, validationIdentifier)
 		if takeover {
 			errorList = append(errorList.RemoveCoveredByDeclarative(), declarativeErrs...)
 		}
