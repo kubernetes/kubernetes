@@ -412,14 +412,13 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 	if err := lv.check(lm); err != nil {
 		return Validations{}, err
 	}
-
+	result := Validations{}
 	if lm.customUnique {
 		// Uniqueness validation is disabled in generated validation for this list.
 		// It would defer to handwritten validation to check the uniqueness.
-		return Validations{}, nil
+		result.AddComment("Uniqueness validation is implemented via custom, handwritten validation")
+		return result, nil
 	}
-
-	result := Validations{}
 
 	// Generate uniqueness checks for lists with higher-order semantics.
 	if lm.semantic == semanticSet {

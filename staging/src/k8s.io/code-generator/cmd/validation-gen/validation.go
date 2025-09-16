@@ -1105,10 +1105,12 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			fldRatchetingChecked := false
 			if !validations.Empty() {
 				emitComments(validations.Comments, bufsw)
-				emitRatchetingCheck(c, fld.childType, bufsw)
-				fldRatchetingChecked = true
-				bufsw.Do("// call field-attached validations\n", nil)
-				emitCallsToValidators(c, validations.Functions, bufsw)
+				if len(validations.Functions) > 0 {
+					emitRatchetingCheck(c, fld.childType, bufsw)
+					fldRatchetingChecked = true
+					bufsw.Do("// call field-attached validations\n", nil)
+					emitCallsToValidators(c, validations.Functions, bufsw)
+				}
 			}
 
 			// If the node is nil, this must be a type in a package we are not
@@ -1132,11 +1134,14 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 					// validations, call its validation function.
 					if validations := fld.fieldValIterations; g.hasValidations(fld.node.elem.node) && !validations.Empty() {
 						emitComments(validations.Comments, bufsw)
-						if !fldRatchetingChecked {
-							emitRatchetingCheck(c, fld.childType, bufsw)
-							fldRatchetingChecked = true
+						if len(validations.Functions) > 0 {
+							if !fldRatchetingChecked {
+								emitRatchetingCheck(c, fld.childType, bufsw)
+								fldRatchetingChecked = true
+							}
+							emitCallsToValidators(c, validations.Functions, bufsw)
 						}
-						emitCallsToValidators(c, validations.Functions, bufsw)
+
 					}
 					// Descend into this field.
 					g.emitValidationForChild(c, fld, bufsw)
@@ -1145,21 +1150,25 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 					// validations, call its validation function.
 					if validations := fld.fieldKeyIterations; g.hasValidations(fld.node.key.node) && !validations.Empty() {
 						emitComments(validations.Comments, bufsw)
-						if !fldRatchetingChecked {
-							emitRatchetingCheck(c, fld.childType, bufsw)
-							fldRatchetingChecked = true
+						if len(validations.Functions) > 0 {
+							if !fldRatchetingChecked {
+								emitRatchetingCheck(c, fld.childType, bufsw)
+								fldRatchetingChecked = true
+							}
+							emitCallsToValidators(c, validations.Functions, bufsw)
 						}
-						emitCallsToValidators(c, validations.Functions, bufsw)
 					}
 					// If this field is a map and the value-type has
 					// validations, call its validation function.
 					if validations := fld.fieldValIterations; g.hasValidations(fld.node.elem.node) && !validations.Empty() {
 						emitComments(validations.Comments, bufsw)
-						if !fldRatchetingChecked {
-							emitRatchetingCheck(c, fld.childType, bufsw)
-							fldRatchetingChecked = true
+						if len(validations.Functions) > 0 {
+							if !fldRatchetingChecked {
+								emitRatchetingCheck(c, fld.childType, bufsw)
+								fldRatchetingChecked = true
+							}
+							emitCallsToValidators(c, validations.Functions, bufsw)
 						}
-						emitCallsToValidators(c, validations.Functions, bufsw)
 					}
 					// Descend into this field.
 					g.emitValidationForChild(c, fld, bufsw)

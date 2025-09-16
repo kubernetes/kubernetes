@@ -113,6 +113,7 @@ func Validate_CertificateSigningRequestStatus(ctx context.Context, op operation.
 	// field certificatesv1beta1.CertificateSigningRequestStatus.Conditions
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []certificatesv1beta1.CertificateSigningRequestCondition) (errs field.ErrorList) {
+			// Uniqueness validation is implemented via custom, handwritten validation
 			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
