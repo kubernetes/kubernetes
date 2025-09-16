@@ -370,6 +370,20 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 
 	framework.Context("when querying /stats/summary under pressure", feature.KubeletPSI, framework.WithSerial(), func() {
 		ginkgo.BeforeEach(func() {
+			// Log the value of the flag for easier debugging in CI.
+			framework.Logf("System Spec Name from CI: %q", framework.TestContext.SystemSpecName)
+
+			// 1. Get the intended environment from the --system-spec-name flag.
+			specName := framework.TestContext.SystemSpecName
+			isCgroupV1Suite := strings.Contains(specName, "cgroupv1")
+
+			// 2. Get the actual environment of the node.
+			isCgroupV2Node := IsCgroup2UnifiedMode()
+
+			// 3. If this is a cgroupv1 suite but it's running on a cgroupv2 node, fail immediately.
+			if isCgroupV1Suite && isCgroupV2Node {
+				ginkgo.Fail("Environment Mismatch: This test is intended for a cgroupv1 suite but is running on a cgroupv2 node. Check the CI job's node image configuration.")
+			}
 			if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
 				ginkgo.Skip("KubeletPSI feature gate is not enabled")
 			}
