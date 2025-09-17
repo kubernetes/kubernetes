@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 
@@ -1170,29 +1169,7 @@ func (c *Cacher) Stop() {
 }
 
 func (c *Cacher) prepareKey(key string, recursive bool) (string, error) {
-	if key == ".." ||
-		strings.HasPrefix(key, "../") ||
-		strings.HasSuffix(key, "/..") ||
-		strings.Contains(key, "/../") {
-		return "", fmt.Errorf("invalid key: %q", key)
-	}
-	if key == "." ||
-		strings.HasPrefix(key, "./") ||
-		strings.HasSuffix(key, "/.") ||
-		strings.Contains(key, "/./") {
-		return "", fmt.Errorf("invalid key: %q", key)
-	}
-	if key == "" || key == "/" {
-		return "", fmt.Errorf("empty key: %q", key)
-	}
-	// For recursive lists, we need to make sure the key ended with "/" so that we only
-	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
-	// with prefix "/a" will return all three, while with prefix "/a/" will return only
-	// "/a/b" which is the correct answer.
-	if recursive && !strings.HasSuffix(key, "/") {
-		key += "/"
-	}
-	return key, nil
+	return storage.PrepareKey(key, recursive)
 }
 
 func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, triggerValue string, triggerSupported bool) func(bool) {
