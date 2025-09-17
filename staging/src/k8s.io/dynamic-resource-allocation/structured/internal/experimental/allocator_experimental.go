@@ -1235,8 +1235,11 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
+	// Skip counter availability check for devices that allow multiple allocation and some capacity has already in-use.
+	skipCounterCheck := allowMultipleAllocations && alloc.deviceCapacityInUse(device.id)
+
 	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
-	if len(device.ConsumesCounters) > 0 {
+	if !skipCounterCheck && len(device.ConsumesCounters) > 0 {
 		// If a device consumes counters from a counter set, verify that
 		// there is sufficient counters available.
 		ok, err := alloc.checkAvailableCounters(device)
@@ -1502,12 +1505,22 @@ func (alloc *allocator) deviceInUse(deviceID DeviceID) bool {
 	return alloc.allocatedState.AllocatedDevices.Has(deviceID) || alloc.allocatingDeviceForAnyClaim(deviceID)
 }
 
+func (alloc *allocator) deviceCapacityInUse(deviceID DeviceID) bool {
+	_, found := alloc.allocatedState.AggregatedCapacity[deviceID]
+	return found || alloc.allocatingCapacityForAnyClaim(deviceID)
+}
+
 func (alloc *allocator) allocatingDeviceForAnyClaim(deviceID DeviceID) bool {
 	return alloc.allocatingDevices[deviceID].Len() > 0
 }
 
 func (alloc *allocator) allocatingDeviceForClaim(deviceID DeviceID, claimIndex int) bool {
 	return alloc.allocatingDevices[deviceID].Has(claimIndex)
+}
+
+func (alloc *allocator) allocatingCapacityForAnyClaim(deviceID DeviceID) bool {
+	_, found := alloc.allocatingCapacity[deviceID]
+	return found
 }
 
 // deallocateCountersForDevice subtracts the consumed counters of the provided
