@@ -352,7 +352,7 @@ func selectDiscoveryAcceptHeader(useLegacy, forceUnmerged bool) string {
 		return AcceptV1
 	}
 	if forceUnmerged {
-		return AcceptV2Unmerged + acceptDiscoveryFormats
+		return AcceptV2Unmerged + "," + acceptDiscoveryFormats
 	}
 	return acceptDiscoveryFormats
 }

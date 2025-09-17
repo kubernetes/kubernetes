@@ -292,7 +292,7 @@ func newFakePeerProxyHandler(informerFinishedSync bool,
 	loopbackClientConfig := &rest.Config{
 		Host: "localhost:1010",
 	}
-	ppH, err := NewPeerProxyHandler(id, nil, "identity=testserver", leaseInformer, reconciler, s, loopbackClientConfig, clientConfig)
+	ppH, err := NewPeerProxyHandler(id, "identity=testserver", leaseInformer, reconciler, s, loopbackClientConfig, clientConfig)
 	if err != nil {
 		return nil, err
 	}

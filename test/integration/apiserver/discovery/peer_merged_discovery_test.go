@@ -38,7 +38,7 @@ import (
 	testutil "k8s.io/kubernetes/test/utils"
 )
 
-func TestMergedDiscoveryBasic(t *testing.T) {
+func TestMergedDiscoveryAggregated(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 

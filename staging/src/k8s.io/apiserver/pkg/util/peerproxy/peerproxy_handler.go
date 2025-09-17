@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/proxy"
-	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/reconcilers"
@@ -60,9 +59,8 @@ const (
 type peerProxyHandler struct {
 	name string
 	// Identity for this server.
-	serverID         string
-	finishedSync     atomic.Bool
-	discoveryManager aggregated.PeerMergedResourceManager
+	serverID     string
+	finishedSync atomic.Bool
 
 	// Label to check against in identity leases to make sure
 	// we are working with apiserver identity leases only.
@@ -87,8 +85,9 @@ type peerProxyHandler struct {
 	peerDiscoveryInfoCache atomic.Value
 	proxyTransport         http.RoundTripper
 	// Worker queue that keeps the peerDiscoveryInfoCache up-to-date.
-	peerLeaseQueue workqueue.TypedRateLimitingInterface[string]
-	serializer     runtime.NegotiatedSerializer
+	peerLeaseQueue             workqueue.TypedRateLimitingInterface[string]
+	serializer                 runtime.NegotiatedSerializer
+	cacheInvalidationCallbacks []func()
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
@@ -214,6 +213,10 @@ func (h *peerProxyHandler) RunLocalDiscoveryCacheSync(stopCh <-chan struct{}) er
 	return nil
 }
 
+func (h *peerProxyHandler) RegisterCacheInvalidationCallback(cb func()) {
+	h.cacheInvalidationCallbacks = append(h.cacheInvalidationCallbacks, cb)
+}
+
 func (h *peerProxyHandler) populateLocalDiscoveryCache() error {
 	_, resourcesByGV, _, err := h.discoveryClient.GroupsAndMaybeResources()
 	if err != nil {
@@ -266,7 +269,12 @@ func (h *peerProxyHandler) findServiceableByPeerFromPeerDiscoveryCache(gvr schem
 		return serviceableByIDs
 	}
 
-	cacheMap := cache.(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+	cacheMap, ok := cache.(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+	if !ok {
+		klog.Warning("Invalid cache type in peerDiscoveryInfoCache")
+		return serviceableByIDs
+	}
+
 	for peerID, servedResources := range cacheMap {
 		// Ignore local apiserver.
 		if peerID == h.serverID {
