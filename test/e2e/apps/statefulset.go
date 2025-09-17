@@ -568,7 +568,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			deletingPodForRollingUpdatePartitionTest(ctx, f, c, ns, ss)
 		})
 
-		f.It("should perform rolling updates with maxUnavailable", func(ctx context.Context) {
+		f.It("should perform rolling updates with maxUnavailable", framework.WithFeatureGate(features.MaxUnavailableStatefulSet), func(ctx context.Context) {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := e2estatefulset.NewStatefulSet("ss-maxunavailable", ns, headlessSvcName, 5, nil, nil, labels)
 			setHTTPProbe(ss)
