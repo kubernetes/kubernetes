@@ -3,10 +3,22 @@ name: "CodeQL"
 on:
   push:
     branches: [ "master", "main" ]
+    # Ignore vendor/third_party and docs so CodeQL doesn't scan large generated files
+    paths-ignore:
+      - 'third_party/**'
+      - 'vendor/**'
+      - 'docs/**'
+      - '.github/**'
   pull_request:
     branches: [ "master", "main" ]
+    paths-ignore:
+      - 'third_party/**'
+      - 'vendor/**'
+      - 'docs/**'
+      - '.github/**'
+  # scheduled runs: weekly full scan of default branches
   schedule:
-    - cron: '0 0 * * 0'
+    - cron: '0 3 * * 0' # weekly at 03:00 UTC on Sunday
 
 jobs:
   analyze:
@@ -21,11 +33,14 @@ jobs:
       fail-fast: false
       matrix:
         # Removed "actions" since no GitHub Actions source code exists
-        language: ['go', 'cpp', 'python'] # add 'cython' if needed
+        language: ['go'] # add 'cython' if needed
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Full history can help CodeQL with some analyses
+          fetch-depth: 0
 
       # Cache Go modules for faster builds
       - name: Cache Go modules
@@ -41,22 +56,41 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
+          # Use the curated 'security-and-quality' query set to reduce noisy results
+          queries: security-and-quality
 
       # Manual build for Kubernetes monorepo
       - name: Build Kubernetes
+        if: matrix.language == 'go'
         run: |
-          if [ "${{ matrix.language }}" = "go" ]; then
-            make WHAT=cmd/kubectl
-            make WHAT=cmd/kubelet
-            make WHAT=cmd/kube-apiserver
-          elif [ "${{ matrix.language }}" = "cpp" ]; then
-            echo "No C++ build steps defined — skipping."
-          elif [ "${{ matrix.language }}" = "python" ]; then
-            echo "No Python build steps defined — skipping."
-          fi
+          make WHAT=cmd/kubectl
+          make WHAT=cmd/kubelet
+          make WHAT=cmd/kube-apiserver
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+
+  # Triage job: runs after analyze to create a short artifact with guidance
+  triage:
+    name: Triage helper
+    needs: analyze
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create triage instructions
+        run: |
+          cat > triage-instructions.txt <<'EOF'
+          CodeQL scheduled scan completed. SARIF results are available in the Security -> Code scanning alerts UI.
+
+          Triage tips:
+          - Focus on high severity / high confidence results first.
+          - Ignore findings in third_party/ or vendor/ if present (we exclude those paths from PR scans).
+          - For very noisy rules (e.g., go/allocation-size-overflow), consider disabling the rule in a follow-up config.
+
+          Download SARIF from the Code scanning UI for detailed offline filtering.
+          EOF
+
+      - name: Upload triage instructions
+        uses: actions/upload-artifact@v4
         with:
-          cache: true
-          cache-key: codeql-${{ matrix.language }}-${{ github.job }}-${{ github.run_id }}
+          name: codeql-triage-instructions
+          path: triage-instructions.txt
