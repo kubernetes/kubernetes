@@ -511,6 +511,55 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			ginkgo.Entry("for registrar", wrappedNewRegistrar, kubeletplugin.RegistrarListener),
 			ginkgo.Entry("for DRA service", newDRAService, kubeletplugin.PluginListener),
 		)
+
+		// This test verifies that the Kubelet establishes only a single gRPC connection
+		// with the DRA plugin throughout the plugin lifecycle.
+		//
+		// It does so by:
+		// - Using a custom gRPC listener that counts accepted connections.
+		// - Sequentially creating pods that trigger NodePrepareResources and NodeUnprepareResources.
+		// - Asserting that only one connection was accepted by the listener — since each
+		// call to net.Listener.Accept() corresponds to a new incoming connection —
+		// ensures that the plugin reused the same gRPC connection for all calls.
+		ginkgo.It("must use one gRPC connection for all service calls", func(ctx context.Context) {
+			var listener *countingListener
+			var err error
+			getListener := func(_ context.Context, socketPath string) (net.Listener, error) {
+				listener, err = newCountingListener(socketPath)
+				return listener, err
+			}
+
+			nodeName := getNodeName(ctx, f)
+
+			ginkgo.By("start DRA registrar")
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
+
+			ginkgo.By("wait for registration to complete")
+			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+
+			ginkgo.By("start DRA plugin service")
+			draService := newDRAService(ctx, f.ClientSet, f.Namespace.Name, nodeName, driverName, "", kubeletplugin.PluginListener(getListener))
+
+			for _, suffix := range []string{"-1", "-2"} {
+				draService.ResetGRPCCalls()
+
+				ginkgo.By("create test objects " + suffix)
+				pod := createTestObjects(ctx, f.ClientSet, nodeName, f.Namespace.Name, "draclass"+suffix, "external-claim"+suffix, "drapod"+suffix, true, []string{driverName})
+
+				ginkgo.By("wait for NodePrepareResources call to succeed " + suffix)
+				gomega.Eventually(draService.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodePrepareResourcesSucceeded)
+
+				ginkgo.By("wait for NodeUnprepareResources call to succeed " + suffix)
+				gomega.Eventually(draService.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesSucceeded)
+
+				ginkgo.By("wait for pod to succeed " + suffix)
+				err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+				framework.ExpectNoError(err)
+
+				ginkgo.By("check that listener.Accept was called only once " + suffix)
+				gomega.Expect(listener.acceptCount()).To(gomega.Equal(1))
+			}
+		})
 	})
 
 	f.Context("Two resource Kubelet Plugins", f.WithSerial(), func() {
@@ -873,6 +922,72 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
 				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
 			}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"), "Device health should recover and update to Healthy")
+		})
+
+		// This test verifies that the Kubelet establishes only a single gRPC connection
+		// with the DRA plugin throughout the plugin lifecycle.
+		//
+		// It does so by:
+		// - Using a custom gRPC listener that counts accepted connections.
+		// - Sequentially creating pods that trigger NodePrepareResources and NodeUnprepareResources.
+		// - Asserting that only one connection was accepted by the listener — since each
+		// call to net.Listener.Accept() corresponds to a new incoming connection —
+		// ensures that the plugin reused the same gRPC connection for all calls.
+		//
+		// NOTE: This is a copy of a similar test to test service connection reuse with enabled
+		// ResourceHealth. It should be merged with the original test when the ResourceHealth feature matures.
+		ginkgo.It("must reuse one gRPC connection for service and health-monitoring calls", func(ctx context.Context) {
+			var listener *countingListener
+			var err error
+			getListener := func(_ context.Context, socketPath string) (net.Listener, error) {
+				listener, err = newCountingListener(socketPath)
+				return listener, err
+			}
+
+			nodeName := getNodeName(ctx, f)
+
+			ginkgo.By("start DRA registrar")
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
+
+			ginkgo.By("wait for registration to complete")
+			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+
+			ginkgo.By("start DRA plugin service")
+			draService := newDRAService(ctx, f.ClientSet, f.Namespace.Name, nodeName, driverName, "", kubeletplugin.PluginListener(getListener))
+
+			for _, suffix := range []string{"-1", "-2"} {
+				className := "health-test-class" + suffix
+				claimName := "health-test-claim" + suffix
+				podName := "health-test-pod" + suffix
+				poolNameForTest := "pool-a" + suffix
+				deviceNameForTest := "dev-0" + suffix
+
+				draService.ResetGRPCCalls()
+
+				ginkgo.By("create test objects " + suffix)
+				pod := createHealthTestPodAndClaim(ctx, f, driverName, podName, claimName, className, poolNameForTest, deviceNameForTest)
+
+				ginkgo.By("wait for NodePrepareResources call to succeed " + suffix)
+				gomega.Eventually(draService.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodePrepareResourcesSucceeded)
+
+				ginkgo.By("Waiting for the pod to be running")
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+
+				ginkgo.By("Forcing a 'Healthy' status update to establish a baseline")
+				draService.HealthControlChan <- testdriver.DeviceHealthUpdate{
+					PoolName:   poolNameForTest,
+					DeviceName: deviceNameForTest,
+					Health:     "Healthy",
+				}
+
+				ginkgo.By("Verifying device health is now Healthy in the pod status")
+				gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+					return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
+				}).WithTimeout(30*time.Second).WithPolling(1*time.Second).Should(gomega.Equal("Healthy"), "Device health should be Healthy after explicit update")
+
+				ginkgo.By("check that listener.Accept was called only once " + suffix)
+				gomega.Expect(listener.acceptCount()).To(gomega.Equal(1))
+			}
 		})
 
 		// Verifies that device health transitions to "Unknown" when a DRA plugin
@@ -1539,4 +1654,44 @@ func (*errorOnCloseListener) Addr() net.Addr {
 func driverNameLabelKey(element any) string {
 	el := element.(*testutil.Sample)
 	return string(el.Metric[testutil.LabelName("driver_name")])
+}
+
+// countingListener is a wrapper around net.Listener that counts the number of times
+// Accept method is called. It embeds a net.Listener and uses atomic counters
+// to safely track the number of accept operations.
+type countingListener struct {
+	net.Listener
+	acceptCalls atomic.Int32
+}
+
+// newCountingListener creates a new Unix domain socket listener
+// wrapped in a countingListener to track accepted connections.
+func newCountingListener(socketPath string) (*countingListener, error) {
+	addr, err := net.ResolveUnixAddr("unix", socketPath)
+	if err != nil {
+		return nil, err
+	}
+
+	l, err := net.ListenUnix("unix", addr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &countingListener{Listener: l}, nil
+}
+
+// Accept waits for and returns the accepted connection.
+// It increments the acceptCalls counter each time the call succeeded.
+func (l *countingListener) Accept() (net.Conn, error) {
+	conn, err := l.Listener.Accept()
+	if err == nil {
+		l.acceptCalls.Add(1)
+	}
+	return conn, err
+}
+
+// acceptCount returns the number of times the accept method
+// has been called on the listener.
+func (l *countingListener) acceptCount() int {
+	return int(l.acceptCalls.Load())
 }
