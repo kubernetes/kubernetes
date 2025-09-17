@@ -392,7 +392,7 @@ type Stats struct {
 	EstimatedAverageObjectSizeBytes int64
 }
 
-func PrepareKey(key string, recursive bool) (string, error) {
+func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 	if key == ".." ||
 		strings.HasPrefix(key, "../") ||
 		strings.HasSuffix(key, "/..") ||
@@ -414,6 +414,9 @@ func PrepareKey(key string, recursive bool) (string, error) {
 	// "/a/b" which is the correct answer.
 	if recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
+	}
+	if !strings.HasPrefix(key, resourcePrefix) {
+		return "", fmt.Errorf("invalid key: %q lacks resource prefix: %q", key, resourcePrefix)
 	}
 	return key, nil
 }

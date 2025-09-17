@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -373,8 +374,18 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		config.Clock = clock.RealClock{}
 	}
 	objType := reflect.TypeOf(obj)
+	resourcePrefix := config.ResourcePrefix
+	if resourcePrefix == "" {
+		return nil, fmt.Errorf("resourcePrefix cannot be empty")
+	}
+	if resourcePrefix == "/" {
+		return nil, fmt.Errorf("resourcePrefix cannot be /")
+	}
+	if !strings.HasPrefix(resourcePrefix, "/") {
+		return nil, fmt.Errorf("resourcePrefix needs to start from /")
+	}
 	cacher := &Cacher{
-		resourcePrefix: config.ResourcePrefix,
+		resourcePrefix: resourcePrefix,
 		ready:          newReady(config.Clock),
 		storage:        config.Storage,
 		objectType:     objType,
@@ -425,8 +436,8 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers,
 		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion)
-	listerWatcher := NewListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc, contextMetadata)
-	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
+	listerWatcher := NewListerWatcher(config.Storage, resourcePrefix, config.NewListFunc, contextMetadata)
+	reflectorName := "storage/cacher.go:" + resourcePrefix
 
 	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0)
 	// Configure reflector's pager to for an appropriate pagination chunk size for fetching data from
@@ -1169,7 +1180,7 @@ func (c *Cacher) Stop() {
 }
 
 func (c *Cacher) prepareKey(key string, recursive bool) (string, error) {
-	return storage.PrepareKey(key, recursive)
+	return storage.PrepareKey(c.resourcePrefix, key, recursive)
 }
 
 func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, triggerValue string, triggerSupported bool) func(bool) {
