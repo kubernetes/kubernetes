@@ -75,19 +75,12 @@ func NewKubeletStartPhase() workflow.Phase {
 func NewKubeletWaitBootstrapPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "kubelet-wait-bootstrap",
-		Short: "[EXPERIMENTAL] Wait for the kubelet to bootstrap itself (only used when feature gate ControlPlaneKubeletLocalMode is enabled)",
+		Short: "Wait for the kubelet to bootstrap itself",
 		Run:   runKubeletWaitBootstrapPhase,
 		InheritFlags: []string{
 			options.CfgPath,
 			options.NodeCRISocket,
 			options.DryRun,
-		},
-		// TODO: unhide this phase once ControlPlaneKubeletLocalMode goes GA:
-		// https://github.com/kubernetes/enhancements/issues/4471
-		Hidden: true,
-		// Only run this phase as if `ControlPlaneKubeletLocalMode` is activated.
-		RunIf: func(c workflow.RunData) (bool, error) {
-			return checkFeatureState(c, features.ControlPlaneKubeletLocalMode, true)
 		},
 	}
 }
@@ -124,16 +117,6 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	}
 	bootstrapKubeConfigFile := filepath.Join(data.KubeConfigDir(), kubeadmconstants.KubeletBootstrapKubeConfigFileName)
 
-	// Do not delete the bootstrapKubeConfigFile at the end of this function when
-	// using ControlPlaneKubeletLocalMode. The KubeletWaitBootstrapPhase will delete
-	// it when the feature is enabled.
-	if !features.Enabled(initCfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-		// Deletes the bootstrapKubeConfigFile, so the credential used for TLS bootstrap is removed from disk
-		defer func() {
-			_ = os.Remove(bootstrapKubeConfigFile)
-		}()
-	}
-
 	var client clientset.Interface
 	// If dry-use the client from joinData, else create a new bootstrap client
 	if data.DryRun() {
@@ -148,17 +131,15 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 		}
 	}
 
-	if features.Enabled(initCfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-		// Set the server url to LocalAPIEndpoint if the feature gate is enabled so the config
-		// which gets passed to the kubelet forces it to talk to the local kube-apiserver.
-		if cfg.ControlPlane != nil {
-			for c, conf := range tlsBootstrapCfg.Clusters {
-				conf.Server, err = kubeadmutil.GetLocalAPIEndpoint(&cfg.ControlPlane.LocalAPIEndpoint)
-				if err != nil {
-					return errors.Wrapf(err, "could not get LocalAPIEndpoint when %s is enabled", features.ControlPlaneKubeletLocalMode)
-				}
-				tlsBootstrapCfg.Clusters[c] = conf
+	// Set the server url to LocalAPIEndpoint if the feature gate is enabled so the config
+	// which gets passed to the kubelet forces it to talk to the local kube-apiserver.
+	if cfg.ControlPlane != nil {
+		for c, conf := range tlsBootstrapCfg.Clusters {
+			conf.Server, err = kubeadmutil.GetLocalAPIEndpoint(&cfg.ControlPlane.LocalAPIEndpoint)
+			if err != nil {
+				return errors.Wrapf(err, "could not get LocalAPIEndpoint")
 			}
+			tlsBootstrapCfg.Clusters[c] = conf
 		}
 	}
 
@@ -251,13 +232,6 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	// Try to start the kubelet service in case it's inactive
 	fmt.Println("[kubelet-start] Starting the kubelet")
 	kubeletphase.TryStartKubelet()
-
-	// Run the same code as KubeletWaitBootstrapPhase would do if the ControlPlaneKubeletLocalMode feature gate is disabled.
-	if !features.Enabled(initCfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-		if err := runKubeletWaitBootstrapPhase(c); err != nil {
-			return err
-		}
-	}
 
 	return nil
 }
