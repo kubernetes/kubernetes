@@ -188,7 +188,7 @@ func waitForMaxUnavailableRollingUpdate(ctx context.Context, c clientset.Interfa
 			set.Name,
 			set.Spec.UpdateStrategy.Type)
 	}
-	e2estatefulset.WaitForState(ctx, c, set, time.Duration(1), func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, set, 1*time.Second, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		if len(pods.Items) < int(*set.Spec.Replicas) {
