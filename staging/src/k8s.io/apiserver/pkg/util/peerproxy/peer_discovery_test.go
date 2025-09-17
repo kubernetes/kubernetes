@@ -166,7 +166,6 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 
 			h, err := NewPeerProxyHandler(
 				localServerID,
-				nil, // discoveryManager
 				tt.labelSelectorString,
 				leaseInformer,
 				fakeReconciler,

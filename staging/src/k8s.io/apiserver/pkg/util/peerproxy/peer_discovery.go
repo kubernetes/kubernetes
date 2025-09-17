@@ -117,9 +117,11 @@ func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
 	// Overwrite cache with new contents.
 	h.peerDiscoveryInfoCache.Store(newCache)
 
-	// After updating peer discovery cache, invalidate discovery manager cache.
-	if h.discoveryManager != nil {
-		h.discoveryManager.InvalidateClusterWideCaches()
+	if len(newCache) != 0 {
+		// After updating peer discovery cache, invalidate discovery manager cache.
+		for _, cb := range h.cacheInvalidationCallbacks {
+			cb()
+		}
 	}
 	return fetchDiscoveryErr
 }

@@ -40,6 +40,8 @@ const aggregatedV2Beta1JSONAccept = jsonAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedV2Beta1ProtoAccept = protobufAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedJSONAccept = jsonAccept + aggregatedAcceptSuffix
 const aggregatedProtoAccept = protobufAccept + aggregatedAcceptSuffix
+const aggregatedMergedJSONAccept = jsonAccept + aggregatedAcceptSuffix + ";profile=merged"
+const aggregatedMergedProtoAccept = protobufAccept + aggregatedAcceptSuffix + ";profile=merged"
 
 func fetchPath(handler http.Handler, path, accept string) string {
 	w := httptest.NewRecorder()
@@ -67,8 +69,9 @@ func TestAggregationEnabled(t *testing.T) {
 	wrapped := WrapAggregatedDiscoveryToHandler(unaggregated, aggregated, merged)
 
 	testCases := []struct {
-		accept   string
-		expected string
+		accept       string
+		expected     string
+		enableMerged bool
 	}{
 		{
 			// Misconstructed/incorrect accept headers should be passed to the unaggregated handler to return an error
@@ -105,11 +108,36 @@ func TestAggregationEnabled(t *testing.T) {
 			accept:   aggregatedProtoAccept + "," + protobufAccept,
 			expected: "aggregated",
 		},
+		// Peer Merged discovery cases.
+		{
+			accept:       aggregatedMergedJSONAccept,
+			expected:     "merged",
+			enableMerged: true,
+		}, {
+			accept:       aggregatedMergedProtoAccept,
+			expected:     "merged",
+			enableMerged: true,
+		},
+		// profile is not set (should default to merged)
+		{
+			accept:       aggregatedJSONAccept,
+			expected:     "merged",
+			enableMerged: true,
+		},
+		// profile is set to something other than unmerged (should default to merged)
+		{
+			accept:       aggregatedJSONAccept + ";profile=foo",
+			expected:     "merged",
+			enableMerged: true,
+		},
 	}
 
 	for _, tc := range testCases {
 		if tc.accept == aggregatedV2Beta1JSONAccept || tc.accept == aggregatedV2Beta1ProtoAccept {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryRemoveBetaType, false)
+		}
+		if tc.enableMerged {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, true)
 		}
 		body := fetchPath(wrapped, discoveryPath, tc.accept)
 		assert.Equal(t, tc.expected, body)

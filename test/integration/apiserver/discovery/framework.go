@@ -45,7 +45,6 @@ import (
 const acceptV1JSON = "application/json"
 const acceptV2JSON = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
 const acceptV2JSONUnmerged = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=unmerged"
-const acceptV2JSONMerged = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=merged"
 
 const maxTimeout = 10 * time.Second
 
@@ -751,7 +750,7 @@ func FetchMergedAggregatedDiscovery(ctx context.Context, client testClient) (api
 		RESTClient().
 		Get().
 		AbsPath("/apis").
-		SetHeader("Accept", acceptV2JSONMerged).
+		SetHeader("Accept", acceptV2JSON).
 		Do(ctx).
 		Raw()
 

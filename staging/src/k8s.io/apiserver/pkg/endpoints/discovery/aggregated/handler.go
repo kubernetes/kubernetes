@@ -83,6 +83,9 @@ type ResourceManager interface {
 	// The group from the least-numbered source is used
 	WithSource(source Source) ResourceManager
 
+	// AddInvalidationCallback adds a callback to be called when the discovery cache is invalidated.
+	AddInvalidationCallback(callback func())
+
 	http.Handler
 }
 
@@ -114,6 +117,10 @@ func (rm resourceManager) WithSource(source Source) ResourceManager {
 	}
 }
 
+func (rm resourceManager) AddInvalidationCallback(callback func()) {
+	rm.resourceDiscoveryManager.AddInvalidationCallback(callback)
+}
+
 type groupKey struct {
 	name string
 
@@ -136,14 +143,28 @@ type resourceDiscoveryManager struct {
 
 	// Writes protected by the lock.
 	// List of all apigroups & resources indexed by the resource manager
-	lock              sync.RWMutex
-	apiGroups         map[groupKey]*apidiscoveryv2.APIGroupDiscovery
-	versionPriorities map[groupVersionKey]priorityInfo
+	lock                  sync.RWMutex
+	apiGroups             map[groupKey]*apidiscoveryv2.APIGroupDiscovery
+	versionPriorities     map[groupVersionKey]priorityInfo
+	invalidationCallbacks []func()
 }
 
 type priorityInfo struct {
 	GroupPriorityMinimum int
 	VersionPriority      int
+}
+
+func (rdm *resourceDiscoveryManager) AddInvalidationCallback(callback func()) {
+	rdm.lock.Lock()
+	defer rdm.lock.Unlock()
+	rdm.invalidationCallbacks = append(rdm.invalidationCallbacks, callback)
+}
+
+func (rdm *resourceDiscoveryManager) invalidateCacheLocked() {
+	rdm.cache.Store(nil)
+	for _, callback := range rdm.invalidationCallbacks {
+		callback()
+	}
 }
 
 func NewResourceManager(path string) ResourceManager {
@@ -186,7 +207,7 @@ func (rdm *resourceDiscoveryManager) SetGroupVersionPriority(source Source, gv m
 		GroupPriorityMinimum: groupPriorityMinimum,
 		VersionPriority:      versionPriority,
 	}
-	rdm.cache.Store(nil)
+	rdm.invalidateCacheLocked()
 }
 
 func (rdm *resourceDiscoveryManager) SetGroups(source Source, groups []apidiscoveryv2.APIGroupDiscovery) {
@@ -194,7 +215,7 @@ func (rdm *resourceDiscoveryManager) SetGroups(source Source, groups []apidiscov
 	defer rdm.lock.Unlock()
 
 	rdm.apiGroups = nil
-	rdm.cache.Store(nil)
+	rdm.invalidateCacheLocked()
 
 	for _, group := range groups {
 		for _, version := range group.Versions {
@@ -295,7 +316,7 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(source Source, groupN
 	}
 
 	// Reset response document so it is recreated lazily
-	rdm.cache.Store(nil)
+	rdm.invalidateCacheLocked()
 }
 
 func (rdm *resourceDiscoveryManager) RemoveGroupVersion(source Source, apiGroup metav1.GroupVersion) {
@@ -336,7 +357,7 @@ func (rdm *resourceDiscoveryManager) RemoveGroupVersion(source Source, apiGroup 
 	}
 
 	// Reset response document so it is recreated lazily
-	rdm.cache.Store(nil)
+	rdm.invalidateCacheLocked()
 }
 
 func (rdm *resourceDiscoveryManager) RemoveGroup(source Source, groupName string) {

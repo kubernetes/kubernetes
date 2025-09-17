@@ -21,16 +21,19 @@ import (
 	"sort"
 	"sync/atomic"
 
-	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
+
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 )
 
 // PeerDiscoveryProvider defines an interface to get peer resources for merged discovery.
@@ -41,12 +44,9 @@ type PeerDiscoveryProvider interface {
 // PeerMergedResourceManager defines the interface for managing merged discovery resources
 // that combines both local and peer server resources.
 type PeerMergedResourceManager interface {
-	// SetPeerDiscoveryProvider sets the peer discovery provider for merged discovery.
-	SetPeerDiscoveryProvider(provider PeerDiscoveryProvider)
-
-	// InvalidateClusterWideCaches invalidates the merged discovery caches
+	// InvalidateCache invalidates the merged discovery caches
 	// This should be called when peer discovery data changes.
-	InvalidateClusterWideCaches()
+	InvalidateCache()
 
 	// ServeHTTP handles merged discovery HTTP requests.
 	http.Handler
@@ -56,59 +56,56 @@ type PeerMergedResourceManager interface {
 type peerMergedDiscoveryHandler struct {
 	localResourceManager  ResourceManager
 	peerDiscoveryProvider PeerDiscoveryProvider
+	apiServiceLister      listers.APIServiceLister
 	serializer            runtime.NegotiatedSerializer
 	cache                 atomic.Pointer[cachedGroupList]
 	serveHTTPFunc         func(http.ResponseWriter, *http.Request)
 }
 
 // NewPeerMergedDiscoveryHandler creates a new handler for merged discovery.
-func NewPeerMergedDiscoveryHandler(rdm ResourceManager, path string) PeerMergedResourceManager {
+func NewPeerMergedDiscoveryHandler(localDiscoveryProvider ResourceManager, peerDiscoveryProvider PeerDiscoveryProvider, apiServiceLister listers.APIServiceLister, path string) PeerMergedResourceManager {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
-	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
 	codecs := serializer.NewCodecFactory(scheme)
 
 	pmd := &peerMergedDiscoveryHandler{
-		localResourceManager: rdm,
-		serializer:           codecs,
+		localResourceManager:  localDiscoveryProvider,
+		peerDiscoveryProvider: peerDiscoveryProvider,
+		apiServiceLister:      apiServiceLister,
+		serializer:            codecs,
 	}
 
+	pmd.localResourceManager.AddInvalidationCallback(func() {
+		pmd.InvalidateCache()
+	})
+
+	// Instrumentation wrapper for serveHTTP
 	pmd.serveHTTPFunc = metrics.InstrumentHandlerFunc(request.MethodGet,
-		/* group = */ "",
-		/* version = */ "",
-		/* resource = */ "",
-		/* subresource = */ path,
-		/* scope = */ "",
-		/* component = */ metrics.APIServerComponent,
-		/* deprecated */ false,
-		/* removedRelease */ "",
-		pmd.serveHTTP)
+		"", "", "", path, "", metrics.APIServerComponent, false, "",
+		func(resp http.ResponseWriter, req *http.Request) {
+			pmd.serveHTTP(resp, req)
+		})
 
 	return pmd
 }
 
-func (m *peerMergedDiscoveryHandler) SetPeerDiscoveryProvider(provider PeerDiscoveryProvider) {
-	m.peerDiscoveryProvider = provider
-	m.cache.Store(nil)
-}
-
-// InvalidateClusterWideCaches invalidates the merged discovery caches.
+// InvalidateCache invalidates the merged discovery caches.
 // This should be called when peer discovery data changes.
-func (m *peerMergedDiscoveryHandler) InvalidateClusterWideCaches() {
-	m.cache.Store(nil)
+func (h *peerMergedDiscoveryHandler) InvalidateCache() {
+	h.cache.Store(nil)
 	klog.V(4).Info("Invalidated merged discovery caches")
 }
 
-func (m *peerMergedDiscoveryHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	m.serveHTTPFunc(resp, req)
+func (h *peerMergedDiscoveryHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	h.serveHTTPFunc(resp, req)
 }
 
-func (m *peerMergedDiscoveryHandler) serveHTTP(resp http.ResponseWriter, req *http.Request) {
-	cache := m.fetchFromCache()
+func (h *peerMergedDiscoveryHandler) serveHTTP(resp http.ResponseWriter, req *http.Request) {
+	cache := h.fetchFromCache()
 	response := cache.cachedResponse
 	etag := cache.cachedResponseETag
 
-	writeDiscoveryResponse(&response, etag, m.serializer, resp, req)
+	writeDiscoveryResponse(&response, etag, h.serializer, resp, req)
 }
 
 func (h *peerMergedDiscoveryHandler) fetchFromCache() *cachedGroupList {
@@ -130,7 +127,7 @@ func (h *peerMergedDiscoveryHandler) fetchFromCache() *cachedGroupList {
 	var mergedGroups []apidiscoveryv2.APIGroupDiscovery
 	if h.peerDiscoveryProvider != nil {
 		peerResources := h.peerDiscoveryProvider.GetPeerResources()
-		mergedGroups = mergeResources(localGroups, peerResources)
+		mergedGroups = h.mergeResources(localGroups, peerResources)
 	} else {
 		mergedGroups = localGroups
 	}
@@ -152,15 +149,12 @@ func (h *peerMergedDiscoveryHandler) fetchFromCache() *cachedGroupList {
 	return cached
 }
 
-func mergeResources(
+func (h *peerMergedDiscoveryHandler) mergeResources(
 	localGroups []apidiscoveryv2.APIGroupDiscovery,
 	peerResources map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery,
 ) []apidiscoveryv2.APIGroupDiscovery {
-
 	groupMap := make(map[string]*apidiscoveryv2.APIGroupDiscovery)
 	localResourceSet := make(map[schema.GroupVersionResource]bool)
-
-	// Process local groups first.
 	for _, group := range localGroups {
 		groupCopy := group.DeepCopy()
 		for i := range groupCopy.Versions {
@@ -175,20 +169,42 @@ func mergeResources(
 		}
 		groupMap[group.Name] = groupCopy
 	}
-
-	// Add peer resources, skip duplicates.
+	if len(peerResources) == 0 {
+		return h.convertToSortedSlice(groupMap)
+	}
+	MergedRequestCounter.Inc()
 	for _, resources := range peerResources {
 		for gvr, resource := range resources {
 			if localResourceSet[gvr] {
 				continue
 			}
-
 			addPeerResource(groupMap, gvr, resource)
 		}
 	}
 
-	// Convert to sorted slice.
-	return convertToSortedSlice(groupMap)
+	return h.convertToSortedSlice(groupMap)
+}
+
+func (h *peerMergedDiscoveryHandler) convertToSortedSlice(groupMap map[string]*apidiscoveryv2.APIGroupDiscovery) []apidiscoveryv2.APIGroupDiscovery {
+	groupList, priorities := h.collectPriorities(groupMap)
+	sort.SliceStable(groupList, func(i, j int) bool {
+		gi, gj := groupList[i], groupList[j]
+
+		gpi, gpj := getGroupPriority(gi, priorities), getGroupPriority(gj, priorities)
+		if gpi != gpj {
+			return gpi > gpj // higher group priority first (descending)
+		}
+
+		vpi, vpj := getMaxVersionPriority(gi, priorities), getMaxVersionPriority(gj, priorities)
+		if vpi != vpj {
+			return vpi > vpj // higher version priority first (descending)
+		}
+
+		// Fallback to lexicographical sort by group name
+		return gi.Name < gj.Name
+	})
+
+	return groupList
 }
 
 func addPeerResource(
@@ -226,16 +242,79 @@ func addPeerResource(
 	group.Versions[versionIndex].Resources = append(group.Versions[versionIndex].Resources, *resourceCopy)
 }
 
-func convertToSortedSlice(groupMap map[string]*apidiscoveryv2.APIGroupDiscovery) []apidiscoveryv2.APIGroupDiscovery {
-	result := make([]apidiscoveryv2.APIGroupDiscovery, 0, len(groupMap))
-	for _, group := range groupMap {
-		result = append(result, *group)
+func (h *peerMergedDiscoveryHandler) collectPriorities(
+	groupMap map[string]*apidiscoveryv2.APIGroupDiscovery,
+) ([]apidiscoveryv2.APIGroupDiscovery, map[gvKey]groupVersionPriorities) {
+	priorities := make(map[gvKey]groupVersionPriorities)
+	// If no lister, return all groups/versions
+	if h.apiServiceLister == nil {
+		groupList := make([]apidiscoveryv2.APIGroupDiscovery, 0, len(groupMap))
+		for _, group := range groupMap {
+			groupList = append(groupList, *group)
+		}
+		return groupList, priorities
 	}
 
-	// TODO: is this right?
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
+	apiServices, err := h.apiServiceLister.List(labels.Everything())
+	apiServiceMap := make(map[string]*v1.APIService)
+	if err == nil {
+		for _, apiSvc := range apiServices {
+			apiServiceMap[apiSvc.Name] = apiSvc
+		}
+	}
 
-	return result
+	groupList := make([]apidiscoveryv2.APIGroupDiscovery, 0, len(groupMap))
+	for _, group := range groupMap {
+		versionList := make([]apidiscoveryv2.APIVersionDiscovery, 0, len(group.Versions))
+		for _, version := range group.Versions {
+			apiServiceName := version.Version + "." + group.Name
+			if apiSvc, ok := apiServiceMap[apiServiceName]; ok {
+				priorities[gvKey{group: group.Name, version: version.Version}] = groupVersionPriorities{
+					groupPriority:   apiSvc.Spec.GroupPriorityMinimum,
+					versionPriority: apiSvc.Spec.VersionPriority,
+				}
+			}
+			versionList = append(versionList, version)
+		}
+		if len(versionList) > 0 {
+			groupCopy := group.DeepCopy()
+			groupCopy.Versions = versionList
+			groupList = append(groupList, *groupCopy)
+		}
+	}
+	return groupList, priorities
+}
+
+func getGroupPriority(group apidiscoveryv2.APIGroupDiscovery, priorities map[gvKey]groupVersionPriorities) int32 {
+	if len(group.Versions) == 0 {
+		return -1
+	}
+	key := gvKey{group: group.Name, version: group.Versions[0].Version}
+	if p, ok := priorities[key]; ok {
+		return p.groupPriority
+	}
+	return -1
+}
+
+func getMaxVersionPriority(group apidiscoveryv2.APIGroupDiscovery, priorities map[gvKey]groupVersionPriorities) int32 {
+	max := int32(-1)
+	for _, version := range group.Versions {
+		key := gvKey{group: group.Name, version: version.Version}
+		if p, ok := priorities[key]; ok {
+			if p.versionPriority > max {
+				max = p.versionPriority
+			}
+		}
+	}
+	return max
+}
+
+type groupVersionPriorities struct {
+	groupPriority   int32
+	versionPriority int32
+}
+
+type gvKey struct {
+	group   string
+	version string
 }

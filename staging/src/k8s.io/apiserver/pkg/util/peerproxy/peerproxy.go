@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/apiserver/pkg/reconcilers"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
@@ -56,6 +55,7 @@ type Interface interface {
 	RunLocalDiscoveryCacheSync(stopCh <-chan struct{}) error
 	RunPeerDiscoveryCacheSync(ctx context.Context, workers int)
 	GetPeerResources() map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery
+	RegisterCacheInvalidationCallback(cb func())
 }
 
 // New creates a new instance to implement unknown version proxy
@@ -63,7 +63,6 @@ type Interface interface {
 // and is subject to future modifications.
 func NewPeerProxyHandler(
 	serverId string,
-	discoveryManager aggregated.PeerMergedResourceManager,
 	identityLeaseLabelSelector string,
 	leaseInformer coordinationv1informers.LeaseInformer,
 	reconciler reconcilers.PeerEndpointLeaseReconciler,
@@ -73,7 +72,6 @@ func NewPeerProxyHandler(
 ) (*peerProxyHandler, error) {
 	h := &peerProxyHandler{
 		name:                             "PeerProxyHandler",
-		discoveryManager:                 discoveryManager,
 		serverID:                         serverId,
 		reconciler:                       reconciler,
 		serializer:                       ser,
