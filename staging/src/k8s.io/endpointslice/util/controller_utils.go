@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 )
 
 // semanticIgnoreResourceVersion does semantic deep equality checks for objects
@@ -160,7 +161,7 @@ func podEndpointsChanged(oldPod, newPod *v1.Pod) (bool, bool) {
 
 // GetServicesToUpdateOnPodChange returns a set of Service keys for Services
 // that have potentially been affected by a change to this pod.
-func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, old, cur interface{}) sets.String {
+func GetServicesToUpdateOnPodChange(logger klog.Logger, serviceLister v1listers.ServiceLister, old, cur interface{}) sets.String {
 	newPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	if newPod.ResourceVersion == oldPod.ResourceVersion {
@@ -178,14 +179,14 @@ func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, old, 
 
 	services, err := GetPodServiceMemberships(serviceLister, newPod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Unable to get pod's service memberships", "pod", newPod.Namespace+"/"+newPod.Name)
 		return sets.String{}
 	}
 
 	if labelsChanged {
 		oldServices, err := GetPodServiceMemberships(serviceLister, oldPod)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", oldPod.Namespace, oldPod.Name, err))
+			utilruntime.HandleErrorWithLogger(logger, err, "Unable to get pod's service memberships", "pod", oldPod.Namespace+"/"+oldPod.Name)
 		}
 		services = determineNeededServiceUpdates(oldServices, services, podChanged)
 	}
@@ -195,7 +196,7 @@ func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, old, 
 
 // GetPodFromDeleteAction returns a pointer to a pod if one can be derived from
 // obj (could be a *v1.Pod, or a DeletionFinalStateUnknown marker item).
-func GetPodFromDeleteAction(obj interface{}) *v1.Pod {
+func GetPodFromDeleteAction(logger klog.Logger, obj interface{}) *v1.Pod {
 	if pod, ok := obj.(*v1.Pod); ok {
 		// Enqueue all the services that the pod used to be a member of.
 		// This is the same thing we do when we add a pod.
@@ -204,12 +205,12 @@ func GetPodFromDeleteAction(obj interface{}) *v1.Pod {
 	// If we reached here it means the pod was deleted but its final state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleErrorWithLogger(logger, fmt.Errorf("couldn't get object from tombstone %#v", obj), "Couldn't get object from tombstone")
 		return nil
 	}
 	pod, ok := tombstone.Obj.(*v1.Pod)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod: %#v", obj))
+		utilruntime.HandleErrorWithLogger(logger, fmt.Errorf("tombstone contained object that is not a Pod: %#v", obj), "Tombstone contained an object that is not a Pod.")
 		return nil
 	}
 	return pod

@@ -92,26 +92,40 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 		workerLoopPeriod: time.Second,
 	}
 
+	logger := klog.FromContext(ctx)
 	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: e.onServiceUpdate,
-		UpdateFunc: func(old, cur interface{}) {
-			e.onServiceUpdate(cur)
+		AddFunc: func(obj interface{}) {
+			e.onServiceUpdate(logger, obj)
 		},
-		DeleteFunc: e.onServiceDelete,
+		UpdateFunc: func(old, cur interface{}) {
+			e.onServiceUpdate(logger, cur)
+		},
+		DeleteFunc: func(obj interface{}) {
+			e.onServiceDelete(logger, obj)
+		},
 	})
 	e.serviceLister = serviceInformer.Lister()
 	e.servicesSynced = serviceInformer.Informer().HasSynced
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    e.addPod,
-		UpdateFunc: e.updatePod,
-		DeleteFunc: e.deletePod,
+		AddFunc: func(obj interface{}) {
+			e.addPod(logger, obj)
+		},
+		UpdateFunc: func(old, cur interface{}) {
+			e.updatePod(logger, old, cur)
+		},
+
+		DeleteFunc: func(obj interface{}) {
+			e.deletePod(logger, obj)
+		},
 	})
 	e.podLister = podInformer.Lister()
 	e.podsSynced = podInformer.Informer().HasSynced
 
 	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		DeleteFunc: e.onEndpointsDelete,
+		DeleteFunc: func(obj interface{}) {
+			e.onEndpointsDelete(logger, obj)
+		},
 	})
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
@@ -175,7 +189,7 @@ type Controller struct {
 // Run will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
 func (e *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	e.eventBroadcaster.StartStructuredLogging(3)
@@ -197,8 +211,8 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 	}
 
 	go func() {
-		defer utilruntime.HandleCrash()
-		e.checkLeftoverEndpoints()
+		defer utilruntime.HandleCrashWithContext(ctx)
+		e.checkLeftoverEndpoints(logger)
 	}()
 
 	<-ctx.Done()
@@ -206,11 +220,11 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 
 // When a pod is added, figure out what services it will be a member of and
 // enqueue them. obj must have *v1.Pod type.
-func (e *Controller) addPod(obj interface{}) {
+func (e *Controller) addPod(logger klog.Logger, obj interface{}) {
 	pod := obj.(*v1.Pod)
 	services, err := endpointsliceutil.GetPodServiceMemberships(e.serviceLister, pod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Unable to get pod's service memberships", "pod", pod.Namespace+"/"+pod.Name)
 		return
 	}
 	for key := range services {
@@ -252,8 +266,8 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 // When a pod is updated, figure out what services it used to be a member of
 // and what services it will be a member of, and enqueue the union of these.
 // old and cur must be *v1.Pod types.
-func (e *Controller) updatePod(old, cur interface{}) {
-	services := endpointsliceutil.GetServicesToUpdateOnPodChange(e.serviceLister, old, cur)
+func (e *Controller) updatePod(logger klog.Logger, old, cur interface{}) {
+	services := endpointsliceutil.GetServicesToUpdateOnPodChange(logger, e.serviceLister, old, cur)
 	for key := range services {
 		e.queue.AddAfter(key, e.endpointUpdatesBatchPeriod)
 	}
@@ -261,37 +275,37 @@ func (e *Controller) updatePod(old, cur interface{}) {
 
 // When a pod is deleted, enqueue the services the pod used to be a member of.
 // obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
-func (e *Controller) deletePod(obj interface{}) {
-	pod := endpointsliceutil.GetPodFromDeleteAction(obj)
+func (e *Controller) deletePod(logger klog.Logger, obj interface{}) {
+	pod := endpointsliceutil.GetPodFromDeleteAction(logger, obj)
 	if pod != nil {
-		e.addPod(pod)
+		e.addPod(logger, pod)
 	}
 }
 
 // onServiceUpdate updates the Service Selector in the cache and queues the Service for processing.
-func (e *Controller) onServiceUpdate(obj interface{}) {
+func (e *Controller) onServiceUpdate(logger klog.Logger, obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "object", obj)
 		return
 	}
 	e.queue.Add(key)
 }
 
 // onServiceDelete removes the Service Selector from the cache and queues the Service for processing.
-func (e *Controller) onServiceDelete(obj interface{}) {
+func (e *Controller) onServiceDelete(logger klog.Logger, obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "object", obj)
 		return
 	}
 	e.queue.Add(key)
 }
 
-func (e *Controller) onEndpointsDelete(obj interface{}) {
+func (e *Controller) onEndpointsDelete(logger klog.Logger, obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "object", obj)
 		return
 	}
 	e.queue.Add(key)
@@ -339,7 +353,7 @@ func (e *Controller) handleErr(logger klog.Logger, err error, key string) {
 
 	logger.Info("Dropping service out of the queue", "service", klog.KRef(ns, name), "err", err)
 	e.queue.Forget(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithLogger(logger, err, "Failed to sync endpoints", "service", klog.KRef(ns, name))
 }
 
 func (e *Controller) syncService(ctx context.Context, key string) error {
@@ -555,10 +569,10 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 // do this once on startup, because in steady-state these are detected (but
 // some stragglers could have been left behind if the endpoint controller
 // reboots).
-func (e *Controller) checkLeftoverEndpoints() {
+func (e *Controller) checkLeftoverEndpoints(logger klog.Logger) {
 	list, err := e.endpointsLister.List(labels.Everything())
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Unable to list endpoints; orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)")
 		return
 	}
 	for _, ep := range list {
@@ -572,7 +586,7 @@ func (e *Controller) checkLeftoverEndpoints() {
 		}
 		key, err := controller.KeyFunc(ep)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %#v", ep))
+			utilruntime.HandleErrorWithLogger(logger, err, "Unable to get key for endpoint", "endpoint", ep)
 			continue
 		}
 		e.queue.Add(key)
