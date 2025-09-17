@@ -2578,3 +2578,80 @@ func TestValidateDependencies(t *testing.T) {
 		})
 	}
 }
+func TestFrozenMode_BasicLifecycle(t *testing.T) {
+	feature := Feature("TestFeature")
+	ver := version.MustParseGeneric("1.20")
+
+	// Create frozen mode gate
+	fg := NewFeatureGateWithFreeze()
+
+	// Add a feature before freeze (should succeed)
+	if err := fg.Add(map[Feature]FeatureSpec{
+		feature: {Default: false, PreRelease: Alpha, Version: ver},
+	}); err != nil {
+		t.Fatalf("failed to add feature before freeze: %v", err)
+	}
+
+	// Override before freeze (should succeed)
+	if err := fg.OverrideDefault(feature, true); err != nil {
+		t.Fatalf("failed to override before freeze: %v", err)
+	}
+
+	// First read => should freeze
+	_ = fg.Enabled(feature)
+
+	// Now feature gate should be frozen
+	if !fg.frozen.Load() {
+		t.Fatalf("expected feature gate to be frozen after first read")
+	}
+
+	// Mutating methods must now fail
+	mutations := []struct {
+		name string
+		fn   func() error
+	}{
+		{"Set", func() error { return fg.Set(fmt.Sprintf("%s=true", feature)) }},
+		{"SetFromMap", func() error { return fg.SetFromMap(map[string]bool{string(feature): false}) }},
+		{"Add", func() error {
+			return fg.Add(map[Feature]FeatureSpec{
+				Feature("AnotherFeature"): {Default: true, PreRelease: Alpha, Version: ver},
+			})
+		}},
+		{"OverrideDefault", func() error { return fg.OverrideDefault(feature, false) }},
+		{"OverrideDefaultAtVersion", func() error { return fg.OverrideDefaultAtVersion(feature, false, ver) }},
+		{"SetEmulationVersion", func() error { return fg.SetEmulationVersion(ver) }},
+		{"ResetFeatureValueToDefault", func() error { return fg.ResetFeatureValueToDefault(feature) }},
+	}
+
+	for _, m := range mutations {
+		if err := m.fn(); err == nil {
+			t.Errorf("%s should fail after frozen, but succeeded", m.name)
+		}
+	}
+}
+
+func TestFrozenMode_NonFrozenGateStillWorks(t *testing.T) {
+	feature := Feature("TestFeature")
+	ver := version.MustParseGeneric("1.20")
+
+	// Normal gate (not frozen on read)
+	fg := NewFeatureGate()
+
+	if err := fg.Add(map[Feature]FeatureSpec{
+		feature: {Default: false, PreRelease: Alpha, Version: ver},
+	}); err != nil {
+		t.Fatalf("failed to add feature: %v", err)
+	}
+
+	// Read should not freeze
+	_ = fg.Enabled(feature)
+
+	if fg.frozen.Load() {
+		t.Fatalf("expected non-frozen gate to remain unfrozen after read")
+	}
+
+	// Mutations must still succeed
+	if err := fg.OverrideDefault(feature, true); err != nil {
+		t.Errorf("OverrideDefault should work on non-frozen gate, got: %v", err)
+	}
+}
