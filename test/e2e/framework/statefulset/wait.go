@@ -66,7 +66,7 @@ func WaitForRunning(ctx context.Context, c clientset.Interface, numPodsRunning, 
 
 // WaitForState periodically polls for the ss and its pods until the until function returns either true or an error.
 // Optionally accepts a polling interval.
-func WaitForState(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error), pollInterval ...time.Duration) {
+func WaitForState(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, , pollInterval time.Duration, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error)) {
 	interval := StatefulSetPoll
 	if len(pollInterval) > 0 {
 		interval = pollInterval[0]
