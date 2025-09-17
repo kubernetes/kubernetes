@@ -171,7 +171,7 @@ func (e *TokensController) Run(ctx context.Context, workers int) {
 	defer e.syncServiceAccountQueue.ShutDown()
 	defer e.syncSecretQueue.ShutDown()
 
-	if !cache.WaitForNamedCacheSync("tokens", ctx.Done(), e.serviceAccountSynced, e.secretSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, e.serviceAccountSynced, e.secretSynced) {
 		return
 	}
 

@@ -205,7 +205,7 @@ func (a *HorizontalController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting HPA controller")
 	defer logger.Info("Shutting down HPA controller")
 
-	if !cache.WaitForNamedCacheSync("HPA", ctx.Done(), a.hpaListerSynced, a.podListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, a.hpaListerSynced, a.podListerSynced) {
 		return
 	}
 
