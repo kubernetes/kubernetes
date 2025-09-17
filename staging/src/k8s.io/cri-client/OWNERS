@@ -16,9 +16,9 @@ filters:
     labels:
       - sig/node
       - area/kubelet
-  # go.{mod,sum,work} files relate to go dependencies, and should be reviewed by the
-  # dep-approvers
-  "go\\.(mod|sum|work)$":
+  # go.{mod,sum,work,work.sum} files relate to go dependencies,
+  # and should be reviewed by the dep-approvers
+  "go\\.(mod|sum|work|work\\.sum)$":
     approvers:
       - dep-approvers
     reviewers:
