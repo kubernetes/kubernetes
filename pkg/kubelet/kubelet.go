@@ -1736,6 +1736,9 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 
 // Run starts the kubelet reacting to config updates
 func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
+	defer func() {
+		panic("simulated kubelet panic before shutdown (for invariant test)")
+	}()
 	ctx := context.Background()
 	if kl.logServer == nil {
 		file := http.FileServer(http.Dir(nodeLogDir))
