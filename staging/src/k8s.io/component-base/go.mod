@@ -2,9 +2,9 @@
 
 module k8s.io/component-base
 
-go 1.24.0
+go 1.25.0
 
-godebug default=go1.24
+godebug default=go1.25
 
 require (
 	github.com/blang/semver/v4 v4.0.0
