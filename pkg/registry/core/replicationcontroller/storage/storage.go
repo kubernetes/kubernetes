@@ -321,7 +321,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
-		const validationIdentifier = "rc_scale"
+		const validationIdentifier = "replicationcontroller_scale_update"
 		// Run declarative validation with panic recovery
 		declarativeErrs := rest.ValidateUpdateDeclaratively(
 			ctx, legacyscheme.Scheme, scale, oldScale, rest.WithTakeover(takeover), rest.WithSubresourceMapper(i.scaleGVKMapper), rest.WithValidationIdentifier(validationIdentifier))
