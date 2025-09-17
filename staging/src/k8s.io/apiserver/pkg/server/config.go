@@ -310,9 +310,6 @@ type Config struct {
 	// AggregatedDiscoveryGroupManager serves /apis in an aggregated form.
 	AggregatedDiscoveryGroupManager discoveryendpoint.ResourceManager
 
-	// PeerMergedDiscoveryManager serves /apis after merging the response from all peer apiservers.
-	PeerMergedDiscoveryManager discoveryendpoint.PeerMergedResourceManager
-
 	// ShutdownWatchTerminationGracePeriod, if set to a positive value,
 	// is the maximum duration the apiserver will wait for all active
 	// watch request(s) to drain.
@@ -867,16 +864,6 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	s.AggregatedDiscoveryGroupManager = manager
 	s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager("api")
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
-		peerMergedDiscoveryManager := c.PeerMergedDiscoveryManager
-		if peerMergedDiscoveryManager == nil {
-			peerMergedDiscoveryManager = discoveryendpoint.NewPeerMergedDiscoveryHandler(s.AggregatedDiscoveryGroupManager, "apis")
-		}
-
-		s.PeerMergedDiscoveryManager = peerMergedDiscoveryManager
-		s.PeerMergedLegacyDiscoveryManager = discoveryendpoint.NewPeerMergedDiscoveryHandler(s.AggregatedLegacyDiscoveryGroupManager, "api")
-	}
-
 	for {
 		if c.JSONPatchMaxCopyBytes <= 0 {
 			break
@@ -1137,7 +1124,8 @@ func installAPI(name string, s *GenericAPIServer, c *Config) {
 	routes.Version{Version: c.EffectiveVersion.Info()}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {
-		wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager, s.PeerMergedDiscoveryManager)
+		// No peer-to-peer discovery for generic apiservers.
+		wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager, s.AggregatedDiscoveryGroupManager)
 		s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/apis", metav1.APIGroupList{}))
 	}
 	if c.FlowControl != nil {

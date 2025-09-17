@@ -189,3 +189,11 @@ func (f *recorderResourceManager) WithSource(source Source) ResourceManager {
 func (f *recorderResourceManager) InvalidateMergedDiscoveryCache() {
 	panic("unimplemented")
 }
+
+func (f *recorderResourceManager) InvalidateClusterWideCaches() {
+	panic("unimplemented")
+}
+
+func (f *recorderResourceManager) AddInvalidationCallback(callback func()) {
+	panic("unimplemented")
+}

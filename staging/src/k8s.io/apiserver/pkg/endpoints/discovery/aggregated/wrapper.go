@@ -33,29 +33,29 @@ import (
 )
 
 type WrappedHandler struct {
-	s                 runtime.NegotiatedSerializer
-	handler           http.Handler
-	aggHandler        http.Handler
-	peerMergedHandler http.Handler
+	s                    runtime.NegotiatedSerializer
+	handler              http.Handler
+	aggHandler           http.Handler
+	peerMergedAggHandler http.Handler
 }
 
 func (wrapped *WrappedHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	// mediaType.Convert looks at the request accept headers and is used to control whether the discovery document will be aggregated.
 	mediaType, _ := negotiation.NegotiateMediaTypeOptions(req.Header.Get("Accept"), wrapped.s.SupportedMediaTypes(), DiscoveryEndpointRestrictions)
-
 	if IsAggregatedDiscoveryGVK(mediaType.Convert) {
 		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) && mediaType.Convert.Version == "v2" {
 			if mediaType.Profile == "unmerged" {
+				UnmergedRequestCounter.Inc()
 				wrapped.aggHandler.ServeHTTP(resp, req)
 				return
 			}
 			// Serve merged discovery by default.
-			wrapped.peerMergedHandler.ServeHTTP(resp, req)
+			wrapped.peerMergedAggHandler.ServeHTTP(resp, req)
 			return
 		}
 		wrapped.aggHandler.ServeHTTP(resp, req)
 		return
 	}
-
 	wrapped.handler.ServeHTTP(resp, req)
 }
 
@@ -81,10 +81,10 @@ func (wrapped *WrappedHandler) GenerateWebService(prefix string, returnType inte
 // emit the aggregated discovery by passing in the aggregated
 // discovery type in content negotiation headers: eg: (Accept:
 // application/json;v=v2;g=apidiscovery.k8s.io;as=APIGroupDiscoveryList)
-func WrapAggregatedDiscoveryToHandler(handler, aggHandler, mergedAggHandler http.Handler) *WrappedHandler {
+func WrapAggregatedDiscoveryToHandler(handler, aggHandler, peerMergedAggHandler http.Handler) *WrappedHandler {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
 	codecs := serializer.NewCodecFactory(scheme)
-	return &WrappedHandler{codecs, handler, aggHandler, mergedAggHandler}
+	return &WrappedHandler{codecs, handler, aggHandler, peerMergedAggHandler}
 }
