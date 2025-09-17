@@ -184,7 +184,7 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "validatingwebhookconfigurations"}
+		ResourcePrefix:          "/validatingwebhookconfigurations/"}
 	storage, err := NewREST(restOptions)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)

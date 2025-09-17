@@ -40,7 +40,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "volumeattachments",
+		ResourcePrefix:          "/volumeattachments/",
 	}
 	volumeAttachmentStorage, err := NewStorage(restOptions)
 	if err != nil {

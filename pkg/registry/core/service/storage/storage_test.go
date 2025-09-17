@@ -66,7 +66,7 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 		StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "services"}),
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "services",
+		ResourcePrefix:          "/services/",
 	}
 
 	ipAllocs := map[api.IPFamily]ipallocator.Interface{}
@@ -90,7 +90,7 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 3,
-		ResourcePrefix:          "pods",
+		ResourcePrefix:          "/pods/",
 	}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
@@ -108,7 +108,7 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 	endpointsStorage, err := endpointstore.NewREST(generic.RESTOptions{
 		StorageConfig:  etcdStorage,
 		Decorator:      generic.UndecoratedStorage,
-		ResourcePrefix: "endpoints",
+		ResourcePrefix: "/endpoints/",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)

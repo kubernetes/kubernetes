@@ -42,7 +42,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "daemonsets",
+		ResourcePrefix:          "/daemonsets/",
 	}
 	daemonSetStorage, statusStorage, err := NewREST(restOptions)
 	if err != nil {

@@ -42,7 +42,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "resourceclaims",
+		ResourcePrefix:          "/resourceclaims/",
 	}
 	fakeClient := fake.NewSimpleClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()

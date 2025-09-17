@@ -46,7 +46,7 @@ func newStorage(t *testing.T) (*JobStorage, *etcd3testing.EtcdTestServer) {
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "jobs",
+		ResourcePrefix:          "/jobs/",
 	}
 	jobStorage, err := NewStorage(restOptions)
 	if err != nil {

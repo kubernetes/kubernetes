@@ -38,7 +38,7 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "resourceslices",
+		ResourcePrefix:          "/resourceslices/",
 	}
 	resourceClassStorage, err := NewREST(restOptions)
 	if err != nil {

@@ -34,7 +34,7 @@ import (
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, policy.GroupName)
-	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "poddisruptionbudgets"}
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "/poddisruptionbudgets/"}
 	podDisruptionBudgetStorage, statusStorage, err := NewREST(restOptions)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)

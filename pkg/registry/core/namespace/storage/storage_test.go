@@ -36,7 +36,7 @@ import (
 
 func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "namespaces"}
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "/namespaces/"}
 	namespaceStorage, _, _, err := NewREST(restOptions)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
@@ -292,7 +292,7 @@ func TestUpdateDeletingNamespaceWithCompleteFinalizers(t *testing.T) {
 func TestFinalizeDeletingNamespaceWithCompleteFinalizers(t *testing.T) {
 	// get finalize storage
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "namespaces"}
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "/namespaces/"}
 	storage, _, finalizeStorage, err := NewREST(restOptions)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
@@ -336,7 +336,7 @@ func TestFinalizeDeletingNamespaceWithCompleteFinalizers(t *testing.T) {
 func TestFinalizeDeletingNamespaceWithIncompleteMetadataFinalizers(t *testing.T) {
 	// get finalize storage
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "namespaces"}
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "/namespaces/"}
 	storage, _, finalizeStorage, err := NewREST(restOptions)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)

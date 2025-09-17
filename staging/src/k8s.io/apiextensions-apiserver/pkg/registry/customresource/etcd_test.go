@@ -53,7 +53,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 	server, etcdStorage := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	etcdStorage.Codec = unstructured.UnstructuredJSONScheme
 	groupResource := schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"}
-	restOptions := generic.RESTOptions{StorageConfig: etcdStorage.ForResource(groupResource), Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "noxus"}
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage.ForResource(groupResource), Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "/noxus/"}
 
 	parameterScheme := runtime.NewScheme()
 	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: "mygroup.example.com", Version: "v1beta1"},

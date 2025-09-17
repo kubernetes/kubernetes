@@ -37,7 +37,7 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "podtemplates",
+		ResourcePrefix:          "/podtemplates/",
 	}
 	rest, err := NewREST(restOptions)
 	if err != nil {

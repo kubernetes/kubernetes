@@ -53,7 +53,7 @@ func newStorage(t *testing.T) (ControllerStorage, *etcd3testing.EtcdTestServer) 
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "replicationcontrollers",
+		ResourcePrefix:          "/replicationcontrollers/",
 	}
 	storage, err := NewStorage(restOptions)
 	if err != nil {

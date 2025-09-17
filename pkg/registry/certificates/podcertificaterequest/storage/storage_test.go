@@ -60,7 +60,7 @@ func newStorage(t *testing.T, authz authorizer.Authorizer, clock clock.PassiveCl
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "podcertificaterequests",
+		ResourcePrefix:          "/podcertificaterequests/",
 	}
 	storage, statusStorage, err := NewREST(restOptions, authz, clock)
 	if err != nil {

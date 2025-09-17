@@ -57,7 +57,7 @@ func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcd3testing.E
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 3,
-		ResourcePrefix:          "pods",
+		ResourcePrefix:          "/pods/",
 	}
 	storage, err := NewStorage(restOptions, nil, nil, nil)
 	if err != nil {
@@ -161,7 +161,7 @@ func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcd3testing.Etcd
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 3,
-		ResourcePrefix:          "pods",
+		ResourcePrefix:          "/pods/",
 	}
 	storage, err := NewStorage(restOptions, nil, nil, nil)
 	if err != nil {

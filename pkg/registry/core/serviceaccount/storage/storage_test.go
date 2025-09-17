@@ -53,7 +53,7 @@ func newTokenStorage(t *testing.T, issuer token.TokenGenerator, auds authenticat
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "serviceaccounts",
+		ResourcePrefix:          "/serviceaccounts/",
 	}
 	// set issuer, podStore and secretStore to allow the token endpoint to be initialised
 	rest, err := NewREST(restOptions, issuer, auds, 0, podStorage, secretStorage, nodeStorage, false, time.Hour*9999)
