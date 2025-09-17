@@ -391,6 +391,11 @@ func TestStats(t *testing.T) {
 		})
 	}
 }
+func TestKeySchema(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestKeySchema(ctx, t, cacher)
+}
 
 func TestWatch(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
