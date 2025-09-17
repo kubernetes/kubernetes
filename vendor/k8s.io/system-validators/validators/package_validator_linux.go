@@ -20,13 +20,13 @@ limitations under the License.
 package system
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os/exec"
 	"strings"
 
 	"github.com/blang/semver/v4"
-	"github.com/pkg/errors"
 )
 
 // semVerDotsCount is the number of dots in a valid semantic version.
@@ -68,7 +68,7 @@ func newDPKG() (packageManager, bool) {
 func (dpkg) getPackageVersion(packageName string) (string, error) {
 	output, err := exec.Command("dpkg-query", "--show", "--showformat='${Version}'", packageName).Output()
 	if err != nil {
-		return "", errors.Wrap(err, "dpkg-query failed")
+		return "", fmt.Errorf("dpkg-query failed: %w", err)
 	}
 	version := extractUpstreamVersion(string(output))
 	if version == "" {
@@ -152,7 +152,7 @@ func (validator *packageValidator) validate(packageSpecs []PackageSpec, manager 
 		if versionRange(sv) {
 			validator.reporter.Report(nameWithVerRange, version, good)
 		} else {
-			errs = append(errs, errors.Errorf("package \"%s %s\" does not meet the spec \"%s (%s)\"", packageName, sv, packageName, spec.VersionRange))
+			errs = append(errs, fmt.Errorf("package \"%s %s\" does not meet the spec \"%s (%s)\"", packageName, sv, packageName, spec.VersionRange))
 			validator.reporter.Report(nameWithVerRange, version, bad)
 		}
 	}
@@ -163,7 +163,7 @@ func (validator *packageValidator) validate(packageSpecs []PackageSpec, manager 
 func getKernelRelease() (string, error) {
 	output, err := exec.Command("uname", "-r").Output()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get kernel release")
+		return "", fmt.Errorf("failed to get kernel release: %w", err)
 	}
 	return strings.TrimSpace(string(output)), nil
 }
@@ -173,7 +173,7 @@ func getOSDistro() (string, error) {
 	f := "/etc/lsb-release"
 	b, err := ioutil.ReadFile(f)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to read %q", f)
+		return "", fmt.Errorf("failed to read %q: %w", f, err)
 	}
 	content := string(b)
 	switch {
@@ -184,7 +184,7 @@ func getOSDistro() (string, error) {
 	case strings.Contains(content, "CoreOS"):
 		return "coreos", nil
 	default:
-		return "", errors.Errorf("failed to get OS distro: %s", content)
+		return "", fmt.Errorf("failed to get OS distro: %s", content)
 	}
 }
 
@@ -244,10 +244,11 @@ func extractUpstreamVersion(version string) string {
 }
 
 // toSemVerRange converts the input to a semantic version range.
-// E.g., ">=1.0"             -> ">=1.0.x"
-//       ">=1"               -> ">=1.x"
-//       ">=1 <=2.3"         -> ">=1.x <=2.3.x"
-//       ">1 || >3.1.0 !4.2" -> ">1.x || >3.1.0 !4.2.x"
+// E.g.,
+// - ">=1.0"             -> ">=1.0.x"
+// - ">=1"               -> ">=1.x"
+// - ">=1 <=2.3"         -> ">=1.x <=2.3.x"
+// - ">1 || >3.1.0 !4.2" -> ">1.x || >3.1.0 !4.2.x"
 func toSemVerRange(input string) string {
 	var output []string
 	fields := strings.Fields(input)
