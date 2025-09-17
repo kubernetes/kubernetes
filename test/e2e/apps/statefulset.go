@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -73,8 +74,6 @@ const (
 	// Timeout for reads from databases running on stateful pods.
 	readTimeout = 60 * time.Second
 
-	// statefulSetPoll is a poll interval for StatefulSet tests
-	statefulSetPoll = 10 * time.Second
 	// statefulSetTimeout is a timeout interval for StatefulSet operations
 	statefulSetTimeout = 10 * time.Minute
 	// statefulPodTimeout is a timeout for stateful pods to change state
@@ -2373,7 +2372,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	gomega.Expect(currentRevision).ToNot(gomega.Equal(updateRevision), "Current revision should not equal update revision during rolling update")
 
 	ginkgo.By("Await for all replicas running, all are updated but pod-0")
-	e2estatefulset.WaitForState(ctx, c, ss, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		ss = set2
 		pods = pods2
 		if ss.Status.UpdatedReplicas == *ss.Spec.Replicas-1 && ss.Status.Replicas == *ss.Spec.Replicas && ss.Status.ReadyReplicas == *ss.Spec.Replicas {
@@ -2413,7 +2412,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	ginkgo.By("Deleting the pod-0 so that kubelet terminates it and StatefulSet controller recreates it")
 	deleteStatefulPodAtIndex(ctx, c, 0, ss)
 	ginkgo.By("Await for two replicas to be updated, while the pod-0 is not running")
-	e2estatefulset.WaitForState(ctx, c, ss, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		ss = set2
 		pods = pods2
 		return ss.Status.ReadyReplicas == *ss.Spec.Replicas-1, nil
@@ -2423,7 +2422,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	e2epod.NewPodClient(f).RemoveFinalizer(ctx, pod0.Name, testFinalizer)
 
 	ginkgo.By("Await for recreation of pod-0, so that all replicas are running")
-	e2estatefulset.WaitForState(ctx, c, ss, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		ss = set2
 		pods = pods2
 		return ss.Status.ReadyReplicas == *ss.Spec.Replicas, nil
@@ -2510,7 +2509,7 @@ func breakPodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
 	cmd := fmt.Sprintf("mv -v %v /tmp/ || true", path)
-	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
+	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, e2estatefulset.StatefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
@@ -2534,7 +2533,7 @@ func restorePodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	}
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /tmp%v / || true", path)
-	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
+	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, e2estatefulset.StatefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }

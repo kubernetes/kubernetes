@@ -65,14 +65,8 @@ func WaitForRunning(ctx context.Context, c clientset.Interface, numPodsRunning, 
 }
 
 // WaitForState periodically polls for the ss and its pods until the until function returns either true or an error.
-// Optionally accepts a polling interval.
-func WaitForState(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, , pollInterval time.Duration, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error)) {
-	interval := StatefulSetPoll
-	if len(pollInterval) > 0 {
-		interval = pollInterval[0]
-	}
-
-	pollErr := wait.PollUntilContextTimeout(ctx, interval, StatefulSetTimeout, true,
+func WaitForState(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, pollInterval time.Duration, until func(*appsv1.StatefulSet, *v1.PodList) (bool, error)) {
+	pollErr := wait.PollUntilContextTimeout(ctx, pollInterval, StatefulSetTimeout, true,
 		func(ctx context.Context) (bool, error) {
 			ssGet, err := c.AppsV1().StatefulSets(ss.Namespace).Get(ctx, ss.Name, metav1.GetOptions{})
 			if err != nil {
@@ -98,7 +92,7 @@ func WaitForRunningAndReady(ctx context.Context, c clientset.Interface, numState
 // WaitForPodReady waits for the Pod named podName in set to exist and have a Ready condition.
 func WaitForPodReady(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, podName string) (*appsv1.StatefulSet, *v1.PodList) {
 	var pods *v1.PodList
-	WaitForState(ctx, c, set, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	WaitForState(ctx, c, set, StatefulSetPoll, func(set2 *appsv1.StatefulSet, pods2 *v1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		for i := range pods.Items {
