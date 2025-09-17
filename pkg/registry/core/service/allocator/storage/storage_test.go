@@ -32,7 +32,8 @@ import (
 func newStorage(t *testing.T) (*Etcd, *etcd3testing.EtcdTestServer, allocator.Interface, *storagebackend.Config) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	mem := allocator.NewAllocationMap(100, "rangeSpecValue")
-	etcd, err := NewEtcd(mem, "/ranges/serviceips", etcdStorage.ForResource(api.Resource("serviceipallocations")))
+	resourcePrefix := "/ranges/"
+	etcd, err := NewEtcd(mem, resourcePrefix, resourcePrefix+"serviceips", etcdStorage.ForResource(api.Resource("serviceipallocations")))
 	if err != nil {
 		t.Fatalf("unexpected error creating etcd: %v", err)
 	}
@@ -95,7 +96,8 @@ func TestStore(t *testing.T) {
 	}
 
 	other = allocator.NewAllocationMap(100, "rangeSpecValue")
-	otherStorage, err := NewEtcd(other, "/ranges/serviceips", config.ForResource(api.Resource("serviceipallocations")))
+	resourcePrefix := "/ranges/"
+	otherStorage, err := NewEtcd(other, resourcePrefix, resourcePrefix+"serviceips", config.ForResource(api.Resource("serviceipallocations")))
 	if err != nil {
 		t.Fatalf("unexpected error creating etcd: %v", err)
 	}

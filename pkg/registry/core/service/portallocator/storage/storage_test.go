@@ -46,10 +46,11 @@ func newStorage(t *testing.T) (*etcd3testing.EtcdTestServer, portallocator.Inter
 	serviceNodePortRange := utilnet.PortRange{Base: basePortRange, Size: sizePortRange}
 	configForAllocations := etcdStorage.ForResource(api.Resource("servicenodeportallocations"))
 	var backing allocator.Interface
+	resourcePrefix := "/ranges/"
 	storage, err := portallocator.New(serviceNodePortRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 		backing = mem
-		etcd, err := allocatorstore.NewEtcd(mem, "/ranges/servicenodeports", configForAllocations)
+		etcd, err := allocatorstore.NewEtcd(mem, resourcePrefix, resourcePrefix+"servicenodeports", configForAllocations)
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +59,7 @@ func newStorage(t *testing.T) (*etcd3testing.EtcdTestServer, portallocator.Inter
 	if err != nil {
 		t.Fatalf("unexpected error creating etcd: %v", err)
 	}
-	s, d, err := generic.NewRawStorage(configForAllocations, nil, nil, "/ranges/servicenodeports")
+	s, d, err := generic.NewRawStorage(configForAllocations, nil, nil, resourcePrefix)
 	if err != nil {
 		t.Fatalf("Couldn't create storage: %v", err)
 	}
