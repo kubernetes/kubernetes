@@ -17,9 +17,9 @@ limitations under the License.
 // +k8s:validation-gen=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
-// Package format is the internal version of the API.
+// Package k8s_label_key is the internal version of the API.
 // +k8s:validation:internal
-package format
+package k8s_label_key
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
