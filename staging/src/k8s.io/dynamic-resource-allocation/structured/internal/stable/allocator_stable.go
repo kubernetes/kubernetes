@@ -58,7 +58,7 @@ type Allocator struct {
 	features         Features
 	allocatedDevices sets.Set[DeviceID]
 	classLister      DeviceClassLister
-	slices           []*resourceapi.ResourceSlice
+	slices           []*draapi.ResourceSlice
 	celCache         *cel.Cache
 	// availableCounters contains the available counters for individual
 	// ResourceSlices. It acts as a cache that is updated the first time
@@ -81,7 +81,7 @@ func NewAllocator(ctx context.Context,
 	features Features,
 	allocatedDevices sets.Set[DeviceID],
 	classLister DeviceClassLister,
-	slices []*resourceapi.ResourceSlice,
+	slices []*draapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
 	return &Allocator{
@@ -865,7 +865,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 // isSelectable checks whether a device satisfies the request and class selectors.
 func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, slice *draapi.ResourceSlice, deviceIndex int) (bool, error) {
 	device := &slice.Spec.Devices[deviceIndex]
-	if (!alloc.features.DeviceBinding || !alloc.features.DeviceStatus) &&
+	if !alloc.features.DeviceBindingAndStatus &&
 		len(device.BindingConditions) > 0 {
 		// Devices with binding conditions are not supported, feature is off.
 		return false, nil

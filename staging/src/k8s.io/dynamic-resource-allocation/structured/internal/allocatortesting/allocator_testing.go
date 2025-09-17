@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/klog/v2/ktesting"
@@ -811,7 +812,7 @@ func TestAllocator(t *testing.T,
 		features Features,
 		allocateState AllocatedState,
 		classLister DeviceClassLister,
-		slices []*resourceapi.ResourceSlice,
+		slices []*draapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)) {
 	nonExistentAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "NonExistentAttribute")
@@ -3802,8 +3803,7 @@ func TestAllocator(t *testing.T,
 		},
 		"device-binding-conditions": {
 			features: Features{
-				DeviceBinding: true,
-				DeviceStatus:  true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 1))),
@@ -3825,8 +3825,7 @@ func TestAllocator(t *testing.T,
 		},
 		"binding-conditions-multiple-devices": {
 			features: Features{
-				DeviceBinding: true,
-				DeviceStatus:  true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
@@ -3854,34 +3853,7 @@ func TestAllocator(t *testing.T,
 		},
 		"binding-conditions-without-feature-gate": {
 			features: Features{
-				DeviceBinding: false,
-				DeviceStatus:  false,
-			},
-			claimsToAllocate: objects(
-				claimWithRequests(claim0, nil, request(req0, classA, 1))),
-			classes: objects(class(classA, driverA)),
-			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}))),
-			node:          node(node1, region1),
-			expectResults: nil,
-		},
-		"device-binding-conditions-without-binding-conditions-feature-gate": {
-			features: Features{
-				DeviceBinding: false,
-				DeviceStatus:  true,
-			},
-			claimsToAllocate: objects(
-				claimWithRequests(claim0, nil, request(req0, classA, 1))),
-			classes: objects(class(classA, driverA)),
-			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}))),
-			node:          node(node1, region1),
-			expectResults: nil,
-		},
-		"device-binding-conditions-without-device-status-feature-gate": {
-			features: Features{
-				DeviceBinding: true,
-				DeviceStatus:  false,
+				DeviceBindingAndStatus: false,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 1))),
@@ -3893,8 +3865,7 @@ func TestAllocator(t *testing.T,
 		},
 		"node-restriction": {
 			features: Features{
-				DeviceBinding: true,
-				DeviceStatus:  true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
@@ -3908,9 +3879,8 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 1)),
@@ -3945,9 +3915,8 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions-multiple": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
@@ -3992,9 +3961,8 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions-some-devices-no-conditions": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
@@ -4046,9 +4014,8 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions-multi-slices": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 2)),
@@ -4096,10 +4063,9 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions-and-taints": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
-				DeviceTaints:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
+				DeviceTaints:           true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 2)),
@@ -4136,10 +4102,9 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions-and-taints-tolerated": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
-				DeviceTaints:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
+				DeviceTaints:           true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 2)).withTolerations(resourceapi.DeviceToleration{
@@ -4936,7 +4901,7 @@ func TestAllocator(t *testing.T,
 				AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
 				AggregatedCapacity:       allocatedShare,
 			}
-			allocator, err := newAllocator(ctx, tc.features, allocatedState, classLister, slices, cel.NewCache(1, cel.Features{EnableConsumableCapacity: tc.features.ConsumableCapacity}))
+			allocator, err := newAllocator(ctx, tc.features, allocatedState, classLister, toDRASlices(slices), cel.NewCache(1, cel.Features{EnableConsumableCapacity: tc.features.ConsumableCapacity}))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			if _, ok := allocator.(internal.AllocatorExtended); tc.expectNumAllocateOneInvocations > 0 && !ok {
@@ -5016,7 +4981,7 @@ func TestAllocator(t *testing.T,
 					ctx = c
 				}
 
-				allocator, err := newAllocator(ctx, Features{}, AllocatedState{}, classLister, slices, cel.NewCache(1, cel.Features{}))
+				allocator, err := newAllocator(ctx, Features{}, AllocatedState{}, classLister, toDRASlices(slices), cel.NewCache(1, cel.Features{}))
 				g.Expect(err).ToNot(gomega.HaveOccurred())
 				_, err = allocator.Allocate(ctx, node, claimsToAllocate)
 				t.Logf("got error %v", err)
@@ -5032,6 +4997,18 @@ func TestAllocator(t *testing.T,
 			})
 		}
 	})
+}
+
+func toDRASlices(slices []*resourceapi.ResourceSlice) []*draapi.ResourceSlice {
+	draSlices := make([]*draapi.ResourceSlice, len(slices))
+	for i := range slices {
+		var slice draapi.ResourceSlice
+		if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(slices[i], &slice, nil); err != nil {
+			panic(fmt.Errorf("convert ResourceSlice: %w", err))
+		}
+		draSlices[i] = &slice
+	}
+	return draSlices
 }
 
 type informerLister[T any] struct {
