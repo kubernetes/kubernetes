@@ -37,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction" // TODO (?): move this common helper somewhere else?
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
@@ -384,12 +385,21 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 	}
 	p.conn = conn
 
+	// Ensure that gRPC tries to connect even if we don't call any gRPC method.
+	// This is necessary to detect early whether a plugin is really available.
+	// This is currently an experimental gRPC method. Should it be removed we
+	// would need to do something else, like sending a fake gRPC method call.
+	conn.Connect()
+
+	// Initialize the health client using the same connection
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
+		p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
+		logger.V(4).Info("Initialized DRAResourceHealthClient", "driverName", driverName, "endpoint", endpoint)
 		pm.wg.Add(1)
 		go func() {
 			defer pm.wg.Done()
 			streamCtx, streamCancel := context.WithCancel(p.backgroundCtx)
-			p.SetHealthStream(streamCtx, streamCancel)
+			p.SetHealthStream(streamCancel)
 
 			wait.UntilWithContext(streamCtx, func(ctx context.Context) {
 				logger.V(4).Info("Attempting to start WatchResources health stream")
@@ -407,12 +417,6 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 			}, 5*time.Second)
 		}()
 	}
-
-	// Ensure that gRPC tries to connect even if we don't call any gRPC method.
-	// This is necessary to detect early whether a plugin is really available.
-	// This is currently an experimental gRPC method. Should it be removed we
-	// would need to do something else, like sending a fake gRPC method call.
-	conn.Connect()
 
 	pm.store[p.driverName] = append(pm.store[p.driverName], mp)
 	logger.V(3).Info("Registered DRA plugin", "driverName", p.driverName, "endpoint", p.endpoint, "chosenService", p.chosenService, "numPlugins", len(pm.store[p.driverName]))

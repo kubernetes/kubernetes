@@ -20,13 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/klog/v2"
@@ -66,67 +63,7 @@ type DRAPlugin struct {
 	backgroundCtx context.Context
 
 	healthClient       drahealthv1alpha1.DRAResourceHealthClient
-	healthStreamCtx    context.Context
 	healthStreamCancel context.CancelFunc
-}
-
-func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	// If connection exists and is ready, return it.
-	if p.conn != nil && p.conn.GetState() != connectivity.Shutdown {
-		// Initialize health client if connection exists but client is nil
-		// This allows lazy init if connection was established before health was added.
-		if p.healthClient == nil {
-			p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
-			klog.FromContext(p.backgroundCtx).V(4).Info("Initialized DRAResourceHealthClient lazily")
-		}
-		return p.conn, nil
-	}
-
-	// If the connection is dead, clean it up before creating a new one.
-	if p.conn != nil {
-		if err := p.conn.Close(); err != nil {
-			return nil, fmt.Errorf("failed to close stale gRPC connection to %s: %w", p.endpoint, err)
-		}
-		p.conn = nil
-		p.healthClient = nil
-	}
-
-	ctx := p.backgroundCtx
-	logger := klog.FromContext(ctx)
-
-	network := "unix"
-	logger.V(4).Info("Creating new gRPC connection", "protocol", network, "endpoint", p.endpoint)
-	// grpc.Dial is deprecated. grpc.NewClient should be used instead.
-	// For now this gets ignored because this function is meant to establish
-	// the connection, with the one second timeout below. Perhaps that
-	// approach should be reconsidered?
-	//nolint:staticcheck
-	conn, err := grpc.Dial(
-		p.endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, target)
-		}),
-		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.driverName)),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	if ok := conn.WaitForStateChange(ctx, connectivity.Connecting); !ok {
-		return nil, errors.New("timed out waiting for gRPC connection to be ready")
-	}
-
-	p.conn = conn
-	p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
-
-	return p.conn, nil
 }
 
 func (p *DRAPlugin) DriverName() string {
@@ -205,10 +142,9 @@ func newMetricsInterceptor(driverName string) grpc.UnaryClientInterceptor {
 }
 
 // SetHealthStream stores the context and cancel function for the active health stream.
-func (p *DRAPlugin) SetHealthStream(ctx context.Context, cancel context.CancelFunc) {
+func (p *DRAPlugin) SetHealthStream(cancel context.CancelFunc) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	p.healthStreamCtx = ctx
 	p.healthStreamCancel = cancel
 }
 
@@ -221,12 +157,15 @@ func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
 
 // NodeWatchResources establishes a stream to receive health updates from the DRA plugin.
 func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, error) {
-	// Ensure a connection and the health client exist before proceeding.
-	// This call is idempotent and will create them if they don't exist.
-	_, err := p.getOrCreateGRPCConn()
-	if err != nil {
-		klog.FromContext(p.backgroundCtx).Error(err, "Failed to get gRPC connection for health client")
-		return nil, err
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	// Check if connection and health client are available
+	if p.conn == nil {
+		return nil, errors.New("gRPC connection not available")
+	}
+	if p.healthClient == nil {
+		return nil, errors.New("health client not initialized")
 	}
 
 	logger := klog.FromContext(ctx).WithValues("pluginName", p.driverName)
