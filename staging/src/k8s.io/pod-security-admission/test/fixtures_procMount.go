@@ -26,7 +26,7 @@ import (
 func init() {
 	fixtureData_1_0 := fixtureGenerator{
 		expectErrorSubstring: "procMount",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
 				// set proc mount of container and init container to a valid value
@@ -65,9 +65,9 @@ func init() {
 
 	fixtureData1_35baseline := fixtureGenerator{
 		expectErrorSubstring: "procMount",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, level api.Level) []*corev1.Pod {
 			p = ensureSecurityContext(p)
-			return []*corev1.Pod{
+			retval := []*corev1.Pod{
 				// set proc mount of container and init container to a valid value
 				tweak(p, func(copy *corev1.Pod) {
 					validProcMountType := corev1.DefaultProcMount
@@ -75,13 +75,19 @@ func init() {
 					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &validProcMountType
 					copy.Spec.HostUsers = ptr.To(false)
 				}),
-				tweak(p, func(copy *corev1.Pod) {
+			}
+
+			if level != api.LevelRestricted {
+				// don't expect the unmasked namespace user pod to pass in restricted mode
+				retval = append(retval, tweak(p, func(copy *corev1.Pod) {
 					unmaskedProcMountType := corev1.UnmaskedProcMount
 					copy.Spec.Containers[0].SecurityContext.ProcMount = &unmaskedProcMountType
 					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &unmaskedProcMountType
 					copy.Spec.HostUsers = ptr.To(false)
-				}),
+				}))
 			}
+
+			return retval
 		},
 		failRequiresFeatures: []featuregate.Feature{"ProcMountType"},
 		generateFail: func(p *corev1.Pod) []*corev1.Pod {
@@ -110,7 +116,7 @@ func init() {
 
 	fixtureData1_35restricted := fixtureGenerator{
 		expectErrorSubstring: "procMount",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
 				// set proc mount of container and init container to a valid value
