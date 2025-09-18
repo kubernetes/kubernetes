@@ -287,10 +287,8 @@ func TestAPIEnablementOptionsApplyToVersionComparison(t *testing.T) {
 				if !strings.Contains(logOutput, "W") { // klog warning prefix
 					t.Errorf("Expected warning log level, but got log output: %s", logOutput)
 				}
-			} else {
-				if strings.Contains(logOutput, "alpha api enabled") {
-					t.Errorf("Expected no warning, but got log output: %s", logOutput)
-				}
+			} else if strings.Contains(logOutput, "alpha api enabled") {
+				t.Errorf("Expected no warning, but got log output: %s", logOutput)
 			}
 		})
 	}
