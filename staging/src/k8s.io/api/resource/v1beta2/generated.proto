@@ -1362,6 +1362,7 @@ message ResourceClaimStatus {
   //
   // +optional
   // +k8s:optional
+  // +k8s:update=NoModify
   optional AllocationResult allocation = 1;
 
   // ReservedFor indicates which entities are currently allowed to use
