@@ -64,14 +64,14 @@ var (
 func validatePoolName(name string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if name == "" {
-		allErrs = append(allErrs, field.Required(fldPath, "").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Required(fldPath, ""))
 	} else {
 		if len(name) > resource.PoolNameMaxLength {
-			allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.PoolNameMaxLength).WithOrigin("format=k8s-resource-pool-name").MarkCoveredByDeclarative())
+			allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.PoolNameMaxLength).WithOrigin("format=k8s-resource-pool-name"))
 		}
 		parts := strings.Split(name, "/")
 		for _, part := range parts {
-			allErrs = append(allErrs, corevalidation.ValidateDNS1123Subdomain(part, fldPath).WithOrigin("format=k8s-resource-pool-name").MarkCoveredByDeclarative()...)
+			allErrs = append(allErrs, corevalidation.ValidateDNS1123Subdomain(part, fldPath).WithOrigin("format=k8s-resource-pool-name")...)
 		}
 	}
 	return allErrs
@@ -1208,7 +1208,7 @@ func truncateIfTooLong(str string, maxLen int) string {
 func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.Path, allocatedDevices sets.Set[structured.SharedDeviceID]) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(device.Driver, fldPath.Child("driver"))...)
-	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool"))...)
+	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateDeviceName(device.Device, fldPath.Child("device"))...)
 	if device.ShareID != nil {
 		allErrs = append(allErrs, validateUID(*device.ShareID, fldPath.Child("shareID"))...)
