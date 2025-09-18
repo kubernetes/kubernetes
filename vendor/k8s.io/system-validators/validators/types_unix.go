@@ -41,13 +41,6 @@ var DefaultSysSpec = SysSpec{
 			{Name: "PID_NS"},
 			{Name: "IPC_NS"},
 			{Name: "UTS_NS"},
-			{Name: "CGROUPS"},
-			{Name: "CGROUP_BPF"},     // cgroups v2
-			{Name: "CGROUP_CPUACCT"}, // cgroups v1 cpuacct
-			{Name: "CGROUP_DEVICE"},
-			{Name: "CGROUP_FREEZER"}, // cgroups v1 freezer
-			{Name: "CGROUP_PIDS"},
-			{Name: "CGROUP_SCHED"}, // cgroups v1 & v2 cpu
 			{Name: "CPUSETS"},
 			{Name: "MEMCG"},
 			{Name: "INET"},
@@ -57,14 +50,33 @@ var DefaultSysSpec = SysSpec{
 			{Name: "NETFILTER_XT_MATCH_COMMENT"},
 			{Name: "FAIR_GROUP_SCHED"},
 		},
+		RequiredCgroupsV1: []KernelConfig{
+			{Name: "CGROUPS", Description: "Required for cgroups."},
+			{Name: "CGROUP_CPUACCT", Description: "Required for cpuacct controller, used in simple CPU accounting controller."},
+			{Name: "CGROUP_DEVICE", Description: "Required for device controller."},
+			{Name: "CGROUP_FREEZER", Description: "Required for freezer controller."},
+			{Name: "CGROUP_PIDS", Description: "Required for PIDs controller."},
+			{Name: "CGROUP_SCHED", Description: "Required for CPU controller."},
+		},
+		RequiredCgroupsV2: []KernelConfig{
+			{Name: "CGROUPS", Description: "Required for cgroups."},
+			{Name: "CGROUP_BPF", Description: "Required for eBPF programs attached to cgroups, used in device controller."},
+			{Name: "CGROUP_PIDS", Description: "Required for PIDs controller."},
+			{Name: "CGROUP_SCHED", Description: "Required for CPU controller."},
+		},
 		Optional: []KernelConfig{
 			{Name: "OVERLAY_FS", Aliases: []string{"OVERLAYFS_FS"}, Description: "Required for overlayfs."},
 			{Name: "AUFS_FS", Description: "Required for aufs."},
 			{Name: "BLK_DEV_DM", Description: "Required for devicemapper."},
 			{Name: "CFS_BANDWIDTH", Description: "Required for CPU quota."},
-			{Name: "CGROUP_HUGETLB", Description: "Required for hugetlb cgroup."},
 			{Name: "SECCOMP", Description: "Required for seccomp."},
 			{Name: "SECCOMP_FILTER", Description: "Required for seccomp mode 2."},
+		},
+		OptionalCgroupsV1: []KernelConfig{
+			{Name: "CGROUP_HUGETLB", Description: "Required for hugetlb cgroup."},
+		},
+		OptionalCgroupsV2: []KernelConfig{
+			{Name: "CGROUP_HUGETLB", Description: "Required for hugetlb cgroup."},
 		},
 		Forbidden: []KernelConfig{},
 	},
