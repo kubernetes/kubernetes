@@ -128,15 +128,15 @@ func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path,
 		func(request resource.DeviceRequest) (string, string) {
 			return request.Name, "name"
 		},
-		fldPath.Child("requests"))...)
+		fldPath.Child("requests"), sizeCovered)...)
 	allErrs = append(allErrs, validateSlice(deviceClaim.Constraints, resource.DeviceConstraintsMaxSize,
 		func(constraint resource.DeviceConstraint, fldPath *field.Path) field.ErrorList {
 			return validateDeviceConstraint(constraint, fldPath, requestNames)
-		}, fldPath.Child("constraints"))...)
+		}, fldPath.Child("constraints"), sizeCovered)...)
 	allErrs = append(allErrs, validateSlice(deviceClaim.Config, resource.DeviceConfigMaxSize,
 		func(config resource.DeviceClaimConfiguration, fldPath *field.Path) field.ErrorList {
 			return validateDeviceClaimConfiguration(config, fldPath, requestNames, stored)
-		}, fldPath.Child("config"))...)
+		}, fldPath.Child("config"), sizeCovered)...)
 	return allErrs
 }
 
@@ -1126,7 +1126,7 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 		// Dumping the entire field into the error message is likely to be too long,
 		// in particular when it is already beyond the maximum size. Instead this
 		// just shows the number of entries.
-		err := field.TooMany(fldPath, len(slice), maxSize)
+		err := field.TooMany(fldPath, len(slice), maxSize).WithOrigin("maxItems")
 		if slices.Contains(opts, sizeCovered) {
 			err = err.MarkCoveredByDeclarative()
 		}
