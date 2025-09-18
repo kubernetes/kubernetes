@@ -165,13 +165,19 @@ func commaSeparatedHeaderValues(header []string) []string {
 // returned, along with a response header containing the list of protocols the
 // server can accept.
 func Handshake(req *http.Request, w http.ResponseWriter, serverProtocols []string) (string, error) {
-	clientProtocols := commaSeparatedHeaderValues(req.Header[http.CanonicalHeaderKey(HeaderProtocolVersion)])
-	if len(clientProtocols) == 0 {
-		return "", fmt.Errorf("unable to upgrade: %s is required", HeaderProtocolVersion)
-	}
-
 	if len(serverProtocols) == 0 {
 		panic(fmt.Errorf("unable to upgrade: serverProtocols is required"))
+	}
+	values, ok := req.Header[http.CanonicalHeaderKey(HeaderProtocolVersion)]
+	if !ok {
+		return "", fmt.Errorf("unable to upgrade: %s not found in request, headers: %v", HeaderProtocolVersion, req.Header)
+	}
+	if len(values) == 0 {
+		return "", fmt.Errorf("unable to upgrade: %s header is empty", HeaderProtocolVersion)
+	}
+	clientProtocols := commaSeparatedHeaderValues(values)
+	if len(clientProtocols) == 0 {
+		return "", fmt.Errorf("unable to upgrade: %s header contains %s, but no valid protocols", HeaderProtocolVersion, values)
 	}
 
 	negotiatedProtocol := negotiateProtocol(clientProtocols, serverProtocols)
