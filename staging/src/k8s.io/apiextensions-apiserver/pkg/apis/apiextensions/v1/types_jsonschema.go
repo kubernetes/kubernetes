@@ -112,12 +112,10 @@ type JSONSchemaProps struct {
 	Example              *JSON                      `json:"example,omitempty" protobuf:"bytes,36,opt,name=example"`
 	Nullable             bool                       `json:"nullable,omitempty" protobuf:"bytes,37,opt,name=nullable"`
 
-	// x-kubernetes-preserve-unknown-fields stops the API server
-	// decoding step from pruning fields which are not specified
-	// in the validation schema. This affects fields recursively,
-	// but switches back to normal pruning behaviour if nested
-	// properties or additionalProperties are specified in the schema.
-	// This can either be true or undefined. False is forbidden.
+	// x-kubernetes-preserve-unknown-fields stops the API server from pruning fields that are not
+	// specified in the schema under this node. When true, unknown fields in this
+	// subtree are preserved during decoding. Use carefully: it disables structural
+	// pruning for the subtree. See CRD docs for details.
 	XPreserveUnknownFields *bool `json:"x-kubernetes-preserve-unknown-fields,omitempty" protobuf:"bytes,38,opt,name=xKubernetesPreserveUnknownFields"`
 
 	// x-kubernetes-embedded-resource defines that the value is an
@@ -144,9 +142,9 @@ type JSONSchemaProps struct {
 	//    - ... zero or more
 	XIntOrString bool `json:"x-kubernetes-int-or-string,omitempty" protobuf:"bytes,40,opt,name=xKubernetesIntOrString"`
 
-	// x-kubernetes-list-map-keys annotates an array with the x-kubernetes-list-type `map` by specifying the keys used
-	// as the index of the map.
-	//
+	// x-kubernetes-list-map-keys lists the object property names that uniquely identify elements
+	// when x-kubernetes-list-type is "map" (example: ["name","port"]).
+	// Only applicable when list items are objects.
 	// This tag MUST only be used on lists that have the "x-kubernetes-list-type"
 	// extension set to "map". Also, the values specified for this attribute must
 	// be a scalar typed field of the child structure (no nesting is supported).
@@ -188,11 +186,10 @@ type JSONSchemaProps struct {
 	// +optional
 	XMapType *string `json:"x-kubernetes-map-type,omitempty" protobuf:"bytes,43,opt,name=xKubernetesMapType"`
 
-	// x-kubernetes-validations describes a list of validation rules written in the CEL expression language.
-	// +patchMergeKey=rule
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=rule
+	// x-kubernetes-validations contains additional validation rules (CEL expressions) evaluated
+	// by the API server. Each rule is typically a map/object with keys like "rule"
+	// (CEL expression) and "message" (user-facing error). Requires the CRD structural
+	// schema and validation feature to be enabled.
 	XValidations ValidationRules `json:"x-kubernetes-validations,omitempty" patchStrategy:"merge" patchMergeKey:"rule" protobuf:"bytes,44,rep,name=xKubernetesValidations"`
 }
 
