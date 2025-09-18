@@ -19,7 +19,7 @@ package v1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -125,7 +125,9 @@ type RollingUpdateStatefulSetStrategy struct {
 	// Absolute number is calculated from percentage by rounding up. This can not be 0.
 	// Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to
 	// Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
-	// will be counted towards MaxUnavailable.
+	// will be counted towards MaxUnavailable. This field works differently for each podManagementPolicy
+	// (e.g. for OrderedReadyPodManagement it is not applied until the StatefulSet had a chance to fully scale up).
+	//
 	// +featureGate=MaxUnavailableStatefulSet
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"varint,2,opt,name=maxUnavailable"`

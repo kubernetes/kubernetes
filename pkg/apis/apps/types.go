@@ -103,7 +103,10 @@ type RollingUpdateStatefulSetStrategy struct {
 	// Absolute number is calculated from percentage by rounding up. This can not be 0.
 	// Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to
 	// Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
-	// will be counted towards MaxUnavailable.
+	// will be counted towards MaxUnavailable. This field works differently for each podManagementPolicy
+	// (e.g. for OrderedReadyPodManagement it is not applied until the StatefulSet had a chance to fully scale up).
+	// This can result in slower rollouts. For ParallelPodManagement this can skip ordering.
+	//
 	// +featureGate=MaxUnavailableStatefulSet
 	// +optional
 	MaxUnavailable *intstr.IntOrString
