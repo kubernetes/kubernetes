@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -28,6 +29,7 @@ import (
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/compatibility"
+	"k8s.io/klog/v2"
 )
 
 type fakeGroupRegistry struct{}
@@ -166,82 +168,190 @@ func (f fakeEffectiveVersion) Validate() []error {
 }
 
 func TestAPIEnablementOptionsApplyToVersionComparison(t *testing.T) {
-	// Test that the version comparison logic works correctly
-	// This test verifies that the fix for issue #134023 works properly
-	
-	// Test case 1: Same major.minor versions, different patch - should NOT warn
-	t.Run("same major.minor versions, different patch - no warning", func(t *testing.T) {
-		binaryVer := version.MustParse("1.34.1")
-		emulationVer := version.MustParse("1.34.0")
+	// Helper function to capture klog output
+	captureKlogOutput := func(fn func()) string {
+		var buf bytes.Buffer
+		klog.SetOutput(&buf)
+		klog.LogToStderr(false)
+		defer func() {
+			klog.SetOutput(nil)
+			klog.LogToStderr(true)
+		}()
 		
-		// This should NOT trigger a warning because major.minor versions are the same
-		// The fix ensures we only compare major.minor versions, not patch versions
-		effectiveVersion := fakeEffectiveVersion{
-			binaryVersion:    binaryVer,
-			emulationVersion: emulationVer,
-		}
-		
-		registry := fakeGroupVersionRegistry{versions: []schema.GroupVersion{
-			{Group: "rbac.authorization.k8s.io", Version: "v1alpha1"},
-		}}
-		
-		config := &server.Config{EffectiveVersion: effectiveVersion}
-		options := &APIEnablementOptions{RuntimeConfig: make(cliflag.ConfigurationMap)}
-		
-		// This should not fail - the fix prevents spurious warnings
-		err := options.ApplyTo(config, serverstore.NewResourceConfig(), registry)
-		if err != nil {
-			t.Fatalf("ApplyTo failed: %v", err)
-		}
-	})
-	
-	// Test case 2: Same major.minor versions, no patch in emulation - should NOT warn
-	t.Run("same major.minor versions, no patch in emulation - no warning", func(t *testing.T) {
-		binaryVer := version.MustParse("1.34.1")
-		emulationVer := version.MustParse("1.34")
-		
-		// This should NOT trigger a warning because major.minor versions are the same
-		effectiveVersion := fakeEffectiveVersion{
-			binaryVersion:    binaryVer,
-			emulationVersion: emulationVer,
-		}
-		
-		registry := fakeGroupVersionRegistry{versions: []schema.GroupVersion{
-			{Group: "rbac.authorization.k8s.io", Version: "v1alpha1"},
-		}}
-		
-		config := &server.Config{EffectiveVersion: effectiveVersion}
-		options := &APIEnablementOptions{RuntimeConfig: make(cliflag.ConfigurationMap)}
-		
-		// This should not fail - the fix prevents spurious warnings
-		err := options.ApplyTo(config, serverstore.NewResourceConfig(), registry)
-		if err != nil {
-			t.Fatalf("ApplyTo failed: %v", err)
-		}
-	})
-	
-	// Test case 3: Different major versions - should still warn (this is correct behavior)
-	t.Run("different major versions - should warn", func(t *testing.T) {
-		binaryVer := version.MustParse("1.34.1")
-		emulationVer := version.MustParse("1.33.0")
-		
-		// This SHOULD trigger a warning because major versions differ
-		effectiveVersion := fakeEffectiveVersion{
-			binaryVersion:    binaryVer,
-			emulationVersion: emulationVer,
-		}
-		
-		registry := fakeGroupVersionRegistry{versions: []schema.GroupVersion{
-			{Group: "rbac.authorization.k8s.io", Version: "v1alpha1"},
-		}}
-		
-		config := &server.Config{EffectiveVersion: effectiveVersion}
-		options := &APIEnablementOptions{RuntimeConfig: make(cliflag.ConfigurationMap)}
-		
-		// This should not fail - warnings are expected for different major versions
-		err := options.ApplyTo(config, serverstore.NewResourceConfig(), registry)
-		if err != nil {
-			t.Fatalf("ApplyTo failed: %v", err)
-		}
-	})
+		fn()
+		klog.Flush()
+		return buf.String()
+	}
+
+	testCases := []struct {
+		name                 string
+		binaryVersion        string
+		emulationVersion     string
+		alphaAPIsPresent     bool
+		expectWarning        bool
+		expectWarningContent string
+	}{
+		{
+			name:             "same major.minor versions, different patch - no warning",
+			binaryVersion:    "1.34.1",
+			emulationVersion: "1.34.0",
+			alphaAPIsPresent: true,
+			expectWarning:    false,
+		},
+		{
+			name:             "same major.minor versions, no patch in emulation - no warning",
+			binaryVersion:    "1.34.1",
+			emulationVersion: "1.34",
+			alphaAPIsPresent: true,
+			expectWarning:    false,
+		},
+		{
+			name:             "identical versions - no warning",
+			binaryVersion:    "1.34.1",
+			emulationVersion: "1.34.1",
+			alphaAPIsPresent: true,
+			expectWarning:    false,
+		},
+		{
+			name:             "different major versions - should warn",
+			binaryVersion:    "1.34.1",
+			emulationVersion: "1.33.0",
+			alphaAPIsPresent: true,
+			expectWarning:    true,
+			expectWarningContent: "alpha api enabled with emulated version",
+		},
+		{
+			name:             "different minor versions - should warn",
+			binaryVersion:    "1.34.1",
+			emulationVersion: "1.33.5",
+			alphaAPIsPresent: true,
+			expectWarning:    true,
+			expectWarningContent: "alpha api enabled with emulated version",
+		},
+		{
+			name:             "different major.minor but no alpha APIs - no warning",
+			binaryVersion:    "1.34.1",
+			emulationVersion: "1.33.0",
+			alphaAPIsPresent: false,
+			expectWarning:    false,
+		},
+		{
+			name:             "same major.minor with alpha APIs - no warning",
+			binaryVersion:    "1.34.5",
+			emulationVersion: "1.34.0",
+			alphaAPIsPresent: true,
+			expectWarning:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			binaryVer := version.MustParse(tc.binaryVersion)
+			emulationVer := version.MustParse(tc.emulationVersion)
+			
+			effectiveVersion := fakeEffectiveVersion{
+				binaryVersion:    binaryVer,
+				emulationVersion: emulationVer,
+			}
+			
+			var versions []schema.GroupVersion
+			if tc.alphaAPIsPresent {
+				versions = []schema.GroupVersion{
+					{Group: "rbac.authorization.k8s.io", Version: "v1alpha1"},
+					{Group: "storage.k8s.io", Version: "v1alpha1"},
+				}
+			} else {
+				versions = []schema.GroupVersion{
+					{Group: "rbac.authorization.k8s.io", Version: "v1"},
+					{Group: "storage.k8s.io", Version: "v1beta1"},
+				}
+			}
+			
+			registry := fakeGroupVersionRegistry{versions: versions}
+			config := &server.Config{EffectiveVersion: effectiveVersion}
+			options := &APIEnablementOptions{RuntimeConfig: make(cliflag.ConfigurationMap)}
+			
+			// Capture log output during ApplyTo execution
+			logOutput := captureKlogOutput(func() {
+				err := options.ApplyTo(config, serverstore.NewResourceConfig(), registry)
+				if err != nil {
+					t.Errorf("ApplyTo failed: %v", err)
+				}
+			})
+			
+			// Verify warning expectations
+			if tc.expectWarning {
+				if !strings.Contains(logOutput, tc.expectWarningContent) {
+					t.Errorf("Expected warning containing '%s', but got log output: %s", tc.expectWarningContent, logOutput)
+				}
+				if !strings.Contains(logOutput, "W") { // klog warning prefix
+					t.Errorf("Expected warning log level, but got log output: %s", logOutput)
+				}
+			} else {
+				if strings.Contains(logOutput, "alpha api enabled") {
+					t.Errorf("Expected no warning, but got log output: %s", logOutput)
+				}
+			}
+		})
+	}
+}
+
+func TestAPIEnablementOptionsApplyToErrorCases(t *testing.T) {
+	// Create a default effective version for test configs
+	defaultEffectiveVersion := fakeEffectiveVersion{
+		binaryVersion:    version.MustParse("1.34.0"),
+		emulationVersion: version.MustParse("1.34.0"),
+	}
+
+	testCases := []struct {
+		name          string
+		options       *APIEnablementOptions
+		config        *server.Config
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:    "nil options should not error",
+			options: nil,
+			config: &server.Config{
+				EffectiveVersion: defaultEffectiveVersion,
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid runtime config value should error",
+			options: &APIEnablementOptions{
+				RuntimeConfig: cliflag.ConfigurationMap{
+					"api/all": "invalid-value", // Must be "true" or "false"
+				},
+			},
+			config: &server.Config{
+				EffectiveVersion: defaultEffectiveVersion,
+			},
+			expectError:   true,
+			errorContains: "invalid value",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			registry := fakeGroupVersionRegistry{versions: []schema.GroupVersion{
+				{Group: "rbac.authorization.k8s.io", Version: "v1"},
+			}}
+			
+			err := tc.options.ApplyTo(tc.config, serverstore.NewResourceConfig(), registry)
+			
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				} else if tc.errorContains != "" && !strings.Contains(err.Error(), tc.errorContains) {
+					t.Errorf("Expected error containing '%s', but got: %v", tc.errorContains, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error but got: %v", err)
+				}
+			}
+		})
+	}
 }
