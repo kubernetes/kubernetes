@@ -1720,6 +1720,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceTaintRuleApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRuleSpec"):
 		return &resourcev1alpha3.DeviceTaintRuleSpecApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRuleStatus"):
+		return &resourcev1alpha3.DeviceTaintRuleStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintSelector"):
 		return &resourcev1alpha3.DeviceTaintSelectorApplyConfiguration{}
 

@@ -283,6 +283,7 @@ func TestValidateDeviceTaint(t *testing.T) {
 				return claim
 			}(),
 		},
+		// Minimal tests for DeviceTaint. Full coverage of validateDeviceTaint is in ResourceSlice test.
 		"valid-taint": {
 			taintRule: func() *resourceapi.DeviceTaintRule {
 				claim := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
@@ -294,16 +295,29 @@ func TestValidateDeviceTaint(t *testing.T) {
 				return claim
 			}(),
 		},
-		"invalid-taint": {
+		"required-taint": {
 			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkCoveredByDeclarative(),
 			},
 			taintRule: func() *resourceapi.DeviceTaintRule {
 				claim := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
 				claim.Spec.Taint = resourceapi.DeviceTaint{
-					// Minimal test. Full coverage of validateDeviceTaint is in ResourceSlice test.
 					Key:   goodName,
 					Value: goodName,
+				}
+				return claim
+			}(),
+		},
+		"invalid-taint": {
+			wantFailures: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "taint", "effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone}).MarkCoveredByDeclarative(),
+			},
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				claim := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				claim.Spec.Taint = resourceapi.DeviceTaint{
+					Effect: "some-other-effect",
+					Key:    goodName,
+					Value:  goodName,
 				}
 				return claim
 			}(),
@@ -321,6 +335,8 @@ func TestValidateDeviceTaint(t *testing.T) {
 func TestValidateDeviceTaintUpdate(t *testing.T) {
 	name := "valid"
 	validTaintRule := testDeviceTaintRule(name, validDeviceTaintRuleSpec)
+	invalidTaintEffectRule := validTaintRule.DeepCopy()
+	invalidTaintEffectRule.Spec.Taint.Effect = "some-other-effect"
 
 	scenarios := map[string]struct {
 		old          *resourceapi.DeviceTaintRule
@@ -336,6 +352,21 @@ func TestValidateDeviceTaintUpdate(t *testing.T) {
 			old:          validTaintRule,
 			update: func(taintRule *resourceapi.DeviceTaintRule) *resourceapi.DeviceTaintRule {
 				taintRule.Name += "-update"
+				return taintRule
+			},
+		},
+		"valid-existing-unknown-effect": {
+			old: invalidTaintEffectRule,
+			update: func(taintRule *resourceapi.DeviceTaintRule) *resourceapi.DeviceTaintRule {
+				taintRule.Labels = map[string]string{"a": "b"}
+				return taintRule
+			},
+		},
+		"invalid-new-unknown-effect": {
+			wantFailures: field.ErrorList{field.NotSupported(field.NewPath("spec", "taint", "effect"), resourceapi.DeviceTaintEffect("some-other-effect"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone})}.MarkCoveredByDeclarative(),
+			old:          validTaintRule,
+			update: func(taintRule *resourceapi.DeviceTaintRule) *resourceapi.DeviceTaintRule {
+				taintRule.Spec.Taint.Effect = "some-other-effect"
 				return taintRule
 			},
 		},
