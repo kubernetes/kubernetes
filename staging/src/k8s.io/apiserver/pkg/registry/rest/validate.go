@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	validationmetrics "k8s.io/apiserver/pkg/validation"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // ValidationConfig defines how a declarative validation request may be configured.

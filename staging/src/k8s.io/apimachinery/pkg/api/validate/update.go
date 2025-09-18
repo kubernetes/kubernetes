@@ -49,16 +49,16 @@ func UpdateValueByCompare[T comparable](_ context.Context, op operation.Operatio
 		switch constraint {
 		case NoSet:
 			if *oldValue == zero && *value != zero {
-				errs = append(errs, field.Forbidden(fldPath, "field cannot be set once created"))
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be set once created").WithOrigin("update"))
 			}
 		case NoUnset:
 			if *oldValue != zero && *value == zero {
-				errs = append(errs, field.Forbidden(fldPath, "field cannot be cleared once set"))
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
 			}
 		case NoModify:
 			// Allow transitions between set/unset
 			if *oldValue != zero && *value != zero && *value != *oldValue {
-				errs = append(errs, field.Forbidden(fldPath, "field cannot be modified once set"))
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be modified once set").WithOrigin("update"))
 			}
 		}
 	}
@@ -78,16 +78,16 @@ func UpdatePointer[T any](_ context.Context, op operation.Operation, fldPath *fi
 		switch constraint {
 		case NoSet:
 			if oldValue == nil && value != nil {
-				errs = append(errs, field.Forbidden(fldPath, "field cannot be set once created"))
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be set once created").WithOrigin("update"))
 			}
 		case NoUnset:
 			if oldValue != nil && value == nil {
-				errs = append(errs, field.Forbidden(fldPath, "field cannot be cleared once set"))
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
 			}
 		case NoModify:
 			// Allow transitions between set/unset
 			if oldValue != nil && value != nil && !equality.Semantic.DeepEqual(value, oldValue) {
-				errs = append(errs, field.Forbidden(fldPath, "field cannot be modified once set"))
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be modified once set").WithOrigin("update"))
 			}
 		}
 	}
@@ -110,16 +110,16 @@ func UpdateValueByReflect[T any](_ context.Context, op operation.Operation, fldP
 		switch constraint {
 		case NoSet:
 			if oldValueIsZero && !valueIsZero {
-				errs = append(errs, field.Forbidden(fldPath, "field cannot be set once created"))
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be set once created").WithOrigin("update"))
 			}
 		case NoUnset:
 			if !oldValueIsZero && valueIsZero {
-				errs = append(errs, field.Forbidden(fldPath, "field cannot be cleared once set"))
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
 			}
 		case NoModify:
 			// Allow transitions between set/unset
 			if !oldValueIsZero && !valueIsZero && !equality.Semantic.DeepEqual(*value, *oldValue) {
-				errs = append(errs, field.Forbidden(fldPath, "field cannot be modified once set"))
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be modified once set").WithOrigin("update"))
 			}
 		}
 	}
@@ -144,7 +144,7 @@ func UpdateStruct[T any](_ context.Context, op operation.Operation, fldPath *fie
 			continue
 		case NoModify:
 			if !equality.Semantic.DeepEqual(value, oldValue) {
-				errs = append(errs, field.Forbidden(fldPath, "field cannot be modified once set"))
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be modified once set").WithOrigin("update"))
 			}
 		}
 	}
