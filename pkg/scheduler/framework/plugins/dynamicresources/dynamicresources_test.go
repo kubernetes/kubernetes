@@ -45,6 +45,7 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
@@ -594,8 +595,8 @@ var (
 
 func taintDevices(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 	slice = slice.DeepCopy()
-	for i := range slice.Spec.Devices {
-		slice.Spec.Devices[i].Taints = append(slice.Spec.Devices[i].Taints, deviceTaint)
+	for _, device := range slice.Spec.Devices {
+		slice.Spec.Taints = append(slice.Spec.Taints, resourceapi.SliceDeviceTaint{Device: device.Name, Taint: deviceTaint})
 	}
 	return slice
 }
@@ -2282,7 +2283,7 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaints: true,
-		SliceInformer:      tc.informerFactory.Resource().V1().ResourceSlices(),
+		SliceInformer:      draapi.NewInformerForResourceSlice(tc.informerFactory),
 		TaintInformer:      tc.informerFactory.Resource().V1alpha3().DeviceTaintRules(),
 		ClassInformer:      tc.informerFactory.Resource().V1().DeviceClasses(),
 		KubeClient:         tc.client,

@@ -37,7 +37,8 @@ type ResourceSliceSpec struct {
 	NodeName               *string
 	NodeSelector           *v1.NodeSelector
 	AllNodes               bool
-	Devices                []Device
+	Devices                []SliceDevice // Manual conversion maps this to the public []resourceapi.Device.
+	Taints                 []SliceDeviceTaint
 	PerDeviceNodeSelection *bool
 	SharedCounters         []CounterSet
 }
@@ -52,6 +53,14 @@ type ResourcePool struct {
 	Generation         int64
 	ResourceSliceCount int64
 }
+
+// SliceDevice is an extension of the public type with
+// additional fields which only get set after conversion.
+type SliceDevice struct {
+	Device
+	Taints []resourceapi.DeviceTaint
+}
+
 type Device struct {
 	Name                     UniqueString
 	Attributes               map[QualifiedName]DeviceAttribute
@@ -60,7 +69,6 @@ type Device struct {
 	NodeName                 *string
 	NodeSelector             *v1.NodeSelector
 	AllNodes                 *bool
-	Taints                   []resourceapi.DeviceTaint
 	BindsToNode              bool
 	BindingConditions        []string
 	BindingFailureConditions []string
@@ -104,20 +112,10 @@ type Counter struct {
 	Value resource.Quantity
 }
 
-type DeviceTaint struct {
-	Key       string
-	Value     string
-	Effect    DeviceTaintEffect
-	TimeAdded *metav1.Time
+type SliceDeviceTaint struct {
+	Device UniqueString
+	Taint  resourceapi.DeviceTaint
 }
-
-type DeviceTaintEffect string
-
-const (
-	DeviceTaintEffectNoSchedule DeviceTaintEffect = "NoSchedule"
-
-	DeviceTaintEffectNoExecute DeviceTaintEffect = "NoExecute"
-)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

@@ -1283,13 +1283,20 @@ func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *Re
 			device.Attributes = typedField
 		case map[resourceapi.QualifiedName]resourceapi.DeviceCapacity:
 			device.Capacity = typedField
-		case resourceapi.DeviceTaint:
-			device.Taints = append(device.Taints, typedField)
 		default:
 			panic(fmt.Sprintf("expected a type which matches a field in BasicDevice, got %T", field))
 		}
 	}
 	wrapper.Spec.Devices = append(wrapper.Spec.Devices, device)
+	return wrapper
+}
+
+// Taint extends the taints in the spec.
+func (wrapper *ResourceSliceWrapper) Taint(deviceName string, taint resourceapi.DeviceTaint) *ResourceSliceWrapper {
+	wrapper.Spec.Taints = append(wrapper.Spec.Taints, resourceapi.SliceDeviceTaint{
+		Device: deviceName,
+		Taint:  taint,
+	})
 	return wrapper
 }
 

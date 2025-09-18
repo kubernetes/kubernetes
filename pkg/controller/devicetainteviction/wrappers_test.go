@@ -46,7 +46,7 @@ func (wrapper *ResourceSliceWrapper) obj() *draapi.ResourceSlice {
 // Devices sets the devices field of the inner object.
 func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrapper {
 	for _, name := range names {
-		wrapper.Spec.Devices = append(wrapper.Spec.Devices, draapi.Device{Name: u(name)})
+		wrapper.Spec.Devices = append(wrapper.Spec.Devices, draapi.SliceDevice{Device: draapi.Device{Name: u(name)}})
 	}
 	return wrapper
 }
@@ -54,7 +54,7 @@ func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrap
 // device extends the devices field of the inner object.
 // The device must have a name and may have arbitrary additional fields.
 func (wrapper *ResourceSliceWrapper) device(name string, otherFields ...any) *ResourceSliceWrapper {
-	device := draapi.Device{Name: u(name)}
+	device := draapi.SliceDevice{Device: draapi.Device{Name: u(name)}}
 	for _, field := range otherFields {
 		switch typedField := field.(type) {
 		case map[draapi.QualifiedName]draapi.DeviceAttribute:
@@ -73,10 +73,24 @@ func (wrapper *ResourceSliceWrapper) device(name string, otherFields ...any) *Re
 	return wrapper
 }
 
+// mustConvertResourceSlice converts a slice for use with fake client-go.
+//
+// All device taints on individual devices are ignored by that conversion.
+// To make those taints visible, we have to move them to the slice.Spec.Taints.
+// This wouldn't work with a real apiserver (validation!), but for unit testing
+// it's good enough.
 func mustConvertResourceSlice(in *draapi.ResourceSlice) *resourceapi.ResourceSlice {
 	var out resourceapi.ResourceSlice
 	if err := draapi.Convert_api_ResourceSlice_To_v1_ResourceSlice(in, &out, nil); err != nil {
 		panic(err)
+	}
+	for _, device := range in.Spec.Devices {
+		for _, taint := range device.Taints {
+			out.Spec.Taints = append(out.Spec.Taints, resourceapi.SliceDeviceTaint{
+				Device: device.Name.String(),
+				Taint:  taint,
+			})
+		}
 	}
 	return &out
 }

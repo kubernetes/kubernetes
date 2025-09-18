@@ -50,9 +50,13 @@ var slice = &resource.ResourceSlice{
 
 var sliceWithDeviceTaints = func() *resource.ResourceSlice {
 	slice := slice.DeepCopy()
-	slice.Spec.Devices[0].Taints = []resource.DeviceTaint{{
-		Key:    "example.com/tainted",
-		Effect: resource.DeviceTaintEffectNoSchedule,
+	slice.Spec.Devices = nil
+	slice.Spec.Taints = []resource.SliceDeviceTaint{{
+		Device: "device-0",
+		Taint: resource.DeviceTaint{
+			Key:    "example.com/tainted",
+			Effect: resource.DeviceTaintEffectNoSchedule,
+		},
 	}}
 	return slice
 }()
@@ -192,8 +196,9 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			obj:          sliceWithDeviceTaints,
 			deviceTaints: false,
 			expectObj: func() *resource.ResourceSlice {
-				obj := slice.DeepCopy()
+				obj := sliceWithDeviceTaints.DeepCopy()
 				obj.Generation = 1
+				obj.Spec.Taints = nil
 				return obj
 			}(),
 		},

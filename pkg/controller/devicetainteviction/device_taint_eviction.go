@@ -185,7 +185,7 @@ func (p pool) getTaintedDevices() []taintedDevice {
 }
 
 // getDevice looks up one device by name. Out-dated slices are ignored.
-func (p pool) getDevice(deviceName string) *draapi.Device {
+func (p pool) getDevice(deviceName string) *draapi.SliceDevice {
 	for slice := range p.slices {
 		if slice.Spec.Pool.Generation != p.maxGeneration {
 			continue

@@ -39,8 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
@@ -88,6 +92,8 @@ const (
 	claim1      = "claim-1"
 	slice1      = "slice-1"
 	slice2      = "slice-2"
+	slice3      = "slice-3"
+	slice4      = "slice-4"
 	device1     = "device-1"
 	device2     = "device-2"
 	device3     = "device-3"
@@ -382,13 +388,6 @@ func (in wrapDevice) obj() resourceapi.Device {
 	return in.Device
 }
 
-func (in wrapDevice) withTaints(taints ...resourceapi.DeviceTaint) wrapDevice {
-	inDevice := resourceapi.Device(in.Device)
-	device := inDevice.DeepCopy()
-	device.Taints = append(device.Taints, taints...)
-	return wrapDevice{Device: *device}
-}
-
 func (in wrapDevice) withDeviceCounterConsumption(deviceCounterConsumption ...resourceapi.DeviceCounterConsumption) wrapDevice {
 	inDevice := in.Device
 	device := inDevice.DeepCopy()
@@ -564,6 +563,20 @@ func (in wrapResourceSlice) obj() *resourceapi.ResourceSlice {
 func (in wrapResourceSlice) withCounterSet(counterSets ...resourceapi.CounterSet) wrapResourceSlice {
 	inResourceSlice := in.DeepCopy()
 	inResourceSlice.Spec.SharedCounters = append(inResourceSlice.Spec.SharedCounters, counterSets...)
+	return wrapResourceSlice{ResourceSlice: inResourceSlice}
+}
+
+func (in wrapResourceSlice) withTaints(taints ...resourceapi.SliceDeviceTaint) wrapResourceSlice {
+	inResourceSlice := in.DeepCopy()
+	inResourceSlice.Spec.Taints = append(inResourceSlice.Spec.Taints, taints...)
+	return wrapResourceSlice{ResourceSlice: inResourceSlice}
+}
+
+func (in wrapResourceSlice) withDeviceTaint(deviceName string, taints ...resourceapi.DeviceTaint) wrapResourceSlice {
+	inResourceSlice := in.DeepCopy()
+	for _, taint := range taints {
+		inResourceSlice.Spec.Taints = append(inResourceSlice.Spec.Taints, resourceapi.SliceDeviceTaint{Device: deviceName, Taint: taint})
+	}
 	return wrapResourceSlice{ResourceSlice: inResourceSlice}
 }
 
@@ -1131,7 +1144,7 @@ func TestAllocator(t *testing.T,
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(
 				sliceWithOneDevice(slice1, node1, pool1, driverA),
-				sliceWithOneDevice(slice1, node1, pool2, driverA),
+				sliceWithOneDevice(slice2, node1, pool2, driverA),
 			),
 			node: node(node1, region1),
 
@@ -1188,7 +1201,7 @@ func TestAllocator(t *testing.T,
 			),
 			slices: unwrap(
 				sliceWithOneDevice(slice1, node1, pool1, driverA),
-				sliceWithOneDevice(slice1, node1, pool1, driverB),
+				sliceWithOneDevice(slice2, node1, pool1, driverB),
 			),
 			node: node(node1, region1),
 
@@ -1227,7 +1240,7 @@ func TestAllocator(t *testing.T,
 			),
 			slices: unwrap(
 				sliceWithOneDevice(slice1, node1, pool1, driverA),
-				sliceWithOneDevice(slice1, node1, pool1, driverB),
+				sliceWithOneDevice(slice2, node1, pool1, driverB),
 			),
 			node: node(node1, region1),
 
@@ -1269,7 +1282,7 @@ func TestAllocator(t *testing.T,
 					device(device1, nil, nil),
 					device(device2, nil, nil),
 				),
-				sliceWithOneDevice(slice1, node1, pool1, driverB),
+				sliceWithOneDevice(slice2, node1, pool1, driverB),
 			),
 			node: node(node1, region1),
 
@@ -1312,7 +1325,7 @@ func TestAllocator(t *testing.T,
 					device(device1, nil, nil),
 					device(device2, nil, nil),
 				),
-				sliceWithOneDevice(slice1, node1, pool1, driverB),
+				sliceWithOneDevice(slice2, node1, pool1, driverB),
 			),
 			node: node(node1, region1),
 
@@ -1659,9 +1672,9 @@ func TestAllocator(t *testing.T,
 			classes:          objects(class(classA, driverA)),
 			slices: unwrap(
 				sliceWithOneDevice(slice1, nodeLabelSelector(regionKey, region1), pool1, driverA),
-				sliceWithOneDevice(slice1, nodeSelectionAll, pool2, driverA),
-				sliceWithOneDevice(slice1, nodeLabelSelector(planetKey, planetValueEarth), pool3, driverA),
-				sliceWithOneDevice(slice1, localNodeSelector(node1), pool4, driverA),
+				sliceWithOneDevice(slice2, nodeSelectionAll, pool2, driverA),
+				sliceWithOneDevice(slice3, nodeLabelSelector(planetKey, planetValueEarth), pool3, driverA),
+				sliceWithOneDevice(slice4, localNodeSelector(node1), pool4, driverA),
 			),
 			node: node(node1, region1),
 
@@ -1689,7 +1702,7 @@ func TestAllocator(t *testing.T,
 			classes:          objects(class(classA, driverA)),
 			slices: unwrap(
 				sliceWithOneDevice(slice1, nodeLabelSelector(regionKey, region1), pool1, driverA),
-				sliceWithOneDevice(slice1, node1, pool2, driverA),
+				sliceWithOneDevice(slice2, node1, pool2, driverA),
 			),
 			node: node(node1, region1),
 
@@ -1708,7 +1721,7 @@ func TestAllocator(t *testing.T,
 					device(device1, nil, nil),
 					device(device2, nil, nil),
 				),
-				sliceWithOneDevice(slice1, node1, pool1, driverB),
+				sliceWithOneDevice(slice2, node1, pool1, driverB),
 			),
 			node: node(node1, region1),
 
@@ -3420,9 +3433,12 @@ func TestAllocator(t *testing.T,
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withTaints(taintNoSchedule),
-				device(device2, nil, nil).withTaints(taintNoExecute),
-			)),
+				device(device1, nil, nil),
+				device(device2, nil, nil),
+			).
+				withDeviceTaint(device1, taintNoSchedule).
+				withDeviceTaint(device2, taintNoExecute),
+			),
 			node: node(node1, region1),
 		},
 		"tainted-one-device-two-taints": {
@@ -3432,8 +3448,8 @@ func TestAllocator(t *testing.T,
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withTaints(taintNoSchedule, taintNoExecute),
-			)),
+				device(device1, nil, nil),
+			).withDeviceTaint(device1, taintNoSchedule, taintNoExecute)),
 			node: node(node1, region1),
 		},
 		"tainted-two-devices-tolerated": {
@@ -3443,9 +3459,12 @@ func TestAllocator(t *testing.T,
 			claimsToAllocate: objects(claim(claim0, req0, classA).withTolerations(tolerationNoExecute)),
 			classes:          objects(class(classA, driverA)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withTaints(taintNoSchedule),
-				device(device2, nil, nil).withTaints(taintNoExecute),
-			)),
+				device(device1, nil, nil),
+				device(device2, nil, nil),
+			).
+				withDeviceTaint(device1, taintNoSchedule).
+				withDeviceTaint(device2, taintNoExecute),
+			),
 			node: node(node1, region1),
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
@@ -3459,7 +3478,7 @@ func TestAllocator(t *testing.T,
 			claimsToAllocate: objects(claim(claim0, req0, classA).withTolerations(tolerationNoSchedule, tolerationNoExecute)),
 			classes:          objects(class(classA, driverA)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withTaints(taintNoSchedule, taintNoExecute),
+				device(device1, nil, nil),
 			)),
 			node: node(node1, region1),
 			expectResults: []any{allocationResult(
@@ -3474,8 +3493,8 @@ func TestAllocator(t *testing.T,
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withTaints(taintNoSchedule, taintNoExecute),
-			)),
+				device(device1, nil, nil),
+			).withDeviceTaint(device1, taintNoSchedule, taintNoExecute)),
 			node: node(node1, region1),
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
@@ -3493,8 +3512,8 @@ func TestAllocator(t *testing.T,
 			))),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withTaints(taintNoSchedule),
-			)),
+				device(device1, nil, nil),
+			).withDeviceTaint(device1, taintNoSchedule)),
 			node: node(node1, region1),
 		},
 		"tainted-prioritized-list-disabled": {
@@ -3508,8 +3527,8 @@ func TestAllocator(t *testing.T,
 			))),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withTaints(taintNoSchedule),
-			)),
+				device(device1, nil, nil),
+			).withDeviceTaint(device1, taintNoSchedule)),
 			node: node(node1, region1),
 
 			expectResults: []any{allocationResult(
@@ -3533,8 +3552,8 @@ func TestAllocator(t *testing.T,
 			},
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withTaints(taintNoSchedule),
-			)),
+				device(device1, nil, nil),
+			).withDeviceTaint(device1, taintNoSchedule)),
 			node: node(node1, region1),
 		},
 		"tainted-admin-access-disabled": {
@@ -3553,8 +3572,8 @@ func TestAllocator(t *testing.T,
 			},
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withTaints(taintNoSchedule),
-			)),
+				device(device1, nil, nil),
+			).withDeviceTaint(device1, taintNoSchedule)),
 			node: node(node1, region1),
 
 			expectResults: []any{allocationResult(
@@ -3575,8 +3594,8 @@ func TestAllocator(t *testing.T,
 			})),
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withTaints(taintNoSchedule),
-			)),
+				device(device1, nil, nil),
+			).withDeviceTaint(device1, taintNoSchedule)),
 			node: node(node1, region1),
 		},
 		"tainted-all-devices-single-disabled": {
@@ -3592,8 +3611,8 @@ func TestAllocator(t *testing.T,
 			})),
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withTaints(taintNoSchedule),
-			)),
+				device(device1, nil, nil),
+			).withDeviceTaint(device1, taintNoSchedule)),
 			node: node(node1, region1),
 
 			expectResults: []any{allocationResult(
@@ -4079,12 +4098,7 @@ func TestAllocator(t *testing.T,
 								"memory": resource.MustParse("4Gi"),
 							}),
 						).
-						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}).
-						withTaints(resourceapi.DeviceTaint{
-							Key:    "key1",
-							Value:  "value1",
-							Effect: resourceapi.DeviceTaintEffectNoSchedule,
-						}),
+						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
 					device(device2, fromCounters, nil).
 						withDeviceCounterConsumption(
 							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
@@ -4095,7 +4109,11 @@ func TestAllocator(t *testing.T,
 					counterSet(counterSet1, map[string]resource.Quantity{
 						"memory": resource.MustParse("8Gi"),
 					}),
-				),
+				).withDeviceTaint(device1, resourceapi.DeviceTaint{
+					Key:    "key1",
+					Value:  "value1",
+					Effect: resourceapi.DeviceTaintEffectNoSchedule,
+				}),
 			),
 			node:          node(node1, region1),
 			expectResults: nil,
@@ -4122,12 +4140,7 @@ func TestAllocator(t *testing.T,
 								"memory": resource.MustParse("4Gi"),
 							}),
 						).
-						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}).
-						withTaints(resourceapi.DeviceTaint{
-							Key:    "key1",
-							Value:  "value1",
-							Effect: resourceapi.DeviceTaintEffectNoSchedule,
-						}),
+						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
 					device(device2, fromCounters, nil).
 						withDeviceCounterConsumption(
 							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
@@ -4138,7 +4151,11 @@ func TestAllocator(t *testing.T,
 					counterSet(counterSet1, map[string]resource.Quantity{
 						"memory": resource.MustParse("8Gi"),
 					}),
-				),
+				).withDeviceTaint(device1, resourceapi.DeviceTaint{
+					Key:    "key1",
+					Value:  "value1",
+					Effect: resourceapi.DeviceTaintEffectNoSchedule,
+				}),
 			),
 			node: node(node1, region1),
 			expectResults: []any{
@@ -4853,7 +4870,7 @@ func TestAllocator(t *testing.T,
 						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"stringAttribute": {StringValue: ptr.To("stringAttributeValue1")}},
 					).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
 				),
-				slice(slice1, node1, pool1, driverA,
+				slice(slice2, node1, pool1, driverA,
 					device(device2, nil,
 						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"stringAttribute": {StringValue: ptr.To("stringAttributeValue2")}},
 					).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
@@ -4895,13 +4912,13 @@ func TestAllocator(t *testing.T,
 			claimsToAllocate := slices.Clone(tc.claimsToAllocate)
 			allocatedDevices := slices.Clone(tc.allocatedDevices)
 			allocatedShare := tc.allocatedCapacityDevices.Clone()
-			slices := slices.Clone(tc.slices)
 			allocatedState := AllocatedState{
 				AllocatedDevices:         sets.New(allocatedDevices...),
 				AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
 				AggregatedCapacity:       allocatedShare,
 			}
-			allocator, err := newAllocator(ctx, tc.features, allocatedState, classLister, toDRASlices(slices), cel.NewCache(1, cel.Features{EnableConsumableCapacity: tc.features.ConsumableCapacity}))
+			slices := slices.Clone(tc.slices)
+			allocator, err := newAllocator(ctx, tc.features, allocatedState, classLister, toDRASlices(t, ctx, tc.features, slices), cel.NewCache(1, cel.Features{EnableConsumableCapacity: tc.features.ConsumableCapacity}))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			if _, ok := allocator.(internal.AllocatorExtended); tc.expectNumAllocateOneInvocations > 0 && !ok {
@@ -4963,6 +4980,7 @@ func TestAllocator(t *testing.T,
 					device(device4, nil, nil),
 					device("device-5", nil, nil),
 				))
+				draSlices := toDRASlices(t, ctx, Features{}, slices)
 				node := node(node1, region1)
 
 				switch name {
@@ -4981,7 +4999,7 @@ func TestAllocator(t *testing.T,
 					ctx = c
 				}
 
-				allocator, err := newAllocator(ctx, Features{}, AllocatedState{}, classLister, toDRASlices(slices), cel.NewCache(1, cel.Features{}))
+				allocator, err := newAllocator(ctx, Features{}, AllocatedState{}, classLister, draSlices, cel.NewCache(1, cel.Features{}))
 				g.Expect(err).ToNot(gomega.HaveOccurred())
 				_, err = allocator.Allocate(ctx, node, claimsToAllocate)
 				t.Logf("got error %v", err)
@@ -4999,14 +5017,49 @@ func TestAllocator(t *testing.T,
 	})
 }
 
-func toDRASlices(slices []*resourceapi.ResourceSlice) []*draapi.ResourceSlice {
-	draSlices := make([]*draapi.ResourceSlice, len(slices))
-	for i := range slices {
-		var slice draapi.ResourceSlice
-		if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(slices[i], &slice, nil); err != nil {
-			panic(fmt.Errorf("convert ResourceSlice: %w", err))
-		}
-		draSlices[i] = &slice
+// toDRASlices converts with the ResourceSlice tracker, which (depending on the feature)
+// either uses the ResourceSlice informer or patches slices.
+func toDRASlices(tb testing.TB, ctx context.Context, features Features, slices []*resourceapi.ResourceSlice) []*draapi.ResourceSlice {
+	objs := make([]runtime.Object, len(slices))
+	for i, slice := range slices {
+		objs[i] = slice
+	}
+	client := fake.NewSimpleClientset(objs...)
+	informerfactory := informers.NewSharedInformerFactory(client, 0)
+	ctx, cancel := context.WithCancel(ctx)
+	defer func() {
+		cancel()
+		informerfactory.Shutdown()
+	}()
+	sliceInformer := draapi.NewInformerForResourceSlice(informerfactory)
+	taintInformer := informerfactory.Resource().V1alpha3().DeviceTaintRules()
+	classInformer := informerfactory.Resource().V1().DeviceClasses()
+
+	tracker, err := resourceslicetracker.StartTracker(ctx, resourceslicetracker.Options{
+		EnableDeviceTaints:       features.DeviceTaints,
+		EnableConsumableCapacity: features.ConsumableCapacity,
+
+		SliceInformer: sliceInformer,
+		TaintInformer: taintInformer,
+		ClassInformer: classInformer,
+
+		KubeClient: client,
+	})
+	if err != nil {
+		tb.Fatalf("Failed to create ResourceClaim tracker: %v", err)
+	}
+	defer tracker.Stop()
+	informerfactory.Start(ctx.Done())
+
+	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, 30*time.Second)
+	defer cancelTimeout()
+	if !cache.WaitForNamedCacheSyncWithContext(timeoutCtx, tracker.HasSynced) {
+		tb.Fatal("ResourceClaim tracker failed to sync")
+	}
+
+	draSlices, err := tracker.ListPatchedResourceSlices()
+	if err != nil {
+		tb.Fatalf("list patched ResourceSlices: %v", err)
 	}
 	return draSlices
 }

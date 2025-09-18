@@ -57,7 +57,8 @@ type handlerEvent struct {
 	newObj *draapi.ResourceSlice
 }
 
-func add[T any](obj *T) [2]*T {
+func add[T draapi.ResourceSlice | resourcealphaapi.DeviceTaintRule | resourceapi.DeviceClass](obj *T) [2]*T {
+	validateTestInput(obj)
 	return [2]*T{nil, obj}
 }
 
@@ -66,7 +67,21 @@ func remove[T any](obj *T) [2]*T {
 }
 
 func update[T any](oldObj, newObj *T) [2]*T {
+
 	return [2]*T{oldObj, newObj}
+}
+
+func validateTestInput(obj any) {
+	if slice, ok := obj.(*draapi.ResourceSlice); ok {
+		// If we add a slice, then it must not have taints in its devices.
+		// That's a mistake in the test because the informer would not
+		// provide such slices.
+		for _, device := range slice.Spec.Devices {
+			if len(device.Taints) > 0 {
+				panic("ResourceSlice as test input must not already have taints on it's devices. Move them to a separate slice.")
+			}
+		}
+	}
 }
 
 func runInputEvents(tCtx *testContext, events []any) {
@@ -168,7 +183,7 @@ var (
 		},
 	}
 
-	sliceWithDevices = func(slice *draapi.ResourceSlice, devices []draapi.Device) *draapi.ResourceSlice {
+	sliceWithDevices = func(slice *draapi.ResourceSlice, devices []draapi.SliceDevice) *draapi.ResourceSlice {
 		slice = slice.DeepCopy()
 		slice.Spec.Devices = devices
 		return slice
@@ -202,15 +217,15 @@ var (
 	}
 	unchangedSlice = &draapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "no-change"}}
 
-	deviceWithName = func(device draapi.Device, name string) draapi.Device {
+	deviceWithName = func(device draapi.SliceDevice, name string) draapi.SliceDevice {
 		device.Name = u(name)
 		return device
 	}
-	deviceWithTaints = func(device draapi.Device, taints []resourceapi.DeviceTaint) draapi.Device {
+	deviceWithTaints = func(device draapi.SliceDevice, taints []resourceapi.DeviceTaint) draapi.SliceDevice {
 		device.Taints = taints
 		return device
 	}
-	emptyDevice = draapi.Device{}
+	emptyDevice = draapi.SliceDevice{}
 	device0     = deviceWithName(emptyDevice, device0Name)
 	device1     = deviceWithName(emptyDevice, device1Name)
 	device2     = deviceWithName(emptyDevice, device2Name)
@@ -230,27 +245,27 @@ var (
 	deviceTaints   = []resourceapi.DeviceTaint{deviceTaint1}
 	device1Tainted = deviceWithTaints(device1, deviceTaints)
 	device2Tainted = deviceWithTaints(device2, deviceTaints)
-	devices        = []draapi.Device{device1}
-	threeDevices   = []draapi.Device{
+	devices        = []draapi.SliceDevice{device1}
+	threeDevices   = []draapi.SliceDevice{
 		device0,
 		device1,
 		device2,
 	}
-	threeDevicesOneTainted = []draapi.Device{
+	threeDevicesOneTainted = []draapi.SliceDevice{
 		device0,
 		device1Tainted,
 		device2,
 	}
-	devices2        = []draapi.Device{device2}
-	taintedDevices  = []draapi.Device{device1Tainted}
-	taintedDevices2 = []draapi.Device{device2Tainted}
+	devices2        = []draapi.SliceDevice{device2}
+	taintedDevices  = []draapi.SliceDevice{device1Tainted}
+	taintedDevices2 = []draapi.SliceDevice{device2Tainted}
 
 	existingDeviceTaints   = []resourceapi.DeviceTaint{deviceTaint2}
 	existingDevice1Tainted = deviceWithTaints(device1, existingDeviceTaints)
-	existingTaintedDevices = []draapi.Device{existingDevice1Tainted}
+	existingTaintedDevices = []draapi.SliceDevice{existingDevice1Tainted}
 	mergedDeviceTaints     = []resourceapi.DeviceTaint{deviceTaint2, deviceTaint1}
 	mergedDevice1Tainted   = deviceWithTaints(device1, mergedDeviceTaints)
-	mergedTaintedDevices   = []draapi.Device{mergedDevice1Tainted}
+	mergedTaintedDevices   = []draapi.SliceDevice{mergedDevice1Tainted}
 
 	slice1               = sliceWithDevices(slice1NoDevices, devices)
 	slice1Tainted        = sliceWithDevices(slice1, taintedDevices)
@@ -259,6 +274,29 @@ var (
 	slice1Labels         = sliceWithLabels(slice1, map[string]string{"foo": "bar"})
 	slice2               = sliceWithDevices(slice2NoDevices, devices2)
 	slice2Tainted        = sliceWithDevices(slice2, taintedDevices2)
+
+	extractTaints = func(slice *draapi.ResourceSlice) *draapi.ResourceSlice {
+		slice = slice.DeepCopy()
+		slice.Name += "-taints"
+		for _, device := range slice.Spec.Devices {
+			for _, taint := range device.Taints {
+				slice.Spec.Taints = append(slice.Spec.Taints, draapi.SliceDeviceTaint{
+					Device: device.Name,
+					Taint:  taint,
+				})
+			}
+		}
+		slice.Spec.Devices = nil
+		return slice
+	}
+
+	trimTaints = func(slice *draapi.ResourceSlice) *draapi.ResourceSlice {
+		slice = slice.DeepCopy()
+		for i := range slice.Spec.Devices {
+			slice.Spec.Devices[i].Taints = nil
+		}
+		return slice
+	}
 
 	alphaDeviceTaint = func(taint resourceapi.DeviceTaint) resourcealphaapi.DeviceTaint {
 		return resourcealphaapi.DeviceTaint{
@@ -455,16 +493,43 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		},
 		"merge-taints": {
 			events: []any{
+				add(extractTaints(slice1AlreadyTainted)),
+				add(trimTaints(slice1AlreadyTainted)),
 				add(taintAllDevicesRule),
-				add(slice1AlreadyTainted),
 			},
 			expectedPatchedSlices: []*draapi.ResourceSlice{
+				extractTaints(slice1AlreadyTainted),
 				slice1MergedTaints,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1MergedTaints},
+				{event: handlerEventAdd, newObj: extractTaints(slice1AlreadyTainted)},
+				{event: handlerEventAdd, newObj: slice1AlreadyTainted},
+				{event: handlerEventUpdate, oldObj: slice1AlreadyTainted, newObj: slice1MergedTaints},
 			},
 		},
+		"merge-taints-reversed": {
+			events: []any{
+				add(trimTaints(slice1AlreadyTainted)),
+				add(extractTaints(slice1AlreadyTainted)),
+				add(taintAllDevicesRule),
+			},
+			expectedPatchedSlices: []*draapi.ResourceSlice{
+				extractTaints(slice1AlreadyTainted),
+				slice1MergedTaints,
+			},
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: trimTaints(slice1AlreadyTainted)},
+				{event: handlerEventUpdate, oldObj: trimTaints(slice1AlreadyTainted), newObj: slice1AlreadyTainted},
+				{event: handlerEventAdd, newObj: extractTaints(slice1AlreadyTainted)},
+				{event: handlerEventUpdate, oldObj: slice1AlreadyTainted, newObj: slice1MergedTaints},
+			},
+		},
+		// TODO:
+		// - different pool generations in parallel
+		// - different pools
+		// - multiple slices with taints
+		// - multiple taints per slice
+		// - multiple taints per device
 		"add-taint-for-driver": {
 			events: []any{
 				add(taintDriver1DevicesRule),
@@ -835,7 +900,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Name: "slice-" + strconv.Itoa(i),
 						},
 						Spec: draapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]draapi.Device{}, 64),
+							Devices: slices.Repeat([]draapi.SliceDevice{}, 64),
 						},
 					}
 				}
@@ -854,7 +919,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Name: "slice-" + strconv.Itoa(i),
 						},
 						Spec: draapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]draapi.Device{{}}, 64),
+							Devices: slices.Repeat([]draapi.SliceDevice{{}}, 64),
 						},
 					}
 				}
@@ -889,7 +954,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Name: "slice-" + strconv.Itoa(i),
 						},
 						Spec: draapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]draapi.Device{{}}, 64),
+							Devices: slices.Repeat([]draapi.SliceDevice{{}}, 64),
 						},
 					}
 				}
@@ -929,11 +994,13 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Pool: draapi.ResourcePool{
 								Name: u("pool-" + strconv.Itoa(i)),
 							},
-							Devices: func() []draapi.Device {
-								devices := make([]draapi.Device, nDevices)
+							Devices: func() []draapi.SliceDevice {
+								devices := make([]draapi.SliceDevice, nDevices)
 								for j := range devices {
-									devices[j] = draapi.Device{
-										Name: u("device-" + strconv.Itoa(j)),
+									devices[j] = draapi.SliceDevice{
+										Device: draapi.Device{
+											Name: u("device-" + strconv.Itoa(j)),
+										},
 									}
 								}
 								return devices
@@ -978,9 +1045,9 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Pool: draapi.ResourcePool{
 								Name: u("pool-" + strconv.Itoa(i)),
 							},
-							Devices: func() []draapi.Device {
+							Devices: func() []draapi.SliceDevice {
 								nDevices := 64
-								devices := slices.Repeat([]draapi.Device{{}}, nDevices)
+								devices := slices.Repeat([]draapi.SliceDevice{{}}, nDevices)
 								devices[nDevices/2].Name = u("patchme")
 								return devices
 							}(),
@@ -1024,7 +1091,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Pool: draapi.ResourcePool{
 								Name: u("pool-" + strconv.Itoa(i)),
 							},
-							Devices: slices.Repeat([]draapi.Device{{}}, 64),
+							Devices: slices.Repeat([]draapi.SliceDevice{{}}, 64),
 						},
 					}
 				}
