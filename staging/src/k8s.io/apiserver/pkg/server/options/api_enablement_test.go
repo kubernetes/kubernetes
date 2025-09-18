@@ -177,7 +177,7 @@ func TestAPIEnablementOptionsApplyToVersionComparison(t *testing.T) {
 			klog.SetOutput(nil)
 			klog.LogToStderr(true)
 		}()
-		
+
 		fn()
 		klog.Flush()
 		return buf.String()
@@ -213,19 +213,19 @@ func TestAPIEnablementOptionsApplyToVersionComparison(t *testing.T) {
 			expectWarning:    false,
 		},
 		{
-			name:             "different major versions - should warn",
-			binaryVersion:    "1.34.1",
-			emulationVersion: "1.33.0",
-			alphaAPIsPresent: true,
-			expectWarning:    true,
+			name:                 "different major versions - should warn",
+			binaryVersion:        "1.34.1",
+			emulationVersion:     "1.33.0",
+			alphaAPIsPresent:     true,
+			expectWarning:        true,
 			expectWarningContent: "alpha api enabled with emulated version",
 		},
 		{
-			name:             "different minor versions - should warn",
-			binaryVersion:    "1.34.1",
-			emulationVersion: "1.33.5",
-			alphaAPIsPresent: true,
-			expectWarning:    true,
+			name:                 "different minor versions - should warn",
+			binaryVersion:        "1.34.1",
+			emulationVersion:     "1.33.5",
+			alphaAPIsPresent:     true,
+			expectWarning:        true,
 			expectWarningContent: "alpha api enabled with emulated version",
 		},
 		{
@@ -248,12 +248,12 @@ func TestAPIEnablementOptionsApplyToVersionComparison(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			binaryVer := version.MustParse(tc.binaryVersion)
 			emulationVer := version.MustParse(tc.emulationVersion)
-			
+
 			effectiveVersion := fakeEffectiveVersion{
 				binaryVersion:    binaryVer,
 				emulationVersion: emulationVer,
 			}
-			
+
 			var versions []schema.GroupVersion
 			if tc.alphaAPIsPresent {
 				versions = []schema.GroupVersion{
@@ -266,11 +266,11 @@ func TestAPIEnablementOptionsApplyToVersionComparison(t *testing.T) {
 					{Group: "storage.k8s.io", Version: "v1beta1"},
 				}
 			}
-			
+
 			registry := fakeGroupVersionRegistry{versions: versions}
 			config := &server.Config{EffectiveVersion: effectiveVersion}
 			options := &APIEnablementOptions{RuntimeConfig: make(cliflag.ConfigurationMap)}
-			
+
 			// Capture log output during ApplyTo execution
 			logOutput := captureKlogOutput(func() {
 				err := options.ApplyTo(config, serverstore.NewResourceConfig(), registry)
@@ -278,7 +278,7 @@ func TestAPIEnablementOptionsApplyToVersionComparison(t *testing.T) {
 					t.Errorf("ApplyTo failed: %v", err)
 				}
 			})
-			
+
 			// Verify warning expectations
 			if tc.expectWarning {
 				if !strings.Contains(logOutput, tc.expectWarningContent) {
@@ -336,9 +336,9 @@ func TestAPIEnablementOptionsApplyToErrorCases(t *testing.T) {
 			registry := fakeGroupVersionRegistry{versions: []schema.GroupVersion{
 				{Group: "rbac.authorization.k8s.io", Version: "v1"},
 			}}
-			
+
 			err := tc.options.ApplyTo(tc.config, serverstore.NewResourceConfig(), registry)
-			
+
 			if tc.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
