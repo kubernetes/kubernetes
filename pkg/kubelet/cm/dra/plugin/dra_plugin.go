@@ -148,10 +148,14 @@ func (p *DRAPlugin) createConnection() (*grpc.ClientConn, error) {
 	// since WaitForStateChange behavior differs. Instead, we'll test with a quick dial check.
 	testConn, err := (&net.Dialer{}).DialContext(ctx, network, p.endpoint)
 	if err != nil {
-		conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			logger.V(4).Info("Failed to close gRPC connection during cleanup", "error", closeErr)
+		}
 		return nil, fmt.Errorf("failed to verify socket connectivity: %w", err)
 	}
-	testConn.Close()
+	if closeErr := testConn.Close(); closeErr != nil {
+		logger.V(4).Info("Failed to close test connection", "error", closeErr)
+	}
 
 	return conn, nil
 }
@@ -285,7 +289,7 @@ func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.D
 	}
 
 	logger := klog.FromContext(ctx).WithValues("driverName", p.driverName)
-	logger.V(4).Info("Starting WatchResources stream using unified connection")
+	logger.V(4).Info("Initiating health monitoring stream via unified connection")
 
 	// Health client is guaranteed to exist after successful ensureConnection call
 	stream, err := p.healthClient.NodeWatchResources(ctx, &drahealthv1alpha1.NodeWatchResourcesRequest{})
@@ -294,7 +298,7 @@ func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.D
 		return nil, err
 	}
 
-	logger.V(4).Info("NodeWatchResources stream initiated successfully")
+	logger.V(4).Info("Health monitoring stream established successfully")
 	return stream, nil
 }
 
