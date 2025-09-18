@@ -152,7 +152,7 @@ type informationForClaim struct {
 	allocation *resourceapi.AllocationResult
 }
 
-// nodeAllocation holds the the allocation results and extended resource claim per node.
+// nodeAllocation holds the allocation results and extended resource claim per node.
 type nodeAllocation struct {
 	// allocationResults has the allocation results, matching the order of
 	// claims which had to be allocated.
