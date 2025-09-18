@@ -70,13 +70,6 @@ type DeviceApplyConfiguration struct {
 	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
 	// At most one of NodeName, NodeSelector and AllNodes can be set.
 	AllNodes *bool `json:"allNodes,omitempty"`
-	// If specified, these are the driver-defined taints.
-	//
-	// The maximum number of taints is 4.
-	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
-	// feature gate.
-	Taints []DeviceTaintApplyConfiguration `json:"taints,omitempty"`
 	// BindsToNode indicates if the usage of an allocation involving this device
 	// has to be limited to exactly the node that was chosen when allocating the claim.
 	// If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
@@ -191,19 +184,6 @@ func (b *DeviceApplyConfiguration) WithNodeSelector(value *corev1.NodeSelectorAp
 // If called multiple times, the AllNodes field is set to the value of the last call.
 func (b *DeviceApplyConfiguration) WithAllNodes(value bool) *DeviceApplyConfiguration {
 	b.AllNodes = &value
-	return b
-}
-
-// WithTaints adds the given value to the Taints field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Taints field.
-func (b *DeviceApplyConfiguration) WithTaints(values ...*DeviceTaintApplyConfiguration) *DeviceApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithTaints")
-		}
-		b.Taints = append(b.Taints, *values[i])
-	}
 	return b
 }
 

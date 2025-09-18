@@ -46,11 +46,14 @@ func (DeviceSelector) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceTaint = map[string]string{
-	"":          "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
-	"key":       "The taint key to be applied to a device. Must be a label name.",
-	"value":     "The taint value corresponding to the taint key. Must be a label value.",
-	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
-	"timeAdded": "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
+	"":                   "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
+	"key":                "The taint key to be applied to a device. Must be a label name.",
+	"value":              "The taint value corresponding to the taint key. Must be a label value.",
+	"effect":             "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+	"timeAdded":          "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
+	"description":        "Description is a human-readable explanation for the taint.\n\nThe length must be smaller or equal to 1024.",
+	"data":               "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+	"evictionsPerSecond": "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint. If multiple taints cause eviction of the same set of Pods, then the lowest rate defined in any of those taints applies.\n\nThe default is 100 Pods/s.",
 }
 
 func (DeviceTaint) SwaggerDoc() map[string]string {
@@ -61,6 +64,7 @@ var map_DeviceTaintRule = map[string]string{
 	"":         "DeviceTaintRule adds one taint to all devices which match the selector. This has the same effect as if the taint was specified directly in the ResourceSlice by the DRA driver.",
 	"metadata": "Standard object metadata",
 	"spec":     "Spec specifies the selector and one taint.\n\nChanging the spec automatically increments the metadata.generation number.",
+	"status":   "Status provides information about an on-going pod eviction.",
 }
 
 func (DeviceTaintRule) SwaggerDoc() map[string]string {
@@ -85,6 +89,16 @@ var map_DeviceTaintRuleSpec = map[string]string{
 
 func (DeviceTaintRuleSpec) SwaggerDoc() map[string]string {
 	return map_DeviceTaintRuleSpec
+}
+
+var map_DeviceTaintRuleStatus = map[string]string{
+	"":                    "DeviceTaintRuleStatus provides information about an on-going pod eviction.",
+	"podsPendingEviction": "PodsPendingEviction counts the number of Pods which still need to be evicted. Because taints with the NoExecute effect also prevent scheduling new pods, this number should eventually reach zero.\n\nThe count gets updated periodically, so it is not guaranteed to be 100% accurate.",
+	"podsEvicted":         "PodsEvicted counts the number of Pods which were evicted because of the taint.\n\nThis gets updated periodically, so it is not guaranteed to be 100% accurate. The actual count may be higher if the controller evicted some Pods and then gets restarted before updating this field.",
+}
+
+func (DeviceTaintRuleStatus) SwaggerDoc() map[string]string {
+	return map_DeviceTaintRuleStatus
 }
 
 var map_DeviceTaintSelector = map[string]string{

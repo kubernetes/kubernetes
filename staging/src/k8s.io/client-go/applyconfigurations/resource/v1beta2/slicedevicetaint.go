@@ -24,102 +24,83 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
-// DeviceTaintApplyConfiguration represents a declarative configuration of the DeviceTaint type for use
+// SliceDeviceTaintApplyConfiguration represents a declarative configuration of the SliceDeviceTaint type for use
 // with apply.
 //
-// The device this taint is attached to has the "effect" on
-// any claim which does not tolerate the taint and, through the claim,
-// to pods using the claim.
-type DeviceTaintApplyConfiguration struct {
-	// The taint key to be applied to a device.
-	// Must be a label name.
-	Key *string `json:"key,omitempty"`
-	// The taint value corresponding to the taint key.
-	// Must be a label value.
-	Value *string `json:"value,omitempty"`
-	// The effect of the taint on claims that do not tolerate the taint
-	// and through such claims on the pods using them.
-	// Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
-	// nodes is not valid here.
-	Effect *resourcev1beta2.DeviceTaintEffect `json:"effect,omitempty"`
-	// TimeAdded represents the time at which the taint was added.
-	// Added automatically during create or update if not set.
-	TimeAdded *v1.Time `json:"timeAdded,omitempty"`
-	// Description is a human-readable explanation for the taint.
-	//
-	// The length must be smaller or equal to 1024.
-	Description *string `json:"description,omitempty"`
-	// Data contains arbitrary data specific to the taint key.
-	//
-	// The length of the raw data must be smaller or equal to 10 Ki.
-	Data *runtime.RawExtension `json:"data,omitempty"`
-	// EvictionsPerSecond controls how quickly Pods get evicted if that is
-	// the effect of the taint. If multiple taints cause eviction
-	// of the same set of Pods, then the lowest rate defined in
-	// any of those taints applies.
-	//
-	// The default is 100 Pods/s.
-	EvictionsPerSecond *int64 `json:"evictionsPerSecond,omitempty"`
+// SliceDeviceTaint defines one taint within a ResourceSlice.
+type SliceDeviceTaintApplyConfiguration struct {
+	// Device is the name of the device in the pool that the ResourceSlice belongs to
+	// which is affected by the taint. Multiple taints may affect the same device.
+	Device                        *string `json:"device,omitempty"`
+	DeviceTaintApplyConfiguration `json:",inline"`
 }
 
-// DeviceTaintApplyConfiguration constructs a declarative configuration of the DeviceTaint type for use with
+// SliceDeviceTaintApplyConfiguration constructs a declarative configuration of the SliceDeviceTaint type for use with
 // apply.
-func DeviceTaint() *DeviceTaintApplyConfiguration {
-	return &DeviceTaintApplyConfiguration{}
+func SliceDeviceTaint() *SliceDeviceTaintApplyConfiguration {
+	return &SliceDeviceTaintApplyConfiguration{}
+}
+
+// WithDevice sets the Device field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Device field is set to the value of the last call.
+func (b *SliceDeviceTaintApplyConfiguration) WithDevice(value string) *SliceDeviceTaintApplyConfiguration {
+	b.Device = &value
+	return b
 }
 
 // WithKey sets the Key field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Key field is set to the value of the last call.
-func (b *DeviceTaintApplyConfiguration) WithKey(value string) *DeviceTaintApplyConfiguration {
-	b.Key = &value
+func (b *SliceDeviceTaintApplyConfiguration) WithKey(value string) *SliceDeviceTaintApplyConfiguration {
+	b.DeviceTaintApplyConfiguration.Key = &value
 	return b
 }
 
 // WithValue sets the Value field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Value field is set to the value of the last call.
-func (b *DeviceTaintApplyConfiguration) WithValue(value string) *DeviceTaintApplyConfiguration {
-	b.Value = &value
+func (b *SliceDeviceTaintApplyConfiguration) WithValue(value string) *SliceDeviceTaintApplyConfiguration {
+	b.DeviceTaintApplyConfiguration.Value = &value
 	return b
 }
 
 // WithEffect sets the Effect field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Effect field is set to the value of the last call.
-func (b *DeviceTaintApplyConfiguration) WithEffect(value resourcev1beta2.DeviceTaintEffect) *DeviceTaintApplyConfiguration {
-	b.Effect = &value
+func (b *SliceDeviceTaintApplyConfiguration) WithEffect(value resourcev1beta2.DeviceTaintEffect) *SliceDeviceTaintApplyConfiguration {
+	b.DeviceTaintApplyConfiguration.Effect = &value
 	return b
 }
 
 // WithTimeAdded sets the TimeAdded field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the TimeAdded field is set to the value of the last call.
-func (b *DeviceTaintApplyConfiguration) WithTimeAdded(value v1.Time) *DeviceTaintApplyConfiguration {
-	b.TimeAdded = &value
+func (b *SliceDeviceTaintApplyConfiguration) WithTimeAdded(value v1.Time) *SliceDeviceTaintApplyConfiguration {
+	b.DeviceTaintApplyConfiguration.TimeAdded = &value
 	return b
 }
 
 // WithDescription sets the Description field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Description field is set to the value of the last call.
-func (b *DeviceTaintApplyConfiguration) WithDescription(value string) *DeviceTaintApplyConfiguration {
-	b.Description = &value
+func (b *SliceDeviceTaintApplyConfiguration) WithDescription(value string) *SliceDeviceTaintApplyConfiguration {
+	b.DeviceTaintApplyConfiguration.Description = &value
 	return b
 }
 
 // WithData sets the Data field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Data field is set to the value of the last call.
-func (b *DeviceTaintApplyConfiguration) WithData(value runtime.RawExtension) *DeviceTaintApplyConfiguration {
-	b.Data = &value
+func (b *SliceDeviceTaintApplyConfiguration) WithData(value runtime.RawExtension) *SliceDeviceTaintApplyConfiguration {
+	b.DeviceTaintApplyConfiguration.Data = &value
 	return b
 }
 
 // WithEvictionsPerSecond sets the EvictionsPerSecond field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the EvictionsPerSecond field is set to the value of the last call.
-func (b *DeviceTaintApplyConfiguration) WithEvictionsPerSecond(value int64) *DeviceTaintApplyConfiguration {
-	b.EvictionsPerSecond = &value
+func (b *SliceDeviceTaintApplyConfiguration) WithEvictionsPerSecond(value int64) *SliceDeviceTaintApplyConfiguration {
+	b.DeviceTaintApplyConfiguration.EvictionsPerSecond = &value
 	return b
 }

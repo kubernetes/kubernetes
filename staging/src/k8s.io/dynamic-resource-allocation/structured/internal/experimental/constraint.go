@@ -40,7 +40,7 @@ type distinctAttributeConstraint struct {
 	numDevices int
 }
 
-func (m *distinctAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool {
+func (m *distinctAttributeConstraint) add(requestName, subRequestName string, device *draapi.SliceDevice, deviceID DeviceID) bool {
 	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
 		// Device not affected by constraint.
 		return true
@@ -72,7 +72,7 @@ func (m *distinctAttributeConstraint) add(requestName, subRequestName string, de
 
 }
 
-func (m *distinctAttributeConstraint) remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) {
+func (m *distinctAttributeConstraint) remove(requestName, subRequestName string, device *draapi.SliceDevice, deviceID DeviceID) {
 	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
 		// Device not affected by constraint.
 		return

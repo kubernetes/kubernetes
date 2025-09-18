@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math"
 	"strings"
-	"time"
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -98,18 +97,6 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 							return consumesCounters
 						}(),
 						NodeName: ptr.To(maxSubDomain(0)),
-						Taints: func() []resourceapi.DeviceTaint {
-							var taints []resourceapi.DeviceTaint
-							for i := 0; i < resourceapi.DeviceTaintsMaxLength; i++ {
-								taints = append(taints, resourceapi.DeviceTaint{
-									Key:       maxLabelName(i),
-									Value:     maxLabelValue(i),
-									Effect:    resourceapi.DeviceTaintEffectNoSchedule,
-									TimeAdded: &metav1.Time{Time: time.Now().Truncate(time.Second)},
-								})
-							}
-							return taints
-						}(),
 					})
 				}
 				return devices

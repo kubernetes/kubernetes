@@ -50,9 +50,12 @@ var slice = &resource.ResourceSlice{
 
 var sliceWithDeviceTaints = func() *resource.ResourceSlice {
 	slice := slice.DeepCopy()
-	slice.Spec.Devices[0].Taints = []resource.DeviceTaint{{
-		Key:    "example.com/tainted",
-		Effect: resource.DeviceTaintEffectNoSchedule,
+	slice.Spec.Taints = []resource.SliceDeviceTaint{{
+		Device: "device-0",
+		DeviceTaint: resource.DeviceTaint{
+			Key:    "example.com/tainted",
+			Effect: resource.DeviceTaintEffectNoSchedule,
+		},
 	}}
 	return slice
 }()

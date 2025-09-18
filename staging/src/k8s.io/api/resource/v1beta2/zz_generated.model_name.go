@@ -235,3 +235,8 @@ func (in ResourceSliceList) OpenAPIModelName() string {
 func (in ResourceSliceSpec) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta2.ResourceSliceSpec"
 }
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in SliceDeviceTaint) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta2.SliceDeviceTaint"
+}

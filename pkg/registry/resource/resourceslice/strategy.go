@@ -179,9 +179,7 @@ func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlic
 		return
 	}
 
-	for i := range newSlice.Spec.Devices {
-		newSlice.Spec.Devices[i].Taints = nil
-	}
+	newSlice.Spec.Taints = nil
 }
 
 func draDeviceTaintsFeatureInUse(slice *resource.ResourceSlice) bool {
@@ -189,12 +187,7 @@ func draDeviceTaintsFeatureInUse(slice *resource.ResourceSlice) bool {
 		return false
 	}
 
-	for _, device := range slice.Spec.Devices {
-		if len(device.Taints) > 0 {
-			return true
-		}
-	}
-	return false
+	return len(slice.Spec.Taints) > 0
 }
 
 func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.ResourceSlice) {
