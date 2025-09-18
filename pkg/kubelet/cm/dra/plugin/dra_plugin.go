@@ -18,7 +18,6 @@ package plugin
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -55,84 +54,136 @@ var servicesSupportedByKubelet = []string{
 // DRAPlugin contains information about one registered plugin of a DRA driver.
 // It implements the kubelet operations for preparing/unpreparing by calling
 // a gRPC interface that is implemented by the plugin.
+//
+// This implementation uses a unified connection approach where both DRA APIs
+// and health monitoring share the same gRPC connection and management logic,
+// completely replacing the previous dual-connection pattern and eliminating
+// all lazy initialization to address issues identified in #133943.
 type DRAPlugin struct {
 	driverName        string
-	conn              *grpc.ClientConn
 	endpoint          string
 	chosenService     string // e.g. drapbv1.DRAPluginService
 	clientCallTimeout time.Duration
 
+	// Unified connection management - all clients use same connection
 	mutex         sync.Mutex
 	backgroundCtx context.Context
+	conn          *grpc.ClientConn
 
-	healthClient       drahealthv1alpha1.DRAResourceHealthClient
+	// Pre-created clients - no lazy initialization
+	draV1Client      drapbv1.DRAPluginClient
+	draV1Beta1Client drapbv1beta1.DRAPluginClient
+	healthClient     drahealthv1alpha1.DRAResourceHealthClient
+
+	// Health stream management
 	healthStreamCtx    context.Context
 	healthStreamCancel context.CancelFunc
 }
 
-// getGRPCConnection returns the gRPC connection, creating it if necessary.
-// Renamed from getOrCreateGRPCConn for clarity as suggested in the issue.
-// Ensures health client is always available when connection exists, removing
-// the lazy initialization pattern that could lead to nil health client issues.
-func (p *DRAPlugin) getGRPCConnection() (*grpc.ClientConn, error) {
+// ensureConnection ensures a healthy gRPC connection exists and all clients are initialized.
+// This unified approach replaces both the previous getOrCreateGRPCConn() function and
+// separate health connection logic, addressing the lazy initialization issues in #133943.
+// All clients are created immediately when connection is established.
+func (p *DRAPlugin) ensureConnection() error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	// If connection exists and is ready, ensure health client also exists
+	// If connection exists and is healthy, all clients should already exist
 	if p.conn != nil && p.conn.GetState() != connectivity.Shutdown {
-		// Always ensure health client is created when connection exists
-		// This removes the lazy initialization issue where connection existed
-		// but health client was nil
-		if p.healthClient == nil {
-			p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
+		// Verify all clients exist (defensive check)
+		if p.draV1Client == nil || p.draV1Beta1Client == nil || p.healthClient == nil {
+			// This should not happen with proper initialization, but recover if needed
+			p.createAllClients()
 		}
-		return p.conn, nil
+		return nil
 	}
 
-	// If the connection is dead, clean it up before creating a new one.
+	// Clean up any existing connection and clients
 	if p.conn != nil {
 		if err := p.conn.Close(); err != nil {
-			return nil, fmt.Errorf("failed to close stale gRPC connection to %s: %w", p.endpoint, err)
+			klog.FromContext(p.backgroundCtx).Error(err, "Failed to close stale gRPC connection", "endpoint", p.endpoint)
 		}
-		p.conn = nil
-		p.healthClient = nil
+		p.clearAllClients()
 	}
 
-	ctx := p.backgroundCtx
-	logger := klog.FromContext(ctx)
-
-	network := "unix"
-	logger.V(4).Info("Creating new gRPC connection", "protocol", network, "endpoint", p.endpoint)
-
-	// grpc.Dial is deprecated. grpc.NewClient should be used instead.
-	// For now this gets ignored because this function is meant to establish
-	// the connection, with the one second timeout below. Perhaps that
-	// approach should be reconsidered?
-	//nolint:staticcheck
-	conn, err := grpc.Dial(
-		p.endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, target)
-		}),
-		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.driverName)),
-	)
+	// Create new connection
+	conn, err := p.createConnection()
 	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	if ok := conn.WaitForStateChange(ctx, connectivity.Connecting); !ok {
-		return nil, errors.New("timed out waiting for gRPC connection to be ready")
+		return fmt.Errorf("failed to create gRPC connection to %s: %w", p.endpoint, err)
 	}
 
 	p.conn = conn
-	// Always create health client immediately when connection is created
-	p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
+	// Immediately create all clients - no lazy initialization
+	p.createAllClients()
 
-	return p.conn, nil
+	klog.FromContext(p.backgroundCtx).V(4).Info("Successfully established unified gRPC connection with all clients",
+		"endpoint", p.endpoint, "driverName", p.driverName)
+
+	return nil
+}
+
+// createConnection creates a new gRPC connection using modern APIs.
+// Replaces deprecated grpc.Dial with grpc.NewClient as requested in review feedback.
+func (p *DRAPlugin) createConnection() (*grpc.ClientConn, error) {
+	logger := klog.FromContext(p.backgroundCtx)
+	logger.V(4).Info("Creating new unified gRPC connection", "protocol", "unix", "endpoint", p.endpoint)
+
+	network := "unix"
+
+	// Use modern grpc.NewClient instead of deprecated grpc.Dial
+	conn, err := grpc.NewClient(
+		"unix://"+p.endpoint,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.driverName)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection: %w", err)
+	}
+
+	// Test connection readiness with a simple connectivity check
+	ctx, cancel := context.WithTimeout(p.backgroundCtx, time.Second)
+	defer cancel()
+
+	// For unix sockets with grpc.NewClient, we need to test actual connectivity differently
+	// since WaitForStateChange behavior differs. Instead, we'll test with a quick dial check.
+	testConn, err := (&net.Dialer{}).DialContext(ctx, network, p.endpoint)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("failed to verify socket connectivity: %w", err)
+	}
+	testConn.Close()
+
+	return conn, nil
+}
+
+// createAllClients creates all necessary gRPC clients using the unified connection.
+// Eliminates lazy initialization by creating all clients immediately upon connection establishment.
+func (p *DRAPlugin) createAllClients() {
+	if p.conn == nil {
+		return
+	}
+
+	// Always create all clients immediately
+	p.draV1Client = drapbv1.NewDRAPluginClient(p.conn)
+	p.draV1Beta1Client = drapbv1beta1.NewDRAPluginClient(p.conn)
+	p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
+}
+
+// clearAllClients resets all client references when connection is closed.
+func (p *DRAPlugin) clearAllClients() {
+	p.conn = nil
+	p.draV1Client = nil
+	p.draV1Beta1Client = nil
+	p.healthClient = nil
+}
+
+func newMetricsInterceptor(driverName string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, conn *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		start := time.Now()
+		err := invoker(ctx, method, req, reply, conn, opts...)
+		metrics.DRAGRPCOperationsDuration.WithLabelValues(driverName, method, status.Code(err).String()).Observe(time.Since(start).Seconds())
+		return err
+	}
 }
 
 func (p *DRAPlugin) DriverName() string {
@@ -149,23 +200,27 @@ func (p *DRAPlugin) NodePrepareResources(
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("Calling NodePrepareResources rpc", "request", req)
 
+	// Ensure unified connection and all clients are available
+	if err := p.ensureConnection(); err != nil {
+		return nil, fmt.Errorf("failed to ensure gRPC connection: %w", err)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
 	defer cancel()
 
-	var err error
 	var response *drapbv1.NodePrepareResourcesResponse
+	var err error
+
+	// Use pre-created clients from unified connection - no more inline client creation
 	switch p.chosenService {
 	case drapbv1beta1.DRAPluginService:
-		client := drapbv1beta1.NewDRAPluginClient(p.conn)
-		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodePrepareResources(ctx, req)
+		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: p.draV1Beta1Client}.NodePrepareResources(ctx, req)
 	case drapbv1.DRAPluginService:
-		client := drapbv1.NewDRAPluginClient(p.conn)
-		response, err = client.NodePrepareResources(ctx, req)
+		response, err = p.draV1Client.NodePrepareResources(ctx, req)
 	default:
-		// Shouldn't happen, validateSupportedServices should only
-		// return services we support here.
 		return nil, fmt.Errorf("internal error: unsupported chosen service: %q", p.chosenService)
 	}
+
 	logger.V(4).Info("Done calling NodePrepareResources rpc", "response", response, "err", err)
 	return response, err
 }
@@ -176,38 +231,33 @@ func (p *DRAPlugin) NodeUnprepareResources(
 	opts ...grpc.CallOption,
 ) (*drapbv1.NodeUnprepareResourcesResponse, error) {
 	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Calling NodeUnprepareResource rpc", "request", req)
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 	ctx = klog.NewContext(ctx, logger)
+	logger.V(4).Info("Calling NodeUnprepareResource rpc", "request", req)
+
+	// Ensure unified connection and all clients are available
+	if err := p.ensureConnection(); err != nil {
+		return nil, fmt.Errorf("failed to ensure gRPC connection: %w", err)
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
 	defer cancel()
 
-	var err error
 	var response *drapbv1.NodeUnprepareResourcesResponse
+	var err error
+
+	// Use pre-created clients from unified connection - no more inline client creation
 	switch p.chosenService {
 	case drapbv1beta1.DRAPluginService:
-		client := drapbv1beta1.NewDRAPluginClient(p.conn)
-		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodeUnprepareResources(ctx, req)
+		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: p.draV1Beta1Client}.NodeUnprepareResources(ctx, req)
 	case drapbv1.DRAPluginService:
-		client := drapbv1.NewDRAPluginClient(p.conn)
-		response, err = client.NodeUnprepareResources(ctx, req)
+		response, err = p.draV1Client.NodeUnprepareResources(ctx, req)
 	default:
-		// Shouldn't happen, validateSupportedServices should only
-		// return services we support here.
 		return nil, fmt.Errorf("internal error: unsupported chosen service: %q", p.chosenService)
 	}
+
 	logger.V(4).Info("Done calling NodeUnprepareResources rpc", "response", response, "err", err)
 	return response, err
-}
-
-func newMetricsInterceptor(driverName string) grpc.UnaryClientInterceptor {
-	return func(ctx context.Context, method string, req, reply any, conn *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-		start := time.Now()
-		err := invoker(ctx, method, req, reply, conn, opts...)
-		metrics.DRAGRPCOperationsDuration.WithLabelValues(driverName, method, status.Code(err).String()).Observe(time.Since(start).Seconds())
-		return err
-	}
 }
 
 // SetHealthStream stores the context and cancel function for the active health stream.
@@ -226,17 +276,18 @@ func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
 }
 
 // NodeWatchResources establishes a stream to receive health updates from the DRA plugin.
-// Now uses the improved connection management that ensures health client availability.
+// Now uses the unified connection management, completely eliminating separate health connection logic.
 func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, error) {
-	// Get connection and ensure health client exists
-	_, err := p.getGRPCConnection()
-	if err != nil {
-		klog.FromContext(p.backgroundCtx).Error(err, "Failed to get gRPC connection for health client")
+	// Ensure unified connection and all clients (including health client) are available
+	if err := p.ensureConnection(); err != nil {
+		klog.FromContext(p.backgroundCtx).Error(err, "Failed to ensure gRPC connection for health client")
 		return nil, err
 	}
 
-	logger := klog.FromContext(ctx).WithValues("pluginName", p.driverName)
-	logger.V(4).Info("Starting WatchResources stream")
+	logger := klog.FromContext(ctx).WithValues("driverName", p.driverName)
+	logger.V(4).Info("Starting WatchResources stream using unified connection")
+
+	// Health client is guaranteed to exist after successful ensureConnection call
 	stream, err := p.healthClient.NodeWatchResources(ctx, &drahealthv1alpha1.NodeWatchResourcesRequest{})
 	if err != nil {
 		logger.Error(err, "NodeWatchResources RPC call failed")
@@ -245,4 +296,26 @@ func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.D
 
 	logger.V(4).Info("NodeWatchResources stream initiated successfully")
 	return stream, nil
+}
+
+// Close gracefully shuts down the plugin connection and cleans up all resources.
+func (p *DRAPlugin) Close() error {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	// Clean up health stream
+	if p.healthStreamCancel != nil {
+		p.healthStreamCancel()
+		p.healthStreamCancel = nil
+		p.healthStreamCtx = nil
+	}
+
+	// Clean up connection and all clients
+	if p.conn != nil {
+		err := p.conn.Close()
+		p.clearAllClients()
+		return err
+	}
+
+	return nil
 }
