@@ -569,16 +569,16 @@ func Test_checkBadIPConfig(t *testing.T) {
 func TestServeMetricsWithStatusz(t *testing.T) {
 	// This test verifies that the serveMetrics function properly configures
 	// the statusz endpoint with the available paths including /healthz, /livez, /readyz, and /metrics
-	
+
 	// Note: This is a basic structural test to ensure the code compiles and the
 	// endpoints are registered. A full integration test would require starting
 	// the HTTP server and making actual requests.
-	
+
 	ctx := context.Background()
 	bindAddress := "127.0.0.1:0" // Use port 0 to let the system choose an available port
 	proxyMode := kubeproxyconfig.ProxyModeIPTables
 	enableProfiling := false
-	
+
 	// Test that serveMetrics doesn't panic and properly sets up the mux
 	// In a real test environment, we would start the server and verify the endpoints
 	defer func() {
@@ -586,11 +586,11 @@ func TestServeMetricsWithStatusz(t *testing.T) {
 			t.Errorf("serveMetrics panicked: %v", r)
 		}
 	}()
-	
+
 	// This will start the metrics server in a goroutine
 	// In a production test, we would need to properly test the HTTP endpoints
 	serveMetrics(ctx, bindAddress, proxyMode, enableProfiling, nil, nil)
-	
+
 	// The test passes if no panic occurs during setup
 	t.Log("serveMetrics completed setup without panicking")
 }
