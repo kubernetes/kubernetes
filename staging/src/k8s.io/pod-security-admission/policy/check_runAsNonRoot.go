@@ -54,7 +54,7 @@ func CheckRunAsNonRoot() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       runAsNonRoot_1_0,
+				CheckPod:       runAsNonRoot1_0,
 			},
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 35),
@@ -72,10 +72,10 @@ func runAsNonRoot1_35(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) C
 		return CheckResult{Allowed: true}
 	}
 
-	return runAsNonRoot_1_0(podMetadata, podSpec)
+	return runAsNonRoot1_0(podMetadata, podSpec)
 }
 
-func runAsNonRoot_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func runAsNonRoot1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	// things that explicitly set runAsNonRoot=false
 	var badSetters []string
 

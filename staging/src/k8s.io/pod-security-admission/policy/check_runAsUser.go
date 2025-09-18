@@ -55,7 +55,7 @@ func CheckRunAsUser() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 23),
-				CheckPod:       runAsUser_1_23,
+				CheckPod:       runAsUser1_23,
 			},
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 35),
@@ -72,11 +72,11 @@ func runAsUser1_35(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) Chec
 	if relaxPolicyForUserNamespacePod(podSpec) {
 		return CheckResult{Allowed: true}
 	}
-	return runAsUser_1_23(podMetadata, podSpec)
+	return runAsUser1_23(podMetadata, podSpec)
 
 }
 
-func runAsUser_1_23(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func runAsUser1_23(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	// things that explicitly set runAsUser=0
 	var badSetters []string
 
