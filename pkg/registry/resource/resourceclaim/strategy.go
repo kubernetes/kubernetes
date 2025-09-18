@@ -219,7 +219,8 @@ func (r *resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, o
 		// Run declarative update validation with panic recovery
 		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newClaim, oldClaim, rest.WithTakeover(takeover))
 		// Compare imperative and declarative errors and emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, "dc_status_update")
+		const validationIdentifier = "resourceclaim_status_update"
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier)
 
 		// Only apply declarative errors if takeover is enabled
 		if takeover {
