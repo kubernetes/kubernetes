@@ -96,11 +96,10 @@ func ValidateResourceClaim(resourceClaim *resource.ResourceClaim) field.ErrorLis
 // ValidateResourceClaimUpdate tests if an update to ResourceClaim is valid.
 func ValidateResourceClaimUpdate(resourceClaim, oldClaim *resource.ResourceClaim) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldClaim.ObjectMeta, field.NewPath("metadata"))
+	// The spec is immutable. On update, we only check for immutability.
+	// Re-validating other fields is skipped because the user cannot change them;
+	// the only actionable error is for the immutability violation.
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceClaim.Spec, oldClaim.Spec, field.NewPath("spec"))...)
-	// Because the spec is immutable, all CEL expressions in it must have been stored.
-	// If the user tries an update, this is not true and checking is less strict, but
-	// as there are errors, it doesn't matter.
-	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, field.NewPath("spec"), true)...)
 	return allErrs
 }
 
@@ -581,11 +580,10 @@ func validateResourceClaimTemplateSpec(spec *resource.ResourceClaimTemplateSpec,
 // ValidateResourceClaimTemplateUpdate tests if an update to template is valid.
 func ValidateResourceClaimTemplateUpdate(template, oldTemplate *resource.ResourceClaimTemplate) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&template.ObjectMeta, &oldTemplate.ObjectMeta, field.NewPath("metadata"))
+	// The spec is immutable. On update, we only check for immutability.
+	// Re-validating other fields is skipped because the user cannot change them;
+	// the only actionable error is for the immutability violation.
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(template.Spec, oldTemplate.Spec, field.NewPath("spec"))...)
-	// Because the spec is immutable, all CEL expressions in it must have been stored.
-	// If the user tries an update, this is not true and checking is less strict, but
-	// as there are errors, it doesn't matter.
-	allErrs = append(allErrs, validateResourceClaimTemplateSpec(&template.Spec, field.NewPath("spec"), true)...)
 	return allErrs
 }
 
