@@ -31,9 +31,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -341,6 +344,9 @@ func TestPlugin_WatchResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	ctx, cancel := context.WithCancel(tCtx)
 	defer cancel()
+
+	// Enable the ResourceHealthStatus feature gate for this test
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceHealthStatus, true)
 
 	driverName := "test-driver"
 	addr := path.Join(t.TempDir(), "dra.sock")
