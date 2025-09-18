@@ -1372,6 +1372,7 @@ type ResourceClaimStatus struct {
 	//
 	// +optional
 	// +k8s:optional
+	// +k8s:update=NoModify
 	Allocation *AllocationResult `json:"allocation,omitempty" protobuf:"bytes,1,opt,name=allocation"`
 
 	// ReservedFor indicates which entities are currently allowed to use
