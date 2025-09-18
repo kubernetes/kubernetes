@@ -17,11 +17,9 @@ limitations under the License.
 package validation
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -30,12 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
-func TestValidateScaleForDeclarative(t *testing.T) {
+// TestScaleDeclarativeValidation verifies that the validation rules that are applied uniformly to the Scale API.
+func TestScaleDeclarativeValidation(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:    "autoscaling",
 		APIVersion:  "v1",
 		Subresource: "scale",
 	})
+
 	testCases := map[string]struct {
 		input        autoscaling.Scale
 		expectedErrs field.ErrorList
@@ -56,9 +56,14 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, func(ctx context.Context, obj runtime.Object) field.ErrorList {
-				return rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, obj)
-			}, tc.expectedErrs, "scale")
+			// The Scale API has no handwritten validation to compare against. So we simply test that all the versions
+			// of the Scale subresource are correct for our test cases.
+			// All resources that have a scale subresource are expected to test Scale validation against any handwritten
+			// validation code defined on that resource.
+			tester := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			tester.Test(t, rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, &tc.input), tc.expectedErrs)
+
+			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil, "scale")
 		})
 	}
 }
