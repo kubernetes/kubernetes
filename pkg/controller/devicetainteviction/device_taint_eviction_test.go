@@ -249,6 +249,24 @@ var (
 		slice.Spec.Devices[len(slice.Spec.Devices)-1].Name += "-other"
 		return slice
 	}()
+	sliceTaintedNone = func() *resourceapi.ResourceSlice {
+		slice := sliceTainted.DeepCopy()
+		for i := range slice.Spec.Devices {
+			for j := range slice.Spec.Devices[i].Taints {
+				slice.Spec.Devices[i].Taints[j].Effect = resourceapi.DeviceTaintEffectNone
+			}
+		}
+		return slice
+	}()
+	sliceTaintedUnknown = func() *resourceapi.ResourceSlice {
+		slice := sliceTainted.DeepCopy()
+		for i := range slice.Spec.Devices {
+			for j := range slice.Spec.Devices[i].Taints {
+				slice.Spec.Devices[i].Taints[j].Effect = resourceapi.DeviceTaintEffect("unknown-effect")
+			}
+		}
+		return slice
+	}()
 	sliceTaintedNoSchedule = func() *resourceapi.ResourceSlice {
 		slice := sliceTainted.DeepCopy()
 		for i := range slice.Spec.Devices {
@@ -959,6 +977,28 @@ func TestHandlers(t *testing.T) {
 				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
 			},
 			wantEvents: []*v1.Event{cancelPodEviction},
+		},
+		"ignore-none-effect": {
+			initialState: state{
+				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
+				slices:          []*resourceapi.ResourceSlice{sliceTaintedNone, slice2},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+			},
+			finalState: state{
+				slices:          []*resourceapi.ResourceSlice{sliceTaintedNone, slice2},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+			},
+		},
+		"ignore-unknown-effect": {
+			initialState: state{
+				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
+				slices:          []*resourceapi.ResourceSlice{sliceTaintedUnknown, slice2},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+			},
+			finalState: state{
+				slices:          []*resourceapi.ResourceSlice{sliceTaintedUnknown, slice2},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+			},
 		},
 		"eviction-change-taint": {
 			initialState: state{

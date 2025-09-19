@@ -867,6 +867,11 @@ func TestAllocator(t *testing.T,
 	taintKey := "taint-key"
 	taintValue := "taint-value"
 	taintValue2 := "taint-value-2"
+	taintNone := resourceapi.DeviceTaint{
+		Key:    taintKey,
+		Value:  taintValue,
+		Effect: resourceapi.DeviceTaintEffectNone,
+	}
 	taintNoSchedule := resourceapi.DeviceTaint{
 		Key:    taintKey,
 		Value:  taintValue,
@@ -3522,6 +3527,21 @@ func TestAllocator(t *testing.T,
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
 				deviceAllocationResult(req0SubReq1, driverA, pool1, device2, false, tolerationNoExecute), // Only second device's taints are tolerated.
+			)},
+		},
+		"tainted-no-effect": {
+			features: Features{
+				DeviceTaints: true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrap(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNone),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
 		"tainted-one-device-two-taints-both-tolerated": {
