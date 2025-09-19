@@ -17,14 +17,21 @@ limitations under the License.
 package kubelet
 
 import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // discoverNodeDeclaredFeatures determines the final set of node features to be declared by using the discovery library.
 func (kl *Kubelet) discoverNodeDeclaredFeatures() ([]string, error) {
 	// Fill the necessary feature gates and kubelet config.
 	featureGates := map[string]bool{}
-	kubeletConfigMap := map[string]string{}
+
+	featureGates[string(inplacepodresize.IPPRExclusiveCPUsFeatureGate)] = utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs)
+	kubeletConfigMap := map[string]string{
+		inplacepodresize.CPUManagerPolicyConfigName: kl.containerManager.GetNodeConfig().CPUManagerPolicy,
+	}
 	cfg := &nodedeclaredfeatures.NodeConfiguration{
 		FeatureGates:  featureGates,
 		KubeletConfig: kubeletConfigMap,
