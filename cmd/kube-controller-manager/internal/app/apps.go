@@ -25,22 +25,25 @@ import (
 	"time"
 
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
+
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller/run"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
 
-func newDaemonSetControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.DaemonSetController,
-		aliases:     []string{"daemonset"},
-		constructor: newDaemonSetController,
+func newDaemonSetControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.DaemonSetController,
+		Aliases:     []string{"daemonset"},
+		Constructor: newDaemonSetController,
 	}
 }
 
-func newDaemonSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newDaemonSetController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	client, err := controllerContext.NewClient("daemon-set-controller")
 	if err != nil {
 		return nil, err
@@ -59,20 +62,20 @@ func newDaemonSetController(ctx context.Context, controllerContext ControllerCon
 		return nil, fmt.Errorf("error creating DaemonSets controller: %w", err)
 	}
 
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		dsc.Run(ctx, int(controllerContext.ComponentConfig.DaemonSetController.ConcurrentDaemonSetSyncs))
 	}, controllerName), nil
 }
 
-func newStatefulSetControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.StatefulSetController,
-		aliases:     []string{"statefulset"},
-		constructor: newStatefulSetController,
+func newStatefulSetControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.StatefulSetController,
+		Aliases:     []string{"statefulset"},
+		Constructor: newStatefulSetController,
 	}
 }
 
-func newStatefulSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newStatefulSetController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	client, err := controllerContext.NewClient("statefulset-controller")
 	if err != nil {
 		return nil, err
@@ -86,20 +89,20 @@ func newStatefulSetController(ctx context.Context, controllerContext ControllerC
 		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
 		client,
 	)
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		ssc.Run(ctx, int(controllerContext.ComponentConfig.StatefulSetController.ConcurrentStatefulSetSyncs))
 	}, controllerName), nil
 }
 
-func newReplicaSetControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.ReplicaSetController,
-		aliases:     []string{"replicaset"},
-		constructor: newReplicaSetController,
+func newReplicaSetControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.ReplicaSetController,
+		Aliases:     []string{"replicaset"},
+		Constructor: newReplicaSetController,
 	}
 }
 
-func newReplicaSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newReplicaSetController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	client, err := controllerContext.NewClient("replicaset-controller")
 	if err != nil {
 		return nil, err
@@ -112,20 +115,20 @@ func newReplicaSetController(ctx context.Context, controllerContext ControllerCo
 		client,
 		replicaset.BurstReplicas,
 	)
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		rsc.Run(ctx, int(controllerContext.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs))
 	}, controllerName), nil
 }
 
-func newDeploymentControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.DeploymentController,
-		aliases:     []string{"deployment"},
-		constructor: newDeploymentController,
+func newDeploymentControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.DeploymentController,
+		Aliases:     []string{"deployment"},
+		Constructor: newDeploymentController,
 	}
 }
 
-func newDeploymentController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newDeploymentController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	client, err := controllerContext.NewClient("deployment-controller")
 	if err != nil {
 		return nil, err
@@ -142,7 +145,7 @@ func newDeploymentController(ctx context.Context, controllerContext ControllerCo
 		return nil, fmt.Errorf("error creating Deployment controller: %w", err)
 	}
 
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		dc.Run(ctx, int(controllerContext.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs))
 	}, controllerName), nil
 }

@@ -30,6 +30,7 @@ import (
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
 
@@ -110,7 +111,7 @@ func possibleDiscoveryResource() []*metav1.APIResourceList {
 }
 
 func TestController_DiscoveryError(t *testing.T) {
-	controllerDescriptorMap := map[string]*ControllerDescriptor{
+	controllerDescriptorMap := map[string]*controller.Descriptor{
 		"ResourceQuotaController":          newResourceQuotaControllerDescriptor(),
 		"GarbageCollectorController":       newGarbageCollectorControllerDescriptor(),
 		"EndpointSliceController":          newEndpointSliceControllerDescriptor(),
@@ -141,14 +142,14 @@ func TestController_DiscoveryError(t *testing.T) {
 			testClientset := NewFakeClientset(testDiscovery)
 			testClientBuilder := TestClientBuilder{clientset: testClientset}
 			testInformerFactory := informers.NewSharedInformerFactoryWithOptions(testClientset, time.Duration(1))
-			controllerContext := ControllerContext{
+			controllerContext := controller.Context{
 				ClientBuilder:                   testClientBuilder,
 				InformerFactory:                 testInformerFactory,
 				ObjectOrMetadataInformerFactory: testInformerFactory,
 				InformersStarted:                make(chan struct{}),
 			}
 			for controllerName, controllerDesc := range controllerDescriptorMap {
-				_, err := controllerDesc.GetControllerConstructor()(ctx, controllerContext, controllerName)
+				_, err := controllerDesc.Constructor(ctx, controllerContext, controllerName)
 				if test.expectedErr != (err != nil) {
 					t.Errorf("%v test failed for use case: %v", controllerName, name)
 				}
