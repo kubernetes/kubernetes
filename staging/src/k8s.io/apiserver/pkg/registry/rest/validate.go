@@ -23,13 +23,14 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	validationmetrics "k8s.io/apiserver/pkg/validation"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // ValidationConfig defines how a declarative validation request may be configured.
@@ -328,6 +329,78 @@ func panicSafeValidateFunc(
 
 		return validateUpdateFunc(ctx, scheme, obj, oldObj, o)
 	}
+}
+
+func metricIdentifier(ctx context.Context, obj runtime.Object, opType operation.Type) (string, error) {
+	var identifier string
+	var err error
+
+	identifier = "unknown_resource"
+	// Use kind for identifier.
+	if obj != nil {
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		if gvk.Kind != "" {
+			identifier = strings.ToLower(gvk.Kind)
+		}
+	}
+
+	// Use requestInfo for subresource.
+	requestInfo, found := genericapirequest.RequestInfoFrom(ctx)
+	if !found {
+		err = fmt.Errorf("could not find requestInfo in context")
+	} else if len(requestInfo.Subresource) > 0 {
+		// subresource can be a path, so replace '/' with '_'
+		identifier += "_" + strings.ReplaceAll(requestInfo.Subresource, "/", "_")
+	}
+
+	switch opType {
+	case operation.Create:
+		identifier += "_create"
+	case operation.Update:
+		identifier += "_update"
+	default:
+		if err == nil {
+			err = fmt.Errorf("unknown operation type: %v", opType)
+		}
+		identifier += "_unknown_op"
+	}
+	return identifier, err
+}
+
+// ValidateDeclarativelyWithMigrationChecks is a helper function that encapsulates the logic for running declarative validation.
+// It checks if the DeclarativeValidation feature gate is enabled, generates a validation identifier,
+// runs declarative validation, compares the results with imperative validation, and merges the errors if takeover is enabled.
+func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, errs field.ErrorList, opType operation.Type, configOpts ...ValidationConfig) field.ErrorList {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+		return errs
+	}
+
+	takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+
+	validationIdentifier, err := metricIdentifier(ctx, obj, opType)
+	if err != nil {
+		// Log the error, but continue with the best-effort identifier.
+		klog.FromContext(ctx).Error(err, "failed to generate complete validation identifier for declarative validation")
+	}
+
+	// Directly create the config and call the core validation logic.
+	cfg := &validationConfigOption{opType: opType}
+	opts := []ValidationConfig{WithTakeover(takeover), WithValidationIdentifier(validationIdentifier)}
+	opts = append(opts, configOpts...)
+	for _, o := range opts {
+		o(cfg)
+	}
+
+	// Call the panic-safe wrapper with the real validation function.
+	declarativeErrs := panicSafeValidateFunc(validateDeclaratively, cfg.takeover, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
+
+	CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier)
+
+	if takeover {
+		errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
+	}
+
+	return errs
 }
 
 // RecordDuplicateValidationErrors increments a metric and log the error when duplicate validation errors are found.
