@@ -45,20 +45,6 @@ func WithOptions(options []string) ValidationConfig {
 	}
 }
 
-// WithTakeover sets the takeover flag for validation.
-func WithTakeover(takeover bool) ValidationConfig {
-	return func(config *validationConfigOption) {
-		config.takeover = takeover
-	}
-}
-
-// WithValidationIdentifier sets the validation identifier, which is used to determine the source of a mismatch in metrics.
-func WithValidationIdentifier(identifier string) ValidationConfig {
-	return func(config *validationConfigOption) {
-		config.validationIdentifier = identifier
-	}
-}
-
 // WithSubresourceMapper sets the subresource mapper for validation.
 // This should be used when registering validation for polymorphic subresources like /scale.
 //
@@ -355,11 +341,13 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	}
 
 	// Directly create the config and call the core validation logic.
-	cfg := &validationConfigOption{opType: opType}
-	opts := []ValidationConfig{WithTakeover(takeover), WithValidationIdentifier(validationIdentifier)}
-	opts = append(opts, configOpts...)
-	for _, o := range opts {
-		o(cfg)
+	cfg := &validationConfigOption{
+		opType:               opType,
+		takeover:             takeover,
+		validationIdentifier: validationIdentifier,
+	}
+	for _, opt := range configOpts {
+		opt(cfg)
 	}
 
 	// Call the panic-safe wrapper with the real validation function.
