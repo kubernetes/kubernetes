@@ -812,7 +812,7 @@ var safeKeyCharset = [utf8.RuneSelf]bool{
 // validateBaggageName checks if the string is a valid OpenTelemetry Baggage name.
 // Baggage name is a valid, non-empty UTF-8 string.
 func validateBaggageName(s string) bool {
-	if len(s) == 0 {
+	if s == "" {
 		return false
 	}
 
@@ -828,7 +828,7 @@ func validateBaggageValue(s string) bool {
 
 // validateKey checks if the string is a valid W3C Baggage key.
 func validateKey(s string) bool {
-	if len(s) == 0 {
+	if s == "" {
 		return false
 	}
 

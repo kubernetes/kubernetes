@@ -19,7 +19,7 @@ import (
 // to the case-insensitive string value of "true" (i.e. "True" and "TRUE"
 // will also enable this).
 var Resource = newFeature("RESOURCE", func(v string) (string, bool) {
-	if strings.ToLower(v) == "true" {
+	if strings.EqualFold(v, "true") {
 		return v, true
 	}
 	return "", false
@@ -59,7 +59,7 @@ func (f Feature[T]) Lookup() (v T, ok bool) {
 	return f.parse(vRaw)
 }
 
-// Enabled returns if the feature is enabled.
+// Enabled reports whether the feature is enabled.
 func (f Feature[T]) Enabled() bool {
 	_, ok := f.Lookup()
 	return ok

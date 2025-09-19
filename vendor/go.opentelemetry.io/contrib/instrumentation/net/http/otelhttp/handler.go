@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/felixge/httpsnoop"
-
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv"
 )
 
 // middleware is an http middleware which wraps the next handler in a span.

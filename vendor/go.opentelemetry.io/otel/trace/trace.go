@@ -4,8 +4,6 @@
 package trace // import "go.opentelemetry.io/otel/trace"
 
 import (
-	"bytes"
-	"encoding/hex"
 	"encoding/json"
 )
 
@@ -38,21 +36,47 @@ var (
 	_          json.Marshaler = nilTraceID
 )
 
-// IsValid checks whether the trace TraceID is valid. A valid trace ID does
+// IsValid reports whether the trace TraceID is valid. A valid trace ID does
 // not consist of zeros only.
 func (t TraceID) IsValid() bool {
-	return !bytes.Equal(t[:], nilTraceID[:])
+	return t != nilTraceID
 }
 
 // MarshalJSON implements a custom marshal function to encode TraceID
 // as a hex string.
 func (t TraceID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(t.String())
+	b := [32 + 2]byte{0: '"', 33: '"'}
+	h := t.hexBytes()
+	copy(b[1:], h[:])
+	return b[:], nil
 }
 
 // String returns the hex string representation form of a TraceID.
 func (t TraceID) String() string {
-	return hex.EncodeToString(t[:])
+	h := t.hexBytes()
+	return string(h[:])
+}
+
+// hexBytes returns the hex string representation form of a TraceID.
+func (t TraceID) hexBytes() [32]byte {
+	return [32]byte{
+		hexLU[t[0x0]>>4], hexLU[t[0x0]&0xf],
+		hexLU[t[0x1]>>4], hexLU[t[0x1]&0xf],
+		hexLU[t[0x2]>>4], hexLU[t[0x2]&0xf],
+		hexLU[t[0x3]>>4], hexLU[t[0x3]&0xf],
+		hexLU[t[0x4]>>4], hexLU[t[0x4]&0xf],
+		hexLU[t[0x5]>>4], hexLU[t[0x5]&0xf],
+		hexLU[t[0x6]>>4], hexLU[t[0x6]&0xf],
+		hexLU[t[0x7]>>4], hexLU[t[0x7]&0xf],
+		hexLU[t[0x8]>>4], hexLU[t[0x8]&0xf],
+		hexLU[t[0x9]>>4], hexLU[t[0x9]&0xf],
+		hexLU[t[0xa]>>4], hexLU[t[0xa]&0xf],
+		hexLU[t[0xb]>>4], hexLU[t[0xb]&0xf],
+		hexLU[t[0xc]>>4], hexLU[t[0xc]&0xf],
+		hexLU[t[0xd]>>4], hexLU[t[0xd]&0xf],
+		hexLU[t[0xe]>>4], hexLU[t[0xe]&0xf],
+		hexLU[t[0xf]>>4], hexLU[t[0xf]&0xf],
+	}
 }
 
 // SpanID is a unique identity of a span in a trace.
@@ -63,21 +87,38 @@ var (
 	_         json.Marshaler = nilSpanID
 )
 
-// IsValid checks whether the SpanID is valid. A valid SpanID does not consist
+// IsValid reports whether the SpanID is valid. A valid SpanID does not consist
 // of zeros only.
 func (s SpanID) IsValid() bool {
-	return !bytes.Equal(s[:], nilSpanID[:])
+	return s != nilSpanID
 }
 
 // MarshalJSON implements a custom marshal function to encode SpanID
 // as a hex string.
 func (s SpanID) MarshalJSON() ([]byte, error) {
-	return json.Marshal(s.String())
+	b := [16 + 2]byte{0: '"', 17: '"'}
+	h := s.hexBytes()
+	copy(b[1:], h[:])
+	return b[:], nil
 }
 
 // String returns the hex string representation form of a SpanID.
 func (s SpanID) String() string {
-	return hex.EncodeToString(s[:])
+	b := s.hexBytes()
+	return string(b[:])
+}
+
+func (s SpanID) hexBytes() [16]byte {
+	return [16]byte{
+		hexLU[s[0]>>4], hexLU[s[0]&0xf],
+		hexLU[s[1]>>4], hexLU[s[1]&0xf],
+		hexLU[s[2]>>4], hexLU[s[2]&0xf],
+		hexLU[s[3]>>4], hexLU[s[3]&0xf],
+		hexLU[s[4]>>4], hexLU[s[4]&0xf],
+		hexLU[s[5]>>4], hexLU[s[5]&0xf],
+		hexLU[s[6]>>4], hexLU[s[6]&0xf],
+		hexLU[s[7]>>4], hexLU[s[7]&0xf],
+	}
 }
 
 // TraceIDFromHex returns a TraceID from a hex string if it is compliant with
@@ -85,65 +126,58 @@ func (s SpanID) String() string {
 // https://www.w3.org/TR/trace-context/#trace-id
 // nolint:revive // revive complains about stutter of `trace.TraceIDFromHex`.
 func TraceIDFromHex(h string) (TraceID, error) {
-	t := TraceID{}
 	if len(h) != 32 {
-		return t, errInvalidTraceIDLength
+		return [16]byte{}, errInvalidTraceIDLength
 	}
-
-	if err := decodeHex(h, t[:]); err != nil {
-		return t, err
+	var b [16]byte
+	invalidMark := byte(0)
+	for i := 0; i < len(h); i += 4 {
+		b[i/2] = (hexRev[h[i]] << 4) | hexRev[h[i+1]]
+		b[i/2+1] = (hexRev[h[i+2]] << 4) | hexRev[h[i+3]]
+		invalidMark |= hexRev[h[i]] | hexRev[h[i+1]] | hexRev[h[i+2]] | hexRev[h[i+3]]
 	}
-
-	if !t.IsValid() {
-		return t, errNilTraceID
+	// If the upper 4 bits of any byte are not zero, there was an invalid hex
+	// character since invalid hex characters are 0xff in hexRev.
+	if invalidMark&0xf0 != 0 {
+		return [16]byte{}, errInvalidHexID
 	}
-	return t, nil
+	// If we didn't set any bits, then h was all zeros.
+	if invalidMark == 0 {
+		return [16]byte{}, errNilTraceID
+	}
+	return b, nil
 }
 
 // SpanIDFromHex returns a SpanID from a hex string if it is compliant
 // with the w3c trace-context specification.
 // See more at https://www.w3.org/TR/trace-context/#parent-id
 func SpanIDFromHex(h string) (SpanID, error) {
-	s := SpanID{}
 	if len(h) != 16 {
-		return s, errInvalidSpanIDLength
+		return [8]byte{}, errInvalidSpanIDLength
 	}
-
-	if err := decodeHex(h, s[:]); err != nil {
-		return s, err
+	var b [8]byte
+	invalidMark := byte(0)
+	for i := 0; i < len(h); i += 4 {
+		b[i/2] = (hexRev[h[i]] << 4) | hexRev[h[i+1]]
+		b[i/2+1] = (hexRev[h[i+2]] << 4) | hexRev[h[i+3]]
+		invalidMark |= hexRev[h[i]] | hexRev[h[i+1]] | hexRev[h[i+2]] | hexRev[h[i+3]]
 	}
-
-	if !s.IsValid() {
-		return s, errNilSpanID
+	// If the upper 4 bits of any byte are not zero, there was an invalid hex
+	// character since invalid hex characters are 0xff in hexRev.
+	if invalidMark&0xf0 != 0 {
+		return [8]byte{}, errInvalidHexID
 	}
-	return s, nil
-}
-
-func decodeHex(h string, b []byte) error {
-	for _, r := range h {
-		switch {
-		case 'a' <= r && r <= 'f':
-			continue
-		case '0' <= r && r <= '9':
-			continue
-		default:
-			return errInvalidHexID
-		}
+	// If we didn't set any bits, then h was all zeros.
+	if invalidMark == 0 {
+		return [8]byte{}, errNilSpanID
 	}
-
-	decoded, err := hex.DecodeString(h)
-	if err != nil {
-		return err
-	}
-
-	copy(b, decoded)
-	return nil
+	return b, nil
 }
 
 // TraceFlags contains flags that can be set on a SpanContext.
 type TraceFlags byte //nolint:revive // revive complains about stutter of `trace.TraceFlags`.
 
-// IsSampled returns if the sampling bit is set in the TraceFlags.
+// IsSampled reports whether the sampling bit is set in the TraceFlags.
 func (tf TraceFlags) IsSampled() bool {
 	return tf&FlagsSampled == FlagsSampled
 }
@@ -160,12 +194,20 @@ func (tf TraceFlags) WithSampled(sampled bool) TraceFlags { // nolint:revive  //
 // MarshalJSON implements a custom marshal function to encode TraceFlags
 // as a hex string.
 func (tf TraceFlags) MarshalJSON() ([]byte, error) {
-	return json.Marshal(tf.String())
+	b := [2 + 2]byte{0: '"', 3: '"'}
+	h := tf.hexBytes()
+	copy(b[1:], h[:])
+	return b[:], nil
 }
 
 // String returns the hex string representation form of TraceFlags.
 func (tf TraceFlags) String() string {
-	return hex.EncodeToString([]byte{byte(tf)}[:])
+	h := tf.hexBytes()
+	return string(h[:])
+}
+
+func (tf TraceFlags) hexBytes() [2]byte {
+	return [2]byte{hexLU[tf>>4], hexLU[tf&0xf]}
 }
 
 // SpanContextConfig contains mutable fields usable for constructing
@@ -201,13 +243,13 @@ type SpanContext struct {
 
 var _ json.Marshaler = SpanContext{}
 
-// IsValid returns if the SpanContext is valid. A valid span context has a
+// IsValid reports whether the SpanContext is valid. A valid span context has a
 // valid TraceID and SpanID.
 func (sc SpanContext) IsValid() bool {
 	return sc.HasTraceID() && sc.HasSpanID()
 }
 
-// IsRemote indicates whether the SpanContext represents a remotely-created Span.
+// IsRemote reports whether the SpanContext represents a remotely-created Span.
 func (sc SpanContext) IsRemote() bool {
 	return sc.remote
 }
@@ -228,7 +270,7 @@ func (sc SpanContext) TraceID() TraceID {
 	return sc.traceID
 }
 
-// HasTraceID checks if the SpanContext has a valid TraceID.
+// HasTraceID reports whether the SpanContext has a valid TraceID.
 func (sc SpanContext) HasTraceID() bool {
 	return sc.traceID.IsValid()
 }
@@ -249,7 +291,7 @@ func (sc SpanContext) SpanID() SpanID {
 	return sc.spanID
 }
 
-// HasSpanID checks if the SpanContext has a valid SpanID.
+// HasSpanID reports whether the SpanContext has a valid SpanID.
 func (sc SpanContext) HasSpanID() bool {
 	return sc.spanID.IsValid()
 }
@@ -270,7 +312,7 @@ func (sc SpanContext) TraceFlags() TraceFlags {
 	return sc.traceFlags
 }
 
-// IsSampled returns if the sampling bit is set in the SpanContext's TraceFlags.
+// IsSampled reports whether the sampling bit is set in the SpanContext's TraceFlags.
 func (sc SpanContext) IsSampled() bool {
 	return sc.traceFlags.IsSampled()
 }
@@ -302,7 +344,7 @@ func (sc SpanContext) WithTraceState(state TraceState) SpanContext {
 	}
 }
 
-// Equal is a predicate that determines whether two SpanContext values are equal.
+// Equal reports whether two SpanContext values are equal.
 func (sc SpanContext) Equal(other SpanContext) bool {
 	return sc.traceID == other.traceID &&
 		sc.spanID == other.spanID &&

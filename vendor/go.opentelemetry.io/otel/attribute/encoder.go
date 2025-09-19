@@ -78,7 +78,7 @@ func DefaultEncoder() Encoder {
 	defaultEncoderOnce.Do(func() {
 		defaultEncoderInstance = &defaultAttrEncoder{
 			pool: sync.Pool{
-				New: func() interface{} {
+				New: func() any {
 					return &bytes.Buffer{}
 				},
 			},
@@ -96,11 +96,11 @@ func (d *defaultAttrEncoder) Encode(iter Iterator) string {
 	for iter.Next() {
 		i, keyValue := iter.IndexedAttribute()
 		if i > 0 {
-			_, _ = buf.WriteRune(',')
+			_ = buf.WriteByte(',')
 		}
 		copyAndEscape(buf, string(keyValue.Key))
 
-		_, _ = buf.WriteRune('=')
+		_ = buf.WriteByte('=')
 
 		if keyValue.Value.Type() == STRING {
 			copyAndEscape(buf, keyValue.Value.AsString())
@@ -122,14 +122,14 @@ func copyAndEscape(buf *bytes.Buffer, val string) {
 	for _, ch := range val {
 		switch ch {
 		case '=', ',', escapeChar:
-			_, _ = buf.WriteRune(escapeChar)
+			_ = buf.WriteByte(escapeChar)
 		}
 		_, _ = buf.WriteRune(ch)
 	}
 }
 
-// Valid returns true if this encoder ID was allocated by
-// `NewEncoderID`.  Invalid encoder IDs will not be cached.
+// Valid reports whether this encoder ID was allocated by
+// [NewEncoderID]. Invalid encoder IDs will not be cached.
 func (id EncoderID) Valid() bool {
 	return id.value != 0
 }

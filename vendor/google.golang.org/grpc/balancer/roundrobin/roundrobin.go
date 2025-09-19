@@ -70,10 +70,3 @@ func (b *rrBalancer) UpdateClientConnState(ccs balancer.ClientConnState) error {
 		ResolverState: pickfirstleaf.EnableHealthListener(ccs.ResolverState),
 	})
 }
-
-func (b *rrBalancer) ExitIdle() {
-	// Should always be ok, as child is endpoint sharding.
-	if ei, ok := b.Balancer.(balancer.ExitIdler); ok {
-		ei.ExitIdle()
-	}
-}

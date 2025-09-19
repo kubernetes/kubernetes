@@ -34,9 +34,6 @@ $(TOOLS)/%: $(TOOLS_MOD_DIR)/go.mod | $(TOOLS)
 MULTIMOD = $(TOOLS)/multimod
 $(TOOLS)/multimod: PACKAGE=go.opentelemetry.io/build-tools/multimod
 
-SEMCONVGEN = $(TOOLS)/semconvgen
-$(TOOLS)/semconvgen: PACKAGE=go.opentelemetry.io/build-tools/semconvgen
-
 CROSSLINK = $(TOOLS)/crosslink
 $(TOOLS)/crosslink: PACKAGE=go.opentelemetry.io/build-tools/crosslink
 
@@ -71,7 +68,7 @@ GOVULNCHECK = $(TOOLS)/govulncheck
 $(TOOLS)/govulncheck: PACKAGE=golang.org/x/vuln/cmd/govulncheck
 
 .PHONY: tools
-tools: $(CROSSLINK) $(GOLANGCI_LINT) $(MISSPELL) $(GOCOVMERGE) $(STRINGER) $(PORTO) $(SEMCONVGEN) $(VERIFYREADMES) $(MULTIMOD) $(SEMCONVKIT) $(GOTMPL) $(GORELEASE)
+tools: $(CROSSLINK) $(GOLANGCI_LINT) $(MISSPELL) $(GOCOVMERGE) $(STRINGER) $(PORTO) $(VERIFYREADMES) $(MULTIMOD) $(SEMCONVKIT) $(GOTMPL) $(GORELEASE)
 
 # Virtualized python tools via docker
 
@@ -284,7 +281,7 @@ semconv-generate: $(SEMCONVKIT)
 	docker run --rm \
 		-u $(DOCKER_USER) \
 		--env HOME=/tmp/weaver \
-		--mount 'type=bind,source=$(PWD)/semconv,target=/home/weaver/templates/registry/go,readonly' \
+		--mount 'type=bind,source=$(PWD)/semconv/templates,target=/home/weaver/templates,readonly' \
 		--mount 'type=bind,source=$(PWD)/semconv/${TAG},target=/home/weaver/target' \
 		--mount 'type=bind,source=$(HOME)/.weaver,target=/tmp/weaver/.weaver' \
 		$(WEAVER_IMAGE) registry generate \
@@ -293,7 +290,7 @@ semconv-generate: $(SEMCONVKIT)
 		--param tag=$(TAG) \
 		go \
 		/home/weaver/target
-	$(SEMCONVKIT) -output "$(SEMCONVPKG)/$(TAG)" -tag "$(TAG)"
+	$(SEMCONVKIT) -semconv "$(SEMCONVPKG)" -tag "$(TAG)"
 
 .PHONY: gorelease
 gorelease: $(OTEL_GO_MOD_DIRS:%=gorelease/%)

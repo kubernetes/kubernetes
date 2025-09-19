@@ -41,22 +41,22 @@ func GetLogger() logr.Logger {
 
 // Info prints messages about the general state of the API or SDK.
 // This should usually be less than 5 messages a minute.
-func Info(msg string, keysAndValues ...interface{}) {
+func Info(msg string, keysAndValues ...any) {
 	GetLogger().V(4).Info(msg, keysAndValues...)
 }
 
 // Error prints messages about exceptional states of the API or SDK.
-func Error(err error, msg string, keysAndValues ...interface{}) {
+func Error(err error, msg string, keysAndValues ...any) {
 	GetLogger().Error(err, msg, keysAndValues...)
 }
 
 // Debug prints messages about all internal changes in the API or SDK.
-func Debug(msg string, keysAndValues ...interface{}) {
+func Debug(msg string, keysAndValues ...any) {
 	GetLogger().V(8).Info(msg, keysAndValues...)
 }
 
 // Warn prints messages about warnings in the API or SDK.
 // Not an error but is likely more important than an informational event.
-func Warn(msg string, keysAndValues ...interface{}) {
+func Warn(msg string, keysAndValues ...any) {
 	GetLogger().V(1).Info(msg, keysAndValues...)
 }
