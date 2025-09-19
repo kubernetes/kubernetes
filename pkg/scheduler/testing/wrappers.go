@@ -930,6 +930,12 @@ func (n *NodeWrapper) Unschedulable(unschedulable bool) *NodeWrapper {
 	return n
 }
 
+// DeclaredFeatures applies the declared features in node status.
+func (n *NodeWrapper) DeclaredFeatures(declaredFeatures []string) *NodeWrapper {
+	n.Status.DeclaredFeatures = declaredFeatures
+	return n
+}
+
 // Condition applies the node condition.
 func (n *NodeWrapper) Condition(typ v1.NodeConditionType, status v1.ConditionStatus, message, reason string) *NodeWrapper {
 	n.Status.Conditions = []v1.NodeCondition{
