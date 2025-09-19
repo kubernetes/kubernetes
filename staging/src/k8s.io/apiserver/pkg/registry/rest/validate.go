@@ -90,28 +90,7 @@ type validationConfigOption struct {
 	validationIdentifier string
 }
 
-// ValidateDeclaratively validates obj against declarative validation tags
-// defined in its Go type. It uses the API version extracted from ctx and the
-// provided scheme for validation.
-//
-// The ctx MUST contain requestInfo, which determines the target API for
-// validation. The obj is converted to the API version using the provided scheme
-// before validation occurs. The scheme MUST have the declarative validation
-// registered for the requested resource/subresource.
-//
-// Returns a field.ErrorList containing any validation errors. An internal error
-// is included if requestInfo is missing from the context or if version
-// conversion fails.
-func ValidateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj runtime.Object, configOpts ...ValidationConfig) field.ErrorList {
-	cfg := &validationConfigOption{opType: operation.Create}
-	for _, o := range configOpts {
-		o(cfg)
-	}
-
-	return panicSafeValidateFunc(validateDeclaratively, cfg.takeover, cfg.validationIdentifier)(ctx, scheme, obj, nil, cfg)
-}
-
-// ValidateUpdateDeclaratively validates obj and oldObj against declarative
+// validateDeclaratively validates obj and oldObj against declarative
 // validation tags defined in its Go type. It uses the API version extracted from
 // ctx and the provided scheme for validation.
 //
@@ -123,14 +102,6 @@ func ValidateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj runt
 // Returns a field.ErrorList containing any validation errors. An internal error
 // is included if requestInfo is missing from the context or if version
 // conversion fails.
-func ValidateUpdateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, configOpts ...ValidationConfig) field.ErrorList {
-	cfg := &validationConfigOption{opType: operation.Update}
-	for _, o := range configOpts {
-		o(cfg)
-	}
-	return panicSafeValidateFunc(validateDeclaratively, cfg.takeover, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
-}
-
 func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList {
 	// Find versionedGroupVersion, which identifies the API version to use for declarative validation.
 	versionedGroupVersion, subresources, err := requestInfo(ctx, o.subresourceGVKMapper)
@@ -187,9 +158,9 @@ func parseSubresourcePath(subresourcePath string) ([]string, error) {
 	return parts, nil
 }
 
-// CompareDeclarativeErrorsAndEmitMismatches checks for mismatches between imperative and declarative validation
+// compareDeclarativeErrorsAndEmitMismatches checks for mismatches between imperative and declarative validation
 // and logs + emits metrics when inconsistencies are found
-func CompareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, takeover bool, validationIdentifier string) {
+func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, takeover bool, validationIdentifier string) {
 	logger := klog.FromContext(ctx)
 	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, takeover)
 	for _, detail := range mismatchDetails {
@@ -394,7 +365,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	// Call the panic-safe wrapper with the real validation function.
 	declarativeErrs := panicSafeValidateFunc(validateDeclaratively, cfg.takeover, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
 
-	CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier)
+	compareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier)
 
 	if takeover {
 		errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)

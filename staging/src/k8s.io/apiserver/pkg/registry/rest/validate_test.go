@@ -162,12 +162,16 @@ func TestValidateDeclaratively(t *testing.T) {
 			Subresource: tc.subresource,
 		})
 		t.Run(tc.name, func(t *testing.T) {
-			var results field.ErrorList
-			if tc.oldObject == nil {
-				results = ValidateDeclaratively(ctx, scheme, tc.object, WithOptions(tc.options))
-			} else {
-				results = ValidateUpdateDeclaratively(ctx, scheme, tc.object, tc.oldObject, WithOptions(tc.options))
+
+			cfg := &validationConfigOption{
+				options: tc.options,
 			}
+			if tc.oldObject == nil {
+				cfg.opType = operation.Create
+			} else {
+				cfg.opType = operation.Update
+			}
+			results := panicSafeValidateFunc(validateDeclaratively, cfg.takeover, cfg.validationIdentifier)(ctx, scheme, tc.object, tc.oldObject, cfg)
 			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 			matcher.Test(t, tc.expected, results)
 		})
@@ -425,7 +429,7 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 			defer klog.LogToStderr(true)
 			ctx := context.Background()
 
-			CompareDeclarativeErrorsAndEmitMismatches(ctx, tc.imperativeErrs, tc.declarativeErrs, tc.takeover, "test_validationIdentifier")
+			compareDeclarativeErrorsAndEmitMismatches(ctx, tc.imperativeErrs, tc.declarativeErrs, tc.takeover, "test_validationIdentifier")
 
 			klog.Flush()
 			logOutput := buf.String()
@@ -630,55 +634,6 @@ func TestWithRecoverUpdate(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestValidateDeclarativelyWithRecovery(t *testing.T) {
-	ctx := context.Background()
-	scheme := runtime.NewScheme()
-	var options []string
-	obj := &runtime.Unknown{}
-
-	// Simple test for the ValidateDeclarativelyWithRecovery function
-	t.Run("with takeover disabled", func(t *testing.T) {
-		errs := ValidateDeclaratively(ctx, scheme, obj, WithOptions(options), WithTakeover(false))
-		if errs == nil {
-			// This is expected to error since the request info is missing
-			t.Errorf("Expected errors but got nil")
-		}
-	})
-
-	t.Run("with takeover enabled", func(t *testing.T) {
-		errs := ValidateDeclaratively(ctx, scheme, obj, WithOptions(options), WithTakeover(true))
-		if errs == nil {
-			// This is expected to error since the request info is missioptionsng
-			t.Errorf("Expected errors but got nil")
-		}
-	})
-}
-
-func TestValidateUpdateDeclarativelyWithRecovery(t *testing.T) {
-	ctx := context.Background()
-	scheme := runtime.NewScheme()
-	var options []string
-	obj := &runtime.Unknown{}
-	oldObj := &runtime.Unknown{}
-
-	// Simple test for the ValidateUpdateDeclarativelyWithRecovery function
-	t.Run("with takeover disabled", func(t *testing.T) {
-		errs := ValidateUpdateDeclaratively(ctx, scheme, obj, oldObj, WithOptions(options), WithTakeover(false))
-		if errs == nil {
-			// This is expected to error since the request info is missing
-			t.Errorf("Expected errors but got nil")
-		}
-	})
-
-	t.Run("with takeover enabled", func(t *testing.T) {
-		errs := ValidateUpdateDeclaratively(ctx, scheme, obj, oldObj, WithOptions(options), WithTakeover(true))
-		if errs == nil {
-			// This is expected to error since the request info is missing
-			t.Errorf("Expected errors but got nil")
-		}
-	})
 }
 
 func TestRecordDuplicateValidationErrors(t *testing.T) {
