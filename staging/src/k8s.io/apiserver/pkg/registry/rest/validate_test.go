@@ -758,3 +758,63 @@ func equalErrorLists(a, b field.ErrorList) bool {
 	// Both non-nil: do a normal DeepEqual
 	return reflect.DeepEqual(a, b)
 }
+
+func TestMetricIdentifier(t *testing.T) {
+	testCases := []struct {
+		name        string
+		opType      operation.Type
+		obj         runtime.Object
+		subresource string
+		expected    string
+		expectErr   bool
+	}{
+		{
+			name:        "with subresource",
+			opType:      operation.Create,
+			obj:         &v1.Pod{TypeMeta: metav1.TypeMeta{Kind: "Pod"}},
+			subresource: "status",
+			expected:    "pod_status_create",
+			expectErr:   false,
+		},
+		{
+			name:      "without subresource",
+			opType:    operation.Update,
+			obj:       &v1.Pod{TypeMeta: metav1.TypeMeta{Kind: "Pod"}},
+			expected:  "pod_update",
+			expectErr: false,
+		},
+		{
+			name:      "unknown operation",
+			opType:    3, // not a valid operation.Type
+			obj:       &v1.Pod{TypeMeta: metav1.TypeMeta{Kind: "Pod"}},
+			expected:  "pod_unknown_op",
+			expectErr: true,
+		},
+		{
+			name:      "no request info and no kind",
+			opType:    operation.Create,
+			obj:       nil,
+			expected:  "unknown_resource_create",
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			if tc.obj != nil {
+				ctx = genericapirequest.WithRequestInfo(ctx, &genericapirequest.RequestInfo{
+					Subresource: tc.subresource,
+				})
+			}
+
+			result, err := metricIdentifier(ctx, tc.obj, tc.opType)
+			if (err != nil) != tc.expectErr {
+				t.Errorf("expected error: %v, got: %v", tc.expectErr, err)
+			}
+			if result != tc.expected {
+				t.Errorf("expected: %s, got: %s", tc.expected, result)
+			}
+		})
+	}
+}
