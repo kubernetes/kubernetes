@@ -53,7 +53,8 @@ func (lw fakePodLW) IsWatchListSemanticsUnSupported() bool { return true }
 var _ cache.ListerWatcher = fakePodLW{}
 
 func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
-	logger := ktesting.Init(t).Logger()
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	pod1v1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "p"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
@@ -73,7 +74,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 
 	ch := make(chan sourceUpdate)
 
-	newSourceApiserverFromLW(logger, lw, ch)
+	newSourceApiserverFromLW(tCtx, lw, ch)
 
 	update, ok := <-ch
 	if !ok {
@@ -135,7 +136,8 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 }
 
 func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
-	logger := ktesting.Init(t).Logger()
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	pod1 := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "one"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
@@ -152,7 +154,7 @@ func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 
 	ch := make(chan sourceUpdate)
 
-	newSourceApiserverFromLW(logger, lw, ch)
+	newSourceApiserverFromLW(tCtx, lw, ch)
 
 	update, ok := <-ch
 	if !ok {
@@ -175,7 +177,8 @@ func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 }
 
 func TestNewSourceApiserverInitialEmptySendsEmptyPodUpdate(t *testing.T) {
-	logger := ktesting.Init(t).Logger()
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	// Setup fake api client.
 	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	lw := fakePodLW{
@@ -185,7 +188,7 @@ func TestNewSourceApiserverInitialEmptySendsEmptyPodUpdate(t *testing.T) {
 
 	ch := make(chan sourceUpdate)
 
-	newSourceApiserverFromLW(logger, lw, ch)
+	newSourceApiserverFromLW(tCtx, lw, ch)
 
 	update, ok := <-ch
 	if !ok {

@@ -422,7 +422,7 @@ func makePodSourceConfig(ctx context.Context, kubeCfg *kubeletconfiginternal.Kub
 
 	if kubeDeps.KubeClient != nil {
 		logger.Info("Adding apiserver pod source")
-		config.NewSourceApiserver(logger, kubeDeps.KubeClient, nodeName, nodeHasSynced, cfg.Channel(ctx, kubetypes.ApiserverSource))
+		config.NewSourceApiserver(ctx, kubeDeps.KubeClient, nodeName, nodeHasSynced, cfg.Channel(ctx, kubetypes.ApiserverSource))
 	}
 	return cfg, nil
 }
