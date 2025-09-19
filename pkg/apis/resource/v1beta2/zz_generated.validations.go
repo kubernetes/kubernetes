@@ -22,7 +22,16 @@ limitations under the License.
 package v1beta2
 
 import (
+	context "context"
+	fmt "fmt"
+
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	equality "k8s.io/apimachinery/pkg/api/equality"
+	operation "k8s.io/apimachinery/pkg/api/operation"
+	safe "k8s.io/apimachinery/pkg/api/safe"
+	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -30,5 +39,465 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type DeviceClass
+	scheme.AddValidationFunc((*resourcev1beta2.DeviceClass)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_DeviceClass(ctx, op, nil /* fldPath */, obj.(*resourcev1beta2.DeviceClass), safe.Cast[*resourcev1beta2.DeviceClass](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type DeviceClassList
+	scheme.AddValidationFunc((*resourcev1beta2.DeviceClassList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_DeviceClassList(ctx, op, nil /* fldPath */, obj.(*resourcev1beta2.DeviceClassList), safe.Cast[*resourcev1beta2.DeviceClassList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ResourceClaim
+	scheme.AddValidationFunc((*resourcev1beta2.ResourceClaim)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ResourceClaim(ctx, op, nil /* fldPath */, obj.(*resourcev1beta2.ResourceClaim), safe.Cast[*resourcev1beta2.ResourceClaim](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ResourceClaimList
+	scheme.AddValidationFunc((*resourcev1beta2.ResourceClaimList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ResourceClaimList(ctx, op, nil /* fldPath */, obj.(*resourcev1beta2.ResourceClaimList), safe.Cast[*resourcev1beta2.ResourceClaimList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ResourceClaimTemplate
+	scheme.AddValidationFunc((*resourcev1beta2.ResourceClaimTemplate)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ResourceClaimTemplate(ctx, op, nil /* fldPath */, obj.(*resourcev1beta2.ResourceClaimTemplate), safe.Cast[*resourcev1beta2.ResourceClaimTemplate](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ResourceClaimTemplateList
+	scheme.AddValidationFunc((*resourcev1beta2.ResourceClaimTemplateList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ResourceClaimTemplateList(ctx, op, nil /* fldPath */, obj.(*resourcev1beta2.ResourceClaimTemplateList), safe.Cast[*resourcev1beta2.ResourceClaimTemplateList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
+}
+
+// Validate_AllocationResult validates an instance of AllocationResult according
+// to declarative validation rules in the API schema.
+func Validate_AllocationResult(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.AllocationResult) (errs field.ErrorList) {
+	// field resourcev1beta2.AllocationResult.Devices
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceAllocationResult) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceAllocationResult(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("devices"), &obj.Devices, safe.Field(oldObj, func(oldObj *resourcev1beta2.AllocationResult) *resourcev1beta2.DeviceAllocationResult {
+			return &oldObj.Devices
+		}))...)
+
+	// field resourcev1beta2.AllocationResult.NodeSelector has no validation
+	// field resourcev1beta2.AllocationResult.AllocationTimestamp has no validation
+	return errs
+}
+
+// Validate_DeviceAllocationConfiguration validates an instance of DeviceAllocationConfiguration according
+// to declarative validation rules in the API schema.
+func Validate_DeviceAllocationConfiguration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceAllocationConfiguration) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceAllocationConfiguration.Source has no validation
+	// field resourcev1beta2.DeviceAllocationConfiguration.Requests has no validation
+
+	// field resourcev1beta2.DeviceAllocationConfiguration.DeviceConfiguration
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceConfiguration) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceConfiguration(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("resourcev1beta2.DeviceConfiguration") }), &obj.DeviceConfiguration, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceAllocationConfiguration) *resourcev1beta2.DeviceConfiguration {
+			return &oldObj.DeviceConfiguration
+		}))...)
+
+	return errs
+}
+
+// Validate_DeviceAllocationResult validates an instance of DeviceAllocationResult according
+// to declarative validation rules in the API schema.
+func Validate_DeviceAllocationResult(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceAllocationResult) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceAllocationResult.Results has no validation
+
+	// field resourcev1beta2.DeviceAllocationResult.Config
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.DeviceAllocationConfiguration) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceAllocationConfiguration)...)
+			return
+		}(fldPath.Child("config"), obj.Config, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceAllocationResult) []resourcev1beta2.DeviceAllocationConfiguration {
+			return oldObj.Config
+		}))...)
+
+	return errs
+}
+
+// Validate_DeviceClaim validates an instance of DeviceClaim according
+// to declarative validation rules in the API schema.
+func Validate_DeviceClaim(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceClaim) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceClaim.Requests has no validation
+	// field resourcev1beta2.DeviceClaim.Constraints has no validation
+
+	// field resourcev1beta2.DeviceClaim.Config
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.DeviceClaimConfiguration) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClaimConfiguration)...)
+			return
+		}(fldPath.Child("config"), obj.Config, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceClaim) []resourcev1beta2.DeviceClaimConfiguration {
+			return oldObj.Config
+		}))...)
+
+	return errs
+}
+
+// Validate_DeviceClaimConfiguration validates an instance of DeviceClaimConfiguration according
+// to declarative validation rules in the API schema.
+func Validate_DeviceClaimConfiguration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceClaimConfiguration) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceClaimConfiguration.Requests has no validation
+
+	// field resourcev1beta2.DeviceClaimConfiguration.DeviceConfiguration
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceConfiguration) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceConfiguration(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("resourcev1beta2.DeviceConfiguration") }), &obj.DeviceConfiguration, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceClaimConfiguration) *resourcev1beta2.DeviceConfiguration {
+			return &oldObj.DeviceConfiguration
+		}))...)
+
+	return errs
+}
+
+// Validate_DeviceClass validates an instance of DeviceClass according
+// to declarative validation rules in the API schema.
+func Validate_DeviceClass(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceClass) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceClass.TypeMeta has no validation
+	// field resourcev1beta2.DeviceClass.ObjectMeta has no validation
+
+	// field resourcev1beta2.DeviceClass.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceClassSpec) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceClassSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceClass) *resourcev1beta2.DeviceClassSpec { return &oldObj.Spec }))...)
+
+	return errs
+}
+
+// Validate_DeviceClassConfiguration validates an instance of DeviceClassConfiguration according
+// to declarative validation rules in the API schema.
+func Validate_DeviceClassConfiguration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceClassConfiguration) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceClassConfiguration.DeviceConfiguration
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceConfiguration) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceConfiguration(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("resourcev1beta2.DeviceConfiguration") }), &obj.DeviceConfiguration, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceClassConfiguration) *resourcev1beta2.DeviceConfiguration {
+			return &oldObj.DeviceConfiguration
+		}))...)
+
+	return errs
+}
+
+// Validate_DeviceClassList validates an instance of DeviceClassList according
+// to declarative validation rules in the API schema.
+func Validate_DeviceClassList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceClassList) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceClassList.TypeMeta has no validation
+	// field resourcev1beta2.DeviceClassList.ListMeta has no validation
+
+	// field resourcev1beta2.DeviceClassList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.DeviceClass) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClass)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceClassList) []resourcev1beta2.DeviceClass { return oldObj.Items }))...)
+
+	return errs
+}
+
+// Validate_DeviceClassSpec validates an instance of DeviceClassSpec according
+// to declarative validation rules in the API schema.
+func Validate_DeviceClassSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceClassSpec) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceClassSpec.Selectors has no validation
+
+	// field resourcev1beta2.DeviceClassSpec.Config
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.DeviceClassConfiguration) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClassConfiguration)...)
+			return
+		}(fldPath.Child("config"), obj.Config, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceClassSpec) []resourcev1beta2.DeviceClassConfiguration {
+			return oldObj.Config
+		}))...)
+
+	// field resourcev1beta2.DeviceClassSpec.ExtendedResourceName has no validation
+	return errs
+}
+
+// Validate_DeviceConfiguration validates an instance of DeviceConfiguration according
+// to declarative validation rules in the API schema.
+func Validate_DeviceConfiguration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceConfiguration) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceConfiguration.Opaque
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.OpaqueDeviceConfiguration) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_OpaqueDeviceConfiguration(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("opaque"), obj.Opaque, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceConfiguration) *resourcev1beta2.OpaqueDeviceConfiguration {
+			return oldObj.Opaque
+		}))...)
+
+	return errs
+}
+
+// Validate_OpaqueDeviceConfiguration validates an instance of OpaqueDeviceConfiguration according
+// to declarative validation rules in the API schema.
+func Validate_OpaqueDeviceConfiguration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.OpaqueDeviceConfiguration) (errs field.ErrorList) {
+	// field resourcev1beta2.OpaqueDeviceConfiguration.Driver
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("driver"), &obj.Driver, safe.Field(oldObj, func(oldObj *resourcev1beta2.OpaqueDeviceConfiguration) *string { return &oldObj.Driver }))...)
+
+	// field resourcev1beta2.OpaqueDeviceConfiguration.Parameters has no validation
+	return errs
+}
+
+// Validate_ResourceClaim validates an instance of ResourceClaim according
+// to declarative validation rules in the API schema.
+func Validate_ResourceClaim(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceClaim) (errs field.ErrorList) {
+	// field resourcev1beta2.ResourceClaim.TypeMeta has no validation
+	// field resourcev1beta2.ResourceClaim.ObjectMeta has no validation
+
+	// field resourcev1beta2.ResourceClaim.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceClaimSpec) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ResourceClaimSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceClaim) *resourcev1beta2.ResourceClaimSpec { return &oldObj.Spec }))...)
+
+	// field resourcev1beta2.ResourceClaim.Status
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceClaimStatus) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ResourceClaimStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("status"), &obj.Status, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceClaim) *resourcev1beta2.ResourceClaimStatus {
+			return &oldObj.Status
+		}))...)
+
+	return errs
+}
+
+// Validate_ResourceClaimList validates an instance of ResourceClaimList according
+// to declarative validation rules in the API schema.
+func Validate_ResourceClaimList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceClaimList) (errs field.ErrorList) {
+	// field resourcev1beta2.ResourceClaimList.TypeMeta has no validation
+	// field resourcev1beta2.ResourceClaimList.ListMeta has no validation
+
+	// field resourcev1beta2.ResourceClaimList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.ResourceClaim) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ResourceClaim)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceClaimList) []resourcev1beta2.ResourceClaim { return oldObj.Items }))...)
+
+	return errs
+}
+
+// Validate_ResourceClaimSpec validates an instance of ResourceClaimSpec according
+// to declarative validation rules in the API schema.
+func Validate_ResourceClaimSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceClaimSpec) (errs field.ErrorList) {
+	// field resourcev1beta2.ResourceClaimSpec.Devices
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceClaim) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceClaim(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("devices"), &obj.Devices, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceClaimSpec) *resourcev1beta2.DeviceClaim { return &oldObj.Devices }))...)
+
+	return errs
+}
+
+// Validate_ResourceClaimStatus validates an instance of ResourceClaimStatus according
+// to declarative validation rules in the API schema.
+func Validate_ResourceClaimStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceClaimStatus) (errs field.ErrorList) {
+	// field resourcev1beta2.ResourceClaimStatus.Allocation
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.AllocationResult) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_AllocationResult(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("allocation"), obj.Allocation, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceClaimStatus) *resourcev1beta2.AllocationResult {
+			return oldObj.Allocation
+		}))...)
+
+	// field resourcev1beta2.ResourceClaimStatus.ReservedFor has no validation
+	// field resourcev1beta2.ResourceClaimStatus.Devices has no validation
+	return errs
+}
+
+// Validate_ResourceClaimTemplate validates an instance of ResourceClaimTemplate according
+// to declarative validation rules in the API schema.
+func Validate_ResourceClaimTemplate(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceClaimTemplate) (errs field.ErrorList) {
+	// field resourcev1beta2.ResourceClaimTemplate.TypeMeta has no validation
+	// field resourcev1beta2.ResourceClaimTemplate.ObjectMeta has no validation
+
+	// field resourcev1beta2.ResourceClaimTemplate.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceClaimTemplateSpec) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ResourceClaimTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceClaimTemplate) *resourcev1beta2.ResourceClaimTemplateSpec {
+			return &oldObj.Spec
+		}))...)
+
+	return errs
+}
+
+// Validate_ResourceClaimTemplateList validates an instance of ResourceClaimTemplateList according
+// to declarative validation rules in the API schema.
+func Validate_ResourceClaimTemplateList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceClaimTemplateList) (errs field.ErrorList) {
+	// field resourcev1beta2.ResourceClaimTemplateList.TypeMeta has no validation
+	// field resourcev1beta2.ResourceClaimTemplateList.ListMeta has no validation
+
+	// field resourcev1beta2.ResourceClaimTemplateList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.ResourceClaimTemplate) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ResourceClaimTemplate)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceClaimTemplateList) []resourcev1beta2.ResourceClaimTemplate {
+			return oldObj.Items
+		}))...)
+
+	return errs
+}
+
+// Validate_ResourceClaimTemplateSpec validates an instance of ResourceClaimTemplateSpec according
+// to declarative validation rules in the API schema.
+func Validate_ResourceClaimTemplateSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceClaimTemplateSpec) (errs field.ErrorList) {
+	// field resourcev1beta2.ResourceClaimTemplateSpec.ObjectMeta has no validation
+
+	// field resourcev1beta2.ResourceClaimTemplateSpec.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceClaimSpec) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ResourceClaimSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceClaimTemplateSpec) *resourcev1beta2.ResourceClaimSpec {
+			return &oldObj.Spec
+		}))...)
+
+	return errs
 }

@@ -1759,7 +1759,7 @@ func validatePVSecretReference(secretRef *core.SecretReference, fldPath *field.P
 type ValidateCSIDriverNameOption int
 
 const (
-	// The validation of each item is covered by declarative validation.
+	// The required check is covered by declarative validation
 	RequiredCovered ValidateCSIDriverNameOption = iota
 	// The list size check is covered by declarative validation.
 	SizeCovered
