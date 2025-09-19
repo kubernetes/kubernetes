@@ -21,19 +21,14 @@ package app
 
 import (
 	"context"
-	"fmt"
-	"math/rand"
 	"net/http"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/blang/semver/v4"
-	"github.com/spf13/cobra"
 	coordinationv1 "k8s.io/api/coordination/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -41,46 +36,32 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/metadata"
-	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
-	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/cli/globalflag"
 	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/component-base/configz"
-	"k8s.io/component-base/featuregate"
-	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	metricsfeatures "k8s.io/component-base/metrics/features"
-	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/slis"
-	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
-	"k8s.io/component-base/version/verflag"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/component-base/zpages/statusz"
 	genericcontrollermanager "k8s.io/controller-manager/app"
-	"k8s.io/controller-manager/controller"
+	kcontroller "k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/clientbuilder"
 	controllerhealthz "k8s.io/controller-manager/pkg/healthz"
-	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
-	garbagecollector "k8s.io/kubernetes/pkg/controller/garbagecollector"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller"
+	controllerrun "k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller/run"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
 
 func init() {
@@ -96,89 +77,6 @@ const (
 	// kubeControllerManager defines variable used internally when referring to cloud-controller-manager component
 	kubeControllerManager = "kube-controller-manager"
 )
-
-// NewControllerManagerCommand creates a *cobra.Command object with default parameters
-func NewControllerManagerCommand() *cobra.Command {
-	s, err := options.NewKubeControllerManagerOptions()
-	if err != nil {
-		klog.Background().Error(err, "Unable to initialize command options")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
-
-	cmd := &cobra.Command{
-		Use: kubeControllerManager,
-		Long: `The Kubernetes controller manager is a daemon that embeds
-the core control loops shipped with Kubernetes. In applications of robotics and
-automation, a control loop is a non-terminating loop that regulates the state of
-the system. In Kubernetes, a controller is a control loop that watches the shared
-state of the cluster through the apiserver and makes changes attempting to move the
-current state towards the desired state. Examples of controllers that ship with
-Kubernetes today are the replication controller, endpoints controller, namespace
-controller, and serviceaccounts controller.`,
-		PersistentPreRunE: func(*cobra.Command, []string) error {
-			// silence client-go warnings.
-			// kube-controller-manager generically watches APIs (including deprecated ones),
-			// and CI ensures it works properly against matching kube-apiserver versions.
-			restclient.SetDefaultWarningHandler(restclient.NoWarnings{})
-			// makes sure feature gates are set before RunE.
-			return s.ComponentGlobalsRegistry.Set()
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			verflag.PrintAndExitIfRequested()
-
-			// Activate logging as soon as possible, after that
-			// show flags with the final logging configuration.
-			if err := logsapi.ValidateAndApply(s.Logs, utilfeature.DefaultFeatureGate); err != nil {
-				return err
-			}
-			cliflag.PrintFlags(cmd.Flags())
-
-			ctx := context.Background()
-			c, err := s.Config(ctx, KnownControllers(), ControllersDisabledByDefault(), ControllerAliases())
-			if err != nil {
-				return err
-			}
-
-			// add feature enablement metrics
-			fg := s.ComponentGlobalsRegistry.FeatureGateFor(basecompatibility.DefaultKubeComponent)
-			fg.(featuregate.MutableFeatureGate).AddMetrics()
-			// add component version metrics
-			s.ComponentGlobalsRegistry.AddMetrics()
-			return Run(ctx, c.Complete())
-		},
-		Args: func(cmd *cobra.Command, args []string) error {
-			for _, arg := range args {
-				if len(arg) > 0 {
-					return fmt.Errorf("%q does not take any arguments, got %q", cmd.CommandPath(), args)
-				}
-			}
-			return nil
-		},
-	}
-
-	fs := cmd.Flags()
-	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault(), ControllerAliases())
-	s.ParsedFlags = &namedFlagSets
-	verflag.AddFlags(namedFlagSets.FlagSet("global"))
-	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
-	for _, f := range namedFlagSets.FlagSets {
-		fs.AddFlagSet(f)
-	}
-
-	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
-	cliflag.SetUsageAndHelpFunc(cmd, namedFlagSets, cols)
-
-	return cmd
-}
-
-// ResyncPeriod returns a function which generates a duration each time it is
-// invoked; this is because that multiple controllers don't get into lock-step.
-func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
-	return func() time.Duration {
-		factor := rand.Float64() + 1
-		return time.Duration(float64(c.ComponentConfig.Generic.MinResyncPeriod.Nanoseconds()) * factor)
-	}
-}
 
 // Run runs the KubeControllerManagerOptions.
 func Run(ctx context.Context, c *config.CompletedConfig) error {
@@ -244,8 +142,8 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 	saTokenControllerDescriptor := newServiceAccountTokenControllerDescriptor(rootClientBuilder)
 
-	run := func(ctx context.Context, controllerDescriptors map[string]*ControllerDescriptor) {
-		controllerContext, err := CreateControllerContext(ctx, c, rootClientBuilder, clientBuilder)
+	run := func(ctx context.Context, controllerDescriptors map[string]*controller.Descriptor) {
+		controllerContext, err := controller.CreateControllerContext(ctx, c, rootClientBuilder, clientBuilder)
 		if err != nil {
 			logger.Error(err, "Error building controller context")
 			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
@@ -301,10 +199,10 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			kubeControllerManager)
 
 		// startSATokenControllerInit is the original constructor.
-		saTokenControllerInit := saTokenControllerDescriptor.GetControllerConstructor()
+		saTokenControllerInit := saTokenControllerDescriptor.Constructor
 
 		// Wrap saTokenControllerDescriptor to signal readiness for migration after starting the controller.
-		saTokenControllerDescriptor.constructor = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+		saTokenControllerDescriptor.Constructor = func(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 			ctrl, err := saTokenControllerInit(ctx, controllerContext, controllerName)
 			if err != nil {
 				return nil, err
@@ -313,7 +211,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			// This wrapping is not exactly flawless as RunControllers uses type casting,
 			// which is now not possible for the wrapped controller.
 			// This fortunately doesn't matter for this particular controller.
-			return newControllerLoop(func(ctx context.Context) {
+			return controllerrun.NewControllerLoop(func(ctx context.Context) {
 				close(leaderMigrator.MigrationReady)
 				ctrl.Run(ctx)
 			}, controllerName), nil
@@ -402,154 +300,6 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	return nil
 }
 
-// ControllerContext defines the context object for controller
-type ControllerContext struct {
-	// ClientBuilder will provide a client for this controller to use
-	ClientBuilder clientbuilder.ControllerClientBuilder
-
-	// InformerFactory gives access to informers for the controller.
-	InformerFactory informers.SharedInformerFactory
-
-	// ObjectOrMetadataInformerFactory gives access to informers for typed resources
-	// and dynamic resources by their metadata. All generic controllers currently use
-	// object metadata - if a future controller needs access to the full object this
-	// would become GenericInformerFactory and take a dynamic client.
-	ObjectOrMetadataInformerFactory informerfactory.InformerFactory
-
-	// ComponentConfig provides access to init options for a given controller
-	ComponentConfig kubectrlmgrconfig.KubeControllerManagerConfiguration
-
-	// DeferredDiscoveryRESTMapper is a RESTMapper that will defer
-	// initialization of the RESTMapper until the first mapping is
-	// requested.
-	RESTMapper *restmapper.DeferredDiscoveryRESTMapper
-
-	// InformersStarted is closed after all of the controllers have been initialized and are running.  After this point it is safe,
-	// for an individual controller to start the shared informers. Before it is closed, they should not.
-	InformersStarted chan struct{}
-
-	// ResyncPeriod generates a duration each time it is invoked; this is so that
-	// multiple controllers don't get into lock-step and all hammer the apiserver
-	// with list requests simultaneously.
-	ResyncPeriod func() time.Duration
-
-	// ControllerManagerMetrics provides a proxy to set controller manager specific metrics.
-	ControllerManagerMetrics *controllersmetrics.ControllerManagerMetrics
-
-	// GraphBuilder gives an access to dependencyGraphBuilder which keeps tracks of resources in the cluster
-	GraphBuilder *garbagecollector.GraphBuilder
-}
-
-// IsControllerEnabled checks if the context's controllers enabled or not
-func (c ControllerContext) IsControllerEnabled(controllerDescriptor *ControllerDescriptor) bool {
-	controllersDisabledByDefault := sets.NewString()
-	if controllerDescriptor.IsDisabledByDefault() {
-		controllersDisabledByDefault.Insert(controllerDescriptor.Name())
-	}
-	return genericcontrollermanager.IsControllerEnabled(controllerDescriptor.Name(), controllersDisabledByDefault, c.ComponentConfig.Generic.Controllers)
-}
-
-// NewClientConfig is a shortcut for ClientBuilder.Config. It wraps the error with an additional message.
-func (c ControllerContext) NewClientConfig(name string) (*restclient.Config, error) {
-	config, err := c.ClientBuilder.Config(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Kubernetes client config for %q: %w", name, err)
-	}
-	return config, nil
-}
-
-// NewClient is a shortcut for ClientBuilder.Client. It wraps the error with an additional message.
-func (c ControllerContext) NewClient(name string) (kubernetes.Interface, error) {
-	client, err := c.ClientBuilder.Client(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Kubernetes client for %q: %w", name, err)
-	}
-	return client, nil
-}
-
-// CreateControllerContext creates a context struct containing references to resources needed by the
-// controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
-// the shared-informers client and token controller.
-func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder) (ControllerContext, error) {
-	// Informer transform to trim ManagedFields for memory efficiency.
-	trim := func(obj interface{}) (interface{}, error) {
-		if accessor, err := meta.Accessor(obj); err == nil {
-			if accessor.GetManagedFields() != nil {
-				accessor.SetManagedFields(nil)
-			}
-		}
-		return obj, nil
-	}
-
-	versionedClient, err := rootClientBuilder.Client("shared-informers")
-	if err != nil {
-		return ControllerContext{}, fmt.Errorf("failed to create Kubernetes client for %q: %w", "shared-informers", err)
-	}
-
-	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim))
-
-	metadataConfig, err := rootClientBuilder.Config("metadata-informers")
-	if err != nil {
-		return ControllerContext{}, fmt.Errorf("failed to create metadata client config: %w", err)
-	}
-
-	metadataClient, err := metadata.NewForConfig(metadataConfig)
-	if err != nil {
-		return ControllerContext{}, fmt.Errorf("failed to create metadata client: %w", err)
-	}
-
-	metadataInformers := metadatainformer.NewSharedInformerFactoryWithOptions(metadataClient, ResyncPeriod(s)(), metadatainformer.WithTransform(trim))
-
-	// If apiserver is not running we should wait for some time and fail only then. This is particularly
-	// important when we start apiserver and controller manager at the same time.
-	if err := genericcontrollermanager.WaitForAPIServer(versionedClient, 10*time.Second); err != nil {
-		return ControllerContext{}, fmt.Errorf("failed to wait for apiserver being healthy: %w", err)
-	}
-
-	// Use a discovery client capable of being refreshed.
-	discoveryClient, err := rootClientBuilder.DiscoveryClient("controller-discovery")
-	if err != nil {
-		return ControllerContext{}, fmt.Errorf("failed to create discovery client: %w", err)
-	}
-
-	cachedClient := cacheddiscovery.NewMemCacheClient(discoveryClient)
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedClient)
-	go wait.Until(func() {
-		restMapper.Reset()
-	}, 30*time.Second, ctx.Done())
-
-	controllerContext := ControllerContext{
-		ClientBuilder:                   clientBuilder,
-		InformerFactory:                 sharedInformers,
-		ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
-		ComponentConfig:                 s.ComponentConfig,
-		RESTMapper:                      restMapper,
-		InformersStarted:                make(chan struct{}),
-		ResyncPeriod:                    ResyncPeriod(s),
-		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics(kubeControllerManager),
-	}
-
-	if controllerContext.ComponentConfig.GarbageCollectorController.EnableGarbageCollector &&
-		controllerContext.IsControllerEnabled(NewControllerDescriptors()[names.GarbageCollectorController]) {
-		ignoredResources := make(map[schema.GroupResource]struct{})
-		for _, r := range controllerContext.ComponentConfig.GarbageCollectorController.GCIgnoredResources {
-			ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
-		}
-
-		controllerContext.GraphBuilder = garbagecollector.NewDependencyGraphBuilder(
-			ctx,
-			metadataClient,
-			controllerContext.RESTMapper,
-			ignoredResources,
-			controllerContext.ObjectOrMetadataInformerFactory,
-			controllerContext.InformersStarted,
-		)
-	}
-
-	controllersmetrics.Register()
-	return controllerContext, nil
-}
-
 // HealthCheckAdder is an interface to represent a healthz handler.
 // The extra level of indirection is useful for testing.
 type HealthCheckAdder interface {
@@ -561,15 +311,15 @@ type HealthCheckAdder interface {
 // A health check is registered for each controller using the controller name. The default check always passes.
 // If the controller implements controller.HealthCheckable, though, the given check is used.
 // The controller can also implement controller.Debuggable, in which case the debug handler is registered with the given mux.
-func BuildControllers(ctx context.Context, controllerCtx ControllerContext, controllerDescriptors map[string]*ControllerDescriptor,
-	unsecuredMux *mux.PathRecorderMux, healthzHandler HealthCheckAdder) ([]Controller, error) {
+func BuildControllers(ctx context.Context, controllerCtx controller.Context, controllerDescriptors map[string]*controller.Descriptor,
+	unsecuredMux *mux.PathRecorderMux, healthzHandler HealthCheckAdder) ([]controller.Controller, error) {
 	logger := klog.FromContext(ctx)
 	var (
-		controllers []Controller
+		controllers []controller.Controller
 		checks      []healthz.HealthChecker
 	)
-	buildController := func(controllerDesc *ControllerDescriptor) error {
-		controllerName := controllerDesc.Name()
+	buildController := func(controllerDesc *controller.Descriptor) error {
+		controllerName := controllerDesc.Name
 		ctrl, err := controllerDesc.BuildController(ctx, controllerCtx)
 		if err != nil {
 			logger.Error(err, "Error initializing a controller", "controller", controllerName)
@@ -583,14 +333,14 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 		check := controllerhealthz.NamedPingChecker(controllerName)
 		// check if the controller supports and requests a debugHandler,
 		// and it needs the unsecuredMux to mount the handler onto.
-		if debuggable, ok := ctrl.(controller.Debuggable); ok && unsecuredMux != nil {
+		if debuggable, ok := ctrl.(kcontroller.Debuggable); ok && unsecuredMux != nil {
 			if debugHandler := debuggable.DebuggingHandler(); debugHandler != nil {
 				basePath := "/debug/controllers/" + controllerName
 				unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
 				unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
 			}
 		}
-		if healthCheckable, ok := ctrl.(controller.HealthCheckable); ok {
+		if healthCheckable, ok := ctrl.(kcontroller.HealthCheckable); ok {
 			if realCheck := healthCheckable.HealthChecker(); realCheck != nil {
 				check = controllerhealthz.NamedHealthChecker(controllerName, realCheck)
 			}
@@ -619,12 +369,12 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 	// - it allows distinguishing between log entries emitted by the controller
 	//   and those emitted for it - this is a bit debatable and could be revised.
 	for _, controllerDesc := range controllerDescriptors {
-		if controllerDesc.RequiresSpecialHandling() {
+		if controllerDesc.RequiresSpecialHandling {
 			continue
 		}
 
 		if !controllerCtx.IsControllerEnabled(controllerDesc) {
-			logger.Info("Warning: controller is disabled", "controller", controllerDesc.Name())
+			logger.Info("Warning: controller is disabled", "controller", controllerDesc.Name)
 			continue
 		}
 
@@ -645,7 +395,7 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 // Once the context is cancelled, RunControllers waits for shutdownTimeout for all controllers to terminate.
 // When the timeout is reached, the function unblocks and returns false.
 // Zero shutdown timeout means that there is no timeout.
-func RunControllers(ctx context.Context, controllerCtx ControllerContext, controllers []Controller,
+func RunControllers(ctx context.Context, controllerCtx controller.Context, controllers []controller.Controller,
 	controllerStartJitterMaxFactor float64, shutdownTimeout time.Duration) bool {
 	logger := klog.FromContext(ctx)
 
@@ -806,8 +556,8 @@ func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdent
 }
 
 // filteredControllerDescriptors returns all controllerDescriptors after filtering through filterFunc.
-func filteredControllerDescriptors(controllerDescriptors map[string]*ControllerDescriptor, filterFunc leadermigration.FilterFunc, expected leadermigration.FilterResult) map[string]*ControllerDescriptor {
-	resultControllers := make(map[string]*ControllerDescriptor)
+func filteredControllerDescriptors(controllerDescriptors map[string]*controller.Descriptor, filterFunc leadermigration.FilterFunc, expected leadermigration.FilterResult) map[string]*controller.Descriptor {
+	resultControllers := make(map[string]*controller.Descriptor)
 	for name, controllerDesc := range controllerDescriptors {
 		if filterFunc(name) == expected {
 			resultControllers[name] = controllerDesc
