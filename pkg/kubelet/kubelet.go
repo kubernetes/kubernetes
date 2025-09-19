@@ -42,6 +42,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"k8s.io/client-go/informers"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	"k8s.io/mount-utils"
 
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -58,6 +60,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
@@ -69,6 +72,7 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/component-base/version"
 	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/component-helpers/apimachinery/lease"
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -1011,6 +1015,25 @@ func NewMainKubelet(ctx context.Context,
 		killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation)
 
 	klet.evictionManager = evictionManager
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		v, err := versionutil.Parse(version.Get().String())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse version: %w", err)
+		}
+		helper, err := ndf.NewHelper(ndffeatures.AllFeatures)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create node feature helper: %w", err)
+		}
+		klet.version = v
+		klet.nodeDeclaredFeaturesHelper = helper
+		features, err := klet.discoverNodeDeclaredFeatures()
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine node declared features: %w", err)
+		}
+		klet.nodeDeclaredFeatures = features
+	}
+
 	handlers := []lifecycle.PodAdmitHandler{}
 	handlers = append(handlers, evictionAdmitHandler)
 
@@ -1047,6 +1070,10 @@ func NewMainKubelet(ctx context.Context,
 	}
 
 	handlers = append(handlers, lifecycle.NewPodFeaturesAdmitHandler())
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		handlers = append(handlers, lifecycle.NewDeclaredFeaturesAdmitHandler(klet.nodeDeclaredFeaturesHelper, klet.nodeDeclaredFeatures, klet.version))
+	}
 
 	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
 	renewInterval := time.Duration(float64(leaseDuration) * nodeLeaseRenewIntervalFraction)
@@ -1248,6 +1275,14 @@ type Kubelet struct {
 	nodeHasSynced cache.InformerSynced
 	// a list of node labels to register
 	nodeLabels map[string]string
+
+	// nodeDeclaredFeatures is the static list of features that are determined at startup and declared.
+	nodeDeclaredFeatures []string
+	// nodeDeclaredFeaturesHelper provides the shared logic for feature discovery and pod requirement inference.
+	nodeDeclaredFeaturesHelper *ndf.Helper
+
+	// kubelet version
+	version *versionutil.Version
 
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
@@ -2764,6 +2799,28 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 					// We can hit this case if a pending resize has been reverted,
 					// so we need to clear the pending resize condition.
 					kl.statusManager.ClearPodResizePendingCondition(pod.UID)
+				}
+			}
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+			oldPodInfo := &ndf.PodInfo{Pod: oldPod}
+			newPodInfo := &ndf.PodInfo{Pod: pod}
+			reqs, err := kl.nodeDeclaredFeaturesHelper.InferForPodUpdate(oldPodInfo, newPodInfo, kl.version)
+			if err != nil {
+				klog.ErrorS(err, "Failed to infer required features for pod update", "pod", klog.KObj(pod))
+			}
+			if len(reqs) != 0 {
+				matchResult, err := kl.nodeDeclaredFeaturesHelper.MatchCurrentNode(reqs, kl.nodeDeclaredFeatures)
+				if err != nil {
+					klog.ErrorS(err, "Failed to match pod features with the node", "pod", klog.KObj(pod))
+
+				}
+				if !matchResult.IsMatch {
+					missingNodeDeclaredFeatures := strings.Join(matchResult.UnsatisfiedRequirements, ", ")
+					klog.ErrorS(nil, "Pod requires node features that are not available", "missingFeatures", missingNodeDeclaredFeatures)
+					kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedNodeDeclaredFeaturesCheck, "Pod requires node features that are not available: %s", missingNodeDeclaredFeatures)
+					// TODO(pravk03): Handle feature check failure. Currently, we just log an error and emit an event.
 				}
 			}
 		}
