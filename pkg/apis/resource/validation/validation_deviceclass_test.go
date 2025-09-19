@@ -236,7 +236,7 @@ func TestValidateClass(t *testing.T) {
 		},
 		"configuration": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "config").Index(1).Child("opaque", "driver"), ""),
+				field.Required(field.NewPath("spec", "config").Index(1).Child("opaque", "driver"), "").MarkCoveredByDeclarative(),
 				field.Required(field.NewPath("spec", "config").Index(1).Child("opaque", "parameters"), ""),
 				field.Invalid(field.NewPath("spec", "config").Index(2).Child("opaque", "parameters"), "<value omitted>", "error parsing data as JSON: invalid character 'x' looking for beginning of value"),
 				field.Invalid(field.NewPath("spec", "config").Index(3).Child("opaque", "parameters"), "<value omitted>", "must be a valid JSON object"),
