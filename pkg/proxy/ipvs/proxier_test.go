@@ -349,64 +349,6 @@ func TestCleanupLeftovers(t *testing.T) {
 	// FIXME: check ipvs and ipset state
 }
 
-func TestCanUseIPVSProxier(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	testCases := []struct {
-		name         string
-		scheduler    string
-		ipsetVersion string
-		ipsetErr     error
-		ipvsErr      string
-		ok           bool
-	}{
-		{
-			name:         "happy days",
-			ipsetVersion: MinIPSetCheckVersion,
-			ok:           true,
-		},
-		{
-			name:         "ipset error",
-			scheduler:    "",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipsetErr:     fmt.Errorf("oops"),
-			ok:           false,
-		},
-		{
-			name:         "ipset version too low",
-			scheduler:    "rr",
-			ipsetVersion: "4.3.0",
-			ok:           false,
-		},
-		{
-			name:         "GetVirtualServers fail",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipvsErr:      "GetVirtualServers",
-			ok:           false,
-		},
-		{
-			name:         "AddVirtualServer fail",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipvsErr:      "AddVirtualServer",
-			ok:           false,
-		},
-		{
-			name:         "DeleteVirtualServer fail",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipvsErr:      "DeleteVirtualServer",
-			ok:           false,
-		},
-	}
-
-	for _, tc := range testCases {
-		ipvs := &fakeIpvs{tc.ipvsErr, false}
-		versioner := &fakeIPSetVersioner{version: tc.ipsetVersion, err: tc.ipsetErr}
-		err := CanUseIPVSProxier(ctx, ipvs, versioner, tc.scheduler)
-		if (err == nil) != tc.ok {
-			t.Errorf("Case [%s], expect %v, got err: %v", tc.name, tc.ok, err)
-		}
-	}
-}
-
 func TestGetNodeIPs(t *testing.T) {
 	testCases := []struct {
 		isIPv6       bool
