@@ -667,29 +667,6 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	proxier.serviceNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
 }
 
-// CleanupLeftovers removes all nftables rules and chains created by the Proxier
-// It returns true if an error was encountered. Errors are logged.
-func CleanupLeftovers(ctx context.Context) bool {
-	logger := klog.FromContext(ctx)
-	var encounteredError bool
-
-	for _, family := range []knftables.Family{knftables.IPv4Family, knftables.IPv6Family} {
-		nft, err := knftables.New(family, kubeProxyTable)
-		if err != nil {
-			continue
-		}
-		tx := nft.NewTransaction()
-		tx.Delete(&knftables.Table{})
-		err = nft.Run(ctx, tx)
-		if err != nil && !knftables.IsNotFound(err) {
-			logger.Error(err, "Error cleaning up nftables rules")
-			encounteredError = true
-		}
-	}
-
-	return encounteredError
-}
-
 // Sync is called to synchronize the proxier state to nftables as soon as possible.
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
