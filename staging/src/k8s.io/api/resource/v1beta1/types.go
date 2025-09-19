@@ -1268,6 +1268,7 @@ type DeviceConfiguration struct {
 	//
 	// +optional
 	// +oneOf=ConfigurationType
+	// +k8s:optional
 	Opaque *OpaqueDeviceConfiguration `json:"opaque,omitempty" protobuf:"bytes,1,opt,name=opaque"`
 }
 
@@ -1284,6 +1285,8 @@ type OpaqueDeviceConfiguration struct {
 	// vendor of the driver. It should use only lower case characters.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-long-name-caseless
 	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
 
 	// Parameters can contain arbitrary data. It is the responsibility of
