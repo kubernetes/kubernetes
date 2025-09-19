@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 )
 
 // featureNameRegexp defines the allowed format for feature names.
@@ -32,7 +33,9 @@ var featureNameRegexp = regexp.MustCompile(`^[A-Z][a-zA-Z0-9]*(\/[a-zA-Z][a-zA-Z
 // AllFeatures is the central registry for all declared features.
 // New features are added to this list to be automatically included in both
 // discovery and inference logic.
-var AllFeatures = []nodedeclaredfeatures.Feature{}
+var AllFeatures = []nodedeclaredfeatures.Feature{
+	inplacepodresize.Feature,
+}
 
 func init() {
 	if err := ValidateFeatures(); err != nil {
