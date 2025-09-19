@@ -17,16 +17,24 @@ limitations under the License.
 package kubelet
 
 import (
-	"context"
-
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 )
 
 // determineNodeDeclaredFeatures determines the final set of node features to be declared by using the discovery library.
-func (kl *Kubelet) determineNodeDeclaredFeatures(ctx context.Context) ([]string, error) {
-	enabledFeatures := make(map[string]bool)
-	kubeletConfigMap := map[string]string{}
-	// Fill in the necessary configuration for declatedfeature discovery.
+func (kl *Kubelet) determineNodeDeclaredFeatures() ([]string, error) {
+	// Fill the necessary feature gates and kubelet config.
+	enabledFeatures := map[string]bool{}
+	//TODO(pravk03): Maybe its ok to pass all feature gates.
+	for feature, spec := range utilfeature.DefaultMutableFeatureGate.GetAll() {
+		if inplacepodresize.Feature.Name() == string(feature) && utilfeature.DefaultFeatureGate.Enabled(feature) {
+			enabledFeatures[string(feature)] = spec.Default
+		}
+	}
+	kubeletConfigMap := map[string]string{
+		inplacepodresize.CPUManagerPolicyConfigName: kl.containerManager.GetNodeConfig().CPUManagerPolicy,
+	}
 	cfg := &nodedeclaredfeatures.NodeConfiguration{
 		FeatureGates:  enabledFeatures,
 		KubeletConfig: kubeletConfigMap,

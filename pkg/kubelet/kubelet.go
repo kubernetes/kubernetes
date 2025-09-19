@@ -1027,7 +1027,7 @@ func NewMainKubelet(ctx context.Context,
 		}
 		klet.version = v
 		klet.nodeDeclaredFeaturesHelper = helper
-		features, err := klet.determineNodeDeclaredFeatures(ctx)
+		features, err := klet.determineNodeDeclaredFeatures()
 		if err != nil {
 			return nil, fmt.Errorf("failed to determine node declared features: %w", err)
 		}
