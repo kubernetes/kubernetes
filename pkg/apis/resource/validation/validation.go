@@ -388,7 +388,7 @@ func validateDeviceConfiguration(config resource.DeviceConfiguration, fldPath *f
 
 func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldPath *field.Path, stored bool) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateDriverName(config.Driver, fldPath.Child("driver"))...)
+	allErrs = append(allErrs, validateDriverName(config.Driver, fldPath.Child("driver"), corevalidation.RequiredCovered, corevalidation.FormatCovered)...)
 	allErrs = append(allErrs, validateRawExtension(config.Parameters, fldPath.Child("parameters"), stored, resource.OpaqueParametersMaxLength)...)
 	return allErrs
 }
