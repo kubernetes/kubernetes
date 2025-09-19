@@ -203,6 +203,10 @@ func verifyPodContainersStatusResources(gotCtrStatuses []v1.ContainerStatus, wan
 			continue
 		}
 
+		if err := framework.Gomega().Expect(gotCtrStatus.AllocatedResources).To(gomega.BeComparableTo(wantCtr.Resources.Requests)); err != nil {
+			errs = append(errs, fmt.Errorf("container[%s] status allocatedResources mismatch: %w", wantCtr.Name, err))
+		}
+
 		if err := framework.Gomega().Expect(*gotCtrStatus.Resources).To(gomega.BeComparableTo(wantCtr.Resources)); err != nil {
 			errs = append(errs, fmt.Errorf("container[%s] status resources mismatch: %w", wantCtr.Name, err))
 		}
