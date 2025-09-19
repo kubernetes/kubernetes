@@ -329,7 +329,7 @@ func TestNewDualStack(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fexec := fakeExecForCommands(tc.commands)
-			runners, err := newDualStackInternal(fexec)
+			runners := newDualStackInternal(fexec)
 
 			if tc.ipv4 && runners[v1.IPv4Protocol] == nil {
 				t.Errorf("Expected ipv4 runner, got nil")
@@ -340,12 +340,6 @@ func TestNewDualStack(t *testing.T) {
 				t.Errorf("Expected ipv6 runner, got nil")
 			} else if !tc.ipv6 && runners[v1.IPv6Protocol] != nil {
 				t.Errorf("Expected no ipv6 runner, got one")
-			}
-
-			if len(runners) == 2 && err != nil {
-				t.Errorf("Got 2 runners but also an error (%v)", err)
-			} else if len(runners) != 2 && err == nil {
-				t.Errorf("Got %d runners but no error", len(runners))
 			}
 		})
 	}
