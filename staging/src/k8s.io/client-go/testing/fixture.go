@@ -63,7 +63,7 @@ type ObjectTracker interface {
 	Patch(gvr schema.GroupVersionResource, obj runtime.Object, ns string, opts ...metav1.PatchOptions) error
 
 	// Apply applies an object in the tracker in the specified namespace.
-	Apply(gvr schema.GroupVersionResource, applyConfiguration runtime.Object, ns string, opts ...metav1.PatchOptions) error
+	Apply(gvr schema.GroupVersionResource, applyConfiguration runtime.Object, ns string, subresource string, opts ...metav1.PatchOptions) error
 
 	// List retrieves all objects of a given kind in the given
 	// namespace. Only non-List kinds are accepted.
@@ -215,7 +215,7 @@ func (o objectTrackerReact) Apply(action PatchActionImpl) (runtime.Object, error
 		return nil, err
 	}
 	patchObj.SetName(action.GetName())
-	err := o.tracker.Apply(gvr, patchObj, ns, action.PatchOptions)
+	err := o.tracker.Apply(gvr, patchObj, ns, action.Subresource, action.PatchOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +468,7 @@ func (t *tracker) Patch(gvr schema.GroupVersionResource, patchedObject runtime.O
 	return t.add(gvr, patchedObject, ns, true)
 }
 
-func (t *tracker) Apply(gvr schema.GroupVersionResource, applyConfiguration runtime.Object, ns string, opts ...metav1.PatchOptions) error {
+func (t *tracker) Apply(gvr schema.GroupVersionResource, applyConfiguration runtime.Object, ns string, subresource string, opts ...metav1.PatchOptions) error {
 	_, err := assertOptionalSingleArgument(opts)
 	if err != nil {
 		return err
@@ -661,7 +661,7 @@ func (t *managedFieldObjectTracker) Create(gvr schema.GroupVersionResource, obj 
 	if err != nil {
 		return err
 	}
-	mgr, err := t.fieldManagerFor(gvk)
+	mgr, err := t.fieldManagerFor(gvk, "")
 	if err != nil {
 		return err
 	}
@@ -705,7 +705,7 @@ func (t *managedFieldObjectTracker) Update(gvr schema.GroupVersionResource, obj 
 	if err != nil {
 		return err
 	}
-	mgr, err := t.fieldManagerFor(gvk)
+	mgr, err := t.fieldManagerFor(gvk, "")
 	if err != nil {
 		return err
 	}
@@ -735,7 +735,7 @@ func (t *managedFieldObjectTracker) Patch(gvr schema.GroupVersionResource, patch
 	if err != nil {
 		return err
 	}
-	mgr, err := t.fieldManagerFor(gvk)
+	mgr, err := t.fieldManagerFor(gvk, "")
 	if err != nil {
 		return err
 	}
@@ -755,7 +755,7 @@ func (t *managedFieldObjectTracker) Patch(gvr schema.GroupVersionResource, patch
 	return t.ObjectTracker.Patch(gvr, objWithManagedFields, ns, vopts...)
 }
 
-func (t *managedFieldObjectTracker) Apply(gvr schema.GroupVersionResource, applyConfiguration runtime.Object, ns string, vopts ...metav1.PatchOptions) error {
+func (t *managedFieldObjectTracker) Apply(gvr schema.GroupVersionResource, applyConfiguration runtime.Object, ns string, subresource string, vopts ...metav1.PatchOptions) error {
 	opts, err := assertOptionalSingleArgument(vopts)
 	if err != nil {
 		return err
@@ -781,7 +781,7 @@ func (t *managedFieldObjectTracker) Apply(gvr schema.GroupVersionResource, apply
 	} else if err != nil {
 		return err
 	}
-	mgr, err := t.fieldManagerFor(gvk)
+	mgr, err := t.fieldManagerFor(gvk, subresource)
 	if err != nil {
 		return err
 	}
@@ -809,7 +809,7 @@ func (t *managedFieldObjectTracker) Apply(gvr schema.GroupVersionResource, apply
 	}
 }
 
-func (t *managedFieldObjectTracker) fieldManagerFor(gvk schema.GroupVersionKind) (*managedfields.FieldManager, error) {
+func (t *managedFieldObjectTracker) fieldManagerFor(gvk schema.GroupVersionKind, subresource string) (*managedfields.FieldManager, error) {
 	return managedfields.NewDefaultFieldManager(
 		t.typeConverter,
 		t.objectConverter,
@@ -817,7 +817,7 @@ func (t *managedFieldObjectTracker) fieldManagerFor(gvk schema.GroupVersionKind)
 		t.scheme,
 		gvk,
 		gvk.GroupVersion(),
-		"",
+		subresource,
 		nil)
 }
 
