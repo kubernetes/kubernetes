@@ -505,7 +505,7 @@ func TestApplySubresource(t *testing.T) {
 	require.Len(t, podActual.ObjectMeta.ManagedFields, 2)
 	assert.Equal(t, "test-manager-a", podActual.ObjectMeta.ManagedFields[0].Manager)
 	assert.Equal(t, metav1.ManagedFieldsOperationApply, podActual.ObjectMeta.ManagedFields[0].Operation)
-	assert.Equal(t, "", podActual.ObjectMeta.ManagedFields[0].Subresource)
+	assert.Empty(t, podActual.ObjectMeta.ManagedFields[0].Subresource)
 
 	assert.Equal(t, "test-manager-a", podActual.ObjectMeta.ManagedFields[1].Manager)
 	assert.Equal(t, metav1.ManagedFieldsOperationApply, podActual.ObjectMeta.ManagedFields[1].Operation)
