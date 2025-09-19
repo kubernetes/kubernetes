@@ -422,9 +422,12 @@ func (cache *cacheImpl) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	if ok && currState.pod.Spec.NodeName != pod.Spec.NodeName {
 		return fmt.Errorf("pod %v(%v) was assumed on %v but assigned to %v", key, klog.KObj(pod), pod.Spec.NodeName, currState.pod.Spec.NodeName)
 	}
-
+	if !ok {
+		// Pod is removed from the cache completely.
+		return nil
+	}
 	// Only assumed pod can be forgotten.
-	if ok && cache.assumedPods.Has(key) {
+	if cache.assumedPods.Has(key) {
 		return cache.removePod(logger, pod)
 	}
 	return fmt.Errorf("pod %v(%v) wasn't assumed so cannot be forgotten", key, klog.KObj(pod))
