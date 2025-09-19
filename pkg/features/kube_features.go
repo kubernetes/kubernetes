@@ -602,6 +602,12 @@ const (
 	// Allows running kube-proxy with `--mode nftables`.
 	NFTablesProxyMode featuregate.Feature = "NFTablesProxyMode"
 
+	// owner: @pravk03, @tallclair
+	// kep: https://kep.k8s.io/5328
+	//
+	// Enables the DeclaredFeatures API in the NodeStatus, populated by the Kubelet. Also enables the scheduler filter using DeclaredFeatures.
+	NodeDeclaredFeatures featuregate.Feature = "NodeDeclaredFeatures"
+
 	// owner: @kerthcet
 	// kep: https://kep.k8s.io/3094
 	//
@@ -1467,6 +1473,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	NodeDeclaredFeatures: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	NodeInclusionPolicyInPodTopologySpread: {
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
@@ -2213,6 +2223,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	MutablePodResourcesForSuspendedJobs: {},
 
 	NFTablesProxyMode: {},
+
+	NodeDeclaredFeatures: {},
 
 	NodeInclusionPolicyInPodTopologySpread: {},
 
