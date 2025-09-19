@@ -50,6 +50,8 @@ const (
 	UpdateNodeTaint
 	UpdateNodeCondition
 	UpdateNodeAnnotation
+	// UpdateNodeDeclaredFeature is an update for node's declared features.
+	UpdateNodeDeclaredFeature
 
 	// UpdatePodXYZ is only applicable for Pod events.
 	// If you use UpdatePodXYZ,
@@ -67,11 +69,13 @@ const (
 	// UpdatePodGeneratedResourceClaim is an update of the list of ResourceClaims generated for the pod.
 	// Depends on the DynamicResourceAllocation feature gate.
 	UpdatePodGeneratedResourceClaim
+	// UpdatePodFeatureRequirement is an update for a pod's requirement of node declared fearures.
+	UpdatePodFeatureRequirement
 
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim | UpdatePodFeatureRequirement
 
 	// None is a special ActionType that is only used internally.
 	None ActionType = 0
@@ -93,6 +97,8 @@ func (a ActionType) String() string {
 		return "UpdateNodeCondition"
 	case UpdateNodeAnnotation:
 		return "UpdateNodeAnnotation"
+	case UpdateNodeDeclaredFeature:
+		return "UpdateNodeDeclaredFeature"
 	case UpdatePodLabel:
 		return "UpdatePodLabel"
 	case UpdatePodScaleDown:
@@ -103,6 +109,8 @@ func (a ActionType) String() string {
 		return "UpdatePodSchedulingGatesEliminated"
 	case UpdatePodGeneratedResourceClaim:
 		return "UpdatePodGeneratedResourceClaim"
+	case UpdatePodFeatureRequirement:
+		return "UpdatePodFeatureRequirement"
 	case All:
 		return "All"
 	case Update:
