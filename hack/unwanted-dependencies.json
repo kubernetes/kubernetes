@@ -174,7 +174,6 @@
         "github.com/grpc-ecosystem/grpc-gateway",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/pkg/v3",
         "go.etcd.io/etcd/raft/v3",
         "go.etcd.io/etcd/server/v3",
         "google.golang.org/genproto",
@@ -258,7 +257,6 @@
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
         "go.etcd.io/etcd/api/v3",
-        "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3"
       ],
       "gopkg.in/yaml.v2": [
