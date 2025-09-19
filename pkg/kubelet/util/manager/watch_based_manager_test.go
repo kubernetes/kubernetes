@@ -42,6 +42,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/ktesting"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/utils/clock"
@@ -83,6 +84,96 @@ func newSecretCache(ctx context.Context, fakeClient clientset.Interface, fakeClo
 		clock:         fakeClock,
 		maxIdleTime:   maxIdleTime,
 		items:         make(map[objectKey]*objectCacheItem),
+	}
+}
+
+func TestObjectCacheStopsReflectorsOnContextCancellation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+	fakeClient := fake.NewClientset(&v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "name"}})
+	fakeWatch := watch.NewRaceFreeFake()
+	watchStarted := make(chan struct{}, 1)
+	fakeClient.PrependWatchReactor("secrets", func(core.Action) (bool, watch.Interface, error) {
+		select {
+		case watchStarted <- struct{}{}:
+		default:
+		}
+		return true, fakeWatch, nil
+	})
+	store := NewObjectCache(ctx, listSecret(ctx, fakeClient), watchSecret(ctx, fakeClient),
+		func() runtime.Object { return &v1.Secret{} }, isSecretImmutable,
+		func(lw *cache.ListWatch) cache.ListerWatcher {
+			return cache.ToListWatcherWithWatchListSemantics(lw, fakeClient)
+		}, corev1.Resource("secret"), clock.RealClock{}, time.Minute).(*objectCache)
+	store.AddReference("ns", "name", "pod")
+	if _, err := store.Get("ns", "name"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-watchStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the secret watch to start")
+	}
+
+	cancel()
+	if err := wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		return store.isStopped() && fakeWatch.IsStopped(), nil
+	}); err != nil {
+		t.Fatalf("cache and secret watch did not stop after context cancellation: %v", err)
+	}
+}
+
+func TestObjectCacheReflectorContextualLogging(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(4))).
+		WithName("watch-manager").WithValues("cache", "secrets")
+	ctx, cancel := context.WithCancel(klog.NewContext(tCtx, logger))
+	defer cancel()
+	logBuffer := logger.GetSink().(klogtesting.Underlier).GetBuffer()
+	fakeClient := fake.NewClientset(&v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "name"}})
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	store := NewObjectCache(ctx, listSecret(ctx, fakeClient), watchSecret(ctx, fakeClient),
+		func() runtime.Object { return &v1.Secret{} }, isSecretImmutable,
+		func(lw *cache.ListWatch) cache.ListerWatcher {
+			return cache.ToListWatcherWithWatchListSemantics(lw, fakeClient)
+		}, corev1.Resource("secret"), fakeClock, time.Minute).(*objectCache)
+	waitForLog := func(message string, expectedCount int) {
+		t.Helper()
+		if err := wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+			count := 0
+			for _, entry := range logBuffer.Data() {
+				if entry.Message == message {
+					count++
+				}
+			}
+			return count >= expectedCount, nil
+		}); err != nil {
+			t.Fatalf("timed out waiting for %d %q log entries: %v", expectedCount, message, err)
+		}
+	}
+
+	store.AddReference("ns", "name", "pod")
+	if _, err := store.Get("ns", "name"); err != nil {
+		t.Fatal(err)
+	}
+	waitForLog("Starting reflector", 1)
+	fakeClock.Step(2 * time.Minute)
+	store.startRecycleIdleWatch(ctx)
+	waitForLog("Stopping reflector", 1)
+	if _, err := store.Get("ns", "name"); err != nil {
+		t.Fatal(err)
+	}
+	waitForLog("Starting reflector", 2)
+	store.DeleteReference("ns", "name", "pod")
+	waitForLog("Stopping reflector", 2)
+
+	for _, entry := range logBuffer.Data() {
+		if entry.Message != "Starting reflector" && entry.Message != "Stopping reflector" {
+			continue
+		}
+		assert.Equal(t, "watch-manager", entry.Prefix, "logger name for %q", entry.Message)
+		assert.Equal(t, []interface{}{"cache", "secrets"}, entry.WithKVList, "logger values for %q", entry.Message)
 	}
 }
 
@@ -410,7 +501,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	assert.True(t, reflectorRunning())
 
 	fakeClock.Step(90 * time.Second)
-	store.startRecycleIdleWatch()
+	store.startRecycleIdleWatch(tCtx)
 
 	// Reflector should already be stopped for maxIdleTime exceeded.
 	assert.False(t, reflectorRunning())
@@ -426,7 +517,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	_, _ = store.Get("ns", "name")
 	fakeClock.Step(20 * time.Second)
 	_, _ = store.Get("ns", "name")
-	store.startRecycleIdleWatch()
+	store.startRecycleIdleWatch(tCtx)
 
 	// Reflector should be running when the get function is called periodically.
 	assert.True(t, reflectorRunning())
@@ -499,7 +590,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	}
 
 	fakeClock.Step(90 * time.Second)
-	store.startRecycleIdleWatch()
+	store.startRecycleIdleWatch(tCtx)
 
 	// Reflector didn't yet initialize, so it shouldn't be stopped.
 	// However, Get should still be failing.
@@ -520,7 +611,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	}
 
 	// recycling shouldn't stop the reflector because it was accessed within last minute.
-	store.startRecycleIdleWatch()
+	store.startRecycleIdleWatch(tCtx)
 	assert.True(t, reflectorRunning())
 
 	obj, _ := store.Get("ns", "name")

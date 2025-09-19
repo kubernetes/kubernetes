@@ -158,6 +158,6 @@ func NewWatchingSecretManager(ctx context.Context, kubeClient clientset.Interfac
 	}
 	gr := corev1.Resource("secret")
 	return &secretManager{
-		manager: manager.NewWatchBasedManager(listSecret, watchSecret, newSecret, isImmutable, listWatcherWithWatchListSemanticsWrapper, gr, resyncInterval, getSecretNames),
+		manager: manager.NewWatchBasedManager(ctx, listSecret, watchSecret, newSecret, isImmutable, listWatcherWithWatchListSemanticsWrapper, gr, resyncInterval, getSecretNames),
 	}
 }
