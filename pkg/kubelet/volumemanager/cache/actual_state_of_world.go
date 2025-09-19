@@ -533,15 +533,6 @@ func (asw *actualStateOfWorld) MarkVolumeAsMounted(markVolumeOpts operationexecu
 	return asw.AddPodToVolume(markVolumeOpts)
 }
 
-func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(logger klog.Logger, volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
-	// no operation for kubelet side
-}
-
-func (asw *actualStateOfWorld) RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) error {
-	// no operation for kubelet side
-	return nil
-}
-
 func (asw *actualStateOfWorld) MarkVolumeAsUnmounted(
 	podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error {
 	return asw.DeletePodFromVolume(podName, volumeName)

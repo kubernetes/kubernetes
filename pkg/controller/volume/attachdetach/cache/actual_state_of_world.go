@@ -22,8 +22,9 @@ reference them.
 package cache
 
 import (
-	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -70,12 +71,25 @@ type ActualStateOfWorld interface {
 	// Otherwise, the volume is not mounted by the given node.
 	SetVolumesMountedByNode(logger klog.Logger, volumeNames []v1.UniqueVolumeName, nodeName types.NodeName)
 
-	// SetNodeStatusUpdateNeeded sets statusUpdateNeeded for the specified
-	// node to true indicating the AttachedVolume field in the Node's Status
-	// object needs to be updated by the node updater again.
+	// SetNodeUpdateHook sets a hook to be called when the node status update
+	// is needed. The hook should update the node asynchronously and call
+	// [ConfirmNodeStatusRemoved] when the update is finished.
+	SetNodeUpdateHook(hook func(types.NodeName))
+
+	// Marks desire to detach the specified volume (remove the volume from the node's
+	// volumesToReportAsAttached list)
+	// Returns true if the update was propagated to the node object.
+	RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) bool
+
+	// Unmarks the desire to detach for the specified volume (add the volume back to
+	// the node's volumesToReportAsAttached list)
+	AddVolumeToReportAsAttached(logger klog.Logger, volumeName v1.UniqueVolumeName, nodeName types.NodeName)
+
+	// ConfirmNodeStatusRemoved indicates removedVolumes have been removed from the
+	// AttachedVolume field in the Node's Status in API server.
 	// If the specified node does not exist in the nodesToUpdateStatusFor list,
 	// log the error and return
-	SetNodeStatusUpdateNeeded(logger klog.Logger, nodeName types.NodeName)
+	ConfirmNodeStatusRemoved(logger klog.Logger, nodeName types.NodeName, removedVolumes []v1.UniqueVolumeName)
 
 	// ResetDetachRequestTime resets the detachRequestTime to 0 which indicates there is no detach
 	// request any more for the volume
@@ -124,19 +138,10 @@ type ActualStateOfWorld interface {
 	// This function is used by reconciler for multi-attach check.
 	GetNodesForAttachedVolume(volumeName v1.UniqueVolumeName) []types.NodeName
 
-	// GetVolumesToReportAttached returns a map containing the set of nodes for
-	// which the VolumesAttached Status field in the Node API object should be
-	// updated. The key in this map is the name of the node to update and the
-	// value is list of volumes that should be reported as attached (note that
-	// this may differ from the actual list of attached volumes for the node
-	// since volumes should be removed from this list as soon a detach operation
-	// is considered, before the detach operation is triggered).
-	GetVolumesToReportAttached(logger klog.Logger) map[types.NodeName][]v1.AttachedVolume
-
 	// GetVolumesToReportAttachedForNode returns the list of volumes that should be reported as
-	// attached for the given node. It reports a boolean indicating if there is an update for that
-	// node and the corresponding attachedVolumes list.
-	GetVolumesToReportAttachedForNode(logger klog.Logger, name types.NodeName) (bool, []v1.AttachedVolume)
+	// attached for the given node. And a list of volumes that should be removed from this node.
+	// Caller should call [ConfirmNodeStatusRemoved] after the volumes are removed from API server.
+	GetVolumesToReportAttachedForNode(logger klog.Logger, name types.NodeName) ([]v1.AttachedVolume, []v1.UniqueVolumeName)
 
 	// GetNodesToUpdateStatusFor returns the map of nodeNames to nodeToUpdateStatusFor
 	GetNodesToUpdateStatusFor() map[types.NodeName]nodeToUpdateStatusFor
@@ -191,6 +196,7 @@ func NewActualStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) ActualStateO
 		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
 		inUseVolumes:           make(map[types.NodeName]sets.Set[v1.UniqueVolumeName]),
 		volumePluginMgr:        volumePluginMgr,
+		nodeUpdateHook:         func(types.NodeName) {},
 	}
 }
 
@@ -206,6 +212,9 @@ type actualStateOfWorld struct {
 	// of the node and the value is an object containing more information about
 	// the node (including the list of volumes to report attached).
 	nodesToUpdateStatusFor map[types.NodeName]nodeToUpdateStatusFor
+	// invoked when nodesToUpdateStatusFor is updated. The change should be
+	// updated to Node object asynchronously.
+	nodeUpdateHook func(nodeName types.NodeName)
 
 	// inUseVolumes is a map containing the set of volumes that are reported as
 	// in use by the kubelet.
@@ -257,22 +266,14 @@ type nodeAttachedTo struct {
 // volume attached. It keeps track of the volumes that should be reported as
 // attached in the Node's Status API object.
 type nodeToUpdateStatusFor struct {
-	// nodeName contains the name of this node.
-	nodeName types.NodeName
-
-	// statusUpdateNeeded indicates that the value of the VolumesAttached field
-	// in the Node's Status API object should be updated. This should be set to
-	// true whenever a volume is added or deleted from
-	// volumesToReportAsAttached. It should be reset whenever the status is
-	// updated.
-	statusUpdateNeeded bool
-
 	// volumesToReportAsAttached is the list of volumes that should be reported
 	// as attached in the Node's status (note that this may differ from the
 	// actual list of attached volumes since volumes should be removed from this
 	// list as soon a detach operation is considered, before the detach
 	// operation is triggered).
-	volumesToReportAsAttached map[v1.UniqueVolumeName]v1.UniqueVolumeName
+	// Value is false when the volume is requested to be removed,
+	// or true if the volume is not requested to be removed.
+	volumesToReportAsAttached map[v1.UniqueVolumeName]bool
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsUncertain(
@@ -296,7 +297,7 @@ func (asw *actualStateOfWorld) MarkVolumeAsDetached(
 }
 
 func (asw *actualStateOfWorld) RemoveVolumeFromReportAsAttached(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName) error {
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName) bool {
 	asw.Lock()
 	defer asw.Unlock()
 	return asw.removeVolumeFromReportAsAttached(volumeName, nodeName)
@@ -466,23 +467,22 @@ func (asw *actualStateOfWorld) getNodeAndVolume(
 // Remove the volumeName from the node's volumesToReportAsAttached list
 // This is an internal function and caller should acquire and release the lock
 func (asw *actualStateOfWorld) removeVolumeFromReportAsAttached(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName) error {
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName) bool {
 
 	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
 	if nodeToUpdateExists {
-		_, nodeToUpdateVolumeExists :=
+		add, nodeToUpdateVolumeExists :=
 			nodeToUpdate.volumesToReportAsAttached[volumeName]
 		if nodeToUpdateVolumeExists {
-			nodeToUpdate.statusUpdateNeeded = true
-			delete(nodeToUpdate.volumesToReportAsAttached, volumeName)
-			asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
-			return nil
+			if add {
+				nodeToUpdate.volumesToReportAsAttached[volumeName] = false
+				asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
+				asw.nodeUpdateHook(nodeName)
+			}
+			return false
 		}
 	}
-	return fmt.Errorf("volume %q does not exist in volumesToReportAsAttached list or node %q does not exist in nodesToUpdateStatusFor list",
-		volumeName,
-		nodeName)
-
+	return true
 }
 
 // Add the volumeName to the node's volumesToReportAsAttached list
@@ -498,47 +498,42 @@ func (asw *actualStateOfWorld) addVolumeToReportAsAttached(
 	if !nodeToUpdateExists {
 		// Create object if it doesn't exist
 		nodeToUpdate = nodeToUpdateStatusFor{
-			nodeName:                  nodeName,
-			statusUpdateNeeded:        true,
-			volumesToReportAsAttached: make(map[v1.UniqueVolumeName]v1.UniqueVolumeName),
+			volumesToReportAsAttached: make(map[v1.UniqueVolumeName]bool),
 		}
 		asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
 		logger.V(4).Info("Add new node to nodesToUpdateStatusFor", "node", klog.KRef("", string(nodeName)))
 	}
-	_, nodeToUpdateVolumeExists :=
-		nodeToUpdate.volumesToReportAsAttached[volumeName]
-	if !nodeToUpdateVolumeExists {
-		nodeToUpdate.statusUpdateNeeded = true
-		nodeToUpdate.volumesToReportAsAttached[volumeName] = volumeName
+	add := nodeToUpdate.volumesToReportAsAttached[volumeName]
+	if !add {
+		nodeToUpdate.volumesToReportAsAttached[volumeName] = true
 		asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
-		logger.V(4).Info("Report volume as attached to node", "node", klog.KRef("", string(nodeName)), "volumeName", volumeName)
+		logger.V(4).Info("Report volume as attached to node",
+			"node", klog.KRef("", string(nodeName)), "volumeName", volumeName)
+		asw.nodeUpdateHook(nodeName)
 	}
 }
 
-// Update the flag statusUpdateNeeded to indicate whether node status is already updated or
-// needs to be updated again by the node status updater.
-// If the specified node does not exist in the nodesToUpdateStatusFor list, log the error and return
-// This is an internal function and caller should acquire and release the lock
-func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeName, needed bool) error {
+func (asw *actualStateOfWorld) SetNodeUpdateHook(hook func(types.NodeName)) {
+	asw.Lock()
+	defer asw.Unlock()
+	asw.nodeUpdateHook = hook
+}
+
+func (asw *actualStateOfWorld) ConfirmNodeStatusRemoved(logger klog.Logger, nodeName types.NodeName, removedVolumes []v1.UniqueVolumeName) {
+	asw.Lock()
+	defer asw.Unlock()
+
 	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
 	if !nodeToUpdateExists {
 		// should not happen
-		errMsg := fmt.Sprintf("Failed to set statusUpdateNeeded to needed %t, because nodeName=%q does not exist",
-			needed, nodeName)
-		return errors.New(errMsg)
+		logger.V(2).Info("Failed to ConfirmNodeStatusRemoved because node does not exist", "node", nodeName)
+		return
 	}
 
-	nodeToUpdate.statusUpdateNeeded = needed
-	asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
-
-	return nil
-}
-
-func (asw *actualStateOfWorld) SetNodeStatusUpdateNeeded(logger klog.Logger, nodeName types.NodeName) {
-	asw.Lock()
-	defer asw.Unlock()
-	if err := asw.updateNodeStatusUpdateNeeded(nodeName, true); err != nil {
-		logger.Info("Failed to update statusUpdateNeeded field in actual state of world", "err", err)
+	for _, volumeName := range removedVolumes {
+		delete(nodeToUpdate.volumesToReportAsAttached, volumeName)
+		logger.V(4).Info("Confirmed volume removal from node status",
+			"node", klog.KRef("", string(nodeName)), "volumeName", volumeName)
 	}
 }
 
@@ -663,66 +658,39 @@ func (asw *actualStateOfWorld) GetNodesForAttachedVolume(volumeName v1.UniqueVol
 	return nodes
 }
 
-func (asw *actualStateOfWorld) GetVolumesToReportAttached(logger klog.Logger) map[types.NodeName][]v1.AttachedVolume {
-	asw.Lock()
-	defer asw.Unlock()
-
-	volumesToReportAttached := make(map[types.NodeName][]v1.AttachedVolume)
-	for nodeName, nodeToUpdateObj := range asw.nodesToUpdateStatusFor {
-		if nodeToUpdateObj.statusUpdateNeeded {
-			volumesToReportAttached[nodeToUpdateObj.nodeName] = asw.getAttachedVolumeFromUpdateObject(nodeToUpdateObj.volumesToReportAsAttached)
-		}
-		// When GetVolumesToReportAttached is called by node status updater, the current status
-		// of this node will be updated, so set the flag statusUpdateNeeded to false indicating
-		// the current status is already updated.
-		if err := asw.updateNodeStatusUpdateNeeded(nodeName, false); err != nil {
-			logger.Error(err, "Failed to update statusUpdateNeeded field when getting volumes")
-		}
-	}
-
-	return volumesToReportAttached
-}
-
-func (asw *actualStateOfWorld) GetVolumesToReportAttachedForNode(logger klog.Logger, nodeName types.NodeName) (bool, []v1.AttachedVolume) {
+func (asw *actualStateOfWorld) GetVolumesToReportAttachedForNode(logger klog.Logger, nodeName types.NodeName) ([]v1.AttachedVolume, []v1.UniqueVolumeName) {
 	asw.Lock()
 	defer asw.Unlock()
 
 	nodeToUpdateObj, ok := asw.nodesToUpdateStatusFor[nodeName]
 	if !ok {
-		return false, nil
-	}
-	if !nodeToUpdateObj.statusUpdateNeeded {
-		return false, nil
+		return nil, nil
 	}
 
-	volumesToReportAttached := asw.getAttachedVolumeFromUpdateObject(nodeToUpdateObj.volumesToReportAsAttached)
-	// When GetVolumesToReportAttached is called by node status updater, the current status
-	// of this node will be updated, so set the flag statusUpdateNeeded to false indicating
-	// the current status is already updated.
-	if err := asw.updateNodeStatusUpdateNeeded(nodeName, false); err != nil {
-		logger.Error(err, "Failed to update statusUpdateNeeded field when getting volumes")
+	volumesToReportAsAttached := nodeToUpdateObj.volumesToReportAsAttached
+	attachedVolumes := make([]v1.AttachedVolume, 0, len(volumesToReportAsAttached))
+	removedVolumes := make([]v1.UniqueVolumeName, 0, len(volumesToReportAsAttached))
+	for volume, add := range volumesToReportAsAttached {
+		if add {
+			attachedVolumes = append(attachedVolumes,
+				v1.AttachedVolume{
+					Name:       volume,
+					DevicePath: asw.attachedVolumes[volume].devicePath,
+				})
+		} else {
+			removedVolumes = append(removedVolumes, volume)
+		}
 	}
-
-	return true, volumesToReportAttached
+	// Sort to ensure consistent order and avoid unnecessary updates
+	slices.SortFunc(attachedVolumes, func(a, b v1.AttachedVolume) int {
+		return strings.Compare(string(a.Name), string(b.Name))
+	})
+	slices.Sort(removedVolumes)
+	return attachedVolumes, removedVolumes
 }
 
 func (asw *actualStateOfWorld) GetNodesToUpdateStatusFor() map[types.NodeName]nodeToUpdateStatusFor {
 	return asw.nodesToUpdateStatusFor
-}
-
-func (asw *actualStateOfWorld) getAttachedVolumeFromUpdateObject(volumesToReportAsAttached map[v1.UniqueVolumeName]v1.UniqueVolumeName) []v1.AttachedVolume {
-	var attachedVolumes = make(
-		[]v1.AttachedVolume,
-		0,
-		len(volumesToReportAsAttached) /* len */)
-	for _, volume := range volumesToReportAsAttached {
-		attachedVolumes = append(attachedVolumes,
-			v1.AttachedVolume{
-				Name:       volume,
-				DevicePath: asw.attachedVolumes[volume].devicePath,
-			})
-	}
-	return attachedVolumes
 }
 
 func (asw *actualStateOfWorld) getAttachedVolume(

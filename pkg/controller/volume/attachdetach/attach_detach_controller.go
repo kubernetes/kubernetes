@@ -350,6 +350,7 @@ func (adc *attachDetachController) Run(ctx context.Context) {
 	if err != nil {
 		logger.Error(err, "Error populating the desired state of world")
 	}
+	go adc.nodeStatusUpdater.Run(ctx, 1)
 	go adc.reconciler.Run(ctx)
 	go adc.desiredStateOfWorldPopulator.Run(ctx)
 	go wait.UntilWithContext(ctx, adc.pvcWorker, time.Second)
@@ -546,10 +547,9 @@ func (adc *attachDetachController) nodeAdd(logger klog.Logger, obj interface{}) 
 	nodeName := types.NodeName(node.Name)
 	adc.nodeUpdate(logger, nil, obj)
 	// kubernetes/kubernetes/issues/37586
-	// This is to workaround the case when a node add causes to wipe out
-	// the attached volumes field. This function ensures that we sync with
-	// the actual status.
-	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(logger, nodeName)
+	// When a node add/update causes to wipe out the attached volumes field.
+	// This function ensures that we sync with the actual status.
+	adc.nodeStatusUpdater.QueueUpdate(nodeName)
 }
 
 func (adc *attachDetachController) nodeUpdate(logger klog.Logger, oldObj, newObj interface{}) {
@@ -562,6 +562,8 @@ func (adc *attachDetachController) nodeUpdate(logger klog.Logger, oldObj, newObj
 	nodeName := types.NodeName(node.Name)
 	adc.addNodeToDswp(node, nodeName)
 	adc.processVolumesInUse(logger, nodeName, node.Status.VolumesInUse)
+	// in case others modified volumesAttached or our last sync see a stale state
+	adc.nodeStatusUpdater.QueueUpdate(nodeName)
 }
 
 func (adc *attachDetachController) nodeDelete(logger klog.Logger, obj interface{}) {
