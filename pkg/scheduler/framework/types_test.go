@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -545,6 +546,28 @@ func TestNodeInfoClone(t *testing.T) {
 						},
 					},
 				},
+			},
+		},
+		{
+			nodeInfo: &NodeInfo{
+				Requested:        &Resource{},
+				NonZeroRequested: &Resource{},
+				Allocatable:      &Resource{},
+				Generation:       3,
+				UsedPorts:        fwk.HostPortInfo{},
+				ImageStates:      map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:     map[string]int{},
+				DeclaredFeatures: ndf.NewFeatureSet("FeatureA", "FeatureB"),
+			},
+			expected: &NodeInfo{
+				Requested:        &Resource{},
+				NonZeroRequested: &Resource{},
+				Allocatable:      &Resource{},
+				Generation:       3,
+				UsedPorts:        fwk.HostPortInfo{},
+				ImageStates:      map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:     map[string]int{},
+				DeclaredFeatures: ndf.NewFeatureSet("FeatureA", "FeatureB"),
 			},
 		},
 	}
@@ -1211,6 +1234,64 @@ func TestNodeInfoRemovePod(t *testing.T) {
 			test.expectedNodeInfo.Generation = ni.Generation
 			if diff := cmp.Diff(test.expectedNodeInfo, ni, nodeInfoCmpOpts...); diff != "" {
 				t.Errorf("Unexpected NodeInfo (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSetNodeDeclaredFeatures(t *testing.T) {
+	tests := []struct {
+		name               string
+		featureGateEnabled bool
+		nodeStatus         v1.NodeStatus
+		expectedFeatures   ndf.FeatureSet
+	}{
+		{
+			name:               "Feature gate disabled",
+			featureGateEnabled: false,
+			nodeStatus: v1.NodeStatus{
+				DeclaredFeatures: []string{"FeatureA", "FeatureB"},
+			},
+			expectedFeatures: ndf.NewFeatureSet(),
+		},
+		{
+			name:               "Feature gate enabled, node has features",
+			featureGateEnabled: true,
+			nodeStatus: v1.NodeStatus{
+				DeclaredFeatures: []string{"FeatureA", "FeatureB"},
+			},
+			expectedFeatures: ndf.NewFeatureSet("FeatureA", "FeatureB"),
+		},
+		{
+			name:               "Feature gate enabled, node has no features",
+			featureGateEnabled: true,
+			nodeStatus: v1.NodeStatus{
+				DeclaredFeatures: []string{},
+			},
+			expectedFeatures: ndf.NewFeatureSet(),
+		},
+		{
+			name:               "Feature gate enabled, node status has nil features",
+			featureGateEnabled: true,
+			nodeStatus: v1.NodeStatus{
+				DeclaredFeatures: nil,
+			},
+			expectedFeatures: ndf.NewFeatureSet(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.featureGateEnabled)
+			ni := NewNodeInfo()
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Status:     tt.nodeStatus,
+			}
+			ni.SetNode(node)
+			gotFeatures := ni.GetNodeDeclaredFeatures()
+			if !gotFeatures.Equal(tt.expectedFeatures) {
+				t.Errorf("SetNode() or GetNodeDeclaredFeatures() unexpected result, got: %v, want: %v", gotFeatures, tt.expectedFeatures)
 			}
 		})
 	}
