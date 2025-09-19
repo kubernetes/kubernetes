@@ -71,14 +71,14 @@ func (matcher *MatchErrorMatcher) Match(actual any) (success bool, err error) {
 		format.Object(expected, 1))
 }
 
-func (matcher *MatchErrorMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *MatchErrorMatcher) FailureMessage(actual any) (message string) {
 	if matcher.isFunc {
 		return format.Message(actual, fmt.Sprintf("to match error function %s", matcher.FuncErrDescription[0]))
 	}
 	return format.Message(actual, "to match error", matcher.Expected)
 }
 
-func (matcher *MatchErrorMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *MatchErrorMatcher) NegatedFailureMessage(actual any) (message string) {
 	if matcher.isFunc {
 		return format.Message(actual, fmt.Sprintf("not to match error function %s", matcher.FuncErrDescription[0]))
 	}

@@ -25,7 +25,7 @@ type RPCServer struct {
 	handler  *ServerHandler
 }
 
-//Create a new server, automatically selecting a port
+// Create a new server, automatically selecting a port
 func newRPCServer(parallelTotal int, reporter reporters.Reporter) (*RPCServer, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -37,7 +37,7 @@ func newRPCServer(parallelTotal int, reporter reporters.Reporter) (*RPCServer, e
 	}, nil
 }
 
-//Start the server.  You don't need to `go s.Start()`, just `s.Start()`
+// Start the server.  You don't need to `go s.Start()`, just `s.Start()`
 func (server *RPCServer) Start() {
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterName("Server", server.handler) //register the handler's methods as the server
@@ -48,17 +48,17 @@ func (server *RPCServer) Start() {
 	go httpServer.Serve(server.listener)
 }
 
-//Stop the server
+// Stop the server
 func (server *RPCServer) Close() {
 	server.listener.Close()
 }
 
-//The address the server can be reached it.  Pass this into the `ForwardingReporter`.
+// The address the server can be reached it.  Pass this into the `ForwardingReporter`.
 func (server *RPCServer) Address() string {
 	return server.listener.Addr().String()
 }
 
-func (server *RPCServer) GetSuiteDone() chan interface{} {
+func (server *RPCServer) GetSuiteDone() chan any {
 	return server.handler.done
 }
 

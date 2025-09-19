@@ -9,18 +9,18 @@ import (
 // ReportEntryValue wraps a report entry's value ensuring it can be encoded and decoded safely into reports
 // and across the network connection when running in parallel
 type ReportEntryValue struct {
-	raw            interface{} //unexported to prevent gob from freaking out about unregistered structs
+	raw            any //unexported to prevent gob from freaking out about unregistered structs
 	AsJSON         string
 	Representation string
 }
 
-func WrapEntryValue(value interface{}) ReportEntryValue {
+func WrapEntryValue(value any) ReportEntryValue {
 	return ReportEntryValue{
 		raw: value,
 	}
 }
 
-func (rev ReportEntryValue) GetRawValue() interface{} {
+func (rev ReportEntryValue) GetRawValue() any {
 	return rev.raw
 }
 
@@ -118,7 +118,7 @@ func (entry ReportEntry) StringRepresentation() string {
 // If used from a rehydrated JSON file _or_ in a ReportAfterSuite when running in parallel this will be
 // a JSON-decoded {}interface.  If you want to reconstitute your original object you can decode the entry.Value.AsJSON
 // field yourself.
-func (entry ReportEntry) GetRawValue() interface{} {
+func (entry ReportEntry) GetRawValue() any {
 	return entry.Value.GetRawValue()
 }
 

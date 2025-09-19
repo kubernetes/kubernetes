@@ -8,61 +8,65 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strings"
+	"unicode"
 
 	"github.com/onsi/gomega/format"
 	errorsutil "github.com/onsi/gomega/gstruct/errors"
 	"github.com/onsi/gomega/types"
 )
 
-//MatchAllFields succeeds if every field of a struct matches the field matcher associated with
-//it, and every element matcher is matched.
-//    actual := struct{
-//      A int
-//      B []bool
-//      C string
-//    }{
-//      A: 5,
-//      B: []bool{true, false},
-//      C: "foo",
-//    }
+// MatchAllFields succeeds if every field of a struct matches the field matcher associated with
+// it, and every element matcher is matched.
 //
-//    Expect(actual).To(MatchAllFields(Fields{
-//      "A": Equal(5),
-//      "B": ConsistOf(true, false),
-//      "C": Equal("foo"),
-//    }))
+//	actual := struct{
+//	  A int
+//	  B []bool
+//	  C string
+//	}{
+//	  A: 5,
+//	  B: []bool{true, false},
+//	  C: "foo",
+//	}
+//
+//	Expect(actual).To(MatchAllFields(Fields{
+//	  "A": Equal(5),
+//	  "B": ConsistOf(true, false),
+//	  "C": Equal("foo"),
+//	}))
 func MatchAllFields(fields Fields) types.GomegaMatcher {
 	return &FieldsMatcher{
 		Fields: fields,
 	}
 }
 
-//MatchFields succeeds if each element of a struct matches the field matcher associated with
-//it. It can ignore extra fields and/or missing fields.
-//    actual := struct{
-//      A int
-//      B []bool
-//      C string
-//    }{
-//      A: 5,
-//      B: []bool{true, false},
-//      C: "foo",
-//    }
+// MatchFields succeeds if each element of a struct matches the field matcher associated with
+// it. It can ignore extra fields and/or missing fields.
 //
-//    Expect(actual).To(MatchFields(IgnoreExtras, Fields{
-//      "A": Equal(5),
-//      "B": ConsistOf(true, false),
-//    }))
-//    Expect(actual).To(MatchFields(IgnoreMissing, Fields{
-//      "A": Equal(5),
-//      "B": ConsistOf(true, false),
-//      "C": Equal("foo"),
-//      "D": Equal("extra"),
-//    }))
+//	actual := struct{
+//	  A int
+//	  B []bool
+//	  C string
+//	}{
+//	  A: 5,
+//	  B: []bool{true, false},
+//	  C: "foo",
+//	}
+//
+//	Expect(actual).To(MatchFields(IgnoreExtras, Fields{
+//	  "A": Equal(5),
+//	  "B": ConsistOf(true, false),
+//	}))
+//	Expect(actual).To(MatchFields(IgnoreMissing, Fields{
+//	  "A": Equal(5),
+//	  "B": ConsistOf(true, false),
+//	  "C": Equal("foo"),
+//	  "D": Equal("extra"),
+//	}))
 func MatchFields(options Options, fields Fields) types.GomegaMatcher {
 	return &FieldsMatcher{
 		Fields:        fields,
 		IgnoreExtras:  options&IgnoreExtras != 0,
+		IgnoreUnexportedExtras: options&IgnoreUnexportedExtras != 0,
 		IgnoreMissing: options&IgnoreMissing != 0,
 	}
 }
@@ -73,6 +77,8 @@ type FieldsMatcher struct {
 
 	// Whether to ignore extra elements or consider it an error.
 	IgnoreExtras bool
+	// Whether to ignore unexported extra elements or consider it an error.
+	IgnoreUnexportedExtras bool
 	// Whether to ignore missing elements or consider it an error.
 	IgnoreMissing bool
 
@@ -83,7 +89,7 @@ type FieldsMatcher struct {
 // Field name to matcher.
 type Fields map[string]types.GomegaMatcher
 
-func (m *FieldsMatcher) Match(actual interface{}) (success bool, err error) {
+func (m *FieldsMatcher) Match(actual any) (success bool, err error) {
 	if reflect.TypeOf(actual).Kind() != reflect.Struct {
 		return false, fmt.Errorf("%v is type %T, expected struct", actual, actual)
 	}
@@ -95,7 +101,15 @@ func (m *FieldsMatcher) Match(actual interface{}) (success bool, err error) {
 	return true, nil
 }
 
-func (m *FieldsMatcher) matchFields(actual interface{}) (errs []error) {
+func isExported(fieldName string) bool {
+	if fieldName == "" {
+		return false
+	}
+	r := []rune(fieldName)[0]
+	return unicode.IsUpper(r)
+}
+
+func (m *FieldsMatcher) matchFields(actual any) (errs []error) {
 	val := reflect.ValueOf(actual)
 	typ := val.Type()
 	fields := map[string]bool{}
@@ -114,13 +128,21 @@ func (m *FieldsMatcher) matchFields(actual interface{}) (errs []error) {
 
 			matcher, expected := m.Fields[fieldName]
 			if !expected {
+				if m.IgnoreUnexportedExtras && !isExported(fieldName) {
+					return nil
+				}
 				if !m.IgnoreExtras {
 					return fmt.Errorf("unexpected field %s: %+v", fieldName, actual)
 				}
 				return nil
 			}
 
-			field := val.Field(i).Interface()
+			var field any
+			if _, isIgnoreMatcher := matcher.(*IgnoreMatcher) ; isIgnoreMatcher {
+				field = struct {}{} // the matcher does not care about the actual value
+			} else {
+				field = val.Field(i).Interface()
+			}
 
 			match, err := matcher.Match(field)
 			if err != nil {
@@ -147,7 +169,7 @@ func (m *FieldsMatcher) matchFields(actual interface{}) (errs []error) {
 	return errs
 }
 
-func (m *FieldsMatcher) FailureMessage(actual interface{}) (message string) {
+func (m *FieldsMatcher) FailureMessage(actual any) (message string) {
 	failures := make([]string, len(m.failures))
 	for i := range m.failures {
 		failures[i] = m.failures[i].Error()
@@ -156,7 +178,7 @@ func (m *FieldsMatcher) FailureMessage(actual interface{}) (message string) {
 		fmt.Sprintf("to match fields: {\n%v\n}\n", strings.Join(failures, "\n")))
 }
 
-func (m *FieldsMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (m *FieldsMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not to match fields")
 }
 

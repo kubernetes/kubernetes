@@ -1,6 +1,7 @@
 package testingtproxy
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -19,9 +20,9 @@ type addReportEntryFunc func(names string, args ...any)
 type ginkgoWriterInterface interface {
 	io.Writer
 
-	Print(a ...interface{})
-	Printf(format string, a ...interface{})
-	Println(a ...interface{})
+	Print(a ...any)
+	Printf(format string, a ...any)
+	Println(a ...any)
 }
 type ginkgoRecoverFunc func()
 type attachProgressReporterFunc func(func() string) func()
@@ -80,11 +81,31 @@ func (t *ginkgoTestingTProxy) Setenv(key, value string) {
 	}
 }
 
-func (t *ginkgoTestingTProxy) Error(args ...interface{}) {
+func (t *ginkgoTestingTProxy) Chdir(dir string) {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.fail(fmt.Sprintf("Failed to get current directory: %v", err), 1)
+	}
+
+	t.cleanup(os.Chdir, currentDir, internal.Offset(1))
+
+	err = os.Chdir(dir)
+	if err != nil {
+		t.fail(fmt.Sprintf("Failed to change directory: %v", err), 1)
+	}
+}
+
+func (t *ginkgoTestingTProxy) Context() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.cleanup(cancel, internal.Offset(1))
+	return ctx
+}
+
+func (t *ginkgoTestingTProxy) Error(args ...any) {
 	t.fail(fmt.Sprintln(args...), t.offset)
 }
 
-func (t *ginkgoTestingTProxy) Errorf(format string, args ...interface{}) {
+func (t *ginkgoTestingTProxy) Errorf(format string, args ...any) {
 	t.fail(fmt.Sprintf(format, args...), t.offset)
 }
 
@@ -100,11 +121,11 @@ func (t *ginkgoTestingTProxy) Failed() bool {
 	return t.report().Failed()
 }
 
-func (t *ginkgoTestingTProxy) Fatal(args ...interface{}) {
+func (t *ginkgoTestingTProxy) Fatal(args ...any) {
 	t.fail(fmt.Sprintln(args...), t.offset)
 }
 
-func (t *ginkgoTestingTProxy) Fatalf(format string, args ...interface{}) {
+func (t *ginkgoTestingTProxy) Fatalf(format string, args ...any) {
 	t.fail(fmt.Sprintf(format, args...), t.offset)
 }
 
@@ -112,11 +133,11 @@ func (t *ginkgoTestingTProxy) Helper() {
 	types.MarkAsHelper(1)
 }
 
-func (t *ginkgoTestingTProxy) Log(args ...interface{}) {
+func (t *ginkgoTestingTProxy) Log(args ...any) {
 	fmt.Fprintln(t.writer, args...)
 }
 
-func (t *ginkgoTestingTProxy) Logf(format string, args ...interface{}) {
+func (t *ginkgoTestingTProxy) Logf(format string, args ...any) {
 	t.Log(fmt.Sprintf(format, args...))
 }
 
@@ -128,7 +149,7 @@ func (t *ginkgoTestingTProxy) Parallel() {
 	// No-op
 }
 
-func (t *ginkgoTestingTProxy) Skip(args ...interface{}) {
+func (t *ginkgoTestingTProxy) Skip(args ...any) {
 	t.skip(fmt.Sprintln(args...), t.offset)
 }
 
@@ -136,7 +157,7 @@ func (t *ginkgoTestingTProxy) SkipNow() {
 	t.skip("skip", t.offset)
 }
 
-func (t *ginkgoTestingTProxy) Skipf(format string, args ...interface{}) {
+func (t *ginkgoTestingTProxy) Skipf(format string, args ...any) {
 	t.skip(fmt.Sprintf(format, args...), t.offset)
 }
 
@@ -207,4 +228,10 @@ func (t *ginkgoTestingTProxy) ParallelTotal() int {
 }
 func (t *ginkgoTestingTProxy) AttachProgressReporter(f func() string) func() {
 	return t.attachProgressReporter(f)
+}
+func (t *ginkgoTestingTProxy) Output() io.Writer {
+	return t.writer
+}
+func (t *ginkgoTestingTProxy) Attr(key, value string) {
+	t.addReportEntry(key, value, internal.Offset(1), types.ReportEntryVisibilityFailureOrVerbose)
 }

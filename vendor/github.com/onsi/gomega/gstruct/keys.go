@@ -41,9 +41,9 @@ type KeysMatcher struct {
 	failures []error
 }
 
-type Keys map[interface{}]types.GomegaMatcher
+type Keys map[any]types.GomegaMatcher
 
-func (m *KeysMatcher) Match(actual interface{}) (success bool, err error) {
+func (m *KeysMatcher) Match(actual any) (success bool, err error) {
 	if reflect.TypeOf(actual).Kind() != reflect.Map {
 		return false, fmt.Errorf("%v is type %T, expected map", actual, actual)
 	}
@@ -55,9 +55,9 @@ func (m *KeysMatcher) Match(actual interface{}) (success bool, err error) {
 	return true, nil
 }
 
-func (m *KeysMatcher) matchKeys(actual interface{}) (errs []error) {
+func (m *KeysMatcher) matchKeys(actual any) (errs []error) {
 	actualValue := reflect.ValueOf(actual)
-	keys := map[interface{}]bool{}
+	keys := map[any]bool{}
 	for _, keyValue := range actualValue.MapKeys() {
 		key := keyValue.Interface()
 		keys[key] = true
@@ -108,7 +108,7 @@ func (m *KeysMatcher) matchKeys(actual interface{}) (errs []error) {
 	return errs
 }
 
-func (m *KeysMatcher) FailureMessage(actual interface{}) (message string) {
+func (m *KeysMatcher) FailureMessage(actual any) (message string) {
 	failures := make([]string, len(m.failures))
 	for i := range m.failures {
 		failures[i] = m.failures[i].Error()
@@ -117,7 +117,7 @@ func (m *KeysMatcher) FailureMessage(actual interface{}) (message string) {
 		fmt.Sprintf("to match keys: {\n%v\n}\n", strings.Join(failures, "\n")))
 }
 
-func (m *KeysMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (m *KeysMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not to match keys")
 }
 
