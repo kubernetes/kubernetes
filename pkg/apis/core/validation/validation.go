@@ -80,6 +80,10 @@ var fileModeErrorMsg = "must be a number between 0 and 0777 (octal), both inclus
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = apimachineryvalidation.BannedOwners
 
+// nodeDeclaredFeatureRegexp defines the allowed format for feature names.
+// The first segment must be in UpperCamelCase. Subsequent segments (separated by '/')
+// can be in either UpperCamelCase or lowerCamelCase.
+var nodeDeclaredFeatureRegexp = regexp.MustCompile(`^[A-Z][a-zA-Z0-9]*(\/[a-zA-Z][a-zA-Z0-9]*)*$`)
 var iscsiInitiatorIqnRegex = regexp.MustCompile(`iqn\.\d{4}-\d{2}\.([[:alnum:]-.]+)(:[^,;*&$|\s]+)$`)
 var iscsiInitiatorEuiRegex = regexp.MustCompile(`^eui.[[:alnum:]]{16}$`)
 var iscsiInitiatorNaaRegex = regexp.MustCompile(`^naa.[[:alnum:]]{32}$`)
@@ -6932,6 +6936,37 @@ func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *fie
 	return allErrs
 }
 
+// validateNodeDeclaredFeatureName checks if a declared feature name is valid.
+func validateNodeDeclaredFeatureName(featureName string) error {
+	if len(featureName) > validation.DNS1123SubdomainMaxLength {
+		return fmt.Errorf("invalid feature name %q: must be no more than %d characters", featureName, validation.DNS1123SubdomainMaxLength)
+	}
+	if !nodeDeclaredFeatureRegexp.MatchString(featureName) {
+		return fmt.Errorf("invalid feature name %q: must start with an UpperCamelCase segment, with subsequent segments separated by '/' (e.g., MyFeature or MyFeature/mySubFeature), and contain only alphanumeric characters and slashes", featureName)
+	}
+	return nil
+}
+
+func validateNodeDeclaredFeatures(nodeFeatures []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// We do not need to check feature gate again here as we do it in dropDisabledFields() (pkg/registry/core/node/strategy.go)
+	featureCount := len(nodeFeatures)
+	for i, feature := range nodeFeatures {
+		if err := validateNodeDeclaredFeatureName(feature); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), feature, err.Error()))
+		}
+		if i+1 < featureCount {
+			nextFeature := nodeFeatures[i+1]
+			if feature == nextFeature {
+				allErrs = append(allErrs, field.Duplicate(fldPath.Index(i+1), nextFeature))
+			} else if feature > nextFeature {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i+1), nextFeature, "list must be sorted alphabetically"))
+			}
+		}
+	}
+	return allErrs
+}
+
 // ValidateNode tests if required fields in the node are set.
 func ValidateNode(node *core.Node) field.ErrorList {
 	fldPath := field.NewPath("metadata")
@@ -6946,6 +6981,8 @@ func ValidateNode(node *core.Node) field.ErrorList {
 	// That said, if specified, we need to ensure they are valid.
 	allErrs = append(allErrs, ValidateNodeResources(node)...)
 	allErrs = append(allErrs, validateNodeSwapStatus(node.Status.NodeInfo.Swap, fldPath.Child("nodeSwapStatus"))...)
+	statusField := field.NewPath("status")
+	allErrs = append(allErrs, validateNodeDeclaredFeatures(node.Status.DeclaredFeatures, statusField.Child("declaredFeatures"))...)
 
 	// validate PodCIDRS only if we need to
 	if len(node.Spec.PodCIDRs) > 0 {
@@ -6994,14 +7031,16 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, fldPath)
 	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
-
 	// TODO: Enable the code once we have better core object.status update model. Currently,
 	// anyone can update node status.
 	// if !apiequality.Semantic.DeepEqual(node.Status, core.NodeStatus{}) {
 	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
-
 	allErrs = append(allErrs, ValidateNodeResources(node)...)
+
+	// TODO: dedup the validation checks in ValidateNode() and ValidateNodeUpdate() since both these functions get called during node update.
+	statusField := field.NewPath("status")
+	allErrs = append(allErrs, validateNodeDeclaredFeatures(node.Status.DeclaredFeatures, statusField.Child("declaredFeatures"))...)
 
 	// Validate no duplicate addresses in node status.
 	addresses := make(map[core.NodeAddress]bool)
