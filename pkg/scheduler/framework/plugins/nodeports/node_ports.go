@@ -18,6 +18,7 @@ package nodeports
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -174,9 +175,9 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod 
 
 // Fits checks if the pod has any ports conflicting with nodeInfo's ports.
 // It returns true if there are no conflicts (which means that pod fits the node), otherwise false with the errMessage.
-func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) (fits bool, errMessage string) {
+func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) (fits bool, err error) {
 	portFits, portConflictErrMessage := fitsPorts(util.GetHostPorts(pod), nodeInfo.GetUsedPorts())
-	return portFits, portConflictErrMessage
+	return portFits, errors.New(portConflictErrMessage)
 }
 
 func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) (fits bool, errMessage string) {
