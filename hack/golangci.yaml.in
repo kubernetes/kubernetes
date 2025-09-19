@@ -249,7 +249,6 @@ linters:
         - sloppyLen
         - typeSwitchVar
         - underef
-        - unlambda
         - unslice
         - valSwap
     {{- end}}

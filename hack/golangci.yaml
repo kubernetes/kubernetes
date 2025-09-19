@@ -402,7 +402,6 @@ linters:
         - sloppyLen
         - typeSwitchVar
         - underef
-        - unlambda
         - unslice
         - valSwap
     revive:
