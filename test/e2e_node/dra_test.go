@@ -936,7 +936,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		//
 		// NOTE: This is a copy of a similar test to test service connection reuse with enabled
 		// ResourceHealth. It should be merged with the original test when the ResourceHealth feature matures.
-		ginkgo.It("must reuse one gRPC connection for service and health-monitoring calls", func(ctx context.Context) {
+		ginkgo.It("must reuse one gRPC connection for service calls", func(ctx context.Context) {
 			var listener *countingListener
 			var err error
 			getListener := func(_ context.Context, socketPath string) (net.Listener, error) {
@@ -955,6 +955,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			ginkgo.By("start DRA plugin service")
 			draService := newDRAService(ctx, f.ClientSet, f.Namespace.Name, nodeName, driverName, "", kubeletplugin.PluginListener(getListener))
 
+			podNames := []string{}
 			for _, suffix := range []string{"-1", "-2"} {
 				className := "health-test-class" + suffix
 				claimName := "health-test-claim" + suffix
@@ -966,6 +967,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 				ginkgo.By("create test objects " + suffix)
 				pod := createHealthTestPodAndClaim(ctx, f, driverName, podName, claimName, className, poolNameForTest, deviceNameForTest)
+				podNames = append(podNames, podName)
 
 				ginkgo.By("wait for NodePrepareResources call to succeed " + suffix)
 				gomega.Eventually(draService.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodePrepareResourcesSucceeded)
@@ -987,6 +989,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 				ginkgo.By("check that listener.Accept was called only once " + suffix)
 				gomega.Expect(listener.acceptCount()).To(gomega.Equal(1))
+			}
+
+			for _, podName := range podNames {
+				ginkgo.By("delete test pod " + podName)
+				framework.ExpectNoError(e2epod.DeletePodWithWaitByName(ctx, f.ClientSet, podName, f.Namespace.Name))
 			}
 		})
 
