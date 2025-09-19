@@ -161,8 +161,12 @@ func NewAttachDetachController(
 			&adc.volumePluginMgr,
 			recorder,
 			blkutil))
-	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
-		kubeClient, nodeInformer.Lister(), adc.actualStateOfWorld)
+	var err error
+	adc.nodeStatusUpdater, err = statusupdater.NewNodeStatusUpdater(logger,
+		kubeClient, nodeInformer, adc.actualStateOfWorld)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize node status updater: %w", err)
+	}
 
 	// Default these to values in options
 	adc.reconciler = reconciler.NewReconciler(
@@ -367,6 +371,9 @@ func (adc *attachDetachController) Run(ctx context.Context) {
 	)
 
 	wg.Go(func() {
+		adc.nodeStatusUpdater.Run(ctx, 1)
+	})
+	wg.Go(func() {
 		adc.reconciler.Run(ctx)
 	})
 	wg.Go(func() {
@@ -551,19 +558,7 @@ func (adc *attachDetachController) podDelete(logger klog.Logger, obj interface{}
 }
 
 func (adc *attachDetachController) nodeAdd(logger klog.Logger, obj interface{}) {
-	node, ok := obj.(*v1.Node)
-	// TODO: investigate if nodeName is empty then if we can return
-	// kubernetes/kubernetes/issues/37777
-	if node == nil || !ok {
-		return
-	}
-	nodeName := types.NodeName(node.Name)
 	adc.nodeUpdate(logger, nil, obj)
-	// kubernetes/kubernetes/issues/37586
-	// This is to workaround the case when a node add causes to wipe out
-	// the attached volumes field. This function ensures that we sync with
-	// the actual status.
-	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(logger, nodeName)
 }
 
 func (adc *attachDetachController) nodeUpdate(logger klog.Logger, oldObj, newObj interface{}) {

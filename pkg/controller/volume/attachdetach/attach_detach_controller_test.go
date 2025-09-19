@@ -435,6 +435,9 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	}
 
 	wg.Go(func() {
+		adc.nodeStatusUpdater.Run(tCtx, 1)
+	})
+	wg.Go(func() {
 		adc.reconciler.Run(tCtx)
 	})
 	wg.Go(func() {

@@ -28,6 +28,8 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/legacyregistry"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
@@ -54,6 +56,15 @@ const (
 
 var registerMetrics sync.Once
 
+func newNodeUpdater(t *testing.T, logger klog.Logger, fakeKubeClient kubernetes.Interface, nodeInformer coreinformers.NodeInformer, asw cache.ActualStateOfWorld) statusupdater.NodeStatusUpdater {
+	nsu, err := statusupdater.NewNodeStatusUpdater(logger, fakeKubeClient, nodeInformer, asw)
+	if err != nil {
+		t.Fatalf("Failed to create NodeStatusUpdater: %v", err)
+	}
+	go nsu.Run(t.Context(), 1)
+	return nsu
+}
+
 // Calls Run()
 // Verifies there are no calls to attach or detach.
 func Test_Run_Positive_DoNothing(t *testing.T) {
@@ -75,8 +86,11 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		fakeRecorder,
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nsu := statusupdater.NewNodeStatusUpdater(
-		fakeKubeClient, informerFactory.Core().V1().Nodes().Lister(), asw)
+	nsu, err := statusupdater.NewNodeStatusUpdater(
+		logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
+	if err != nil {
+		t.Fatalf("Failed to create NodeStatusUpdater: %v", err)
+	}
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
@@ -113,7 +127,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 		fakeRecorder,
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
@@ -168,7 +182,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 		fakeRecorder,
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
@@ -260,7 +274,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 	podName := "pod-uid"
@@ -342,7 +356,8 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
-	nsu := statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
+	asw.SetNodeUpdateHook(func(k8stypes.NodeName) {}) // Simulate node status update failure
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 	podName := "pod-uid"
@@ -419,8 +434,8 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
@@ -517,7 +532,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 	podName1 := "pod-uid1"
@@ -611,7 +626,7 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 	podName1 := "pod-uid1"
@@ -674,7 +689,7 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	rc := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 	reconciliationLoopFunc := rc.(*reconciler).reconciliationLoopFunc(ctx)
@@ -703,18 +718,27 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
 
 	// Mock NodeStatusUpdate fail
-	rc.(*reconciler).nodeStatusUpdater = statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
+	asw.SetNodeUpdateHook(func(k8stypes.NodeName) {})
 	reconciliationLoopFunc(ctx)
 	// The first detach will be triggered after at least 50ms (maxWaitForUnmountDuration in test).
 	time.Sleep(100 * time.Millisecond)
+	reconciliationLoopFunc(ctx) // trigger async node status update
+	time.Sleep(100 * time.Millisecond)
 	reconciliationLoopFunc(ctx)
-	// Right before detach operation is performed, the volume will be first removed from being reported
-	// as attached on node status (RemoveVolumeFromReportAsAttached). After UpdateNodeStatus operation which is expected to fail,
-	// controller then added the volume back as attached.
-	// verifyVolumeReportedAsAttachedToNode will check volume is in the list of volume attached that needs to be updated
-	// in node status. By calling this function (GetVolumesToReportAttached), node status should be updated, and the volume
-	// will not need to be updated until new changes are applied (detach is triggered again)
+	time.Sleep(100 * time.Millisecond) // wait for possible detach
+	// Right before detach operation is performed, the volume will be removed from being reported
+	// as attached on node status (RemoveVolumeFromReportAsAttached).
+	// The failed update should be retried by NodeStatusUpdater.
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
+	verifyVolumeReportedAsAttachedToNode(t, logger, generatedVolumeName, nodeName1, false, asw, volumeAttachedCheckTimeout)
+
+	// re-create the pod, everything should goes back
+	podName2 := "pod-uid2"
+	generatedVolumeName, podAddErr = dsw.AddPod(types.UniquePodName(podName2), controllervolumetesting.NewPod(podName2, podName2), volumeSpec, nodeName1)
+	if podAddErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
+	}
+	reconciliationLoopFunc(ctx)
 	verifyVolumeReportedAsAttachedToNode(t, logger, generatedVolumeName, nodeName1, true, asw, volumeAttachedCheckTimeout)
 
 }
@@ -738,7 +762,7 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 	podName1 := "pod-uid1"
@@ -783,7 +807,6 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 	time.Sleep(1000 * time.Millisecond)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
 	verifyVolumeReportedAsAttachedToNode(t, logger, generatedVolumeName, nodeName1, true, asw, volumeAttachedCheckTimeout)
-	// verifyVolumeNoStatusUpdateNeeded(t, logger, generatedVolumeName, nodeName1, asw)
 
 	// Add a third pod which tries to attach the volume to a different node.
 	// At this point, volume is still attached to first node. There are no status update for both nodes.
@@ -792,8 +815,7 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
 	}
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
-	verifyVolumeNoStatusUpdateNeeded(t, logger, generatedVolumeName, nodeName1, asw)
-	verifyVolumeNoStatusUpdateNeeded(t, logger, generatedVolumeName, nodeName2, asw)
+	verifyVolumeReportedAsAttachedToNode(t, logger, generatedVolumeName, nodeName1, true, asw, volumeAttachedCheckTimeout)
 }
 
 // Creates a volume with accessMode ReadWriteOnce
@@ -820,7 +842,7 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 	podName1 := "pod-uid1"
@@ -906,7 +928,7 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 		fakeRecorder,
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxLongWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad,
@@ -993,7 +1015,7 @@ func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
 		fakeRecorder,
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxLongWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad,
@@ -1071,7 +1093,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
 		fakeRecorder,
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad,
@@ -1188,7 +1210,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 		fakeRecorder,
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, true, dsw, asw, ad,
@@ -1352,7 +1374,7 @@ func Test_ReportWaitingOnDetach(t *testing.T) {
 			fakeHandler))
 		informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 		nodeLister := informerFactory.Core().V1().Nodes().Lister()
-		nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+		nsu := newNodeUpdater(t, logger, fakeKubeClient, informerFactory.Core().V1().Nodes(), asw)
 		rc := NewReconciler(
 			reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 
@@ -1794,9 +1816,9 @@ func verifyVolumeReportedAsAttachedToNode(
 	var result bool
 	var lastErr error
 	err := wait.PollUntilContextTimeout(context.TODO(), 50*time.Millisecond, timeout, false, func(context.Context) (done bool, err error) {
-		volumes := asw.GetVolumesToReportAttached(logger)
-		for _, volume := range volumes[nodeName] {
-			if volume.Name == volumeName {
+		volumes := asw.GetVolumesToReportAttachedForNode(logger, nodeName)
+		for _, volume := range volumes {
+			if volume.Volume.Name == volumeName && volume.Report == cache.NodeStatusReportAdding {
 				result = true
 			}
 		}
@@ -1816,24 +1838,6 @@ func verifyVolumeReportedAsAttachedToNode(
 		t.Fatalf("last error: %q, wait timeout: %q", lastErr, err.Error())
 	}
 
-}
-
-func verifyVolumeNoStatusUpdateNeeded(
-	t *testing.T,
-	logger klog.Logger,
-	volumeName v1.UniqueVolumeName,
-	nodeName k8stypes.NodeName,
-	asw cache.ActualStateOfWorld,
-) {
-	volumes := asw.GetVolumesToReportAttached(logger)
-	for _, volume := range volumes[nodeName] {
-		if volume.Name == volumeName {
-			t.Fatalf("Check volume <%v> is reported as need to update status on node <%v>, expected false",
-				volumeName,
-				nodeName)
-		}
-	}
-	t.Logf("Volume <%v> is not reported as need to update status on node <%v>", volumeName, nodeName)
 }
 
 func verifyNewDetacherCallCount(
