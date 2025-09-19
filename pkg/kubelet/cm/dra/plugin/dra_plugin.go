@@ -63,6 +63,7 @@ type DRAPlugin struct {
 	backgroundCtx context.Context
 
 	healthClient       drahealthv1alpha1.DRAResourceHealthClient
+	healthStreamCtx    context.Context
 	healthStreamCancel context.CancelFunc
 }
 
@@ -142,9 +143,10 @@ func newMetricsInterceptor(driverName string) grpc.UnaryClientInterceptor {
 }
 
 // SetHealthStream stores the context and cancel function for the active health stream.
-func (p *DRAPlugin) SetHealthStream(cancel context.CancelFunc) {
+func (p *DRAPlugin) SetHealthStream(ctx context.Context, cancel context.CancelFunc) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
+	p.healthStreamCtx = ctx
 	p.healthStreamCancel = cancel
 }
 

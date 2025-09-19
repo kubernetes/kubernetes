@@ -96,6 +96,10 @@ type monitoredPlugin struct {
 
 	// connected is protected by store.mutex.
 	connected bool
+
+	// pluginCtx and pluginCancel are used for per-plugin operations like health monitoring
+	pluginCtx    context.Context
+	pluginCancel context.CancelFunc
 }
 
 var _ grpcstats.Handler = &monitoredPlugin{}
@@ -363,9 +367,14 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 
 	logger := klog.FromContext(pm.backgroundCtx)
 
+	// Create a per-plugin context that can be cancelled when the plugin is removed
+	pluginCtx, pluginCancel := context.WithCancel(pm.backgroundCtx)
+
 	mp := &monitoredPlugin{
-		DRAPlugin: p,
-		pm:        pm,
+		DRAPlugin:    p,
+		pm:           pm,
+		pluginCtx:    pluginCtx,
+		pluginCancel: pluginCancel,
 	}
 
 	// The gRPC connection gets created once. gRPC then connects to the gRPC server on demand.
@@ -398,8 +407,8 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 		pm.wg.Add(1)
 		go func() {
 			defer pm.wg.Done()
-			streamCtx, streamCancel := context.WithCancel(p.backgroundCtx)
-			p.SetHealthStream(streamCancel)
+			streamCtx, streamCancel := context.WithCancel(mp.pluginCtx)
+			p.SetHealthStream(streamCtx, streamCancel)
 
 			wait.UntilWithContext(streamCtx, func(ctx context.Context) {
 				logger.V(4).Info("Attempting to start WatchResources health stream")
@@ -466,7 +475,13 @@ func (pm *DRAPluginManager) remove(driverName, endpoint string) {
 		pm.store[driverName] = slices.Delete(plugins, i, i+1)
 	}
 
-	// Cancel the plugin's health stream if it was active.
+	// Cancel the plugin's context, which will stop all plugin-specific operations including health monitoring
+	if p.pluginCancel != nil {
+		logger.V(4).Info("Canceling plugin context during deregistration")
+		p.pluginCancel()
+	}
+
+	// Also cancel the plugin's health stream if it was active (redundant but safe)
 	healthCancel := p.HealthStreamCancel()
 	if healthCancel != nil {
 		logger.V(4).Info("Canceling health stream during deregistration")
