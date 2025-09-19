@@ -212,7 +212,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		aggregatedDiscoveryManager = aggregatedDiscoveryManager.WithSource(aggregated.CRDSource)
 	}
 	discoveryController := NewDiscoveryController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler, aggregatedDiscoveryManager)
-	namingController := status.NewNamingConditionController(klog.TODO() /* for contextual logging */, s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
 	nonStructuralSchemaController := nonstructuralschema.NewConditionController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
 	apiApprovalController := apiapproval.NewKubernetesAPIApprovalPolicyConformantConditionController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
 	finalizingController := finalizer.NewCRDFinalizer(
@@ -226,6 +225,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-controllers", func(hookContext genericapiserver.PostStartHookContext) error {
+		logger := klog.FromContext(hookContext)
+
 		// OpenAPIVersionedService and StaticOpenAPISpec are populated in generic apiserver PrepareRun().
 		// Together they serve the /openapi/v2 endpoint on a generic apiserver. A generic apiserver may
 		// choose to not enable OpenAPI by having null openAPIConfig, and thus OpenAPIVersionedService
@@ -242,7 +243,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			}
 		}
 
-		go namingController.Run(hookContext.Done())
+		namingController := status.NewNamingConditionController(logger, s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
+
+		go namingController.RunWithContext(hookContext)
 		go establishingController.RunWithContext(hookContext)
 		go nonStructuralSchemaController.Run(5, hookContext.Done())
 		go apiApprovalController.Run(5, hookContext.Done())
