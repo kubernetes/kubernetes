@@ -248,6 +248,15 @@ var (
 		slice.Spec.Devices[len(slice.Spec.Devices)-1].Name = u(slice.Spec.Devices[len(slice.Spec.Devices)-1].Name.String() + "-other")
 		return slice
 	}()
+	sliceTaintedNone = func() *draapi.ResourceSlice {
+		slice := sliceTainted.DeepCopy()
+		for i := range slice.Spec.Devices {
+			for j := range slice.Spec.Devices[i].Taints {
+				slice.Spec.Devices[i].Taints[j].Effect = resourceapi.DeviceTaintEffectNone
+			}
+		}
+		return slice
+	}()
 	sliceTaintedNoSchedule = func() *draapi.ResourceSlice {
 		slice := sliceTainted.DeepCopy()
 		for i := range slice.Spec.Devices {
@@ -935,6 +944,17 @@ func TestHandlers(t *testing.T) {
 				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
 			},
 			wantEvents: []*v1.Event{cancelPodEviction},
+		},
+		"ignore-effect": {
+			initialState: state{
+				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
+				slices:          []*draapi.ResourceSlice{sliceTaintedNone, slice2},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+			},
+			finalState: state{
+				slices:          []*draapi.ResourceSlice{sliceTaintedNone, slice2},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
+			},
 		},
 		"eviction-change-taint": {
 			initialState: state{

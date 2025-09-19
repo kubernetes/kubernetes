@@ -1228,7 +1228,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 	// Might be tainted, in which case the taint has to be tolerated.
 	// The check is skipped if the feature is disabled.
-	if alloc.features.DeviceTaints && !allTaintsTolerated(device.SliceDevice, request) {
+	if alloc.features.DeviceTaints && taintPreventsAllocation(device.SliceDevice, request) {
 		return false, nil, nil
 	}
 
@@ -1334,13 +1334,16 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	}, nil
 }
 
-func allTaintsTolerated(device *draapi.SliceDevice, request requestAccessor) bool {
+func taintPreventsAllocation(device *draapi.SliceDevice, request requestAccessor) bool {
 	for _, taint := range device.Taints {
+		if taint.Effect == resourceapi.DeviceTaintEffectNone {
+			continue
+		}
 		if !taintTolerated(taint, request) {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func taintTolerated(taint resourceapi.DeviceTaint, request requestAccessor) bool {
