@@ -239,6 +239,10 @@ type MutableVersionedFeatureGate interface {
 	// and resets all the enabled status of the new feature gate.
 	// This is useful for creating a new instance of feature gate without inheriting all the enabled configurations of the base feature gate.
 	DeepCopyAndReset() MutableVersionedFeatureGate
+	// Snapshot returns a copy of the current internal state of the feature gate.
+	Snapshot() FeatureGateState
+	// Restore restores the feature gate to a previously captured snapshot.
+	Restore(state FeatureGateState) error
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -271,6 +275,77 @@ type featureGate struct {
 	// frozen is atomically set to true when the first read (Enabled call) occurs
 	// if freezeOnRead is true. Once frozen, the gate becomes immutable.
 	freezeOnRead bool
+}
+
+// FeatureGateState holds a complete snapshot of a featureGate's internal state.
+type FeatureGateState struct {
+	Known            map[Feature]VersionedSpecs
+	Enabled          map[Feature]bool
+	EnabledRaw       map[string]bool
+	QueriedFeatures  sets.Set[Feature]
+	EmulationVersion *version.Version
+	Closed           bool
+	Frozen           bool
+}
+
+// Snapshot captures the current state of the feature gate, returning a FeatureGateState.
+func (f *featureGate) Snapshot() FeatureGateState {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	known := make(map[Feature]VersionedSpecs)
+	for k, v := range f.GetAllVersioned() {
+		vsCopy := make(VersionedSpecs, len(v))
+		copy(vsCopy, v)
+		known[k] = vsCopy
+	}
+
+	enabled := make(map[Feature]bool)
+	for k, v := range f.enabled.Load().(map[Feature]bool) {
+		enabled[k] = v
+	}
+
+	enabledRaw := make(map[string]bool)
+	for k, v := range f.enabledRaw.Load().(map[string]bool) {
+		enabledRaw[k] = v
+	}
+
+	queried := sets.New[Feature]()
+	if qf, ok := f.queriedFeatures.Load().(sets.Set[Feature]); ok {
+		for k := range qf {
+			queried.Insert(k)
+		}
+	}
+
+	return FeatureGateState{
+		Known:            known,
+		Enabled:          enabled,
+		EnabledRaw:       enabledRaw,
+		QueriedFeatures:  queried,
+		EmulationVersion: f.EmulationVersion(),
+		Closed:           f.closed,
+		Frozen:           f.frozen.Load(),
+	}
+}
+
+// Restore sets the feature gate state to a previously captured snapshot.
+func (f *featureGate) Restore(state FeatureGateState) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	f.known.Store(state.Known)
+	f.enabled.Store(state.Enabled)
+	f.enabledRaw.Store(state.EnabledRaw)
+	f.emulationVersion.Store(state.EmulationVersion)
+	f.queriedFeatures.Store(state.QueriedFeatures)
+
+	f.closed = state.Closed
+
+	if !f.frozen.Load() {
+		f.frozen.Store(state.Frozen)
+	}
+
+	return nil
 }
 
 func setUnsetAlphaGates(known map[Feature]VersionedSpecs, enabled map[Feature]bool, val bool, emuVer, minCompatVer *version.Version) {
