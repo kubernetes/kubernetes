@@ -32,7 +32,7 @@ podFields: []string{
 func init() {
 	fixtureData_1_0 := fixtureGenerator{
 		expectErrorSubstring: "forbidden sysctl",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			if p.Spec.SecurityContext == nil {
 				p.Spec.SecurityContext = &corev1.PodSecurityContext{}
 			}
@@ -72,7 +72,7 @@ func init() {
 
 	fixtureData_1_27 := fixtureGenerator{
 		expectErrorSubstring: "forbidden sysctl",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			if p.Spec.SecurityContext == nil {
 				p.Spec.SecurityContext = &corev1.PodSecurityContext{}
 			}
@@ -113,7 +113,7 @@ func init() {
 
 	fixtureDataV1Dot29 := fixtureGenerator{
 		expectErrorSubstring: "forbidden sysctl",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			if p.Spec.SecurityContext == nil {
 				p.Spec.SecurityContext = &corev1.PodSecurityContext{}
 			}
@@ -159,7 +159,7 @@ func init() {
 
 	fixtureDataV1Dot32 := fixtureGenerator{
 		expectErrorSubstring: "forbidden sysctl",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			if p.Spec.SecurityContext == nil {
 				p.Spec.SecurityContext = &corev1.PodSecurityContext{}
 			}
