@@ -330,6 +330,19 @@ func addAuditAnnotationLocked(ac *AuditContext, key, value string) {
 	ae.Annotations[key] = value
 }
 
+// AuditEventCopyFrom returns a deep copy of the audit event struct on the ctx.
+func AuditEventCopyFrom(ctx context.Context) *auditinternal.Event {
+	ac := AuditContextFrom(ctx)
+	if !ac.Enabled() {
+		return nil
+	}
+
+	ac.lock.Lock()
+	defer ac.lock.Unlock()
+
+	return ac.event.DeepCopy()
+}
+
 // WithAuditContext returns a new context that stores the AuditContext.
 func WithAuditContext(parent context.Context) context.Context {
 	if AuditContextFrom(parent) != nil {
