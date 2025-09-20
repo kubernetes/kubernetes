@@ -76,13 +76,12 @@ func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 // making this the variant that is used when any of those
 // are enabled.
 var SupportedFeatures = internal.Features{
-	AdminAccess:          true,
-	PrioritizedList:      true,
-	PartitionableDevices: true,
-	DeviceTaints:         true,
-	DeviceBinding:        true,
-	DeviceStatus:         true,
-	ConsumableCapacity:   true,
+	AdminAccess:            true,
+	PrioritizedList:        true,
+	PartitionableDevices:   true,
+	DeviceTaints:           true,
+	DeviceBindingAndStatus: true,
+	ConsumableCapacity:     true,
 }
 
 type Allocator struct {
@@ -374,14 +373,14 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 			// Performance optimization: skip the for loop if the feature is off.
 			// Not needed for correctness because if the feature is off, the selected
 			// device should not have binding conditions.
-			if a.features.DeviceBinding {
+			if a.features.DeviceBindingAndStatus {
 				allocationResult.Devices.Results[i].BindingConditions = internal.BindingConditions
 				allocationResult.Devices.Results[i].BindingFailureConditions = internal.BindingFailureConditions
 			}
 			// Performance optimization: skip the for loop if the feature is off.
 			// Not needed for correctness because if the feature is off, the selected
 			// device should not have binding conditions.
-			if a.features.DeviceBinding {
+			if a.features.DeviceBindingAndStatus {
 				allocationResult.Devices.Results[i].BindingConditions = internal.BindingConditions
 				allocationResult.Devices.Results[i].BindingFailureConditions = internal.BindingFailureConditions
 			}
@@ -1060,7 +1059,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 // isSelectable checks whether a device satisfies the request and class selectors.
 func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, slice *draapi.ResourceSlice, deviceIndex int) (bool, error) {
 	device := &slice.Spec.Devices[deviceIndex]
-	if (!alloc.features.DeviceBinding || !alloc.features.DeviceStatus) &&
+	if !alloc.features.DeviceBindingAndStatus &&
 		len(device.BindingConditions) > 0 {
 		// Devices with binding conditions are not supported, feature is off.
 		return false, nil
