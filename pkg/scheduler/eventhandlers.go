@@ -225,14 +225,25 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		utilruntime.HandleErrorWithLogger(logger, err, "Unable to get profile", "pod", klog.KObj(pod))
 		return
 	}
-	// If a waiting pod is rejected, it indicates it's previously assumed and we're
-	// removing it from the scheduler cache. In this case, signal a AssignedPodDelete
-	// event to immediately retry some unscheduled Pods.
-	// Similarly when a pod that had nominated node is deleted, it can unblock scheduling of other pods,
-	// because the lower or equal priority pods treat such a pod as if it was assigned.
-	if fwk.RejectWaitingPod(pod.UID) {
+	isAssumed, err := sched.Cache.IsAssumedPod(pod)
+	if err != nil {
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(pod))
+	}
+	if isAssumed {
+		if !fwk.RejectWaitingPod(pod.UID) {
+			// Pod is in another phase, likely PreBind or Bind.
+			// We have to forget the pod in the cache, to make sure it won't be taking the space on the nodes.
+			if err := sched.Cache.ForgetPod(logger, pod); err != nil {
+				utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache ForgetPod failed", "pod", klog.KObj(pod))
+			}
+		}
+		// If a waiting pod is rejected, it indicates it's previously assumed and we're
+		// removing it from the scheduler cache. In this case, signal a AssignedPodDelete
+		// event to immediately retry some unscheduled Pods.
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, nil)
 	} else if pod.Status.NominatedNodeName != "" {
+		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
+		// because the lower or equal priority pods treat such a pod as if it was assigned.
 		// Note that a nominated pod can fall into `RejectWaitingPod` case as well,
 		// but in that case the `MoveAllToActiveOrBackoffQueue` already covered lower priority pods.
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(pod)))
