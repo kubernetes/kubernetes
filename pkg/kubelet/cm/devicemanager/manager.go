@@ -720,8 +720,12 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 }
 
 func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, available sets.Set[string]) (sets.Set[string], sets.Set[string], sets.Set[string]) {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
+
 	// If alignment information is not available, just pass the available list back.
-	hint := m.topologyAffinityStore.GetAffinity(podUID, contName)
+	hint := m.topologyAffinityStore.GetAffinity(ctx, podUID, contName)
 	if !m.deviceHasTopologyAlignment(resource) || hint.NUMANodeAffinity == nil {
 		return sets.New[string](), sets.New[string](), available
 	}

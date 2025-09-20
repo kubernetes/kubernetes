@@ -130,7 +130,7 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 	}
 
 	// Call Topology Manager to get the aligned affinity across all hint providers.
-	hint := p.affinity.GetAffinity(podUID, container.Name)
+	hint := p.affinity.GetAffinity(ctx, podUID, container.Name)
 	logger.Info("Got topology affinity", "hint", hint)
 
 	requestedResources, err := getRequestedResources(pod, container)

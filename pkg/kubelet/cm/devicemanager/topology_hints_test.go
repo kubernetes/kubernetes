@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -35,7 +36,7 @@ type mockAffinityStore struct {
 	hint topologymanager.TopologyHint
 }
 
-func (m *mockAffinityStore) GetAffinity(podUID string, containerName string) topologymanager.TopologyHint {
+func (m *mockAffinityStore) GetAffinity(ctx context.Context, podUID string, containerName string) topologymanager.TopologyHint {
 	return m.hint
 }
 

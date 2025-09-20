@@ -17,7 +17,9 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -31,10 +33,10 @@ func (f *fakeInternalContainerLifecycle) PreCreateContainer(pod *v1.Pod, contain
 	return nil
 }
 
-func (f *fakeInternalContainerLifecycle) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
+func (f *fakeInternalContainerLifecycle) PreStartContainer(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID string) error {
 	return nil
 }
 
-func (f *fakeInternalContainerLifecycle) PostStopContainer(containerID string) error {
+func (f *fakeInternalContainerLifecycle) PostStopContainer(ctx context.Context, containerID string) error {
 	return nil
 }

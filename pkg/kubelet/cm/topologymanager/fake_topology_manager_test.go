@@ -20,8 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNewFakeManager(t *testing.T) {
@@ -47,9 +48,11 @@ func TestFakeGetAffinity(t *testing.T) {
 			expected:      TopologyHint{},
 		},
 	}
+
+	tCtx := ktesting.Init(t)
 	for _, tc := range tcases {
 		fm := fakeManager{}
-		actual := fm.GetAffinity(tc.podUID, tc.containerName)
+		actual := fm.GetAffinity(tCtx, tc.podUID, tc.containerName)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Expected Affinity in result to be %v, got %v", tc.expected, actual)
 		}
@@ -74,8 +77,9 @@ func TestFakeRemoveContainer(t *testing.T) {
 		},
 	}
 	fm := fakeManager{}
+	tCtx := ktesting.Init(t)
 	for _, tc := range testCases {
-		err := fm.RemoveContainer(tc.containerID)
+		err := fm.RemoveContainer(tCtx, tc.containerID)
 		if err != nil {
 			t.Errorf("Expected error to be nil but got: %v", err)
 		}

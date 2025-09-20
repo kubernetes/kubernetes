@@ -28,8 +28,8 @@ import (
 
 type InternalContainerLifecycle interface {
 	PreCreateContainer(pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error
-	PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error
-	PostStopContainer(containerID string) error
+	PreStartContainer(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID string) error
+	PostStopContainer(ctx context.Context, containerID string) error
 }
 
 // Implements InternalContainerLifecycle interface.
@@ -39,20 +39,20 @@ type internalContainerLifecycleImpl struct {
 	topologyManager topologymanager.Manager
 }
 
-func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
+func (i *internalContainerLifecycleImpl) PreStartContainer(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID string) error {
 	if i.cpuManager != nil {
 		i.cpuManager.AddContainer(pod, container, containerID)
 	}
 
 	if i.memoryManager != nil {
-		i.memoryManager.AddContainer(context.TODO(), pod, container, containerID)
+		i.memoryManager.AddContainer(ctx, pod, container, containerID)
 	}
 
-	i.topologyManager.AddContainer(pod, container, containerID)
+	i.topologyManager.AddContainer(ctx, pod, container, containerID)
 
 	return nil
 }
 
-func (i *internalContainerLifecycleImpl) PostStopContainer(containerID string) error {
-	return i.topologyManager.RemoveContainer(containerID)
+func (i *internalContainerLifecycleImpl) PostStopContainer(ctx context.Context, containerID string) error {
+	return i.topologyManager.RemoveContainer(ctx, containerID)
 }
