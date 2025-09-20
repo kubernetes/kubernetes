@@ -103,6 +103,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"v1ListOptions":                   c.Universe.Type(v1ListOptions),
 		"version":                         namer.IC(g.groupVersion.Version.String()),
 		"watchInterface":                  c.Universe.Type(watchInterface),
+		"watchlistIsUnsupportedWatchListSemantics": c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/watchlist", Name: "IsUnsupportedWatchListSemantics"}),
 	}
 
 	sw.Do(typeInformerInterface, m)
@@ -147,6 +148,10 @@ var typeFilteredInformerPublicConstructor = `
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$, tweakListOptions $.interfacesTweakListOptionsFunc|raw$) $.cacheSharedIndexInformer|raw$ {
+    var unsupportedWatchListSemantics bool
+	if  ok := $.watchlistIsUnsupportedWatchListSemantics|raw$(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return $.cacheNewSharedIndexInformer|raw$(
 		&$.cacheListWatch|raw${
 			ListFunc: func(options $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
@@ -173,6 +178,7 @@ func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .name
 				}
 				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch(ctx, options)
 			},
+            UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&$.type|raw${},
 		resyncPeriod,
