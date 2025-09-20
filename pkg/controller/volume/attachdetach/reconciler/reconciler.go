@@ -240,7 +240,7 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 
 			// Before triggering volume detach, mark volume as detached and update the node status
 			// Wait until the update is propagated to Node object.
-			removed := rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
+			removed := rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(logger, attachedVolume.VolumeName, attachedVolume.NodeName)
 			if !removed {
 				logger.V(5).Info("waiting RemoveVolumeFromReportAsAttached",
 					"node", klog.KRef("", string(attachedVolume.NodeName)),

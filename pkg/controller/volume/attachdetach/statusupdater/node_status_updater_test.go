@@ -218,7 +218,7 @@ func TestRemove(t *testing.T) {
 	}
 
 	// ask for removal
-	removed := asw.RemoveVolumeFromReportAsAttached("volume-name-1", "testnode-1")
+	removed := asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1")
 	if removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached returned true, expected false")
 	}
@@ -230,7 +230,7 @@ func TestRemove(t *testing.T) {
 	}
 
 	// should be removed now
-	removed = asw.RemoveVolumeFromReportAsAttached("volume-name-1", "testnode-1")
+	removed = asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1")
 	if !removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached returned false, expected true")
 	}
@@ -255,7 +255,7 @@ func TestNodeNotFound(t *testing.T) {
 	}
 
 	// ask for removal
-	removed := asw.RemoveVolumeFromReportAsAttached("volume-name-1", "testnode-1")
+	removed := asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1")
 	if removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached returned true, expected false")
 	}
@@ -267,7 +267,7 @@ func TestNodeNotFound(t *testing.T) {
 	}
 
 	// should be removed now even if the node is gone
-	removed = asw.RemoveVolumeFromReportAsAttached("volume-name-1", "testnode-1")
+	removed = asw.RemoveVolumeFromReportAsAttached(logger, "volume-name-1", "testnode-1")
 	if !removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached returned false, expected true")
 	}
