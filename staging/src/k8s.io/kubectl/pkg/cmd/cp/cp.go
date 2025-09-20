@@ -168,6 +168,13 @@ var (
 )
 
 func extractFileSpec(arg string) (fileSpec, error) {
+	// Check for Windows absolute path first.
+	if isWindowsAbsolutePath(arg) {
+		return fileSpec{
+			File: newLocalPath(arg),
+		}, nil
+	}
+
 	i := strings.Index(arg, ":")
 
 	// filespec starting with a semicolon is invalid
