@@ -410,3 +410,9 @@ func (o *cachingObject) SetManagedFields(managedFields []metav1.ManagedFieldsEnt
 		func() { o.object.SetManagedFields(managedFields) },
 	)
 }
+
+func (o *cachingObject) MutateObject(obj runtime.Object) {
+	o.conditionalSet(
+		func() bool { return reflect.DeepEqual(o.object, obj) },
+		func() { o.object = obj.(metaRuntimeInterface) })
+}
