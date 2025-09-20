@@ -61,18 +61,18 @@ var _ = common.SIGDescribe("DNS", func() {
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
 		// TODO: We should change this whole test mechanism to run the same probes
 		// against a known list of different base images.  Agnhost happens to be alpine
-		// (MUSL libc) for the moment, and jessie is (an old version of) libc.
+		// (MUSL libc) for the moment, and debian is (an old version of) libc.
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileNames := createProbeCommand(namesToResolve, nil, "", "debian", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
-		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
+		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
+		validateDNSResults(ctx, f, pod, append(agnhostFileNames, debianFileNames...))
 	})
 
 	// Added due to #8512. This is critical for GCE and GKE deployments.
@@ -88,15 +88,15 @@ var _ = common.SIGDescribe("DNS", func() {
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileNames := createProbeCommand(namesToResolve, nil, "", "debian", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
-		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
+		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
+		validateDNSResults(ctx, f, pod, append(agnhostFileNames, debianFileNames...))
 	})
 
 	// [LinuxOnly]: As Windows currently does not support resolving PQDNs.
@@ -111,15 +111,15 @@ var _ = common.SIGDescribe("DNS", func() {
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, hostEntries, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileNames := createProbeCommand(namesToResolve, hostEntries, "", "debian", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
-		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
+		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
+		validateDNSResults(ctx, f, pod, append(agnhostFileNames, debianFileNames...))
 	})
 
 	/*
@@ -133,15 +133,15 @@ var _ = common.SIGDescribe("DNS", func() {
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(nil, hostEntries, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileNames := createProbeCommand(nil, hostEntries, "", "debian", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes /etc/hosts and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe /etc/hosts")
-		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
-		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
+		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
+		validateDNSResults(ctx, f, pod, append(agnhostFileNames, debianFileNames...))
 	})
 
 	/*
@@ -186,17 +186,17 @@ var _ = common.SIGDescribe("DNS", func() {
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "debian", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
+		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
 		pod.ObjectMeta.Labels = testServiceSelector
 
-		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(agnhostFileNames, debianFileNames...))
 	})
 
 	/*
@@ -241,17 +241,17 @@ var _ = common.SIGDescribe("DNS", func() {
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "debian", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
+		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
 		pod.ObjectMeta.Labels = testServiceSelector
 
-		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(agnhostFileNames, debianFileNames...))
 	})
 
 	/*
@@ -283,19 +283,19 @@ var _ = common.SIGDescribe("DNS", func() {
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(nil, hostNames, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostNames, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileNames := createProbeCommand(nil, hostNames, "", "debian", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
+		pod1 := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
 		pod1.ObjectMeta.Labels = testServiceSelector
 		pod1.Spec.Hostname = podHostname
 		pod1.Spec.Subdomain = serviceName
 
-		validateDNSResults(ctx, f, pod1, append(agnhostFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod1, append(agnhostFileNames, debianFileNames...))
 	})
 
 	/*
@@ -328,19 +328,19 @@ var _ = common.SIGDescribe("DNS", func() {
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileNames := createProbeCommand(namesToResolve, nil, "", "debian", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
+		pod1 := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
 		pod1.ObjectMeta.Labels = testServiceSelector
 		pod1.Spec.Hostname = podHostname
 		pod1.Spec.Subdomain = serviceName
 
-		validateDNSResults(ctx, f, pod1, append(agnhostFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod1, append(agnhostFileNames, debianFileNames...))
 	})
 
 	/*
@@ -365,16 +365,16 @@ var _ = common.SIGDescribe("DNS", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		agnhostProbeCmd, agnhostFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "agnhost")
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "jessie")
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "debian")
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
+		pod1 := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
 
-		validateTargetedProbeOutput(ctx, f, pod1, []string{agnhostFileName, jessieFileName}, "foo.example.com.")
+		validateTargetedProbeOutput(ctx, f, pod1, []string{agnhostFileName, debianFileName}, "foo.example.com.")
 
 		// Test changing the externalName field
 		ginkgo.By("changing the externalName to bar.example.com")
@@ -384,16 +384,16 @@ var _ = common.SIGDescribe("DNS", func() {
 		framework.ExpectNoError(err, "failed to change externalName of service: %s", serviceName)
 		agnhostProbeCmd, agnhostFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "agnhost")
 		agnhostProber = dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "jessie")
-		jessieProber = dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "debian")
+		debianProber = dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a second pod to probe DNS")
-		pod2 := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
+		pod2 := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
 
-		validateTargetedProbeOutput(ctx, f, pod2, []string{agnhostFileName, jessieFileName}, "bar.example.com.")
+		validateTargetedProbeOutput(ctx, f, pod2, []string{agnhostFileName, debianFileName}, "bar.example.com.")
 
 		// Test changing type from ExternalName to ClusterIP
 		ginkgo.By("changing the service to type=ClusterIP")
@@ -412,19 +412,19 @@ var _ = common.SIGDescribe("DNS", func() {
 		// one looking for an A record and another one for an AAAA record
 		agnhostProbeCmd, agnhostFileName = createTargetedProbeCommand(hostFQDN, targetRecord, "agnhost")
 		agnhostProber = dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, targetRecord, "jessie")
-		jessieProber = dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileName = createTargetedProbeCommand(hostFQDN, targetRecord, "debian")
+		debianProber = dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a third pod to probe DNS")
-		pod3 := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
+		pod3 := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
 
 		svc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Get(ctx, externalNameService.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get service: %s", externalNameService.Name)
 
-		validateTargetedProbeOutput(ctx, f, pod3, []string{agnhostFileName, jessieFileName}, svc.Spec.ClusterIP)
+		validateTargetedProbeOutput(ctx, f, pod3, []string{agnhostFileName, debianFileName}, svc.Spec.ClusterIP)
 	})
 
 	/*
@@ -598,10 +598,10 @@ var _ = common.SIGDescribe("DNS", func() {
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, hostEntries, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileNames := createProbeCommand(namesToResolve, hostEntries, "", "debian", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		ginkgo.By("Creating a pod with expanded DNS configuration to probe DNS")
 		testNdotsValue := "5"
@@ -613,7 +613,7 @@ var _ = common.SIGDescribe("DNS", func() {
 			fmt.Sprintf("%038d.k8s.io", 5),
 			fmt.Sprintf("%038d.k8s.io", 6), // 260 characters
 		}
-		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
+		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
 		pod.Spec.DNSPolicy = v1.DNSClusterFirst
 		pod.Spec.DNSConfig = &v1.PodDNSConfig{
 			Searches: testSearchPaths,
@@ -624,7 +624,7 @@ var _ = common.SIGDescribe("DNS", func() {
 				},
 			},
 		}
-		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(agnhostFileNames, debianFileNames...))
 	})
 
 	ginkgo.It("should work with a search path containing an underscore and a search path with a single dot", func(ctx context.Context) {
@@ -638,22 +638,22 @@ var _ = common.SIGDescribe("DNS", func() {
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, hostEntries, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileNames := createProbeCommand(namesToResolve, hostEntries, "", "debian", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		ginkgo.By("Creating a pod with expanded DNS configuration to probe DNS")
 		testSearchPaths := []string{
 			".",
 			"_sip._tcp.abc_d.example.com",
 		}
-		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
+		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
 		pod.Spec.DNSPolicy = v1.DNSClusterFirst
 		pod.Spec.DNSConfig = &v1.PodDNSConfig{
 			Searches: testSearchPaths,
 		}
-		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(agnhostFileNames, debianFileNames...))
 	})
 
 	framework.It("should work with a service name that starts with a digit", framework.WithFeatureGate(features.RelaxedServiceNameValidation), func(ctx context.Context) {
@@ -718,18 +718,18 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
 		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
-		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		debianProbeCmd, debianFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "debian", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		debianProber := dnsQuerier{name: "debian", image: imageutils.DebianDnsutils, cmd: debianProbeCmd}
 		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
-		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on debian: " + debianProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
+		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, debianProber}, dnsTestPodHostName, dnsTestServiceName)
 		pod.ObjectMeta.Labels = testServiceSelector
 		pod.Spec.HostNetwork = true
 		pod.Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
-		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(agnhostFileNames, debianFileNames...))
 	})
 
 	// https://issues.k8s.io/67019
