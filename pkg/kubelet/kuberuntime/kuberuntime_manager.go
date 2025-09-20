@@ -1111,7 +1111,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
 		// to it.
 		if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateRunning {
-			if err := m.internalLifecycle.PostStopContainer(containerStatus.ID.ID); err != nil {
+			if err := m.internalLifecycle.PostStopContainer(ctx, containerStatus.ID.ID); err != nil {
 				logger.Error(err, "Internal container post-stop lifecycle hook failed for container in pod with error",
 					"containerName", container.Name, "pod", klog.KObj(pod))
 			}

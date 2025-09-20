@@ -17,16 +17,18 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func NewTestBitMask(sockets ...int) bitmask.BitMask {
@@ -138,10 +140,12 @@ func TestNewManager(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
+
 	for _, tc := range tcases {
 		topology := tc.topology
 
-		mngr, err := NewManager(topology, tc.policyName, "container", tc.policyOptions)
+		mngr, err := NewManager(tCtx, topology, tc.policyName, "container", tc.policyOptions)
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
 				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), tc.expectedError.Error())
@@ -185,8 +189,10 @@ func TestManagerScope(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
+
 	for _, tc := range tcases {
-		mngr, err := NewManager(nil, "best-effort", tc.scopeName, nil)
+		mngr, err := NewManager(tCtx, nil, "best-effort", tc.scopeName, nil)
 
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
@@ -226,7 +232,7 @@ type mockPolicy struct {
 	ph []map[string][]TopologyHint
 }
 
-func (p *mockPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
+func (p *mockPolicy) Merge(ctx context.Context, providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	p.ph = providersHints
 	return TopologyHint{}, true
 }
@@ -247,9 +253,10 @@ func TestAddHintProvider(t *testing.T) {
 	}
 	mngr := manager{}
 	mngr.scope = NewContainerScope(NewNonePolicy())
+	tCtx := ktesting.Init(t)
 	for _, tc := range tcases {
 		for _, hp := range tc.hp {
-			mngr.AddHintProvider(hp)
+			mngr.AddHintProvider(tCtx, hp)
 		}
 		if len(tc.hp) != len(mngr.scope.(*containerScope).hintProviders) {
 			t.Errorf("error")
@@ -536,6 +543,7 @@ func TestAdmit(t *testing.T) {
 			expected: false,
 		},
 	}
+
 	for _, tc := range tcases {
 		ctnScopeManager := manager{}
 		ctnScopeManager.scope = NewContainerScope(tc.policy)

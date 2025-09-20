@@ -17,6 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -315,6 +316,10 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 }
 
 func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
+
 	numCPUs := p.guaranteedCPUs(pod, container)
 	if numCPUs == 0 {
 		// container belongs in the shared pool (nothing to do; use default cpuset)
@@ -384,7 +389,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	}
 
 	// Call Topology Manager to get the aligned socket affinity across all hint providers.
-	hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
+	hint := p.affinity.GetAffinity(ctx, string(pod.UID), container.Name)
 	klog.InfoS("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
 
 	// Allocate CPUs according to the NUMA affinity contained in the hint.
