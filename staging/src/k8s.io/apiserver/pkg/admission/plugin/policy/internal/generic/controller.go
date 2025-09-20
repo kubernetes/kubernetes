@@ -174,7 +174,7 @@ func (c *controller[T]) Run(ctx context.Context) error {
 
 	// Wait for initial cache list to complete before beginning to reconcile
 	// objects.
-	if !cache.WaitForNamedCacheSync(c.options.Name, ctx.Done(), c.informer.HasSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.informer.HasSynced) {
 		// ctx cancelled during cache sync. return early
 		err := ctx.Err()
 		if err == nil {

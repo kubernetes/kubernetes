@@ -209,7 +209,7 @@ func (c *ConfigMapCAController) Run(ctx context.Context, workers int) {
 	go c.configMapInformer.Run(ctx.Done())
 
 	// wait for your secondary caches to fill before starting your work
-	if !cache.WaitForNamedCacheSync(c.name, ctx.Done(), c.preRunCaches...) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.preRunCaches...) {
 		return
 	}
 
