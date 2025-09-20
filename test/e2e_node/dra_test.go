@@ -1171,7 +1171,7 @@ func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName,
 	allOpts = append(allOpts, opts...)
 
 	registrar, err := testdriver.StartPlugin(
-		ctx,
+		context.WithoutCancel(ctx), // It gets stopped during test cleanup or when requested earlier.
 		cdiDir,
 		driverName,
 		clientSet,
@@ -1180,6 +1180,7 @@ func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName,
 		allOpts...,
 	)
 	framework.ExpectNoError(err, "start only Kubelet plugin registrar")
+	ginkgo.DeferCleanup(registrar.Stop)
 	return registrar
 }
 
@@ -1273,6 +1274,10 @@ func draServiceCleanup(ctx context.Context, clientSet kubernetes.Interface, driv
 	// shutdown.
 	ginkgo.By("Deleting pods and waiting for ResourceClaims to be released...")
 	framework.ExpectNoError(clientSet.CoreV1().Pods(testNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}))
+
+	// Failing here is a bit more obvious than in the metric check below.
+	// The metrics get checked, too, because we want to be certain that those go down.
+	gomega.Eventually(ctx, framework.ListObjects(clientSet.CoreV1().Pods(testNamespace).List, metav1.ListOptions{})).Should(gomega.HaveField("Items", gomega.BeEmpty()), "All pods should be deleted, shut down and removed.")
 
 	// We allow for a delay because it takes a while till the kubelet fully deals with pod deletion.
 	// Typically there is no dra_resource_claims_in_use entry for the driver (covered by gstruct.IgnoreMissing).
