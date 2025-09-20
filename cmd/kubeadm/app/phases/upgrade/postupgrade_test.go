@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -145,6 +146,26 @@ func TestWriteKubeletConfigFiles(t *testing.T) {
 		err := WriteKubeletConfigFiles(tc.cfg, tempDir, tempDir, tc.patchesDir, true, os.Stdout)
 		if (err != nil) != tc.expectedError {
 			t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, err != nil, err)
+		}
+	}
+}
+
+func TestRemoveKubeletArgsFromFile(t *testing.T) {
+	tempDir := t.TempDir()
+	testCases := []struct {
+		name          string
+		unwantedFlags []string
+		wantErr       bool
+		wantOut       string
+	}{}
+	for _, tc := range testCases {
+		out := &bytes.Buffer{}
+		err := RemoveKubeletArgsFromFile(tempDir, tc.unwantedFlags, true, out)
+		if (err != nil) != tc.wantErr {
+			t.Fatalf("expected error: %v, got: %v, error: %v", tc.wantErr, err != nil, err)
+		}
+		if gotOut := out.String(); gotOut != tc.wantOut {
+			t.Errorf("Actual output of RemoveKubeletArgsFromFile() does not match expected.\nActual:  %v\nExpected: %v\n", gotOut, tc.wantOut)
 		}
 	}
 }
