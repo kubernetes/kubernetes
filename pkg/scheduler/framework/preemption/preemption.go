@@ -192,7 +192,7 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPree
 				if apierrors.IsNotFound(err) {
 					logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
 				} else {
-					logger.Error(err, "Tried to preempted pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
+					logger.Error(err, "Failed to delete victim Pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
 				}
 				return err
 			}
