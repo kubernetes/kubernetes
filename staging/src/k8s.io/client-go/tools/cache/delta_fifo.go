@@ -270,7 +270,8 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 }
 
 var (
-	_ = Queue(&DeltaFIFO{}) // DeltaFIFO is a Queue
+	_ = Queue(&DeltaFIFO{})             // DeltaFIFO is a Queue
+	_ = TransformingStore(&DeltaFIFO{}) // DeltaFIFO implements TransformingStore to allow memory optimizations
 )
 
 var (
