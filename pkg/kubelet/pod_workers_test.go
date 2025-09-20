@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -453,7 +452,7 @@ func createPodWorkers() (*podWorkers, *containertest.FakeRuntime, map[types.UID]
 		time.Second,
 		time.Millisecond,
 		fakeCache,
-		allocation.NewInMemoryManager(cm.NodeConfig{}, nil, nil, nil, nil, nil, nil),
+		allocation.NewInMemoryManager(nil, nil, nil, nil, nil),
 	)
 	workers := w.(*podWorkers)
 	workers.clock = clock
@@ -1948,7 +1947,7 @@ func TestFakePodWorkers(t *testing.T) {
 		time.Second,
 		time.Second,
 		fakeCache,
-		allocation.NewInMemoryManager(cm.NodeConfig{}, nil, nil, nil, nil, nil, nil),
+		allocation.NewInMemoryManager(nil, nil, nil, nil, nil),
 	)
 	fakePodWorkers := &fakePodWorkers{
 		syncPodFn: kubeletForFakeWorkers.SyncPod,
