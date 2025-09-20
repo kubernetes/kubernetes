@@ -19,13 +19,17 @@ package structured
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
+
 	"k8s.io/dynamic-resource-allocation/structured/internal/experimental"
 	"k8s.io/dynamic-resource-allocation/structured/internal/incubating"
 	"k8s.io/dynamic-resource-allocation/structured/internal/stable"
@@ -109,7 +113,7 @@ func NewAllocator(ctx context.Context,
 	features Features,
 	allocatedState AllocatedState,
 	classLister DeviceClassLister,
-	slices []*resourceapi.ResourceSlice,
+	slices []*draapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (Allocator, error) {
 	// The actual implementation may vary depending on which features are enabled.
@@ -135,58 +139,84 @@ func NewAllocator(ctx context.Context,
 	// file name!) into "stable", or individual chunks can be copied over.
 	//
 	// Unit tests are shared between all implementations.
+	var enabledAllocators []string
 	for _, allocator := range availableAllocators {
+		// Disabled?
+		if !allocatorEnabled(allocator.name) {
+			continue
+		}
+		enabledAllocators = append(enabledAllocators, allocator.name)
+
 		// All required features supported?
 		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
 			// Use it!
 			return allocator.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		}
 	}
-	return nil, fmt.Errorf("internal error: no allocator available for feature set %v", features)
+	return nil, fmt.Errorf("internal error: no allocator available for feature set %+v, enabled allocators: %s", features, strings.Join(enabledAllocators, ", "))
+}
+
+// EnableAllocators, if passed a non-empty list, controls which allocators may get picked by NewAllocator.
+// The entries are the names of the implementing package ("stable", "incubating", "experimental").
+// Not thread-safe, meant for use during testing.
+func EnableAllocators(names ...string) {
+	explicitlyEnabledAllocators = sets.New(names...)
+}
+
+// explicitlyEnabledAllocators stores the result of EnableAllocators.
+// If empty (the default), all available allocators are enabled.
+var explicitlyEnabledAllocators sets.Set[string]
+
+func allocatorEnabled(name string) bool {
+	return len(explicitlyEnabledAllocators) == 0 || explicitlyEnabledAllocators.Has(name)
 }
 
 var availableAllocators = []struct {
+	name              string
 	supportedFeatures Features
 	newAllocator      func(ctx context.Context,
 		features Features,
 		allocatedState AllocatedState,
 		classLister DeviceClassLister,
-		slices []*resourceapi.ResourceSlice,
+		slices []*draapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)
 }{
 	// Most stable first.
 	{
+		name:              "stable",
 		supportedFeatures: stable.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
 			allocatedState AllocatedState,
 			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
+			slices []*draapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
 			return stable.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
 	},
 	{
+		name:              "incubating",
 		supportedFeatures: incubating.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
 			allocatedState AllocatedState,
 			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
+			slices []*draapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
 			return incubating.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
 	},
 	{
+		name:              "experimental",
 		supportedFeatures: experimental.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
 			allocateState AllocatedState,
 			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
+			slices []*draapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
 			return experimental.NewAllocator(ctx, features, allocateState, classLister, slices, celCache)

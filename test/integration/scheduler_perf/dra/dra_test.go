@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	_ "k8s.io/component-base/logs/json/register"
+	"k8s.io/dynamic-resource-allocation/structured"
 	perf "k8s.io/kubernetes/test/integration/scheduler_perf"
 )
 
@@ -35,9 +36,21 @@ func TestMain(m *testing.M) {
 }
 
 func TestSchedulerPerf(t *testing.T) {
-	perf.RunIntegrationPerfScheduling(t, "performance-config.yaml")
+	// Verify correct behavior with all available allocators.
+	for _, allocatorName := range []string{"stable", "incubating", "experimental"} {
+		t.Run(allocatorName, func(t *testing.T) {
+			structured.EnableAllocators(allocatorName)
+			defer structured.EnableAllocators()
+
+			perf.RunIntegrationPerfScheduling(t, "performance-config.yaml")
+		})
+	}
 }
 
 func BenchmarkPerfScheduling(b *testing.B) {
+	// Restrict benchmarking to the default allocator.
+	structured.EnableAllocators("incubating")
+	defer structured.EnableAllocators()
+
 	perf.RunBenchmarkPerfScheduling(b, "performance-config.yaml", "dra", nil)
 }
