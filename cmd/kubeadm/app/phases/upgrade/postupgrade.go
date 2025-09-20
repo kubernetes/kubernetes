@@ -180,10 +180,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletDir strin
 	return nil
 }
 
-// UpdateKubeletKubeconfigServer changes the Server URL in the kubelets kubeconfig if necessary depending on the
-// ControlPlaneKubeletLocalMode feature gate.
-// TODO: remove this function once ControlPlaneKubeletLocalMode goes GA and is hardcoded to be enabled by default:
-// https://github.com/kubernetes/kubeadm/issues/2271
+// UpdateKubeletKubeconfigServer changes the Server URL in the kubelet's kubeconfig if necessary.
 func UpdateKubeletKubeconfigServer(cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
 	kubeletKubeConfigFilePath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
 
@@ -216,21 +213,12 @@ func UpdateKubeletKubeconfigServer(cfg *kubeadmapi.InitConfiguration, dryRun boo
 	}
 
 	var targetServer string
-	if features.Enabled(cfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-		// Skip changing kubeconfig file if Server does not match the ControlPlaneEndpoint.
-		if config.Clusters[configContext.Cluster].Server != controlPlaneAPIEndpoint || controlPlaneAPIEndpoint == localAPIEndpoint {
-			klog.V(2).Infof("Skipping update of the Server URL in %s, because it's already not equal to %q or already matches the localAPIEndpoint", kubeletKubeConfigFilePath, controlPlaneAPIEndpoint)
-			return nil
-		}
-		targetServer = localAPIEndpoint
-	} else {
-		// Skip changing kubeconfig file if Server does not match the localAPIEndpoint.
-		if config.Clusters[configContext.Cluster].Server != localAPIEndpoint {
-			klog.V(2).Infof("Skipping update of the Server URL in %s, because it already matches the controlPlaneAPIEndpoint", kubeletKubeConfigFilePath)
-			return nil
-		}
-		targetServer = controlPlaneAPIEndpoint
+	// Skip changing kubeconfig file if Server does not match the ControlPlaneEndpoint.
+	if config.Clusters[configContext.Cluster].Server != controlPlaneAPIEndpoint || controlPlaneAPIEndpoint == localAPIEndpoint {
+		klog.V(2).Infof("Skipping update of the Server URL in %s, because it's already not equal to %q or already matches the localAPIEndpoint", kubeletKubeConfigFilePath, controlPlaneAPIEndpoint)
+		return nil
 	}
+	targetServer = localAPIEndpoint
 
 	if dryRun {
 		fmt.Printf("[dryrun] Would change the Server URL from %q to %q in %s and try to restart kubelet\n", config.Clusters[configContext.Cluster].Server, targetServer, kubeletKubeConfigFilePath)
