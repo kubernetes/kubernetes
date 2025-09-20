@@ -26,6 +26,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 	apisapiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kube-aggregator/pkg/client/informers/externalversions/internalinterfaces"
@@ -81,6 +82,7 @@ func NewFilteredAPIServiceInformer(client clientset.Interface, resyncPeriod time
 				}
 				return client.ApiregistrationV1().APIServices().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apisapiregistrationv1.APIService{},
 		resyncPeriod,

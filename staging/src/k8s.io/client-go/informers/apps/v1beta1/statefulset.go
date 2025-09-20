@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	appsv1beta1 "k8s.io/client-go/listers/apps/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // StatefulSetInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredStatefulSetInformer(client kubernetes.Interface, namespace strin
 				}
 				return client.AppsV1beta1().StatefulSets(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiappsv1beta1.StatefulSet{},
 		resyncPeriod,

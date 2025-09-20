@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	apiserverinternalv1alpha1 "k8s.io/client-go/listers/apiserverinternal/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // StorageVersionInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredStorageVersionInformer(client kubernetes.Interface, resyncPeriod
 				}
 				return client.InternalV1alpha1().StorageVersions().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiapiserverinternalv1alpha1.StorageVersion{},
 		resyncPeriod,

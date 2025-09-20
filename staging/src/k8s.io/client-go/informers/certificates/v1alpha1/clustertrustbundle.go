@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	certificatesv1alpha1 "k8s.io/client-go/listers/certificates/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ClusterTrustBundleInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredClusterTrustBundleInformer(client kubernetes.Interface, resyncPe
 				}
 				return client.CertificatesV1alpha1().ClusterTrustBundles().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apicertificatesv1alpha1.ClusterTrustBundle{},
 		resyncPeriod,

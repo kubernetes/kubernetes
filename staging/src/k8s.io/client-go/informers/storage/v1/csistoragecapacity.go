@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	storagev1 "k8s.io/client-go/listers/storage/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // CSIStorageCapacityInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredCSIStorageCapacityInformer(client kubernetes.Interface, namespac
 				}
 				return client.StorageV1().CSIStorageCapacities(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apistoragev1.CSIStorageCapacity{},
 		resyncPeriod,

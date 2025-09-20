@@ -30,6 +30,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // CustomResourceDefinitionInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredCustomResourceDefinitionInformer(client clientset.Interface, res
 				}
 				return client.ApiextensionsV1().CustomResourceDefinitions().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apisapiextensionsv1.CustomResourceDefinition{},
 		resyncPeriod,

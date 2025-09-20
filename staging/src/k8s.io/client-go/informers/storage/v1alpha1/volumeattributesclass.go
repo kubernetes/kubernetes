@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	storagev1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // VolumeAttributesClassInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredVolumeAttributesClassInformer(client kubernetes.Interface, resyn
 				}
 				return client.StorageV1alpha1().VolumeAttributesClasses().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apistoragev1alpha1.VolumeAttributesClass{},
 		resyncPeriod,
