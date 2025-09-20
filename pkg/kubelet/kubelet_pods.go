@@ -2404,6 +2404,12 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			oldStatusPtr = &oldStatus
 		}
 		status := convertContainerStatus(cStatus, oldStatusPtr)
+		if cStatus.State == kubecontainer.ContainerStateRunning {
+			if oldStatus, ok := oldStatuses[status.Name]; ok && oldStatus.Ready {
+				status.Ready = true
+			}
+		}
+
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
 			if allocatedContainer != nil {
