@@ -21,6 +21,7 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
 	_ "time/tzdata" // for CronJob Time Zone support
 
@@ -33,6 +34,35 @@ import (
 
 func main() {
 	command := app.NewControllerManagerCommand()
+	// The race detecter reports the same race only once, so calling fakeDataRace twice only
+	// leads to one report for it.
+	fakeDataRace()
+	fakeDataRace2()
+	fakeDataRace()
 	code := cli.Run(command)
 	os.Exit(code)
+}
+
+func fakeDataRace() {
+	var a int
+
+	go func() {
+		a = 1
+	}()
+
+	go func() {
+		_ = fmt.Sprintf("%d", a)
+	}()
+}
+
+func fakeDataRace2() {
+	var a int
+
+	go func() {
+		a = 1
+	}()
+
+	go func() {
+		_ = fmt.Sprintf("%d", a)
+	}()
 }
