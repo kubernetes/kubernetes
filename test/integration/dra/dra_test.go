@@ -599,7 +599,7 @@ func testFilterTimeout(tCtx ktesting.TContext) {
 	// Chosen so that Filter takes a few seconds:
 	// without a timeout, the test doesn't run too long,
 	// but long enough that a short timeout triggers.
-	devicesPerSlice := 9
+	devicesPerSlice := 20
 	deviceNames := make([]string, devicesPerSlice)
 	for i := 0; i < devicesPerSlice; i++ {
 		deviceNames[i] = fmt.Sprintf("dev-%d", i)

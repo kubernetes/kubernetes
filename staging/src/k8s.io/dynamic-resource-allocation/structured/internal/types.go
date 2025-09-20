@@ -52,6 +52,14 @@ type Stats struct {
 	NumAllocateOneInvocations int64
 }
 
+type AllocatorChannel string
+
+const (
+	Experimental = "experimental"
+	Stable       = "stable"
+	Incubating   = "incubating"
+)
+
 // Features contains all feature gates that may influence the behavior of ResourceClaim allocation.
 type Features struct {
 	// Sorted alphabetically. When adding a new entry, also extend Set and FeaturesAll.
