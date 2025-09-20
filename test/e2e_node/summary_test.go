@@ -368,7 +368,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 		})
 	})
 
-	framework.Context("when querying /stats/summary under pressure", feature.KubeletPSI, framework.WithSerial(), func() {
+	framework.Context("when querying /stats/summary under pressure", feature.KubeletPSI, framework.WithSerial(), feature.CgroupV1, func() {
 		ginkgo.BeforeEach(func() {
 			if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
 				ginkgo.Skip("KubeletPSI feature gate is not enabled")
