@@ -184,7 +184,6 @@
       ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
@@ -204,14 +203,12 @@
       "github.com/modern-go/concurrent": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/modern-go/reflect2": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
@@ -241,7 +238,6 @@
         "github.com/google/cel-go",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
-        "github.com/grpc-ecosystem/grpc-gateway/v2",
         "github.com/onsi/ginkgo/v2",
         "github.com/onsi/gomega",
         "github.com/prometheus/common",

@@ -132,13 +132,13 @@ func (b *dnsBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts 
 	// DNS address (non-IP).
 	ctx, cancel := context.WithCancel(context.Background())
 	d := &dnsResolver{
-		host:                 host,
-		port:                 port,
-		ctx:                  ctx,
-		cancel:               cancel,
-		cc:                   cc,
-		rn:                   make(chan struct{}, 1),
-		disableServiceConfig: opts.DisableServiceConfig,
+		host:                host,
+		port:                port,
+		ctx:                 ctx,
+		cancel:              cancel,
+		cc:                  cc,
+		rn:                  make(chan struct{}, 1),
+		enableServiceConfig: envconfig.EnableTXTServiceConfig && !opts.DisableServiceConfig,
 	}
 
 	d.resolver, err = internal.NewNetResolver(target.URL.Host)
@@ -181,8 +181,8 @@ type dnsResolver struct {
 	// finishes, race detector sometimes will warn lookup (READ the lookup
 	// function pointers) inside watcher() goroutine has data race with
 	// replaceNetFunc (WRITE the lookup function pointers).
-	wg                   sync.WaitGroup
-	disableServiceConfig bool
+	wg                  sync.WaitGroup
+	enableServiceConfig bool
 }
 
 // ResolveNow invoke an immediate resolution of the target that this
@@ -346,7 +346,7 @@ func (d *dnsResolver) lookup() (*resolver.State, error) {
 	if len(srv) > 0 {
 		state = grpclbstate.Set(state, &grpclbstate.State{BalancerAddresses: srv})
 	}
-	if !d.disableServiceConfig {
+	if d.enableServiceConfig {
 		state.ServiceConfig = d.lookupTXT(ctx)
 	}
 	return &state, nil

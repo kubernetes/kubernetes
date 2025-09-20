@@ -30,6 +30,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	// maxAllowedServices defines the maximum number of resources a List
+	// operation can return. An error is returned if the number of services
+	// exceeds this limit.
+	maxAllowedServices = 100
+)
+
 // Server implements `service Health`.
 type Server struct {
 	healthgrpc.UnimplementedHealthServer
@@ -60,6 +67,23 @@ func (s *Server) Check(_ context.Context, in *healthpb.HealthCheckRequest) (*hea
 		}, nil
 	}
 	return nil, status.Error(codes.NotFound, "unknown service")
+}
+
+// List implements `service Health`.
+func (s *Server) List(_ context.Context, _ *healthpb.HealthListRequest) (*healthpb.HealthListResponse, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if len(s.statusMap) > maxAllowedServices {
+		return nil, status.Errorf(codes.ResourceExhausted, "server health list exceeds maximum capacity: %d", maxAllowedServices)
+	}
+
+	statusMap := make(map[string]*healthpb.HealthCheckResponse, len(s.statusMap))
+	for k, v := range s.statusMap {
+		statusMap[k] = &healthpb.HealthCheckResponse{Status: v}
+	}
+
+	return &healthpb.HealthListResponse{Statuses: statusMap}, nil
 }
 
 // Watch implements `service Health`.

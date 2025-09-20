@@ -9,10 +9,34 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // CurlyRouter expects Routes with paths that contain zero or more parameters in curly brackets.
 type CurlyRouter struct{}
+
+var (
+	regexCache            sync.Map // Cache for compiled regex patterns
+	pathTokenCacheEnabled = true   // Enable/disable path token regex caching
+)
+
+// SetPathTokenCacheEnabled enables or disables path token regex caching for CurlyRouter.
+// When disabled, regex patterns will be compiled on every request.
+// When enabled (default), compiled regex patterns are cached for better performance.
+func SetPathTokenCacheEnabled(enabled bool) {
+	pathTokenCacheEnabled = enabled
+}
+
+// getCachedRegexp retrieves a compiled regex from the cache if found and valid.
+// Returns the regex and true if found and valid, nil and false otherwise.
+func getCachedRegexp(cache *sync.Map, pattern string) (*regexp.Regexp, bool) {
+	if cached, found := cache.Load(pattern); found {
+		if regex, ok := cached.(*regexp.Regexp); ok {
+			return regex, true
+		}
+	}
+	return nil, false
+}
 
 // SelectRoute is part of the Router interface and returns the best match
 // for the WebService and its Route for the given Request.
@@ -113,8 +137,28 @@ func (c CurlyRouter) regularMatchesPathToken(routeToken string, colon int, reque
 		}
 		return true, true
 	}
-	matched, err := regexp.MatchString(regPart, requestToken)
-	return (matched && err == nil), false
+
+	// Check cache first (if enabled)
+	if pathTokenCacheEnabled {
+		if regex, found := getCachedRegexp(&regexCache, regPart); found {
+			matched := regex.MatchString(requestToken)
+			return matched, false
+		}
+	}
+
+	// Compile the regex
+	regex, err := regexp.Compile(regPart)
+	if err != nil {
+		return false, false
+	}
+
+	// Cache the regex (if enabled)
+	if pathTokenCacheEnabled {
+		regexCache.Store(regPart, regex)
+	}
+
+	matched := regex.MatchString(requestToken)
+	return matched, false
 }
 
 var jsr311Router = RouterJSR311{}
@@ -168,7 +212,7 @@ func (c CurlyRouter) computeWebserviceScore(requestTokens []string, routeTokens 
 				if matchesToken {
 					score++ // extra score for regex match
 				}
-			}			
+			}
 		} else {
 			// not a parameter
 			if eachRequestToken != eachRouteToken {
