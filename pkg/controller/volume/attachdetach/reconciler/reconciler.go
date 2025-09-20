@@ -33,7 +33,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
-	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -73,7 +72,6 @@ func NewReconciler(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	attacherDetacher operationexecutor.OperationExecutor,
-	nodeStatusUpdater statusupdater.NodeStatusUpdater,
 	nodeLister corelisters.NodeLister,
 	recorder record.EventRecorder) Reconciler {
 	return &reconciler{
@@ -85,7 +83,6 @@ func NewReconciler(
 		desiredStateOfWorld:         desiredStateOfWorld,
 		actualStateOfWorld:          actualStateOfWorld,
 		attacherDetacher:            attacherDetacher,
-		nodeStatusUpdater:           nodeStatusUpdater,
 		nodeLister:                  nodeLister,
 		timeOfLastSync:              time.Now(),
 		recorder:                    recorder,
@@ -99,7 +96,6 @@ type reconciler struct {
 	desiredStateOfWorld         cache.DesiredStateOfWorld
 	actualStateOfWorld          cache.ActualStateOfWorld
 	attacherDetacher            operationexecutor.OperationExecutor
-	nodeStatusUpdater           statusupdater.NodeStatusUpdater
 	nodeLister                  corelisters.NodeLister
 	timeOfLastSync              time.Time
 	disableReconciliationSync   bool
