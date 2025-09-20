@@ -65,6 +65,8 @@ func isSecretImmutable(object runtime.Object) bool {
 }
 
 func newSecretCache(ctx context.Context, fakeClient clientset.Interface, fakeClock clock.Clock, maxIdleTime time.Duration) *objectCache {
+	cCtx, cancel := context.WithCancel(ctx)
+
 	return &objectCache{
 		listObject:    listSecret(ctx, fakeClient),
 		watchObject:   watchSecret(ctx, fakeClient),
@@ -74,6 +76,8 @@ func newSecretCache(ctx context.Context, fakeClient clientset.Interface, fakeClo
 		clock:         fakeClock,
 		maxIdleTime:   maxIdleTime,
 		items:         make(map[objectKey]*objectCacheItem),
+		ctx:           cCtx,
+		cancel:        cancel,
 	}
 }
 
@@ -397,7 +401,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	assert.True(t, reflectorRunning())
 
 	fakeClock.Step(90 * time.Second)
-	store.startRecycleIdleWatch()
+	store.startRecycleIdleWatch(tCtx)
 
 	// Reflector should already be stopped for maxIdleTime exceeded.
 	assert.False(t, reflectorRunning())
@@ -413,7 +417,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	_, _ = store.Get("ns", "name")
 	fakeClock.Step(20 * time.Second)
 	_, _ = store.Get("ns", "name")
-	store.startRecycleIdleWatch()
+	store.startRecycleIdleWatch(tCtx)
 
 	// Reflector should be running when the get function is called periodically.
 	assert.True(t, reflectorRunning())
@@ -485,7 +489,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	}
 
 	fakeClock.Step(90 * time.Second)
-	store.startRecycleIdleWatch()
+	store.startRecycleIdleWatch(tCtx)
 
 	// Reflector didn't yet initialize, so it shouldn't be stopped.
 	// However, Get should still be failing.
@@ -506,7 +510,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	}
 
 	// recycling shouldn't stop the reflector because it was accessed within last minute.
-	store.startRecycleIdleWatch()
+	store.startRecycleIdleWatch(tCtx)
 	assert.True(t, reflectorRunning())
 
 	obj, _ := store.Get("ns", "name")
