@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -108,6 +109,10 @@ type ExtraConfig struct {
 	// the concept of services and endpoints might differ, and might require another implementation of this
 	// controller. Local APIService are reconciled nevertheless.
 	DisableRemoteAvailableConditionController bool
+
+	// PeerProxy, if not nil, sets proxy transport between kube-apiserver peers for requests
+	// that can not be served locally
+	PeerProxy utilpeerproxy.Interface
 }
 
 // Config represents the configuration needed to create an APIAggregator.
@@ -275,9 +280,30 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		discoveryGroup: discoveryGroup(enabledVersions),
 	}
 
-	apisHandlerWithAggregationSupport := aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedDiscoveryGroupManager)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
+		apiServiceLister := informerFactory.Apiregistration().V1().APIServices().Lister()
+		s.GenericAPIServer.PeerMergedAggregatedDiscoveryManager = aggregated.NewPeerMergedDiscoveryHandler(s.GenericAPIServer.AggregatedDiscoveryGroupManager, c.ExtraConfig.PeerProxy, apiServiceLister, "apis")
+		s.GenericAPIServer.PeerMergedAggregatedLegacyDiscoveryManager = aggregated.NewPeerMergedDiscoveryHandler(s.GenericAPIServer.AggregatedLegacyDiscoveryGroupManager, c.ExtraConfig.PeerProxy, apiServiceLister, "api")
+
+		// Register cache invalidation callbacks to the peer proxy handler
+		if c.ExtraConfig.PeerProxy != nil {
+			if s.GenericAPIServer.PeerMergedAggregatedDiscoveryManager != nil {
+				c.ExtraConfig.PeerProxy.RegisterCacheInvalidationCallback(s.GenericAPIServer.PeerMergedAggregatedDiscoveryManager.InvalidateCache)
+			}
+			if s.GenericAPIServer.PeerMergedAggregatedLegacyDiscoveryManager != nil {
+				c.ExtraConfig.PeerProxy.RegisterCacheInvalidationCallback(s.GenericAPIServer.PeerMergedAggregatedLegacyDiscoveryManager.InvalidateCache)
+			}
+		}
+	}
+
+	apisHandlerWithAggregationSupport := aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedDiscoveryGroupManager, s.GenericAPIServer.PeerMergedAggregatedDiscoveryManager)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandlerWithAggregationSupport)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
+
+	// TODO: do we want to support legacy /api endpoint with peer merged discovery for aggregator?
+	/* apiHandler := aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedLegacyDiscoveryGroupManager, s.GenericAPIServer.PeerMergedAggregatedLegacyDiscoveryManager)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/api", apiHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/api/", apiHandler) */
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().V1().APIServices(), s)
 	if len(c.ExtraConfig.ProxyClientCertFile) > 0 && len(c.ExtraConfig.ProxyClientKeyFile) > 0 {

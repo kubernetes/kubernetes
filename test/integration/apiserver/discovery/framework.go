@@ -44,6 +44,7 @@ import (
 
 const acceptV1JSON = "application/json"
 const acceptV2JSON = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
+const acceptV2JSONUnmerged = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=unmerged"
 
 const maxTimeout = 10 * time.Second
 
@@ -716,4 +717,73 @@ func FindGroupVersionV2(discovery apidiscoveryv2.APIGroupDiscoveryList, gv metav
 	}
 
 	return nil
+}
+
+// FetchUnmergedAggregatedDiscovery explicitly requests unmerged aggregated discovery
+func FetchUnmergedAggregatedDiscovery(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
+	result, err := client.
+		Discovery().
+		RESTClient().
+		Get().
+		AbsPath("/apis").
+		SetHeader("Accept", acceptV2JSONUnmerged).
+		Do(ctx).
+		Raw()
+
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch unmerged aggregated discovery: %w", err)
+	}
+
+	groupList := apidiscoveryv2.APIGroupDiscoveryList{}
+	err = json.Unmarshal(result, &groupList)
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse unmerged aggregated discovery: %w", err)
+	}
+
+	return groupList, nil
+}
+
+// FetchMergedAggregatedDiscovery explicitly requests merged aggregated discovery
+func FetchMergedAggregatedDiscovery(ctx context.Context, client testClient) (apidiscoveryv2.APIGroupDiscoveryList, error) {
+	result, err := client.
+		Discovery().
+		RESTClient().
+		Get().
+		AbsPath("/apis").
+		SetHeader("Accept", acceptV2JSON).
+		Do(ctx).
+		Raw()
+
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to fetch merged aggregated discovery: %w", err)
+	}
+
+	groupList := apidiscoveryv2.APIGroupDiscoveryList{}
+	err = json.Unmarshal(result, &groupList)
+	if err != nil {
+		return apidiscoveryv2.APIGroupDiscoveryList{}, fmt.Errorf("failed to parse merged aggregated discovery: %w", err)
+	}
+
+	return groupList, nil
+}
+
+// WaitForMergedDiscoveryWithCondition waits for merged discovery to satisfy a condition.
+func WaitForMergedDiscoveryWithCondition(ctx context.Context, client testClient, condition func(result apidiscoveryv2.APIGroupDiscoveryList) bool) error {
+	return wait.PollUntilContextTimeout(
+		ctx,
+		5*time.Second,
+		30*time.Second,
+		true,
+		func(ctx context.Context) (done bool, err error) {
+			groupList, err := FetchMergedAggregatedDiscovery(ctx, client)
+			if err != nil {
+				return false, err
+			}
+
+			if condition(groupList) {
+				return true, nil
+			}
+
+			return false, nil
+		})
 }

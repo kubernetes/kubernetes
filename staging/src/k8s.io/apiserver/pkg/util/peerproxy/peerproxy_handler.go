@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/proxy"
@@ -60,6 +61,7 @@ type peerProxyHandler struct {
 	// Identity for this server.
 	serverID     string
 	finishedSync atomic.Bool
+
 	// Label to check against in identity leases to make sure
 	// we are working with apiserver identity leases only.
 	identityLeaseLabelSelector labels.Selector
@@ -83,8 +85,9 @@ type peerProxyHandler struct {
 	peerDiscoveryInfoCache atomic.Value
 	proxyTransport         http.RoundTripper
 	// Worker queue that keeps the peerDiscoveryInfoCache up-to-date.
-	peerLeaseQueue workqueue.TypedRateLimitingInterface[string]
-	serializer     runtime.NegotiatedSerializer
+	peerLeaseQueue             workqueue.TypedRateLimitingInterface[string]
+	serializer                 runtime.NegotiatedSerializer
+	cacheInvalidationCallbacks []func()
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
@@ -152,10 +155,6 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 		}
 
 		gvr := schema.GroupVersionResource{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion, Resource: requestInfo.Resource}
-		if requestInfo.APIGroup == "" {
-			gvr.Group = "core"
-		}
-
 		if h.shouldServeLocally(gvr) {
 			handler.ServeHTTP(w, r)
 			return
@@ -214,6 +213,10 @@ func (h *peerProxyHandler) RunLocalDiscoveryCacheSync(stopCh <-chan struct{}) er
 	return nil
 }
 
+func (h *peerProxyHandler) RegisterCacheInvalidationCallback(cb func()) {
+	h.cacheInvalidationCallbacks = append(h.cacheInvalidationCallbacks, cb)
+}
+
 func (h *peerProxyHandler) populateLocalDiscoveryCache() error {
 	_, resourcesByGV, _, err := h.discoveryClient.GroupsAndMaybeResources()
 	if err != nil {
@@ -222,9 +225,6 @@ func (h *peerProxyHandler) populateLocalDiscoveryCache() error {
 
 	freshLocalDiscoveryResponse := map[schema.GroupVersionResource]bool{}
 	for gv, resources := range resourcesByGV {
-		if gv.Group == "" {
-			gv.Group = "core"
-		}
 		for _, resource := range resources.APIResources {
 			gvr := gv.WithResource(resource.Name)
 			freshLocalDiscoveryResponse[gvr] = true
@@ -242,39 +242,48 @@ func (h *peerProxyHandler) populateLocalDiscoveryCache() error {
 // shouldServeLocally checks if the requested resource is present in the local
 // discovery cache indicating the request can be served by this server.
 func (h *peerProxyHandler) shouldServeLocally(gvr schema.GroupVersionResource) bool {
-	cache := h.localDiscoveryInfoCache.Load().(map[schema.GroupVersionResource]bool)
+	cacheValue := h.localDiscoveryInfoCache.Load()
+	if cacheValue == nil {
+		return false
+	}
+
+	cache, ok := cacheValue.(map[schema.GroupVersionResource]bool)
+	if !ok {
+		klog.Warning("Invalid cache type in localDiscoveryInfoCache")
+		return false
+	}
+
 	exists, ok := cache[gvr]
 	if !ok {
 		klog.V(4).Infof("resource not found for %v in local discovery cache\n", gvr.GroupVersion())
 		return false
 	}
 
-	if exists {
-		return true
-	}
-
-	return false
+	return exists
 }
 
 func (h *peerProxyHandler) findServiceableByPeerFromPeerDiscoveryCache(gvr schema.GroupVersionResource) []string {
 	var serviceableByIDs []string
-	cache := h.peerDiscoveryInfoCache.Load().(map[string]map[schema.GroupVersionResource]bool)
-	for peerID, servedResources := range cache {
+	cache := h.peerDiscoveryInfoCache.Load()
+	if cache == nil {
+		return serviceableByIDs
+	}
+
+	cacheMap, ok := cache.(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+	if !ok {
+		klog.Warning("Invalid cache type in peerDiscoveryInfoCache")
+		return serviceableByIDs
+	}
+
+	for peerID, servedResources := range cacheMap {
 		// Ignore local apiserver.
 		if peerID == h.serverID {
 			continue
 		}
-
-		exists, ok := servedResources[gvr]
-		if !ok {
-			continue
-		}
-
-		if exists {
+		if _, exists := servedResources[gvr]; exists {
 			serviceableByIDs = append(serviceableByIDs, peerID)
 		}
 	}
-
 	return serviceableByIDs
 }
 
@@ -352,4 +361,32 @@ func (h *peerProxyHandler) buildProxyRoundtripper(req *http.Request) (http.Round
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 	klog.ErrorS(err, "Error while proxying request to destination apiserver")
 	http.Error(w, err.Error(), http.StatusServiceUnavailable)
+}
+
+// GetPeerResources implements PeerDiscoveryProvider interface
+// Returns a map of serverID -> resources served by peer servers
+func (h *peerProxyHandler) GetPeerResources() map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery {
+	result := make(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+
+	// Only add peer server resources (exclude local)
+	peerCache := h.peerDiscoveryInfoCache.Load()
+	if peerCache == nil {
+		klog.V(4).Infof("GetPeerResources: peer cache is nil")
+		return result
+	}
+
+	cacheMap := peerCache.(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+
+	for serverID, resources := range cacheMap {
+		if serverID == h.serverID {
+			klog.V(4).Infof("GetPeerResources: skipping local server %s", serverID)
+			continue // Skip local server
+		}
+		result[serverID] = make(map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+		for gvr, resourceDetails := range resources {
+			result[serverID][gvr] = resourceDetails.DeepCopy()
+		}
+	}
+
+	return result
 }

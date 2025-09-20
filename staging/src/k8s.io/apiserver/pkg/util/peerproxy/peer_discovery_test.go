@@ -52,7 +52,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 		labelSelectorString string
 		updatedLease        *v1.Lease
 		deletedLeaseNames   []string
-		wantCache           map[string]map[schema.GroupVersionResource]bool
+		wantCache           map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery
 	}{
 		{
 			desc:                "single remote server",
@@ -66,9 +66,11 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 					Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
 				},
 			},
-			wantCache: map[string]map[schema.GroupVersionResource]bool{
+			wantCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
 				"remote-1": {
-					{Group: "testgroup", Version: "v1", Resource: "testresources"}: true,
+					{Group: "testgroup", Version: "v1", Resource: "testresources"}: {
+						Resource: "testresources",
+					},
 				},
 			},
 		},
@@ -91,12 +93,16 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 					Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-2")},
 				},
 			},
-			wantCache: map[string]map[schema.GroupVersionResource]bool{
+			wantCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
 				"remote-1": {
-					{Group: "testgroup", Version: "v1", Resource: "testresources"}: true,
+					{Group: "testgroup", Version: "v1", Resource: "testresources"}: {
+						Resource: "testresources",
+					},
 				},
 				"remote-2": {
-					{Group: "testgroup", Version: "v1", Resource: "testresources"}: true,
+					{Group: "testgroup", Version: "v1", Resource: "testresources"}: {
+						Resource: "testresources",
+					},
 				},
 			},
 		},
@@ -119,9 +125,11 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 				},
 				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-2")},
 			},
-			wantCache: map[string]map[schema.GroupVersionResource]bool{
+			wantCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
 				"remote-1": {
-					{Group: "testgroup", Version: "v1", Resource: "testresources"}: true,
+					{Group: "testgroup", Version: "v1", Resource: "testresources"}: {
+						Resource: "testresources",
+					},
 				},
 			},
 		},
@@ -138,7 +146,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 				},
 			},
 			deletedLeaseNames: []string{"remote-1"},
-			wantCache:         map[string]map[schema.GroupVersionResource]bool{},
+			wantCache:         map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{},
 		},
 	}
 
@@ -202,10 +210,12 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 			go h.RunPeerDiscoveryCacheSync(ctx, 1)
 
 			// Wait for initial cache update.
-			initialCache := map[string]map[schema.GroupVersionResource]bool{}
+			initialCache := map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{}
 			for _, lease := range tt.leases {
-				initialCache[lease.Name] = map[schema.GroupVersionResource]bool{
-					{Group: "testgroup", Version: "v1", Resource: "testresources"}: true,
+				initialCache[lease.Name] = map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
+					{Group: "testgroup", Version: "v1", Resource: "testresources"}: {
+						Resource: "testresources",
+					},
 				}
 			}
 			err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
