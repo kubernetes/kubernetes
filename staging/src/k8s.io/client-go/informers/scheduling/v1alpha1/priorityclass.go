@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	schedulingv1alpha1 "k8s.io/client-go/listers/scheduling/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // PriorityClassInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredPriorityClassInformer(client kubernetes.Interface, resyncPeriod 
 				}
 				return client.SchedulingV1alpha1().PriorityClasses().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apischedulingv1alpha1.PriorityClass{},
 		resyncPeriod,

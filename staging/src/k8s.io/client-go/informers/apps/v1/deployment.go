@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/listers/apps/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // DeploymentInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredDeploymentInformer(client kubernetes.Interface, namespace string
 				}
 				return client.AppsV1().Deployments(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiappsv1.Deployment{},
 		resyncPeriod,

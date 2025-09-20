@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // PersistentVolumeInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredPersistentVolumeInformer(client kubernetes.Interface, resyncPeri
 				}
 				return client.CoreV1().PersistentVolumes().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apicorev1.PersistentVolume{},
 		resyncPeriod,

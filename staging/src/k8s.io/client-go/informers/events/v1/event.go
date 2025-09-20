@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	eventsv1 "k8s.io/client-go/listers/events/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // EventInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredEventInformer(client kubernetes.Interface, namespace string, res
 				}
 				return client.EventsV1().Events(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apieventsv1.Event{},
 		resyncPeriod,

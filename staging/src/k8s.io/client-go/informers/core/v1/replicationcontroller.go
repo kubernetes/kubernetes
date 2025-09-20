@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ReplicationControllerInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredReplicationControllerInformer(client kubernetes.Interface, names
 				}
 				return client.CoreV1().ReplicationControllers(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apicorev1.ReplicationController{},
 		resyncPeriod,

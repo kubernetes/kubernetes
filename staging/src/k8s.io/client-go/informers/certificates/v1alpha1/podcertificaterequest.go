@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	certificatesv1alpha1 "k8s.io/client-go/listers/certificates/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // PodCertificateRequestInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredPodCertificateRequestInformer(client kubernetes.Interface, names
 				}
 				return client.CertificatesV1alpha1().PodCertificateRequests(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apicertificatesv1alpha1.PodCertificateRequest{},
 		resyncPeriod,

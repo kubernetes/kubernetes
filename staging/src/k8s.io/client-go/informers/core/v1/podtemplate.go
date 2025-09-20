@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // PodTemplateInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredPodTemplateInformer(client kubernetes.Interface, namespace strin
 				}
 				return client.CoreV1().PodTemplates(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apicorev1.PodTemplate{},
 		resyncPeriod,

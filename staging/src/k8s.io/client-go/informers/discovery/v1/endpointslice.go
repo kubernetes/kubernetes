@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	discoveryv1 "k8s.io/client-go/listers/discovery/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // EndpointSliceInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredEndpointSliceInformer(client kubernetes.Interface, namespace str
 				}
 				return client.DiscoveryV1().EndpointSlices(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apidiscoveryv1.EndpointSlice{},
 		resyncPeriod,

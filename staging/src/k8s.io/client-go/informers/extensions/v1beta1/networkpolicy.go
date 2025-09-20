@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	extensionsv1beta1 "k8s.io/client-go/listers/extensions/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // NetworkPolicyInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredNetworkPolicyInformer(client kubernetes.Interface, namespace str
 				}
 				return client.ExtensionsV1beta1().NetworkPolicies(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiextensionsv1beta1.NetworkPolicy{},
 		resyncPeriod,

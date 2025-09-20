@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ServiceAccountInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredServiceAccountInformer(client kubernetes.Interface, namespace st
 				}
 				return client.CoreV1().ServiceAccounts(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apicorev1.ServiceAccount{},
 		resyncPeriod,

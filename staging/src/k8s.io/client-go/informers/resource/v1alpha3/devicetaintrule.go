@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	resourcev1alpha3 "k8s.io/client-go/listers/resource/v1alpha3"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // DeviceTaintRuleInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredDeviceTaintRuleInformer(client kubernetes.Interface, resyncPerio
 				}
 				return client.ResourceV1alpha3().DeviceTaintRules().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiresourcev1alpha3.DeviceTaintRule{},
 		resyncPeriod,

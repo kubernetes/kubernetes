@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	networkingv1 "k8s.io/client-go/listers/networking/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ServiceCIDRInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredServiceCIDRInformer(client kubernetes.Interface, resyncPeriod ti
 				}
 				return client.NetworkingV1().ServiceCIDRs().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apinetworkingv1.ServiceCIDR{},
 		resyncPeriod,

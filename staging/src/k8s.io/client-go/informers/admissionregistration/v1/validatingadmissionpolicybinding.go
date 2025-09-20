@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	admissionregistrationv1 "k8s.io/client-go/listers/admissionregistration/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ValidatingAdmissionPolicyBindingInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredValidatingAdmissionPolicyBindingInformer(client kubernetes.Inter
 				}
 				return client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiadmissionregistrationv1.ValidatingAdmissionPolicyBinding{},
 		resyncPeriod,

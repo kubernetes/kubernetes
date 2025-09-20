@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	nodev1 "k8s.io/client-go/listers/node/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // RuntimeClassInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredRuntimeClassInformer(client kubernetes.Interface, resyncPeriod t
 				}
 				return client.NodeV1().RuntimeClasses().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apinodev1.RuntimeClass{},
 		resyncPeriod,

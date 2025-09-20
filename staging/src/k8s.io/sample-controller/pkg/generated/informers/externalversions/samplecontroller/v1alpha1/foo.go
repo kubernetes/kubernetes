@@ -26,6 +26,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 	apissamplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	versioned "k8s.io/sample-controller/pkg/generated/clientset/versioned"
 	internalinterfaces "k8s.io/sample-controller/pkg/generated/informers/externalversions/internalinterfaces"
@@ -82,6 +83,7 @@ func NewFilteredFooInformer(client versioned.Interface, namespace string, resync
 				}
 				return client.SamplecontrollerV1alpha1().Foos(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apissamplecontrollerv1alpha1.Foo{},
 		resyncPeriod,

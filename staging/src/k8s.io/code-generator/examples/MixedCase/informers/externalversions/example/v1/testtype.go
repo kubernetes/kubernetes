@@ -26,6 +26,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 	apisexamplev1 "k8s.io/code-generator/examples/MixedCase/apis/example/v1"
 	versioned "k8s.io/code-generator/examples/MixedCase/clientset/versioned"
 	internalinterfaces "k8s.io/code-generator/examples/MixedCase/informers/externalversions/internalinterfaces"
@@ -82,6 +83,7 @@ func NewFilteredTestTypeInformer(client versioned.Interface, namespace string, r
 				}
 				return client.ExampleV1().TestTypes(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apisexamplev1.TestType{},
 		resyncPeriod,

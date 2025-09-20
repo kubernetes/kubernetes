@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	networkingv1beta1 "k8s.io/client-go/listers/networking/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // IngressClassInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredIngressClassInformer(client kubernetes.Interface, resyncPeriod t
 				}
 				return client.NetworkingV1beta1().IngressClasses().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apinetworkingv1beta1.IngressClass{},
 		resyncPeriod,

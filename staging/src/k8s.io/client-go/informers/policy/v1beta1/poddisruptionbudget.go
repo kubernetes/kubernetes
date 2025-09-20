@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	policyv1beta1 "k8s.io/client-go/listers/policy/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // PodDisruptionBudgetInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredPodDisruptionBudgetInformer(client kubernetes.Interface, namespa
 				}
 				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apipolicyv1beta1.PodDisruptionBudget{},
 		resyncPeriod,

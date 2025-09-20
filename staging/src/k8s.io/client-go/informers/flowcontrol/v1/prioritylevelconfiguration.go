@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	flowcontrolv1 "k8s.io/client-go/listers/flowcontrol/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // PriorityLevelConfigurationInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredPriorityLevelConfigurationInformer(client kubernetes.Interface, 
 				}
 				return client.FlowcontrolV1().PriorityLevelConfigurations().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiflowcontrolv1.PriorityLevelConfiguration{},
 		resyncPeriod,
