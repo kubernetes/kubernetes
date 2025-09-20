@@ -175,7 +175,6 @@ func NewAttachDetachController(
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
-		adc.nodeStatusUpdater,
 		adc.nodeLister,
 		recorder)
 
