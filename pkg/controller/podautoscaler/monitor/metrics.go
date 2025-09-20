@@ -60,10 +60,10 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"action", "error", "metric_type"})
-	objectsCount = metrics.NewGauge(
+	numHorizontalPodAutoscalers = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      hpaControllerSubsystem,
-			Name:           "objects_count",
+			Name:           "num_horizontal_pod_autoscalers",
 			Help:           "Current number of controlled HPA objects.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -74,7 +74,7 @@ var (
 		reconciliationsDuration,
 		metricComputationTotal,
 		metricComputationDuration,
-		objectsCount,
+		numHorizontalPodAutoscalers,
 	}
 )
 

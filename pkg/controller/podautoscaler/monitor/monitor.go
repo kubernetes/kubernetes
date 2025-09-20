@@ -65,10 +65,10 @@ func (r *monitor) ObserveMetricComputationResult(action ActionLabel, err ErrorLa
 
 // ObserveHPAAddition observes the addition of an HPA object.
 func (r *monitor) ObserveHPAAddition() {
-	objectsCount.Inc()
+	numHorizontalPodAutoscalers.Inc()
 }
 
 // ObserveHPADeletion observes the deletion of an HPA object.
 func (r *monitor) ObserveHPADeletion() {
-	objectsCount.Dec()
+	numHorizontalPodAutoscalers.Dec()
 }
