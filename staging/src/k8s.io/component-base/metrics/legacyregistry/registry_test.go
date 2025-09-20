@@ -29,15 +29,31 @@ const (
 )
 
 func TestProcessStartTimeHeader(t *testing.T) {
-	now := time.Now()
+	now := processStart
 	handler := Handler()
 
-	request, _ := http.NewRequest("GET", "/", nil)
+	request, _ := http.NewRequest(http.MethodGet, "/", nil)
 	writer := httptest.NewRecorder()
 	handler.ServeHTTP(writer, request)
 	got := writer.Header().Get(processStartTimeHeader)
 	gotInt, _ := strconv.ParseInt(got, 10, 64)
 	if gotInt != now.Unix() {
 		t.Errorf("got %d, wanted %d", gotInt, now.Unix())
+	}
+}
+
+func TestProcessStartTimeHeaderStress(t *testing.T) {
+	now := time.Now()
+	handler := Handler()
+
+	for range 1000 {
+		req, _ := http.NewRequest(http.MethodGet, "/", nil)
+		writer := httptest.NewRecorder()
+		handler.ServeHTTP(writer, req)
+		got := writer.Header().Get(processStartTimeHeader)
+		gotInt, _ := strconv.ParseInt(got, 10, 64)
+		if gotInt != now.Unix() {
+			t.Errorf("got %d, wanted %d", gotInt, now.Unix())
+		}
 	}
 }
