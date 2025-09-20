@@ -368,8 +368,8 @@ func (c *Controller) pvcUpdated(logger klog.Logger, old, new interface{}) {
 
 	logger.V(4).Info("Got event on PVC", "PVC", klog.KObj(newPVC))
 
-	vavNames := sets.New(getPVCReferencedVACNames(oldPVC)...).Delete(getPVCReferencedVACNames(newPVC)...).UnsortedList()
-	for _, vacName := range vavNames {
+	vavNames := sets.New(getPVCReferencedVACNames(oldPVC)...).Delete(getPVCReferencedVACNames(newPVC)...)
+	for vacName := range vavNames {
 		c.queue.Add(vacName)
 	}
 }
@@ -388,8 +388,8 @@ func (c *Controller) pvUpdated(logger klog.Logger, old, new interface{}) {
 	}
 
 	logger.V(4).Info("Got event on PV", "PV", klog.KObj(newPV))
-	vavNames := sets.New(getPVReferencedVACNames(oldPV)...).Delete(getPVReferencedVACNames(newPV)...).UnsortedList()
-	for _, vacName := range vavNames {
+	vavNames := sets.New(getPVReferencedVACNames(oldPV)...).Delete(getPVReferencedVACNames(newPV)...)
+	for vacName := range vavNames {
 		c.queue.Add(vacName)
 	}
 }
