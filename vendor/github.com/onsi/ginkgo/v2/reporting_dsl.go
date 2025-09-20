@@ -60,7 +60,7 @@ AddReportEntry() must be called within a Subject or Setup node - not in a Contai
 
 You can learn more about Report Entries here: https://onsi.github.io/ginkgo/#attaching-data-to-reports
 */
-func AddReportEntry(name string, args ...interface{}) {
+func AddReportEntry(name string, args ...any) {
 	cl := types.NewCodeLocation(1)
 	reportEntry, err := internal.NewReportEntry(name, cl, args...)
 	if err != nil {
@@ -89,7 +89,7 @@ You can learn more about ReportBeforeEach here: https://onsi.github.io/ginkgo/#g
 You can learn about interruptible nodes here: https://onsi.github.io/ginkgo/#spec-timeouts-and-interruptible-nodes
 */
 func ReportBeforeEach(body any, args ...any) bool {
-	combinedArgs := []interface{}{body}
+	combinedArgs := []any{body}
 	combinedArgs = append(combinedArgs, args...)
 
 	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeReportBeforeEach, "", combinedArgs...))
@@ -113,7 +113,7 @@ You can learn more about ReportAfterEach here: https://onsi.github.io/ginkgo/#ge
 You can learn about interruptible nodes here: https://onsi.github.io/ginkgo/#spec-timeouts-and-interruptible-nodes
 */
 func ReportAfterEach(body any, args ...any) bool {
-	combinedArgs := []interface{}{body}
+	combinedArgs := []any{body}
 	combinedArgs = append(combinedArgs, args...)
 
 	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeReportAfterEach, "", combinedArgs...))
@@ -143,7 +143,7 @@ You can learn more about Ginkgo's reporting infrastructure, including generating
 You can learn about interruptible nodes here: https://onsi.github.io/ginkgo/#spec-timeouts-and-interruptible-nodes
 */
 func ReportBeforeSuite(body any, args ...any) bool {
-	combinedArgs := []interface{}{body}
+	combinedArgs := []any{body}
 	combinedArgs = append(combinedArgs, args...)
 	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeReportBeforeSuite, "", combinedArgs...))
 }
@@ -174,8 +174,8 @@ You can learn more about Ginkgo's reporting infrastructure, including generating
 
 You can learn about interruptible nodes here: https://onsi.github.io/ginkgo/#spec-timeouts-and-interruptible-nodes
 */
-func ReportAfterSuite(text string, body any, args ...interface{}) bool {
-	combinedArgs := []interface{}{body}
+func ReportAfterSuite(text string, body any, args ...any) bool {
+	combinedArgs := []any{body}
 	combinedArgs = append(combinedArgs, args...)
 	return pushNode(internal.NewNode(deprecationTracker, types.NodeTypeReportAfterSuite, text, combinedArgs...))
 }

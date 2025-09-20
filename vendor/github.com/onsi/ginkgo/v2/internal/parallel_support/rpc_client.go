@@ -35,7 +35,7 @@ func (client *rpcClient) Close() error {
 	return client.client.Close()
 }
 
-func (client *rpcClient) poll(method string, data interface{}) error {
+func (client *rpcClient) poll(method string, data any) error {
 	for {
 		err := client.client.Call(method, voidSender, data)
 		if err == nil {
