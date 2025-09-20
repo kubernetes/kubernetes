@@ -98,7 +98,7 @@ resources:
 // 2. Secrets are decrypted on read
 // when EncryptionConfiguration is passed to KubeAPI server.
 func TestSecretsShouldBeTransformed(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		transformerConfigContent string
 		transformerPrefix        string
 		unSealFunc               unSealSecret
@@ -334,8 +334,17 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 				t.Errorf("unexpected failure when etting the secret from the cache: %v", err)
 			}
 
-			// l) let's try the normal deletion flow, we expect an error
-			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, metav1.DeleteOptions{})
+			withDryRun := func(opts metav1.DeleteOptions) metav1.DeleteOptions {
+				opts.DryRun = []string{metav1.DryRunAll}
+
+				return opts
+			}
+
+			// l) let's try the normal deletion flow with/without dry run, we expect an error
+			emptyOptions := metav1.DeleteOptions{}
+			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, withDryRun(emptyOptions))
+			tc.corrupObjDeletWithoutOption.verify(t, err)
+			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, emptyOptions)
 			tc.corrupObjDeletWithoutOption.verify(t, err)
 
 			// m) make an attempt to delete the corrupt object by enabling the option,
@@ -344,6 +353,9 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			options := metav1.DeleteOptions{
 				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
 			}
+			dryRunOptions := withDryRun(options)
+			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, dryRunOptions)
+			tc.corrupObjDeleteWithOption.verify(t, err)
 			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, options)
 			tc.corrupObjDeleteWithOption.verify(t, err)
 
@@ -351,6 +363,8 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			permitUserToDoVerbOnSecret(t, adminClient, testUser, testNamespace, []string{"unsafe-delete-ignore-read-errors"})
 
 			// o) let's try to do unsafe delete again
+			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, dryRunOptions)
+			tc.corrupObjDeleteWithOptionAndPrivilege.verify(t, err)
 			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, options)
 			tc.corrupObjDeleteWithOptionAndPrivilege.verify(t, err)
 
