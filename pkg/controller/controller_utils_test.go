@@ -29,6 +29,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -48,6 +48,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/testutil"
@@ -1690,4 +1691,112 @@ func TestFilterPodsByOwner(t *testing.T) {
 			}
 		})
 	}
+}
+func TestGetPodFromTemplate_PropagateOwnerRefs(t *testing.T) {
+	parent := &appsv1.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rs-test",
+			Namespace: "default",
+			UID:       "12345",
+		},
+	}
+
+	tests := []struct {
+		name           string
+		featureGate    bool
+		templateRefs   []metav1.OwnerReference
+		expectedRefs   int
+		expectedUIDs   []string
+	}{
+		{
+			name:        "feature gate disabled - no propagation",
+			featureGate: false,
+			templateRefs: []metav1.OwnerReference{
+				{APIVersion: "apps/v1", Kind: "Foo", Name: "bar", UID: "111"},
+			},
+			expectedRefs: 1, // only controllerRef
+		},
+		{
+			name:        "feature gate enabled - valid non-controller ref propagated",
+			featureGate: true,
+			templateRefs: []metav1.OwnerReference{
+				{APIVersion: "apps/v1", Kind: "Foo", Name: "bar", UID: "222"},
+			},
+			expectedRefs: 2,
+			expectedUIDs: []string{"12345", "222"},
+		},
+		{
+			name:        "feature gate enabled - controller=true ref skipped",
+			featureGate: true,
+			templateRefs: []metav1.OwnerReference{
+				{APIVersion: "apps/v1", Kind: "Foo", Name: "bar", UID: "333", Controller: boolPtr(true)},
+			},
+			expectedRefs: 1, // only controllerRef
+			expectedUIDs: []string{"12345"},
+		},
+		{
+			name:        "feature gate enabled - empty UID ref skipped",
+			featureGate: true,
+			templateRefs: []metav1.OwnerReference{
+				{APIVersion: "apps/v1", Kind: "Foo", Name: "bar"},
+			},
+			expectedRefs: 1, // only controllerRef
+			expectedUIDs: []string{"12345"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(
+    		t,
+    		utilfeature.DefaultFeatureGate,
+    		features.PropagatePodTemplateOwnerRefs,
+    		tt.featureGate,
+			)
+
+
+			template := &v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: tt.templateRefs,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c", Image: "busybox"}},
+				},
+			}
+
+			controllerRef := metav1.NewControllerRef(parent, appsv1.SchemeGroupVersion.WithKind("ReplicaSet"))
+			pod, err := GetPodFromTemplate(template, parent, controllerRef)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(pod.OwnerReferences) != tt.expectedRefs {
+				t.Errorf("expected %d ownerRefs, got %d", tt.expectedRefs, len(pod.OwnerReferences))
+			}
+
+			// If we expect specific UIDs, check them
+			if len(tt.expectedUIDs) > 0 {
+				var gotUIDs []string
+				for _, or := range pod.OwnerReferences {
+					gotUIDs = append(gotUIDs, string(or.UID))
+				}
+				for _, expectedUID := range tt.expectedUIDs {
+					found := false
+					for _, got := range gotUIDs {
+						if got == expectedUID {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("expected UID %s not found in OwnerReferences: %v", expectedUID, gotUIDs)
+					}
+				}
+			}
+		})
+	}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
