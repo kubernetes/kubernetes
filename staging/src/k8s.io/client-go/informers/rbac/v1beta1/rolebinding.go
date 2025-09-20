@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	rbacv1beta1 "k8s.io/client-go/listers/rbac/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // RoleBindingInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredRoleBindingInformer(client kubernetes.Interface, namespace strin
 				}
 				return client.RbacV1beta1().RoleBindings(namespace).Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
 		},
 		&apirbacv1beta1.RoleBinding{},
 		resyncPeriod,
