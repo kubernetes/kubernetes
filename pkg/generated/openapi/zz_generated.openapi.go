@@ -1059,12 +1059,14 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.ResourceSlice{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1_ResourceSlice(ref),
 		resourcev1.ResourceSliceList{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_ResourceSliceList(ref),
 		resourcev1.ResourceSliceSpec{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_ResourceSliceSpec(ref),
+		resourcev1.SliceDeviceTaint{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1_SliceDeviceTaint(ref),
 		v1alpha3.CELDeviceSelector{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref),
 		v1alpha3.DeviceSelector{}.OpenAPIModelName():                                                                    schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref),
 		v1alpha3.DeviceTaint{}.OpenAPIModelName():                                                                       schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref),
 		v1alpha3.DeviceTaintRule{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1alpha3_DeviceTaintRule(ref),
 		v1alpha3.DeviceTaintRuleList{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleList(ref),
 		v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleSpec(ref),
+		v1alpha3.DeviceTaintRuleStatus{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleStatus(ref),
 		v1alpha3.DeviceTaintSelector{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref),
 		resourcev1beta1.AllocatedDeviceStatus{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref),
 		resourcev1beta1.AllocationResult{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_AllocationResult(ref),
@@ -1109,6 +1111,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.ResourceSlice{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta1_ResourceSlice(ref),
 		resourcev1beta1.ResourceSliceList{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta1_ResourceSliceList(ref),
 		resourcev1beta1.ResourceSliceSpec{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref),
+		resourcev1beta1.SliceDeviceTaint{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_SliceDeviceTaint(ref),
 		resourcev1beta2.AllocatedDeviceStatus{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta2_AllocatedDeviceStatus(ref),
 		resourcev1beta2.AllocationResult{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_AllocationResult(ref),
 		resourcev1beta2.CELDeviceSelector{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_CELDeviceSelector(ref),
@@ -1152,6 +1155,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.ResourceSlice{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta2_ResourceSlice(ref),
 		resourcev1beta2.ResourceSliceList{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_ResourceSliceList(ref),
 		resourcev1beta2.ResourceSliceSpec{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref),
+		resourcev1beta2.SliceDeviceTaint{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_SliceDeviceTaint(ref),
 		schedulingv1.PriorityClass{}.OpenAPIModelName():                                                                 schema_k8sio_api_scheduling_v1_PriorityClass(ref),
 		schedulingv1.PriorityClassList{}.OpenAPIModelName():                                                             schema_k8sio_api_scheduling_v1_PriorityClassList(ref),
 		schedulingv1alpha1.PriorityClass{}.OpenAPIModelName():                                                           schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref),
@@ -48390,25 +48394,6 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
-					"taints": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceTaint{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
 					"bindsToNode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
@@ -48468,7 +48453,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.DeviceAttribute{}.OpenAPIModelName(), resourcev1.DeviceCapacity{}.OpenAPIModelName(), resourcev1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1.DeviceTaint{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.DeviceAttribute{}.OpenAPIModelName(), resourcev1.DeviceCapacity{}.OpenAPIModelName(), resourcev1.DeviceCounterConsumption{}.OpenAPIModelName()},
 	}
 }
 
@@ -49359,7 +49344,7 @@ func schema_k8sio_api_resource_v1_DeviceTaint(ref common.ReferenceCallback) comm
 					},
 					"effect": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -49372,12 +49357,32 @@ func schema_k8sio_api_resource_v1_DeviceTaint(ref common.ReferenceCallback) comm
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is a human-readable explanation for the taint.\n\nThe length must be smaller or equal to 1024.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"data": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
+						},
+					},
+					"evictionsPerSecond": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint. If multiple taints cause eviction of the same set of Pods, then the lowest rate defined in any of those taints applies.\n\nThe default is 100 Pods/s.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 				Required: []string{"key", "effect"},
 			},
 		},
 		Dependencies: []string{
-			metav1.Time{}.OpenAPIModelName()},
+			metav1.Time{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -50156,6 +50161,25 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 							},
 						},
 					},
+					"taints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, these are driver-defined taints.\n\nThe maximum number of taints is 32. Either Devices or Taints may be set, but not both.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(resourcev1.SliceDeviceTaint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 					"perDeviceNodeSelection": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
@@ -50187,7 +50211,81 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.CounterSet{}.OpenAPIModelName(), resourcev1.Device{}.OpenAPIModelName(), resourcev1.ResourcePool{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.CounterSet{}.OpenAPIModelName(), resourcev1.Device{}.OpenAPIModelName(), resourcev1.ResourcePool{}.OpenAPIModelName(), resourcev1.SliceDeviceTaint{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_SliceDeviceTaint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SliceDeviceTaint defines one taint within a ResourceSlice.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"device": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Device is the name of the device in the pool that the ResourceSlice belongs to which is affected by the taint. Multiple taints may affect the same device.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint key to be applied to a device. Must be a label name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint value corresponding to the taint key. Must be a label value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+						},
+					},
+					"timeAdded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is a human-readable explanation for the taint.\n\nThe length must be smaller or equal to 1024.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"data": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
+						},
+					},
+					"evictionsPerSecond": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint. If multiple taints cause eviction of the same set of Pods, then the lowest rate defined in any of those taints applies.\n\nThe default is 100 Pods/s.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+				Required: []string{"device", "key", "effect"},
+			},
+		},
+		Dependencies: []string{
+			metav1.Time{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -50258,11 +50356,11 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref common.ReferenceCallback
 					},
 					"effect": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.\n - `\"None\"` No effect, the taint is purely informational.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+							Enum:        []interface{}{"NoExecute", "NoSchedule", "None"},
 						},
 					},
 					"timeAdded": {
@@ -50271,12 +50369,32 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref common.ReferenceCallback
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is a human-readable explanation for the taint.\n\nThe length must be smaller or equal to 1024.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"data": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
+						},
+					},
+					"evictionsPerSecond": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint. If multiple taints cause eviction of the same set of Pods, then the lowest rate defined in any of those taints applies.\n\nThe default is 100 Pods/s.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 				Required: []string{"key", "effect"},
 			},
 		},
 		Dependencies: []string{
-			metav1.Time{}.OpenAPIModelName()},
+			metav1.Time{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -50315,12 +50433,19 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintRule(ref common.ReferenceCall
 							Ref:         ref(v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName()),
 						},
 					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status provides information about an on-going pod eviction.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(v1alpha3.DeviceTaintRuleStatus{}.OpenAPIModelName()),
+						},
+					},
 				},
-				Required: []string{"spec"},
+				Required: []string{"spec", "status"},
 			},
 		},
 		Dependencies: []string{
-			v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+			v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName(), v1alpha3.DeviceTaintRuleStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -50401,6 +50526,33 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleSpec(ref common.Reference
 		},
 		Dependencies: []string{
 			v1alpha3.DeviceTaint{}.OpenAPIModelName(), v1alpha3.DeviceTaintSelector{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceTaintRuleStatus provides information about an on-going pod eviction.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"podsPendingEviction": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodsPendingEviction counts the number of Pods which still need to be evicted. Because taints with the NoExecute effect also prevent scheduling new pods, this number should eventually reach zero.\n\nThe count gets updated periodically, so it is not guaranteed to be 100% accurate.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"podsEvicted": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodsEvicted counts the number of Pods which were evicted because of the taint.\n\nThis gets updated periodically, so it is not guaranteed to be 100% accurate. The actual count may be higher if the controller evicted some Pods and then gets restarted before updating this field.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -50657,25 +50809,6 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
-					"taints": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceTaint{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
 					"bindsToNode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
@@ -50734,7 +50867,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta1.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta1.DeviceTaint{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta1.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta1.DeviceCounterConsumption{}.OpenAPIModelName()},
 	}
 }
 
@@ -51913,7 +52046,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceTaint(ref common.ReferenceCallback)
 					},
 					"effect": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -51926,12 +52059,32 @@ func schema_k8sio_api_resource_v1beta1_DeviceTaint(ref common.ReferenceCallback)
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is a human-readable explanation for the taint.\n\nThe length must be smaller or equal to 1024.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"data": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
+						},
+					},
+					"evictionsPerSecond": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint. If multiple taints cause eviction of the same set of Pods, then the lowest rate defined in any of those taints applies.\n\nThe default is 100 Pods/s.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 				Required: []string{"key", "effect"},
 			},
 		},
 		Dependencies: []string{
-			metav1.Time{}.OpenAPIModelName()},
+			metav1.Time{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -52621,6 +52774,25 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 					},
+					"taints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, these are driver-defined taints.\n\nThe maximum number of taints is 32. Either Devices or Taints may be set, but not both.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(resourcev1beta1.SliceDeviceTaint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 					"perDeviceNodeSelection": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
@@ -52652,7 +52824,81 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.CounterSet{}.OpenAPIModelName(), resourcev1beta1.Device{}.OpenAPIModelName(), resourcev1beta1.ResourcePool{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.CounterSet{}.OpenAPIModelName(), resourcev1beta1.Device{}.OpenAPIModelName(), resourcev1beta1.ResourcePool{}.OpenAPIModelName(), resourcev1beta1.SliceDeviceTaint{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_SliceDeviceTaint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SliceDeviceTaint defines one taint within a ResourceSlice.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"device": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Device is the name of the device in the pool that the ResourceSlice belongs to which is affected by the taint. Multiple taints may affect the same device.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint key to be applied to a device. Must be a label name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint value corresponding to the taint key. Must be a label value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+						},
+					},
+					"timeAdded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is a human-readable explanation for the taint.\n\nThe length must be smaller or equal to 1024.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"data": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
+						},
+					},
+					"evictionsPerSecond": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint. If multiple taints cause eviction of the same set of Pods, then the lowest rate defined in any of those taints applies.\n\nThe default is 100 Pods/s.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+				Required: []string{"device", "key", "effect"},
+			},
+		},
+		Dependencies: []string{
+			metav1.Time{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -53046,25 +53292,6 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							Format:      "",
 						},
 					},
-					"taints": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceTaint{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
 					"bindsToNode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
@@ -53124,7 +53351,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta2.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta2.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta2.DeviceTaint{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta2.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta2.DeviceCounterConsumption{}.OpenAPIModelName()},
 	}
 }
 
@@ -54015,7 +54242,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceTaint(ref common.ReferenceCallback)
 					},
 					"effect": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -54028,12 +54255,32 @@ func schema_k8sio_api_resource_v1beta2_DeviceTaint(ref common.ReferenceCallback)
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is a human-readable explanation for the taint.\n\nThe length must be smaller or equal to 1024.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"data": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
+						},
+					},
+					"evictionsPerSecond": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint. If multiple taints cause eviction of the same set of Pods, then the lowest rate defined in any of those taints applies.\n\nThe default is 100 Pods/s.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 				Required: []string{"key", "effect"},
 			},
 		},
 		Dependencies: []string{
-			metav1.Time{}.OpenAPIModelName()},
+			metav1.Time{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -54812,6 +55059,25 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 					},
+					"taints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, these are driver-defined taints.\n\nThe maximum number of taints is 32. Either Devices or Taints may be set, but not both.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(resourcev1beta2.SliceDeviceTaint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 					"perDeviceNodeSelection": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
@@ -54843,7 +55109,81 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.CounterSet{}.OpenAPIModelName(), resourcev1beta2.Device{}.OpenAPIModelName(), resourcev1beta2.ResourcePool{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.CounterSet{}.OpenAPIModelName(), resourcev1beta2.Device{}.OpenAPIModelName(), resourcev1beta2.ResourcePool{}.OpenAPIModelName(), resourcev1beta2.SliceDeviceTaint{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_SliceDeviceTaint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SliceDeviceTaint defines one taint within a ResourceSlice.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"device": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Device is the name of the device in the pool that the ResourceSlice belongs to which is affected by the taint. Multiple taints may affect the same device.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint key to be applied to a device. Must be a label name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint value corresponding to the taint key. Must be a label value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+						},
+					},
+					"timeAdded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is a human-readable explanation for the taint.\n\nThe length must be smaller or equal to 1024.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"data": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
+						},
+					},
+					"evictionsPerSecond": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint. If multiple taints cause eviction of the same set of Pods, then the lowest rate defined in any of those taints applies.\n\nThe default is 100 Pods/s.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+				Required: []string{"device", "key", "effect"},
+			},
+		},
+		Dependencies: []string{
+			metav1.Time{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 

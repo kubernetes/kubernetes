@@ -556,11 +556,27 @@ func TaintAllDevices(taints ...resourceapi.DeviceTaint) driverResourcesMutatorFu
 	return func(resources map[string]resourceslice.DriverResources) {
 		for i := range resources {
 			for j := range resources[i].Pools {
-				for k := range resources[i].Pools[j].Slices {
-					for l := range resources[i].Pools[j].Slices[k].Devices {
-						resources[i].Pools[j].Slices[k].Devices[l].Taints = append(resources[i].Pools[j].Slices[k].Devices[l].Taints, taints...)
+				if len(resources[i].Pools[j].Slices) == 0 {
+					continue
+				}
+
+				// We need one additional slice to hold all the device taints for the pool.
+				taintSlice := resources[i].Pools[j].Slices[0].DeepCopy()
+				taintSlice.Devices = nil
+				for _, slice := range resources[i].Pools[j].Slices {
+					for _, device := range slice.Devices {
+						for _, taint := range taints {
+							slice.Taints = append(slice.Taints, resourceapi.SliceDeviceTaint{
+								Device:      device.Name,
+								DeviceTaint: taint,
+							})
+						}
 					}
 				}
+
+				pool := resources[i].Pools[j]
+				pool.Slices = append(pool.Slices, *taintSlice)
+				resources[i].Pools[j] = pool
 			}
 		}
 	}
@@ -570,25 +586,33 @@ func NetworkResources(maxAllocations int, tainted bool) driverResourcesGenFunc {
 	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
 		driverResources := make(map[string]resourceslice.DriverResources)
 		devices := make([]resourceapi.Device, 0)
+		var taintSlice resourceslice.Slice
 		for i := 0; i < maxAllocations; i++ {
 			device := resourceapi.Device{
 				Name: fmt.Sprintf("device-%d", i),
 			}
 			if tainted {
-				device.Taints = []resourceapi.DeviceTaint{{
-					Key:    "example.com/taint",
-					Value:  "tainted",
-					Effect: resourceapi.DeviceTaintEffectNoSchedule,
-				}}
+				taintSlice.Taints = append(taintSlice.Taints, resourceapi.SliceDeviceTaint{
+					Device: device.Name,
+					DeviceTaint: resourceapi.DeviceTaint{
+						Key:    "example.com/taint",
+						Value:  "tainted",
+						Effect: resourceapi.DeviceTaintEffectNoSchedule,
+					},
+				})
 			}
 			devices = append(devices, device)
+		}
+		slices := []resourceslice.Slice{{
+			Devices: devices,
+		}}
+		if len(taintSlice.Taints) > 0 {
+			slices = append(slices, taintSlice)
 		}
 		driverResources[multiHostDriverResources] = resourceslice.DriverResources{
 			Pools: map[string]resourceslice.Pool{
 				"network": {
-					Slices: []resourceslice.Slice{{
-						Devices: devices,
-					}},
+					Slices: slices,
 					NodeSelector: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{{
 							// MatchExpressions allow multiple values,
