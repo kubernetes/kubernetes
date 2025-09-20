@@ -500,6 +500,10 @@ func (m *manager) SetContainerRuntime(runtime kubecontainer.Runtime) {
 	m.containerRuntime = runtime
 }
 
+func (m *manager) SetContainerRuntime(runtime kubecontainer.Runtime) {
+	m.containerRuntime = runtime
+}
+
 func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
@@ -557,7 +561,7 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 	}
 
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
-	fit, reason, message := m.canResizePod(m.getAllocatedPods(m.getActivePods()), pod)
+	fit, reason, message := m.canResizePod(ctx, m.getAllocatedPods(m.getActivePods()), pod)
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(pod); err != nil {

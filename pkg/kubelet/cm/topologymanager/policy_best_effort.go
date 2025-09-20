@@ -16,6 +16,8 @@ limitations under the License.
 
 package topologymanager
 
+import "context"
+
 type bestEffortPolicy struct {
 	// numaInfo represents list of NUMA Nodes available on the underlying machine and distances between them
 	numaInfo *NUMAInfo
@@ -40,8 +42,8 @@ func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	return true
 }
 
-func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
-	filteredHints := filterProvidersHints(providersHints)
+func (p *bestEffortPolicy) Merge(ctx context.Context, providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
+	filteredHints := filterProvidersHints(ctx, providersHints)
 	merger := NewHintMerger(p.numaInfo, filteredHints, p.Name(), p.opts)
 	bestHint := merger.Merge()
 	admit := p.canAdmitPodResult(&bestHint)
