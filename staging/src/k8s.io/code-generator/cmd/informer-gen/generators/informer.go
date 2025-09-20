@@ -103,6 +103,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"v1ListOptions":                   c.Universe.Type(v1ListOptions),
 		"version":                         namer.IC(g.groupVersion.Version.String()),
 		"watchInterface":                  c.Universe.Type(watchInterface),
+		"watchlistDoesClientNotSupportWatchListSemantics": c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/watchlist", Name: "DoesClientNotSupportWatchListSemantics"}),
 	}
 
 	sw.Do(typeInformerInterface, m)
@@ -173,6 +174,7 @@ func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .name
 				}
 				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch(ctx, options)
 			},
+            UnsupportedWatchListSemantics: $.watchlistDoesClientNotSupportWatchListSemantics|raw$(client),
 		},
 		&$.type|raw${},
 		resyncPeriod,
