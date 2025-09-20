@@ -55,8 +55,8 @@ func GetPodAdmitResult(err error) lifecycle.PodAdmitResult {
 	}
 
 	return lifecycle.PodAdmitResult{
+		Admit:   false,
 		Message: admissionErr.Error(),
 		Reason:  admissionErr.Type(),
-		Admit:   false,
 	}
 }
