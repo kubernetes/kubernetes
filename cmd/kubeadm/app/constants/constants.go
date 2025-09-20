@@ -145,7 +145,7 @@ const (
 	// FrontProxyClientKeyName defines front proxy key name
 	FrontProxyClientKeyName = "front-proxy-client.key"
 	// FrontProxyClientCertCommonName defines front proxy certificate common name
-	FrontProxyClientCertCommonName = "front-proxy-client" //used as subject.commonname attribute (CN)
+	FrontProxyClientCertCommonName = "front-proxy-client" // used as subject.commonname attribute (CN)
 
 	// AdminKubeConfigFileName defines name for the kubeconfig aimed to be used by the admin of the cluster
 	AdminKubeConfigFileName = "admin.conf"
@@ -186,8 +186,10 @@ const (
 	// CSRAutoApprovalClusterRoleName defines the name of the auto-bootstrapped ClusterRole for making the csrapprover controller auto-approve the CSR
 	// Starting from v1.8, CSRAutoApprovalClusterRoleName is automatically created by the API server on startup
 	CSRAutoApprovalClusterRoleName = "system:certificates.k8s.io:certificatesigningrequests:nodeclient"
-	// NodeSelfCSRAutoApprovalClusterRoleName is a role defined in default 1.8 RBAC policies for automatic CSR approvals for automatically rotated node certificates
+	// NodeSelfCSRAutoApprovalClusterRoleName is a role defined in default 1.8 RBAC policies for automatic CSR approvals for automatically rotated node client certificates
 	NodeSelfCSRAutoApprovalClusterRoleName = "system:certificates.k8s.io:certificatesigningrequests:selfnodeclient"
+	// NodeSelfServingCSRAutoApprovalClusterRoleName is a role defined in default 1.35 RBAC policies for automatic CSR approvals for automatically rotated node serving certificates
+	NodeSelfServingCSRAutoApprovalClusterRoleName = "system:certificates.k8s.io:certificatesigningrequests:selfnodeserving"
 	// NodesClusterRoleBinding defines the well-known ClusterRoleBinding which binds the too permissive system:node
 	// ClusterRole to the system:nodes group. Since kubeadm is using the Node Authorizer, this ClusterRoleBinding's
 	// system:nodes group subject is removed if present.
@@ -203,8 +205,10 @@ const (
 	GetNodesClusterRoleName = "kubeadm:get-nodes"
 	// NodeAutoApproveBootstrapClusterRoleBinding defines the name of the ClusterRoleBinding that makes the csrapprover approve node CSRs
 	NodeAutoApproveBootstrapClusterRoleBinding = "kubeadm:node-autoapprove-bootstrap"
-	// NodeAutoApproveCertificateRotationClusterRoleBinding defines name of the ClusterRoleBinding that makes the csrapprover approve node auto rotated CSRs
+	// NodeAutoApproveCertificateRotationClusterRoleBinding defines name of the ClusterRoleBinding that makes the csrapprover approve node auto rotated client CSRs
 	NodeAutoApproveCertificateRotationClusterRoleBinding = "kubeadm:node-autoapprove-certificate-rotation"
+	// NodeAutoApproveServingCertificateRotationClusterRoleBinding defines name of the ClusterRoleBinding that makes the csrapprover approve node auto rotated serving CSRs
+	NodeAutoApproveServingCertificateRotationClusterRoleBinding = "kubeadm:node-autoapprove-serving-certificate-rotation"
 	// ClusterAdminsGroupAndClusterRoleBinding is the name of the Group used for kubeadm generated cluster
 	// admin credentials and the name of the ClusterRoleBinding that binds the same Group to the "cluster-admin"
 	// built-in ClusterRole.
