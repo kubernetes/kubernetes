@@ -2568,6 +2568,8 @@ type ResourceRequirements struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	Claims []ResourceClaim
+	// per cpu usage
+	PerCPU []uint64
 }
 
 // VolumeResourceRequirements describes the storage resource requirements for a volume.
