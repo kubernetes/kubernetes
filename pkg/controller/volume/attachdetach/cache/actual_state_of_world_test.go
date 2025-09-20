@@ -811,7 +811,7 @@ func Test_SetVolumesMountedByNode_Positive_UnsetWithInitialSetVerifyDetachReques
 	if err != nil {
 		t.Fatalf("SetDetachRequestTime failed. Expected: <no error> Actual: <%v>", err)
 	}
-	asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName)
 	expectedDetachRequestedTime := asw.GetAttachedVolumes()[0].DetachRequestedTime
 
 	// Act
@@ -879,7 +879,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_Marked(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetDetachRequestTime failed. Expected: <no error> Actual: <%v>", err)
 	}
-	asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName)
 
 	// Assert
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -913,7 +913,7 @@ func Test_MarkDesireToDetach_Positive_MarkedAddVolumeNodeReset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetDetachRequestTime failed. Expected: <no error> Actual: <%v>", err)
 	}
-	asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName)
 	// Reset detach request time to 0
 	asw.ResetDetachRequestTime(logger, generatedVolumeName, nodeName)
 
@@ -955,7 +955,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_UnsetWithInitialSetVolumesMo
 	if err != nil {
 		t.Fatalf("SetDetachRequestTime failed. Expected: <no error> Actual: <%v>", err)
 	}
-	asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName)
 
 	// Assert
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -988,7 +988,7 @@ func Test_RemoveVolumeFromReportAsAttached(t *testing.T) {
 	vol1 := addVol("vol1")
 	vol2 := addVol("vol2")
 
-	removed := asw.RemoveVolumeFromReportAsAttached(vol1, nodeName)
+	removed := asw.RemoveVolumeFromReportAsAttached(logger, vol1, nodeName)
 	if removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached succeeded. Should wait for ConfirmNodeStatusRemoved")
 	}
@@ -1005,7 +1005,7 @@ func Test_RemoveVolumeFromReportAsAttached(t *testing.T) {
 	}
 
 	// remove vol2 after get `removing` (should only contains vol1)
-	removed = asw.RemoveVolumeFromReportAsAttached(vol2, nodeName)
+	removed = asw.RemoveVolumeFromReportAsAttached(logger, vol2, nodeName)
 	if removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached succeeded. Should wait for ConfirmNodeStatusRemoved")
 	}
@@ -1016,12 +1016,12 @@ func Test_RemoveVolumeFromReportAsAttached(t *testing.T) {
 
 	asw.ConfirmNodeStatusRemoved(logger, nodeName, removing)
 	// Should success after async node update
-	removed = asw.RemoveVolumeFromReportAsAttached(vol1, nodeName)
+	removed = asw.RemoveVolumeFromReportAsAttached(logger, vol1, nodeName)
 	if !removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached failed. ConfirmNodeStatusRemoved not effective")
 	}
 	// vol2 should still fail, because we only confirmed vol1
-	removed = asw.RemoveVolumeFromReportAsAttached(vol2, nodeName)
+	removed = asw.RemoveVolumeFromReportAsAttached(logger, vol2, nodeName)
 	if removed {
 		t.Fatalf("RemoveVolumeFromReportAsAttached succeeded. Should wait for ConfirmNodeStatusRemoved")
 	}
@@ -1045,7 +1045,7 @@ func Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive(
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
 
-	asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName)
 
 	volumes, _ := asw.GetVolumesToReportAttachedForNode(logger, nodeName)
 	if len(volumes) > 0 {
@@ -1078,7 +1078,7 @@ func Test_RemoveVolumeFromReportAsAttached_Delete_AddVolumeNode(t *testing.T) {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
 
-	asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName)
 
 	volumes, _ := asw.GetVolumesToReportAttachedForNode(logger, nodeName)
 	if len(volumes) > 0 {
@@ -1456,7 +1456,7 @@ func Test_GetVolumesToReportAttachedForNode_Positive(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName)
 
 	attachedVolumes, _ = asw.GetVolumesToReportAttachedForNode(logger, nodeName)
 	if len(attachedVolumes) != 0 {
