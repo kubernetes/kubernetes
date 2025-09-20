@@ -31,8 +31,9 @@ type UsageStatsOptions struct {
 	// Scopes that must match counted objects
 	Scopes []corev1.ResourceQuotaScope
 	// Resources are the set of resources to include in the measurement
-	Resources     []corev1.ResourceName
-	ScopeSelector *corev1.ScopeSelector
+	Resources      []corev1.ResourceName
+	ScopeSelector  *corev1.ScopeSelector
+	DeviceClassMap map[string]string
 }
 
 // UsageStats is result of measuring observed resource use in the system
@@ -60,6 +61,7 @@ type Evaluator interface {
 	MatchingResources(input []corev1.ResourceName) []corev1.ResourceName
 	// Usage returns the resource usage for the specified object
 	Usage(item runtime.Object) (corev1.ResourceList, error)
+	UsageWithDeviceClass(item runtime.Object, deviceClassMap map[string]string) (corev1.ResourceList, error)
 	// UsageStats calculates latest observed usage stats for all objects
 	UsageStats(options UsageStatsOptions) (UsageStats, error)
 }

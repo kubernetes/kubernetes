@@ -137,7 +137,9 @@ type ListFuncByNamespace func(namespace string) ([]runtime.Object, error)
 type MatchesScopeFunc func(scope corev1.ScopedResourceSelectorRequirement, object runtime.Object) (bool, error)
 
 // UsageFunc knows how to measure usage associated with an object
+
 type UsageFunc func(object runtime.Object) (corev1.ResourceList, error)
+type UsageWithDeviceClassFunc func(object runtime.Object, devieClassMap map[string]string) (corev1.ResourceList, error)
 
 // MatchingResourceNamesFunc is a function that returns the list of resources matched
 type MatchingResourceNamesFunc func(input []corev1.ResourceName) []corev1.ResourceName
@@ -185,7 +187,7 @@ func getScopeSelectorsFromQuota(quota *corev1.ResourceQuota) []corev1.ScopedReso
 func CalculateUsageStats(options quota.UsageStatsOptions,
 	listFunc ListFuncByNamespace,
 	scopeFunc MatchesScopeFunc,
-	usageFunc UsageFunc) (quota.UsageStats, error) {
+	usageFunc UsageWithDeviceClassFunc) (quota.UsageStats, error) {
 	// default each tracked resource to zero
 	result := quota.UsageStats{Used: corev1.ResourceList{}}
 	for _, resourceName := range options.Resources {
@@ -218,7 +220,7 @@ func CalculateUsageStats(options quota.UsageStatsOptions,
 		}
 		// only count usage if there was a match
 		if matchesScopes {
-			usage, err := usageFunc(item)
+			usage, err := usageFunc(item, options.DeviceClassMap)
 			if err != nil {
 				return result, err
 			}
@@ -288,6 +290,11 @@ func (o *objectCountEvaluator) Usage(object runtime.Object) (corev1.ResourceList
 	return resourceList, nil
 }
 
+// UsageWithDeviceClass returns the resource usage for the specified object
+func (o *objectCountEvaluator) UsageWithDeviceClass(object runtime.Object, deviceClassMap map[string]string) (corev1.ResourceList, error) {
+	return o.Usage(object)
+}
+
 // GroupResource tracked by this evaluator
 func (o *objectCountEvaluator) GroupResource() schema.GroupResource {
 	return o.groupResource
@@ -295,7 +302,7 @@ func (o *objectCountEvaluator) GroupResource() schema.GroupResource {
 
 // UsageStats calculates aggregate usage for the object.
 func (o *objectCountEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
-	return CalculateUsageStats(options, o.listFuncByNamespace, MatchesNoScopeFunc, o.Usage)
+	return CalculateUsageStats(options, o.listFuncByNamespace, MatchesNoScopeFunc, o.UsageWithDeviceClass)
 }
 
 // Verify implementation of interface at compile time.

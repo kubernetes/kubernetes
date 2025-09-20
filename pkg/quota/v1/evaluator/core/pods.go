@@ -22,6 +22,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // the name used for object count quota
@@ -82,8 +84,10 @@ func maskResourceWithPrefix(resource corev1.ResourceName, prefix string) corev1.
 // has the quota related resource prefix.
 func isExtendedResourceNameForQuota(name corev1.ResourceName) bool {
 	// As overcommit is not supported by extended resources for now,
-	// only quota objects in format of "requests.resourceName" is allowed.
-	return !helper.IsNativeResource(name) && strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
+	// quota objects in format of "requests.resourceName" is allowed,
+	// allow the implicit extended resource name in the format of
+	// requests.deviceclass.resource.kubernetes.io/deivce-class-name
+	return (!helper.IsNativeResource(name) || strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix+resourceapi.ResourceDeviceClassPrefix)) && strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
 }
 
 // NOTE: it was a mistake, but if a quota tracks cpu or memory related resources,
@@ -246,6 +250,11 @@ func (p *podEvaluator) UncoveredQuotaScopes(limitedScopes []corev1.ScopedResourc
 	return uncoveredScopes, nil
 }
 
+// UsageWithDeivceClass knows how to measure usage associated with pods
+func (p *podEvaluator) UsageWithDeviceClass(item runtime.Object, deviceClassToExtendedResourceMap map[string]string) (corev1.ResourceList, error) {
+	return p.Usage(item)
+}
+
 // Usage knows how to measure usage associated with pods
 func (p *podEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 	// delegate to normal usage
@@ -254,7 +263,7 @@ func (p *podEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 
 // UsageStats calculates aggregate usage for the object.
 func (p *podEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
-	return generic.CalculateUsageStats(options, p.listFuncByNamespace, podMatchesScopeFunc, p.Usage)
+	return generic.CalculateUsageStats(options, p.listFuncByNamespace, podMatchesScopeFunc, p.UsageWithDeviceClass)
 }
 
 // verifies we implement the required interface.
@@ -312,7 +321,7 @@ func podComputeUsageHelper(requests corev1.ResourceList, limits corev1.ResourceL
 			result[maskResourceWithPrefix(resource, corev1.DefaultResourceRequestsPrefix)] = request
 		}
 		// for extended resources
-		if helper.IsExtendedResourceName(resource) {
+		if schedutil.IsDRAExtendedResourceName(resource) {
 			// only quota objects in format of "requests.resourceName" is allowed for extended resource.
 			result[maskResourceWithPrefix(resource, corev1.DefaultResourceRequestsPrefix)] = request
 		}

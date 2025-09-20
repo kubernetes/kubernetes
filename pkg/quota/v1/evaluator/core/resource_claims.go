@@ -28,8 +28,10 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
 	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // The name used for object count quota. This evaluator takes over counting
@@ -40,6 +42,16 @@ var ClaimObjectCountName = generic.ObjectCountQuotaResourceNameFor(resourceapi.S
 // V1ResourceByDeviceClass returns a quota resource name by device class.
 func V1ResourceByDeviceClass(className string) corev1.ResourceName {
 	return corev1.ResourceName(className + corev1.ResourceClaimsPerClass)
+}
+
+// V1ExtendedResourceByDeviceClass returns a quota extended resource name by device class.
+func V1ExtendedResourceByDeviceClass(extendedResourceName string) corev1.ResourceName {
+	return corev1.ResourceName(corev1.DefaultResourceRequestsPrefix + extendedResourceName)
+}
+
+// V1ImplicitExtendedResourceByDeviceClass returns a quota implicit extended resource name by device class.
+func V1ImplicitExtendedResourceByDeviceClass(className string) corev1.ResourceName {
+	return corev1.ResourceName(corev1.ResourceImplicitExtendedClaimsPerClass + className)
 }
 
 // NewResourceClaimEvaluator returns an evaluator that can evaluate resource claims
@@ -99,18 +111,60 @@ func (p *claimEvaluator) MatchingResources(items []corev1.ResourceName) []corev1
 			strings.HasSuffix(string(item), corev1.ResourceClaimsPerClass /* by device class */) {
 			result = append(result, item)
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+			if strings.HasPrefix(string(item), corev1.ResourceImplicitExtendedClaimsPerClass /* by implicit extended resource name */) ||
+				isExtendedResourceNameForQuota(item) /* by extended resource name */ {
+				result = append(result, item)
+			}
+		}
 	}
 	return result
 }
 
 // Usage knows how to measure usage associated with item.
 func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
+	return p.UsageWithDeviceClass(item, nil)
+}
+
+func extendedResourceQuota(deviceClassMap map[string]string, dcName string) corev1.ResourceName {
+	resource := corev1.ResourceName("")
+	if name, ok := deviceClassMap[dcName]; ok {
+		resource = V1ExtendedResourceByDeviceClass(name)
+	}
+	return resource
+}
+
+func isImplicitRequestName(name string) bool {
+	return strings.HasSuffix(name, "-i")
+}
+
+func setResourceQuantity(resourceMap map[corev1.ResourceName]resource.Quantity, quantity resource.Quantity, deviceClassMap map[string]string, deviceClassName, name string, isExtendedResourceClaim bool) {
+	deviceClassClaim := V1ResourceByDeviceClass(deviceClassName)
+	resourceMap[deviceClassClaim] = quantity
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		return
+	}
+	implicitExtendedResourceClaim := V1ImplicitExtendedResourceByDeviceClass(deviceClassName)
+	extendedResourceClaim := extendedResourceQuota(deviceClassMap, deviceClassName)
+	isImplicitExtendedResourceRequest := isImplicitRequestName(name)
+	if !isExtendedResourceClaim || !isImplicitExtendedResourceRequest {
+		resourceMap[implicitExtendedResourceClaim] = quantity
+	}
+	if extendedResourceClaim != "" {
+		if !isExtendedResourceClaim || isImplicitExtendedResourceRequest {
+			resourceMap[extendedResourceClaim] = quantity
+		}
+	}
+}
+
+// UsageWithDeviceClass knows how to measure usage associated with item.
+func (p *claimEvaluator) UsageWithDeviceClass(item runtime.Object, deviceClassMap map[string]string) (corev1.ResourceList, error) {
 	result := corev1.ResourceList{}
 	claim, err := toExternalResourceClaimOrError(item)
 	if err != nil {
 		return result, err
 	}
-
+	isExtendedResourceClaim := claim.Annotations[resourceapi.ExtendedResourceClaimAnnotation] == "true"
 	// charge for claim
 	result[ClaimObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
 	for _, request := range claim.Spec.Devices.Requests {
@@ -136,8 +190,9 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 				}
 
 				q := resource.NewQuantity(numDevices, resource.DecimalSI)
+
 				if q.Cmp(maxQuantityByDeviceClassClaim[deviceClassClaim]) > 0 {
-					maxQuantityByDeviceClassClaim[deviceClassClaim] = *q
+					setResourceQuantity(maxQuantityByDeviceClassClaim, *q, deviceClassMap, subrequest.DeviceClassName, subrequest.Name, isExtendedResourceClaim)
 				}
 			}
 			for deviceClassClaim, q := range maxQuantityByDeviceClassClaim {
@@ -162,7 +217,8 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 			}
 			quantity := result[deviceClassClaim]
 			quantity.Add(*(resource.NewQuantity(numDevices, resource.DecimalSI)))
-			result[deviceClassClaim] = quantity
+			setResourceQuantity(result, quantity, deviceClassMap, request.Exactly.DeviceClassName, request.Name, isExtendedResourceClaim)
+
 		default:
 			// Some unknown, future request type. Cannot do quota for it.
 		}
@@ -173,7 +229,7 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 
 // UsageStats calculates aggregate usage for the object.
 func (p *claimEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
-	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
+	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.UsageWithDeviceClass)
 }
 
 // ensure we implement required interface
