@@ -173,13 +173,13 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
-	_, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	_, err := testClient.CoreV1().Nodes().Create(tCtx, node, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	pod := fakePodWithVol(namespaceName)
-	if _, err := testClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -198,13 +198,13 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 	// Patch the node to mark the volume in use as attach-detach controller verifies if safe to detach the volume
 	// based on that.
 	node.Status.VolumesInUse = append(node.Status.VolumesInUse, "kubernetes.io/mock-provisioner/fake-mount")
-	node, err = testClient.CoreV1().Nodes().UpdateStatus(context.TODO(), node, metav1.UpdateOptions{})
+	node, err = testClient.CoreV1().Nodes().UpdateStatus(tCtx, node, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("error in patch volumeInUse status to nodes: %s", err)
 	}
 	// Delete the pod with grace period time so that it is stuck in terminating state
 	gracePeriod := int64(300)
-	err = testClient.CoreV1().Pods(namespaceName).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
+	err = testClient.CoreV1().Pods(namespaceName).Delete(tCtx, pod.Name, metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriod,
 	})
 	if err != nil {
@@ -220,7 +220,7 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 		Effect: v1.TaintEffectNoExecute,
 	}
 	node.Spec.Taints = append(node.Spec.Taints, taint)
-	if _, err := testClient.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Update(tCtx, node, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("error in patch oos taint to node: %v", err)
 	}
 	waitForNodeToBeTainted(tCtx, t, testClient, v1.TaintNodeOutOfService, nodeName)
@@ -338,13 +338,13 @@ func TestPodUpdateWithADC(t *testing.T) {
 	podStopCh := make(chan struct{})
 	defer close(podStopCh)
 
-	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(tCtx, node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(tCtx, pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -377,7 +377,7 @@ func TestPodUpdateWithADC(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, pod, metav1.UpdateOptions{}); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -608,7 +608,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 			},
 		},
 	}
-	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(tCtx, node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
@@ -616,10 +616,10 @@ func TestPVCBoundWithADC(t *testing.T) {
 	pvcs := []*v1.PersistentVolumeClaim{}
 	for i := 0; i < 3; i++ {
 		pod, pvc := fakePodWithPVC(fmt.Sprintf("fakepod-pvcnotbound-%d", i), fmt.Sprintf("fakepvc-%d", i), namespaceName)
-		if _, err := testClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+		if _, err := testClient.CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pod : %v", err)
 		}
-		if _, err := testClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
+		if _, err := testClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(tCtx, pvc, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pvc : %v", err)
 		}
 		pvcs = append(pvcs, pvc)
@@ -627,7 +627,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 	// pod with no pvc
 	podNew := fakePodWithVol(namespaceName)
 	podNew.SetName("fakepod")
-	if _, err := testClient.CoreV1().Pods(podNew.Namespace).Create(context.TODO(), podNew, metav1.CreateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().Pods(podNew.Namespace).Create(tCtx, podNew, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -644,13 +644,13 @@ func TestPVCBoundWithADC(t *testing.T) {
 	time.Sleep(10 * time.Second)
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 60*time.Second, "expected 1 pod in dsw", 1)
 	for _, pvc := range pvcs {
-		createPVForPVC(t, testClient, pvc)
+		createPVForPVC(tCtx, t, testClient, pvc)
 	}
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 60*time.Second, "expected 4 pods in dsw after PVCs are bound", 4)
 }
 
 // Create PV for PVC, pv controller will bind them together.
-func createPVForPVC(t *testing.T, testClient *clientset.Clientset, pvc *v1.PersistentVolumeClaim) {
+func createPVForPVC(ctx context.Context, t *testing.T, testClient *clientset.Clientset, pvc *v1.PersistentVolumeClaim) {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("fakepv-%s", pvc.Name),
@@ -667,15 +667,15 @@ func createPVForPVC(t *testing.T, testClient *clientset.Clientset, pvc *v1.Persi
 			StorageClassName: *pvc.Spec.StorageClassName,
 		},
 	}
-	if _, err := testClient.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
+	if _, err := testClient.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pv : %v", err)
 	}
 }
 
 // Wait for DeletionTimestamp added to pod
 func waitForPodDeletionTimestampToSet(tCtx context.Context, t *testing.T, testingClient *clientset.Clientset, podName, podNamespace string) {
-	if err := wait.PollUntilContextCancel(tCtx, 100*time.Millisecond, false, func(context.Context) (bool, error) {
-		pod, err := testingClient.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+	if err := wait.PollUntilContextCancel(tCtx, 100*time.Millisecond, false, func(ctx context.Context) (bool, error) {
+		pod, err := testingClient.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -690,8 +690,8 @@ func waitForPodDeletionTimestampToSet(tCtx context.Context, t *testing.T, testin
 
 // Wait for VolumeAttach added to node
 func waitForVolumeToBeAttached(ctx context.Context, t *testing.T, testingClient *clientset.Clientset, podName, nodeName string) {
-	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 120*time.Second, false, func(context.Context) (bool, error) {
-		node, err := testingClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 120*time.Second, false, func(ctx context.Context) (bool, error) {
+		node, err := testingClient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if len(node.Status.VolumesAttached) >= 1 {
 			return true, nil
 		}
@@ -706,8 +706,8 @@ func waitForVolumeToBeAttached(ctx context.Context, t *testing.T, testingClient 
 
 // Wait for taint added to node
 func waitForNodeToBeTainted(ctx context.Context, t *testing.T, testingClient *clientset.Clientset, taintKey, nodeName string) {
-	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 60*time.Second, false, func(context.Context) (bool, error) {
-		node, err := testingClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 60*time.Second, false, func(ctx context.Context) (bool, error) {
+		node, err := testingClient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
