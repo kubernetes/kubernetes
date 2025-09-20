@@ -241,6 +241,8 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 	defer a.hpaSelectorsMux.Unlock()
 	if hpaKey := selectors.Parse(key); !a.hpaSelectors.SelectorExists(hpaKey) {
 		a.hpaSelectors.PutSelector(hpaKey, labels.Nothing())
+		// Observe HPA addition - only when it's a new HPA
+		a.monitor.ObserveHPAAddition()
 	}
 }
 
@@ -258,6 +260,8 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 	a.hpaSelectorsMux.Lock()
 	defer a.hpaSelectorsMux.Unlock()
 	a.hpaSelectors.DeleteSelector(selectors.Parse(key))
+	// Observe HPA deletion
+	a.monitor.ObserveHPADeletion()
 }
 
 func (a *HorizontalController) worker(ctx context.Context) {
