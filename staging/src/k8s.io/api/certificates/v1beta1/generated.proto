@@ -86,7 +86,6 @@ message CertificateSigningRequestList {
 // CertificateSigningRequestSpec contains the certificate request.
 message CertificateSigningRequestSpec {
   // Base64-encoded PKCS#10 CSR data
-  // +listType=atomic
   optional bytes request = 1;
 
   // Requested signer for the request. It is a qualified name in the form:
@@ -192,7 +191,6 @@ message CertificateSigningRequestStatus {
   repeated CertificateSigningRequestCondition conditions = 1;
 
   // If request was approved, the controller will place the issued certificate here.
-  // +listType=atomic
   // +optional
   optional bytes certificate = 2;
 }

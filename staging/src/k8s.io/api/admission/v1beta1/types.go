@@ -151,6 +151,7 @@ type AdmissionResponse struct {
 	// Limit warnings to 120 characters if possible.
 	// Warnings over 256 characters and large numbers of warnings may be truncated.
 	// +optional
+	// +listType=atomic
 	Warnings []string `json:"warnings,omitempty" protobuf:"bytes,7,rep,name=warnings"`
 }
 
