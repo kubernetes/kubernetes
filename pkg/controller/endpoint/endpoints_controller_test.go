@@ -178,6 +178,7 @@ func makeTestServer(t *testing.T, namespace string) (*httptest.Server, *utiltest
 func makeBlockingEndpointTestServer(t *testing.T, controller *endpointController, endpoint *v1.Endpoints, blockUpdate, blockDelete, blockNextAction chan struct{}, namespace string) *httptest.Server {
 
 	handlerFunc := func(res http.ResponseWriter, req *http.Request) {
+		tCtx := ktesting.Init(t)
 		if controller == nil {
 			res.WriteHeader(http.StatusInternalServerError)
 			res.Write([]byte("controller has not been set yet"))
@@ -203,11 +204,11 @@ func makeBlockingEndpointTestServer(t *testing.T, controller *endpointController
 					// Delay the deletion of endpoints to make endpoints cache out of sync
 					<-blockDelete
 					_ = controller.endpointsStore.Delete(endpoint)
-					controller.onEndpointsDelete(endpoint)
+					controller.onEndpointsDelete(tCtx, endpoint)
 				}()
 			} else {
 				_ = controller.endpointsStore.Delete(endpoint)
-				controller.onEndpointsDelete(endpoint)
+				controller.onEndpointsDelete(tCtx, endpoint)
 			}
 			blockNextAction <- struct{}{}
 		}
@@ -462,7 +463,7 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 1000}},
 		}},
 	})
-	endpoints.checkLeftoverEndpoints()
+	endpoints.checkLeftoverEndpoints(tCtx)
 	if e, a := 1, endpoints.queue.Len(); e != a {
 		t.Fatalf("Expected %v, got %v", e, a)
 	}
@@ -1200,7 +1201,7 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 				},
 			}
 			endpoints.serviceStore.Add(service)
-			endpoints.onServiceUpdate(service)
+			endpoints.onServiceUpdate(tCtx, service)
 			endpoints.podsSynced = test.podsSynced
 			endpoints.servicesSynced = test.servicesSynced
 			endpoints.endpointsSynced = test.endpointsSynced
@@ -1930,7 +1931,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 				resourceVersion++
 
 				endpoints.podStore.Update(newPod)
-				endpoints.updatePod(oldPod, newPod)
+				endpoints.updatePod(tCtx, oldPod, newPod)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -2039,7 +2040,7 @@ func TestPodAddsBatching(t *testing.T) {
 
 				p := testPod(ns, i, 1, true, ipv4only)
 				endpoints.podStore.Add(p)
-				endpoints.addPod(p)
+				endpoints.addPod(tCtx, p)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -2170,7 +2171,7 @@ func TestPodDeleteBatching(t *testing.T) {
 					t.Fatalf("Pod %q doesn't exist", update.podName)
 				}
 				endpoints.podStore.Delete(old)
-				endpoints.deletePod(old)
+				endpoints.deletePod(tCtx, old)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -2503,18 +2504,18 @@ func TestMultipleServiceChanges(t *testing.T) {
 	}
 
 	controller.serviceStore.Add(svc)
-	controller.onServiceUpdate(svc)
+	controller.onServiceUpdate(tCtx, svc)
 	// blockNextAction should eventually unblock once server gets endpoint request.
 	waitForChanReceive(t, 1*time.Second, blockNextAction, "Service Add should have caused a request to be sent to the test server")
 
 	controller.serviceStore.Delete(svc)
-	controller.onServiceDelete(svc)
+	controller.onServiceDelete(tCtx, svc)
 	waitForChanReceive(t, 1*time.Second, blockNextAction, "Service Delete should have caused a request to be sent to the test server")
 
 	// If endpoints cache has not updated before service update is registered
 	// Services add will not trigger a Create endpoint request.
 	controller.serviceStore.Add(svc)
-	controller.onServiceUpdate(svc)
+	controller.onServiceUpdate(tCtx, svc)
 
 	// Ensure the work queue has been processed by looping for up to a second to prevent flakes.
 	wait.PollImmediate(50*time.Millisecond, 1*time.Second, func() (bool, error) {
@@ -2582,7 +2583,7 @@ func TestMultiplePodChanges(t *testing.T) {
 	pod2.ResourceVersion = "2"
 	pod2.Status.Conditions[0].Status = v1.ConditionFalse
 	_ = controller.podStore.Update(pod2)
-	controller.updatePod(pod, pod2)
+	controller.updatePod(tCtx, pod, pod2)
 	// blockNextAction should eventually unblock once server gets endpoints request.
 	waitForChanReceive(t, 1*time.Second, blockNextAction, "Pod Update should have caused a request to be sent to the test server")
 	// The endpoints update hasn't been applied to the cache yet.
@@ -2590,7 +2591,7 @@ func TestMultiplePodChanges(t *testing.T) {
 	pod3.ResourceVersion = "3"
 	pod3.Status.Conditions[0].Status = v1.ConditionTrue
 	_ = controller.podStore.Update(pod3)
-	controller.updatePod(pod2, pod3)
+	controller.updatePod(tCtx, pod2, pod3)
 	// It shouldn't get endpoints request as the endpoints in the cache is out-of-date.
 	timer := time.NewTimer(100 * time.Millisecond)
 	select {
@@ -2857,7 +2858,7 @@ func TestEndpointsDeletionEvents(t *testing.T) {
 
 	// Test Unexpected and Expected Deletes
 	store.Delete(ep1)
-	controller.onEndpointsDelete(ep1)
+	controller.onEndpointsDelete(tCtx, ep1)
 
 	if controller.queue.Len() != 1 {
 		t.Errorf("Expected one service to be in the queue, found %d", controller.queue.Len())
