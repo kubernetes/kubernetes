@@ -260,7 +260,7 @@ func ToSet(resourceNames []corev1.ResourceName) sets.String {
 
 // CalculateUsage calculates and returns the requested ResourceList usage.
 // If an error is returned, usage only contains the resources which encountered no calculation errors.
-func CalculateUsage(namespaceName string, scopes []corev1.ResourceQuotaScope, hardLimits corev1.ResourceList, registry Registry, scopeSelector *corev1.ScopeSelector) (corev1.ResourceList, error) {
+func CalculateUsage(namespaceName string, scopes []corev1.ResourceQuotaScope, hardLimits corev1.ResourceList, registry Registry, scopeSelector *corev1.ScopeSelector, deviceClassMap map[string]string) (corev1.ResourceList, error) {
 	// find the intersection between the hard resources on the quota
 	// and the resources this controller can track to know what we can
 	// look to measure updated usage stats for
@@ -284,7 +284,7 @@ func CalculateUsage(namespaceName string, scopes []corev1.ResourceQuotaScope, ha
 			continue
 		}
 
-		usageStatsOptions := UsageStatsOptions{Namespace: namespaceName, Scopes: scopes, Resources: intersection, ScopeSelector: scopeSelector}
+		usageStatsOptions := UsageStatsOptions{Namespace: namespaceName, Scopes: scopes, Resources: intersection, ScopeSelector: scopeSelector, DeviceClassMap: deviceClassMap}
 		stats, err := evaluator.UsageStats(usageStatsOptions)
 		if err != nil {
 			// remember the error
