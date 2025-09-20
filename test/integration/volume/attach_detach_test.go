@@ -193,7 +193,7 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 
 	waitToObservePods(t, podInformer, 1)
 	// wait for volume to be attached
-	waitForVolumeToBeAttached(tCtx, t, testClient, pod.Name, nodeName)
+	node = waitForVolumeToBeAttached(tCtx, t, testClient, pod.Name, nodeName)
 
 	// Patch the node to mark the volume in use as attach-detach controller verifies if safe to detach the volume
 	// based on that.
@@ -689,9 +689,11 @@ func waitForPodDeletionTimestampToSet(tCtx context.Context, t *testing.T, testin
 }
 
 // Wait for VolumeAttach added to node
-func waitForVolumeToBeAttached(ctx context.Context, t *testing.T, testingClient *clientset.Clientset, podName, nodeName string) {
+func waitForVolumeToBeAttached(ctx context.Context, t *testing.T, testingClient *clientset.Clientset, podName, nodeName string) *v1.Node {
+	var node *v1.Node
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 120*time.Second, false, func(ctx context.Context) (bool, error) {
-		node, err := testingClient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+		var err error
+		node, err = testingClient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if len(node.Status.VolumesAttached) >= 1 {
 			return true, nil
 		}
@@ -702,6 +704,7 @@ func waitForVolumeToBeAttached(ctx context.Context, t *testing.T, testingClient 
 	}); err != nil {
 		t.Fatalf("Failed to attach volume to pod: %s for node: %s", podName, nodeName)
 	}
+	return node
 }
 
 // Wait for taint added to node
