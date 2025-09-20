@@ -401,6 +401,7 @@ func TestReflectorStopWatch(t *testing.T) {
 }
 
 func TestReflectorListAndWatch(t *testing.T) {
+	t.Fatal("fix me")
 	type listResult struct {
 		Object runtime.Object
 		Error  error
