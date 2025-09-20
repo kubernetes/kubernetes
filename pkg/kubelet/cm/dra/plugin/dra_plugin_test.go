@@ -37,10 +37,10 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
+// fakeGRPCServer implements all required interfaces properly to avoid gRPC compilation issues
 type fakeGRPCServer struct {
-	drapbv1beta1.UnimplementedDRAPluginServer
+	drapbv1.UnimplementedDRAPluginServer
 	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
-	drapbv1.UnsafeDRAPluginServer
 }
 
 var _ drapbv1.DRAPluginServer = &fakeGRPCServer{}
@@ -57,7 +57,6 @@ func (f *fakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1.N
 }
 
 func (f *fakeGRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1.NodeUnprepareResourcesRequest) (*drapbv1.NodeUnprepareResourcesResponse, error) {
-
 	return &drapbv1.NodeUnprepareResourcesResponse{}, nil
 }
 
@@ -110,7 +109,7 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 			drapbv1beta1.RegisterDRAPluginServer(s, drapbv1beta1.V1ServerWrapper{DRAPluginServer: fakeGRPCServer})
 			drahealthv1alpha1.RegisterDRAResourceHealthServer(s, fakeGRPCServer)
 		} else {
-			return nil, err
+			return nil, errors.New("unknown service")
 		}
 	}
 
@@ -373,4 +372,56 @@ func TestPlugin_WatchResources(t *testing.T) {
 	//    closed the stream by returning nil. This confirms the stream ended cleanly.
 	_, err = stream.Recv()
 	require.ErrorIs(t, err, io.EOF, "The second Recv() should return an io.EOF error to signal a clean stream closure")
+}
+
+// Test that demonstrates unified connection approach - both DRA and Health use same connection
+func TestUnifiedConnectionUsage(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	addr := path.Join(t.TempDir(), "dra.sock")
+	teardown, err := setupFakeGRPCServer("", addr) // All services registered
+	require.NoError(t, err)
+	defer teardown()
+
+	driverName := "test-driver"
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	err = draPlugins.add(driverName, addr, drapbv1.DRAPluginService, defaultClientCallTimeout)
+	require.NoError(t, err)
+	defer draPlugins.remove(driverName, addr)
+
+	plugin, err := draPlugins.GetPlugin(driverName)
+	require.NoError(t, err)
+
+	// Perform DRA operation first
+	req := &drapbv1.NodePrepareResourcesRequest{
+		Claims: []*drapbv1.Claim{
+			{
+				Namespace: "test-namespace",
+				Uid:       "test-uid",
+				Name:      "test-claim",
+			},
+		},
+	}
+	_, err = plugin.NodePrepareResources(tCtx, req)
+	require.NoError(t, err)
+
+	// Capture connection reference after DRA operation
+	firstConn := plugin.conn
+	require.NotNil(t, firstConn, "Connection should exist after DRA operation")
+
+	// Now perform Health operation - should use same connection
+	ctx, cancel := context.WithTimeout(tCtx, 5*time.Second)
+	defer cancel()
+
+	stream, err := plugin.NodeWatchResources(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+
+	// Verify same connection is used
+	require.Equal(t, firstConn, plugin.conn, "Health operation should use same connection as DRA operation")
+
+	// Verify we can still receive health data
+	resp, err := stream.Recv()
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Len(t, resp.Devices, 1)
 }
