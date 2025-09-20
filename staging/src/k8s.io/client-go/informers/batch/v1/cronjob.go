@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	batchv1 "k8s.io/client-go/listers/batch/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // CronJobInformer provides access to a shared informer and lister for
@@ -56,6 +57,10 @@ func NewCronJobInformer(client kubernetes.Interface, namespace string, resyncPer
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredCronJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -82,6 +87,7 @@ func NewFilteredCronJobInformer(client kubernetes.Interface, namespace string, r
 				}
 				return client.BatchV1().CronJobs(namespace).Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apibatchv1.CronJob{},
 		resyncPeriod,

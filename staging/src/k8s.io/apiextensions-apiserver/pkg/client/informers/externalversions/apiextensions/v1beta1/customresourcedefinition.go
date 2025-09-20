@@ -30,6 +30,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // CustomResourceDefinitionInformer provides access to a shared informer and lister for
@@ -55,6 +56,10 @@ func NewCustomResourceDefinitionInformer(client clientset.Interface, resyncPerio
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredCustomResourceDefinitionInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -81,6 +86,7 @@ func NewFilteredCustomResourceDefinitionInformer(client clientset.Interface, res
 				}
 				return client.ApiextensionsV1beta1().CustomResourceDefinitions().Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apisapiextensionsv1beta1.CustomResourceDefinition{},
 		resyncPeriod,

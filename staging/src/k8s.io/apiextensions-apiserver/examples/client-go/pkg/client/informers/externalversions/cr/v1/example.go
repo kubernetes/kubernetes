@@ -30,6 +30,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ExampleInformer provides access to a shared informer and lister for
@@ -56,6 +57,10 @@ func NewExampleInformer(client versioned.Interface, namespace string, resyncPeri
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredExampleInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -82,6 +87,7 @@ func NewFilteredExampleInformer(client versioned.Interface, namespace string, re
 				}
 				return client.CrV1().Examples(namespace).Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apiscrv1.Example{},
 		resyncPeriod,

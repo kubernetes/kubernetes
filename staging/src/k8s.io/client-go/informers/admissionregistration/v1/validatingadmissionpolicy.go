@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	admissionregistrationv1 "k8s.io/client-go/listers/admissionregistration/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ValidatingAdmissionPolicyInformer provides access to a shared informer and lister for
@@ -55,6 +56,10 @@ func NewValidatingAdmissionPolicyInformer(client kubernetes.Interface, resyncPer
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredValidatingAdmissionPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -81,6 +86,7 @@ func NewFilteredValidatingAdmissionPolicyInformer(client kubernetes.Interface, r
 				}
 				return client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apiadmissionregistrationv1.ValidatingAdmissionPolicy{},
 		resyncPeriod,

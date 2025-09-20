@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	certificatesv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // CertificateSigningRequestInformer provides access to a shared informer and lister for
@@ -55,6 +56,10 @@ func NewCertificateSigningRequestInformer(client kubernetes.Interface, resyncPer
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredCertificateSigningRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -81,6 +86,7 @@ func NewFilteredCertificateSigningRequestInformer(client kubernetes.Interface, r
 				}
 				return client.CertificatesV1beta1().CertificateSigningRequests().Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apicertificatesv1beta1.CertificateSigningRequest{},
 		resyncPeriod,

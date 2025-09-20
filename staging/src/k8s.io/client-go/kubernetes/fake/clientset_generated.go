@@ -184,16 +184,16 @@ type Clientset struct {
 	tracker   testing.ObjectTracker
 }
 
-func (c *Clientset) WatchListNotSupported() {
-	/*no-op*/
-}
-
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.discovery
 }
 
 func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
+}
+
+func (c *Clientset) WatchListNotSupported() {
+	/*no-op*/
 }
 
 // NewClientset returns a clientset that will respond with the provided objects.

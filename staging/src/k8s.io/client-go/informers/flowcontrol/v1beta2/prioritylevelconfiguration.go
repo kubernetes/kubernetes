@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	flowcontrolv1beta2 "k8s.io/client-go/listers/flowcontrol/v1beta2"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // PriorityLevelConfigurationInformer provides access to a shared informer and lister for
@@ -55,6 +56,10 @@ func NewPriorityLevelConfigurationInformer(client kubernetes.Interface, resyncPe
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredPriorityLevelConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -81,6 +86,7 @@ func NewFilteredPriorityLevelConfigurationInformer(client kubernetes.Interface, 
 				}
 				return client.FlowcontrolV1beta2().PriorityLevelConfigurations().Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apiflowcontrolv1beta2.PriorityLevelConfiguration{},
 		resyncPeriod,

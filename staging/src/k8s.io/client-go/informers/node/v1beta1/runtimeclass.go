@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	nodev1beta1 "k8s.io/client-go/listers/node/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // RuntimeClassInformer provides access to a shared informer and lister for
@@ -55,6 +56,10 @@ func NewRuntimeClassInformer(client kubernetes.Interface, resyncPeriod time.Dura
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredRuntimeClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -81,6 +86,7 @@ func NewFilteredRuntimeClassInformer(client kubernetes.Interface, resyncPeriod t
 				}
 				return client.NodeV1beta1().RuntimeClasses().Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apinodev1beta1.RuntimeClass{},
 		resyncPeriod,

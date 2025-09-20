@@ -26,6 +26,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 	apiswardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	versioned "k8s.io/sample-apiserver/pkg/generated/clientset/versioned"
 	internalinterfaces "k8s.io/sample-apiserver/pkg/generated/informers/externalversions/internalinterfaces"
@@ -55,6 +56,10 @@ func NewFischerInformer(client versioned.Interface, resyncPeriod time.Duration, 
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredFischerInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -81,6 +86,7 @@ func NewFilteredFischerInformer(client versioned.Interface, resyncPeriod time.Du
 				}
 				return client.WardleV1alpha1().Fischers().Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apiswardlev1alpha1.Fischer{},
 		resyncPeriod,

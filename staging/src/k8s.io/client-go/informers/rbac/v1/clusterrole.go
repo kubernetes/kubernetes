@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	rbacv1 "k8s.io/client-go/listers/rbac/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ClusterRoleInformer provides access to a shared informer and lister for
@@ -55,6 +56,10 @@ func NewClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Durat
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -81,6 +86,7 @@ func NewFilteredClusterRoleInformer(client kubernetes.Interface, resyncPeriod ti
 				}
 				return client.RbacV1().ClusterRoles().Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apirbacv1.ClusterRole{},
 		resyncPeriod,

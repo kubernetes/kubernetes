@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	flowcontrolv1 "k8s.io/client-go/listers/flowcontrol/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // FlowSchemaInformer provides access to a shared informer and lister for
@@ -55,6 +56,10 @@ func NewFlowSchemaInformer(client kubernetes.Interface, resyncPeriod time.Durati
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredFlowSchemaInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -81,6 +86,7 @@ func NewFilteredFlowSchemaInformer(client kubernetes.Interface, resyncPeriod tim
 				}
 				return client.FlowcontrolV1().FlowSchemas().Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apiflowcontrolv1.FlowSchema{},
 		resyncPeriod,
