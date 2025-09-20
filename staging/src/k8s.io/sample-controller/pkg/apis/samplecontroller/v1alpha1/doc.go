@@ -16,6 +16,8 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +groupName=samplecontroller.k8s.io
+// +k8s:openapi-gen=true
+// +k8s:openapi-model-package=io.k8s.sample-controller.pkg.apis.samplecontroller.v1alpha1
 
 // Package v1alpha1 is the v1alpha1 version of the API.
 package v1alpha1
