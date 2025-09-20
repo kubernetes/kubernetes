@@ -74,6 +74,7 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []fwk
 		extractPodScaleDown,
 		extractPodSchedulingGateEliminatedChange,
 		extractPodTolerationChange,
+		extractPodFeatureRequirementChange,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		podChangeExtractors = append(podChangeExtractors, extractPodGeneratedResourceClaimChange)
@@ -157,6 +158,14 @@ func extractPodGeneratedResourceClaimChange(newPod *v1.Pod, oldPod *v1.Pod) fwk.
 	return fwk.None
 }
 
+func extractPodFeatureRequirementChange(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType {
+	// TODO(pravk03): Implement logic to check if pod requirements are updated in a way if node feature requirements are changed.
+	if newPod.Generation != oldPod.Generation {
+		return fwk.UpdatePodFeatureRequirement
+	}
+	return fwk.None
+}
+
 // NodeSchedulingPropertiesChange interprets the update of a node and returns corresponding UpdateNodeXYZ event(s).
 func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events []fwk.ClusterEvent) {
 	nodeChangeExtracters := []nodeChangeExtractor{
@@ -166,6 +175,7 @@ func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events 
 		extractNodeTaintsChange,
 		extractNodeConditionsChange,
 		extractNodeAnnotationsChange,
+		extractNodeFeaturesChange,
 	}
 
 	for _, fn := range nodeChangeExtracters {
@@ -228,6 +238,13 @@ func extractNodeSpecUnschedulableChange(newNode *v1.Node, oldNode *v1.Node) fwk.
 func extractNodeAnnotationsChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	if !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations()) {
 		return fwk.UpdateNodeAnnotation
+	}
+	return fwk.None
+}
+
+func extractNodeFeaturesChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
+	if !equality.Semantic.DeepEqual(oldNode.Status.DeclaredFeatures, newNode.Status.DeclaredFeatures) {
+		return fwk.UpdateNodeDeclaredFeature
 	}
 	return fwk.None
 }
