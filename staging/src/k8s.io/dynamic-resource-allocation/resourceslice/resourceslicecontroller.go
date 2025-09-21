@@ -194,6 +194,8 @@ func StartController(ctx context.Context, options Options) (*Controller, error) 
 // Options contains various optional settings for [StartController].
 type Options struct {
 	// DriverName is the required name of the DRA driver.
+	// Must be a DNS subdomain and should end with a DNS domain
+	// owned by the vendor of the driver. It should use only lower case characters.
 	DriverName string
 
 	// KubeClient is used to read Node objects (if necessary) and to access

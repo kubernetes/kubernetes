@@ -41,7 +41,7 @@ message AllocatedDeviceStatus {
   // needed on a node.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver.
+  // vendor of the driver. It should use only lower case characters.
   //
   // +required
   optional string driver = 1;
@@ -935,7 +935,7 @@ message DeviceRequestAllocationResult {
   // needed on a node.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver.
+  // vendor of the driver. It should use only lower case characters.
   //
   // +required
   optional string driver = 2;
@@ -1267,7 +1267,7 @@ message OpaqueDeviceConfiguration {
   // to decide whether it needs to validate them.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver.
+  // vendor of the driver. It should use only lower case characters.
   //
   // +required
   optional string driver = 1;
@@ -1528,7 +1528,8 @@ message ResourceSliceSpec {
   // objects with a certain driver name.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver. This field is immutable.
+  // vendor of the driver. It should use only lower case characters.
+  // This field is immutable.
   //
   // +required
   optional string driver = 1;
