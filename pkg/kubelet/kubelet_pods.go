@@ -1643,8 +1643,6 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 // getPhase returns the phase of a pod given its container info.
 func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasInitialized bool) v1.PodPhase {
 	spec := pod.Spec
-	pendingRestartableInitContainers := 0
-	pendingRegularInitContainers := 0
 	failedInitialization := 0
 	failedInitializationNotRestartable := 0
 
@@ -1659,13 +1657,10 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 
 		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
 		if !ok {
-			pendingRegularInitContainers++
 			continue
 		}
 
 		switch {
-		case containerStatus.State.Running != nil:
-			pendingRegularInitContainers++
 		case containerStatus.State.Terminated != nil:
 			exitCode := containerStatus.State.Terminated.ExitCode
 			if exitCode != 0 {
@@ -1687,11 +1682,9 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 						}
 					}
 				}
-			} else {
-				pendingRegularInitContainers++
 			}
 		default:
-			pendingRegularInitContainers++
+			// Ignore other states
 		}
 	}
 
@@ -1717,9 +1710,6 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 
 		switch {
 		case containerStatus.State.Running != nil:
-			if containerStatus.Started == nil || !*containerStatus.Started {
-				pendingRestartableInitContainers++
-			}
 			running++
 		case containerStatus.State.Terminated != nil:
 			// Do nothing here, as terminated restartable init containers are not
@@ -1729,11 +1719,9 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 				// Do nothing here, as terminated restartable init containers are not
 				// taken into account for the pod phase.
 			} else {
-				pendingRestartableInitContainers++
 				waiting++
 			}
 		default:
-			pendingRestartableInitContainers++
 			unknown++
 		}
 	}
@@ -1787,12 +1775,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 	}
 
 	switch {
-	case pendingRegularInitContainers > 0 ||
-		(pendingRestartableInitContainers > 0 &&
-			// This is needed to handle the case where the pod has been initialized but
-			// the restartable init containers are restarting and the pod should not be
-			// placed back into v1.PodPending since the regular containers have run.
-			!podHasInitialized):
+	case !podHasInitialized:
 		fallthrough
 	case waiting > 0:
 		klog.V(5).InfoS("Pod waiting > 0, pending")
