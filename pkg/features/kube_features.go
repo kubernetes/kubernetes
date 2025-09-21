@@ -606,7 +606,7 @@ const (
 	// owner: @kannon92
 	// kep: https://kep.k8s.io/5440
 	//
-	// Enables mutable pod resources for Jobs when the job is suspended.
+	// Enables mutable pod resources for suspended Jobs, regardless of whether they have started before.
 	MutableJobPodResourcesForSuspendedJobs featuregate.Feature = "MutableJobPodResourcesForSuspendedJobs"
 
 	// owner: @danwinship

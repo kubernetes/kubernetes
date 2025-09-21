@@ -1262,7 +1262,7 @@ func TestJobStrategy_ValidateUpdate_MutablePodResources(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
 			},
 		},
-		"feature gate enabled - suspended but started job resource updates rejected": {
+		"feature gate enabled - suspended but started job resource updates allowed": {
 			enableFeatureGate: true,
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1285,9 +1285,6 @@ func TestJobStrategy_ValidateUpdate_MutablePodResources(t *testing.T) {
 				job.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{
 					api.ResourceCPU: resource.MustParse("200m"),
 				}
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
 			},
 		},
 		"feature gate enabled - suspended and not started job resource updates allowed": {
