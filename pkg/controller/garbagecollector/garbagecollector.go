@@ -130,7 +130,7 @@ func (gc *GarbageCollector) resyncMonitors(logger klog.Logger, deletableResource
 
 // Run starts garbage collector workers.
 func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTimeout time.Duration) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer gc.attemptToDelete.ShutDown()
 	defer gc.attemptToOrphan.ShutDown()
 	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
@@ -221,7 +221,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 		// case, the restMapper will fail to map some of newResources until the next
 		// attempt.
 		if err := gc.resyncMonitors(logger, newResources); err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %w", err))
+			utilruntime.HandleErrorWithContext(ctx, err, "Failed to sync resource monitors")
 			metrics.GarbageCollectorResourcesSyncError.Inc()
 			return
 		}
@@ -234,7 +234,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 		if cacheSynced {
 			logger.V(2).Info("synced garbage collector")
 		} else {
-			utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync"))
+			utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync"), "Failed to sync garbage collector")
 			metrics.GarbageCollectorResourcesSyncError.Inc()
 		}
 
@@ -317,7 +317,7 @@ const (
 func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item interface{}) workQueueItemAction {
 	n, ok := item.(*node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
+		utilruntime.HandleErrorWithContext(ctx, fmt.Errorf("expect *node, got %#v", item), "Invalid item in attemptToDeleteWorker")
 		return forgetItem
 	}
 
@@ -357,7 +357,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 			// For now, record the error and retry.
 			logger.V(5).Error(err, "error syncing item", "item", n.identity)
 		} else {
-			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
+			utilruntime.HandleErrorWithContext(ctx, err, "Error syncing item", "item", n)
 		}
 		// retry if garbage collection of an object failed.
 		return requeueItem
@@ -734,7 +734,7 @@ func (gc *GarbageCollector) processAttemptToOrphanWorker(logger klog.Logger) boo
 func (gc *GarbageCollector) attemptToOrphanWorker(logger klog.Logger, item interface{}) workQueueItemAction {
 	owner, ok := item.(*node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
+		utilruntime.HandleErrorWithLogger(logger, fmt.Errorf("expect *node, got %#v", item), "Invalid item in attemptToOrphanWorker")
 		return forgetItem
 	}
 	// we don't need to lock each element, because they never get updated
@@ -747,13 +747,13 @@ func (gc *GarbageCollector) attemptToOrphanWorker(logger klog.Logger, item inter
 
 	err := gc.orphanDependents(logger, owner.identity, dependents)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("orphanDependents for %s failed with %v", owner.identity, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "OrphanDependents for owner failed", "owner", owner.identity)
 		return requeueItem
 	}
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
 	err = gc.removeFinalizer(logger, owner, metav1.FinalizerOrphanDependents)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("removeOrphanFinalizer for %s failed with %v", owner.identity, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "RemoveOrphanFinalizer for owner failed", "owner", owner.identity)
 		return requeueItem
 	}
 	return forgetItem
