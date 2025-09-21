@@ -2183,6 +2183,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	MutableCSINodeAllocatableCount: {},
 
+	MutablePodResourcesForSuspendedJobs: {},
+
 	NFTablesProxyMode: {},
 
 	NodeInclusionPolicyInPodTopologySpread: {},

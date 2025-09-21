@@ -4209,6 +4209,9 @@ func TestUpdateJobPodResources(t *testing.T) {
 		updateResources   bool
 		containers        []v1.Container
 		expectUpdate      bool
+		startThenSuspend  bool
+		initialResources  *v1.ResourceRequirements
+		jobName           string
 	}{
 		"suspended job, feature gate enabled, update resources": {
 			enableFeatureGate: true,
@@ -4219,6 +4222,7 @@ func TestUpdateJobPodResources(t *testing.T) {
 				Image: "busybox",
 			}},
 			expectUpdate: true,
+			jobName:      "update-suspend",
 		},
 		"non-suspended job, feature gate enabled, update resources": {
 			enableFeatureGate: true,
@@ -4229,6 +4233,7 @@ func TestUpdateJobPodResources(t *testing.T) {
 				Image: "busybox",
 			}},
 			expectUpdate: false,
+			jobName:      "update-fail-running",
 		},
 		"suspended job, feature gate disabled, update resources": {
 			enableFeatureGate: false,
@@ -4239,6 +4244,19 @@ func TestUpdateJobPodResources(t *testing.T) {
 				Image: "busybox",
 			}},
 			expectUpdate: false,
+			jobName:      "no-update-with-feature-disabled",
+		},
+		"started then suspended job, feature gate enabled, update resources": {
+			enableFeatureGate: true,
+			suspend:           false,
+			updateResources:   true,
+			containers: []v1.Container{{
+				Name:  "test-container",
+				Image: "busybox",
+			}},
+			expectUpdate:     true,
+			startThenSuspend: true,
+			jobName:          "suspend-resume-mutate",
 		},
 	}
 
@@ -4254,11 +4272,13 @@ func TestUpdateJobPodResources(t *testing.T) {
 
 			job := &batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-job",
+					Name:      tc.jobName,
 					Namespace: ns.Name,
 				},
 				Spec: batchv1.JobSpec{
-					Suspend: ptr.To(tc.suspend),
+					Suspend:     ptr.To(tc.suspend),
+					Parallelism: ptr.To[int32](1),
+					Completions: ptr.To[int32](1),
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
 							Containers:    tc.containers,
@@ -4274,6 +4294,35 @@ func TestUpdateJobPodResources(t *testing.T) {
 			}
 
 			jobClient := cs.BatchV1().Jobs(ns.Name)
+
+			// Handle start-then-suspend case
+			if tc.startThenSuspend {
+				t.Logf("Waiting for pods to be active on starting job")
+				waitForPodsToBeActive(ctx, t, jobClient, 1, job)
+				// Suspend the job
+				_, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
+					j.Spec.Suspend = ptr.To(true)
+				})
+				if err != nil {
+					t.Fatalf("Failed to suspend Job: %v", err)
+				}
+
+				// Wait for the job to be suspended
+				err = wait.PollUntilContextTimeout(ctx, time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					j, err := jobClient.Get(ctx, job.Name, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					return j.Spec.Suspend != nil && *j.Spec.Suspend, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for job to be suspended: %v", err)
+				}
+				t.Logf("job is suspended")
+			}
+
+			waitForPodsToBeActive(ctx, t, jobClient, 0, job)
+
 			if tc.updateResources {
 				_, err := updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
 					for i := range j.Spec.Template.Spec.Containers {
@@ -4294,8 +4343,8 @@ func TestUpdateJobPodResources(t *testing.T) {
 				}
 			}
 
-			// Unsuspend the job if it was suspended
-			if tc.suspend {
+			// Unsuspend the job if it was suspended or if it's the start-then-suspend case
+			if tc.suspend || tc.startThenSuspend {
 				_, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
 					j.Spec.Suspend = ptr.To(false)
 				})
