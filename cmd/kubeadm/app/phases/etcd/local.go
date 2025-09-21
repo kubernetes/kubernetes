@@ -35,14 +35,12 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
 const (
@@ -301,26 +299,6 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 func prepareAndWriteEtcdStaticPod(manifestDir string, patchesDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member, isDryRun bool) error {
 	// gets etcd StaticPodSpec, actualized for the current ClusterConfiguration and the new list of etcd members
 	spec := GetEtcdPodSpec(cfg, endpoint, nodeName, initialCluster)
-
-	var usersAndGroups *users.UsersAndGroups
-	var err error
-	if features.Enabled(cfg.FeatureGates, features.RootlessControlPlane) {
-		if isDryRun {
-			fmt.Printf("[etcd] Would create users and groups for %q to run as non-root\n", kubeadmconstants.Etcd)
-			fmt.Printf("[etcd] Would update static pod manifest for %q to run run as non-root\n", kubeadmconstants.Etcd)
-		} else {
-			usersAndGroups, err = staticpodutil.GetUsersAndGroups()
-			if err != nil {
-				return errors.Wrap(err, "failed to create users and groups")
-			}
-			// usersAndGroups is nil on non-linux.
-			if usersAndGroups != nil {
-				if err := staticpodutil.RunComponentAsNonRoot(kubeadmconstants.Etcd, &spec, usersAndGroups, cfg); err != nil {
-					return errors.Wrapf(err, "failed to run component %q as non-root", kubeadmconstants.Etcd)
-				}
-			}
-		}
-	}
 
 	// if patchesDir is defined, patch the static Pod manifest
 	if patchesDir != "" {
