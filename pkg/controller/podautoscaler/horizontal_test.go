@@ -5396,7 +5396,6 @@ func TestMultipleHPAs(t *testing.T) {
 	testClient.AddReactor("delete", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		deleteAction := action.(core.DeleteAction)
 		hpaName := deleteAction.GetName()
-		fmt.Printf("DELETE REACTOR CALLED: %s\n", hpaName)
 		processed <- hpaName
 		return true, nil, nil
 	})
