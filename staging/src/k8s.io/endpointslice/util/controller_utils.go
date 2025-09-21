@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 )
 
 // semanticIgnoreResourceVersion does semantic deep equality checks for objects
@@ -55,11 +56,11 @@ type PodProjectionKey struct {
 	PodChanged bool       // set to true if the pod's fields changed in a way that may affect its endpoints membership
 }
 
-func GetPodUpdateProjectionKey(oldObj, newObj interface{}) *PodProjectionKey {
-	newPod := getPodFromObject(newObj)
-	oldPod := getPodFromObject(oldObj)
+func GetPodUpdateProjectionKey(logger klog.Logger, oldObj, newObj interface{}) *PodProjectionKey {
+	newPod := getPodFromObject(logger, newObj)
+	oldPod := getPodFromObject(logger, oldObj)
 	if newPod == nil && oldPod == nil {
-		utilruntime.HandleError(fmt.Errorf("unexpected pod event with both old/new values as nil, ignoring"))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected pod event with both old/new values as nil, ignoring")
 		return nil
 	}
 	if oldPod == nil {
@@ -106,7 +107,7 @@ func GetPodUpdateProjectionKey(oldObj, newObj interface{}) *PodProjectionKey {
 	}
 }
 
-func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjectionKey) (sets.String, error) {
+func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjectionKey) (sets.Set[string], error) {
 	if key == nil {
 		return nil, nil
 	}
@@ -130,13 +131,13 @@ func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjecti
 }
 
 // getServicesForPod returns a set of services matching the given pod's namespace and labels (via service selector).
-func getServicesForPod(serviceLister v1listers.ServiceLister, namespace string, podLabels labels.Set) (sets.String, error) {
+func getServicesForPod(serviceLister v1listers.ServiceLister, namespace string, podLabels labels.Set) (sets.Set[string], error) {
 	services, err := serviceLister.Services(namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	set := sets.String{}
+	set := sets.Set[string]{}
 	for _, service := range services {
 		if service.Spec.Selector == nil {
 			// If the service has a nil selector this means selectors match nothing, not everything.
@@ -239,7 +240,7 @@ func podEndpointsChanged(oldPod, newPod *v1.Pod) (bool, bool) {
 	return false, labelsChanged
 }
 
-func getPodFromObject(obj interface{}) *v1.Pod {
+func getPodFromObject(logger klog.Logger, obj interface{}) *v1.Pod {
 	if obj == nil {
 		return nil
 	}
@@ -249,12 +250,12 @@ func getPodFromObject(obj interface{}) *v1.Pod {
 	// If we reached here it means the pod was deleted but its final state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Couldn't get object from tombstone", "obj", obj)
 		return nil
 	}
 	pod, ok := tombstone.Obj.(*v1.Pod)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod: %#v", obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Tombstone contained object that is not a Pod", "type", fmt.Sprintf("%T", obj))
 		return nil
 	}
 	return pod
@@ -265,7 +266,7 @@ func hostNameAndDomainAreEqual(pod1, pod2 *v1.Pod) bool {
 		pod1.Spec.Subdomain == pod2.Spec.Subdomain
 }
 
-func determineNeededServiceUpdates(oldServices, services sets.String, podChanged bool) sets.String {
+func determineNeededServiceUpdates(oldServices, services sets.Set[string], podChanged bool) sets.Set[string] {
 	if podChanged {
 		// if the labels and pod changed, all services need to be updated
 		services = services.Union(oldServices)
