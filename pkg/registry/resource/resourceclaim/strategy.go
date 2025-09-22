@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -96,7 +97,18 @@ func (s *resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object
 	claim := obj.(*resource.ResourceClaim)
 
 	allErrs := resourceutils.AuthorizedForAdmin(ctx, claim.Spec.Devices.Requests, claim.Namespace, s.nsClient)
-	return append(allErrs, validation.ValidateResourceClaim(claim)...)
+	allErrs = append(allErrs, validation.ValidateResourceClaim(claim)...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+		const validationIdentifier = "resourceclaim_create"
+		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, claim, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover, validationIdentifier)
+		if takeover {
+			allErrs = append(allErrs.RemoveCoveredByDeclarative(), declarativeErrs...)
+		}
+	}
+	return allErrs
 }
 
 func (*resourceclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -123,7 +135,18 @@ func (s *resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	oldClaim := old.(*resource.ResourceClaim)
 	// AuthorizedForAdmin isn't needed here because the spec is immutable.
 	errorList := validation.ValidateResourceClaim(newClaim)
-	return append(errorList, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
+	errorList = append(errorList, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+		const validationIdentifier = "resourceclaim_update"
+		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newClaim, oldClaim, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errorList, declarativeErrs, takeover, validationIdentifier)
+		if takeover {
+			errorList = append(errorList.RemoveCoveredByDeclarative(), declarativeErrs...)
+		}
+	}
+	return errorList
 }
 
 func (*resourceclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {

@@ -308,7 +308,7 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	logger.Info("Starting persistent volume controller")
 	defer logger.Info("Shutting down persistent volume controller")
 
-	if !cache.WaitForNamedCacheSync("persistent volume", ctx.Done(), ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
 		return
 	}
 

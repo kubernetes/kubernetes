@@ -21,9 +21,9 @@ filters:
       - area/kubelet
     emeritus_approvers:
       - resouer
-  # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
-  # dep-approvers
-  "go\\.(mod|sum)$":
+  # go.{mod,sum,work,work.sum} files relate to go dependencies,
+  # and should be reviewed by the dep-approvers
+  "go\\.(mod|sum|work|work\\.sum)$":
     approvers:
       - dep-approvers
     reviewers:

@@ -21,6 +21,7 @@ package preemption
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -97,7 +97,7 @@ func (fp *tokenFilter) Filter(ctx context.Context, state fwk.CycleState, pod *v1
 	return fwk.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
 }
 
-func (fp *tokenFilter) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (fp *tokenFilter) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	if !fp.EnablePreFilter || fp.Tokens > 0 {
 		return nil, nil
 	}
@@ -116,18 +116,18 @@ func (fp *tokenFilter) RemovePod(ctx context.Context, state fwk.CycleState, podT
 	return nil
 }
 
-func (fp *tokenFilter) PreFilterExtensions() framework.PreFilterExtensions {
+func (fp *tokenFilter) PreFilterExtensions() fwk.PreFilterExtensions {
 	return fp
 }
 
-var _ framework.FilterPlugin = &tokenFilter{}
+var _ fwk.FilterPlugin = &tokenFilter{}
 
 // TestPreemption tests a few preemption scenarios.
 func TestPreemption(t *testing.T) {
 	// Initialize scheduler with a filter plugin.
 	var filter tokenFilter
 	registry := make(frameworkruntime.Registry)
-	err := registry.Register(filterPluginName, func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+	err := registry.Register(filterPluginName, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		return &filter, nil
 	})
 	if err != nil {
@@ -795,16 +795,19 @@ func TestAsyncPreemption(t *testing.T) {
 
 				// We need to use a custom preemption plugin to test async preemption behavior
 				delayedPreemptionPluginName := "delay-preemption"
+				var lock sync.Mutex
 				// keyed by the pod name
 				preemptionDoneChannels := make(map[string]chan struct{})
 				defer func() {
+					lock.Lock()
+					defer lock.Unlock()
 					for _, ch := range preemptionDoneChannels {
 						close(ch)
 					}
 				}()
 				registry := make(frameworkruntime.Registry)
 				var preemptionPlugin *defaultpreemption.DefaultPreemption
-				err := registry.Register(delayedPreemptionPluginName, func(c context.Context, r runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				err := registry.Register(delayedPreemptionPluginName, func(c context.Context, r runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					p, err := frameworkruntime.FactoryAdapter(plfeature.Features{EnableAsyncPreemption: true}, defaultpreemption.New)(c, &config.DefaultPreemptionArgs{
 						// Set default values to pass the validation at the initialization, not related to the test.
 						MinCandidateNodesPercentage: 10,
@@ -823,7 +826,10 @@ func TestAsyncPreemption(t *testing.T) {
 					preemptPodFn := preemptionPlugin.Evaluator.PreemptPod
 					preemptionPlugin.Evaluator.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor, victim *v1.Pod, pluginName string) error {
 						// block the preemption goroutine to complete until the test case allows it to proceed.
-						if ch, ok := preemptionDoneChannels[preemptor.Name]; ok {
+						lock.Lock()
+						ch, ok := preemptionDoneChannels[preemptor.Name]
+						lock.Unlock()
+						if ok {
 							<-ch
 						}
 						return preemptPodFn(ctx, c, preemptor, victim, pluginName)
@@ -927,7 +933,9 @@ func TestAsyncPreemption(t *testing.T) {
 							t.Fatal(lastFailure)
 						}
 
+						lock.Lock()
 						preemptionDoneChannels[scenario.schedulePod.podName] = make(chan struct{})
+						lock.Unlock()
 						testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
 						if scenario.schedulePod.expectSuccess {
 							if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
@@ -939,12 +947,14 @@ func TestAsyncPreemption(t *testing.T) {
 							}
 						}
 					case scenario.completePreemption != "":
+						lock.Lock()
 						if _, ok := preemptionDoneChannels[scenario.completePreemption]; !ok {
 							t.Fatalf("The preemptor Pod %q is not running preemption", scenario.completePreemption)
 						}
 
 						close(preemptionDoneChannels[scenario.completePreemption])
 						delete(preemptionDoneChannels, scenario.completePreemption)
+						lock.Unlock()
 					case scenario.podGatedInQueue != "":
 						// make sure the Pod is in the queue in the first place.
 						if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.podGatedInQueue) {

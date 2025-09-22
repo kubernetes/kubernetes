@@ -25,9 +25,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/spf13/pflag"
+	"google.golang.org/protobuf/proto"
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"

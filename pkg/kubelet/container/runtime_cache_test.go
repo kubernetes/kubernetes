@@ -17,13 +17,13 @@ limitations under the License.
 package container_test
 
 import (
-	"context"
 	"reflect"
 	"testing"
 	"time"
 
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func comparePods(t *testing.T, expected []*ctest.FakePod, actual []*Pod) {
@@ -38,12 +38,12 @@ func comparePods(t *testing.T, expected []*ctest.FakePod, actual []*Pod) {
 }
 
 func TestGetPods(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	runtime := &ctest.FakeRuntime{}
 	expected := []*ctest.FakePod{{Pod: &Pod{ID: "1111"}}, {Pod: &Pod{ID: "2222"}}, {Pod: &Pod{ID: "3333"}}}
 	runtime.PodList = expected
 	cache := NewTestRuntimeCache(runtime)
-	actual, err := cache.GetPods(ctx)
+	actual, err := cache.GetPods(tCtx)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -52,26 +52,32 @@ func TestGetPods(t *testing.T) {
 }
 
 func TestForceUpdateIfOlder(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	runtime := &ctest.FakeRuntime{}
 	cache := NewTestRuntimeCache(runtime)
 
 	// Cache old pods.
 	oldpods := []*ctest.FakePod{{Pod: &Pod{ID: "1111"}}}
 	runtime.PodList = oldpods
-	cache.UpdateCacheWithLock()
+	if err := cache.UpdateCacheWithLock(tCtx); err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
 
 	// Update the runtime to new pods.
 	newpods := []*ctest.FakePod{{Pod: &Pod{ID: "1111"}}, {Pod: &Pod{ID: "2222"}}, {Pod: &Pod{ID: "3333"}}}
 	runtime.PodList = newpods
 
 	// An older timestamp should not force an update.
-	cache.ForceUpdateIfOlder(ctx, time.Now().Add(-20*time.Minute))
+	if err := cache.ForceUpdateIfOlder(tCtx, time.Now().Add(-20*time.Minute)); err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
 	actual := cache.GetCachedPods()
 	comparePods(t, oldpods, actual)
 
 	// A newer timestamp should force an update.
-	cache.ForceUpdateIfOlder(ctx, time.Now().Add(20*time.Second))
+	if err := cache.ForceUpdateIfOlder(tCtx, time.Now().Add(20*time.Second)); err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
 	actual = cache.GetCachedPods()
 	comparePods(t, newpods, actual)
 }

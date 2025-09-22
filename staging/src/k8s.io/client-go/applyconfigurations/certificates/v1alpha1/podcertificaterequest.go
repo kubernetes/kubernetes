@@ -29,11 +29,19 @@ import (
 
 // PodCertificateRequestApplyConfiguration represents a declarative configuration of the PodCertificateRequest type for use
 // with apply.
+//
+// PodCertificateRequest encodes a pod requesting a certificate from a given
+// signer.
+//
+// Kubelets use this API to implement podCertificate projected volumes
 type PodCertificateRequestApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata contains the object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PodCertificateRequestSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *PodCertificateRequestStatusApplyConfiguration `json:"status,omitempty"`
+	// spec contains the details about the certificate being requested.
+	Spec *PodCertificateRequestSpecApplyConfiguration `json:"spec,omitempty"`
+	// status contains the issued certificate, and a standard set of conditions.
+	Status *PodCertificateRequestStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PodCertificateRequest constructs a declarative configuration of the PodCertificateRequest type for use with
@@ -47,29 +55,14 @@ func PodCertificateRequest(name, namespace string) *PodCertificateRequestApplyCo
 	return b
 }
 
-// ExtractPodCertificateRequest extracts the applied configuration owned by fieldManager from
-// podCertificateRequest. If no managedFields are found in podCertificateRequest for fieldManager, a
-// PodCertificateRequestApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractPodCertificateRequestFrom extracts the applied configuration owned by fieldManager from
+// podCertificateRequest for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // podCertificateRequest must be a unmodified PodCertificateRequest API object that was retrieved from the Kubernetes API.
-// ExtractPodCertificateRequest provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractPodCertificateRequestFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractPodCertificateRequest(podCertificateRequest *certificatesv1alpha1.PodCertificateRequest, fieldManager string) (*PodCertificateRequestApplyConfiguration, error) {
-	return extractPodCertificateRequest(podCertificateRequest, fieldManager, "")
-}
-
-// ExtractPodCertificateRequestStatus is the same as ExtractPodCertificateRequest except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractPodCertificateRequestStatus(podCertificateRequest *certificatesv1alpha1.PodCertificateRequest, fieldManager string) (*PodCertificateRequestApplyConfiguration, error) {
-	return extractPodCertificateRequest(podCertificateRequest, fieldManager, "status")
-}
-
-func extractPodCertificateRequest(podCertificateRequest *certificatesv1alpha1.PodCertificateRequest, fieldManager string, subresource string) (*PodCertificateRequestApplyConfiguration, error) {
+func ExtractPodCertificateRequestFrom(podCertificateRequest *certificatesv1alpha1.PodCertificateRequest, fieldManager string, subresource string) (*PodCertificateRequestApplyConfiguration, error) {
 	b := &PodCertificateRequestApplyConfiguration{}
 	err := managedfields.ExtractInto(podCertificateRequest, internal.Parser().Type("io.k8s.api.certificates.v1alpha1.PodCertificateRequest"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +75,27 @@ func extractPodCertificateRequest(podCertificateRequest *certificatesv1alpha1.Po
 	b.WithAPIVersion("certificates.k8s.io/v1alpha1")
 	return b, nil
 }
+
+// ExtractPodCertificateRequest extracts the applied configuration owned by fieldManager from
+// podCertificateRequest. If no managedFields are found in podCertificateRequest for fieldManager, a
+// PodCertificateRequestApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// podCertificateRequest must be a unmodified PodCertificateRequest API object that was retrieved from the Kubernetes API.
+// ExtractPodCertificateRequest provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractPodCertificateRequest(podCertificateRequest *certificatesv1alpha1.PodCertificateRequest, fieldManager string) (*PodCertificateRequestApplyConfiguration, error) {
+	return ExtractPodCertificateRequestFrom(podCertificateRequest, fieldManager, "")
+}
+
+// ExtractPodCertificateRequestStatus extracts the applied configuration owned by fieldManager from
+// podCertificateRequest for the status subresource.
+func ExtractPodCertificateRequestStatus(podCertificateRequest *certificatesv1alpha1.PodCertificateRequest, fieldManager string) (*PodCertificateRequestApplyConfiguration, error) {
+	return ExtractPodCertificateRequestFrom(podCertificateRequest, fieldManager, "status")
+}
+
 func (b PodCertificateRequestApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

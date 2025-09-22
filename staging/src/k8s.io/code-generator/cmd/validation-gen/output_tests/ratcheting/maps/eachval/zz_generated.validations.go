@@ -38,6 +38,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type StructWithMaps
 	scheme.AddValidationFunc((*StructWithMaps)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -48,15 +49,19 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_StructWithMaps validates an instance of StructWithMaps according
+// to declarative validation rules in the API schema.
 func Validate_StructWithMaps(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StructWithMaps) (errs field.ErrorList) {
 	// field StructWithMaps.TypeMeta has no validation
 
 	// field StructWithMaps.MapPrimitiveField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapTest.MapPrimitiveField[*]")
 			})...)
@@ -66,9 +71,11 @@ func Validate_StructWithMaps(ctx context.Context, op operation.Operation, fldPat
 	// field StructWithMaps.MapTypedefField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj map[string]StringType) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StringType) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapTest.MapTypedefField[*]")
 			})...)
@@ -78,9 +85,11 @@ func Validate_StructWithMaps(ctx context.Context, op operation.Operation, fldPat
 	// field StructWithMaps.MapComparableStructField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj map[string]ComparableStruct) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComparableStruct) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapTest.MapComparableStructField[*]")
 			})...)
@@ -90,9 +99,11 @@ func Validate_StructWithMaps(ctx context.Context, op operation.Operation, fldPat
 	// field StructWithMaps.MapNonComparableStructField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj map[string]NonComparableStruct) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
+			// call field-attached validations
 			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapTest.MapNonComparableStructField[*]")
 			})...)

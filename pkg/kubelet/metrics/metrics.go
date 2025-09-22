@@ -1075,7 +1075,8 @@ var (
 		[]string{"driver_name", "method_name", "grpc_status_code"},
 	)
 
-	DRAResourceClaimsInUseDesc = metrics.NewDesc(DRASubsystem+"_resource_claims_in_use",
+	DRAResourceClaimsInUseDesc = metrics.NewDesc(
+		metrics.BuildFQName("", DRASubsystem, "resource_claims_in_use"),
 		"The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.",
 		[]string{"driver_name"},
 		nil,
@@ -1194,7 +1195,7 @@ var (
 var registerMetrics sync.Once
 
 // Register registers all metrics.
-func Register(collectors ...metrics.StableCollector) {
+func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(FirstNetworkPodStartSLIDuration)
@@ -1274,10 +1275,6 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(OrphanPodCleanedVolumes)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumesErrors)
 
-		for _, collector := range collectors {
-			legacyregistry.CustomMustRegister(collector)
-		}
-
 		if utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) &&
 			utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
 			legacyregistry.MustRegister(GracefulShutdownStartTime)
@@ -1312,6 +1309,10 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
 		}
 	})
+}
+
+func RegisterCollectors(collectors ...metrics.StableCollector) {
+	legacyregistry.CustomMustRegister(collectors...)
 }
 
 // GetGather returns the gatherer. It used by test case outside current package.

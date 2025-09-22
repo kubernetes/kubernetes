@@ -226,7 +226,7 @@ func TestPodTopology(t *testing.T) {
 func newHandlerForTest(c kubernetes.Interface) (*Plugin, informers.SharedInformerFactory, error) {
 	factory := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler := NewPodTopologyPlugin(defaultConfig) // todo: write additional test cases with non-default config.
-	pluginInitializer := genericadmissioninitializer.New(c, nil, factory, nil, feature.DefaultFeatureGate, nil, nil)
+	pluginInitializer := genericadmissioninitializer.New(c, nil, factory, nil, feature.DefaultFeatureGate, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	return handler, factory, admission.ValidateInitialization(handler)
 }

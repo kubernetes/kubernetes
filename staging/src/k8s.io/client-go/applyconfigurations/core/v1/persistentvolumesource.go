@@ -20,29 +20,94 @@ package v1
 
 // PersistentVolumeSourceApplyConfiguration represents a declarative configuration of the PersistentVolumeSource type for use
 // with apply.
+//
+// PersistentVolumeSource is similar to VolumeSource but meant for the
+// administrator who creates PVs. Exactly one of its members must be set.
 type PersistentVolumeSourceApplyConfiguration struct {
-	GCEPersistentDisk    *GCEPersistentDiskVolumeSourceApplyConfiguration    `json:"gcePersistentDisk,omitempty"`
+	// gcePersistentDisk represents a GCE Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod. Provisioned by an admin.
+	// Deprecated: GCEPersistentDisk is deprecated. All operations for the in-tree
+	// gcePersistentDisk type are redirected to the pd.csi.storage.gke.io CSI driver.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
+	GCEPersistentDisk *GCEPersistentDiskVolumeSourceApplyConfiguration `json:"gcePersistentDisk,omitempty"`
+	// awsElasticBlockStore represents an AWS Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	// Deprecated: AWSElasticBlockStore is deprecated. All operations for the in-tree
+	// awsElasticBlockStore type are redirected to the ebs.csi.aws.com CSI driver.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSourceApplyConfiguration `json:"awsElasticBlockStore,omitempty"`
-	HostPath             *HostPathVolumeSourceApplyConfiguration             `json:"hostPath,omitempty"`
-	Glusterfs            *GlusterfsPersistentVolumeSourceApplyConfiguration  `json:"glusterfs,omitempty"`
-	NFS                  *NFSVolumeSourceApplyConfiguration                  `json:"nfs,omitempty"`
-	RBD                  *RBDPersistentVolumeSourceApplyConfiguration        `json:"rbd,omitempty"`
-	ISCSI                *ISCSIPersistentVolumeSourceApplyConfiguration      `json:"iscsi,omitempty"`
-	Cinder               *CinderPersistentVolumeSourceApplyConfiguration     `json:"cinder,omitempty"`
-	CephFS               *CephFSPersistentVolumeSourceApplyConfiguration     `json:"cephfs,omitempty"`
-	FC                   *FCVolumeSourceApplyConfiguration                   `json:"fc,omitempty"`
-	Flocker              *FlockerVolumeSourceApplyConfiguration              `json:"flocker,omitempty"`
-	FlexVolume           *FlexPersistentVolumeSourceApplyConfiguration       `json:"flexVolume,omitempty"`
-	AzureFile            *AzureFilePersistentVolumeSourceApplyConfiguration  `json:"azureFile,omitempty"`
-	VsphereVolume        *VsphereVirtualDiskVolumeSourceApplyConfiguration   `json:"vsphereVolume,omitempty"`
-	Quobyte              *QuobyteVolumeSourceApplyConfiguration              `json:"quobyte,omitempty"`
-	AzureDisk            *AzureDiskVolumeSourceApplyConfiguration            `json:"azureDisk,omitempty"`
+	// hostPath represents a directory on the host.
+	// Provisioned by a developer or tester.
+	// This is useful for single-node development and testing only!
+	// On-host storage is not supported in any way and WILL NOT WORK in a multi-node cluster.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+	HostPath *HostPathVolumeSourceApplyConfiguration `json:"hostPath,omitempty"`
+	// glusterfs represents a Glusterfs volume that is attached to a host and
+	// exposed to the pod. Provisioned by an admin.
+	// Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported.
+	// More info: https://examples.k8s.io/volumes/glusterfs/README.md
+	Glusterfs *GlusterfsPersistentVolumeSourceApplyConfiguration `json:"glusterfs,omitempty"`
+	// nfs represents an NFS mount on the host. Provisioned by an admin.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
+	NFS *NFSVolumeSourceApplyConfiguration `json:"nfs,omitempty"`
+	// rbd represents a Rados Block Device mount on the host that shares a pod's lifetime.
+	// Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported.
+	// More info: https://examples.k8s.io/volumes/rbd/README.md
+	RBD *RBDPersistentVolumeSourceApplyConfiguration `json:"rbd,omitempty"`
+	// iscsi represents an ISCSI Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod. Provisioned by an admin.
+	ISCSI *ISCSIPersistentVolumeSourceApplyConfiguration `json:"iscsi,omitempty"`
+	// cinder represents a cinder volume attached and mounted on kubelets host machine.
+	// Deprecated: Cinder is deprecated. All operations for the in-tree cinder type
+	// are redirected to the cinder.csi.openstack.org CSI driver.
+	// More info: https://examples.k8s.io/mysql-cinder-pd/README.md
+	Cinder *CinderPersistentVolumeSourceApplyConfiguration `json:"cinder,omitempty"`
+	// cephFS represents a Ceph FS mount on the host that shares a pod's lifetime.
+	// Deprecated: CephFS is deprecated and the in-tree cephfs type is no longer supported.
+	CephFS *CephFSPersistentVolumeSourceApplyConfiguration `json:"cephfs,omitempty"`
+	// fc represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
+	FC *FCVolumeSourceApplyConfiguration `json:"fc,omitempty"`
+	// flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running.
+	// Deprecated: Flocker is deprecated and the in-tree flocker type is no longer supported.
+	Flocker *FlockerVolumeSourceApplyConfiguration `json:"flocker,omitempty"`
+	// flexVolume represents a generic volume resource that is
+	// provisioned/attached using an exec based plugin.
+	// Deprecated: FlexVolume is deprecated. Consider using a CSIDriver instead.
+	FlexVolume *FlexPersistentVolumeSourceApplyConfiguration `json:"flexVolume,omitempty"`
+	// azureFile represents an Azure File Service mount on the host and bind mount to the pod.
+	// Deprecated: AzureFile is deprecated. All operations for the in-tree azureFile type
+	// are redirected to the file.csi.azure.com CSI driver.
+	AzureFile *AzureFilePersistentVolumeSourceApplyConfiguration `json:"azureFile,omitempty"`
+	// vsphereVolume represents a vSphere volume attached and mounted on kubelets host machine.
+	// Deprecated: VsphereVolume is deprecated. All operations for the in-tree vsphereVolume type
+	// are redirected to the csi.vsphere.vmware.com CSI driver.
+	VsphereVolume *VsphereVirtualDiskVolumeSourceApplyConfiguration `json:"vsphereVolume,omitempty"`
+	// quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
+	// Deprecated: Quobyte is deprecated and the in-tree quobyte type is no longer supported.
+	Quobyte *QuobyteVolumeSourceApplyConfiguration `json:"quobyte,omitempty"`
+	// azureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+	// Deprecated: AzureDisk is deprecated. All operations for the in-tree azureDisk type
+	// are redirected to the disk.csi.azure.com CSI driver.
+	AzureDisk *AzureDiskVolumeSourceApplyConfiguration `json:"azureDisk,omitempty"`
+	// photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
+	// Deprecated: PhotonPersistentDisk is deprecated and the in-tree photonPersistentDisk type is no longer supported.
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSourceApplyConfiguration `json:"photonPersistentDisk,omitempty"`
-	PortworxVolume       *PortworxVolumeSourceApplyConfiguration             `json:"portworxVolume,omitempty"`
-	ScaleIO              *ScaleIOPersistentVolumeSourceApplyConfiguration    `json:"scaleIO,omitempty"`
-	Local                *LocalVolumeSourceApplyConfiguration                `json:"local,omitempty"`
-	StorageOS            *StorageOSPersistentVolumeSourceApplyConfiguration  `json:"storageos,omitempty"`
-	CSI                  *CSIPersistentVolumeSourceApplyConfiguration        `json:"csi,omitempty"`
+	// portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
+	// Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
+	// are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
+	// is on.
+	PortworxVolume *PortworxVolumeSourceApplyConfiguration `json:"portworxVolume,omitempty"`
+	// scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+	// Deprecated: ScaleIO is deprecated and the in-tree scaleIO type is no longer supported.
+	ScaleIO *ScaleIOPersistentVolumeSourceApplyConfiguration `json:"scaleIO,omitempty"`
+	// local represents directly-attached storage with node affinity
+	Local *LocalVolumeSourceApplyConfiguration `json:"local,omitempty"`
+	// storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod.
+	// Deprecated: StorageOS is deprecated and the in-tree storageos type is no longer supported.
+	// More info: https://examples.k8s.io/volumes/storageos/README.md
+	StorageOS *StorageOSPersistentVolumeSourceApplyConfiguration `json:"storageos,omitempty"`
+	// csi represents storage that is handled by an external CSI driver.
+	CSI *CSIPersistentVolumeSourceApplyConfiguration `json:"csi,omitempty"`
 }
 
 // PersistentVolumeSourceApplyConfiguration constructs a declarative configuration of the PersistentVolumeSource type for use with

@@ -351,11 +351,11 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 		return nil, err
 	}
 
-	// if dry running creates a temporary folder for saving kubeadm generated files
+	// If dry running creates a temporary directory for saving kubeadm generated files.
 	dryRunDir := ""
 	if initOptions.dryRun || cfg.DryRun {
 		if dryRunDir, err = kubeadmconstants.GetDryRunDir(kubeadmconstants.EnvVarInitDryRunDir, "kubeadm-init-dryrun", klog.Warningf); err != nil {
-			return nil, errors.Wrap(err, "couldn't create a temporary directory")
+			return nil, errors.Wrap(err, "could not create a temporary directory on dryrun")
 		}
 	}
 
@@ -475,7 +475,7 @@ func (d *initData) KubeConfig() (*clientcmdapi.Config, error) {
 	return d.kubeconfig, nil
 }
 
-// KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
+// KubeConfigDir returns the Kubernetes configuration directory or the temporary directory if DryRun is true.
 func (d *initData) KubeConfigDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -491,7 +491,7 @@ func (d *initData) KubeConfigPath() string {
 	return d.kubeconfigPath
 }
 
-// ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
+// ManifestDir returns the path where manifest should be stored or the temporary directory if DryRun is true.
 func (d *initData) ManifestDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -499,7 +499,7 @@ func (d *initData) ManifestDir() string {
 	return kubeadmconstants.GetStaticPodDirectory()
 }
 
-// KubeletDir returns path of the kubelet configuration folder or the temporary folder in case of DryRun.
+// KubeletDir returns the kubelet configuration directory or the temporary directory if DryRun is true.
 func (d *initData) KubeletDir() string {
 	if d.dryRun {
 		return d.dryRunDir

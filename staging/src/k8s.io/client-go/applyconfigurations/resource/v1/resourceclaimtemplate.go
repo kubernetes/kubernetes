@@ -29,10 +29,21 @@ import (
 
 // ResourceClaimTemplateApplyConfiguration represents a declarative configuration of the ResourceClaimTemplate type for use
 // with apply.
+//
+// ResourceClaimTemplate is used to produce ResourceClaim objects.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
 type ResourceClaimTemplateApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ResourceClaimTemplateSpecApplyConfiguration `json:"spec,omitempty"`
+	// Describes the ResourceClaim that is to be generated.
+	//
+	// This field is immutable. A ResourceClaim will get created by the
+	// control plane for a Pod when needed and then not get updated
+	// anymore.
+	Spec *ResourceClaimTemplateSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ResourceClaimTemplate constructs a declarative configuration of the ResourceClaimTemplate type for use with
@@ -46,29 +57,14 @@ func ResourceClaimTemplate(name, namespace string) *ResourceClaimTemplateApplyCo
 	return b
 }
 
-// ExtractResourceClaimTemplate extracts the applied configuration owned by fieldManager from
-// resourceClaimTemplate. If no managedFields are found in resourceClaimTemplate for fieldManager, a
-// ResourceClaimTemplateApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractResourceClaimTemplateFrom extracts the applied configuration owned by fieldManager from
+// resourceClaimTemplate for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // resourceClaimTemplate must be a unmodified ResourceClaimTemplate API object that was retrieved from the Kubernetes API.
-// ExtractResourceClaimTemplate provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractResourceClaimTemplateFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractResourceClaimTemplate(resourceClaimTemplate *resourcev1.ResourceClaimTemplate, fieldManager string) (*ResourceClaimTemplateApplyConfiguration, error) {
-	return extractResourceClaimTemplate(resourceClaimTemplate, fieldManager, "")
-}
-
-// ExtractResourceClaimTemplateStatus is the same as ExtractResourceClaimTemplate except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractResourceClaimTemplateStatus(resourceClaimTemplate *resourcev1.ResourceClaimTemplate, fieldManager string) (*ResourceClaimTemplateApplyConfiguration, error) {
-	return extractResourceClaimTemplate(resourceClaimTemplate, fieldManager, "status")
-}
-
-func extractResourceClaimTemplate(resourceClaimTemplate *resourcev1.ResourceClaimTemplate, fieldManager string, subresource string) (*ResourceClaimTemplateApplyConfiguration, error) {
+func ExtractResourceClaimTemplateFrom(resourceClaimTemplate *resourcev1.ResourceClaimTemplate, fieldManager string, subresource string) (*ResourceClaimTemplateApplyConfiguration, error) {
 	b := &ResourceClaimTemplateApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceClaimTemplate, internal.Parser().Type("io.k8s.api.resource.v1.ResourceClaimTemplate"), fieldManager, b, subresource)
 	if err != nil {
@@ -81,6 +77,21 @@ func extractResourceClaimTemplate(resourceClaimTemplate *resourcev1.ResourceClai
 	b.WithAPIVersion("resource.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractResourceClaimTemplate extracts the applied configuration owned by fieldManager from
+// resourceClaimTemplate. If no managedFields are found in resourceClaimTemplate for fieldManager, a
+// ResourceClaimTemplateApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// resourceClaimTemplate must be a unmodified ResourceClaimTemplate API object that was retrieved from the Kubernetes API.
+// ExtractResourceClaimTemplate provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractResourceClaimTemplate(resourceClaimTemplate *resourcev1.ResourceClaimTemplate, fieldManager string) (*ResourceClaimTemplateApplyConfiguration, error) {
+	return ExtractResourceClaimTemplateFrom(resourceClaimTemplate, fieldManager, "")
+}
+
 func (b ResourceClaimTemplateApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -47,7 +48,6 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -152,7 +152,7 @@ type informationForClaim struct {
 	allocation *resourceapi.AllocationResult
 }
 
-// nodeAllocation holds the the allocation results and extended resource claim per node.
+// nodeAllocation holds the allocation results and extended resource claim per node.
 type nodeAllocation struct {
 	// allocationResults has the allocation results, matching the order of
 	// claims which had to be allocated.
@@ -177,14 +177,14 @@ type DynamicResources struct {
 	filterTimeout                 time.Duration
 	enableConsumableCapacity      bool
 
-	fh         framework.Handle
+	fh         fwk.Handle
 	clientset  kubernetes.Interface
 	celCache   *cel.Cache
-	draManager framework.SharedDRAManager
+	draManager fwk.SharedDRAManager
 }
 
 // New initializes a new plugin and returns it.
-func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	if !fts.EnableDynamicResourceAllocation {
 		// Disabled, won't do anything.
 		return &DynamicResources{}, nil
@@ -224,13 +224,13 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	return pl, nil
 }
 
-var _ framework.PreEnqueuePlugin = &DynamicResources{}
-var _ framework.PreFilterPlugin = &DynamicResources{}
-var _ framework.FilterPlugin = &DynamicResources{}
-var _ framework.PostFilterPlugin = &DynamicResources{}
-var _ framework.ReservePlugin = &DynamicResources{}
-var _ framework.EnqueueExtensions = &DynamicResources{}
-var _ framework.PreBindPlugin = &DynamicResources{}
+var _ fwk.PreEnqueuePlugin = &DynamicResources{}
+var _ fwk.PreFilterPlugin = &DynamicResources{}
+var _ fwk.FilterPlugin = &DynamicResources{}
+var _ fwk.PostFilterPlugin = &DynamicResources{}
+var _ fwk.ReservePlugin = &DynamicResources{}
+var _ fwk.EnqueueExtensions = &DynamicResources{}
+var _ fwk.PreBindPlugin = &DynamicResources{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DynamicResources) Name() string {
@@ -435,7 +435,7 @@ func hasDeviceClassMappedExtendedResource(reqs v1.ResourceList, deviceClassMappi
 			// We only care about the resources requested by the pod we are trying to schedule.
 			continue
 		}
-		if v1helper.IsExtendedResourceName(rName) {
+		if schedutil.IsDRAExtendedResourceName(rName) {
 			_, ok := deviceClassMapping[rName]
 			if ok {
 				return true
@@ -546,7 +546,7 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 // PreFilter invoked at the prefilter extension point to check if pod has all
 // immediate claims bound. UnschedulableAndUnresolvable is returned if
 // the pod cannot be scheduled at the moment on any node.
-func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	if !pl.enabled {
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
@@ -727,7 +727,7 @@ func (pl *DynamicResources) validateDeviceClass(logger klog.Logger, deviceClassN
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *DynamicResources) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *DynamicResources) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
@@ -766,7 +766,7 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 	extendedResources := make(map[v1.ResourceName]int64)
 	hasExtendedResource := false
 	for rName, rQuant := range state.draExtendedResource.podScalarResources {
-		if !v1helper.IsExtendedResourceName(rName) {
+		if !schedutil.IsDRAExtendedResourceName(rName) {
 			continue
 		}
 		// Skip in case request quantity is zero
@@ -883,6 +883,9 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 				})
 		}
 	}
+	sort.Slice(deviceRequests, func(i, j int) bool {
+		return deviceRequests[i].Name < deviceRequests[j].Name
+	})
 	return deviceRequests
 }
 
@@ -1041,7 +1044,7 @@ func isSpecialClaimName(name string) bool {
 // deallocated to help get the Pod schedulable. If yes, it picks one and
 // requests its deallocation.  This only gets called when filtering found no
 // suitable node.
-func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *fwk.Status) {
+func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	if !pl.enabled {
 		return nil, fwk.NewStatus(fwk.Unschedulable, "plugin disabled")
 	}
@@ -1431,7 +1434,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod) []v1.C
 // bindClaim gets called by PreBind for claim which is not reserved for the pod yet.
 // It might not even be allocated. bindClaim then ensures that the allocation
 // and reservation are recorded. This finishes the work started in Reserve.
-func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (patchedClaim *resourceapi.ResourceClaim, finalErr error) {
+func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (*resourceapi.ResourceClaim, error) {
 	logger := klog.FromContext(ctx)
 	claim := state.claims.get(index)
 	allocation := state.informationsForClaim[index].allocation
@@ -1444,38 +1447,38 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		isExtendedResourceClaim = true
 	}
 	claimUIDs := []types.UID{claim.UID}
+	resourceClaimModified := false
 	defer func() {
-		if allocation != nil {
-			// The scheduler was handling allocation. Now that has
-			// completed, either successfully or with a failure.
-			if finalErr == nil {
+		// The scheduler was handling allocation. Now that has
+		// completed, either successfully or with a failure.
+		if resourceClaimModified {
+			if isExtendedResourceClaim {
+				// Unlike other claims, extended resource claim is created in API server below.
+				// AssumeClaimAfterAPICall returns ErrNotFound when the informer update has not reached assumed cache yet.
+				// Hence we must poll and wait for it.
+				pollErr := wait.PollUntilContextTimeout(ctx, 1*time.Second, time.Duration(AssumeExtendedResourceTimeoutDefaultSeconds)*time.Second, true,
+					func(ctx context.Context) (bool, error) {
+						if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
+							if errors.Is(err, assumecache.ErrNotFound) {
+								return false, nil
+							}
+							logger.V(5).Info("Claim not stored in assume cache", "claim", klog.KObj(claim), "err", err)
+							return false, err
+						}
+						return true, nil
+					})
+				if pollErr != nil {
+					logger.V(5).Info("Claim not stored in assume cache after retries", "claim", klog.KObj(claim), "err", pollErr)
+				}
+			} else {
 				// This can fail, but only for reasons that are okay (concurrent delete or update).
 				// Shouldn't happen in this case.
-				if isExtendedResourceClaim {
-					// Unlike other claims, extended resource claim is created in API server below.
-					// AssumeClaimAfterAPICall returns ErrNotFound when the informer update has not reached assumed cache yet.
-					// Hence we must poll and wait for it.
-					pollErr := wait.PollUntilContextTimeout(ctx, 1*time.Second, time.Duration(AssumeExtendedResourceTimeoutDefaultSeconds)*time.Second, true,
-						func(ctx context.Context) (bool, error) {
-							if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
-								if errors.Is(err, assumecache.ErrNotFound) {
-									return false, nil
-								}
-								logger.V(5).Info("Claim not stored in assume cache", "claim", klog.KObj(claim), "err", err)
-								return false, err
-							}
-							return true, nil
-						})
-					if pollErr != nil {
-						logger.V(5).Info("Claim not stored in assume cache after retries", "claim", klog.KObj(claim), "err", pollErr)
-					}
-				} else {
-					if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
-						logger.V(5).Info("Claim not stored in assume cache", "err", err)
-					}
+				if err := pl.draManager.ResourceClaims().AssumeClaimAfterAPICall(claim); err != nil {
+					logger.V(5).Info("Claim not stored in assume cache", "err", err)
 				}
 			}
-
+		}
+		if allocation != nil {
 			for _, claimUID := range claimUIDs {
 				pl.draManager.ResourceClaims().RemoveClaimPendingAllocation(claimUID)
 			}
@@ -1501,6 +1504,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		if err != nil {
 			return nil, fmt.Errorf("create claim for extended resources %v: %w", klog.KObj(claim), err)
 		}
+		resourceClaimModified = true
 		logger.V(5).Info("created claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
 
 		// Track the actual extended ResourceClaim from now.
@@ -1568,6 +1572,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			return fmt.Errorf("add reservation to claim %s: %w", klog.KObj(claim), err)
 		}
 		claim = updatedClaim
+		resourceClaimModified = true
 		return nil
 	})
 

@@ -81,8 +81,9 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 					Containers: []v1.Container{
 						{
 							Name:         "webserver",
-							Image:        imageutils.GetE2EImage(imageutils.Httpd),
+							Image:        imageutils.GetE2EImage(imageutils.AgnhostPrev),
 							VolumeMounts: mounts,
+							Args:         []string{"test-webserver"},
 						},
 					},
 					Volumes: vols,

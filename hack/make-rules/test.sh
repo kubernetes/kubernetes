@@ -22,7 +22,6 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
-kube::golang::setup_gomaxprocs
 kube::util::require-jq
 
 # start the cache mutation detector by default so that cache mutators will be found
@@ -57,6 +56,8 @@ kube::test::find_go_packages() {
   )
 }
 
+set -x
+
 # TODO: This timeout should really be lower, this is a *long* time to test one
 # package, however pkg/api/testing in particular will fail with a lower timeout
 # currently. We should attempt to lower this over time.
@@ -84,6 +85,8 @@ fi
 KUBE_KEEP_VERBOSE_TEST_OUTPUT=${KUBE_KEEP_VERBOSE_TEST_OUTPUT:-n}
 # Set to 'false' to disable reduction of the JUnit file to only the top level tests.
 KUBE_PRUNE_JUNIT_TESTS=${KUBE_PRUNE_JUNIT_TESTS:-true}
+
+set +x
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -225,7 +228,7 @@ runTests() {
   fi
 
   kube::log::status "Running tests ${cover_msg} ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
-  gotestsum --format="${gotestsum_format}" \
+  kube::log::run gotestsum --format="${gotestsum_format}" \
             --jsonfile="${jsonfile}" \
             --junitfile="${junit_filename_prefix:+"${junit_filename_prefix}.xml"}" \
             --raw-command \

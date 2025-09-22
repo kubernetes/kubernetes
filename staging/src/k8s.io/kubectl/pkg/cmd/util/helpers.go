@@ -437,12 +437,6 @@ const (
 	// Separate kubectl user preferences.
 	KubeRC FeatureGate = "KUBECTL_KUBERC"
 
-	// owner: @soltysh
-	// kep: https://kep.k8s.io/3515
-	//
-	// Improved kubectl apply --prune behavior.
-	OpenAPIV3Patch FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
-
 	// owner: @justinb
 	// kep: https://kep.k8s.io/3659
 	//

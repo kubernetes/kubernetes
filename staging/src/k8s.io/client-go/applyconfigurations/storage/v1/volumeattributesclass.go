@@ -29,11 +29,32 @@ import (
 
 // VolumeAttributesClassApplyConfiguration represents a declarative configuration of the VolumeAttributesClass type for use
 // with apply.
+//
+// VolumeAttributesClass represents a specification of mutable volume attributes
+// defined by the CSI driver. The class can be specified during dynamic provisioning
+// of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.
 type VolumeAttributesClassApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	DriverName                           *string           `json:"driverName,omitempty"`
-	Parameters                           map[string]string `json:"parameters,omitempty"`
+	// Name of the CSI driver
+	// This field is immutable.
+	DriverName *string `json:"driverName,omitempty"`
+	// parameters hold volume attributes defined by the CSI driver. These values
+	// are opaque to the Kubernetes and are passed directly to the CSI driver.
+	// The underlying storage provider supports changing these attributes on an
+	// existing volume, however the parameters field itself is immutable. To
+	// invoke a volume update, a new VolumeAttributesClass should be created with
+	// new parameters, and the PersistentVolumeClaim should be updated to reference
+	// the new VolumeAttributesClass.
+	//
+	// This field is required and must contain at least one key/value pair.
+	// The keys cannot be empty, and the maximum number of parameters is 512, with
+	// a cumulative max size of 256K. If the CSI driver rejects invalid parameters,
+	// the target PersistentVolumeClaim will be set to an "Infeasible" state in the
+	// modifyVolumeStatus field.
+	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 // VolumeAttributesClass constructs a declarative configuration of the VolumeAttributesClass type for use with
@@ -46,29 +67,14 @@ func VolumeAttributesClass(name string) *VolumeAttributesClassApplyConfiguration
 	return b
 }
 
-// ExtractVolumeAttributesClass extracts the applied configuration owned by fieldManager from
-// volumeAttributesClass. If no managedFields are found in volumeAttributesClass for fieldManager, a
-// VolumeAttributesClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractVolumeAttributesClassFrom extracts the applied configuration owned by fieldManager from
+// volumeAttributesClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // volumeAttributesClass must be a unmodified VolumeAttributesClass API object that was retrieved from the Kubernetes API.
-// ExtractVolumeAttributesClass provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractVolumeAttributesClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractVolumeAttributesClass(volumeAttributesClass *storagev1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
-	return extractVolumeAttributesClass(volumeAttributesClass, fieldManager, "")
-}
-
-// ExtractVolumeAttributesClassStatus is the same as ExtractVolumeAttributesClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractVolumeAttributesClassStatus(volumeAttributesClass *storagev1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
-	return extractVolumeAttributesClass(volumeAttributesClass, fieldManager, "status")
-}
-
-func extractVolumeAttributesClass(volumeAttributesClass *storagev1.VolumeAttributesClass, fieldManager string, subresource string) (*VolumeAttributesClassApplyConfiguration, error) {
+func ExtractVolumeAttributesClassFrom(volumeAttributesClass *storagev1.VolumeAttributesClass, fieldManager string, subresource string) (*VolumeAttributesClassApplyConfiguration, error) {
 	b := &VolumeAttributesClassApplyConfiguration{}
 	err := managedfields.ExtractInto(volumeAttributesClass, internal.Parser().Type("io.k8s.api.storage.v1.VolumeAttributesClass"), fieldManager, b, subresource)
 	if err != nil {
@@ -80,6 +86,21 @@ func extractVolumeAttributesClass(volumeAttributesClass *storagev1.VolumeAttribu
 	b.WithAPIVersion("storage.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractVolumeAttributesClass extracts the applied configuration owned by fieldManager from
+// volumeAttributesClass. If no managedFields are found in volumeAttributesClass for fieldManager, a
+// VolumeAttributesClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// volumeAttributesClass must be a unmodified VolumeAttributesClass API object that was retrieved from the Kubernetes API.
+// ExtractVolumeAttributesClass provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractVolumeAttributesClass(volumeAttributesClass *storagev1.VolumeAttributesClass, fieldManager string) (*VolumeAttributesClassApplyConfiguration, error) {
+	return ExtractVolumeAttributesClassFrom(volumeAttributesClass, fieldManager, "")
+}
+
 func (b VolumeAttributesClassApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

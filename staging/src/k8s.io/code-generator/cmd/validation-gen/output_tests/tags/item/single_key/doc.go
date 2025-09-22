@@ -46,6 +46,13 @@ type Struct struct {
 	// +k8s:listMapKey=id
 	// +k8s:item(id: "typedef-target")=+k8s:validateFalse="item TypedefItems[id=typedef-target]"
 	TypedefItems TypedefItemList `json:"typedefItems"`
+
+	// Test atomic + unique=map + item combination
+	// +k8s:listType=atomic
+	// +k8s:unique=map
+	// +k8s:listMapKey=key
+	// +k8s:item(key: "target")=+k8s:validateFalse="item AtomicUniqueMapItems[key=target]"
+	AtomicUniqueMapItems []Item `json:"atomicUniqueMapItems"`
 }
 
 type StructWithNestedTypedef struct {

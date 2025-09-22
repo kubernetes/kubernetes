@@ -29,10 +29,14 @@ import (
 
 // MutatingAdmissionPolicyApplyConfiguration represents a declarative configuration of the MutatingAdmissionPolicy type for use
 // with apply.
+//
+// MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
 type MutatingAdmissionPolicyApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *MutatingAdmissionPolicySpecApplyConfiguration `json:"spec,omitempty"`
+	// Specification of the desired behavior of the MutatingAdmissionPolicy.
+	Spec *MutatingAdmissionPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // MutatingAdmissionPolicy constructs a declarative configuration of the MutatingAdmissionPolicy type for use with
@@ -45,29 +49,14 @@ func MutatingAdmissionPolicy(name string) *MutatingAdmissionPolicyApplyConfigura
 	return b
 }
 
-// ExtractMutatingAdmissionPolicy extracts the applied configuration owned by fieldManager from
-// mutatingAdmissionPolicy. If no managedFields are found in mutatingAdmissionPolicy for fieldManager, a
-// MutatingAdmissionPolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractMutatingAdmissionPolicyFrom extracts the applied configuration owned by fieldManager from
+// mutatingAdmissionPolicy for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // mutatingAdmissionPolicy must be a unmodified MutatingAdmissionPolicy API object that was retrieved from the Kubernetes API.
-// ExtractMutatingAdmissionPolicy provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractMutatingAdmissionPolicyFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractMutatingAdmissionPolicy(mutatingAdmissionPolicy *admissionregistrationv1beta1.MutatingAdmissionPolicy, fieldManager string) (*MutatingAdmissionPolicyApplyConfiguration, error) {
-	return extractMutatingAdmissionPolicy(mutatingAdmissionPolicy, fieldManager, "")
-}
-
-// ExtractMutatingAdmissionPolicyStatus is the same as ExtractMutatingAdmissionPolicy except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractMutatingAdmissionPolicyStatus(mutatingAdmissionPolicy *admissionregistrationv1beta1.MutatingAdmissionPolicy, fieldManager string) (*MutatingAdmissionPolicyApplyConfiguration, error) {
-	return extractMutatingAdmissionPolicy(mutatingAdmissionPolicy, fieldManager, "status")
-}
-
-func extractMutatingAdmissionPolicy(mutatingAdmissionPolicy *admissionregistrationv1beta1.MutatingAdmissionPolicy, fieldManager string, subresource string) (*MutatingAdmissionPolicyApplyConfiguration, error) {
+func ExtractMutatingAdmissionPolicyFrom(mutatingAdmissionPolicy *admissionregistrationv1beta1.MutatingAdmissionPolicy, fieldManager string, subresource string) (*MutatingAdmissionPolicyApplyConfiguration, error) {
 	b := &MutatingAdmissionPolicyApplyConfiguration{}
 	err := managedfields.ExtractInto(mutatingAdmissionPolicy, internal.Parser().Type("io.k8s.api.admissionregistration.v1beta1.MutatingAdmissionPolicy"), fieldManager, b, subresource)
 	if err != nil {
@@ -79,6 +68,21 @@ func extractMutatingAdmissionPolicy(mutatingAdmissionPolicy *admissionregistrati
 	b.WithAPIVersion("admissionregistration.k8s.io/v1beta1")
 	return b, nil
 }
+
+// ExtractMutatingAdmissionPolicy extracts the applied configuration owned by fieldManager from
+// mutatingAdmissionPolicy. If no managedFields are found in mutatingAdmissionPolicy for fieldManager, a
+// MutatingAdmissionPolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// mutatingAdmissionPolicy must be a unmodified MutatingAdmissionPolicy API object that was retrieved from the Kubernetes API.
+// ExtractMutatingAdmissionPolicy provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractMutatingAdmissionPolicy(mutatingAdmissionPolicy *admissionregistrationv1beta1.MutatingAdmissionPolicy, fieldManager string) (*MutatingAdmissionPolicyApplyConfiguration, error) {
+	return ExtractMutatingAdmissionPolicyFrom(mutatingAdmissionPolicy, fieldManager, "")
+}
+
 func (b MutatingAdmissionPolicyApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

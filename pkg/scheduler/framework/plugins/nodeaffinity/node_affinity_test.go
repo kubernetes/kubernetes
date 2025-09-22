@@ -46,7 +46,7 @@ func TestNodeAffinity(t *testing.T) {
 		nodeName            string
 		wantStatus          *fwk.Status
 		wantPreFilterStatus *fwk.Status
-		wantPreFilterResult *framework.PreFilterResult
+		wantPreFilterResult *fwk.PreFilterResult
 		args                config.NodeAffinityArgs
 		runPreFilter        bool
 	}{
@@ -497,7 +497,7 @@ func TestNodeAffinity(t *testing.T) {
 				},
 			},
 			nodeName:            "node1",
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
+			wantPreFilterResult: &fwk.PreFilterResult{NodeNames: sets.New("node1")},
 			runPreFilter:        true,
 		},
 		{
@@ -525,7 +525,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:            "node2",
 			wantStatus:          fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
+			wantPreFilterResult: &fwk.PreFilterResult{NodeNames: sets.New("node1")},
 			runPreFilter:        true,
 		},
 		{
@@ -601,7 +601,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:            "node2",
 			labels:              map[string]string{"foo": "bar"},
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
+			wantPreFilterResult: &fwk.PreFilterResult{NodeNames: sets.New("node1")},
 			wantStatus:          fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter:        true,
 		},
@@ -637,7 +637,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:            "node1",
 			labels:              map[string]string{"foo": "bar"},
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
+			wantPreFilterResult: &fwk.PreFilterResult{NodeNames: sets.New("node1")},
 			runPreFilter:        true,
 		},
 		{
@@ -710,7 +710,7 @@ func TestNodeAffinity(t *testing.T) {
 				},
 			},
 			nodeName:            "node2",
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1", "node2")},
+			wantPreFilterResult: &fwk.PreFilterResult{NodeNames: sets.New("node1", "node2")},
 			runPreFilter:        true,
 		},
 		{
@@ -917,7 +917,7 @@ func TestNodeAffinity(t *testing.T) {
 			state := framework.NewCycleState()
 			var gotStatus *fwk.Status
 			if test.runPreFilter {
-				gotPreFilterResult, gotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod, nil)
+				gotPreFilterResult, gotStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, state, test.pod, nil)
 				if diff := cmp.Diff(test.wantPreFilterStatus, gotStatus); diff != "" {
 					t.Errorf("unexpected PreFilter Status (-want,+got):\n%s", diff)
 				}
@@ -925,7 +925,7 @@ func TestNodeAffinity(t *testing.T) {
 					t.Errorf("unexpected PreFilterResult (-want,+got):\n%s", diff)
 				}
 			}
-			gotStatus = p.(framework.FilterPlugin).Filter(ctx, state, test.pod, nodeInfo)
+			gotStatus = p.(fwk.FilterPlugin).Filter(ctx, state, test.pod, nodeInfo)
 			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 				t.Errorf("unexpected Filter Status (-want,+got):\n%s", diff)
 			}
@@ -1012,7 +1012,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 		name               string
 		pod                *v1.Pod
 		nodes              []*v1.Node
-		expectedList       framework.NodeScoreList
+		expectedList       fwk.NodeScoreList
 		args               config.NodeAffinityArgs
 		runPreScore        bool
 		wantPreScoreStatus *fwk.Status
@@ -1029,7 +1029,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
 		},
 		{
 			// PreScore returns Skip.
@@ -1090,7 +1090,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
 			runPreScore:  true,
 		},
 		{
@@ -1105,7 +1105,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: fwk.MaxNodeScore}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
 			runPreScore:  true,
 		},
 		{
@@ -1120,7 +1120,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node5", Labels: label5}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 			},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 18}, {Name: "node5", Score: framework.MaxNodeScore}, {Name: "node2", Score: 36}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 18}, {Name: "node5", Score: fwk.MaxNodeScore}, {Name: "node2", Score: 36}},
 			runPreScore:  true,
 		},
 		{
@@ -1130,7 +1130,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 			},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: 0}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: fwk.MaxNodeScore}, {Name: "node2", Score: 0}},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: affinity1.NodeAffinity,
 			},
@@ -1148,7 +1148,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label5}},
 			},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 40}, {Name: "node2", Score: 60}, {Name: "node3", Score: framework.MaxNodeScore}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 40}, {Name: "node2", Score: 60}, {Name: "node3", Score: fwk.MaxNodeScore}},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: &v1.NodeAffinity{
 					PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
@@ -1181,7 +1181,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node5", Labels: label5}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 			},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 18}, {Name: "node5", Score: framework.MaxNodeScore}, {Name: "node2", Score: 36}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 18}, {Name: "node5", Score: fwk.MaxNodeScore}, {Name: "node2", Score: 36}},
 		},
 	}
 
@@ -1199,7 +1199,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 			}
 			var status *fwk.Status
 			if test.runPreScore {
-				status = p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
+				status = p.(fwk.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
 				if status.Code() != test.wantPreScoreStatus.Code() {
 					t.Errorf("unexpected status code from PreScore: want: %v got: %v", test.wantPreScoreStatus.Code().String(), status.Code().String())
 				}
@@ -1211,18 +1211,18 @@ func TestNodeAffinityPriority(t *testing.T) {
 					return
 				}
 			}
-			var gotList framework.NodeScoreList
+			var gotList fwk.NodeScoreList
 			nodeInfos := tf.BuildNodeInfos(test.nodes)
 			for _, nodeInfo := range nodeInfos {
 				nodeName := nodeInfo.Node().Name
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
+				score, status := p.(fwk.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
-				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
+				gotList = append(gotList, fwk.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status = p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(ctx, state, test.pod, gotList)
+			status = p.(fwk.ScorePlugin).ScoreExtensions().NormalizeScore(ctx, state, test.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}

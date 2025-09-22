@@ -80,7 +80,7 @@ func (af *alwaysFail) PreBind(_ context.Context, _ fwk.CycleState, p *v1.Pod, _ 
 	return fwk.NewStatus(fwk.Unschedulable)
 }
 
-func newAlwaysFail(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newAlwaysFail(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 	return &alwaysFail{}, nil
 }
 

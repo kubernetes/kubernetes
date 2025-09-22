@@ -32,7 +32,7 @@ import (
 	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	"k8s.io/kubernetes/pkg/kubelet/allocation"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -119,7 +119,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		logManager:             logManager,
 		memoryThrottlingFactor: 0.9,
 		podLogsDirectory:       fakePodLogsDirectory,
-		allocationManager:      allocation.NewInMemoryManager(nil, nil, nil, nil, nil, nil),
+		actuatedState:          state.NewStateMemory(nil),
 	}
 
 	// Initialize swap controller availability check (always false for tests)

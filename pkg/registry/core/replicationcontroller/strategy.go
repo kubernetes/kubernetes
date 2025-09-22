@@ -134,12 +134,13 @@ func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorL
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+		const validationIdentifier = "rc_create"
 
 		// Run declarative validation with panic recovery
-		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, controller, rest.WithTakeover(takeover))
+		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, controller, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
 
 		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover)
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover, validationIdentifier)
 
 		// Only apply declarative errors if takeover is enabled
 		if takeover {
@@ -202,12 +203,13 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+		const validationIdentifier = "rc_update"
 
 		// Run declarative update validation with panic recovery
-		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newRc, oldRc, rest.WithTakeover(takeover))
+		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newRc, oldRc, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
 
 		// Compare imperative and declarative errors and emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier)
 
 		// Only apply declarative errors if takeover is enabled
 		if takeover {

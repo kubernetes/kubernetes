@@ -1747,7 +1747,13 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		nodePort := service.Spec.Ports[0].NodePort
-		defer e2eservice.ReleaseStaticNodePort(nodePort)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err := cs.CoreV1().Services(ns).Delete(ctx, serviceName, metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
+			}
+			e2eservice.ReleaseStaticNodePort(nodePort)
+		})
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {
 			framework.Failf("got unexpected Spec.Type for new service: %v", service)

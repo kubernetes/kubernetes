@@ -338,7 +338,8 @@ var _ = SIGDescribe("Pods Extended", func() {
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			})
 
-			err := e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, pod.Name, "Evicted", f.Namespace.Name)
+			// Intentionally increase the timeout to ensure the metrics availability required for this test.
+			err := e2epod.WaitForPodTerminatedInNamespaceTimeout(ctx, f.ClientSet, pod.Name, "Evicted", f.Namespace.Name, 10*time.Minute)
 			if err != nil {
 				framework.Failf("error waiting for pod to be evicted: %v", err)
 			}

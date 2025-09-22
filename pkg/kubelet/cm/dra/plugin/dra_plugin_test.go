@@ -40,6 +40,7 @@ import (
 type fakeGRPCServer struct {
 	drapbv1beta1.UnimplementedDRAPluginServer
 	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
+	drapbv1.UnsafeDRAPluginServer
 }
 
 var _ drapbv1.DRAPluginServer = &fakeGRPCServer{}
@@ -49,7 +50,7 @@ func (f *fakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1.N
 		Devices: []*drapbv1.Device{
 			{
 				RequestNames: []string{"test-request"},
-				CDIDeviceIDs: []string{"test-cdi-id"},
+				CdiDeviceIds: []string{"test-cdi-id"},
 			},
 		},
 	}}}, nil
@@ -162,7 +163,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 				Claims: []*drapbv1.Claim{
 					{
 						Namespace: "dummy-namespace",
-						UID:       "dummy-uid",
+						Uid:       "dummy-uid",
 						Name:      "dummy-claim",
 					},
 				},
@@ -183,6 +184,44 @@ func TestGRPCConnIsReused(t *testing.T) {
 	// We should have only one entry otherwise it means another gRPC connection has been created
 	require.Len(t, reusedConns, 1, "expected length to be 1 but got %d", len(reusedConns))
 	require.Equal(t, 2, reusedConns[conn], "expected counter to be 2 but got %d", reusedConns[conn])
+}
+
+func TestGRPCConnUsableAfterIdle(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	service := drapbv1.DRAPluginService
+	addr := path.Join(t.TempDir(), "dra.sock")
+	teardown, err := setupFakeGRPCServer(service, addr)
+	require.NoError(t, err)
+	defer teardown()
+
+	driverName := "dummy-driver"
+
+	// ensure the plugin we are using is registered
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	draPlugins.withIdleTimeout = 5 * time.Second
+	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, defaultClientCallTimeout), "add plugin")
+	plugin, err := draPlugins.GetPlugin(driverName)
+	tCtx.ExpectNoError(err, "get plugin")
+
+	// The connection doesn't really become idle because HandleConn
+	// kicks it back to ready by calling Connect. Just sleep long
+	// enough here, the code should be reached...
+	tCtx.Log("Waiting for idle timeout...")
+	time.Sleep(2 * draPlugins.withIdleTimeout)
+
+	req := &drapbv1.NodePrepareResourcesRequest{
+		Claims: []*drapbv1.Claim{
+			{
+				Namespace: "dummy-namespace",
+				Uid:       "dummy-uid",
+				Name:      "dummy-claim",
+			},
+		},
+	}
+
+	callCtx := ktesting.WithTimeout(tCtx, 10*time.Second, "call timed out")
+	_, err = plugin.NodePrepareResources(callCtx, req)
+	tCtx.ExpectNoError(err, "NodePrepareResources")
 }
 
 func TestGetDRAPlugin(t *testing.T) {

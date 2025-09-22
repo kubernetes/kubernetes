@@ -353,26 +353,6 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3
-		gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"): {
-			Stub:              `{"metadata": {"name": "fs-2"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
-			ExpectedEtcdPath:  "/registry/flowschemas/fs-2",
-			ExpectedGVK:       gvkP("flowcontrol.apiserver.k8s.io", "v1", "FlowSchema"),
-			IntroducedVersion: "1.26",
-			RemovedVersion:    "1.32",
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3
-		gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"): {
-			Stub:              `{"metadata": {"name": "conf4"}, "spec": {"type": "Limited", "limited": {"nominalConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
-			ExpectedEtcdPath:  "/registry/prioritylevelconfigurations/conf4",
-			ExpectedGVK:       gvkP("flowcontrol.apiserver.k8s.io", "v1", "PriorityLevelConfiguration"),
-			IntroducedVersion: "1.26",
-			RemovedVersion:    "1.32",
-		},
-		// --
-
 		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1
 		gvr("flowcontrol.apiserver.k8s.io", "v1", "flowschemas"): {
 			Stub:              `{"metadata": {"name": "fs-3"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
@@ -502,14 +482,12 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicies"): {
 			Stub:              `{"metadata":{"name":"map1b1"},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicies/map1b1",
-			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1alpha1", "MutatingAdmissionPolicy"),
 			IntroducedVersion: "1.34",
 			RemovedVersion:    "1.40",
 		},
 		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicybindings"): {
 			Stub:              `{"metadata":{"name":"mpb1b1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com", "parameterNotFoundAction": "Allow"}}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicybindings/mpb1b1",
-			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1alpha1", "MutatingAdmissionPolicyBinding"),
 			IntroducedVersion: "1.34",
 			RemovedVersion:    "1.40",
 		},
@@ -519,12 +497,14 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicies"): {
 			Stub:              `{"metadata":{"name":"map1"},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicies/map1",
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1beta1", "MutatingAdmissionPolicy"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicybindings"): {
 			Stub:              `{"metadata":{"name":"mpb1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com", "parameterNotFoundAction": "Allow"}}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicybindings/mpb1",
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1beta1", "MutatingAdmissionPolicyBinding"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},

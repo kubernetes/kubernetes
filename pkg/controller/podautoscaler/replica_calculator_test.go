@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -287,7 +288,7 @@ func (tc *replicaCalcTestCase) prepareTestCMClient(t *testing.T) *cmfake.FakeCus
 				Metric: cmapi.MetricIdentifier{
 					Name: tc.metric.name,
 				},
-				Value: *resource.NewMilliQuantity(int64(tc.metric.levels[0]), resource.DecimalSI),
+				Value: *resource.NewMilliQuantity(tc.metric.levels[0], resource.DecimalSI),
 			},
 		}
 
@@ -341,6 +342,9 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 }
 
 func (tc *replicaCalcTestCase) runTest(t *testing.T) {
+	// Create the special test-aware context.
+	tCtx := ktesting.Init(t)
+
 	testClient, testMetricsClient, testCMClient, testEMClient := tc.prepareTestClient(t)
 	metricsClient := metricsclient.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
 
@@ -349,11 +353,15 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 
 	replicaCalc := NewReplicaCalculator(metricsClient, informer.Lister(), defaultTestingCPUInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
 
-	stop := make(chan struct{})
-	defer close(stop)
-	informerFactory.Start(stop)
-	if !cache.WaitForNamedCacheSync("HPA", stop, informer.Informer().HasSynced) {
-		return
+	// Use the test context's Done() channel to manage the informer's lifecycle.
+	informerFactory.Start(tCtx.Done())
+
+	// Create a new context specifically for the cache sync operation with a timeout.
+	syncCtx, cancel := context.WithTimeout(tCtx, 10*time.Second)
+	defer cancel()
+
+	if !cache.WaitForNamedCacheSyncWithContext(syncCtx, informer.Informer().HasSynced) {
+		tCtx.Fatal("Failed to sync informer cache within the 10s timeout")
 	}
 
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
@@ -368,7 +376,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	}
 
 	if tc.resource != nil {
-		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, tolerances, testNamespace, selector, tc.container)
+		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(tCtx, tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, tolerances, testNamespace, selector, tc.container)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
@@ -2476,4 +2484,22 @@ func TestCalculatePodRequestsFromContainers_NonExistentContainer(t *testing.T) {
 	expectedErr := "container non-existent-container not found in Pod test-pod"
 	assert.Equal(t, expectedErr, err.Error(), "error message should match expected format")
 	assert.Equal(t, int64(0), request, "request should be 0 when container does not exist")
+}
+
+func TestReplicaCalcExternalMetricUsageOverflow(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 3,
+		metric: &metricInfo{
+			name: "qps",
+			// Two values that when added together will overflow int64
+			levels:        []int64{math.MaxInt64/2 + 1, math.MaxInt64/2 + 1},
+			targetUsage:   math.MaxInt64, // Set high target
+			metricType:    externalMetric,
+			selector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			expectedUsage: math.MaxInt64, // expect capped value
+
+		},
+	}
+	tc.runTest(t)
 }

@@ -641,11 +641,17 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 
 			ginkgo.By("Send a http request to verify port-forward working")
 			client := http.Client{
-				Timeout: 15 * time.Second,
+				// As discussed in https://github.com/kubernetes/kubernetes/pull/133682#issuecomment-3228372990,
+				// 30 second should be sufficient to complete.
+				Timeout: 30 * time.Second,
 			}
 			resp, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/", cmd.port))
 			framework.ExpectNoError(err, "couldn't get http response from port-forward")
 			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK), "unexpected status code")
+
+			ginkgo.By("Close response body")
+			err = resp.Body.Close()
+			framework.ExpectNoError(err, "couldn't close response body")
 
 			ginkgo.By("Dialing the local port")
 			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", cmd.port))
@@ -671,6 +677,10 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 			resp, err = client.Get(fmt.Sprintf("http://127.0.0.1:%d/", cmd.port))
 			framework.ExpectNoError(err, "couldn't get http response from port-forward")
 			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK), "unexpected status code")
+
+			ginkgo.By("Close response body")
+			err = resp.Body.Close()
+			framework.ExpectNoError(err, "couldn't close response body")
 		})
 	})
 })

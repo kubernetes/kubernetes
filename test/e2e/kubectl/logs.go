@@ -282,6 +282,9 @@ var _ = SIGDescribe("Kubectl logs", func() {
 					framework.Failf("Failed to wait for Deployment to complete: %v", err)
 				}
 
+				if err = e2epod.WaitForPodsRunningReady(ctx, c, ns, 2, framework.PodStartTimeout); err != nil {
+					framework.Failf("Failed to wait for Pods are running: %v", err)
+				}
 			})
 
 			ginkgo.AfterEach(func() {

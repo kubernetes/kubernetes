@@ -29,11 +29,19 @@ import (
 
 // ClusterRoleBindingApplyConfiguration represents a declarative configuration of the ClusterRoleBinding type for use
 // with apply.
+//
+// ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,
+// and adds who information via Subject.
 type ClusterRoleBindingApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Subjects                             []SubjectApplyConfiguration `json:"subjects,omitempty"`
-	RoleRef                              *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`
+	// Subjects holds references to the objects the role applies to.
+	Subjects []SubjectApplyConfiguration `json:"subjects,omitempty"`
+	// RoleRef can only reference a ClusterRole in the global namespace.
+	// If the RoleRef cannot be resolved, the Authorizer must return an error.
+	// This field is immutable.
+	RoleRef *RoleRefApplyConfiguration `json:"roleRef,omitempty"`
 }
 
 // ClusterRoleBinding constructs a declarative configuration of the ClusterRoleBinding type for use with
@@ -46,29 +54,14 @@ func ClusterRoleBinding(name string) *ClusterRoleBindingApplyConfiguration {
 	return b
 }
 
-// ExtractClusterRoleBinding extracts the applied configuration owned by fieldManager from
-// clusterRoleBinding. If no managedFields are found in clusterRoleBinding for fieldManager, a
-// ClusterRoleBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractClusterRoleBindingFrom extracts the applied configuration owned by fieldManager from
+// clusterRoleBinding for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // clusterRoleBinding must be a unmodified ClusterRoleBinding API object that was retrieved from the Kubernetes API.
-// ExtractClusterRoleBinding provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractClusterRoleBindingFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractClusterRoleBinding(clusterRoleBinding *rbacv1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
-	return extractClusterRoleBinding(clusterRoleBinding, fieldManager, "")
-}
-
-// ExtractClusterRoleBindingStatus is the same as ExtractClusterRoleBinding except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractClusterRoleBindingStatus(clusterRoleBinding *rbacv1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
-	return extractClusterRoleBinding(clusterRoleBinding, fieldManager, "status")
-}
-
-func extractClusterRoleBinding(clusterRoleBinding *rbacv1.ClusterRoleBinding, fieldManager string, subresource string) (*ClusterRoleBindingApplyConfiguration, error) {
+func ExtractClusterRoleBindingFrom(clusterRoleBinding *rbacv1.ClusterRoleBinding, fieldManager string, subresource string) (*ClusterRoleBindingApplyConfiguration, error) {
 	b := &ClusterRoleBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(clusterRoleBinding, internal.Parser().Type("io.k8s.api.rbac.v1.ClusterRoleBinding"), fieldManager, b, subresource)
 	if err != nil {
@@ -80,6 +73,21 @@ func extractClusterRoleBinding(clusterRoleBinding *rbacv1.ClusterRoleBinding, fi
 	b.WithAPIVersion("rbac.authorization.k8s.io/v1")
 	return b, nil
 }
+
+// ExtractClusterRoleBinding extracts the applied configuration owned by fieldManager from
+// clusterRoleBinding. If no managedFields are found in clusterRoleBinding for fieldManager, a
+// ClusterRoleBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// clusterRoleBinding must be a unmodified ClusterRoleBinding API object that was retrieved from the Kubernetes API.
+// ExtractClusterRoleBinding provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractClusterRoleBinding(clusterRoleBinding *rbacv1.ClusterRoleBinding, fieldManager string) (*ClusterRoleBindingApplyConfiguration, error) {
+	return ExtractClusterRoleBindingFrom(clusterRoleBinding, fieldManager, "")
+}
+
 func (b ClusterRoleBindingApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

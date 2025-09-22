@@ -20,10 +20,19 @@ package v1
 
 // EndpointAddressApplyConfiguration represents a declarative configuration of the EndpointAddress type for use
 // with apply.
+//
+// EndpointAddress is a tuple that describes single IP address.
+// Deprecated: This API is deprecated in v1.33+.
 type EndpointAddressApplyConfiguration struct {
-	IP        *string                            `json:"ip,omitempty"`
-	Hostname  *string                            `json:"hostname,omitempty"`
-	NodeName  *string                            `json:"nodeName,omitempty"`
+	// The IP of this endpoint.
+	// May not be loopback (127.0.0.0/8 or ::1), link-local (169.254.0.0/16 or fe80::/10),
+	// or link-local multicast (224.0.0.0/24 or ff02::/16).
+	IP *string `json:"ip,omitempty"`
+	// The Hostname of this endpoint
+	Hostname *string `json:"hostname,omitempty"`
+	// Optional: Node hosting this endpoint. This can be used to determine endpoints local to a node.
+	NodeName *string `json:"nodeName,omitempty"`
+	// Reference to object providing the endpoint.
 	TargetRef *ObjectReferenceApplyConfiguration `json:"targetRef,omitempty"`
 }
 

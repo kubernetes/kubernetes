@@ -271,7 +271,7 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, allNodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, allNodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	var nodesWithRequiredAntiAffinityPods []fwk.NodeInfo
 	var err error
 	if nodesWithRequiredAntiAffinityPods, err = pl.sharedLister.NodeInfos().HavePodsWithRequiredAntiAffinityList(); err != nil {
@@ -309,7 +309,7 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleS
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *InterPodAffinity) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *InterPodAffinity) PreFilterExtensions() fwk.PreFilterExtensions {
 	return pl
 }
 

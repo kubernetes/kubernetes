@@ -42,7 +42,8 @@ var (
 
 	// NumResourceClaimsDesc tracks the number of ResourceClaims,
 	// categorized by their allocation status and admin access.
-	NumResourceClaimsDesc = metrics.NewDesc(ResourceClaimSubsystem+"_resource_claims",
+	NumResourceClaimsDesc = metrics.NewDesc(
+		metrics.BuildFQName("", ResourceClaimSubsystem, "resource_claims"),
 		"Number of ResourceClaims, categorized by allocation status and admin access",
 		[]string{"allocated", "admin_access"}, nil,
 		metrics.ALPHA, "")

@@ -617,7 +617,7 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	fieldValidation := cleanFieldValidation(req.URL)
 	fieldValidationRequestLatencies.WithContext(req.Context()).WithLabelValues(fieldValidation)
 
-	if wd, ok := request.LatencyTrackersFrom(req.Context()); ok {
+	if wd, ok := request.LatencyTrackersFrom(req.Context()); ok && dryRun == "" {
 		sliLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency() + wd.APFQueueWaitTracker.GetLatency()).Seconds()
 		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)
 		requestSliLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)

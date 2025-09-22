@@ -56,7 +56,7 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 					"--disable-admission-plugins=ServiceAccount",
 					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
 				}
-				if !enableMultiServiceCIDR {
+				if !enableMultiServiceCIDR || !disableAllocatorDualWrite {
 					flags = append(flags, "--emulated-version=1.33")
 				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,
@@ -303,7 +303,7 @@ func TestCreateServiceSingleStackIPv6(t *testing.T) {
 					"--disable-admission-plugins=ServiceAccount",
 					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
 				}
-				if !enableMultiServiceCIDR {
+				if !enableMultiServiceCIDR || !disableAllocatorDualWrite {
 					flags = append(flags, "--emulated-version=1.33")
 				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,
@@ -537,7 +537,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 					"--disable-admission-plugins=ServiceAccount",
 					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
 				}
-				if !enableMultiServiceCIDR {
+				if !enableMultiServiceCIDR || !disableAllocatorDualWrite {
 					flags = append(flags, "--emulated-version=1.33")
 				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,
@@ -819,7 +819,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 					"--disable-admission-plugins=ServiceAccount",
 					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
 				}
-				if !enableMultiServiceCIDR {
+				if !enableMultiServiceCIDR || !disableAllocatorDualWrite {
 					flags = append(flags, "--emulated-version=1.33")
 				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,

@@ -64,6 +64,7 @@ type nodeData struct {
 	etcdUpgrade           bool
 	renewCerts            bool
 	dryRun                bool
+	dryRunDir             string
 	cfg                   *kubeadmapi.UpgradeConfiguration
 	initCfg               *kubeadmapi.InitConfiguration
 	isControlPlaneNode    bool
@@ -191,6 +192,14 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 		return nil, cmdutil.TypeMismatchErr("dryRun", "bool")
 	}
 
+	// If dry running creates a temporary directory for saving kubeadm generated files.
+	dryRunDir := ""
+	if *dryRun {
+		if dryRunDir, err = constants.GetDryRunDir(constants.EnvVarUpgradeDryRunDir, "kubeadm-upgrade-node-dryrun", klog.Warningf); err != nil {
+			return nil, errors.Wrap(err, "could not create a temporary directory on dryrun")
+		}
+	}
+
 	printer := &output.TextPrinter{}
 	client, err := getClient(nodeOptions.kubeConfigPath, *dryRun, printer)
 	if err != nil {
@@ -222,6 +231,7 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 	return &nodeData{
 		cfg:                   upgradeCfg,
 		dryRun:                *dryRun,
+		dryRunDir:             dryRunDir,
 		initCfg:               initCfg,
 		client:                client,
 		isControlPlaneNode:    isControlPlaneNode,
@@ -286,4 +296,20 @@ func (d *nodeData) KubeConfigPath() string {
 
 func (d *nodeData) OutputWriter() io.Writer {
 	return d.outputWriter
+}
+
+// KubeConfigDir returns the Kubernetes configuration directory or the temporary directory if DryRun is true.
+func (j *nodeData) KubeConfigDir() string {
+	if j.dryRun {
+		return j.dryRunDir
+	}
+	return constants.KubernetesDir
+}
+
+// KubeletDir returns the kubelet configuration directory or the temporary directory if DryRun is true.
+func (j *nodeData) KubeletDir() string {
+	if j.dryRun {
+		return j.dryRunDir
+	}
+	return constants.KubeletRunDirectory
 }

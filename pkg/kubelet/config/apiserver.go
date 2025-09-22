@@ -34,22 +34,22 @@ import (
 const WaitForAPIServerSyncPeriod = 1 * time.Second
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
-func NewSourceApiserver(c clientset.Interface, nodeName types.NodeName, nodeHasSynced func() bool, updates chan<- interface{}) {
+func NewSourceApiserver(logger klog.Logger, c clientset.Interface, nodeName types.NodeName, nodeHasSynced func() bool, updates chan<- interface{}) {
 	lw := cache.NewListWatchFromClient(c.CoreV1().RESTClient(), "pods", metav1.NamespaceAll, fields.OneTermEqualSelector("spec.nodeName", string(nodeName)))
 
 	// The Reflector responsible for watching pods at the apiserver should be run only after
 	// the node sync with the apiserver has completed.
-	klog.InfoS("Waiting for node sync before watching apiserver pods")
+	logger.Info("Waiting for node sync before watching apiserver pods")
 	go func() {
 		for {
 			if nodeHasSynced() {
-				klog.V(4).InfoS("node sync completed")
+				logger.V(4).Info("node sync completed")
 				break
 			}
 			time.Sleep(WaitForAPIServerSyncPeriod)
-			klog.V(4).InfoS("node sync has not completed yet")
+			logger.V(4).Info("node sync has not completed yet")
 		}
-		klog.InfoS("Watching apiserver")
+		logger.Info("Watching apiserver")
 		newSourceApiserverFromLW(lw, updates)
 	}()
 }
