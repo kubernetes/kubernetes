@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -81,7 +82,7 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity,
 
 	hugetlbLimitFile := ""
 	// this command takes the expected value and compares it against the actual value for the pod cgroup hugetlb.2MB.<LIMIT>
-	if IsCgroup2UnifiedMode() {
+	if e2enode.IsCgroup2UnifiedMode() {
 		hugetlbLimitFile = fmt.Sprintf("/tmp/%s/%s.max", cgroupFsName, hugepagesCgroup)
 	} else {
 		hugetlbLimitFile = fmt.Sprintf("/tmp/hugetlb/%s/%s.limit_in_bytes", cgroupFsName, hugepagesCgroup)

@@ -38,6 +38,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
 	"github.com/onsi/ginkgo/v2"
@@ -88,7 +89,7 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 		ginkgo.It("should correctly start with cpumanager none policy in use with systemd", func(ctx context.Context) {
 			ginkgo.Skip("currently broken")
 
-			if !IsCgroup2UnifiedMode() {
+			if !e2enode.IsCgroup2UnifiedMode() {
 				ginkgo.Skip("this test requires cgroups v2")
 			}
 
@@ -303,7 +304,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	}
 
 	memoryLimitFile := "memory.limit_in_bytes"
-	if IsCgroup2UnifiedMode() {
+	if e2enode.IsCgroup2UnifiedMode() {
 		memoryLimitFile = "memory.max"
 	}
 
@@ -328,7 +329,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		// Total Memory reservation is 200Mi excluding eviction thresholds.
 		// Expect CPU shares on node allocatable cgroup to equal allocatable.
 		shares := int64(cm.MilliCPUToShares(allocatableCPU.MilliValue()))
-		if IsCgroup2UnifiedMode() {
+		if e2enode.IsCgroup2UnifiedMode() {
 			// convert to the cgroup v2 cpu.weight value
 			if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], cgroupName, "cpu.weight"), convertSharesToWeight(shares), 10); err != nil {
 				return err
@@ -375,7 +376,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	// Expect CPU shares on kube reserved cgroup to equal it's reservation which is `100m`.
 	kubeReservedCPU := resource.MustParse(currentConfig.KubeReserved[string(v1.ResourceCPU)])
 	shares := int64(cm.MilliCPUToShares(kubeReservedCPU.MilliValue()))
-	if IsCgroup2UnifiedMode() {
+	if e2enode.IsCgroup2UnifiedMode() {
 		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], cgroupPath, "cpu.weight"), convertSharesToWeight(shares), 10); err != nil {
 			return err
 		}
@@ -404,7 +405,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	// Expect CPU shares on system reserved cgroup to equal it's reservation which is `100m`.
 	systemReservedCPU := resource.MustParse(currentConfig.SystemReserved[string(v1.ResourceCPU)])
 	shares = int64(cm.MilliCPUToShares(systemReservedCPU.MilliValue()))
-	if IsCgroup2UnifiedMode() {
+	if e2enode.IsCgroup2UnifiedMode() {
 		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], cgroupPath, "cpu.weight"), convertSharesToWeight(shares), 10); err != nil {
 			return err
 		}

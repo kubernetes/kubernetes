@@ -462,7 +462,7 @@ func toCgroupFsName(cgroupName cm.CgroupName) string {
 // the time to reduce pressure may be unbounded, but usually finishes within a second.
 // memory.force_empty is no supported in cgroupv2.
 func reduceAllocatableMemoryUsageIfCgroupv1() {
-	if !IsCgroup2UnifiedMode() {
+	if !e2enode.IsCgroup2UnifiedMode() {
 		cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
 		_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
 		framework.ExpectNoError(err)

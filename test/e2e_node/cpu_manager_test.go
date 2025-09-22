@@ -46,6 +46,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
@@ -147,7 +148,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 		uncoreGroupSize = getUncoreCPUGroupSize()
 		framework.Logf("Uncore Group Size: %d", uncoreGroupSize)
 
-		e2enodeCgroupV2Enabled = IsCgroup2UnifiedMode()
+		e2enodeCgroupV2Enabled = e2enode.IsCgroup2UnifiedMode()
 		framework.Logf("cgroup V2 enabled: %v", e2enodeCgroupV2Enabled)
 
 		e2enodeCgroupDriver = oldCfg.CgroupDriver
@@ -1945,7 +1946,7 @@ var _ = SIGDescribe("CPU Manager Incompatibility Pod Level Resources", ginkgo.Or
 		uncoreGroupSize = getUncoreCPUGroupSize()
 		framework.Logf("Uncore Group Size: %d", uncoreGroupSize)
 
-		e2enodeCgroupV2Enabled = IsCgroup2UnifiedMode()
+		e2enodeCgroupV2Enabled = e2enode.IsCgroup2UnifiedMode()
 		framework.Logf("cgroup V2 enabled: %v", e2enodeCgroupV2Enabled)
 
 		e2enodeCgroupDriver = oldCfg.CgroupDriver

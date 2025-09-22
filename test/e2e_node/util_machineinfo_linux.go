@@ -29,16 +29,9 @@ import (
 	"strconv"
 	"strings"
 
-	libcontainercgroups "github.com/opencontainers/cgroups"
-	"k8s.io/utils/cpuset"
-
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/utils/cpuset"
 )
-
-// IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
-func IsCgroup2UnifiedMode() bool {
-	return libcontainercgroups.IsCgroup2UnifiedMode()
-}
 
 func isHTEnabled() bool {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Thread(s) per core:\" | cut -d \":\" -f 2").Output()

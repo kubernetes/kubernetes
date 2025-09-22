@@ -33,10 +33,12 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	systemdutil "github.com/coreos/go-systemd/v22/util"
 	"github.com/onsi/ginkgo/v2"
@@ -129,7 +131,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			}
 			expectedPageFaultsUpperBound := 1000000
 			expectedMajorPageFaultsUpperBound := 1e9
-			if IsCgroup2UnifiedMode() {
+			if e2enode.IsCgroup2UnifiedMode() {
 				// On cgroupv2 these stats are recursive, so make sure they are at least like the value set
 				// above for the container.
 				expectedPageFaultsUpperBound = 1e9
@@ -373,9 +375,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
 				ginkgo.Skip("KubeletPSI feature gate is not enabled")
 			}
-			if !IsCgroup2UnifiedMode() {
-				ginkgo.Skip("Skipping since CgroupV2 not used")
-			}
+			e2eskipper.SkipIfNotCgroupv2()
 		})
 
 		ginkgo.It("should report CPU pressure in PSI metrics", func(ctx context.Context) {
@@ -606,7 +606,7 @@ func recordSystemCgroupProcesses(ctx context.Context) {
 		}
 
 		filePattern := "/sys/fs/cgroup/cpu/%s/cgroup.procs"
-		if IsCgroup2UnifiedMode() {
+		if e2enode.IsCgroup2UnifiedMode() {
 			filePattern = "/sys/fs/cgroup/%s/cgroup.procs"
 		}
 		pids, err := os.ReadFile(fmt.Sprintf(filePattern, cgroup))
