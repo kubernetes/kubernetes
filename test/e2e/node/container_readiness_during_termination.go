@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -109,7 +109,7 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 			if err != nil {
 				// If pod is not found, it means it was fully deleted
 				// This is expected during termination, so we can stop monitoring
-				if errors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					framework.Logf("Pod was deleted during monitoring - this is expected during termination")
 					return true, nil
 				}
