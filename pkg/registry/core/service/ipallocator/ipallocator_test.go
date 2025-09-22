@@ -198,6 +198,58 @@ func TestAllocateIPAllocator(t *testing.T) {
 	}
 }
 
+func TestAddOffsetAddress(t *testing.T) {
+	baseAddr := netip.MustParseAddr("fd54:ceea:51ad:2f00::0")
+	for _, tc := range []struct {
+		offset   uint64
+		wantAddr netip.Addr
+	}{
+		{
+			offset:   0,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00::0"),
+		},
+		{
+			offset:   1,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00::1"),
+		},
+		{
+			offset:   math.MaxInt64,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00:7fff:ffff:ffff:ffff"),
+		},
+		{
+			offset:   math.MaxInt64 + 1,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00:8000::"),
+		},
+		{
+			offset:   math.MaxUint64,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00:ffff:ffff:ffff:ffff"),
+		},
+		{
+			offset:   math.MaxUint64 - 1,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00:ffff:ffff:ffff:fffe"),
+		},
+		{
+			offset:   math.MaxUint64>>13 - 1,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00:7:ffff:ffff:fffe"),
+		},
+		{
+			offset:   math.MaxUint64 >> 59,
+			wantAddr: netip.MustParseAddr("fd54:ceea:51ad:2f00::1f"),
+		},
+	} {
+		t.Run(fmt.Sprintf("base:%s,offset:%x,want:%s", baseAddr, tc.offset, tc.wantAddr), func(t *testing.T) {
+			gotAddr, err := addOffsetAddress(baseAddr, tc.offset)
+			if err != nil {
+				t.Fatalf("err: %v", err)
+			}
+
+			if gotAddr.Compare(tc.wantAddr) != 0 {
+				t.Fatalf("compareAddr: got %s, want %s", gotAddr, tc.wantAddr)
+			}
+		})
+	}
+}
+
 func TestAllocateTinyIPAllocator(t *testing.T) {
 	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/32")
 	if err != nil {
