@@ -751,6 +751,7 @@ func TestPrepareCandidate(t *testing.T) {
 						apiDispatcher.Run(logger)
 						defer apiDispatcher.Close()
 					}
+					cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
 
 					fwk, err := tf.NewFramework(
 						ctx,
@@ -764,6 +765,7 @@ func TestPrepareCandidate(t *testing.T) {
 						frameworkruntime.WithPodNominator(nominator),
 						frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
 						frameworkruntime.WithPodActivator(fakeActivator),
+						frameworkruntime.WithPendingDeletionChecker(cache),
 					)
 					if err != nil {
 						t.Fatal(err)
@@ -772,7 +774,6 @@ func TestPrepareCandidate(t *testing.T) {
 					informerFactory.WaitForCacheSync(ctx.Done())
 					fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
 					if asyncAPICallsEnabled {
-						cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
 						fwk.SetAPICacher(apicache.New(nil, cache))
 					}
 

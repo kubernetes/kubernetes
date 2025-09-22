@@ -348,6 +348,8 @@ func New(ctx context.Context,
 		apiDispatcher = apidispatcher.New(client, int(options.parallelism), apicalls.Relevances)
 	}
 
+	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod, apiDispatcher)
+
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
 		frameworkruntime.WithClientSet(client),
@@ -361,6 +363,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithMetricsRecorder(metricsRecorder),
 		frameworkruntime.WithWaitingPods(waitingPods),
 		frameworkruntime.WithAPIDispatcher(apiDispatcher),
+		frameworkruntime.WithPendingDeletionChecker(schedulerCache),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
@@ -404,8 +407,6 @@ func New(ctx context.Context,
 		internalqueue.WithMetricsRecorder(metricsRecorder),
 		internalqueue.WithAPIDispatcher(apiDispatcher),
 	)
-
-	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod, apiDispatcher)
 
 	var apiCache fwk.APICacher
 	if apiDispatcher != nil {

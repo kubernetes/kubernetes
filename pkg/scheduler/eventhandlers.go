@@ -150,6 +150,33 @@ func (sched *Scheduler) syncPodWithDispatcher(pod *v1.Pod) *v1.Pod {
 	return enrichedPod
 }
 
+func (sched *Scheduler) handleAssumedPodDeletion(pod *v1.Pod) {
+	logger := sched.logger
+	fwk, err := sched.frameworkForPod(pod)
+	if err != nil {
+		// This shouldn't happen, because we only accept for scheduling the pods
+		// which specify a scheduler name that matches one of the profiles.
+		utilruntime.HandleErrorWithLogger(logger, err, "Unable to get profile", "pod", klog.KObj(pod))
+		return
+	}
+	// If a waiting pod is rejected, it indicates it's previously assumed and we're
+	// removing it from the scheduler cache. In this case, signal a AssignedPodDelete
+	// event to immediately retry some unscheduled Pods.
+	// Similarly when a pod that had nominated node is deleted, it can unblock scheduling of other pods,
+	// because the lower or equal priority pods treat such a pod as if it was assigned.
+	if fwk.RejectWaitingPod(pod.UID) {
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, nil)
+	}
+	// Always mark such pod as pending deletion to handle it appropriately by the preemption process,
+	// i.e. skip sending further Pod/Delete API calls for this pod.
+	// We don't forget the pod here, because it could reserve some resources, at least in memory,
+	// that should be freed up before forgetting the pod in handleBindingCycleError.
+	err = sched.Cache.MarkPendingDeletion(pod)
+	if err != nil {
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to mark the pod as pending deletion", "pod", klog.KObj(pod))
+	}
+}
+
 func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	start := time.Now()
 	logger := sched.logger
@@ -178,6 +205,12 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(newPod))
 	}
 	if isAssumed {
+		if newPod.DeletionTimestamp != nil && oldPod.DeletionTimestamp == nil {
+			// If the DeletionTimestamp was added, it means that the pod deletion process has started.
+			// If it happend to the assumed pod, it should be handled appropriately,
+			// because we can't update it in any structure.
+			sched.handleAssumedPodDeletion(newPod)
+		}
 		return
 	}
 
@@ -218,22 +251,18 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 
 	logger.V(3).Info("Delete event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.SchedulingQueue.Delete(pod)
-	fwk, err := sched.frameworkForPod(pod)
+	isAssumed, err := sched.Cache.IsAssumedPod(pod)
 	if err != nil {
-		// This shouldn't happen, because we only accept for scheduling the pods
-		// which specify a scheduler name that matches one of the profiles.
-		utilruntime.HandleErrorWithLogger(logger, err, "Unable to get profile", "pod", klog.KObj(pod))
-		return
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(pod))
 	}
-	// If a waiting pod is rejected, it indicates it's previously assumed and we're
-	// removing it from the scheduler cache. In this case, signal a AssignedPodDelete
-	// event to immediately retry some unscheduled Pods.
-	// Similarly when a pod that had nominated node is deleted, it can unblock scheduling of other pods,
-	// because the lower or equal priority pods treat such a pod as if it was assigned.
-	if fwk.RejectWaitingPod(pod.UID) {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, nil)
+	if isAssumed {
+		// Deletion of an assumed pod should be handled appropriately,
+		// because we can't remove it directly from any structure.
+		sched.handleAssumedPodDeletion(pod)
 	} else if pod.Status.NominatedNodeName != "" {
-		// Note that a nominated pod can fall into `RejectWaitingPod` case as well,
+		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
+		// because the lower or equal priority pods treat such a pod as if it was assigned.
+		// Note that a nominated pod can fall into `handleAssumedPodDeletion` case as well,
 		// but in that case the `MoveAllToActiveOrBackoffQueue` already covered lower priority pods.
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(pod)))
 	}

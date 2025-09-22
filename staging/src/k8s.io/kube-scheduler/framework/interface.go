@@ -632,6 +632,8 @@ type Handle interface {
 	PluginsRunner
 	// PodActivator abstracts operations in the scheduling queue.
 	PodActivator
+	// PendingDeletionChecker abstracts operation to check if the deletion is already pending for a pod.
+	PendingDeletionChecker
 	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
 	// a pod finishes "Permit" point.
@@ -748,4 +750,10 @@ type PluginsRunner interface {
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
 	RunPreFilterExtensionRemovePod(ctx context.Context, state CycleState, podToSchedule *v1.Pod, podInfoToRemove PodInfo, nodeInfo NodeInfo) *Status
+}
+
+// PendingDeletionChecker allows to check if the deletion is already pending for a pod.
+type PendingDeletionChecker interface {
+	// PendingDeletion returns whether the pod is pending deletion.
+	PendingDeletion(pod *v1.Pod) (bool, error)
 }

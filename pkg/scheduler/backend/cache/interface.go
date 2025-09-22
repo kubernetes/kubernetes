@@ -118,6 +118,13 @@ type Cache interface {
 	// BindPod handles the pod binding by adding a bind API call to the dispatcher.
 	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
 	BindPod(binding *v1.Binding) (<-chan error, error)
+
+	// MarkPendingDeletion marks the pod as pending deletion.
+	// This allows to skip the processing for a pod that will be removed from the scheduler soon.
+	MarkPendingDeletion(pod *v1.Pod) error
+
+	// PendingDeletion returns whether the pod is pending deletion.
+	PendingDeletion(pod *v1.Pod) (bool, error)
 }
 
 // Dump is a dump of the cache state.

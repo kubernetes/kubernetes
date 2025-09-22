@@ -90,6 +90,9 @@ type podState struct {
 	deadline *time.Time
 	// Used to block cache from expiring assumedPod if binding still runs
 	bindingFinished bool
+	// pendingDeletion says whether the pod is pending deletion
+	// and will be removed from the cache soon.
+	pendingDeletion bool
 }
 
 func newCache(ctx context.Context, ttl, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
@@ -379,6 +382,39 @@ func (cache *cacheImpl) AssumePod(logger klog.Logger, pod *v1.Pod) error {
 	}
 
 	return cache.addPod(logger, pod, true)
+}
+
+// MarkPendingDeletion marks the pod as pending deletion.
+// This allows to skip the processing for a pod that will be removed from the scheduler soon.
+func (cache *cacheImpl) MarkPendingDeletion(pod *v1.Pod) error {
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	ps, ok := cache.podStates[key]
+	if !ok {
+		return nil
+	}
+	ps.pendingDeletion = true
+	return nil
+}
+
+// PendingDeletion returns whether the pod is pending deletion.
+func (cache *cacheImpl) PendingDeletion(pod *v1.Pod) (bool, error) {
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return false, err
+	}
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+	ps, ok := cache.podStates[key]
+	if !ok {
+		return false, nil
+	}
+	return ps.pendingDeletion, nil
 }
 
 func (cache *cacheImpl) FinishBinding(logger klog.Logger, pod *v1.Pod) error {
