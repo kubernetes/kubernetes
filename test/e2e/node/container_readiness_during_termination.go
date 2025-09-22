@@ -149,7 +149,7 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 		framework.ExpectNoError(err, "failed to monitor pod termination")
 
 		ginkgo.By("Verifying readiness was updated during termination")
-		gomega.Expect(readinessUpdated).To(gomega.BeTrue(), "container readiness should be updated when containers die during termination")
+		gomega.Expect(readinessUpdated).To(gomega.BeTrueBecause("container readiness should be updated when containers die during termination"))
 
 		// Additional verification: check that the pod eventually gets fully terminated
 		ginkgo.By("Waiting for pod to be fully terminated")
@@ -216,7 +216,7 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 			return false, nil
 		})
 		framework.ExpectNoError(err, "container should restart after crash")
-		gomega.Expect(containerRestarted).To(gomega.BeTrue(), "container should have restarted")
+		gomega.Expect(containerRestarted).To(gomega.BeTrueBecause("container should have restarted"))
 
 		ginkgo.By("Deleting the pod during container restart")
 		err = podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
@@ -254,6 +254,6 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 		})
 
 		framework.ExpectNoError(err, "failed to monitor pod termination")
-		gomega.Expect(readinessUpdated).To(gomega.BeTrue(), "readiness should be updated during container crash termination")
+		gomega.Expect(readinessUpdated).To(gomega.BeTrueBecause("readiness should be updated during container crash termination"))
 	})
 })
