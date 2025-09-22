@@ -203,6 +203,11 @@ var (
 		slice.Spec.Devices = devices
 		return slice
 	}
+	sliceWithLabels = func(slice *draapi.ResourceSlice, labels map[string]string) *draapi.ResourceSlice {
+		slice = slice.DeepCopy()
+		slice.Labels = labels
+		return slice
+	}
 	slice1NoDevices = &draapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "s1",
@@ -281,6 +286,7 @@ var (
 	slice1Tainted        = sliceWithDevices(slice1, taintedDevices)
 	slice1AlreadyTainted = sliceWithDevices(slice1, existingTaintedDevices)
 	slice1MergedTaints   = sliceWithDevices(slice1, mergedTaintedDevices)
+	slice1Labels         = sliceWithLabels(slice1, map[string]string{"foo": "bar"})
 	slice2               = sliceWithDevices(slice2NoDevices, devices2)
 	slice2Tainted        = sliceWithDevices(slice2, taintedDevices2)
 
@@ -417,6 +423,21 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				{event: handlerEventAdd, newObj: slice2NoDevices},
 				{event: handlerEventUpdate, oldObj: slice2NoDevices, newObj: slice2},
 				{event: handlerEventAdd, newObj: unchangedSlice},
+			},
+		},
+		"update-slice-labels": {
+			events: []any{
+				[]any{
+					add(slice1),
+					update(slice1, slice1Labels),
+				},
+			},
+			expectedPatchedSlices: []*draapi.ResourceSlice{
+				slice1Labels,
+			},
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventUpdate, oldObj: slice1, newObj: slice1Labels},
 			},
 		},
 		"delete-slices": {
