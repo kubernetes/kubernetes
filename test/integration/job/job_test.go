@@ -4204,14 +4204,14 @@ func TestNodeSelectorUpdate(t *testing.T) {
 
 func TestUpdateJobPodResources(t *testing.T) {
 	testCases := map[string]struct {
-		enableFeatureGate  bool
-		suspend            bool
-		updateResources    bool
-		containers         []v1.Container
-		expectUpdate       bool
-		startThenSuspend   bool
-		initialResources   *v1.ResourceRequirements
-		jobName            string
+		enableFeatureGate bool
+		suspend           bool
+		updateResources   bool
+		containers        []v1.Container
+		expectUpdate      bool
+		startThenSuspend  bool
+		initialResources  *v1.ResourceRequirements
+		jobName           string
 	}{
 		"suspended job, feature gate enabled, update resources": {
 			enableFeatureGate: true,
@@ -4283,7 +4283,9 @@ func TestUpdateJobPodResources(t *testing.T) {
 					Namespace: ns.Name,
 				},
 				Spec: batchv1.JobSpec{
-					Suspend: ptr.To(tc.suspend),
+					Suspend:     ptr.To(tc.suspend),
+					Parallelism: ptr.To[int32](1),
+					Completions: ptr.To[int32](1),
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
 							Containers:    tc.containers,
@@ -4298,12 +4300,6 @@ func TestUpdateJobPodResources(t *testing.T) {
 				for i := range job.Spec.Template.Spec.Containers {
 					job.Spec.Template.Spec.Containers[i].Resources = *tc.initialResources
 				}
-			}
-
-			// For start-then-suspend case, also set parallelism and completions
-			if tc.startThenSuspend {
-				job.Spec.Parallelism = ptr.To[int32](1)
-				job.Spec.Completions = ptr.To[int32](1)
 			}
 
 			job, err := createJobWithDefaults(ctx, cs, ns.Name, job)
@@ -4428,7 +4424,6 @@ func TestUpdateJobPodResources(t *testing.T) {
 		})
 	}
 }
-
 
 // TestDelayedJobUpdateEvent tests that a Job only creates one Pod even when
 // the job events are delayed. This test verfies the finishedJobStore is working
