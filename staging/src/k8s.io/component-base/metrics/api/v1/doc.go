@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,5 +25,10 @@ limitations under the License.
 //
 // The "v1" package name is just a reminder that API compatibility rules apply,
 // not an indication of the stability of all features covered by it.
+//
+// NOTE: Component owners are advised to rely on `k8s.io/component-base/metrics` to operate upon
+// `k8s.io/component-base/metrics/api/v1.MetricsConfiguration` as the former contains functions to apply and validate
+// the configuration, which in turn rely on members of the same package, which cannot be moved,
+// or imported (cyclic dependency) here.
 
 package v1 // import "k8s.io/component-base/metrics/api/v1"

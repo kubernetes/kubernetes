@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,16 +28,13 @@ type MetricsConfiguration struct {
 	// Disabling metrics is higher in precedence than showing hidden metrics.
 	DisabledMetrics []string `json:"disabledMetrics,omitempty"`
 	// AllowListMapping is the map from metric-label to value allow-list of this label.
-	// The key's format is <MetricName>,<LabelName>, while its value is a list of allowed values for that label of that metric. For e.g., "metric1,label1": "v1,v2,v3".
+	// The key's format is <MetricName>,<LabelName>, while its value is a list of allowed values for that label of that metric, i.e., <allowed_value>,<allowed_value>,...
+	// For e.g., metric1,label1='v1,v2,v3', metric1,label2='v1,v2,v3' metric2,label1='v1,v2,v3'."
 	AllowListMapping map[string]string `json:"allowListMapping,omitempty"`
 	// The path to the manifest file that contains the allow-list mapping. Provided for convenience over AllowListMapping.
-	// NOTE: When this is supplied as a flag, the path resolution is relative to the current working directory.
-	// However, when this is supplied as a configuration file, the path resolution is relative to the configuration file's location.
-	// Components are required to pass in the resolved absolute path in such cases.
-	// TODO: Check this somehow??
+	// The file contents must represent a map of string keys and values, i.e.,
+	// allowListMapping:
+	//  "metric1,label1": "value11,value12"
+	//  "metric2,label2": ""
 	AllowListMappingManifest string `json:"allowListMappingManifest,omitempty"`
 }
-
-// Ideally, we'd like to keep all accompanying code in the same package, but
-// this is not possible due to backward-compatibility reasons. As such, that
-// code resides in the `k8s.io/component-base/metrics` package.

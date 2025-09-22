@@ -84,6 +84,7 @@ func NewOptions() *Options {
 }
 
 // AddFlags adds flags for exposing component metrics.
+// This won't be called in embedded instances within component configurations.
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
@@ -106,7 +107,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 			"e.g. metric1,label1='v1,v2,v3', metric1,label2='v1,v2,v3' metric2,label1='v1,v2,v3'.")
 	fs.StringVar(&o.AllowListMappingManifest, "allow-metric-labels-manifest", o.AllowListMappingManifest,
 		"The path to the manifest file that contains the allow-list mapping. "+
-			"The format of the file is the same as the flag --allow-metric-labels. "+
+			"The format of the file is the same as the flag --allow-metric-labels, i.e., \n"+
+			"allowListMapping:\n  \"metric1,label1\": \"value11,value12\"\n  \"metric2,label2\": \"\"\n"+
 			"Note that the flag --allow-metric-labels will override the manifest file.")
 }
 
@@ -133,17 +135,21 @@ func ShouldShowHidden() bool {
 // SetDisabledMetric will disable a metric by name.
 // This will also increment the disabled metrics counter.
 // Note that this is a no-op if the metric is already disabled.
-func SetDisabledMetric(name string) {
-	// An empty metric name is not a valid Prometheus metric.
-	if name == "" {
-		klog.Warningf("Attempted to disable an empty metric name, ignoring.")
-		return
-	}
-	disabledMetricsLock.Lock()
-	defer disabledMetricsLock.Unlock()
-	if _, ok := disabledMetrics[name]; !ok {
-		disabledMetrics[name] = struct{}{}
-		disabledMetricsTotal.Inc()
+func SetDisabledMetrics(names []string) {
+	for _, name := range names {
+		func(name string) {
+			// An empty metric name is not a valid Prometheus metric.
+			if name == "" {
+				klog.Warningf("Attempted to disable an empty metric name, ignoring.")
+				return
+			}
+			disabledMetricsLock.Lock()
+			defer disabledMetricsLock.Unlock()
+			if _, ok := disabledMetrics[name]; !ok {
+				disabledMetrics[name] = struct{}{}
+				disabledMetricsTotal.Inc()
+			}
+		}(name)
 	}
 }
 
@@ -175,6 +181,11 @@ func (allowList *MetricLabelAllowList) ConstrainLabelMap(labels map[string]strin
 }
 
 func SetLabelAllowList(allowListMapping map[string]string) {
+	if len(allowListMapping) == 0 {
+		klog.Errorf("empty allow-list mapping supplied, ignoring.")
+		return
+	}
+
 	allowListLock.Lock()
 	defer allowListLock.Unlock()
 	for metricLabelName, labelValues := range allowListMapping {
@@ -196,6 +207,11 @@ func SetLabelAllowList(allowListMapping map[string]string) {
 }
 
 func SetLabelAllowListFromManifest(manifest string) {
+	if manifest == "" {
+		klog.Errorf("The manifest file is empty, ignoring.")
+		return
+	}
+
 	data, err := os.ReadFile(filepath.Clean(manifest))
 	if err != nil {
 		klog.Errorf("Failed to read allow list manifest: %v", err)
@@ -210,22 +226,30 @@ func SetLabelAllowListFromManifest(manifest string) {
 	SetLabelAllowList(allowListMapping)
 }
 
+// ApplyMetricsConfiguration applies a MetricsConfiguration into global configuration of metrics.
+func ApplyMetricsConfiguration(c *v1.MetricsConfiguration) {
+	if c == nil {
+		return
+	}
+
+	if len(c.ShowHiddenMetricsForVersion) > 0 {
+		SetShowHidden()
+	}
+	SetDisabledMetrics(c.DisabledMetrics)
+	if c.AllowListMapping != nil {
+		SetLabelAllowList(c.AllowListMapping)
+	} else {
+		SetLabelAllowListFromManifest(c.AllowListMappingManifest)
+	}
+}
+
 // Apply applies parameters into global configuration of metrics.
 func (o *Options) Apply() {
 	if o == nil {
 		return
 	}
-	if len(o.ShowHiddenMetricsForVersion) > 0 {
-		SetShowHidden()
-	}
-	for _, metricName := range o.DisabledMetrics {
-		SetDisabledMetric(metricName)
-	}
-	if o.AllowListMapping != nil {
-		SetLabelAllowList(o.AllowListMapping)
-	} else if len(o.AllowListMappingManifest) > 0 {
-		SetLabelAllowListFromManifest(o.AllowListMappingManifest)
-	}
+
+	ApplyMetricsConfiguration(&o.MetricsConfiguration)
 }
 
 func validateShowHiddenMetricsVersion(currentVersion semver.Version, targetVersionStr string) error {
@@ -297,24 +321,24 @@ func validateAllowListMappingManifest(allowListMappingManifestPath string) error
 	return nil
 }
 
-// Validate validates metrics flags options.
-func (o *Options) Validate() []error {
-	if o == nil {
+// ValidateMetricsConfiguration validates a MetricsConfiguration.
+func ValidateMetricsConfiguration(c *v1.MetricsConfiguration) []error {
+	if c == nil {
 		return nil
 	}
 
 	var errs []error
-	err := validateShowHiddenMetricsVersion(parseVersion(version.Get()), o.ShowHiddenMetricsForVersion)
+	err := validateShowHiddenMetricsVersion(parseVersion(version.Get()), c.ShowHiddenMetricsForVersion)
 	if err != nil {
 		errs = append(errs, err)
 	}
-	if err = validateDisabledMetrics(o.DisabledMetrics); err != nil {
+	if err = validateDisabledMetrics(c.DisabledMetrics); err != nil {
 		errs = append(errs, err)
 	}
-	if err = validateAllowListMapping(o.AllowListMapping); err != nil {
+	if err = validateAllowListMapping(c.AllowListMapping); err != nil {
 		errs = append(errs, err)
 	}
-	if err = validateAllowListMappingManifest(o.AllowListMappingManifest); err != nil {
+	if err = validateAllowListMappingManifest(c.AllowListMappingManifest); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -322,4 +346,13 @@ func (o *Options) Validate() []error {
 		return nil
 	}
 	return errs
+}
+
+// Validate validates metrics flags options.
+func (o *Options) Validate() []error {
+	if o == nil {
+		return nil
+	}
+
+	return ValidateMetricsConfiguration(&o.MetricsConfiguration)
 }
