@@ -304,13 +304,9 @@ func (s *ProxyServer) setupConntrack(ctx context.Context, ct Conntracker) error 
 			if err != errReadOnlySysFS {
 				return err
 			}
-			// errReadOnlySysFS is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
-			// the only remediation we know is to restart the docker daemon.
-			// Here we'll send an node event with specific reason and message, the
-			// administrator should decide whether and how to handle this issue,
-			// whether to drain the node and restart docker.  Occurs in other container runtimes
-			// as well.
-			// TODO(random-liu): Remove this when the docker bug is fixed.
+			// errReadOnlySysFS means we ran into a known container runtim bug
+			// (https://issues.k8s.io/134108). For historical reasons we ignore
+			// this problem and just alert the admin that it occurred.
 			const message = "CRI error: /sys is read-only: " +
 				"cannot modify conntrack limits, problems may arise later (If running Docker, see docker issue #24000)"
 			s.Recorder.Eventf(s.NodeRef, nil, v1.EventTypeWarning, err.Error(), "StartKubeProxy", message)
