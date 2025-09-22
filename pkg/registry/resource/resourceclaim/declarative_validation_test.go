@@ -22,14 +22,12 @@ import (
 	"testing"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 	pointer "k8s.io/utils/ptr"
 )
 
@@ -66,47 +64,31 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: mkValidResourceClaim(tweakDevicesConstraints(32)),
 		},
 		"valid config, max allowed": {
-			input: mkValidResourceClaim(tweakDevicesRequests(32)),
+			input: mkValidResourceClaim(tweakDevicesConfigs(32)),
 		},
 		"invalid requests, too many": {
-			input: mkValidResourceClaim(tweakDevicesConfigs(33)),
+			input: mkValidResourceClaim(tweakDevicesRequests(33)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "devices", "requests"), 33, 32),
+				field.TooMany(field.NewPath("spec", "devices", "requests"), 33, 32).WithOrigin("maxItems"),
 			},
 		},
 		"invalid constraints, too many": {
 			input: mkValidResourceClaim(tweakDevicesConstraints(33)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "devices", "constraints"), 33, 32),
+				field.TooMany(field.NewPath("spec", "devices", "constraints"), 33, 32).WithOrigin("maxItems"),
 			},
 		},
 		"invalid config, too many": {
-			input: mkValidResourceClaim(tweakDevicesRequests(33)),
+			input: mkValidResourceClaim(tweakDevicesConfigs(33)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "devices", "config"), 33, 32),
+				field.TooMany(field.NewPath("spec", "devices", "config"), 33, 32).WithOrigin("maxItems"),
 			},
 		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			var declarativeTakeoverErrs field.ErrorList
-			var imperativeErrs field.ErrorList
-			for _, gateVal := range []bool{true, false} {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
-
-				errs := Strategy.Validate(ctx, &tc.input)
-				if gateVal {
-					declarativeTakeoverErrs = errs
-				} else {
-					imperativeErrs = errs
-				}
-			}
-			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
-
-			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil)
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
 		})
 	}
 }
@@ -129,7 +111,8 @@ func tweakDevicesConstraints(items int) func(*resource.ResourceClaim) {
 
 func tweakDevicesRequests(items int) func(*resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
-		for i := 0; i < items; i++ {
+		// The first request already exists in the valid template
+		for i := 1; i < items; i++ {
 			rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests, mkDeviceRequest(fmt.Sprintf("req-%d", i)))
 		}
 	}
@@ -138,13 +121,20 @@ func tweakDevicesRequests(items int) func(*resource.ResourceClaim) {
 func mkDeviceClaimConfiguration() resource.DeviceClaimConfiguration {
 	return resource.DeviceClaimConfiguration{
 		Requests: []string{"req-0"},
+		DeviceConfiguration: resource.DeviceConfiguration{
+			Opaque: &resource.OpaqueDeviceConfiguration{
+				Driver: "dra.example.com",
+				Parameters: runtime.RawExtension{
+					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+				}},
+		},
 	}
 }
 
 func mkDeviceConstraint() resource.DeviceConstraint {
 	return resource.DeviceConstraint{
 		Requests:       []string{"req-0"},
-		MatchAttribute: pointer.To(resource.FullyQualifiedName("a")),
+		MatchAttribute: pointer.To(resource.FullyQualifiedName("foo/bar")),
 	}
 }
 
@@ -189,23 +179,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			var declarativeTakeoverErrs field.ErrorList
-			var imperativeErrs field.ErrorList
-			for _, gateVal := range []bool{true, false} {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
-
-				errs := Strategy.ValidateUpdate(ctx, &tc.update, &tc.old)
-				if gateVal {
-					declarativeTakeoverErrs = errs
-				} else {
-					imperativeErrs = errs
-				}
-			}
-			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
-
-			apitesting.VerifyVersionedValidationEquivalence(t, &tc.update, &tc.old)
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "2"
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
 		})
 	}
 }
@@ -282,51 +258,7 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 		t.Run(k, func(t *testing.T) {
 			tc.old.ObjectMeta.ResourceVersion = "1"
 			tc.update.ObjectMeta.ResourceVersion = "1"
-			var declarativeTakeoverErrs field.ErrorList
-			var imperativeErrs field.ErrorList
-			for _, gateVal := range []bool{true, false} {
-				t.Run(fmt.Sprintf("gate=%v", gateVal), func(t *testing.T) {
-					// We only need to test both gate enabled and disabled together, because
-					// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
-					// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
-					errs := strategy.ValidateUpdate(ctx, &tc.update, &tc.old)
-					if gateVal {
-						declarativeTakeoverErrs = errs
-					} else {
-						imperativeErrs = errs
-					}
-					// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
-					errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-
-					if len(tc.expectedErrs) > 0 {
-						errOutputMatcher.Test(t, tc.expectedErrs, errs)
-					} else if len(errs) != 0 {
-						t.Errorf("expected no errors, but got: %v", errs)
-					}
-				})
-			}
-			// The equivalenceMatcher is used to verify the output errors from hand-written imperative validation
-			// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
-			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-			// TODO: remove this once ErrorMatcher has been extended to handle this form of deduplication.
-			dedupedImperativeErrs := field.ErrorList{}
-			for _, err := range imperativeErrs {
-				found := false
-				for _, existingErr := range dedupedImperativeErrs {
-					if equivalenceMatcher.Matches(existingErr, err) {
-						found = true
-						break
-					}
-				}
-				if !found {
-					dedupedImperativeErrs = append(dedupedImperativeErrs, err)
-				}
-			}
-			equivalenceMatcher.Test(t, dedupedImperativeErrs, declarativeTakeoverErrs)
-
-			apitesting.VerifyVersionedValidationEquivalence(t, &tc.update, &tc.old)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy.ValidateUpdate, tc.expectedErrs, "status")
 		})
 	}
 }
