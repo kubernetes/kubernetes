@@ -551,11 +551,12 @@ func (t *Tracker) deviceClassDelete(ctx context.Context) func(obj any) {
 }
 
 // syncSlice updates the slice with the given name, applying
-// DeviceTaints that match. sendEvent is used to force the Tracker
-// to publish an event for listeners added by [Tracker.AddEventHandler]. It
-// is set when syncSlice is triggered by a ResourceSlice event to avoid
-// doing costly DeepEqual comparisons where possible.
-func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
+// DeviceTaints that match.
+//
+// isSliceChange is true if the reason for the sync is some modification of
+// the ResourceSlice itself. Such changes are always emitted as events.
+// Other invocations emit an event only if the taints change.
+func (t *Tracker) syncSlice(ctx context.Context, name string, isSliceChange bool) {
 	defer t.emitEvents()
 
 	logger := klog.FromContext(ctx)
@@ -580,7 +581,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 			return
 		}
 		t.pushEvent(oldPatchedObj, nil)
-		logger.V(5).Info("patched ResourceSlice deleted")
+		logger.V(5).Info("ResourceSlice synced", "change", "delete")
 		return
 	}
 	var oldPatchedSlice *draapi.ResourceSlice
@@ -606,30 +607,38 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 	}
 
 	// When syncSlice is triggered by something other than a ResourceSlice
-	// event, only the device attributes and capacity might change. We
-	// deliberately avoid any costly DeepEqual-style comparisons here.
-	if !sendEvent && oldPatchedSlice != nil {
+	// event, only the applied taints may have changed. We
+	// deliberately avoid a costly full DeepEqual-style comparisons here in favor
+	// of comparing only the taints.
+	changed := isSliceChange
+	if !changed && oldPatchedSlice != nil {
 		for i := range patchedSlice.Spec.Devices {
 			oldDevice := oldPatchedSlice.Spec.Devices[i]
 			newDevice := patchedSlice.Spec.Devices[i]
-			sendEvent = sendEvent ||
-				!slices.EqualFunc(oldDevice.Taints, newDevice.Taints, taintsEqual)
+			if !slices.EqualFunc(oldDevice.Taints, newDevice.Taints, taintsEqual) {
+				changed = true
+				break
+			}
 		}
 	}
 
-	err = t.patchedResourceSlices.Add(patchedSlice)
-	if err != nil {
-		t.handleError(ctx, err, "failed to add patched resource slice to cache", "resourceslice", klog.KObj(patchedSlice))
-		return
-	}
-	if sendEvent {
+	if changed {
+		err = t.patchedResourceSlices.Add(patchedSlice)
+		if err != nil {
+			t.handleError(ctx, err, "failed to add patched resource slice to cache", "resourceslice", klog.KObj(patchedSlice))
+			return
+		}
 		t.pushEvent(oldPatchedObj, patchedSlice)
 	}
 
-	if loggerV := logger.V(6); loggerV.Enabled() {
-		loggerV.Info("ResourceSlice synced", "diff", diff.Diff(oldPatchedObj, patchedSlice))
+	if oldPatchedObj != nil {
+		if loggerV := logger.V(6); loggerV.Enabled() {
+			loggerV.Info("ResourceSlice synced", "change", "update", "diff", diff.Diff(oldPatchedObj, patchedSlice))
+		} else {
+			logger.V(5).Info("ResourceSlice synced", "change", "update")
+		}
 	} else {
-		logger.V(5).Info("ResourceSlice synced")
+		logger.V(5).Info("ResourceSlice synced", "change", "add")
 	}
 }
 
