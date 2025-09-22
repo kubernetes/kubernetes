@@ -22,10 +22,12 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNewFakeManager(t *testing.T) {
-	fm := NewFakeManager()
+	tCtx := ktesting.Init(t)
+	fm := NewFakeManager(tCtx)
 
 	if _, ok := fm.(Manager); !ok {
 		t.Errorf("Result is not Manager type")
@@ -74,8 +76,9 @@ func TestFakeRemoveContainer(t *testing.T) {
 		},
 	}
 	fm := fakeManager{}
+	tCtx := ktesting.Init(t)
 	for _, tc := range testCases {
-		err := fm.RemoveContainer(tc.containerID)
+		err := fm.RemoveContainer(tCtx, tc.containerID)
 		if err != nil {
 			t.Errorf("Expected error to be nil but got: %v", err)
 		}

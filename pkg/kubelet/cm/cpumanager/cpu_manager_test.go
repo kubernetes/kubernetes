@@ -30,6 +30,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
@@ -284,6 +285,8 @@ func makeMultiContainerPodWithOptions(initCPUs, appCPUs []*containerOptions) *v1
 }
 
 func TestCPUManagerAdd(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	if runtime.GOOS == "windows" {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
@@ -302,7 +305,7 @@ func TestCPUManagerAdd(t *testing.T) {
 		},
 		0,
 		cpuset.New(),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(tCtx),
 		nil)
 	testCases := []struct {
 		description        string
@@ -556,8 +559,10 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
+
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(tCtx), nil)
 
 		mockState := &mockState{
 			assignments:   testCase.stAssignments,
@@ -708,6 +713,8 @@ func TestCPUManagerGenerate(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
+
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			machineInfo := &mockedMachineInfo
@@ -720,7 +727,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			mgr, err := NewManager(testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			mgr, err := NewManager(testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(tCtx))
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
@@ -787,6 +794,8 @@ func TestCPUManagerRemove(t *testing.T) {
 }
 
 func TestReconcileState(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	if runtime.GOOS == "windows" {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
@@ -809,7 +818,7 @@ func TestReconcileState(t *testing.T) {
 		},
 		0,
 		cpuset.New(),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(tCtx),
 		nil)
 
 	testCases := []struct {
@@ -1314,6 +1323,8 @@ func TestReconcileState(t *testing.T) {
 // above test cases are without kubelet --reserved-cpus cmd option
 // the following tests are with --reserved-cpus configured
 func TestCPUManagerAddWithResvList(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	if runtime.GOOS == "windows" {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
@@ -1332,7 +1343,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		},
 		1,
 		cpuset.New(0),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(tCtx),
 		nil)
 	testCases := []struct {
 		description        string
@@ -1439,6 +1450,8 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
+
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			machineInfo := &mockedMachineInfo
@@ -1449,7 +1462,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			_, err = NewManager(testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			_, err = NewManager(testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(tCtx))
 			if err == nil {
 				t.Errorf("Expected error, but NewManager succeeded")
 			}
@@ -1462,6 +1475,8 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 }
 
 func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	if runtime.GOOS == "windows" {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
@@ -1481,7 +1496,7 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 		},
 		1,
 		cpuset.New(0),
-		topologymanager.NewFakeManager(),
+		topologymanager.NewFakeManager(tCtx),
 		nil)
 
 	testCases := []struct {

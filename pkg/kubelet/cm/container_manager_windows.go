@@ -118,7 +118,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 }
 
 // NewContainerManager creates windows container manager.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
+func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
@@ -134,13 +134,15 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		cadvisorInterface: cadvisorInterface,
 	}
 
-	cm.topologyManager = topologymanager.NewFakeManager()
+	cm.topologyManager = topologymanager.NewFakeManager(ctx)
 	cm.cpuManager = cpumanager.NewFakeManager()
 	cm.memoryManager = memorymanager.NewFakeManager(context.TODO())
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		klog.InfoS("Creating topology manager")
-		cm.topologyManager, err = topologymanager.NewManager(machineInfo.Topology,
+		cm.topologyManager, err = topologymanager.NewManager(
+			ctx,
+			machineInfo.Topology,
 			nodeConfig.TopologyManagerPolicy,
 			nodeConfig.TopologyManagerScope,
 			nodeConfig.TopologyManagerPolicyOptions)
@@ -164,7 +166,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			klog.ErrorS(err, "Failed to initialize cpu manager")
 			return nil, err
 		}
-		cm.topologyManager.AddHintProvider(cm.cpuManager)
+		cm.topologyManager.AddHintProvider(ctx, cm.cpuManager)
 
 		klog.InfoS("Creating memory manager")
 		cm.memoryManager, err = memorymanager.NewManager(
@@ -180,7 +182,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			klog.ErrorS(err, "Failed to initialize memory manager")
 			return nil, err
 		}
-		cm.topologyManager.AddHintProvider(cm.memoryManager)
+		cm.topologyManager.AddHintProvider(ctx, cm.memoryManager)
 	}
 
 	klog.InfoS("Creating device plugin manager")
@@ -188,7 +190,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if err != nil {
 		return nil, err
 	}
-	cm.topologyManager.AddHintProvider(cm.deviceManager)
+	cm.topologyManager.AddHintProvider(ctx, cm.deviceManager)
 
 	return cm, nil
 }

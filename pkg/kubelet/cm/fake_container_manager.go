@@ -178,10 +178,13 @@ func (cm *FakeContainerManager) UpdatePluginResources(*schedulerframework.NodeIn
 }
 
 func (cm *FakeContainerManager) InternalContainerLifecycle() InternalContainerLifecycle {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "InternalContainerLifecycle")
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), cm.memoryManager, topologymanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), cm.memoryManager, topologymanager.NewFakeManager(ctx)}
 }
 
 func (cm *FakeContainerManager) GetPodCgroupRoot() string {
@@ -213,10 +216,13 @@ func (cm *FakeContainerManager) ShouldResetExtendedResourceCapacity() bool {
 }
 
 func (cm *FakeContainerManager) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocateResourcesPodAdmitHandler")
-	return topologymanager.NewFakeManager()
+	return topologymanager.NewFakeManager(ctx)
 }
 
 func (cm *FakeContainerManager) UpdateAllocatedDevices() {
