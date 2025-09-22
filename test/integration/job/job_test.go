@@ -4200,14 +4200,14 @@ func TestNodeSelectorUpdate(t *testing.T) {
 
 func TestUpdateJobPodResources(t *testing.T) {
 	testCases := map[string]struct {
-		enableFeatureGate  bool
-		suspend            bool
-		updateResources    bool
-		containers         []v1.Container
-		expectUpdate       bool
-		startThenSuspend   bool
-		initialResources   *v1.ResourceRequirements
-		jobName            string
+		enableFeatureGate bool
+		suspend           bool
+		updateResources   bool
+		containers        []v1.Container
+		expectUpdate      bool
+		startThenSuspend  bool
+		initialResources  *v1.ResourceRequirements
+		jobName           string
 	}{
 		"suspended job, feature gate enabled, update resources": {
 			enableFeatureGate: true,
@@ -4265,7 +4265,7 @@ func TestUpdateJobPodResources(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutableJobPodResourcesForSuspendedJobs, tc.enableFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, tc.enableFeatureGate)
 
 			closeFn, restConfig, cs, ns := setup(t, "update-job-pod-resources")
 			defer closeFn()
@@ -4424,7 +4424,6 @@ func TestUpdateJobPodResources(t *testing.T) {
 		})
 	}
 }
-
 
 // TestDelayedJobUpdateEvent tests that a Job only creates one Pod even when
 // the job events are delayed. This test verfies the finishedJobStore is working

@@ -607,7 +607,7 @@ const (
 	// kep: https://kep.k8s.io/5440
 	//
 	// Enables mutable pod resources for suspended Jobs, regardless of whether they have started before.
-	MutableJobPodResourcesForSuspendedJobs featuregate.Feature = "MutableJobPodResourcesForSuspendedJobs"
+	MutablePodResourcesForSuspendedJobs featuregate.Feature = "MutablePodResourcesForSuspendedJobs"
 
 	// owner: @danwinship
 	// kep: https://kep.k8s.io/3866
@@ -1464,7 +1464,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Beta},
 	},
 
-	MutableJobPodResourcesForSuspendedJobs: {
+	MutablePodResourcesForSuspendedJobs: {
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 

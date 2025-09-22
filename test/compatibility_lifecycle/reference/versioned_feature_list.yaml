@@ -1005,7 +1005,7 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
-- name: MutableJobPodResourcesForSuspendedJobs
+- name: MutablePodResourcesForSuspendedJobs
   versionedSpecs:
   - default: true
     lockToDefault: false
