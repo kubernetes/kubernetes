@@ -1085,7 +1085,7 @@ gopkg.in/yaml.v3
 ## explicit; go 1.25.0
 # k8s.io/externaljwt v0.0.0 => ./staging/src/k8s.io/externaljwt
 ## explicit; go 1.25.0
-# k8s.io/gengo/v2 v2.0.0-20250903151518-081d64401ab4
+# k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b
 ## explicit; go 1.23
 k8s.io/gengo/v2
 k8s.io/gengo/v2/codetags
