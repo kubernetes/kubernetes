@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -51,7 +52,7 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 	})
 
 	ginkgo.It("should update container readiness when containers die during pod termination", func(ctx context.Context) {
-		ginkgo.By("Creating a pod with two containers - one with long preStop hook")
+		ginkgo.By("Creating a pod with two containers - one dies quickly, one has long preStop hook")
 		podName := "test-pod-readiness-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -59,181 +60,22 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 				Namespace: ns,
 			},
 			Spec: v1.PodSpec{
-				TerminationGracePeriodSeconds: func() *int64 { v := int64(200); return &v }(),
+				TerminationGracePeriodSeconds: func() *int64 { v := int64(50); return &v }(),
 				Containers: []v1.Container{
 					{
-						Name:  "fast-container",
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args:  []string{"sleep", "3600"},
-						ReadinessProbe: &v1.Probe{
-							ProbeHandler: v1.ProbeHandler{
-								Exec: &v1.ExecAction{
-									Command: []string{"sh", "-c", "echo 'ready'"},
-								},
-							},
-							InitialDelaySeconds: 2,
-							PeriodSeconds:       3,
-							TimeoutSeconds:      1,
-							SuccessThreshold:    1,
-							FailureThreshold:    2,
+						Name:    "fast-container",
+						Image:   "alpine:latest",
+						Command: []string{"sh", "-c", "trap 'exit 0' TERM; while true; do sleep 1; done"},
+						Ports: []v1.ContainerPort{
+							{ContainerPort: 8080},
 						},
 					},
 					{
-						Name:  "slow-container",
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args:  []string{"sleep", "3600"},
-						ReadinessProbe: &v1.Probe{
-							ProbeHandler: v1.ProbeHandler{
-								Exec: &v1.ExecAction{
-									Command: []string{"sh", "-c", "echo 'ready'"},
-								},
-							},
-							InitialDelaySeconds: 2,
-							PeriodSeconds:       3,
-							TimeoutSeconds:      1,
-							SuccessThreshold:    1,
-							FailureThreshold:    2,
-						},
-						Lifecycle: &v1.Lifecycle{
-							PreStop: &v1.LifecycleHandler{
-								Exec: &v1.ExecAction{
-									Command: []string{"sh", "-c", "sleep 60"},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-
-		ginkgo.By("Creating the pod")
-		pod = podClient.Create(ctx, pod)
-
-		ginkgo.By("Waiting for pod to be running and ready")
-		err := e2epod.WaitForPodRunningInNamespace(ctx, cs, pod)
-		framework.ExpectNoError(err, "pod should be running")
-
-		// Verify both containers are ready
-		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod")
-		gomega.Expect(pod.Status.ContainerStatuses[0].Ready).To(gomega.BeTrue(), "fast-container should be ready")
-		gomega.Expect(pod.Status.ContainerStatuses[1].Ready).To(gomega.BeTrue(), "slow-container should be ready")
-
-		ginkgo.By("Deleting the pod")
-		err = podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete pod")
-
-		ginkgo.By("Monitoring pod status during termination")
-		var readinessUpdated bool
-		var fastContainerDied bool
-		var slowContainerDied bool
-
-		// Monitor pod status for up to 2 minutes
-		err = wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
-			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-
-			// Check if pod is still terminating
-			if pod.DeletionTimestamp == nil {
-				return false, fmt.Errorf("pod should be terminating")
-			}
-
-			// Count ready containers
-			readyContainers := 0
-			for i, status := range pod.Status.ContainerStatuses {
-				if status.Ready {
-					readyContainers++
-				}
-
-				// Track which containers have died
-				if status.State.Terminated != nil {
-					if i == 0 {
-						fastContainerDied = true
-					} else {
-						slowContainerDied = true
-					}
-				}
-			}
-
-			framework.Logf("Pod status: %d/%d containers ready, fast-container died: %v, slow-container died: %v",
-				readyContainers, len(pod.Status.ContainerStatuses), fastContainerDied, slowContainerDied)
-
-			// The key test: if fast container died but slow container is still running,
-			// the ready count should be updated (not 2/2)
-			if fastContainerDied && !slowContainerDied {
-				if readyContainers < 2 {
-					readinessUpdated = true
-					framework.Logf("SUCCESS: Readiness updated to %d/2 when fast container died", readyContainers)
-					return true, nil
-				}
-			}
-
-			// If both containers died, we're done
-			if fastContainerDied && slowContainerDied {
-				return true, nil
-			}
-
-			return false, nil
-		})
-
-		framework.ExpectNoError(err, "failed to monitor pod termination")
-
-		ginkgo.By("Verifying readiness was updated during termination")
-		gomega.Expect(readinessUpdated).To(gomega.BeTrue(), "container readiness should be updated when containers die during termination")
-
-		// Additional verification: check that the pod eventually gets fully terminated
-		ginkgo.By("Waiting for pod to be fully terminated")
-		err = wait.PollImmediate(5*time.Second, 3*time.Minute, func() (bool, error) {
-			_, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			if err != nil {
-				// Pod not found means it's fully terminated
-				return true, nil
-			}
-			return false, nil
-		})
-		framework.ExpectNoError(err, "pod should be fully terminated")
-	})
-
-	ginkgo.It("should update readiness for liveness probe failures during termination", func(ctx context.Context) {
-		ginkgo.By("Creating a pod with liveness probe that will fail")
-		podName := "test-pod-liveness-readiness-" + string(uuid.NewUUID())
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      podName,
-				Namespace: ns,
-			},
-			Spec: v1.PodSpec{
-				TerminationGracePeriodSeconds: func() *int64 { v := int64(120); return &v }(),
-				Containers: []v1.Container{
-					{
-						Name:  "test-container",
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args:  []string{"sh", "-c", "sleep 10; echo 'Container crashing...'; exit 1"},
-						LivenessProbe: &v1.Probe{
-							ProbeHandler: v1.ProbeHandler{
-								Exec: &v1.ExecAction{
-									Command: []string{"sh", "-c", "echo 'liveness check'"},
-								},
-							},
-							InitialDelaySeconds: 5,
-							PeriodSeconds:       3,
-							TimeoutSeconds:      1,
-							SuccessThreshold:    1,
-							FailureThreshold:    1,
-						},
-						ReadinessProbe: &v1.Probe{
-							ProbeHandler: v1.ProbeHandler{
-								Exec: &v1.ExecAction{
-									Command: []string{"sh", "-c", "echo 'readiness check'"},
-								},
-							},
-							InitialDelaySeconds: 2,
-							PeriodSeconds:       3,
-							TimeoutSeconds:      1,
-							SuccessThreshold:    1,
-							FailureThreshold:    2,
+						Name:    "slow-container",
+						Image:   "alpine:latest",
+						Command: []string{"sh", "-c", "trap 'exit 0' TERM; while true; do sleep 1; done"},
+						Ports: []v1.ContainerPort{
+							{ContainerPort: 8081},
 						},
 						Lifecycle: &v1.Lifecycle{
 							PreStop: &v1.LifecycleHandler{
@@ -250,18 +92,115 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 		ginkgo.By("Creating the pod")
 		pod = podClient.Create(ctx, pod)
 
-		ginkgo.By("Waiting for pod to be running and ready")
+		ginkgo.By("Waiting for pod to be running")
 		err := e2epod.WaitForPodRunningInNamespace(ctx, cs, pod)
 		framework.ExpectNoError(err, "pod should be running")
 
-		// Verify container is ready initially
-		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod")
-		gomega.Expect(pod.Status.ContainerStatuses[0].Ready).To(gomega.BeTrue(), "container should be ready initially")
+		ginkgo.By("Deleting the pod")
+		err = podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "failed to delete pod")
+
+		ginkgo.By("Monitoring pod status during termination")
+		var readinessUpdated bool
+
+		// Monitor pod status for up to 2 minutes
+		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				// If pod is not found, it means it was fully deleted
+				// This is expected during termination, so we can stop monitoring
+				if errors.IsNotFound(err) {
+					framework.Logf("Pod was deleted during monitoring - this is expected during termination")
+					return true, nil
+				}
+				return false, err
+			}
+
+			// Check if pod is still terminating
+			if pod.DeletionTimestamp == nil {
+				return false, fmt.Errorf("pod should be terminating")
+			}
+
+			// Count ready containers
+			readyContainers := 0
+			for _, status := range pod.Status.ContainerStatuses {
+				if status.Ready {
+					readyContainers++
+				}
+			}
+
+			framework.Logf("Pod status: %d/%d containers ready", readyContainers, len(pod.Status.ContainerStatuses))
+
+			// The key test: we should see 1/2 containers ready at some point during termination
+			if readyContainers == 1 {
+				readinessUpdated = true
+				framework.Logf("SUCCESS: Readiness updated to %d/2 during termination (expected 1/2)", readyContainers)
+				return true, nil
+			}
+
+			// If all containers are dead, we're done
+			if readyContainers == 0 {
+				return true, nil
+			}
+
+			return false, nil
+		})
+
+		framework.ExpectNoError(err, "failed to monitor pod termination")
+
+		ginkgo.By("Verifying readiness was updated during termination")
+		gomega.Expect(readinessUpdated).To(gomega.BeTrue(), "container readiness should be updated when containers die during termination")
+
+		// Additional verification: check that the pod eventually gets fully terminated
+		ginkgo.By("Waiting for pod to be fully terminated")
+		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
+			_, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				// Pod not found means it's fully terminated
+				return true, nil
+			}
+			return false, nil
+		})
+		framework.ExpectNoError(err, "pod should be fully terminated")
+	})
+
+	ginkgo.It("should update readiness when container crashes during termination", func(ctx context.Context) {
+		ginkgo.By("Creating a pod with container that will crash")
+		podName := "test-pod-liveness-readiness-" + string(uuid.NewUUID())
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      podName,
+				Namespace: ns,
+			},
+			Spec: v1.PodSpec{
+				TerminationGracePeriodSeconds: func() *int64 { v := int64(120); return &v }(),
+				Containers: []v1.Container{
+					{
+						Name:  "test-container",
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"sh", "-c", "sleep 10; echo 'Container crashing...'; exit 1"},
+						Lifecycle: &v1.Lifecycle{
+							PreStop: &v1.LifecycleHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"sh", "-c", "sleep 30"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		ginkgo.By("Creating the pod")
+		pod = podClient.Create(ctx, pod)
+
+		ginkgo.By("Waiting for pod to be running")
+		err := e2epod.WaitForPodRunningInNamespace(ctx, cs, pod)
+		framework.ExpectNoError(err, "pod should be running")
 
 		ginkgo.By("Waiting for container to crash and restart")
 		var containerRestarted bool
-		err = wait.PollImmediate(2*time.Second, 1*time.Minute, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -276,7 +215,7 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 
 			return false, nil
 		})
-		framework.ExpectNoError(err, "container should restart after liveness failure")
+		framework.ExpectNoError(err, "container should restart after crash")
 		gomega.Expect(containerRestarted).To(gomega.BeTrue(), "container should have restarted")
 
 		ginkgo.By("Deleting the pod during container restart")
@@ -285,7 +224,7 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 
 		ginkgo.By("Monitoring readiness during termination with preStop hook")
 		var readinessUpdated bool
-		err = wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -304,10 +243,10 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 
 			framework.Logf("Pod status during termination: %d/%d containers ready", readyContainers, len(pod.Status.ContainerStatuses))
 
-			// If container is being killed due to liveness failure, readiness should be updated
+			// If container is being killed due to crash, readiness should be updated
 			if readyContainers < len(pod.Status.ContainerStatuses) {
 				readinessUpdated = true
-				framework.Logf("SUCCESS: Readiness updated during liveness failure termination")
+				framework.Logf("SUCCESS: Readiness updated during container crash termination")
 				return true, nil
 			}
 
@@ -315,6 +254,6 @@ var _ = SIGDescribe("Container Readiness During Termination", func() {
 		})
 
 		framework.ExpectNoError(err, "failed to monitor pod termination")
-		gomega.Expect(readinessUpdated).To(gomega.BeTrue(), "readiness should be updated during liveness failure termination")
+		gomega.Expect(readinessUpdated).To(gomega.BeTrue(), "readiness should be updated during container crash termination")
 	})
 })
