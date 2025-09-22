@@ -158,15 +158,26 @@ func (c *cache) get(id types.UID) *data {
 func (c *cache) getIfNewerThan(id types.UID, minTime time.Time) *data {
 	d, ok := c.pods[id]
 	globalTimestampIsNewer := (c.timestamp != nil && c.timestamp.After(minTime))
-	if !ok && globalTimestampIsNewer {
-		// Status is not cached, but the global timestamp is newer than
-		// minTime, return the default status.
+
+	// Handle time shift scenarios: if the current time is significantly earlier than minTime,
+	// it indicates a clock step backwards. In such cases, we should treat cached data as "newer"
+	// to avoid blocking indefinitely and prevent container name reservation conflicts.
+	currentTime := time.Now()
+	timeShiftThreshold := 30 * time.Second // Allow for reasonable clock adjustments
+	timeShiftDetected := currentTime.Before(minTime.Add(-timeShiftThreshold))
+
+	if !ok && (globalTimestampIsNewer || timeShiftDetected) {
+		// Status is not cached, but either:
+		//   * the global timestamp is newer than minTime, or
+		//   * a time shift was detected (clock went backwards)
+		// Return the default status.
 		return makeDefaultData(id)
 	}
-	if ok && (d.modified.After(minTime) || globalTimestampIsNewer) {
-		// Status is cached, return status if either of the following is true.
+	if ok && (d.modified.After(minTime) || globalTimestampIsNewer || timeShiftDetected) {
+		// Status is cached, return status if any of the following is true:
 		//   * status was modified after minTime
-		//   * the global timestamp of the cache is newer than minTime.
+		//   * the global timestamp of the cache is newer than minTime
+		//   * a time shift was detected (clock went backwards)
 		return d
 	}
 	// The pod status is not ready.
@@ -182,9 +193,17 @@ func (c *cache) notify(id types.UID, timestamp time.Time) {
 		return
 	}
 	newList := []*subRecord{}
+	currentTime := time.Now()
+	timeShiftThreshold := 30 * time.Second // Allow for reasonable clock adjustments
+
 	for i, r := range list {
-		if timestamp.Before(r.time) {
-			// Doesn't meet the time requirement; keep the record.
+		// Handle time shift scenarios: if the current time is significantly earlier than the
+		// subscriber's time, it indicates a clock step backwards. In such cases, we should
+		// notify the subscriber to avoid blocking indefinitely.
+		timeShiftDetected := currentTime.Before(r.time.Add(-timeShiftThreshold))
+
+		if timestamp.Before(r.time) && !timeShiftDetected {
+			// Doesn't meet the time requirement and no time shift detected; keep the record.
 			newList = append(newList, list[i])
 			continue
 		}
