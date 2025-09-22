@@ -4853,6 +4853,49 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Status: v1.ConditionTrue,
 			},
 		},
+		{
+			name: "admission rejected pod status is preserved after restart",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					Phase:   v1.PodFailed,
+					Reason:  "OutOfCpu",
+					Message: "Pod was rejected: Node didn't have enough resource: cpu",
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod"},
+			},
+			// After a restart, the runtime has no record of this pod
+			currentStatus: &kubecontainer.PodStatus{},
+			// The status manager cache is also empty after a restart, but the function
+			// will use the pod's own status as the "old" status.
+			previousStatus: v1.PodStatus{
+				Phase:   v1.PodFailed,
+				Reason:  "OutOfCpu",
+				Message: "Pod was rejected: Node didn't have enough resource: cpu",
+			},
+			isPodTerminal: true,
+			expected: v1.PodStatus{
+				Phase:    v1.PodFailed,
+				Reason:   "OutOfCpu",
+				Message:  "Pod was rejected: Node didn't have enough resource: cpu",
+				HostIP:   "127.0.0.1",
+				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					// For a failed pod with no init containers, Initialized should be True with an empty reason.
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue, Reason: ""},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				// CRUCIAL: No container statuses for admission rejected pods
+				ContainerStatuses: []v1.ContainerStatus{},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   v1.PodReadyToStartContainers,
+				Status: v1.ConditionFalse,
+			},
+		},
 	}
 	for _, test := range tests {
 		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
