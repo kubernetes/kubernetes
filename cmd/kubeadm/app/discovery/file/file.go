@@ -94,7 +94,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Durat
 	err = wait.PollUntilContextTimeout(context.Background(),
 		constants.DiscoveryRetryInterval, discoveryTimeout,
 		true, func(_ context.Context) (bool, error) {
-			clusterinfoCM, lastError = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+			clusterinfoCM, lastError = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.Background(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 			if lastError != nil {
 				if apierrors.IsForbidden(lastError) {
 					// If the request fails with a forbidden error, the cluster admin has not granted access to the cluster info configmap for anonymous clients.
