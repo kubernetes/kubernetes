@@ -151,7 +151,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		// just after the test ends.
 		err := wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 			existing := 0
-			for _, pvName := range l.pvNames.UnsortedList() {
+			for pvName := range l.pvNames {
 				_, err := l.cs.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 				if err == nil {
 					existing++

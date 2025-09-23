@@ -433,7 +433,7 @@ func (c *Controller) syncPod(ctx context.Context, pod *v1.Pod) error {
 	}
 
 	mounts, _, seLinuxLabels := volumeutil.GetPodVolumeNames(pod, true /* collectSELinuxOptions */)
-	for _, mount := range mounts.UnsortedList() {
+	for mount := range mounts {
 		opts := seLinuxLabels[mount]
 		spec, found := volumeSpecs[mount]
 		if !found {

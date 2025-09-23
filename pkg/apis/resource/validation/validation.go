@@ -419,9 +419,9 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 			if claimDeleted {
 				oldSet := sets.New(oldStatus.ReservedFor...)
 				newSet := sets.New(status.ReservedFor...)
-				newItems := newSet.Difference(oldSet)
-				if len(newItems) > 0 {
+				for range newSet.DifferenceSeq(oldSet) {
 					allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "new entries may not be added while `deallocationRequested` or `deletionTimestamp` are set"))
+					break // only need to check if there is at least one item
 				}
 			}
 		}
