@@ -1243,24 +1243,38 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 // testMaxResourceSlice creates a ResourceSlice that is as large as possible
 // and prints some information about it.
 func testMaxResourceSlice(tCtx ktesting.TContext) {
-	slice := NewMaxResourceSlice()
-	createdSlice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err)
-	totalSize := createdSlice.Size()
-	var managedFieldsSize int
-	for _, f := range createdSlice.ManagedFields {
-		managedFieldsSize += f.Size()
+	for name, tc := range map[string]struct {
+		resourceSliceGenFunc func() *resourceapi.ResourceSlice
+	}{
+		"resourceslice-with-devices": {
+			resourceSliceGenFunc: NewMaxResourceSlice,
+		},
+		"resourceslice-with-shared-counters": {
+			resourceSliceGenFunc: NewMaxResourceSliceWithSharedCounters,
+		},
+	} {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			slice := tc.resourceSliceGenFunc()
+			createdSlice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+			tCtx.ExpectNoError(err)
+			totalSize := createdSlice.Size()
+			var managedFieldsSize int
+			for _, f := range createdSlice.ManagedFields {
+				managedFieldsSize += f.Size()
+			}
+			specSize := createdSlice.Spec.Size()
+			tCtx.Logf("\n\nTotal size: %s\nManagedFields size: %s (%.0f%%)\nSpec size: %s (%.0f)%%\n\nManagedFields:\n%s",
+				resource.NewQuantity(int64(totalSize), resource.BinarySI),
+				resource.NewQuantity(int64(managedFieldsSize), resource.BinarySI), float64(managedFieldsSize)*100/float64(totalSize),
+				resource.NewQuantity(int64(specSize), resource.BinarySI), float64(specSize)*100/float64(totalSize),
+				klog.Format(createdSlice.ManagedFields),
+			)
+			if diff := cmp.Diff(slice.Spec, createdSlice.Spec); diff != "" {
+				tCtx.Errorf("ResourceSliceSpec got modified during Create (- want, + got):\n%s", diff)
+			}
+		})
 	}
-	specSize := createdSlice.Spec.Size()
-	tCtx.Logf("\n\nTotal size: %s\nManagedFields size: %s (%.0f%%)\nSpec size: %s (%.0f)%%\n\nManagedFields:\n%s",
-		resource.NewQuantity(int64(totalSize), resource.BinarySI),
-		resource.NewQuantity(int64(managedFieldsSize), resource.BinarySI), float64(managedFieldsSize)*100/float64(totalSize),
-		resource.NewQuantity(int64(specSize), resource.BinarySI), float64(specSize)*100/float64(totalSize),
-		klog.Format(createdSlice.ManagedFields),
-	)
-	if diff := cmp.Diff(slice.Spec, createdSlice.Spec); diff != "" {
-		tCtx.Errorf("ResourceSliceSpec got modified during Create (- want, + got):\n%s", diff)
-	}
+
 }
 
 // testControllerManagerMetrics tests ResourceClaim metrics
