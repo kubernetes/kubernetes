@@ -22,19 +22,21 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
-func init() {
+func registerAndResetMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, true)
 	metrics.Register()
-}
 
-func resetMetrics() {
 	metrics.AsyncAPICallsTotal.Reset()
 	metrics.AsyncAPICallDuration.Reset()
 	metrics.AsyncAPIPendingCalls.Reset()
@@ -100,7 +102,7 @@ func (mac *mockAPICall) IsNoOp() bool {
 
 func TestAPIDispatcherLifecycle(t *testing.T) {
 	// Reset all async API metrics
-	resetMetrics()
+	registerAndResetMetrics(t)
 
 	logger, _ := ktesting.NewTestContext(t)
 

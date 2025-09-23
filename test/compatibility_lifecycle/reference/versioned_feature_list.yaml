@@ -1385,7 +1385,7 @@
     version: "1.29"
 - name: SchedulerAsyncAPICalls
   versionedSpecs:
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
