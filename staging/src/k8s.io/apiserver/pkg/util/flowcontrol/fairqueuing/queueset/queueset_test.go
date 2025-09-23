@@ -617,6 +617,50 @@ func TestExampt(t *testing.T) {
 	}
 }
 
+func TestZeroConcurrencyLimitJail(t *testing.T) {
+	metrics.Register()
+	now := time.Now()
+
+	clk, counter := testeventclock.NewFake(now, 0, nil)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qCfg := fq.QueuingConfig{
+		Name:             "TestZeroConcurrencyJail",
+		DesiredNumQueues: 0, // Default value for Reject limitResponse type
+		QueueLengthLimit: 0,
+		HandSize:         0,
+	}
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, "seatDemandSubject")
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Set concurrency limit to 0 for "jail" behavior
+	qs := qsComplete(qsc, 0)
+
+	// Test that requests are rejected when ConcurrencyLimit is 0
+	ctx := context.Background()
+	req, idle := qs.StartRequest(ctx, &fcrequest.WorkEstimate{InitialSeats: 1, FinalSeats: 1}, 1, "", "test-fs", "test", "req1", nil)
+	if req != nil {
+		t.Errorf("Expected request to be rejected (returned nil) with zero concurrency limit, but got non-nil request")
+		req.Finish(func() {})
+	}
+	if !idle {
+		t.Errorf("Expected queueset to be idle after rejecting request, but got idle=false")
+	}
+
+	// Test multiple requests are all rejected
+	for i := 2; i <= 5; i++ {
+		req, idle := qs.StartRequest(ctx, &fcrequest.WorkEstimate{InitialSeats: 1, FinalSeats: 1}, uint64(i), "", "test-fs", "test", fmt.Sprintf("req%d", i), nil)
+		if req != nil {
+			t.Errorf("Expected request %d to be rejected (returned nil) with zero concurrency limit, but got non-nil request", i)
+			req.Finish(func() {})
+		}
+		if !idle {
+			t.Errorf("Expected queueset to be idle after rejecting request %d, but got idle=false", i)
+		}
+	}
+}
+
 func TestSeparations(t *testing.T) {
 	flts := func(avgs ...float64) []float64 { return avgs }
 	for _, seps := range []struct {
