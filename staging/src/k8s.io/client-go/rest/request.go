@@ -1174,6 +1174,7 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 	logger := klog.FromContext(ctx)
 	var body []byte
 	if resp.Body != nil {
+		defer resp.Body.Close()
 		data, err := io.ReadAll(resp.Body)
 		switch err.(type) {
 		case nil:
