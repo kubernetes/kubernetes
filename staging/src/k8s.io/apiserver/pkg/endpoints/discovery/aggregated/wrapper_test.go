@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -61,6 +62,7 @@ func (f fakeHTTPHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) 
 }
 
 func TestAggregationEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 	unaggregated := fakeHTTPHandler{data: "unaggregated"}
 	aggregated := fakeHTTPHandler{data: "aggregated"}
 	wrapped := WrapAggregatedDiscoveryToHandler(unaggregated, aggregated)
