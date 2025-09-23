@@ -145,7 +145,7 @@ func (s *policySource[P, B, E]) Run(ctx context.Context) error {
 
 	// Wait for initial cache sync of policies and informers before reconciling
 	// any
-	if !cache.WaitForNamedCacheSync(fmt.Sprintf("%T", s), ctx.Done(), s.UpstreamHasSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, s.UpstreamHasSynced) {
 		err := ctx.Err()
 		if err == nil {
 			err = fmt.Errorf("initial cache sync for %T failed", s)
