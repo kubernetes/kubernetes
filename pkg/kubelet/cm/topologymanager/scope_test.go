@@ -23,7 +23,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetAffinity(t *testing.T) {
@@ -101,7 +100,6 @@ func TestRemoveContainer(t *testing.T) {
 			podUID:      "b3ee37fc-39a5-11e9-bcb1-a4bf01040474",
 		},
 	}
-	tCtx := ktesting.Init(t)
 	var len1, len2 int
 	var lenHints1, lenHints2 int
 	scope := scope{}
@@ -113,7 +111,7 @@ func TestRemoveContainer(t *testing.T) {
 		scope.podTopologyHints[string(tc.podUID)][tc.name] = TopologyHint{}
 		len1 = len(scope.podMap)
 		lenHints1 = len(scope.podTopologyHints)
-		err := scope.RemoveContainer(tCtx, tc.containerID)
+		err := scope.RemoveContainer(tc.containerID)
 		len2 = len(scope.podMap)
 		lenHints2 = len(scope.podTopologyHints)
 		if err != nil {

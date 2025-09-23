@@ -40,27 +40,19 @@ type internalContainerLifecycleImpl struct {
 }
 
 func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	ctx := context.TODO()
-
 	if i.cpuManager != nil {
 		i.cpuManager.AddContainer(pod, container, containerID)
 	}
 
 	if i.memoryManager != nil {
-		i.memoryManager.AddContainer(ctx, pod, container, containerID)
+		i.memoryManager.AddContainer(context.TODO(), pod, container, containerID)
 	}
 
-	i.topologyManager.AddContainer(ctx, pod, container, containerID)
+	i.topologyManager.AddContainer(pod, container, containerID)
 
 	return nil
 }
 
 func (i *internalContainerLifecycleImpl) PostStopContainer(containerID string) error {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	ctx := context.TODO()
-
-	return i.topologyManager.RemoveContainer(ctx, containerID)
+	return i.topologyManager.RemoveContainer(containerID)
 }

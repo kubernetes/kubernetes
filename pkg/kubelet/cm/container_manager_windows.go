@@ -118,7 +118,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 }
 
 // NewContainerManager creates windows container manager.
-func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
@@ -133,6 +133,10 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		nodeConfig:        nodeConfig,
 		cadvisorInterface: cadvisorInterface,
 	}
+
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
 
 	cm.topologyManager = topologymanager.NewFakeManager(ctx)
 	cm.cpuManager = cpumanager.NewFakeManager()

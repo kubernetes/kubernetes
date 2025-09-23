@@ -77,12 +77,18 @@ func (m *fakeManager) AddHintProvider(ctx context.Context, h HintProvider) {
 	logger.Info("AddHintProvider", "hintProvider", h)
 }
 
-func (m *fakeManager) AddContainer(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID string) {
+func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
 	logger := klog.FromContext(ctx)
 	logger.Info("AddContainer", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 
-func (m *fakeManager) RemoveContainer(ctx context.Context, containerID string) error {
+func (m *fakeManager) RemoveContainer(containerID string) error {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
 	logger := klog.FromContext(ctx)
 	logger.Info("RemoveContainer", "containerID", containerID)
 	return nil

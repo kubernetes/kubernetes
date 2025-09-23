@@ -76,9 +76,8 @@ func TestFakeRemoveContainer(t *testing.T) {
 		},
 	}
 	fm := fakeManager{}
-	tCtx := ktesting.Init(t)
 	for _, tc := range testCases {
-		err := fm.RemoveContainer(tCtx, tc.containerID)
+		err := fm.RemoveContainer(tc.containerID)
 		if err != nil {
 			t.Errorf("Expected error to be nil but got: %v", err)
 		}

@@ -62,9 +62,9 @@ type Manager interface {
 	// wants to be consulted with when making topology hints
 	AddHintProvider(ctx context.Context, h HintProvider)
 	// AddContainer adds pod to Manager for tracking
-	AddContainer(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID string)
+	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
-	RemoveContainer(ctx context.Context, containerID string) error
+	RemoveContainer(containerID string) error
 	// Store is the interface for storing pod topology hints
 	Store
 }
@@ -216,12 +216,12 @@ func (m *manager) AddHintProvider(ctx context.Context, h HintProvider) {
 	m.scope.AddHintProvider(h)
 }
 
-func (m *manager) AddContainer(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID string) {
+func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
 	m.scope.AddContainer(pod, container, containerID)
 }
 
-func (m *manager) RemoveContainer(ctx context.Context, containerID string) error {
-	return m.scope.RemoveContainer(ctx, containerID)
+func (m *manager) RemoveContainer(containerID string) error {
+	return m.scope.RemoveContainer(containerID)
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {

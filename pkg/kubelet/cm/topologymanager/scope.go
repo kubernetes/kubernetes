@@ -49,7 +49,7 @@ type Scope interface {
 	// AddContainer adds pod to Manager for tracking
 	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
-	RemoveContainer(ctx context.Context, containerID string) error
+	RemoveContainer(containerID string) error
 	// Store is the interface for storing pod topology hints
 	Store
 }
@@ -111,7 +111,10 @@ func (s *scope) AddContainer(pod *v1.Pod, container *v1.Container, containerID s
 
 // It would be better to implement this function in topologymanager instead of scope
 // but topologymanager do not track mapping anymore
-func (s *scope) RemoveContainer(ctx context.Context, containerID string) error {
+func (s *scope) RemoveContainer(containerID string) error {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
 	logger := klog.FromContext(ctx)
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
