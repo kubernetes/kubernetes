@@ -1039,30 +1039,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 		scaleScopes[v.Name] = &scaleScope
 
-		// override status subresource values
-		// shallow copy
-		statusScope := *requestScopes[v.Name]
-		statusScope.Subresource = "status"
-		statusScope.Namer = handlers.ContextBasedNaming{
-			Namer:         meta.NewAccessor(),
-			ClusterScoped: clusterScoped,
-		}
-
-		if subresources != nil && subresources.Status != nil {
-			resetFields := storages[v.Name].Status.GetResetFields()
-			statusScope, err = scopeWithFieldManager(
-				typeConverter,
-				statusScope,
-				resetFields,
-				"status",
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		statusScopes[v.Name] = &statusScope
-
 		if v.Deprecated {
 			deprecated[v.Name] = true
 			if v.DeprecationWarning != nil {
@@ -1070,6 +1046,44 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			} else {
 				warnings[v.Name] = append(warnings[v.Name], defaultDeprecationWarning(v.Name, crd.Spec))
 			}
+		}
+	}
+
+	// override status subresource values
+	// shallow copy
+	// resetField write all version information
+	for _, v := range crd.Spec.Versions {
+		clusterScoped := crd.Spec.Scope == apiextensionsv1.ClusterScoped
+		statusScope := *requestScopes[v.Name]
+		statusScope.Subresource = "status"
+		statusScope.Namer = handlers.ContextBasedNaming{
+			Namer:         meta.NewAccessor(),
+			ClusterScoped: clusterScoped,
+		}
+
+		subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, v.Name)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR subresources")
+		}
+		if subresources != nil && subresources.Status != nil {
+			var statusResetFields = make(map[fieldpath.APIVersion]*fieldpath.Set)
+			for _, value := range crd.Spec.Versions {
+				resetField := storages[value.Name].Status.GetResetFields()
+				for apiVersion, set := range resetField {
+					statusResetFields[apiVersion] = set
+				}
+			}
+			statusScope, err = scopeWithFieldManager(
+				typeConverter,
+				statusScope,
+				statusResetFields,
+				"status",
+			)
+			if err != nil {
+				return nil, err
+			}
+			statusScopes[v.Name] = &statusScope
 		}
 	}
 
