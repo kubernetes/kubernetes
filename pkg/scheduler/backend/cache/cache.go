@@ -91,7 +91,9 @@ type podState struct {
 	// Used to block cache from expiring assumedPod if binding still runs
 	bindingFinished bool
 	// pendingDeletion says whether the pod is pending deletion
-	// and will be removed from the cache soon.
+	// and is expected to be removed from the cache when both are met:
+	// 1) the notification about pod removal comes from the api-server
+	// 2) the scheduler finishes processing (scheduling/binding) the in-memory pod.
 	pendingDeletion bool
 }
 

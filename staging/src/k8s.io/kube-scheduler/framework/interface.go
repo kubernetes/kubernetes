@@ -754,6 +754,9 @@ type PluginsRunner interface {
 
 // PendingDeletionChecker allows to check if the deletion is already pending for a pod.
 type PendingDeletionChecker interface {
+	// MarkPendingDeletion marks the pod as pending deletion.
+	// This allows to skip the processing for a pod that will be removed from the scheduler soon.
+	MarkPendingDeletion(pod *v1.Pod) error
 	// PendingDeletion returns whether the pod is pending deletion.
 	PendingDeletion(pod *v1.Pod) (bool, error)
 }

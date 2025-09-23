@@ -207,7 +207,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	if isAssumed {
 		if newPod.DeletionTimestamp != nil && oldPod.DeletionTimestamp == nil {
 			// If the DeletionTimestamp was added, it means that the pod deletion process has started.
-			// If it happend to the assumed pod, it should be handled appropriately,
+			// If it happened to the assumed pod, it should be handled appropriately,
 			// because we can't update it in any structure.
 			sched.handleAssumedPodDeletion(newPod)
 		}

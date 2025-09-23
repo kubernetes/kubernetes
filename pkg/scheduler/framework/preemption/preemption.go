@@ -197,6 +197,10 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPree
 				return err
 			}
 			logger.V(2).Info("Preemptor Pod preempted victim Pod", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
+
+			if err := ev.Handler.MarkPendingDeletion(victim); err != nil {
+				logger.Error(err, "Failed to mark victim pod as pending deletion", "victim", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
+			}
 		}
 
 		ev.Handler.EventRecorder().Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by pod %v on node %v", preemptor.UID, c.Name())
