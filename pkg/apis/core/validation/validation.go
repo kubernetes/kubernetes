@@ -1753,19 +1753,46 @@ func validatePVSecretReference(secretRef *core.SecretReference, fldPath *field.P
 	return allErrs
 }
 
-func ValidateCSIDriverName(driverName string, fldPath *field.Path) field.ErrorList {
+// ValidateCSIDriverNameOption is an option for ValidateCSIDriverName.
+// These options are for marking if a validation error message is covered
+// by declarative validation
+type ValidateCSIDriverNameOption int
+
+const (
+	// The required check is covered by declarative validation
+	RequiredCovered ValidateCSIDriverNameOption = iota
+	// The list size check is covered by declarative validation.
+	SizeCovered
+	// The format check is covered by declarative validation.
+	FormatCovered
+)
+
+func ValidateCSIDriverName(driverName string, fldPath *field.Path, opts ...ValidateCSIDriverNameOption) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(driverName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+		err := field.Required(fldPath, "")
+		if slices.Contains(opts, RequiredCovered) {
+			err = err.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
+		return allErrs
 	}
 
 	if len(driverName) > 63 {
-		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, 63))
+		err := field.TooLong(fldPath, "" /*unused*/, 63)
+		if slices.Contains(opts, SizeCovered) {
+			err = err.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
 	}
 
 	for _, msg := range validation.IsDNS1123Subdomain(strings.ToLower(driverName)) {
-		allErrs = append(allErrs, field.Invalid(fldPath, driverName, msg)).WithOrigin("format=k8s-long-name")
+		err := field.Invalid(fldPath, driverName, msg)
+		if slices.Contains(opts, FormatCovered) {
+			err = err.WithOrigin("format=k8s-long-name-caseless").MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
 	}
 
 	return allErrs
