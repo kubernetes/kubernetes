@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	draapi "k8s.io/dynamic-resource-allocation/api"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
 
@@ -51,20 +52,40 @@ func nodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 // Out-dated slices are silently ignored. Pools may be incomplete (not all
 // required slices available) or invalid (for example, device names not unique).
 // Both is recorded in the result.
-func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, features Features) ([]*Pool, error) {
-	pools := make(map[PoolID]*Pool)
+func GatherPools(ctx context.Context, logger klog.Logger, slices []*resourceapi.ResourceSlice, node *v1.Node, allocatedDeviceIDs sets.Set[DeviceID], features Features) ([]*Pool, error) {
+	pools := make(map[PoolID][]*draapi.ResourceSlice)
 	var slicesWithBindingConditions []*resourceapi.ResourceSlice
+	allocatedDevices := make(map[PoolID][]*resourceapi.Device)
 
 	for _, slice := range slices {
 		if !features.PartitionableDevices && slice.Spec.PerDeviceNodeSelection != nil {
 			continue
 		}
 
+		// Always add slices that contains SharedCounters since they aren't really associated with
+		// specified nodes.
+		if slice.Spec.SharedCounters != nil {
+			if err := addSlice(pools, slice); err != nil {
+				return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
+			}
+			continue
+		}
+
+		poolID := PoolID{Driver: draapi.MakeUniqueString(slice.Spec.Driver), Pool: draapi.MakeUniqueString(slice.Spec.Pool.Name)}
 		if nodeName, allNodes := ptr.Deref(slice.Spec.NodeName, ""), ptr.Deref(slice.Spec.AllNodes, false); nodeName != "" || allNodes || slice.Spec.NodeSelector != nil {
 			match, err := nodeMatches(node, nodeName, allNodes, slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
 			}
+
+			// We need all allocated devices to compute the available counters in a resource pool.
+			for i := range slice.Spec.Devices {
+				device := slice.Spec.Devices[i]
+				if allocatedDeviceIDs.Has(MakeDeviceID(slice.Spec.Driver, slice.Spec.Pool.Name, device.Name)) {
+					allocatedDevices[poolID] = append(allocatedDevices[poolID], &device)
+				}
+			}
+
 			if match {
 				if hasBindingConditions(slice) {
 					// If there is a Device in the ResourceSlice that contains BindingConditions,
@@ -78,8 +99,16 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 					return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
 				}
 			}
-		} else if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
-			for _, device := range slice.Spec.Devices {
+		}
+		if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
+			for i := range slice.Spec.Devices {
+				device := slice.Spec.Devices[i]
+
+				// We need all allocated devices to compute the available counters in a resource pool.
+				if allocatedDeviceIDs.Has(MakeDeviceID(slice.Spec.Driver, slice.Spec.Pool.Name, device.Name)) {
+					allocatedDevices[poolID] = append(allocatedDevices[poolID], &device)
+				}
+
 				match, err := nodeMatches(node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
 				if err != nil {
 					return nil, fmt.Errorf("failed to perform node selection for device %s in slice %s: %w",
@@ -120,9 +149,21 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	// Find incomplete pools and flatten into a single slice.
 	result := make([]*Pool, 0, len(pools))
 	var resultWithBindingConditions []*Pool
-	for _, pool := range pools {
-		pool.IsIncomplete = int64(len(pool.Slices)) != pool.Slices[0].Spec.Pool.ResourceSliceCount
-		pool.IsInvalid, pool.InvalidReason = poolIsInvalid(pool)
+	for id, slicesInPool := range pools {
+		// We don't allocate devices from incomplete pools.
+		poolIsIncomplete := poolIsIncomplete(slicesInPool)
+		if poolIsIncomplete {
+			logger.V(5).Info("reesource pool is incomplete", "pool", id)
+			// We don't want to validate incomplete pools, as any issues might
+			// just be because we are seeing an inconsistent view.
+			result = append(result, buildIncompletePool(id))
+			continue
+		}
+
+		pool, err := buildPool(id, slicesInPool, allocatedDevices)
+		if err != nil {
+			return nil, fmt.Errorf("pool %s is invalid: %w", id.Pool, err)
+		}
 		// if pool has binding conditions, add the pool to the end of the result
 		if poolHasBindingConditions(*pool) {
 			resultWithBindingConditions = append(resultWithBindingConditions, pool)
@@ -137,50 +178,38 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	return result, nil
 }
 
-func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) error {
+func addSlice(pools map[PoolID][]*draapi.ResourceSlice, s *resourceapi.ResourceSlice) error {
 	var slice draapi.ResourceSlice
 	if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(s, &slice, nil); err != nil {
 		return fmt.Errorf("convert ResourceSlice: %w", err)
 	}
 
 	id := PoolID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name}
-	pool := pools[id]
-	if pool == nil {
-		// New pool.
-		pool = &Pool{
-			PoolID: id,
-			Slices: []*draapi.ResourceSlice{&slice},
-		}
-		pools[id] = pool
+	slicesInPool, ok := pools[id]
+	if !ok || len(slicesInPool) == 0 {
+		pools[id] = []*draapi.ResourceSlice{&slice}
 		return nil
 	}
 
-	if slice.Spec.Pool.Generation < pool.Slices[0].Spec.Pool.Generation {
+	if slice.Spec.Pool.Generation < slicesInPool[0].Spec.Pool.Generation {
 		// Out-dated.
 		return nil
 	}
 
-	if slice.Spec.Pool.Generation > pool.Slices[0].Spec.Pool.Generation {
+	if slice.Spec.Pool.Generation > slicesInPool[0].Spec.Pool.Generation {
 		// Newer, replaces all old slices.
-		pool.Slices = nil
+		pools[id] = []*draapi.ResourceSlice{&slice}
+		return nil
 	}
 
 	// Add to pool.
-	pool.Slices = append(pool.Slices, &slice)
+	slicesInPool = append(slicesInPool, &slice)
+	pools[id] = slicesInPool
 	return nil
 }
 
-func poolIsInvalid(pool *Pool) (bool, string) {
-	devices := sets.New[draapi.UniqueString]()
-	for _, slice := range pool.Slices {
-		for _, device := range slice.Spec.Devices {
-			if devices.Has(device.Name) {
-				return true, fmt.Sprintf("duplicate device name %s", device.Name)
-			}
-			devices.Insert(device.Name)
-		}
-	}
-	return false, ""
+func poolIsIncomplete(slicesInPool []*draapi.ResourceSlice) bool {
+	return int64(len(slicesInPool)) < slicesInPool[0].Spec.Pool.ResourceSliceCount
 }
 
 func hasBindingConditions(slice *resourceapi.ResourceSlice) bool {
@@ -193,7 +222,7 @@ func hasBindingConditions(slice *resourceapi.ResourceSlice) bool {
 }
 
 func poolHasBindingConditions(pool Pool) bool {
-	for _, slice := range pool.Slices {
+	for _, slice := range pool.SlicesWithDevices {
 		for _, device := range slice.Spec.Devices {
 			if device.BindingConditions != nil {
 				return true
@@ -203,12 +232,74 @@ func poolHasBindingConditions(pool Pool) bool {
 	return false
 }
 
+func buildIncompletePool(id PoolID) *Pool {
+	return &Pool{
+		PoolID:     id,
+		Incomplete: true,
+	}
+}
+
+func buildPool(id PoolID, slices []*draapi.ResourceSlice, allocatedDevices map[PoolID][]*resourceapi.Device) (*Pool, error) {
+	// First collect all counter sets in the pool and put them into a map
+	// so we can do quick lookups.
+	counterSets := make(map[draapi.UniqueString]*draapi.CounterSet)
+	counterSetSlicesCount := 0
+	for _, slice := range slices {
+		if slice.Spec.SharedCounters != nil {
+			counterSetSlicesCount++
+		}
+		for i := range slice.Spec.SharedCounters {
+			counterSet := slice.Spec.SharedCounters[i]
+			if _, found := counterSets[counterSet.Name]; found {
+				return nil, fmt.Errorf("duplicate counter set name %s", counterSet.Name)
+			}
+			counterSets[counterSet.Name] = &counterSet
+		}
+	}
+
+	slicesWithDevices := make([]*draapi.ResourceSlice, 0, len(slices)-counterSetSlicesCount)
+	deviceNames := sets.New[draapi.UniqueString]()
+	for _, slice := range slices {
+		for i := range slice.Spec.Devices {
+			device := slice.Spec.Devices[i]
+
+			// Make sure we don't have duplicate device names
+			if deviceNames.Has(device.Name) {
+				return nil, fmt.Errorf("duplicate device name %s", device.Name)
+			}
+			deviceNames.Insert(device.Name)
+
+			// Make sure all consumed counters for the device references counter sets that exists and
+			// that they consume counters that exists within those counter sets.
+			for _, deviceCounterConsumption := range device.ConsumesCounters {
+				counterSet, found := counterSets[deviceCounterConsumption.CounterSet]
+				if !found {
+					return nil, fmt.Errorf("counter set %s not found", deviceCounterConsumption.CounterSet)
+				}
+
+				for counterName := range deviceCounterConsumption.Counters {
+					if _, found := counterSet.Counters[counterName]; !found {
+						return nil, fmt.Errorf("counter %s not found in counter set %s", counterName, counterSet.Name)
+					}
+				}
+			}
+		}
+		slicesWithDevices = append(slicesWithDevices, slice)
+	}
+	return &Pool{
+		PoolID:            id,
+		SlicesWithDevices: slicesWithDevices,
+		CounterSets:       counterSets,
+		AllocatedDevices:  allocatedDevices[id],
+	}, nil
+}
+
 type Pool struct {
 	PoolID
-	IsIncomplete  bool
-	IsInvalid     bool
-	InvalidReason string
-	Slices        []*draapi.ResourceSlice
+	Incomplete        bool
+	SlicesWithDevices []*draapi.ResourceSlice
+	CounterSets       map[draapi.UniqueString]*draapi.CounterSet
+	AllocatedDevices  []*resourceapi.Device
 }
 
 type PoolID struct {

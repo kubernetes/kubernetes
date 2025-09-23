@@ -151,7 +151,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 
 	alloc.logger.V(5).Info("Gathering pools", "slices", alloc.slices)
 	// First determine all eligible pools.
-	pools, err := GatherPools(ctx, alloc.slices, node, a.features)
+	pools, err := GatherPools(ctx, alloc.logger, alloc.slices, node, a.allocatedState.AllocatedDevices, a.features)
 	if err != nil {
 		return nil, fmt.Errorf("gather pool information: %w", err)
 	}
@@ -513,14 +513,10 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 		// has some matching device.
 		requestData.allDevices = make([]deviceWithID, 0, resourceapi.AllocationResultsMaxSize)
 		for _, pool := range pools {
-			if pool.IsIncomplete {
+			if pool.Incomplete {
 				return requestData, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently being updated", klog.KObj(claim), request.name(), pool.PoolID)
 			}
-			if pool.IsInvalid {
-				return requestData, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently invalid", klog.KObj(claim), request.name(), pool.PoolID)
-			}
-
-			for _, slice := range pool.Slices {
+			for _, slice := range pool.SlicesWithDevices {
 				for deviceIndex := range slice.Spec.Devices {
 					selectable, err := alloc.isSelectable(requestKey, requestData, slice, deviceIndex)
 					if err != nil {
@@ -650,6 +646,7 @@ type deviceWithID struct {
 	*draapi.Device
 	id    DeviceID
 	slice *draapi.ResourceSlice
+	pool  *Pool
 }
 
 type internalAllocationResult struct {
@@ -967,13 +964,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 
 	// We need to find suitable devices.
 	for _, pool := range alloc.pools {
-		// If the pool is not valid, then fail now. It's okay when pools of one driver
-		// are invalid if we allocate from some other pool, but it's not safe to
-		// allocated from an invalid pool.
-		if pool.IsInvalid {
-			return false, fmt.Errorf("pool %s is invalid: %s", pool.Pool, pool.InvalidReason)
-		}
-		for _, slice := range pool.Slices {
+		for _, slice := range pool.SlicesWithDevices {
 			for deviceIndex := range slice.Spec.Devices {
 				deviceID := DeviceID{Driver: pool.Driver, Pool: pool.Pool, Device: slice.Spec.Devices[deviceIndex].Name}
 
@@ -1016,6 +1007,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 					id:     deviceID,
 					Device: &slice.Spec.Devices[deviceIndex],
 					slice:  slice,
+					pool:   pool,
 				}
 				allocated, deallocate, err := alloc.allocateDevice(r, device, false)
 				if err != nil {
@@ -1359,13 +1351,15 @@ func taintTolerated(taint resourceapi.DeviceTaint, request requestAccessor) bool
 // Gets called only if the partitionable devices feature is enabled and the device
 // consumes counters.
 func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error) {
-	slice := device.slice
-	sliceName := slice.Name
+	// slice := device.slice
+	// sliceName := slice.Name
+	pool := device.pool
+	poolName := pool.PoolID.Pool.String()
 
 	// Check first if the available counters for this slice have already been
 	// calculated.
 	alloc.mutex.RLock()
-	availableCountersForSlice, found := alloc.availableCounters[sliceName]
+	availableCountersForPool, found := alloc.availableCounters[poolName]
 	alloc.mutex.RUnlock()
 	// If not, we need to do it now. But we store the result so it doesn't need
 	// to be calculated again.
@@ -1373,31 +1367,21 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	// might also do this work. But the input will be the same to all of them, so
 	// the result will also always be the same.
 	if !found {
-		availableCountersForSlice = make(counterSets, len(slice.Spec.SharedCounters))
-		for _, counterSet := range slice.Spec.SharedCounters {
+		availableCountersForPool = make(counterSets, len(pool.CounterSets))
+		for _, counterSet := range pool.CounterSets {
 			availableCountersForCounterSet := make(map[string]draapi.Counter, len(counterSet.Counters))
 			for name, c := range counterSet.Counters {
 				availableCountersForCounterSet[name] = c
 			}
-			availableCountersForSlice[counterSet.Name] = availableCountersForCounterSet
+			availableCountersForPool[counterSet.Name] = availableCountersForCounterSet
 		}
 
 		// Update the data structure to reflect counters already consumed by allocated devices. This
 		// only includes devices where the allocation process has completed, so this will never
 		// change during the allocation process.
-		for _, device := range slice.Spec.Devices {
-			deviceID := DeviceID{
-				Driver: slice.Spec.Driver,
-				Pool:   slice.Spec.Pool.Name,
-				Device: device.Name,
-			}
-			// Devices that aren't allocated doesn't consume any counters, so we don't
-			// need to consider them.
-			if !alloc.allocatedState.AllocatedDevices.Has(deviceID) {
-				continue
-			}
+		for _, device := range pool.AllocatedDevices {
 			for _, deviceCounterConsumption := range device.ConsumesCounters {
-				availableCountersForCounterSet := availableCountersForSlice[deviceCounterConsumption.CounterSet]
+				availableCountersForCounterSet := availableCountersForPool[draapi.MakeUniqueString(deviceCounterConsumption.CounterSet)]
 				for name, c := range deviceCounterConsumption.Counters {
 					existingCounter, ok := availableCountersForCounterSet[name]
 					if !ok {
@@ -1418,24 +1402,24 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		// Set the available counters on the allocator so we don't have to
 		// compute this again.
 		alloc.mutex.Lock()
-		alloc.availableCounters[sliceName] = availableCountersForSlice
+		alloc.availableCounters[poolName] = availableCountersForPool
 		alloc.mutex.Unlock()
 	}
 
 	// Update the consumedCounters data structure with the counters consumed
 	// by the current device.
-	consumedCountersForSlice, found := alloc.consumedCounters[sliceName]
+	consumedCountersForPool, found := alloc.consumedCounters[poolName]
 	// If no devices in the allocating state have consumed any counters from the current
 	// slice, initialize the data structure.
 	if !found {
-		consumedCountersForSlice = make(counterSets)
-		alloc.consumedCounters[sliceName] = consumedCountersForSlice
+		consumedCountersForPool = make(counterSets)
+		alloc.consumedCounters[poolName] = consumedCountersForPool
 	}
 	for _, deviceCounterConsumption := range device.ConsumesCounters {
-		consumedCountersForCounterSet, found := consumedCountersForSlice[deviceCounterConsumption.CounterSet]
+		consumedCountersForCounterSet, found := consumedCountersForPool[deviceCounterConsumption.CounterSet]
 		if !found {
 			consumedCountersForCounterSet = make(map[string]draapi.Counter)
-			consumedCountersForSlice[deviceCounterConsumption.CounterSet] = consumedCountersForCounterSet
+			consumedCountersForPool[deviceCounterConsumption.CounterSet] = consumedCountersForCounterSet
 		}
 		for name, c := range deviceCounterConsumption.Counters {
 			consumedCounters, found := consumedCountersForCounterSet[name]
@@ -1451,8 +1435,8 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	// Check that we didn't exceed the availability of any counters by allocating
 	// the current device. If we did, the current set of devices doesn't work, so we
 	// update the consumed counters to no longer reflect the current device.
-	for availableCounterSetName, availableCounters := range availableCountersForSlice {
-		consumedCounters := consumedCountersForSlice[availableCounterSetName]
+	for availableCounterSetName, availableCounters := range availableCountersForPool {
+		consumedCounters := consumedCountersForPool[availableCounterSetName]
 		for availableCounterName, availableCounter := range availableCounters {
 			consumedCounter := consumedCounters[availableCounterName]
 			if availableCounter.Value.Cmp(consumedCounter.Value) < 0 {
@@ -1480,10 +1464,9 @@ func (alloc *allocator) allocatingDeviceForClaim(deviceID DeviceID, claimIndex i
 // deallocateCountersForDevice subtracts the consumed counters of the provided
 // device from the consumedCounters data structure.
 func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
-	slice := device.slice
-	sliceName := slice.Name
+	poolName := device.pool.PoolID.Pool.String()
 
-	consumedCountersForSlice := alloc.consumedCounters[sliceName]
+	consumedCountersForSlice := alloc.consumedCounters[poolName]
 	for _, deviceCounterConsumption := range device.ConsumesCounters {
 		counterSetName := deviceCounterConsumption.CounterSet
 		consumedCounterSet := consumedCountersForSlice[counterSetName]
