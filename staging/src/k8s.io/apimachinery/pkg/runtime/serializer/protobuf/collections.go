@@ -21,8 +21,6 @@ import (
 	"io"
 	"math/bits"
 
-	"github.com/gogo/protobuf/proto"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -98,6 +96,10 @@ type streamingListData struct {
 	items      []runtime.Object
 }
 
+type sizer interface {
+	Size() int
+}
+
 // listSize return size of ListMeta and items to be later used for preallocations.
 // listMetaSize and itemSizes do not include header bytes (field identifier, size).
 func listSize(listMeta metav1.ListMeta, items []runtime.Object) (totalSize, listMetaSize int, itemSizes []int, err error) {
@@ -107,7 +109,7 @@ func listSize(listMeta metav1.ListMeta, items []runtime.Object) (totalSize, list
 	// Items
 	itemSizes = make([]int, len(items))
 	for i, item := range items {
-		sizer, ok := item.(proto.Sizer)
+		sizer, ok := item.(sizer)
 		if !ok {
 			return totalSize, listMetaSize, nil, errItemsSizer
 		}
