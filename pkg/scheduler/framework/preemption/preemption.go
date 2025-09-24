@@ -197,6 +197,10 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPree
 				return err
 			}
 			logger.V(2).Info("Preemptor Pod preempted victim Pod", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
+
+			if err := ev.Handler.MarkPendingDeletion(victim); err != nil {
+				logger.Error(err, "Failed to mark victim pod as pending deletion", "victim", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
+			}
 		}
 
 		ev.Handler.EventRecorder().Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by pod %v on node %v", preemptor.UID, c.Name())
@@ -437,7 +441,11 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	errCh := parallelize.NewErrorChannel()
 	fh.Parallelizer().Until(ctx, len(c.Victims().Pods), func(index int) {
 		victimPod := c.Victims().Pods[index]
-		if victimPod.DeletionTimestamp != nil {
+		pendingDeletion, err := ev.Handler.PendingDeletion(victimPod)
+		if err != nil {
+			logger.Error(err, "Failed to check if a victim is pending deletion", "preemptor", klog.KObj(pod), "victim", klog.KObj(victimPod))
+		}
+		if victimPod.DeletionTimestamp != nil || pendingDeletion {
 			// If the victim Pod is already being deleted, we don't have to make another deletion api call.
 			logger.V(2).Info("Victim Pod is already deleted, skipping the API call for it", "preemptor", klog.KObj(pod), "node", c.Name(), "victim", klog.KObj(victimPod))
 			return
@@ -507,7 +515,11 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 	logger := klog.FromContext(ctx)
 	victimPods := make([]*v1.Pod, 0, len(c.Victims().Pods))
 	for _, victim := range c.Victims().Pods {
-		if victim.DeletionTimestamp != nil {
+		pendingDeletion, err := ev.Handler.PendingDeletion(victim)
+		if err != nil {
+			logger.Error(err, "Failed to check if a victim is pending deletion", "preemptor", klog.KObj(pod), "victim", klog.KObj(victim))
+		}
+		if victim.DeletionTimestamp != nil || pendingDeletion {
 			// If the victim Pod is already being deleted, we don't have to make another deletion api call.
 			logger.V(2).Info("Victim Pod is already deleted, skipping the API call for it", "preemptor", klog.KObj(pod), "node", c.Name(), "victim", klog.KObj(victim))
 			continue

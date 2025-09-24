@@ -89,6 +89,7 @@ type frameworkImpl struct {
 	fwk.PodActivator
 	apiDispatcher *apidispatcher.APIDispatcher
 	apiCacher     fwk.APICacher
+	fwk.PendingDeletionChecker
 
 	parallelizer fwk.Parallelizer
 }
@@ -143,6 +144,7 @@ type frameworkOptions struct {
 	waitingPods            *waitingPodsMap
 	apiDispatcher          *apidispatcher.APIDispatcher
 	logger                 *klog.Logger
+	pendingDeletionChecker fwk.PendingDeletionChecker
 }
 
 // Option for the frameworkImpl.
@@ -234,6 +236,13 @@ func WithAPIDispatcher(apiDispatcher *apidispatcher.APIDispatcher) Option {
 	}
 }
 
+// WithPendingDeletionChecker sets pending deletion checker for the scheduling frameworkImpl.
+func WithPendingDeletionChecker(pendingDeletionChecker fwk.PendingDeletionChecker) Option {
+	return func(o *frameworkOptions) {
+		o.pendingDeletionChecker = pendingDeletionChecker
+	}
+}
+
 // CaptureProfile is a callback to capture a finalized profile.
 type CaptureProfile func(config.KubeSchedulerProfile)
 
@@ -287,22 +296,23 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		logger = *options.logger
 	}
 	f := &frameworkImpl{
-		registry:             r,
-		snapshotSharedLister: options.snapshotSharedLister,
-		scorePluginWeight:    make(map[string]int),
-		waitingPods:          options.waitingPods,
-		clientSet:            options.clientSet,
-		kubeConfig:           options.kubeConfig,
-		eventRecorder:        options.eventRecorder,
-		informerFactory:      options.informerFactory,
-		sharedDRAManager:     options.sharedDRAManager,
-		metricsRecorder:      options.metricsRecorder,
-		extenders:            options.extenders,
-		PodNominator:         options.podNominator,
-		PodActivator:         options.podActivator,
-		apiDispatcher:        options.apiDispatcher,
-		parallelizer:         options.parallelizer,
-		logger:               logger,
+		registry:               r,
+		snapshotSharedLister:   options.snapshotSharedLister,
+		scorePluginWeight:      make(map[string]int),
+		waitingPods:            options.waitingPods,
+		clientSet:              options.clientSet,
+		kubeConfig:             options.kubeConfig,
+		eventRecorder:          options.eventRecorder,
+		informerFactory:        options.informerFactory,
+		sharedDRAManager:       options.sharedDRAManager,
+		metricsRecorder:        options.metricsRecorder,
+		extenders:              options.extenders,
+		PodNominator:           options.podNominator,
+		PodActivator:           options.podActivator,
+		apiDispatcher:          options.apiDispatcher,
+		parallelizer:           options.parallelizer,
+		PendingDeletionChecker: options.pendingDeletionChecker,
+		logger:                 logger,
 	}
 
 	if len(f.extenders) > 0 {

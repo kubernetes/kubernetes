@@ -439,6 +439,7 @@ func TestPostFilter(t *testing.T) {
 					apiDispatcher.Run(logger)
 					defer apiDispatcher.Close()
 				}
+				cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
 
 				f, err := tf.NewFramework(ctx, registeredPlugins, "",
 					frameworkruntime.WithClientSet(cs),
@@ -450,12 +451,12 @@ func TestPostFilter(t *testing.T) {
 					frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
 					frameworkruntime.WithLogger(logger),
 					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+					frameworkruntime.WithPendingDeletionChecker(cache),
 				)
 				if err != nil {
 					t.Fatal(err)
 				}
 				if asyncAPICallsEnabled {
-					cache := internalcache.New(ctx, 100*time.Millisecond, apiDispatcher)
 					f.SetAPICacher(apicache.New(nil, cache))
 				}
 
@@ -2219,6 +2220,7 @@ func TestPreempt(t *testing.T) {
 						frameworkruntime.WithWaitingPods(waitingPods),
 						frameworkruntime.WithLogger(logger),
 						frameworkruntime.WithPodActivator(&fakePodActivator{}),
+						frameworkruntime.WithPendingDeletionChecker(cache),
 					)
 					if err != nil {
 						t.Fatal(err)
