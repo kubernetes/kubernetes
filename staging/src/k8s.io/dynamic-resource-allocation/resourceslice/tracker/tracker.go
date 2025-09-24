@@ -628,7 +628,9 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, isSliceChange bool
 		for i := range patchedSlice.Spec.Devices {
 			oldDevice := oldPatchedSlice.Spec.Devices[i]
 			newDevice := patchedSlice.Spec.Devices[i]
-			if !slices.EqualFunc(oldDevice.Taints, newDevice.Taints, taintsEqual) {
+			if !slices.EqualFunc(oldDevice.Taints, newDevice.Taints, func(a, b draapi.TrackedDeviceTaint) bool {
+				return taintsEqual(a.DeviceTaint, b.DeviceTaint)
+			}) {
 				changed = true
 				break
 			}
@@ -669,7 +671,10 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *draapi.ResourceSlice,
 					if patchedSlice == slice {
 						patchedSlice = slice.DeepCopy()
 					}
-					patchedSlice.Spec.Devices[i].Taints = append(patchedSlice.Spec.Devices[i].Taints, taint.Taint)
+					patchedSlice.Spec.Devices[i].Taints = append(patchedSlice.Spec.Devices[i].Taints, draapi.TrackedDeviceTaint{
+						// TODO
+						DeviceTaint: taint.Taint,
+					})
 
 					// There can be no further device with the same name.
 					break
@@ -786,19 +791,22 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *draapi.ResourceSlice,
 
 			logger.V(6).Info("applying matching DeviceTaintRule")
 
-			// TODO: remove conversion once taint is already in the right API package.
-			ta := resourceapi.DeviceTaint{
-				Key:       taintRule.Spec.Taint.Key,
-				Value:     taintRule.Spec.Taint.Value,
-				Effect:    resourceapi.DeviceTaintEffect(taintRule.Spec.Taint.Effect),
-				TimeAdded: taintRule.Spec.Taint.TimeAdded,
+			taint := draapi.TrackedDeviceTaint{
+				// TODO
+				// TODO: remove conversion once taint is already in the right API package.
+				DeviceTaint: resourceapi.DeviceTaint{
+					Key:       taintRule.Spec.Taint.Key,
+					Value:     taintRule.Spec.Taint.Value,
+					Effect:    resourceapi.DeviceTaintEffect(taintRule.Spec.Taint.Effect),
+					TimeAdded: taintRule.Spec.Taint.TimeAdded,
+				},
 			}
 
 			if patchedSlice == slice {
 				patchedSlice = slice.DeepCopy()
 			}
 
-			patchedSlice.Spec.Devices[dIndex].Taints = append(patchedSlice.Spec.Devices[dIndex].Taints, ta)
+			patchedSlice.Spec.Devices[dIndex].Taints = append(patchedSlice.Spec.Devices[dIndex].Taints, taint)
 		}
 	}
 

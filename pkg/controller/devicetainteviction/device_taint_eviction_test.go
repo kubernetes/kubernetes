@@ -239,7 +239,7 @@ var (
 	}()
 	sliceTainted = func() *draapi.ResourceSlice {
 		slice := slice.DeepCopy()
-		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, Value: taintValue, TimeAdded: &taintTime}}
+		slice.Spec.Devices[0].Taints = []draapi.TrackedDeviceTaint{{DeviceTaint: resourceapi.DeviceTaint{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, Value: taintValue, TimeAdded: &taintTime}}}
 		return slice
 	}()
 	sliceTaintedExtended = func() *draapi.ResourceSlice {
@@ -277,9 +277,9 @@ var (
 	}()
 	sliceTaintedTwice = func() *draapi.ResourceSlice {
 		slice := slice.DeepCopy()
-		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{
-			{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: &taintTime},
-			{Key: taintKey + "-other", Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: &taintTime},
+		slice.Spec.Devices[0].Taints = []draapi.TrackedDeviceTaint{
+			{DeviceTaint: resourceapi.DeviceTaint{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: &taintTime}},
+			{DeviceTaint: resourceapi.DeviceTaint{Key: taintKey + "-other", Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: &taintTime}},
 		}
 		return slice
 	}()
@@ -473,7 +473,7 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 			},
 		},
 		"evict-pod-resourceclaim": {
@@ -485,7 +485,7 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
 			},
 		},
@@ -493,7 +493,7 @@ func TestHandlers(t *testing.T) {
 			initialState: state{
 				pods:            []*v1.Pod{podWithClaimName},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
 			},
 			events: []any{
@@ -501,7 +501,7 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
 			},
 			// It is debatable whether the controller should react
@@ -518,7 +518,7 @@ func TestHandlers(t *testing.T) {
 			initialState: state{
 				pods:            []*v1.Pod{unscheduledPodWithClaimName},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 			},
 			events: []any{
 				// Normally the scheduler shouldn't schedule when there is a taint,
@@ -527,7 +527,7 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
 			},
 		},
@@ -535,7 +535,7 @@ func TestHandlers(t *testing.T) {
 			initialState: state{
 				pods:            []*v1.Pod{podWithClaimName},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
 			},
 			events: []any{
@@ -545,7 +545,7 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTaintedExtended, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTaintedExtended.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
 			},
 		},
@@ -558,7 +558,7 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
 			},
 		},
@@ -571,7 +571,7 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimWithToleration, evictionTime: &metav1.Time{Time: taintTime.Add(tolerationDuration)}}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimWithToleration, evictionTime: &metav1.Time{Time: taintTime.Add(tolerationDuration)}, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time.Add(tolerationDuration)}},
 			},
 		},
@@ -628,7 +628,7 @@ func TestHandlers(t *testing.T) {
 						},
 					}
 					return claim
-				}(), evictionTime: &metav1.Time{Time: taintTime.Add(30 * time.Second)}}},
+				}(), evictionTime: &metav1.Time{Time: taintTime.Add(30 * time.Second)}, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting: []evictAt{{newObject(podWithClaimName), taintTime.Time.Add(30 * time.Second)}},
 			},
 		},
@@ -661,7 +661,7 @@ func TestHandlers(t *testing.T) {
 						TolerationSeconds: ptr.To(int64(60)),
 					}}
 					return claim
-				}(), evictionTime: &metav1.Time{Time: taintTime.Time}}},
+				}(), evictionTime: &metav1.Time{Time: taintTime.Time}, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting: []evictAt{{newObject(podWithClaimName), taintTime.Time}},
 			},
 		},
@@ -756,7 +756,7 @@ func TestHandlers(t *testing.T) {
 						Effect:   resourceapi.DeviceTaintEffectNoExecute,
 					}}
 					return claim
-				}(), evictionTime: &taintTime}},
+				}(), evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTaintedTwice.Spec.Devices[0].Taints[1]}}},
 				evicting: []evictAt{{newObject(podWithClaimName), taintTime.Time}},
 			},
 		},
@@ -803,7 +803,7 @@ func TestHandlers(t *testing.T) {
 						},
 					}
 					return claim
-				}(), evictionTime: &metav1.Time{Time: taintTime.Add(30 * time.Second)}}},
+				}(), evictionTime: &metav1.Time{Time: taintTime.Add(30 * time.Second)}, taints: []*draapi.TrackedDeviceTaint{&sliceTaintedTwice.Spec.Devices[0].Taints[0], &sliceTaintedTwice.Spec.Devices[0].Taints[1]}}},
 				evicting: []evictAt{{newObject(podWithClaimName), taintTime.Time.Add(30 * time.Second)}},
 			},
 		},
@@ -820,7 +820,7 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 			},
 		},
 		"no-evict-no-taint": {
@@ -857,7 +857,7 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 			},
 		},
 		"no-evict-pod-resourceclaimtemplate-no-claim": {
@@ -871,7 +871,7 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 			},
 		},
 		"no-evict-other-device": {
@@ -895,21 +895,21 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 			},
 		},
 		"evict-wrong-pod-replaced": {
 			initialState: state{
 				pods:            []*v1.Pod{podWithClaimNameOther},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 			},
 			events: []any{
 				[]any{remove(podWithClaimNameOther), add(podWithClaimName)},
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
 			},
 		},
@@ -917,7 +917,7 @@ func TestHandlers(t *testing.T) {
 			initialState: state{
 				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
 			},
 			events: []any{
@@ -933,7 +933,7 @@ func TestHandlers(t *testing.T) {
 			initialState: state{
 				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
 			},
 			events: []any{
@@ -960,7 +960,7 @@ func TestHandlers(t *testing.T) {
 			initialState: state{
 				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimWithToleration, evictionTime: &metav1.Time{Time: taintTime.Add(tolerationDuration)}}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimWithToleration, evictionTime: &metav1.Time{Time: taintTime.Add(tolerationDuration)}, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time.Add(tolerationDuration)}},
 			},
 			events: []any{
@@ -969,7 +969,7 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTaintedValueOther, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimWithToleration, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimWithToleration, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTaintedValueOther.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
 			},
 		},
@@ -977,7 +977,7 @@ func TestHandlers(t *testing.T) {
 			initialState: state{
 				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
 			},
 			events: []any{
@@ -995,7 +995,7 @@ func TestHandlers(t *testing.T) {
 			initialState: state{
 				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
 			},
 			events: []any{
@@ -1019,7 +1019,7 @@ func TestHandlers(t *testing.T) {
 						TolerationSeconds: ptr.To(int64(60)),
 					}}
 					return claim
-				}(), evictionTime: &metav1.Time{Time: taintTime.Add(60 * time.Second)}}},
+				}(), evictionTime: &metav1.Time{Time: taintTime.Add(60 * time.Second)}, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting: []evictAt{{newObject(podWithClaimName), taintTime.Time.Add(60 * time.Second)}},
 			},
 			events: []any{
@@ -1035,7 +1035,7 @@ func TestHandlers(t *testing.T) {
 						TolerationSeconds: ptr.To(int64(60)),
 					}}
 					return claim
-				}(), evictionTime: &metav1.Time{Time: taintTime.Add(60 * time.Second)}}},
+				}(), evictionTime: &metav1.Time{Time: taintTime.Add(60 * time.Second)}, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 			},
 		},
 		"no-evict-wrong-resourceclaim": {
@@ -1047,21 +1047,21 @@ func TestHandlers(t *testing.T) {
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimOld, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimOld, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 			},
 		},
 		"evict-wrong-resourceclaim-replaced": {
 			initialState: state{
 				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimOld, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaimOld, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 			},
 			events: []any{
 				update(inUseClaimOld, inUseClaim),
 			},
 			finalState: state{
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
 			},
 		},
@@ -1069,7 +1069,7 @@ func TestHandlers(t *testing.T) {
 			initialState: state{
 				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
 			},
 			events: []any{
@@ -1094,7 +1094,7 @@ func TestHandlers(t *testing.T) {
 			initialState: state{
 				pods:            []*v1.Pod{podWithClaimTemplateInStatus},
 				slices:          []*draapi.ResourceSlice{sliceTainted, slice2},
-				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime, taints: []*draapi.TrackedDeviceTaint{&sliceTainted.Spec.Devices[0].Taints[0]}}},
 				evicting:        []evictAt{{newObject(podWithClaimTemplateInStatus), taintTime.Time}},
 			},
 			events: []any{

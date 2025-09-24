@@ -222,7 +222,9 @@ var (
 		return device
 	}
 	deviceWithTaints = func(device draapi.SliceDevice, taints []resourceapi.DeviceTaint) draapi.SliceDevice {
-		device.Taints = taints
+		for _, taint := range taints {
+			device.Taints = append(device.Taints, draapi.TrackedDeviceTaint{DeviceTaint: taint})
+		}
 		return device
 	}
 	emptyDevice = draapi.SliceDevice{}
@@ -282,7 +284,7 @@ var (
 			for _, taint := range device.Taints {
 				slice.Spec.Taints = append(slice.Spec.Taints, draapi.SliceDeviceTaint{
 					Device: device.Name,
-					Taint:  taint,
+					Taint:  taint.DeviceTaint,
 				})
 			}
 		}
