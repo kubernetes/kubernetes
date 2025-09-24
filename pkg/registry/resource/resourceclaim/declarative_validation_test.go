@@ -549,14 +549,6 @@ func tweakStatusDevices(devices ...resource.AllocatedDeviceStatus) func(rc *reso
 	}
 }
 
-func tweakStatusDeviceRequestAllocationResultPool(pool string) func(rc *resource.ResourceClaim) {
-	return func(rc *resource.ResourceClaim) {
-		for i := range rc.Status.Allocation.Devices.Results {
-			rc.Status.Allocation.Devices.Results[i].Pool = pool
-		}
-	}
-}
-
 func tweakStatusDeviceRequestAllocationResultShareID(shareID types.UID) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		for i := range rc.Status.Allocation.Devices.Results {
