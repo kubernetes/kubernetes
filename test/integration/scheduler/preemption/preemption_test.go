@@ -1383,8 +1383,8 @@ func TestAsyncPreemptionBind(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Error registering a filter: %v", err)
 				}
-				var bindPlugin = FakeBindPluginLongBind{name: "fakeBindPluginLongBind", bindingDuration: 1 * time.Minute, nameOfPodToHold: "pod-blocked-in-binding1"}
-				err = registry.Register(bindPlugin.name, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+				err = registry.Register("fakeBindPluginLongBind", func(c context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+					var bindPlugin = FakeBindPluginLongBind{name: "fakeBindPluginLongBind", bindingDuration: 1 * time.Minute, nameOfPodToHold: "pod-blocked-in-binding1"}
 					return &bindPlugin, nil
 				})
 				if err != nil {
@@ -1536,6 +1536,10 @@ type FakeBindPluginLongBind struct {
 	bindingDuration time.Duration // 5 * time.Second
 	nameOfPodToHold string
 }
+
+func NewFakeBindPluginLongBind(name string, bindingDuration time.Duration, podToHold string) *FakeBindPluginLongBind {
+	return &FakeBindPluginLongBind{name, bindingDuration, podToHold}
+} //var bindPlugin = FakeBindPluginLongBind{name: "fakeBindPluginLongBind", bindingDuration: 1 * time.Minute, nameOfPodToHold: "pod-blocked-in-binding1"})
 
 func (bp *FakeBindPluginLongBind) Name() string {
 	return bp.name
