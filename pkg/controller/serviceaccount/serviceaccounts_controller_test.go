@@ -21,13 +21,14 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestServiceAccountCreation(t *testing.T) {
@@ -161,7 +162,9 @@ func TestServiceAccountCreation(t *testing.T) {
 		}
 		saInformer := informers.Core().V1().ServiceAccounts()
 		nsInformer := informers.Core().V1().Namespaces()
+		logger, ctx := ktesting.NewTestContext(t)
 		controller, err := NewServiceAccountsController(
+			logger,
 			saInformer,
 			nsInformer,
 			client,
@@ -188,7 +191,7 @@ func TestServiceAccountCreation(t *testing.T) {
 		}
 		stopCh := make(chan struct{})
 		defer close(stopCh)
-		go controller.Run(context.TODO(), 1)
+		go controller.Run(ctx, 1)
 
 		if tc.ExistingNamespace != nil {
 			nsStore.Add(tc.ExistingNamespace)
@@ -206,7 +209,7 @@ func TestServiceAccountCreation(t *testing.T) {
 			controller.namespaceUpdated(nil, tc.UpdatedNamespace)
 		}
 		if tc.DeletedServiceAccount != nil {
-			controller.serviceAccountDeleted(tc.DeletedServiceAccount)
+			controller.serviceAccountDeleted(logger, tc.DeletedServiceAccount)
 		}
 
 		// wait to be called
