@@ -874,7 +874,7 @@ func TestNodeRestrictionServiceAccountAudience(t *testing.T) {
 
 	ctx := testContext(t)
 
-	kcm := kubecontrollermanagertesting.StartTestServerOrDie(ctx, []string{
+	kcm := kubecontrollermanagertesting.StartTestServerOrDie(t, ctx, []string{
 		"--kubeconfig=" + kubeConfigFile,
 		"--controllers=ephemeral-volume-controller", // we need this controller to test the ephemeral volume source in the pod
 		"--leader-elect=false",                      // KCM leader election calls os.Exit when it ends, so it is easier to just turn it off altogether
