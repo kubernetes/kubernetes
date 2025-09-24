@@ -29,21 +29,21 @@ var localSchemeBuilder = testscheme.New()
 // +k8s:validation:Required
 type MyObject struct {
 	TypeMeta int
-	// +k8s:Optional
+	// +k8s:optional
 	// +k8s:format=k8s-uuid
 	// +k8s:declarativeValidationNative
 	UUIDField string `json:"uuidField"`
 
-	// +k8s:Optional
+	// +k8s:optional
 	// +k8s:format=k8s-uuid
 	UUIDFieldWithoutDV string `json:"uuidFieldWithoutDV"`
 
-	// +k8s:Optional
+	// +k8s:optional
 	// +k8s:format=k8s-uuid
 	// +k8s:declarativeValidationNative
 	UUIDPtrField *string `json:"uuidPtrField"`
 
-	// +k8s:Optional
+	// +k8s:optional
 	// +k8s:format=k8s-uuid
 	UUIDPtrFieldWithoutDV *string `json:"uuidPtrFieldWithoutDV"`
 
@@ -93,12 +93,12 @@ type MyObject struct {
 
 	NestedStableWithoutDV NestedStableType `json:"nestedStableWithoutDV"`
 
-	// +k8s:Optional
+	// +k8s:optional
 	// +k8s:format=k8s-ip
 	// +k8s:declarativeValidationNative
 	IPAddress string `json:"ipAddress"`
 
-	// +k8s:Optional
+	// +k8s:optional
 	// +k8s:format=k8s-ip
 	IPAddressWithoutDV string `json:"ipAddressWithoutDV"`
 }
