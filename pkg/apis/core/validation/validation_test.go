@@ -26082,7 +26082,7 @@ func TestValidatePodHostName(t *testing.T) {
 				HostnameOverride: ptr.To(""),
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.hostnameOverride"), "", dnsSubdomainLabelErrMsg).WithOrigin("format=k8s-qualified-name"),
+				field.Invalid(field.NewPath("spec.hostnameOverride"), nil, "").WithOrigin("format=k8s-long-name"),
 			},
 		},
 		{
@@ -26121,7 +26121,7 @@ func TestValidatePodHostName(t *testing.T) {
 				HostnameOverride: ptr.To("Not-RFC1123"),
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.hostnameOverride"), "Not-RFC1123", dnsSubdomainLabelErrMsg).WithOrigin("format=k8s-qualified-name"),
+				field.Invalid(field.NewPath("spec.hostnameOverride"), nil, "").WithOrigin("format=k8s-long-name"),
 			},
 		},
 		{
