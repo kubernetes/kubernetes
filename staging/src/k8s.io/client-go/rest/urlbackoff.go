@@ -136,17 +136,17 @@ func (b *URLBackoff) UpdateBackoffWithContext(ctx context.Context, actualURL *ur
 // CalculateBackoff takes a url and back's off exponentially,
 // based on its knowledge of existing failures.
 func (b *URLBackoff) CalculateBackoff(actualURL *url.URL) time.Duration {
-	return b.CalculateBackoffWithContext(context.Background(), actualURL)
+	return b.Backoff.Get(b.baseUrlKey(actualURL))
 }
 
 // CalculateBackoffWithContext takes a url and back's off exponentially,
 // based on its knowledge of existing failures.
-func (b *URLBackoff) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
-	return b.Backoff.Get(b.baseUrlKey(actualURL))
+func (b *URLBackoff) CalculateBackoffWithContext(_ context.Context, actualURL *url.URL) time.Duration {
+	return b.CalculateBackoff(actualURL)
 }
 
 func (b *URLBackoff) Sleep(d time.Duration) {
-	b.SleepWithContext(context.Background(), d)
+	b.Backoff.Clock.Sleep(d)
 }
 
 func (b *URLBackoff) SleepWithContext(ctx context.Context, d time.Duration) {
