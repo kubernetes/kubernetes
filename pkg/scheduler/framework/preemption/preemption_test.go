@@ -30,8 +30,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -421,10 +419,13 @@ func TestPrepareCandidate(t *testing.T) {
 			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 			Obj()
 
+<<<<<<< HEAD
 		notFoundVictim1 = st.MakePod().Name("not-found-victim").UID("victim1").
 				Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
+=======
+>>>>>>> parent of 5be5fd02292 (Merge pull request #133167 from sanposhiho/preemption-conor-case)
 		failVictim = st.MakePod().Name("fail-victim").UID("victim1").
 				Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
@@ -456,12 +457,6 @@ func TestPrepareCandidate(t *testing.T) {
 		errPatchStatusFailed = errors.New("patch pod status failed")
 	)
 
-	victimWithDeletionTimestamp := victim1.DeepCopy()
-	victimWithDeletionTimestamp.Name = "victim1-with-deletion-timestamp"
-	victimWithDeletionTimestamp.UID = "victim1-with-deletion-timestamp"
-	victimWithDeletionTimestamp.DeletionTimestamp = &metav1.Time{Time: time.Now().Add(-100 * time.Second)}
-	victimWithDeletionTimestamp.Finalizers = []string{"test"}
-
 	tests := []struct {
 		name      string
 		nodeNames []string
@@ -490,8 +485,9 @@ func TestPrepareCandidate(t *testing.T) {
 			testPods: []*v1.Pod{
 				victim1,
 			},
-			nodeNames:      []string{node1Name},
-			expectedStatus: nil,
+			nodeNames:             []string{node1Name},
+			expectedStatus:        nil,
+			expectedPreemptingMap: sets.New(types.UID("preemptor")),
 		},
 		{
 			name: "one victim without condition",
@@ -511,42 +507,6 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
-			expectedPreemptingMap: sets.New(types.UID("preemptor")),
-		},
-		{
-			name: "one victim, but victim is already being deleted",
-
-			candidate: &fakeCandidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						victimWithDeletionTimestamp,
-					},
-				},
-			},
-			preemptor: preemptor,
-			testPods: []*v1.Pod{
-				victimWithDeletionTimestamp,
-			},
-			nodeNames:      []string{node1Name},
-			expectedStatus: nil,
-		},
-		{
-			name: "one victim, but victim is already deleted",
-
-			candidate: &fakeCandidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						notFoundVictim1,
-					},
-				},
-			},
-			preemptor:             preemptor,
-			testPods:              []*v1.Pod{},
-			nodeNames:             []string{node1Name},
-			expectedStatus:        nil,
-			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
 		},
 		{
@@ -686,28 +646,64 @@ func TestPrepareCandidate(t *testing.T) {
 					for i, nodeName := range tt.nodeNames {
 						nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
 					}
-					registeredPlugins := append([]tf.RegisterPluginFunc{
-						tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
-						tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-					)
-					var objs []runtime.Object
-					for _, pod := range tt.testPods {
-						objs = append(objs, pod)
-					}
 
 					mu := &sync.RWMutex{}
 					deletedPods := sets.New[string]()
 					deletionFailure := false // whether any request to delete pod failed
 					patchFailure := false    // whether any request to patch pod status failed
 
-					cs := clientsetfake.NewClientset(objs...)
-					cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-						mu.Lock()
-						defer mu.Unlock()
-						name := action.(clienttesting.DeleteAction).GetName()
-						if name == "fail-victim" {
-							deletionFailure = true
-							return true, nil, errDeletePodFailed
+				cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
+				fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod), mu: mu}
+
+				// Note: NominatedPodsForNode is called at the beginning of the goroutine in any case.
+				// fakePodNominator can delay the response of NominatedPodsForNode until the channel is closed,
+				// which allows us to test the preempting map before the goroutine does nothing yet.
+				requestStopper := make(chan struct{})
+				nominator := &fakePodNominator{
+					SchedulingQueue: internalqueue.NewSchedulingQueue(nil, informerFactory),
+					requestStopper:  requestStopper,
+				}
+				fwk, err := tf.NewFramework(
+					ctx,
+					registeredPlugins, "",
+					frameworkruntime.WithClientSet(cs),
+					frameworkruntime.WithLogger(logger),
+					frameworkruntime.WithInformerFactory(informerFactory),
+					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+					frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.testPods, nodes)),
+					frameworkruntime.WithPodNominator(nominator),
+					frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
+					frameworkruntime.WithPodActivator(fakeActivator),
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				informerFactory.Start(ctx.Done())
+				informerFactory.WaitForCacheSync(ctx.Done())
+				fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
+				pe := NewEvaluator("FakePreemptionScorePostFilter", fwk, fakePreemptionScorePostFilterPlugin, asyncPreemptionEnabled)
+
+				if asyncPreemptionEnabled {
+					pe.prepareCandidateAsync(tt.candidate, tt.preemptor, "test-plugin")
+					pe.mu.Lock()
+					// The preempting map should be registered synchronously
+					// so we don't need wait.Poll.
+					if !tt.expectedPreemptingMap.Equal(pe.preempting) {
+						t.Errorf("expected preempting map %v, got %v", tt.expectedPreemptingMap, pe.preempting)
+						close(requestStopper)
+						pe.mu.Unlock()
+						return
+					}
+					pe.mu.Unlock()
+					// make the requests complete
+					close(requestStopper)
+				} else {
+					close(requestStopper) // no need to stop requests
+					status := pe.prepareCandidate(ctx, tt.candidate, tt.preemptor, "test-plugin")
+					if tt.expectedStatus == nil {
+						if status != nil {
+							t.Errorf("expect nil status, but got %v", status)
 						}
 						// fake clientset does not return an error for not-found pods, so we simulate it here.
 						if name == "not-found-victim" {
@@ -718,7 +714,6 @@ func TestPrepareCandidate(t *testing.T) {
 						deletedPods.Insert(name)
 						return true, nil, nil
 					})
-
 					cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 						mu.Lock()
 						defer mu.Unlock()
@@ -871,8 +866,25 @@ func TestPrepareCandidate(t *testing.T) {
 					}); err != nil {
 						t.Fatal(lastErrMsg)
 					}
-				})
-			}
+
+					found := false
+					for _, podName := range tt.expectedDeletedPod {
+						if deletedPods.Has(podName) ||
+							// If podName is empty, we expect no pod to be deleted.
+							(deletedPods.Len() == 0 && podName == "") {
+							found = true
+						}
+					}
+					if !found {
+						lastErrMsg = fmt.Sprintf("expected pod %v to be deleted, but %v is deleted", strings.Join(tt.expectedDeletedPod, " or "), deletedPods.UnsortedList())
+						return false, nil
+					}
+
+					return true, nil
+				}); err != nil {
+					t.Fatal(lastErrMsg)
+				}
+			})
 		}
 	}
 }
