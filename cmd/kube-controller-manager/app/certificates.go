@@ -33,6 +33,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
+	"k8s.io/kubernetes/openshift-kube-controller-manager/servicecacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	ctbpublisher "k8s.io/kubernetes/pkg/controller/certificates/clustertrustbundlepublisher"
@@ -385,4 +386,26 @@ func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte
 	}
 	return rootCA, nil
 
+}
+
+func newServiceCACertPublisherControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:        names.ServiceCACertificatePublisherController,
+		aliases:     []string{"service-ca-cert-publisher"},
+		constructor: newServiceCACertPublisherController,
+	}
+}
+
+func newServiceCACertPublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	sac, err := servicecacertpublisher.NewPublisher(
+		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
+		controllerContext.InformerFactory.Core().V1().Namespaces(),
+		controllerContext.ClientBuilder.ClientOrDie("service-ca-cert-publisher"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating service CA certificate publisher: %w", err)
+	}
+	return newControllerLoop(func(ctx context.Context) {
+		sac.Run(ctx, 1)
+	}, controllerName), nil
 }
