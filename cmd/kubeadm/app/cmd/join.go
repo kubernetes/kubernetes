@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -636,9 +637,9 @@ func (j *joinData) WaitControlPlaneClient() (clientset.Interface, error) {
 		return nil, err
 	}
 	for _, v := range config.Clusters {
-		v.Server = fmt.Sprintf("https://%s:%d",
+		v.Server = net.JoinHostPort(
 			j.Cfg().ControlPlane.LocalAPIEndpoint.AdvertiseAddress,
-			j.Cfg().ControlPlane.LocalAPIEndpoint.BindPort)
+			fmt.Sprintf("%d", j.Cfg().ControlPlane.LocalAPIEndpoint.BindPort))
 	}
 	client, err := kubeconfigutil.ToClientSet(config)
 	if err != nil {
