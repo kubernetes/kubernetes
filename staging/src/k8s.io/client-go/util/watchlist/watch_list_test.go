@@ -27,6 +27,52 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+type supportsWLS struct{}
+
+func (supportsWLS) IsWatchListSemanticsUnSupported() bool { return false }
+
+type doesNotSupportWLS struct{}
+
+func (doesNotSupportWLS) IsWatchListSemanticsUnSupported() bool { return true }
+
+func TestDoesClientNotSupportWatchListSemantics(t *testing.T) {
+	scenarios := []struct {
+		name                                string
+		client                              any
+		expectUnSupportedWatchListSemantics bool
+	}{
+		{
+			name:                                "client implements the unSupportedWatchListSemantics interface and returns false",
+			client:                              supportsWLS{},
+			expectUnSupportedWatchListSemantics: false,
+		},
+		{
+			name:                                "client implements the unSupportedWatchListSemantics interface and returns true",
+			client:                              doesNotSupportWLS{},
+			expectUnSupportedWatchListSemantics: true,
+		},
+		{
+			name:                                "client does not implement the unSupportedWatchListSemantics interface",
+			client:                              struct{}{},
+			expectUnSupportedWatchListSemantics: false,
+		},
+		{
+			name:                                "nil client",
+			client:                              nil,
+			expectUnSupportedWatchListSemantics: false,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			got := DoesClientNotSupportWatchListSemantics(scenario.client)
+			if got != scenario.expectUnSupportedWatchListSemantics {
+				t.Errorf("DoesClientNotSupportWatchListSemantics returned: %v, want: %v", got, scenario.expectUnSupportedWatchListSemantics)
+			}
+		})
+	}
+}
+
 // TestPrepareWatchListOptionsFromListOptions test the following cases:
 //
 // +--------------------------+-----------------+---------+-----------------+
