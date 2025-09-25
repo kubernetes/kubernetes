@@ -72,3 +72,41 @@ func TestGetReferenceRefVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestGetReferenceNilScheme(t *testing.T) {
+	input := &TestRuntimeObj{
+		ObjectMeta: metav1.ObjectMeta{},
+	}
+	_, err := GetReference(nil, input)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if err.Error() != "scheme is required to look up gvk" {
+		t.Errorf("expected %q, got %q", "scheme is required to look up gvk", err.Error())
+	}
+}
+
+func TestGetReferenceNilSchemeWithPopulatedGVK(t *testing.T) {
+	input := &TestRuntimeObj{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "foo.group/v3",
+			Kind:       "Bar",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "a-name",
+		},
+	}
+	ref, err := GetReference(nil, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ref.APIVersion != "foo.group/v3" {
+		t.Errorf("expected %q, got %q", "foo.group/v3", ref.APIVersion)
+	}
+	if ref.Kind != "Bar" {
+		t.Errorf("expected %q, got %q", "Bar", ref.Kind)
+	}
+	if ref.Name != "a-name" {
+		t.Errorf("expected %q, got %q", "a-name", ref.Name)
+	}
+}
