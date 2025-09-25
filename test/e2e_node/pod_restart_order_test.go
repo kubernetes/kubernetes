@@ -21,26 +21,24 @@ import (
 	"fmt"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/fields"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	admissionapi "k8s.io/pod-security-admission/api"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("Pod Restart with PodStartingOrderByPriority Featuregate", func() {
+var _ = SIGDescribe("Pod Restart with PodStartingOrderByPriority Featuregate", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("pod-restart-order-by-priority")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -62,15 +60,14 @@ var _ = SIGDescribe("Pod Restart with PodStartingOrderByPriority Featuregate", f
 		)
 
 		var (
-			customClassHigh2 = getPriorityClass("high-priority-2", 1000000)
-			customClassHigh  = getPriorityClass("high-priority", 1000)
-			customClassLow   = getPriorityClass("low-priority", -1000000)
+			customClassHigh2 = newPriorityClass("high-priority-2", 1000000)
+			customClassHigh  = newPriorityClass("high-priority", 1000)
+			customClassLow   = newPriorityClass("low-priority", -1000000)
 		)
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			ginkgo.By("Wait for the node to be ready")
-			waitForNodeReady(ctx)
-
+			ginkgo.By("Wait for node to be ready")
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
 			// Create custom priority classes
 			customClasses := []*schedulingv1.PriorityClass{customClassHigh2, customClassHigh, customClassLow}
 			for _, customClass := range customClasses {
@@ -203,4 +200,18 @@ func getPodWithPriority(name string, node string, priority string) *v1.Pod {
 		},
 	}
 	return pod
+}
+
+func newPriorityClass(name string, value int32) *schedulingv1.PriorityClass {
+	priority := &schedulingv1.PriorityClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "PriorityClass",
+			APIVersion: "scheduling.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Value: value,
+	}
+	return priority
 }
