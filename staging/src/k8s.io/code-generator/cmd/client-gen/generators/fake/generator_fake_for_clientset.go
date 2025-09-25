@@ -210,6 +210,10 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
+
+func (c *Clientset) WatchListNotSupported() {
+	/*no-op*/
+}
 `
 
 var checkImpl = `
