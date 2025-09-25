@@ -23,581 +23,46 @@ import (
 	fmt "fmt"
 
 	io "io"
+	"sort"
 
-	proto "github.com/gogo/protobuf/proto"
-	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 )
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+func (m *ExtraValue) Reset() { *m = ExtraValue{} }
 
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
+func (m *FieldSelectorAttributes) Reset() { *m = FieldSelectorAttributes{} }
 
-func (m *ExtraValue) Reset()      { *m = ExtraValue{} }
-func (*ExtraValue) ProtoMessage() {}
-func (*ExtraValue) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{0}
-}
-func (m *ExtraValue) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ExtraValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ExtraValue) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ExtraValue.Merge(m, src)
-}
-func (m *ExtraValue) XXX_Size() int {
-	return m.Size()
-}
-func (m *ExtraValue) XXX_DiscardUnknown() {
-	xxx_messageInfo_ExtraValue.DiscardUnknown(m)
-}
+func (m *LabelSelectorAttributes) Reset() { *m = LabelSelectorAttributes{} }
 
-var xxx_messageInfo_ExtraValue proto.InternalMessageInfo
+func (m *LocalSubjectAccessReview) Reset() { *m = LocalSubjectAccessReview{} }
 
-func (m *FieldSelectorAttributes) Reset()      { *m = FieldSelectorAttributes{} }
-func (*FieldSelectorAttributes) ProtoMessage() {}
-func (*FieldSelectorAttributes) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{1}
-}
-func (m *FieldSelectorAttributes) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *FieldSelectorAttributes) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *FieldSelectorAttributes) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_FieldSelectorAttributes.Merge(m, src)
-}
-func (m *FieldSelectorAttributes) XXX_Size() int {
-	return m.Size()
-}
-func (m *FieldSelectorAttributes) XXX_DiscardUnknown() {
-	xxx_messageInfo_FieldSelectorAttributes.DiscardUnknown(m)
-}
+func (m *NonResourceAttributes) Reset() { *m = NonResourceAttributes{} }
 
-var xxx_messageInfo_FieldSelectorAttributes proto.InternalMessageInfo
+func (m *NonResourceRule) Reset() { *m = NonResourceRule{} }
 
-func (m *LabelSelectorAttributes) Reset()      { *m = LabelSelectorAttributes{} }
-func (*LabelSelectorAttributes) ProtoMessage() {}
-func (*LabelSelectorAttributes) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{2}
-}
-func (m *LabelSelectorAttributes) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *LabelSelectorAttributes) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *LabelSelectorAttributes) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_LabelSelectorAttributes.Merge(m, src)
-}
-func (m *LabelSelectorAttributes) XXX_Size() int {
-	return m.Size()
-}
-func (m *LabelSelectorAttributes) XXX_DiscardUnknown() {
-	xxx_messageInfo_LabelSelectorAttributes.DiscardUnknown(m)
-}
+func (m *ResourceAttributes) Reset() { *m = ResourceAttributes{} }
 
-var xxx_messageInfo_LabelSelectorAttributes proto.InternalMessageInfo
+func (m *ResourceRule) Reset() { *m = ResourceRule{} }
 
-func (m *LocalSubjectAccessReview) Reset()      { *m = LocalSubjectAccessReview{} }
-func (*LocalSubjectAccessReview) ProtoMessage() {}
-func (*LocalSubjectAccessReview) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{3}
-}
-func (m *LocalSubjectAccessReview) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *LocalSubjectAccessReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *LocalSubjectAccessReview) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_LocalSubjectAccessReview.Merge(m, src)
-}
-func (m *LocalSubjectAccessReview) XXX_Size() int {
-	return m.Size()
-}
-func (m *LocalSubjectAccessReview) XXX_DiscardUnknown() {
-	xxx_messageInfo_LocalSubjectAccessReview.DiscardUnknown(m)
-}
+func (m *SelfSubjectAccessReview) Reset() { *m = SelfSubjectAccessReview{} }
 
-var xxx_messageInfo_LocalSubjectAccessReview proto.InternalMessageInfo
+func (m *SelfSubjectAccessReviewSpec) Reset() { *m = SelfSubjectAccessReviewSpec{} }
 
-func (m *NonResourceAttributes) Reset()      { *m = NonResourceAttributes{} }
-func (*NonResourceAttributes) ProtoMessage() {}
-func (*NonResourceAttributes) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{4}
-}
-func (m *NonResourceAttributes) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *NonResourceAttributes) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *NonResourceAttributes) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NonResourceAttributes.Merge(m, src)
-}
-func (m *NonResourceAttributes) XXX_Size() int {
-	return m.Size()
-}
-func (m *NonResourceAttributes) XXX_DiscardUnknown() {
-	xxx_messageInfo_NonResourceAttributes.DiscardUnknown(m)
-}
+func (m *SelfSubjectRulesReview) Reset() { *m = SelfSubjectRulesReview{} }
 
-var xxx_messageInfo_NonResourceAttributes proto.InternalMessageInfo
+func (m *SelfSubjectRulesReviewSpec) Reset() { *m = SelfSubjectRulesReviewSpec{} }
 
-func (m *NonResourceRule) Reset()      { *m = NonResourceRule{} }
-func (*NonResourceRule) ProtoMessage() {}
-func (*NonResourceRule) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{5}
-}
-func (m *NonResourceRule) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *NonResourceRule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *NonResourceRule) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NonResourceRule.Merge(m, src)
-}
-func (m *NonResourceRule) XXX_Size() int {
-	return m.Size()
-}
-func (m *NonResourceRule) XXX_DiscardUnknown() {
-	xxx_messageInfo_NonResourceRule.DiscardUnknown(m)
-}
+func (m *SubjectAccessReview) Reset() { *m = SubjectAccessReview{} }
 
-var xxx_messageInfo_NonResourceRule proto.InternalMessageInfo
+func (m *SubjectAccessReviewSpec) Reset() { *m = SubjectAccessReviewSpec{} }
 
-func (m *ResourceAttributes) Reset()      { *m = ResourceAttributes{} }
-func (*ResourceAttributes) ProtoMessage() {}
-func (*ResourceAttributes) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{6}
-}
-func (m *ResourceAttributes) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ResourceAttributes) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ResourceAttributes) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ResourceAttributes.Merge(m, src)
-}
-func (m *ResourceAttributes) XXX_Size() int {
-	return m.Size()
-}
-func (m *ResourceAttributes) XXX_DiscardUnknown() {
-	xxx_messageInfo_ResourceAttributes.DiscardUnknown(m)
-}
+func (m *SubjectAccessReviewStatus) Reset() { *m = SubjectAccessReviewStatus{} }
 
-var xxx_messageInfo_ResourceAttributes proto.InternalMessageInfo
-
-func (m *ResourceRule) Reset()      { *m = ResourceRule{} }
-func (*ResourceRule) ProtoMessage() {}
-func (*ResourceRule) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{7}
-}
-func (m *ResourceRule) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ResourceRule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *ResourceRule) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ResourceRule.Merge(m, src)
-}
-func (m *ResourceRule) XXX_Size() int {
-	return m.Size()
-}
-func (m *ResourceRule) XXX_DiscardUnknown() {
-	xxx_messageInfo_ResourceRule.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ResourceRule proto.InternalMessageInfo
-
-func (m *SelfSubjectAccessReview) Reset()      { *m = SelfSubjectAccessReview{} }
-func (*SelfSubjectAccessReview) ProtoMessage() {}
-func (*SelfSubjectAccessReview) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{8}
-}
-func (m *SelfSubjectAccessReview) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SelfSubjectAccessReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SelfSubjectAccessReview) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SelfSubjectAccessReview.Merge(m, src)
-}
-func (m *SelfSubjectAccessReview) XXX_Size() int {
-	return m.Size()
-}
-func (m *SelfSubjectAccessReview) XXX_DiscardUnknown() {
-	xxx_messageInfo_SelfSubjectAccessReview.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SelfSubjectAccessReview proto.InternalMessageInfo
-
-func (m *SelfSubjectAccessReviewSpec) Reset()      { *m = SelfSubjectAccessReviewSpec{} }
-func (*SelfSubjectAccessReviewSpec) ProtoMessage() {}
-func (*SelfSubjectAccessReviewSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{9}
-}
-func (m *SelfSubjectAccessReviewSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SelfSubjectAccessReviewSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SelfSubjectAccessReviewSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SelfSubjectAccessReviewSpec.Merge(m, src)
-}
-func (m *SelfSubjectAccessReviewSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *SelfSubjectAccessReviewSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_SelfSubjectAccessReviewSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SelfSubjectAccessReviewSpec proto.InternalMessageInfo
-
-func (m *SelfSubjectRulesReview) Reset()      { *m = SelfSubjectRulesReview{} }
-func (*SelfSubjectRulesReview) ProtoMessage() {}
-func (*SelfSubjectRulesReview) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{10}
-}
-func (m *SelfSubjectRulesReview) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SelfSubjectRulesReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SelfSubjectRulesReview) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SelfSubjectRulesReview.Merge(m, src)
-}
-func (m *SelfSubjectRulesReview) XXX_Size() int {
-	return m.Size()
-}
-func (m *SelfSubjectRulesReview) XXX_DiscardUnknown() {
-	xxx_messageInfo_SelfSubjectRulesReview.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SelfSubjectRulesReview proto.InternalMessageInfo
-
-func (m *SelfSubjectRulesReviewSpec) Reset()      { *m = SelfSubjectRulesReviewSpec{} }
-func (*SelfSubjectRulesReviewSpec) ProtoMessage() {}
-func (*SelfSubjectRulesReviewSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{11}
-}
-func (m *SelfSubjectRulesReviewSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SelfSubjectRulesReviewSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SelfSubjectRulesReviewSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SelfSubjectRulesReviewSpec.Merge(m, src)
-}
-func (m *SelfSubjectRulesReviewSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *SelfSubjectRulesReviewSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_SelfSubjectRulesReviewSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SelfSubjectRulesReviewSpec proto.InternalMessageInfo
-
-func (m *SubjectAccessReview) Reset()      { *m = SubjectAccessReview{} }
-func (*SubjectAccessReview) ProtoMessage() {}
-func (*SubjectAccessReview) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{12}
-}
-func (m *SubjectAccessReview) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SubjectAccessReview) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SubjectAccessReview) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SubjectAccessReview.Merge(m, src)
-}
-func (m *SubjectAccessReview) XXX_Size() int {
-	return m.Size()
-}
-func (m *SubjectAccessReview) XXX_DiscardUnknown() {
-	xxx_messageInfo_SubjectAccessReview.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SubjectAccessReview proto.InternalMessageInfo
-
-func (m *SubjectAccessReviewSpec) Reset()      { *m = SubjectAccessReviewSpec{} }
-func (*SubjectAccessReviewSpec) ProtoMessage() {}
-func (*SubjectAccessReviewSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{13}
-}
-func (m *SubjectAccessReviewSpec) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SubjectAccessReviewSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SubjectAccessReviewSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SubjectAccessReviewSpec.Merge(m, src)
-}
-func (m *SubjectAccessReviewSpec) XXX_Size() int {
-	return m.Size()
-}
-func (m *SubjectAccessReviewSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_SubjectAccessReviewSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SubjectAccessReviewSpec proto.InternalMessageInfo
-
-func (m *SubjectAccessReviewStatus) Reset()      { *m = SubjectAccessReviewStatus{} }
-func (*SubjectAccessReviewStatus) ProtoMessage() {}
-func (*SubjectAccessReviewStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{14}
-}
-func (m *SubjectAccessReviewStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SubjectAccessReviewStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SubjectAccessReviewStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SubjectAccessReviewStatus.Merge(m, src)
-}
-func (m *SubjectAccessReviewStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *SubjectAccessReviewStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_SubjectAccessReviewStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SubjectAccessReviewStatus proto.InternalMessageInfo
-
-func (m *SubjectRulesReviewStatus) Reset()      { *m = SubjectRulesReviewStatus{} }
-func (*SubjectRulesReviewStatus) ProtoMessage() {}
-func (*SubjectRulesReviewStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aafd0e5e70cec678, []int{15}
-}
-func (m *SubjectRulesReviewStatus) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SubjectRulesReviewStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	b = b[:cap(b)]
-	n, err := m.MarshalToSizedBuffer(b)
-	if err != nil {
-		return nil, err
-	}
-	return b[:n], nil
-}
-func (m *SubjectRulesReviewStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SubjectRulesReviewStatus.Merge(m, src)
-}
-func (m *SubjectRulesReviewStatus) XXX_Size() int {
-	return m.Size()
-}
-func (m *SubjectRulesReviewStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_SubjectRulesReviewStatus.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SubjectRulesReviewStatus proto.InternalMessageInfo
-
-func init() {
-	proto.RegisterType((*ExtraValue)(nil), "k8s.io.api.authorization.v1.ExtraValue")
-	proto.RegisterType((*FieldSelectorAttributes)(nil), "k8s.io.api.authorization.v1.FieldSelectorAttributes")
-	proto.RegisterType((*LabelSelectorAttributes)(nil), "k8s.io.api.authorization.v1.LabelSelectorAttributes")
-	proto.RegisterType((*LocalSubjectAccessReview)(nil), "k8s.io.api.authorization.v1.LocalSubjectAccessReview")
-	proto.RegisterType((*NonResourceAttributes)(nil), "k8s.io.api.authorization.v1.NonResourceAttributes")
-	proto.RegisterType((*NonResourceRule)(nil), "k8s.io.api.authorization.v1.NonResourceRule")
-	proto.RegisterType((*ResourceAttributes)(nil), "k8s.io.api.authorization.v1.ResourceAttributes")
-	proto.RegisterType((*ResourceRule)(nil), "k8s.io.api.authorization.v1.ResourceRule")
-	proto.RegisterType((*SelfSubjectAccessReview)(nil), "k8s.io.api.authorization.v1.SelfSubjectAccessReview")
-	proto.RegisterType((*SelfSubjectAccessReviewSpec)(nil), "k8s.io.api.authorization.v1.SelfSubjectAccessReviewSpec")
-	proto.RegisterType((*SelfSubjectRulesReview)(nil), "k8s.io.api.authorization.v1.SelfSubjectRulesReview")
-	proto.RegisterType((*SelfSubjectRulesReviewSpec)(nil), "k8s.io.api.authorization.v1.SelfSubjectRulesReviewSpec")
-	proto.RegisterType((*SubjectAccessReview)(nil), "k8s.io.api.authorization.v1.SubjectAccessReview")
-	proto.RegisterType((*SubjectAccessReviewSpec)(nil), "k8s.io.api.authorization.v1.SubjectAccessReviewSpec")
-	proto.RegisterMapType((map[string]ExtraValue)(nil), "k8s.io.api.authorization.v1.SubjectAccessReviewSpec.ExtraEntry")
-	proto.RegisterType((*SubjectAccessReviewStatus)(nil), "k8s.io.api.authorization.v1.SubjectAccessReviewStatus")
-	proto.RegisterType((*SubjectRulesReviewStatus)(nil), "k8s.io.api.authorization.v1.SubjectRulesReviewStatus")
-}
-
-func init() {
-	proto.RegisterFile("k8s.io/api/authorization/v1/generated.proto", fileDescriptor_aafd0e5e70cec678)
-}
-
-var fileDescriptor_aafd0e5e70cec678 = []byte{
-	// 1247 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xec, 0x58, 0xcf, 0x6f, 0x1b, 0xc5,
-	0x17, 0xf7, 0xfa, 0x47, 0x62, 0x8f, 0xe3, 0x6f, 0xd2, 0xc9, 0x37, 0xcd, 0x36, 0x11, 0x76, 0x64,
-	0x24, 0x48, 0xd5, 0xb2, 0x26, 0x51, 0xdb, 0x44, 0x95, 0x0a, 0xf2, 0xaa, 0x01, 0x45, 0x4a, 0x4b,
-	0x35, 0x51, 0x22, 0x51, 0x04, 0x62, 0xbc, 0x9e, 0xd8, 0x4b, 0xec, 0xdd, 0xed, 0xcc, 0xac, 0xd3,
-	0x70, 0xaa, 0xc4, 0x3f, 0xc0, 0x91, 0x43, 0x0f, 0xfc, 0x07, 0x5c, 0x90, 0xb8, 0x73, 0x40, 0x11,
-	0xa7, 0x1e, 0x8b, 0x84, 0x2c, 0x62, 0xce, 0xfc, 0x0f, 0x68, 0x66, 0xc7, 0xde, 0xdd, 0xc4, 0x76,
-	0x6d, 0x0e, 0x94, 0x43, 0x6f, 0x9e, 0xf7, 0x79, 0xbf, 0xe7, 0xbd, 0xb7, 0x6f, 0x0c, 0x6e, 0x1c,
-	0x6f, 0x33, 0xc3, 0x76, 0x2b, 0xd8, 0xb3, 0x2b, 0xd8, 0xe7, 0x4d, 0x97, 0xda, 0x5f, 0x63, 0x6e,
-	0xbb, 0x4e, 0xa5, 0xb3, 0x51, 0x69, 0x10, 0x87, 0x50, 0xcc, 0x49, 0xdd, 0xf0, 0xa8, 0xcb, 0x5d,
-	0xb8, 0x1a, 0x30, 0x1b, 0xd8, 0xb3, 0x8d, 0x18, 0xb3, 0xd1, 0xd9, 0x58, 0x79, 0xaf, 0x61, 0xf3,
-	0xa6, 0x5f, 0x33, 0x2c, 0xb7, 0x5d, 0x69, 0xb8, 0x0d, 0xb7, 0x22, 0x65, 0x6a, 0xfe, 0x91, 0x3c,
-	0xc9, 0x83, 0xfc, 0x15, 0xe8, 0x5a, 0xb9, 0x15, 0x1a, 0x6e, 0x63, 0xab, 0x69, 0x3b, 0x84, 0x9e,
-	0x56, 0xbc, 0xe3, 0x86, 0x20, 0xb0, 0x4a, 0x9b, 0x70, 0x3c, 0xc4, 0x83, 0x95, 0xca, 0x28, 0x29,
-	0xea, 0x3b, 0xdc, 0x6e, 0x93, 0x4b, 0x02, 0x77, 0x5e, 0x25, 0xc0, 0xac, 0x26, 0x69, 0xe3, 0x8b,
-	0x72, 0xe5, 0x2d, 0x00, 0x76, 0x9e, 0x72, 0x8a, 0x0f, 0x71, 0xcb, 0x27, 0xb0, 0x04, 0x32, 0x36,
-	0x27, 0x6d, 0xa6, 0x6b, 0x6b, 0xa9, 0xf5, 0x9c, 0x99, 0xeb, 0x75, 0x4b, 0x99, 0x5d, 0x41, 0x40,
-	0x01, 0xfd, 0x6e, 0xf6, 0xbb, 0xef, 0x4b, 0x89, 0x67, 0xbf, 0xaf, 0x25, 0xca, 0xbf, 0x6a, 0x60,
-	0xf9, 0x23, 0x9b, 0xb4, 0xea, 0xfb, 0xa4, 0x45, 0x2c, 0xee, 0xd2, 0x2a, 0xe7, 0xd4, 0xae, 0xf9,
-	0x9c, 0x30, 0x78, 0x1b, 0xe4, 0x29, 0x3e, 0xe9, 0x03, 0xba, 0xb6, 0xa6, 0xad, 0xe7, 0xcc, 0xc5,
-	0xb3, 0x6e, 0x29, 0xd1, 0xeb, 0x96, 0xf2, 0x28, 0x84, 0x50, 0x94, 0x0f, 0x3e, 0x05, 0x73, 0x94,
-	0x3c, 0xf1, 0x6d, 0x4a, 0xda, 0xc4, 0xe1, 0x4c, 0x4f, 0xae, 0xa5, 0xd6, 0xf3, 0x9b, 0x1f, 0x18,
-	0xe1, 0x6d, 0x0c, 0x42, 0x33, 0xbc, 0xe3, 0x86, 0x20, 0x30, 0x43, 0x64, 0xd0, 0xe8, 0x6c, 0x18,
-	0x31, 0x5f, 0x50, 0xa8, 0xc6, 0xfc, 0xbf, 0xb2, 0x3b, 0x17, 0x21, 0x32, 0x14, 0xb3, 0x24, 0x83,
-	0xd9, 0xc3, 0x35, 0xd2, 0xfa, 0x8f, 0x04, 0x13, 0xf3, 0x65, 0xda, 0x60, 0x7e, 0x4c, 0x02, 0x7d,
-	0xcf, 0xb5, 0x70, 0x6b, 0xdf, 0xaf, 0x7d, 0x45, 0x2c, 0x5e, 0xb5, 0x2c, 0xc2, 0x18, 0x22, 0x1d,
-	0x9b, 0x9c, 0xc0, 0x2f, 0x41, 0x56, 0x18, 0xa9, 0x63, 0x8e, 0x65, 0x28, 0xf9, 0xcd, 0xf7, 0x27,
-	0x73, 0xe9, 0x13, 0xa9, 0xeb, 0x01, 0xe1, 0xd8, 0x84, 0xca, 0x09, 0x10, 0xd2, 0xd0, 0x40, 0x2b,
-	0x3c, 0x04, 0x69, 0xe6, 0x11, 0x4b, 0x4f, 0x4a, 0xed, 0xb7, 0x8c, 0x31, 0xbd, 0x64, 0x0c, 0xf1,
-	0x70, 0xdf, 0x23, 0x96, 0x39, 0xa7, 0x2c, 0xa4, 0xc5, 0x09, 0x49, 0x7d, 0xf0, 0x0b, 0x30, 0xc3,
-	0x38, 0xe6, 0x3e, 0xd3, 0x53, 0x52, 0xf3, 0x9d, 0xa9, 0x35, 0x4b, 0x69, 0xf3, 0x7f, 0x4a, 0xf7,
-	0x4c, 0x70, 0x46, 0x4a, 0x6b, 0xf9, 0x33, 0xb0, 0xf4, 0xd0, 0x75, 0x10, 0x61, 0xae, 0x4f, 0x2d,
-	0x12, 0x29, 0x80, 0x35, 0x90, 0xf6, 0x30, 0x6f, 0xaa, 0x9b, 0x1f, 0xb8, 0xf6, 0x08, 0xf3, 0x26,
-	0x92, 0x88, 0xe0, 0xe8, 0x10, 0x5a, 0x93, 0x21, 0x47, 0x38, 0x0e, 0x09, 0xad, 0x21, 0x89, 0x94,
-	0x9f, 0x80, 0xf9, 0x88, 0x72, 0xe4, 0xb7, 0x64, 0xaf, 0x09, 0x28, 0xd6, 0x6b, 0x42, 0x82, 0xa1,
-	0x80, 0x0e, 0xef, 0x81, 0x79, 0x27, 0x94, 0x39, 0x40, 0x7b, 0x41, 0x11, 0xe5, 0xcc, 0xc5, 0x5e,
-	0xb7, 0x14, 0x55, 0x27, 0x20, 0x74, 0x91, 0xb7, 0xfc, 0x3c, 0x0d, 0xe0, 0x90, 0x68, 0x2a, 0x20,
-	0xe7, 0xe0, 0x36, 0x61, 0x1e, 0xb6, 0x88, 0x0a, 0xe9, 0x8a, 0x72, 0x38, 0xf7, 0xb0, 0x0f, 0xa0,
-	0x90, 0xe7, 0xd5, 0xc1, 0xc1, 0xb7, 0x41, 0xa6, 0x41, 0x5d, 0xdf, 0x93, 0x17, 0x93, 0x33, 0x0b,
-	0x8a, 0x25, 0xf3, 0xb1, 0x20, 0xa2, 0x00, 0x83, 0xd7, 0xc1, 0x6c, 0x87, 0x50, 0x66, 0xbb, 0x8e,
-	0x9e, 0x96, 0x6c, 0xf3, 0x8a, 0x6d, 0xf6, 0x30, 0x20, 0xa3, 0x3e, 0x0e, 0x6f, 0x82, 0x2c, 0x55,
-	0x8e, 0xeb, 0x19, 0xc9, 0xbb, 0xa0, 0x78, 0xb3, 0x83, 0x0c, 0x0e, 0x38, 0x44, 0x7f, 0x32, 0xbf,
-	0x36, 0x10, 0x98, 0x89, 0xf7, 0xe7, 0x7e, 0x08, 0xa1, 0x28, 0x9f, 0x08, 0x4b, 0xc4, 0xa8, 0xcf,
-	0xc6, 0xc3, 0x12, 0x29, 0x40, 0x12, 0x81, 0x6d, 0x50, 0x38, 0x8a, 0x0e, 0x15, 0x3d, 0x3b, 0x41,
-	0x45, 0x8f, 0x18, 0x89, 0xe6, 0x95, 0x5e, 0xb7, 0x54, 0x88, 0xcf, 0xa8, 0xb8, 0x76, 0x61, 0xae,
-	0x15, 0x6d, 0x7b, 0x3d, 0x37, 0x81, 0xb9, 0x11, 0x43, 0x2b, 0x30, 0x17, 0x9f, 0x22, 0x71, 0xed,
-	0xe5, 0x9f, 0x35, 0x30, 0x37, 0x5d, 0x3d, 0xde, 0x00, 0x39, 0xec, 0xd9, 0xf2, 0x52, 0xfb, 0x95,
-	0x58, 0x10, 0x55, 0x53, 0x7d, 0xb4, 0x1b, 0x10, 0x51, 0x88, 0x0b, 0xe6, 0x7e, 0xaa, 0x45, 0xc3,
-	0x0e, 0x98, 0xfb, 0x26, 0x19, 0x0a, 0x71, 0xb8, 0x05, 0x0a, 0xfd, 0x83, 0x2c, 0x41, 0x3d, 0x2d,
-	0x05, 0x64, 0x10, 0x28, 0x0a, 0xa0, 0x38, 0x5f, 0xf9, 0xa7, 0x24, 0x58, 0xde, 0x27, 0xad, 0xa3,
-	0xd7, 0x33, 0xe9, 0x1e, 0xc7, 0x26, 0xdd, 0xf6, 0xf8, 0x79, 0x34, 0xdc, 0xcb, 0xd7, 0x36, 0xed,
-	0x9e, 0x27, 0xc1, 0xea, 0x18, 0x9f, 0xe0, 0x09, 0x80, 0xf4, 0xd2, 0xf0, 0x50, 0x79, 0xac, 0x8c,
-	0xf5, 0xe5, 0xf2, 0xcc, 0x31, 0xaf, 0xf6, 0xba, 0xa5, 0x21, 0xb3, 0x08, 0x0d, 0x31, 0x01, 0xbf,
-	0xd1, 0xc0, 0x92, 0x33, 0x6c, 0x0e, 0xab, 0x34, 0x6f, 0x8e, 0x35, 0x3e, 0x74, 0x82, 0x9b, 0xd7,
-	0x7a, 0xdd, 0xd2, 0xf0, 0xe1, 0x8e, 0x86, 0xdb, 0x12, 0xdf, 0xd0, 0xab, 0x91, 0xf4, 0x88, 0x06,
-	0xf9, 0xf7, 0xea, 0xea, 0xd3, 0x58, 0x5d, 0x6d, 0x4d, 0x5a, 0x57, 0x11, 0x27, 0x47, 0x96, 0xd5,
-	0xe7, 0x17, 0xca, 0xea, 0xf6, 0x24, 0x65, 0x15, 0x55, 0x3c, 0xbe, 0xaa, 0x1e, 0x80, 0x95, 0xd1,
-	0x0e, 0x4d, 0xfd, 0xe9, 0x29, 0xff, 0x90, 0x04, 0x8b, 0x6f, 0x96, 0x98, 0x69, 0xda, 0xfa, 0x97,
-	0x34, 0x58, 0x7e, 0xd3, 0xd2, 0xa3, 0xd6, 0x38, 0x9f, 0x11, 0xaa, 0x96, 0x94, 0xc1, 0xe5, 0x1c,
-	0x30, 0x42, 0x91, 0x44, 0x60, 0x19, 0xcc, 0x34, 0x82, 0xaf, 0x5b, 0xf0, 0xfd, 0x01, 0x22, 0xc1,
-	0xea, 0xd3, 0xa6, 0x10, 0x58, 0x07, 0x19, 0x22, 0xde, 0x4b, 0x7a, 0x46, 0xee, 0xf3, 0x1f, 0xfe,
-	0x93, 0xca, 0x30, 0xe4, 0x8b, 0x6b, 0xc7, 0xe1, 0xf4, 0x34, 0x5c, 0x96, 0x24, 0x0d, 0x05, 0xca,
-	0xe1, 0x5b, 0x20, 0xe5, 0xdb, 0x75, 0xb5, 0xcb, 0xe4, 0x15, 0x4b, 0xea, 0x60, 0xf7, 0x3e, 0x12,
-	0xf4, 0x15, 0xac, 0x1e, 0x6d, 0x52, 0x05, 0x5c, 0x00, 0xa9, 0x63, 0x72, 0x1a, 0x34, 0x14, 0x12,
-	0x3f, 0xe1, 0x3d, 0x90, 0xe9, 0x88, 0xf7, 0x9c, 0xca, 0xef, 0xbb, 0x63, 0x9d, 0x0c, 0x9f, 0x7f,
-	0x28, 0x90, 0xba, 0x9b, 0xdc, 0xd6, 0xca, 0xbf, 0x69, 0xe0, 0xda, 0xc8, 0xf2, 0x13, 0xcb, 0x1c,
-	0x6e, 0xb5, 0xdc, 0x13, 0x52, 0x97, 0x66, 0xb3, 0xe1, 0x32, 0x57, 0x0d, 0xc8, 0xa8, 0x8f, 0xc3,
-	0x77, 0xc0, 0x4c, 0x9d, 0x38, 0x36, 0xa9, 0xcb, 0xb5, 0x2f, 0x1b, 0x56, 0xee, 0x7d, 0x49, 0x45,
-	0x0a, 0x15, 0x7c, 0x94, 0x60, 0xe6, 0x3a, 0x6a, 0xd1, 0x1c, 0xf0, 0x21, 0x49, 0x45, 0x0a, 0x85,
-	0x55, 0x30, 0x4f, 0x84, 0x9b, 0xd2, 0xff, 0x1d, 0x4a, 0xdd, 0xfe, 0x8d, 0x2e, 0x2b, 0x81, 0xf9,
-	0x9d, 0x38, 0x8c, 0x2e, 0xf2, 0x97, 0xff, 0x4a, 0x02, 0x7d, 0xd4, 0x68, 0x83, 0x47, 0xe1, 0x2e,
-	0x22, 0x41, 0xb9, 0x0e, 0xe5, 0x37, 0xaf, 0x4f, 0xd4, 0x20, 0x42, 0xc2, 0x5c, 0x52, 0x8e, 0x14,
-	0xa2, 0xd4, 0xc8, 0xea, 0x22, 0x8f, 0x90, 0x82, 0x05, 0x27, 0xfe, 0x22, 0xe8, 0xbf, 0x11, 0x6f,
-	0x4e, 0xda, 0x0e, 0xd2, 0x9a, 0xae, 0xac, 0x2d, 0x5c, 0x00, 0x18, 0xba, 0xa4, 0x1f, 0x6e, 0x02,
-	0x60, 0x3b, 0x96, 0xdb, 0xf6, 0x5a, 0x84, 0x13, 0x99, 0xb6, 0x6c, 0x38, 0x07, 0x77, 0x07, 0x08,
-	0x8a, 0x70, 0x0d, 0xcb, 0x77, 0x7a, 0xba, 0x7c, 0x9b, 0xd5, 0xb3, 0xf3, 0x62, 0xe2, 0xc5, 0x79,
-	0x31, 0xf1, 0xf2, 0xbc, 0x98, 0x78, 0xd6, 0x2b, 0x6a, 0x67, 0xbd, 0xa2, 0xf6, 0xa2, 0x57, 0xd4,
-	0x5e, 0xf6, 0x8a, 0xda, 0x1f, 0xbd, 0xa2, 0xf6, 0xed, 0x9f, 0xc5, 0xc4, 0xe3, 0xd5, 0x31, 0xff,
-	0xd0, 0xfc, 0x1d, 0x00, 0x00, 0xff, 0xff, 0xb5, 0x8c, 0x77, 0x0f, 0xbf, 0x11, 0x00, 0x00,
-}
+func (m *SubjectRulesReviewStatus) Reset() { *m = SubjectRulesReviewStatus{} }
 
 func (m ExtraValue) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -1247,7 +712,7 @@ func (m *SubjectAccessReviewSpec) MarshalToSizedBuffer(dAtA []byte) (int, error)
 		for k := range m.Extra {
 			keysForExtra = append(keysForExtra, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForExtra)
+		sort.Strings(keysForExtra)
 		for iNdEx := len(keysForExtra) - 1; iNdEx >= 0; iNdEx-- {
 			v := m.Extra[string(keysForExtra[iNdEx])]
 			baseI := i
@@ -1914,7 +1379,7 @@ func (this *SubjectAccessReviewSpec) String() string {
 	for k := range this.Extra {
 		keysForExtra = append(keysForExtra, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForExtra)
+	sort.Strings(keysForExtra)
 	mapStringForExtra := "map[string]ExtraValue{"
 	for _, k := range keysForExtra {
 		mapStringForExtra += fmt.Sprintf("%v: %v,", k, this.Extra[k])
