@@ -108,7 +108,7 @@ func TestAggregationEnabled(t *testing.T) {
 			accept:   aggregatedProtoAccept + "," + protobufAccept,
 			expected: "aggregated",
 		},
-		// Peer Merged discovery cases.
+		// Peer Agg discovery cases.
 		{
 			accept:       aggregatedMergedJSONAccept,
 			expected:     "merged",

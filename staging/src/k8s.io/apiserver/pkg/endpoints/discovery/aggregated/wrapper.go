@@ -33,10 +33,10 @@ import (
 )
 
 type WrappedHandler struct {
-	s                    runtime.NegotiatedSerializer
-	handler              http.Handler
-	aggHandler           http.Handler
-	peerMergedAggHandler http.Handler
+	s              runtime.NegotiatedSerializer
+	handler        http.Handler
+	aggHandler     http.Handler
+	peerAggHandler http.Handler
 }
 
 func (wrapped *WrappedHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
@@ -50,7 +50,7 @@ func (wrapped *WrappedHandler) ServeHTTP(resp http.ResponseWriter, req *http.Req
 				return
 			}
 			// Serve merged discovery by default.
-			wrapped.peerMergedAggHandler.ServeHTTP(resp, req)
+			wrapped.peerAggHandler.ServeHTTP(resp, req)
 			return
 		}
 		wrapped.aggHandler.ServeHTTP(resp, req)
@@ -81,10 +81,10 @@ func (wrapped *WrappedHandler) GenerateWebService(prefix string, returnType inte
 // emit the aggregated discovery by passing in the aggregated
 // discovery type in content negotiation headers: eg: (Accept:
 // application/json;v=v2;g=apidiscovery.k8s.io;as=APIGroupDiscoveryList)
-func WrapAggregatedDiscoveryToHandler(handler, aggHandler, peerMergedAggHandler http.Handler) *WrappedHandler {
+func WrapAggregatedDiscoveryToHandler(handler, aggHandler, peerAggHandler http.Handler) *WrappedHandler {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
 	codecs := serializer.NewCodecFactory(scheme)
-	return &WrappedHandler{codecs, handler, aggHandler, peerMergedAggHandler}
+	return &WrappedHandler{codecs, handler, aggHandler, peerAggHandler}
 }
