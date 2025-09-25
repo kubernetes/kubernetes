@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/watchlist"
 )
 
 // NewDynamicSharedInformerFactory constructs a new instance of dynamicSharedInformerFactory for all namespaces.
@@ -145,6 +146,10 @@ func (f *dynamicSharedInformerFactory) Shutdown() {
 
 // NewFilteredDynamicInformer constructs a new informer for a dynamic type.
 func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return &dynamicInformer{
 		gvr: gvr,
 		informer: cache.NewSharedIndexInformerWithOptions(
@@ -173,6 +178,7 @@ func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersio
 					}
 					return client.Resource(gvr).Namespace(namespace).Watch(ctx, options)
 				},
+				UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 			},
 			&unstructured.Unstructured{},
 			cache.SharedIndexInformerOptions{
