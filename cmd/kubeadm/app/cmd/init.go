@@ -19,8 +19,10 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -578,9 +580,12 @@ func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
 		return nil, err
 	}
 	for _, v := range config.Clusters {
-		v.Server = fmt.Sprintf("https://%s:%d",
-			d.Cfg().LocalAPIEndpoint.AdvertiseAddress,
-			d.Cfg().LocalAPIEndpoint.BindPort)
+		v.Server = fmt.Sprintf("https://%s",
+			net.JoinHostPort(
+				d.Cfg().LocalAPIEndpoint.AdvertiseAddress,
+				strconv.Itoa(int(d.Cfg().LocalAPIEndpoint.BindPort)),
+			),
+		)
 	}
 	client, err := kubeconfigutil.ToClientSet(config)
 	if err != nil {
