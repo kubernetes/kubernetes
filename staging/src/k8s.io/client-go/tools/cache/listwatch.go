@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/watchlist"
 )
 
 // Lister is any object that knows how to perform an initial list.
@@ -121,14 +122,20 @@ func ToListerWatcherWithContext(lw ListerWatcher) ListerWatcherWithContext {
 		return lw
 	}
 	return listerWatcherWrapper{
-		ListerWithContext:  ToListerWithContext(lw),
-		WatcherWithContext: ToWatcherWithContext(lw),
+		ListerWithContext:             ToListerWithContext(lw),
+		WatcherWithContext:            ToWatcherWithContext(lw),
+		unsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(lw),
 	}
 }
 
 type listerWatcherWrapper struct {
 	ListerWithContext
 	WatcherWithContext
+	unsupportedWatchListSemantics bool
+}
+
+func (lw listerWatcherWrapper) IsWatchListSemanticsUnSupported() bool {
+	return lw.unsupportedWatchListSemantics
 }
 
 // ListFunc knows how to list resources
@@ -171,6 +178,17 @@ type ListWatch struct {
 
 	// DisableChunking requests no chunking for this list watcher.
 	DisableChunking bool
+
+	// UnsupportedWatchListSemantics indicates whether a client explicitly does NOT support
+	// WatchList semantics.
+	//
+	// Over the years, unit tests in kube have been written in many different ways.
+	// After enabling the WatchListClient feature by default, existing tests started failing.
+	// To avoid breaking lots of existing client-go users after upgrade,
+	// we introduced this field as an opt-in.
+	//
+	// When true, the reflector disables WatchList even if the feature gate is enabled.
+	UnsupportedWatchListSemantics bool
 }
 
 var (
@@ -234,10 +252,11 @@ func NewFilteredListWatchFromClient(c Getter, resource string, namespace string,
 			Watch(ctx)
 	}
 	return &ListWatch{
-		ListFunc:             listFunc,
-		WatchFunc:            watchFunc,
-		ListWithContextFunc:  listFuncWithContext,
-		WatchFuncWithContext: watchFuncWithContext,
+		ListFunc:                      listFunc,
+		WatchFunc:                     watchFunc,
+		ListWithContextFunc:           listFuncWithContext,
+		WatchFuncWithContext:          watchFuncWithContext,
+		UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(c),
 	}
 }
 
@@ -279,4 +298,8 @@ func (lw *ListWatch) WatchWithContext(ctx context.Context, options metav1.ListOp
 		return lw.WatchFuncWithContext(ctx, options)
 	}
 	return lw.WatchFunc(options)
+}
+
+func (lw *ListWatch) IsWatchListSemanticsUnSupported() bool {
+	return lw.UnsupportedWatchListSemantics
 }
