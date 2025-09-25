@@ -289,7 +289,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				IdentityLeaseGCPeriod,
 				metav1.NamespaceSystem,
 				IdentityLeaseComponentLabelKey+"="+name,
-			).Run(hookContext.Done())
+			).RunWithContext(hookContext)
 			return nil
 		})
 	}
