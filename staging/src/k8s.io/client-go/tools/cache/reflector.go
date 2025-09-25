@@ -249,6 +249,11 @@ type ReflectorOptions struct {
 	Clock clock.Clock
 }
 
+// TODO: explain
+type watchListSemanticsSupporter interface {
+	IsWatchListSemanticsUnsupported() bool
+}
+
 // NewReflectorWithOptions creates a new Reflector object which will keep the
 // given store up to date with the server's contents for the given
 // resource. Reflector promises to only put things in the store that
@@ -297,6 +302,15 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 	}
 
 	r.useWatchList = clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient)
+	if r.useWatchList {
+		lws, ok := lw.(watchListSemanticsSupporter)
+		if !ok {
+			klog.Warningf("WARNING: the provided ListWatcher (client) doesn't implement listWatchSemanticsSupport interface. %v feature will be disabled", clientfeatures.WatchListClient)
+		} else if lws.IsWatchListSemanticsUnsupported() {
+			klog.Warningf("WARNING: the provided ListWatcher doesn't support WatchList semantics. %v will feature be disabled", clientfeatures.WatchListClient)
+		}
+		r.useWatchList = false
+	}
 
 	return r
 }
