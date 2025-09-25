@@ -190,6 +190,23 @@ func TestKeySchema(t *testing.T) {
 	storagetesting.RunTestKeySchema(ctx, t, store)
 }
 
+func TestGetListWithErrorAggregation(t *testing.T) {
+	storagetesting.RunTestGetListWithErrorAggregation(t, func(t *testing.T) (context.Context, *storagetesting.ErrorAggregatorFactory, storagetesting.InterfaceWithCorruptTransformer) {
+		ctx, s, _ := testSetup(t)
+		var store storage.Interface = s
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+			store = NewStoreWithUnsafeCorruptObjectDeletion(store, s.groupResource)
+		}
+
+		// wrap the original error aggregator the store is using so the test can
+		// keep track of the values GetList passes to the original aggregator.
+		factory := storagetesting.WrapListErrorAggregatorFactory(s.listErrAggrFactory)
+		s.listErrAggrFactory = factory.WithRecorder()
+
+		return ctx, factory, &storeWithCorruptedTransformer{Interface: store, store: s}
+	})
+}
+
 type storeWithPrefixTransformer struct {
 	*store
 }
@@ -210,20 +227,32 @@ type corruptedTransformer struct {
 }
 
 func (f *corruptedTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
-	return nil, true, &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
+	out, stale, err = f.Transformer.TransformFromStorage(ctx, data, dataCtx)
+
+	switch {
+	case err != nil: // unexpected error
+		return out, stale, err
+	case strings.Contains(string(data), storagetesting.CorruptErrKey):
+		return out, stale, &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
+	case strings.Contains(string(data), storagetesting.UnexpectedErrKey):
+		return out, stale, fmt.Errorf("bits flipped")
+	}
+	return out, stale, err
 }
 
 type storeWithCorruptedTransformer struct {
-	*store
+	storage.Interface
+	// we need the original *store instance to mutate the transformer
+	store *store
 }
 
 func (s *storeWithCorruptedTransformer) CorruptTransformer() func() {
-	ct := &corruptedTransformer{Transformer: s.transformer}
-	s.transformer = ct
-	s.watcher.transformer = ct
+	ct := &corruptedTransformer{Transformer: s.store.transformer}
+	s.store.transformer = ct
+	s.store.watcher.transformer = ct
 	return func() {
-		s.transformer = ct.Transformer
-		s.watcher.transformer = ct.Transformer
+		s.store.transformer = ct.Transformer
+		s.store.watcher.transformer = ct.Transformer
 	}
 }
 
