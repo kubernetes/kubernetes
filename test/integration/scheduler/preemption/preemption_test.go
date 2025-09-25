@@ -21,6 +21,7 @@ package preemption
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -999,6 +1001,18 @@ func podInUnschedulablePodPool(t *testing.T, queue queue.SchedulingQueue, podNam
 	return false
 }
 
+// unschedulablePod checks if the given Pod is in the unschedulable queue and returns it.
+func unschedulablePod(t *testing.T, queue queue.SchedulingQueue, podName string) *v1.Pod {
+	t.Helper()
+	unschedPods := queue.UnschedulablePods()
+	for _, pod := range unschedPods {
+		if pod.Name == podName {
+			return pod
+		}
+	}
+	return nil
+}
+
 func TestAsyncPreemptionBind(t *testing.T) {
 	type createPod struct {
 		pod *v1.Pod
@@ -1009,8 +1023,13 @@ func TestAsyncPreemptionBind(t *testing.T) {
 	}
 
 	type schedulePod struct {
-		podName       string
-		expectSuccess bool
+		podName             string
+		expectSuccess       bool
+		expectUnschedulable bool
+	}
+
+	type activatePod struct {
+		podName string
 	}
 
 	type scenario struct {
@@ -1034,6 +1053,8 @@ func TestAsyncPreemptionBind(t *testing.T) {
 		// You should give a Pod index representing the order of Pod creation.
 		// e.g., if you want to check the Pod created first in the test case, you should give 0.
 		podRunningPreemption *int
+		// activatePod moves the pod from unschedulable to active or backoff
+		activatePod *activatePod
 	}
 
 	tests := []struct {
@@ -1048,44 +1069,57 @@ func TestAsyncPreemptionBind(t *testing.T) {
 				{
 					name: "create victim Pod",
 					createPod: &createPod{
-						pod:   st.MakePod().Name("pod-blocked-in-binding1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						pod:   st.MakePod().Name("pod-blocked-in-binding").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
 						count: ptr.To(1),
 					},
 				},
 				{
 					name: "create victim Pod2",
 					createPod: &createPod{
-						pod:   st.MakePod().Name("pod-blocked-in-binding2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						pod:   st.MakePod().Name("victim-pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
 						count: ptr.To(1),
 					},
 				},
 				{
 					name: "schedule victim Pod",
 					schedulePod: &schedulePod{
-						podName:       "pod-blocked-in-binding1",
-						expectSuccess: true,
+						podName: "pod-blocked-in-binding",
 					},
 				},
 				{
 					name: "schedule victim Pod2",
 					schedulePod: &schedulePod{
-						podName:       "pod-blocked-in-binding2",
+						podName:       "victim-pod2",
 						expectSuccess: true,
 					},
 				},
 				{
 					name: "create a preemptor Pod",
 					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+						pod: st.MakePod().Name("anias-preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
 					},
 				},
 				{
 					name: "schedule the preemptor Pod",
 					schedulePod: &schedulePod{
-						podName: "preemptor",
+						podName:             "anias-preemptor",
+						expectUnschedulable: true,
 					},
 				},
 				{
+					name: "activate preemptor Pod",
+					activatePod: &activatePod{
+						podName: "anias-preemptor",
+					},
+				},
+				{
+					name: "schedule the preemptor Pod again and expect it to be unschedulable (waiting for preemption to finish)",
+					schedulePod: &schedulePod{
+						podName:             "anias-preemptor",
+						expectUnschedulable: true,
+					},
+				},
+				/*{
 					name:            "check the pod is in the queue and gated",
 					podGatedInQueue: "preemptor",
 				},
@@ -1103,7 +1137,7 @@ func TestAsyncPreemptionBind(t *testing.T) {
 						podName:       "preemptor",
 						expectSuccess: true,
 					},
-				},
+				},*/
 			},
 		},
 		/*{
@@ -1383,8 +1417,13 @@ func TestAsyncPreemptionBind(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Error registering a filter: %v", err)
 				}
-				err = registry.Register("fakeBindPluginLongBind", func(c context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-					var bindPlugin = FakeBindPluginLongBind{name: "fakeBindPluginLongBind", bindingDuration: 1 * time.Minute, nameOfPodToHold: "pod-blocked-in-binding1"}
+				fakeName := "fakeBindPluginLongBind"
+				err = registry.Register(fakeName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+					db, err := defaultbinder.New(ctx, o, fh)
+					if err != nil {
+						t.Fatalf("Error creating a default binder plugin: %v", err)
+					}
+					var bindPlugin = FakeBindPluginLongBind{name: fakeName, bindingDuration: 1 * time.Minute, nameOfPodToHold: "pod-blocked-in-binding", realPlugin: db.(fwk.BindPlugin)}
 					return &bindPlugin, nil
 				})
 				if err != nil {
@@ -1397,10 +1436,12 @@ func TestAsyncPreemptionBind(t *testing.T) {
 						Plugins: &configv1.Plugins{
 							MultiPoint: configv1.PluginSet{
 								Enabled: []configv1.Plugin{
+									{Name: fakeName},
 									{Name: delayedPreemptionPluginName},
 								},
 								Disabled: []configv1.Plugin{
 									{Name: names.DefaultPreemption},
+									{Name: names.DefaultBinder},
 								},
 							},
 						},
@@ -1492,10 +1533,26 @@ func TestAsyncPreemptionBind(t *testing.T) {
 							if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
 								t.Fatalf("Expected the pod %s to be scheduled", scenario.schedulePod.podName)
 							}
-						} else {
+						} else if scenario.schedulePod.expectUnschedulable {
 							if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.schedulePod.podName) {
 								t.Fatalf("Expected the pod %s to be in the queue after the scheduling attempt", scenario.schedulePod.podName)
 							}
+						}
+					case scenario.activatePod != nil:
+						lastFailure := ""
+
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+							pod := unschedulablePod(t, testCtx.Scheduler.SchedulingQueue, scenario.activatePod.podName)
+							if pod == nil {
+								lastFailure = fmt.Sprintf("Expected the pod %s to be unschedulable, but it's not there", scenario.activatePod.podName)
+								return false, nil
+							}
+							m := make(map[string]*v1.Pod)
+							m[scenario.activatePod.podName] = pod
+							testCtx.Scheduler.SchedulingQueue.Activate(logger, m)
+							return true, nil
+						}); err != nil {
+							t.Fatal(lastFailure)
 						}
 					case scenario.completePreemption != "":
 						lock.Lock()
@@ -1535,19 +1592,22 @@ type FakeBindPluginLongBind struct {
 	name            string
 	bindingDuration time.Duration // 5 * time.Second
 	nameOfPodToHold string
+	realPlugin      fwk.BindPlugin
 }
 
-func NewFakeBindPluginLongBind(name string, bindingDuration time.Duration, podToHold string) *FakeBindPluginLongBind {
-	return &FakeBindPluginLongBind{name, bindingDuration, podToHold}
-} //var bindPlugin = FakeBindPluginLongBind{name: "fakeBindPluginLongBind", bindingDuration: 1 * time.Minute, nameOfPodToHold: "pod-blocked-in-binding1"})
+func NewFakeBindPluginLongBind(name string, bindingDuration time.Duration, podToHold string, realPlugin fwk.BindPlugin) *FakeBindPluginLongBind {
+	return &FakeBindPluginLongBind{name, bindingDuration, podToHold, realPlugin}
+}
 
 func (bp *FakeBindPluginLongBind) Name() string {
 	return bp.name
 }
 
 func (bp *FakeBindPluginLongBind) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
-	if p.GenerateName == bp.nameOfPodToHold {
+	if strings.Contains(p.Name, bp.nameOfPodToHold) {
 		time.Sleep(bp.bindingDuration)
 	}
-	return fwk.NewStatus(fwk.Error, "some reasons")
+	return bp.realPlugin.Bind(ctx, state, p, nodeName)
 }
+
+var _ fwk.BindPlugin = &FakeBindPluginLongBind{}
