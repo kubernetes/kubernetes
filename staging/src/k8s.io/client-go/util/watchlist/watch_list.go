@@ -80,3 +80,19 @@ func PrepareWatchListOptionsFromListOptions(listOptions metav1.ListOptions) (met
 
 	return watchListOptions, true, nil
 }
+
+type supportedWatchListSemantics interface {
+	IsWatchListSemanticsSupported() bool
+}
+
+// DoesClientSupportWatchListSemantics reports whether the given client
+// supports WatchList semantics.
+//
+// A client supports WatchList if it implements the `IsWatchListSemanticsSupported` method.
+func DoesClientSupportWatchListSemantics(client any) bool {
+	lw, ok := client.(supportedWatchListSemantics)
+	if !ok {
+		return false
+	}
+	return lw.IsWatchListSemanticsSupported()
+}
