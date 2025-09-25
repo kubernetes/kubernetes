@@ -19,6 +19,7 @@ package fake
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/util/watchlist"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -56,6 +57,13 @@ func newPartialObjectMetadataWithAnnotations(annotations map[string]string) *met
 	u := newPartialObjectMetadata(testAPIVersion, testKind, testNamespace, testName)
 	u.Annotations = annotations
 	return u
+}
+
+func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	target := &FakeMetadataClient{}
+	if !watchlist.DoesClientNotSupportWatchListSemantics(target) {
+		t.Fatalf("Client should NOT support WatchList semantics")
+	}
 }
 
 func TestList(t *testing.T) {
