@@ -18,6 +18,7 @@ package metadatainformer
 
 import (
 	"context"
+	"k8s.io/client-go/util/watchlist"
 	"sync"
 	"time"
 
@@ -203,6 +204,7 @@ func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVers
 					}
 					return client.Resource(gvr).Namespace(namespace).Watch(ctx, options)
 				},
+				WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 			},
 			&metav1.PartialObjectMetadata{},
 			resyncPeriod,
