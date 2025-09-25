@@ -192,10 +192,24 @@ func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) s
 
 func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := validateRequestName(request.Name, fldPath.Child("name"))
-
 	numDeviceRequestType := 0
-	if len(request.FirstAvailable) > 0 {
+
+	hasFirstAvailable := len(request.FirstAvailable) > 0
+	hasExactly := request.Exactly != nil
+
+	if hasFirstAvailable {
 		numDeviceRequestType++
+	}
+	if hasExactly {
+		numDeviceRequestType++
+	}
+
+	switch {
+	case numDeviceRequestType == 0:
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `exactly` or `firstAvailable` is required"))
+	case numDeviceRequestType > 1:
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `exactly` or `firstAvailable` is required, but multiple fields are set"))
+	case hasFirstAvailable:
 		allErrs = append(allErrs, validateSet(request.FirstAvailable, resource.FirstAvailableDeviceRequestMaxSize,
 			func(subRequest resource.DeviceSubRequest, fldPath *field.Path) field.ErrorList {
 				return validateDeviceSubRequest(subRequest, fldPath, stored)
@@ -204,19 +218,8 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 				return subRequest.Name, "name"
 			},
 			fldPath.Child("firstAvailable"), sizeCovered)...)
-	}
-
-	if request.Exactly != nil {
-		numDeviceRequestType++
+	case hasExactly:
 		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, fldPath.Child("exactly"), stored)...)
-	}
-
-	switch numDeviceRequestType {
-	case 0:
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `exactly` or `firstAvailable` is required"))
-	case 1:
-	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `exactly` or `firstAvailable` is required, but multiple fields are set"))
 	}
 	return allErrs
 }
