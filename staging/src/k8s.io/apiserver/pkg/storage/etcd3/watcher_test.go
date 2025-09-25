@@ -112,7 +112,7 @@ func TestWatch(t *testing.T) {
 	t.Run("WatchWithUnsafeDelete", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
 		ctx, store, _ := testSetup(t)
-		storagetesting.RunTestWatchWithUnsafeDelete(ctx, t, &storeWithCorruptedTransformer{store})
+		storagetesting.RunTestWatchWithUnsafeDelete(ctx, t, &storeWithCorruptedTransformer{Interface: store, store: store})
 	})
 	t.Run("WatchDispatchBookmarkEvents", func(t *testing.T) {
 		clusterConfig := testserver.NewTestConfig(t)
