@@ -43,6 +43,62 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+type lwSupportsWatchListSemantics struct{ fakeListWatcher }
+
+func (lw *lwSupportsWatchListSemantics) IsWatchListSemanticsSupported() bool { return true }
+
+type lwDoesNotSupportWatchListSemantics struct{ fakeListWatcher }
+
+func (lw *lwDoesNotSupportWatchListSemantics) IsWatchListSemanticsSupported() bool { return false }
+
+type lwNoWatchListSemanticsExposed struct{ fakeListWatcher }
+
+func TestNewReflectorWithOptions_useWatchList(t *testing.T) {
+	scenarios := []struct {
+		name                    string
+		enableWatchListClientFG bool
+		lw                      ListerWatcher
+		expectUseWatchList      bool
+	}{
+		{
+			name:                    "feature gate OFF, client supports WatchListSemantics",
+			enableWatchListClientFG: false,
+			lw:                      &lwSupportsWatchListSemantics{},
+			expectUseWatchList:      false,
+		},
+		{
+			name:                    "feature gate ON, client supports WatchListSemantics",
+			enableWatchListClientFG: true,
+			lw:                      &lwSupportsWatchListSemantics{},
+			expectUseWatchList:      true,
+		},
+		{
+			name:                    "feature gate ON, client exposes the WatchListSemantics method but doesnt' support the semantic",
+			enableWatchListClientFG: true,
+			lw:                      &lwDoesNotSupportWatchListSemantics{},
+			expectUseWatchList:      false,
+		},
+		{
+			name:                    "feature gate ON, client doesn't expose the WatchListSemantics method",
+			enableWatchListClientFG: true,
+			lw:                      &lwNoWatchListSemanticsExposed{},
+			expectUseWatchList:      false,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, scenario.enableWatchListClientFG)
+
+			r := NewReflectorWithOptions(scenario.lw, struct{}{}, &fakeStore{}, ReflectorOptions{})
+
+			if r.useWatchList != scenario.expectUseWatchList {
+				t.Fatalf("got: %v, want: %v", r.useWatchList, scenario.expectUseWatchList)
+			}
+		})
+	}
+}
+
 func TestInitialEventsEndBookmarkTicker(t *testing.T) {
 	assertNoEvents := func(t *testing.T, c <-chan time.Time) {
 		select {
