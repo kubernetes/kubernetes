@@ -286,7 +286,3 @@ func (lw *ListWatch) WatchWithContext(ctx context.Context, options metav1.ListOp
 func (lw *ListWatch) IsWatchListSemanticsUnsupported() bool {
 	return lw.UnsupportedWatchListSemantics
 }
-
-type UnsupportedWatchListSemantics interface {
-	WatchListNotSupported()
-}
