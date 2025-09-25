@@ -303,13 +303,16 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 
 	r.useWatchList = clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient)
 	if r.useWatchList {
+		disableWatchListFn := func(reason string) {
+			klog.Warningf("WARNING: %s %q feature will be disabled.", reason, clientfeatures.WatchListClient)
+			r.useWatchList = false
+		}
 		lws, ok := lw.(watchListSemanticsSupporter)
 		if !ok {
-			klog.Warningf("WARNING: the provided ListWatcher (client) doesn't implement listWatchSemanticsSupport interface. %v feature will be disabled", clientfeatures.WatchListClient)
+			disableWatchListFn("The provided ListWatcher doesn't implement watchListSemanticsSupporter interface.")
 		} else if lws.IsWatchListSemanticsUnsupported() {
-			klog.Warningf("WARNING: the provided ListWatcher doesn't support WatchList semantics. %v will feature be disabled", clientfeatures.WatchListClient)
+			disableWatchListFn("The provided ListWatcher doesn't support WatchList semantics.")
 		}
-		r.useWatchList = false
 	}
 
 	return r
