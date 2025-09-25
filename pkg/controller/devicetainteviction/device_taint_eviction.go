@@ -139,6 +139,9 @@ type deviceTaint struct {
 
 	// pendingPods contains all known pods which need to be evicted because of this taint.
 	pendingPods sets.Set[types.UID]
+
+	// numEvictedPods counts the number of pods evicted because of this taint.
+	numEvictedPods int64
 }
 
 // addSlice adds one slice to the pool.
@@ -236,31 +239,135 @@ type allocatedClaim struct {
 	// <toleration seconds, 0 if not set>`.
 	evictionTime *metav1.Time
 
-	// taints contains pointers to the taints into the pool which cause eviction.
+	// taints contains pointers to the taints in the pool which cause eviction.
+	// Non-empty if and only if evictionTime is set.
 	taints []*draapi.TrackedDeviceTaint
 }
 
-func (tc *Controller) deletePodHandler(c clientset.Interface, emitEventFunc func(tainteviction.NamespacedObject)) func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
+func (tc *Controller) createDeletePodHandler(c clientset.Interface, emitEventFunc func(tainteviction.NamespacedObject)) func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
 	return func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
-		klog.FromContext(ctx).Info("Deleting pod", "pod", args.Object)
-		var err error
-		for i := 0; i < retries; i++ {
-			err = addConditionAndDeletePod(ctx, c, args.Object, &emitEventFunc)
-			if apierrors.IsNotFound(err) {
-				// Not a problem, the work is done.
-				// But we didn't do it, so don't
-				// bump the metric.
-				return nil
-			}
-			if err == nil {
-				tc.metrics.PodDeletionsTotal.Inc()
-				tc.metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt).Seconds()))
-				return nil
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-		return err
+		return tc.deletePod(ctx, c, emitEventFunc, fireAt, args)
 	}
+}
+
+// deletePod gets called by the worker queue when it is time to evict a pod.
+// It checks for rate limiting and depending on that either puts back the pod
+// for future processing or proceeds with the eviction.
+func (tc *Controller) deletePod(ctx context.Context, c clientset.Interface, emitEventFunc func(tainteviction.NamespacedObject), fireAt time.Time, args *tainteviction.WorkArgs) error {
+	logger := klog.FromContext(ctx)
+
+	// reservations contains all token reservations taken for the pod.
+	// If some rate limiter failed to grant a token, then we need to cancel
+	// the reservations and evict the pod at a later time, as indicated by the
+	// rate limiters.
+	//
+	// We don't hold onto the reservations because some other pod might be
+	// able to proceed with the tokens that are made available by cancellation.
+	//
+	// Some change in the rate limiting configuration could enable pod eviction
+	// sooner than calculated here. No attempts are made to capture that because
+	// it would be complicated and doesn't seem worth it: rate limiting only
+	// needs to work on average, it doesn't need to be absolutely precise.
+	//
+	// If we evicted successfully, then we need to update the count in
+	// all on-going evictions and ensure that the update state gets written
+	// back to the DeviceTaintRule status.
+	preallocate := 10
+	reservations := make([]*rate.Reservation, 0, preallocate)
+	reservationsSuccessful := true
+	defer func() {
+		if reservationsSuccessful {
+			return
+		}
+
+		now := time.Now()
+		var maxDelay time.Duration
+		for _, reservation := range reservations {
+			delay := reservation.DelayFrom(now)
+			if delay == rate.InfDuration {
+				// This rate limiter can never grant any token?!
+				// Shouldn't happen, log it and try again anyway
+				// after one minute (chosen so that if this happens
+				// we aren't busy looping).
+				logger.Error(nil, "Internal error: rate limiter refuses to grant tokens")
+				delay = time.Minute
+			}
+			if delay > maxDelay {
+				maxDelay = delay
+			}
+			reservation.Cancel()
+		}
+
+		// Try eviction again at some point in the future.
+		tc.evictPod(args.Object, now.Add(maxDelay))
+	}()
+
+	// Figure out all on-going evictions which affect the pod and reserve a token
+	// from their rate limiter (creating one if needed). At the end, update
+	// those evictions.
+	//
+	// Both must be protected by the mutex, but let's not hold that mutex
+	// while doing API calls.
+	evictionsForPod := make([]*deviceTaint, 0, preallocate)
+	evicted := false
+	defer func() {
+		if !evicted {
+			return
+		}
+
+		tc.mutex.Lock()
+		defer tc.mutex.Unlock()
+
+		for _, eviction := range evictionsForPod {
+			eviction.numEvictedPods++
+			if eviction.taint.Rule != nil {
+				// TODO: schedule status update
+			}
+		}
+	}()
+	func() {
+		tc.mutex.Lock()
+		defer tc.mutex.Unlock()
+
+		for _, eviction := range tc.evictions {
+			if !eviction.pendingPods.Has(args.Object.UID) {
+				continue
+			}
+			evictionsForPod = append(evictionsForPod, eviction)
+
+			if eviction.limiter == nil {
+				// Eviction proceeds in bursts of 10 pods, more or less arbitrarily chosen.
+				// The rate limit is configurable.
+				limit := rate.Limit(ptr.Deref(eviction.taint.EvictionsPerSecond, resourceapi.DefaultEvictionsPerSecond))
+				eviction.limiter = rate.NewLimiter(limit, 10)
+			}
+			reservation := eviction.limiter.Reserve()
+			reservations = append(reservations, reservation)
+			if !reservation.OK() {
+				reservationsSuccessful = false
+			}
+		}
+	}()
+
+	logger.Info("Deleting pod", "pod", args.Object)
+	var err error
+	for i := 0; i < retries; i++ {
+		err = addConditionAndDeletePod(ctx, c, args.Object, &emitEventFunc)
+		if apierrors.IsNotFound(err) {
+			// Not a problem, the work is done.
+			// But we didn't do it, so don't
+			// bump the metric.
+			return nil
+		}
+		if err == nil {
+			evicted = true
+			tc.metrics.PodDeletionsTotal.Inc()
+			tc.metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt).Seconds()))
+			return nil
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return err
 }
 
 func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, podRef tainteviction.NamespacedObject, emitEventFunc *func(tainteviction.NamespacedObject)) (err error) {
@@ -359,7 +466,7 @@ func (tc *Controller) Run(ctx context.Context) error {
 	tc.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: tc.name}).WithLogger(logger)
 	defer eventBroadcaster.Shutdown()
 
-	taintEvictionQueue := tainteviction.CreateWorkerQueue(tc.deletePodHandler(tc.client, tc.emitPodDeletionEvent))
+	taintEvictionQueue := tainteviction.CreateWorkerQueue(tc.createDeletePodHandler(tc.client, tc.emitPodDeletionEvent))
 	evictPod := tc.evictPod
 	tc.evictPod = func(podRef tainteviction.NamespacedObject, fireAt time.Time) {
 		// Only relevant for testing.
