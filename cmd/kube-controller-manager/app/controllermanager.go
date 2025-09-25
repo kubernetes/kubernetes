@@ -261,6 +261,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		// Start the informers.
 		stopCh := ctx.Done()
 		controllerContext.InformerFactory.Start(stopCh)
+		controllerContext.InformerFactory.WaitForCacheSync(stopCh)
 		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
 		close(controllerContext.InformersStarted)
 
