@@ -52,7 +52,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 		labelSelectorString string
 		updatedLease        *v1.Lease
 		deletedLeaseNames   []string
-		wantCache           map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery
+		wantCache           map[string]PeerDiscoveryCacheEntry
 	}{
 		{
 			desc:                "single remote server",
@@ -66,12 +66,8 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 					Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
 				},
 			},
-			wantCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
-				"remote-1": {
-					{Group: "testgroup", Version: "v1", Resource: "testresources"}: {
-						Resource: "testresources",
-					},
-				},
+			wantCache: map[string]PeerDiscoveryCacheEntry{
+				"remote-1": makePeerDiscoveryCacheEntry("testgroup", "v1", "testresources"),
 			},
 		},
 		{
@@ -93,17 +89,9 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 					Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-2")},
 				},
 			},
-			wantCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
-				"remote-1": {
-					{Group: "testgroup", Version: "v1", Resource: "testresources"}: {
-						Resource: "testresources",
-					},
-				},
-				"remote-2": {
-					{Group: "testgroup", Version: "v1", Resource: "testresources"}: {
-						Resource: "testresources",
-					},
-				},
+			wantCache: map[string]PeerDiscoveryCacheEntry{
+				"remote-1": makePeerDiscoveryCacheEntry("testgroup", "v1", "testresources"),
+				"remote-2": makePeerDiscoveryCacheEntry("testgroup", "v1", "testresources"),
 			},
 		},
 		{
@@ -125,12 +113,8 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 				},
 				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-2")},
 			},
-			wantCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
-				"remote-1": {
-					{Group: "testgroup", Version: "v1", Resource: "testresources"}: {
-						Resource: "testresources",
-					},
-				},
+			wantCache: map[string]PeerDiscoveryCacheEntry{
+				"remote-1": makePeerDiscoveryCacheEntry("testgroup", "v1", "testresources"),
 			},
 		},
 		{
@@ -146,7 +130,7 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 				},
 			},
 			deletedLeaseNames: []string{"remote-1"},
-			wantCache:         map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{},
+			wantCache:         map[string]PeerDiscoveryCacheEntry{},
 		},
 	}
 
@@ -210,13 +194,9 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 			go h.RunPeerDiscoveryCacheSync(ctx, 1)
 
 			// Wait for initial cache update.
-			initialCache := map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{}
+			initialCache := map[string]PeerDiscoveryCacheEntry{}
 			for _, lease := range tt.leases {
-				initialCache[lease.Name] = map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
-					{Group: "testgroup", Version: "v1", Resource: "testresources"}: {
-						Resource: "testresources",
-					},
-				}
+				initialCache[lease.Name] = makePeerDiscoveryCacheEntry("testgroup", "v1", "testresources")
 			}
 			err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
 				select {
@@ -272,7 +252,8 @@ func TestRunPeerDiscoveryCacheSync(t *testing.T) {
 				default:
 				}
 				gotCache := h.peerDiscoveryInfoCache.Load()
-				return assert.ObjectsAreEqual(tt.wantCache, gotCache), nil
+				r := assert.ObjectsAreEqual(tt.wantCache, gotCache)
+				return r, nil
 			})
 			if err != nil {
 				t.Errorf("cache doesnt match expectation: %v", err)
@@ -351,4 +332,27 @@ func (f *fakeReconciler) StopReconciling() {
 
 func (f *fakeReconciler) setEndpoint(serverID, endpoint string) {
 	f.endpoints[serverID] = endpoint
+}
+
+func makePeerDiscoveryCacheEntry(group, version, resource string) PeerDiscoveryCacheEntry {
+	return PeerDiscoveryCacheEntry{
+		GVRs: map[schema.GroupVersionResource]bool{
+			{Group: group, Version: version, Resource: resource}: true,
+		},
+		Groups: []apidiscoveryv2.APIGroupDiscovery{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: group,
+				},
+				Versions: []apidiscoveryv2.APIVersionDiscovery{
+					{
+						Version: version,
+						Resources: []apidiscoveryv2.APIResourceDiscovery{
+							{Resource: resource},
+						},
+					},
+				},
+			},
+		},
+	}
 }

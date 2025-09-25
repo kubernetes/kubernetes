@@ -281,9 +281,8 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
-		apiServiceLister := informerFactory.Apiregistration().V1().APIServices().Lister()
-		s.GenericAPIServer.PeerMergedAggregatedDiscoveryManager = aggregated.NewPeerMergedDiscoveryHandler(s.GenericAPIServer.AggregatedDiscoveryGroupManager, c.ExtraConfig.PeerProxy, apiServiceLister, "apis")
-		s.GenericAPIServer.PeerMergedAggregatedLegacyDiscoveryManager = aggregated.NewPeerMergedDiscoveryHandler(s.GenericAPIServer.AggregatedLegacyDiscoveryGroupManager, c.ExtraConfig.PeerProxy, apiServiceLister, "api")
+		s.GenericAPIServer.PeerMergedAggregatedDiscoveryManager = aggregated.NewPeerMergedDiscoveryHandler(s.GenericAPIServer.AggregatedDiscoveryGroupManager, c.ExtraConfig.PeerProxy, "apis")
+		s.GenericAPIServer.PeerMergedAggregatedLegacyDiscoveryManager = aggregated.NewPeerMergedDiscoveryHandler(s.GenericAPIServer.AggregatedLegacyDiscoveryGroupManager, c.ExtraConfig.PeerProxy, "api")
 
 		// Register cache invalidation callbacks to the peer proxy handler
 		if c.ExtraConfig.PeerProxy != nil {
