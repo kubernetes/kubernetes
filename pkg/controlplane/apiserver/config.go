@@ -237,6 +237,7 @@ func BuildGenericConfig(
 	}
 
 	genericConfig.AggregatedDiscoveryGroupManager = aggregated.NewResourceManager("apis")
+
 	return
 }
 

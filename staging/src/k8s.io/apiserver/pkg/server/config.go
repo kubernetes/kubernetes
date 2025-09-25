@@ -863,7 +863,6 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	}
 	s.AggregatedDiscoveryGroupManager = manager
 	s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager("api")
-
 	for {
 		if c.JSONPatchMaxCopyBytes <= 0 {
 			break

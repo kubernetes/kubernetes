@@ -37,6 +37,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
 
@@ -564,6 +566,13 @@ func writeDiscoveryResponse(
 			mediaType.Convert.GroupVersion() != apidiscoveryv2beta1.SchemeGroupVersion) {
 		utilruntime.HandleError(fmt.Errorf("expected aggregated discovery group version, got group: %s, version %s", mediaType.Convert.Group, mediaType.Convert.Version))
 		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if mediaType.Convert.GroupVersion() == apidiscoveryv2beta1.SchemeGroupVersion &&
+		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryRemoveBetaType) {
+		klog.Errorf("aggregated discovery version v2beta1 is removed. Please update to use v2")
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 	targetGV = mediaType.Convert.GroupVersion()

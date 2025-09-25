@@ -2279,8 +2279,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	TranslateStreamCloseWebsocketRequests: {},
 
-	UnknownVersionInteroperabilityProxy: {},
-
 	UserNamespacesPodSecurityStandards: {},
 
 	UserNamespacesSupport: {},
@@ -2368,6 +2366,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.TokenRequestServiceAccountUIDValidation: {},
 
 	genericfeatures.UnauthenticatedHTTP2DOSMitigation: {},
+
+	genericfeatures.UnknownVersionInteroperabilityProxy: {genericfeatures.APIServerIdentity},
 
 	genericfeatures.WatchCacheInitializationPostStartHook: {},
 

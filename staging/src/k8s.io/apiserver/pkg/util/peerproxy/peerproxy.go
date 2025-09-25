@@ -54,7 +54,7 @@ type Interface interface {
 	HasFinishedSync() bool
 	RunLocalDiscoveryCacheSync(stopCh <-chan struct{}) error
 	RunPeerDiscoveryCacheSync(ctx context.Context, workers int)
-	GetPeerResources() map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery
+	GetPeerResources() map[string][]apidiscoveryv2.APIGroupDiscovery
 	RegisterCacheInvalidationCallback(cb func())
 }
 
@@ -109,7 +109,7 @@ func NewPeerProxyHandler(
 	discoveryClient.ForceUnmergedDiscovery = true
 	h.discoveryClient = discoveryClient
 	h.localDiscoveryInfoCache.Store(map[schema.GroupVersionResource]bool{})
-	h.peerDiscoveryInfoCache.Store(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{})
+	h.peerDiscoveryInfoCache.Store(map[string]PeerDiscoveryCacheEntry{})
 
 	proxyTransport, err := transport.New(proxyClientConfig)
 	if err != nil {
