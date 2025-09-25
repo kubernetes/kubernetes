@@ -82,14 +82,14 @@ type corruptObjErrAggregator struct {
 }
 
 func (a *corruptObjErrAggregator) Aggregate(key string, err error) bool {
-	if len(a.errs) >= a.maxCount {
-		// add a sentinel error to indicate there are more
-		a.errs = append(a.errs, errTooMany)
-		return true
-	}
 	var corruptObjErr *corruptObjectError
 	if errors.As(err, &corruptObjErr) {
 		a.errs = append(a.errs, storage.NewCorruptObjError(key, corruptObjErr))
+		if len(a.errs) >= a.maxCount {
+			// add a sentinel error to indicate there are more
+			a.errs = append(a.errs, errTooMany)
+			return true
+		}
 		return false
 	}
 
