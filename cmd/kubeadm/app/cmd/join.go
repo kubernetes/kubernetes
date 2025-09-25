@@ -625,6 +625,28 @@ func (j *joinData) Client() (clientset.Interface, error) {
 	return client, nil
 }
 
+// WaitControlPlaneClient returns a basic client used for the purpose of waiting
+// for control plane components to report 'ok' on their respective health check endpoints.
+// It uses the admin.conf as the base, but modifies it to point at the local API server instead
+// of the control plane endpoint.
+func (j *joinData) WaitControlPlaneClient() (clientset.Interface, error) {
+	pathAdmin := filepath.Join(j.KubeConfigDir(), kubeadmconstants.AdminKubeConfigFileName)
+	config, err := clientcmd.LoadFromFile(pathAdmin)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range config.Clusters {
+		v.Server = fmt.Sprintf("https://%s:%d",
+			j.Cfg().ControlPlane.LocalAPIEndpoint.AdvertiseAddress,
+			j.Cfg().ControlPlane.LocalAPIEndpoint.BindPort)
+	}
+	client, err := kubeconfigutil.ToClientSet(config)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
 // IgnorePreflightErrors returns the list of preflight errors to ignore.
 func (j *joinData) IgnorePreflightErrors() sets.Set[string] {
 	return j.ignorePreflightErrors
