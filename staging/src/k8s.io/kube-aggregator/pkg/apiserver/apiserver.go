@@ -281,17 +281,12 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
-		apiServiceLister := informerFactory.Apiregistration().V1().APIServices().Lister()
-		s.GenericAPIServer.PeerMergedAggregatedDiscoveryManager = aggregated.NewPeerMergedDiscoveryHandler(s.GenericAPIServer.AggregatedDiscoveryGroupManager, c.ExtraConfig.PeerProxy, apiServiceLister, "apis")
-		s.GenericAPIServer.PeerMergedAggregatedLegacyDiscoveryManager = aggregated.NewPeerMergedDiscoveryHandler(s.GenericAPIServer.AggregatedLegacyDiscoveryGroupManager, c.ExtraConfig.PeerProxy, apiServiceLister, "api")
+		s.GenericAPIServer.PeerMergedAggregatedDiscoveryManager = aggregated.NewPeerMergedDiscoveryHandler(s.GenericAPIServer.AggregatedDiscoveryGroupManager, c.ExtraConfig.PeerProxy, "apis")
 
 		// Register cache invalidation callbacks to the peer proxy handler
 		if c.ExtraConfig.PeerProxy != nil {
 			if s.GenericAPIServer.PeerMergedAggregatedDiscoveryManager != nil {
 				c.ExtraConfig.PeerProxy.RegisterCacheInvalidationCallback(s.GenericAPIServer.PeerMergedAggregatedDiscoveryManager.InvalidateCache)
-			}
-			if s.GenericAPIServer.PeerMergedAggregatedLegacyDiscoveryManager != nil {
-				c.ExtraConfig.PeerProxy.RegisterCacheInvalidationCallback(s.GenericAPIServer.PeerMergedAggregatedLegacyDiscoveryManager.InvalidateCache)
 			}
 		}
 	}
@@ -299,11 +294,6 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	apisHandlerWithAggregationSupport := aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedDiscoveryGroupManager, s.GenericAPIServer.PeerMergedAggregatedDiscoveryManager)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandlerWithAggregationSupport)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
-
-	// TODO: do we want to support legacy /api endpoint with peer merged discovery for aggregator?
-	/* apiHandler := aggregated.WrapAggregatedDiscoveryToHandler(apisHandler, s.GenericAPIServer.AggregatedLegacyDiscoveryGroupManager, s.GenericAPIServer.PeerMergedAggregatedLegacyDiscoveryManager)
-	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/api", apiHandler)
-	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/api/", apiHandler) */
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().V1().APIServices(), s)
 	if len(c.ExtraConfig.ProxyClientCertFile) > 0 && len(c.ExtraConfig.ProxyClientKeyFile) > 0 {

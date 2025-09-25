@@ -24,8 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -36,8 +34,6 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	v1 "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 )
 
 func TestMergedDiscovery(t *testing.T) {
@@ -46,29 +42,18 @@ func TestMergedDiscovery(t *testing.T) {
 	manager.AddGroupVersion(localGroup.Name, localGroup.Versions[0])
 
 	peerProvider := &mockPeerDiscoveryProvider{
-		resources: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
+		resources: map[string][]apidiscoveryv2.APIGroupDiscovery{
 			"peer-server-1": {
-				gvr("peer.example.com", "v2", "peer-resource"): newAPIResource(gvr("peer.example.com", "v2", "peer-resource")),
+				newAPIGroup("peer.example.com", "v2", "peer-resource"),
 			},
 		},
 	}
 
-	mockLister := &mockAPIServiceLister{services: map[string]*mockAPIService{
-		"v1.local.example.com": {
-			groupPriority:   100,
-			versionPriority: 10,
-		},
-		"v2.peer.example.com": {
-			groupPriority:   90,
-			versionPriority: 5,
-		},
-	}}
 	testCases := []struct {
 		name                      string
 		enablePeerMergedDiscovery bool
 		acceptHeader              string
 		peerProvider              discoveryendpoint.PeerDiscoveryProvider
-		mockLister                v1.APIServiceLister
 		wantGroupNames            []string
 	}{
 		{
@@ -82,7 +67,6 @@ func TestMergedDiscovery(t *testing.T) {
 			enablePeerMergedDiscovery: true,
 			acceptHeader:              "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList",
 			peerProvider:              peerProvider,
-			mockLister:                mockLister,
 			wantGroupNames:            []string{"local.example.com", "peer.example.com"},
 		},
 		{
@@ -90,7 +74,6 @@ func TestMergedDiscovery(t *testing.T) {
 			enablePeerMergedDiscovery: true,
 			acceptHeader:              "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=foo",
 			peerProvider:              peerProvider,
-			mockLister:                mockLister,
 			wantGroupNames:            []string{"local.example.com", "peer.example.com"},
 		},
 		{
@@ -98,7 +81,6 @@ func TestMergedDiscovery(t *testing.T) {
 			enablePeerMergedDiscovery: true,
 			acceptHeader:              "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=unmerged",
 			peerProvider:              peerProvider,
-			mockLister:                mockLister,
 			wantGroupNames:            []string{"local.example.com"},
 		},
 		{
@@ -106,7 +88,6 @@ func TestMergedDiscovery(t *testing.T) {
 			enablePeerMergedDiscovery: true,
 			acceptHeader:              "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList",
 			peerProvider:              nil,
-			mockLister:                mockLister,
 			wantGroupNames:            []string{"local.example.com"},
 		},
 		{
@@ -114,20 +95,13 @@ func TestMergedDiscovery(t *testing.T) {
 			enablePeerMergedDiscovery: true,
 			acceptHeader:              "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList",
 			peerProvider: &mockPeerDiscoveryProvider{
-				resources: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
+				resources: map[string][]apidiscoveryv2.APIGroupDiscovery{
 					"peer-server-1": {
-						gvr("peer.example.com", "v2", "peer-resource"): newAPIResource(gvr("peer.example.com", "v2", "peer-resource")),
+						newAPIGroup("peer.example.com", "v2", "peer-resource"),
 					},
 					"peer-server-2": {
-						gvr("peer2.example.com", "v1", "peer2-resource"): newAPIResource(gvr("peer2.example.com", "v1", "peer2-resource")),
+						newAPIGroup("peer2.example.com", "v1", "peer2-resource"),
 					},
-				},
-			},
-			mockLister: &mockAPIServiceLister{
-				services: map[string]*mockAPIService{
-					"v1.local.example.com": {groupPriority: 100, versionPriority: 10},
-					"v2.peer.example.com":  {groupPriority: 90, versionPriority: 5},
-					"v1.peer2.example.com": {groupPriority: 80, versionPriority: 2},
 				},
 			},
 			wantGroupNames: []string{
@@ -140,7 +114,7 @@ func TestMergedDiscovery(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, tc.enablePeerMergedDiscovery)
 
-			peerMergedDiscoveryManager := discoveryendpoint.NewPeerMergedDiscoveryHandler(manager, tc.peerProvider, tc.mockLister, "apis")
+			peerMergedDiscoveryManager := discoveryendpoint.NewPeerMergedDiscoveryHandler(manager, tc.peerProvider, "apis")
 			wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(manager, manager, peerMergedDiscoveryManager)
 
 			resp, _, decoded := fetchPath(wrapped, tc.acceptHeader, "/apis", "")
@@ -161,14 +135,13 @@ func TestMergedDiscoveryMetrics(t *testing.T) {
 	localGroup := newAPIGroup("local.example.com", "v1", "local-resource")
 	manager.AddGroupVersion(localGroup.Name, localGroup.Versions[0])
 	peerProvider := &mockPeerDiscoveryProvider{
-		resources: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
+		resources: map[string][]apidiscoveryv2.APIGroupDiscovery{
 			"peer-server-1": {
-				gvr("peer.example.com", "v2", "peer-resource"): newAPIResource(gvr("peer.example.com", "v2", "peer-resource")),
+				newAPIGroup("peer.example.com", "v2", "peer-resource"),
 			},
 		},
 	}
-	mockLister := &mockAPIServiceLister{}
-	peerMergedDiscoveryManager := discoveryendpoint.NewPeerMergedDiscoveryHandler(manager, peerProvider, mockLister, "apis")
+	peerMergedDiscoveryManager := discoveryendpoint.NewPeerMergedDiscoveryHandler(manager, peerProvider, "apis")
 	wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(manager, manager, peerMergedDiscoveryManager)
 
 	legacyregistry.MustRegister(discoveryendpoint.MergedRequestCounter)
@@ -216,26 +189,14 @@ func TestMergedDiscovery_ETagHandling(t *testing.T) {
 	localGroup := newAPIGroup("local.example.com", "v1", "local-resource")
 	manager.AddGroupVersion(localGroup.Name, localGroup.Versions[0])
 	peerProvider := &mockPeerDiscoveryProvider{
-		resources: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
+		resources: map[string][]apidiscoveryv2.APIGroupDiscovery{
 			"peer-server-1": {
-				gvr("peer.example.com", "v2", "peer-resource"): newAPIResource(gvr("peer.example.com", "v2", "peer-resource")),
-			},
-		},
-	}
-	mockLister := &mockAPIServiceLister{
-		services: map[string]*mockAPIService{
-			"local.example.com.v1.svc": {
-				groupPriority:   100,
-				versionPriority: 10,
-			},
-			"peer.example.com.v2.svc": {
-				groupPriority:   90,
-				versionPriority: 5,
+				newAPIGroup("peer.example.com", "v2", "peer-resource"),
 			},
 		},
 	}
 
-	peerMergedDiscoveryManager := discoveryendpoint.NewPeerMergedDiscoveryHandler(manager, peerProvider, mockLister, "apis")
+	peerMergedDiscoveryManager := discoveryendpoint.NewPeerMergedDiscoveryHandler(manager, peerProvider, "apis")
 	wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(manager, manager, peerMergedDiscoveryManager)
 
 	// First request, get ETag
@@ -257,7 +218,7 @@ func TestMergedDiscovery_ETagHandling(t *testing.T) {
 	// Invalidate cache and add a new peer resource
 	peerMergedDiscoveryManager.InvalidateCache()
 	gvr := schema.GroupVersionResource{Group: "peer.example.com", Version: "v2", Resource: "peer-resource2"}
-	peerProvider.addResource("peer-server-3", gvr, newAPIResource(gvr))
+	peerProvider.addResource("peer-server-3", gvr, newAPIGroup(gvr.Group, gvr.Version, "peer-resource2"))
 
 	// Third request, ETag should change
 	rr3 := &responseRecorder{header: make(http.Header)}
@@ -270,7 +231,7 @@ func TestMergedDiscovery_ETagHandling(t *testing.T) {
 }
 
 type mockPeerDiscoveryProvider struct {
-	resources map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery
+	resources map[string][]apidiscoveryv2.APIGroupDiscovery
 }
 
 // responseRecorder is a minimal http.ResponseWriter for testing status codes and headers
@@ -284,21 +245,19 @@ func (r *responseRecorder) Header() http.Header         { return r.header }
 func (r *responseRecorder) Write(b []byte) (int, error) { return r.body.Write(b) }
 func (r *responseRecorder) WriteHeader(statusCode int)  { r.statusCode = statusCode }
 
-func (m *mockPeerDiscoveryProvider) GetPeerResources() map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery {
-	if m == nil || m.resources == nil {
-		return make(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
-	}
+func (m *mockPeerDiscoveryProvider) GetPeerResources() map[string][]apidiscoveryv2.APIGroupDiscovery {
 	return m.resources
 }
 
-func (m *mockPeerDiscoveryProvider) addResource(serverID string, gvr schema.GroupVersionResource, resource *apidiscoveryv2.APIResourceDiscovery) {
+func (m *mockPeerDiscoveryProvider) addResource(serverID string, gvr schema.GroupVersionResource, groupDiscovery apidiscoveryv2.APIGroupDiscovery) {
 	if m.resources == nil {
-		m.resources = make(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+		m.resources = make(map[string][]apidiscoveryv2.APIGroupDiscovery)
 	}
-	if _, ok := m.resources[serverID]; !ok {
-		m.resources[serverID] = make(map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+
+	if _, exists := m.resources[serverID]; !exists {
+		m.resources[serverID] = []apidiscoveryv2.APIGroupDiscovery{}
 	}
-	m.resources[serverID][gvr] = resource
+	m.resources[serverID] = append(m.resources[serverID], groupDiscovery)
 }
 
 func newAPIGroup(groupName, versionName, resourceName string) apidiscoveryv2.APIGroupDiscovery {
@@ -313,53 +272,4 @@ func newAPIGroup(groupName, versionName, resourceName string) apidiscoveryv2.API
 			},
 		},
 	}
-}
-
-func newAPIResource(gvr schema.GroupVersionResource) *apidiscoveryv2.APIResourceDiscovery {
-	return &apidiscoveryv2.APIResourceDiscovery{
-		Resource: gvr.Resource,
-		Scope:    apidiscoveryv2.ScopeCluster,
-		Verbs:    []string{"get", "list", "watch"},
-	}
-}
-
-func gvr(group, version, resource string) schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
-}
-
-type mockAPIService struct {
-	groupPriority   int32
-	versionPriority int32
-}
-
-type mockAPIServiceLister struct {
-	services map[string]*mockAPIService
-}
-
-func (l *mockAPIServiceLister) List(selector labels.Selector) ([]*apiregistrationv1.APIService, error) {
-	var result []*apiregistrationv1.APIService
-	for name, svc := range l.services {
-		result = append(result, &apiregistrationv1.APIService{
-			ObjectMeta: metav1.ObjectMeta{Name: name},
-			Spec: apiregistrationv1.APIServiceSpec{
-				GroupPriorityMinimum: svc.groupPriority,
-				VersionPriority:      svc.versionPriority,
-			},
-		})
-	}
-	return result, nil
-}
-
-func (l *mockAPIServiceLister) Get(name string) (*apiregistrationv1.APIService, error) {
-	svc, ok := l.services[name]
-	if !ok {
-		return nil, errors.NewNotFound(apiregistrationv1.Resource("apiservices"), name)
-	}
-	return &apiregistrationv1.APIService{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: apiregistrationv1.APIServiceSpec{
-			GroupPriorityMinimum: svc.groupPriority,
-			VersionPriority:      svc.versionPriority,
-		},
-	}, nil
 }

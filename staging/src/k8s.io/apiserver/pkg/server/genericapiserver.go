@@ -161,9 +161,6 @@ type GenericAPIServer struct {
 	// AggregatedLegacyDiscoveryGroupManager serves /api in an aggregated form.
 	AggregatedLegacyDiscoveryGroupManager discoveryendpoint.ResourceManager
 
-	// PeerMergedAggregatedLegacyDiscoveryManager serves /api in aggregated form merged from all peer apiservers.
-	PeerMergedAggregatedLegacyDiscoveryManager discoveryendpoint.PeerMergedResourceManager
-
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	openAPIConfig *openapicommon.Config
 

@@ -42,7 +42,6 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 
-	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -78,7 +77,7 @@ func TestPeerProxy(t *testing.T) {
 		peerproxiedHeader    string
 		reconcilerConfig     reconciler
 		localCache           map[schema.GroupVersionResource]bool
-		peerCache            map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery
+		peerCache            map[string]PeerDiscoveryCacheEntry
 		wantStatus           int
 		wantMetricsData      string
 	}{
@@ -117,10 +116,10 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 if no endpoint fetched from lease",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
+			peerCache: map[string]PeerDiscoveryCacheEntry{
 				remoteServerID1: {
-					{Group: "", Version: "foo", Resource: "bar"}: {
-						Resource: "bar",
+					GVRs: map[schema.GroupVersionResource]bool{
+						{Group: "", Version: "foo", Resource: "bar"}: true,
 					},
 				},
 			},
@@ -130,10 +129,10 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 unreachable peer bind address",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
+			peerCache: map[string]PeerDiscoveryCacheEntry{
 				remoteServerID1: {
-					{Group: "", Version: "foo", Resource: "bar"}: {
-						Resource: "bar",
+					GVRs: map[schema.GroupVersionResource]bool{
+						{Group: "", Version: "foo", Resource: "bar"}: true,
 					},
 				},
 			},
@@ -157,15 +156,15 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 if one apiserver's endpoint lease wasnt found but another valid (unreachable) apiserver was found",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery{
+			peerCache: map[string]PeerDiscoveryCacheEntry{
 				remoteServerID1: {
-					{Group: "", Version: "foo", Resource: "bar"}: {
-						Resource: "bar",
+					GVRs: map[schema.GroupVersionResource]bool{
+						{Group: "", Version: "foo", Resource: "bar"}: true,
 					},
 				},
 				remoteServerID2: {
-					{Group: "", Version: "foo", Resource: "bar"}: {
-						Resource: "bar",
+					GVRs: map[schema.GroupVersionResource]bool{
+						{Group: "", Version: "foo", Resource: "bar"}: true,
 					},
 				},
 			},
@@ -260,7 +259,7 @@ func newFakePeerEndpointReconciler(t *testing.T) reconcilers.PeerEndpointLeaseRe
 
 func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handler,
 	reconciler reconcilers.PeerEndpointLeaseReconciler,
-	localCache map[schema.GroupVersionResource]bool, peerCache map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery) http.Handler {
+	localCache map[schema.GroupVersionResource]bool, peerCache map[string]PeerDiscoveryCacheEntry) http.Handler {
 	// Add peerproxy handler
 	s := serializer.NewCodecFactory(runtime.NewScheme()).WithoutConversion()
 	peerProxyHandler, err := newFakePeerProxyHandler(informerFinishedSync, reconciler, localServerID, s, localCache, peerCache)
@@ -281,7 +280,7 @@ func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handl
 
 func newFakePeerProxyHandler(informerFinishedSync bool,
 	reconciler reconcilers.PeerEndpointLeaseReconciler, id string, s runtime.NegotiatedSerializer,
-	localCache map[schema.GroupVersionResource]bool, peerCache map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery) (*peerProxyHandler, error) {
+	localCache map[schema.GroupVersionResource]bool, peerCache map[string]PeerDiscoveryCacheEntry) (*peerProxyHandler, error) {
 	clientset := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 	leaseInformer := informerFactory.Coordination().V1().Leases()

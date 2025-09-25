@@ -18,27 +18,22 @@ package aggregated
 
 import (
 	"net/http"
-	"sort"
 	"sync/atomic"
 
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
+	utilsort "k8s.io/apimachinery/pkg/util/sort"
 )
 
 // PeerDiscoveryProvider defines an interface to get peer resources for merged discovery.
 type PeerDiscoveryProvider interface {
-	GetPeerResources() map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery
+	GetPeerResources() map[string][]apidiscoveryv2.APIGroupDiscovery
 }
 
 // PeerMergedResourceManager defines the interface for managing merged discovery resources
@@ -56,14 +51,13 @@ type PeerMergedResourceManager interface {
 type peerMergedDiscoveryHandler struct {
 	localResourceManager  ResourceManager
 	peerDiscoveryProvider PeerDiscoveryProvider
-	apiServiceLister      listers.APIServiceLister
 	serializer            runtime.NegotiatedSerializer
 	cache                 atomic.Pointer[cachedGroupList]
 	serveHTTPFunc         func(http.ResponseWriter, *http.Request)
 }
 
 // NewPeerMergedDiscoveryHandler creates a new handler for merged discovery.
-func NewPeerMergedDiscoveryHandler(localDiscoveryProvider ResourceManager, peerDiscoveryProvider PeerDiscoveryProvider, apiServiceLister listers.APIServiceLister, path string) PeerMergedResourceManager {
+func NewPeerMergedDiscoveryHandler(localDiscoveryProvider ResourceManager, peerDiscoveryProvider PeerDiscoveryProvider, path string) PeerMergedResourceManager {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
 	codecs := serializer.NewCodecFactory(scheme)
@@ -71,7 +65,6 @@ func NewPeerMergedDiscoveryHandler(localDiscoveryProvider ResourceManager, peerD
 	pmd := &peerMergedDiscoveryHandler{
 		localResourceManager:  localDiscoveryProvider,
 		peerDiscoveryProvider: peerDiscoveryProvider,
-		apiServiceLister:      apiServiceLister,
 		serializer:            codecs,
 	}
 
@@ -151,170 +144,110 @@ func (h *peerMergedDiscoveryHandler) fetchFromCache() *cachedGroupList {
 
 func (h *peerMergedDiscoveryHandler) mergeResources(
 	localGroups []apidiscoveryv2.APIGroupDiscovery,
-	peerResources map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery,
+	peerGroupDiscovery map[string][]apidiscoveryv2.APIGroupDiscovery,
 ) []apidiscoveryv2.APIGroupDiscovery {
-	groupMap := make(map[string]*apidiscoveryv2.APIGroupDiscovery)
-	localResourceSet := make(map[schema.GroupVersionResource]bool)
+	// Return local groups if no peer resources exist.
+	if len(peerGroupDiscovery) == 0 {
+		return localGroups
+	}
+
+	groupMap := make(map[string]apidiscoveryv2.APIGroupDiscovery)
+	allGroups := make([][]string, 0, 1+len(peerGroupDiscovery))
+
+	// Add local groups
+	localGroupNames := make([]string, 0, len(localGroups))
 	for _, group := range localGroups {
-		groupCopy := group.DeepCopy()
-		for i := range groupCopy.Versions {
-			for j := range groupCopy.Versions[i].Resources {
-				gvr := schema.GroupVersionResource{
-					Group:    group.Name,
-					Version:  groupCopy.Versions[i].Version,
-					Resource: groupCopy.Versions[i].Resources[j].Resource,
-				}
-				localResourceSet[gvr] = true
+		localGroupNames = append(localGroupNames, group.Name)
+		groupMap[group.Name] = group
+	}
+	allGroups = append(allGroups, localGroupNames)
+
+	// Add peer groups.
+	for _, peerGroupList := range peerGroupDiscovery {
+		peerGroupNames := make([]string, 0, len(peerGroupList))
+		for _, group := range peerGroupList {
+			if existing, ok := groupMap[group.Name]; ok {
+				// Merge versions and resources
+				merged := mergeVersionsAcrossGroups(existing, group)
+				groupMap[group.Name] = merged
+			} else {
+				groupMap[group.Name] = group
 			}
+
+			peerGroupNames = append(peerGroupNames, group.Name)
 		}
-		groupMap[group.Name] = groupCopy
+		allGroups = append(allGroups, peerGroupNames)
 	}
-	if len(peerResources) == 0 {
-		return h.convertToSortedSlice(groupMap)
-	}
+
 	MergedRequestCounter.Inc()
-	for _, resources := range peerResources {
-		for gvr, resource := range resources {
-			if localResourceSet[gvr] {
-				continue
-			}
-			addPeerResource(groupMap, gvr, resource)
-		}
-	}
-
-	return h.convertToSortedSlice(groupMap)
+	return h.mergeGroups(groupMap, allGroups)
 }
 
-func (h *peerMergedDiscoveryHandler) convertToSortedSlice(groupMap map[string]*apidiscoveryv2.APIGroupDiscovery) []apidiscoveryv2.APIGroupDiscovery {
-	groupList, priorities := h.collectPriorities(groupMap)
-	sort.SliceStable(groupList, func(i, j int) bool {
-		gi, gj := groupList[i], groupList[j]
-
-		gpi, gpj := getGroupPriority(gi, priorities), getGroupPriority(gj, priorities)
-		if gpi != gpj {
-			return gpi > gpj // higher group priority first (descending)
-		}
-
-		vpi, vpj := getMaxVersionPriority(gi, priorities), getMaxVersionPriority(gj, priorities)
-		if vpi != vpj {
-			return vpi > vpj // higher version priority first (descending)
-		}
-
-		// Fallback to lexicographical sort by group name
-		return gi.Name < gj.Name
-	})
-
-	return groupList
-}
-
-func addPeerResource(
-	groupMap map[string]*apidiscoveryv2.APIGroupDiscovery,
-	gvr schema.GroupVersionResource,
-	resource *apidiscoveryv2.APIResourceDiscovery,
-) {
-	groupName := gvr.Group
-	group, exists := groupMap[groupName]
-	if !exists {
-		group = &apidiscoveryv2.APIGroupDiscovery{
-			ObjectMeta: metav1.ObjectMeta{Name: groupName},
-			Versions:   []apidiscoveryv2.APIVersionDiscovery{},
-		}
-		groupMap[groupName] = group
-	}
-
-	versionIndex := -1
-	for i, version := range group.Versions {
-		if version.Version == gvr.Version {
-			versionIndex = i
-			break
-		}
-	}
-
-	if versionIndex == -1 {
-		group.Versions = append(group.Versions, apidiscoveryv2.APIVersionDiscovery{
-			Version:   gvr.Version,
-			Resources: []apidiscoveryv2.APIResourceDiscovery{},
-		})
-		versionIndex = len(group.Versions) - 1
-	}
-
-	resourceCopy := resource.DeepCopy()
-	group.Versions[versionIndex].Resources = append(group.Versions[versionIndex].Resources, *resourceCopy)
-}
-
-func (h *peerMergedDiscoveryHandler) collectPriorities(
-	groupMap map[string]*apidiscoveryv2.APIGroupDiscovery,
-) ([]apidiscoveryv2.APIGroupDiscovery, map[gvKey]groupVersionPriorities) {
-	priorities := make(map[gvKey]groupVersionPriorities)
-	// If no lister, return all groups/versions
-	if h.apiServiceLister == nil {
-		groupList := make([]apidiscoveryv2.APIGroupDiscovery, 0, len(groupMap))
-		for _, group := range groupMap {
-			groupList = append(groupList, *group)
-		}
-		return groupList, priorities
-	}
-
-	apiServices, err := h.apiServiceLister.List(labels.Everything())
-	apiServiceMap := make(map[string]*v1.APIService)
-	if err == nil {
-		for _, apiSvc := range apiServices {
-			apiServiceMap[apiSvc.Name] = apiSvc
-		}
-	}
-
-	groupList := make([]apidiscoveryv2.APIGroupDiscovery, 0, len(groupMap))
-	for _, group := range groupMap {
-		versionList := make([]apidiscoveryv2.APIVersionDiscovery, 0, len(group.Versions))
-		for _, version := range group.Versions {
-			apiServiceName := version.Version + "." + group.Name
-			if apiSvc, ok := apiServiceMap[apiServiceName]; ok {
-				priorities[gvKey{group: group.Name, version: version.Version}] = groupVersionPriorities{
-					groupPriority:   apiSvc.Spec.GroupPriorityMinimum,
-					versionPriority: apiSvc.Spec.VersionPriority,
-				}
-			}
-			versionList = append(versionList, version)
-		}
-		if len(versionList) > 0 {
-			groupCopy := group.DeepCopy()
-			groupCopy.Versions = versionList
-			groupList = append(groupList, *groupCopy)
-		}
-	}
-	return groupList, priorities
-}
-
-func getGroupPriority(group apidiscoveryv2.APIGroupDiscovery, priorities map[gvKey]groupVersionPriorities) int32 {
-	if len(group.Versions) == 0 {
-		return -1
-	}
-	key := gvKey{group: group.Name, version: group.Versions[0].Version}
-	if p, ok := priorities[key]; ok {
-		return p.groupPriority
-	}
-	return -1
-}
-
-func getMaxVersionPriority(group apidiscoveryv2.APIGroupDiscovery, priorities map[gvKey]groupVersionPriorities) int32 {
-	max := int32(-1)
-	for _, version := range group.Versions {
-		key := gvKey{group: group.Name, version: version.Version}
-		if p, ok := priorities[key]; ok {
-			if p.versionPriority > max {
-				max = p.versionPriority
+// mergeVersionsAcrossGroups merges two APIGroupDiscovery objects using consensus topological ordering for versions and resources.
+func mergeVersionsAcrossGroups(a, b apidiscoveryv2.APIGroupDiscovery) apidiscoveryv2.APIGroupDiscovery {
+	// Collect all version orderings
+	versionOrderings := [][]string{}
+	versionMap := make(map[string]apidiscoveryv2.APIVersionDiscovery)
+	for _, src := range []apidiscoveryv2.APIGroupDiscovery{a, b} {
+		names := make([]string, 0, len(src.Versions))
+		for _, v := range src.Versions {
+			names = append(names, v.Version)
+			if existing, ok := versionMap[v.Version]; ok {
+				// Merge resources for this version
+				versionMap[v.Version] = mergeResourcesAcrossVersions(existing, v)
+			} else {
+				versionMap[v.Version] = v
 			}
 		}
+		versionOrderings = append(versionOrderings, names)
 	}
-	return max
+	// Consensus order for versions
+	orderedVersions := utilsort.SortDiscoveryGroupsTopo(versionOrderings)
+	mergedVersions := make([]apidiscoveryv2.APIVersionDiscovery, 0, len(orderedVersions))
+	for _, vName := range orderedVersions {
+		if v, ok := versionMap[vName]; ok {
+			mergedVersions = append(mergedVersions, v)
+		}
+	}
+	merged := a
+	merged.Versions = mergedVersions
+	return merged
 }
 
-type groupVersionPriorities struct {
-	groupPriority   int32
-	versionPriority int32
+// mergeResourcesAcrossVersions merges two APIVersionDiscovery objects using consensus ordering for resources.
+func mergeResourcesAcrossVersions(a, b apidiscoveryv2.APIVersionDiscovery) apidiscoveryv2.APIVersionDiscovery {
+	resourceOrderings := [][]string{}
+	resourceMap := make(map[string]apidiscoveryv2.APIResourceDiscovery)
+	for _, src := range []apidiscoveryv2.APIVersionDiscovery{a, b} {
+		names := make([]string, 0, len(src.Resources))
+		for _, r := range src.Resources {
+			names = append(names, r.Resource)
+			resourceMap[r.Resource] = r // Prefer last seen
+		}
+		resourceOrderings = append(resourceOrderings, names)
+	}
+	orderedResources := utilsort.SortDiscoveryGroupsTopo(resourceOrderings)
+	mergedResources := make([]apidiscoveryv2.APIResourceDiscovery, 0, len(orderedResources))
+	for _, rName := range orderedResources {
+		if r, ok := resourceMap[rName]; ok {
+			mergedResources = append(mergedResources, r)
+		}
+	}
+	merged := a
+	merged.Resources = mergedResources
+	return merged
 }
 
-type gvKey struct {
-	group   string
-	version string
+func (h *peerMergedDiscoveryHandler) mergeGroups(
+	groupMap map[string]apidiscoveryv2.APIGroupDiscovery,
+	groupOrderings [][]string,
+) []apidiscoveryv2.APIGroupDiscovery {
+	mergedOrderGroups := utilsort.SortDiscoveryGroupsTopo(groupOrderings)
+	result := make([]apidiscoveryv2.APIGroupDiscovery, 0, len(mergedOrderGroups))
+	for _, groupName := range mergedOrderGroups {
+		if group, ok := groupMap[groupName]; ok {
+			result = append(result, group)
+		}
+	}
+	return result
 }

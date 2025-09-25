@@ -79,15 +79,21 @@ type peerProxyHandler struct {
 	localDiscoveryCacheTicker            *time.Ticker
 	localDiscoveryInfoCachePopulated     chan struct{}
 	localDiscoveryInfoCachePopulatedOnce sync.Once
-	// Cache that stores resources served by peer apiservers.
+	// Cache that stores resources and groups served by peer apiservers.
 	// Refreshed if a new apiserver identity lease is added, deleted or
 	// holderIndentity change is observed in the lease.
-	peerDiscoveryInfoCache atomic.Value
+	peerDiscoveryInfoCache atomic.Value // map[string]struct{GVRs map[schema.GroupVersionResource]bool; Groups []apidiscoveryv2.APIGroupDiscovery}
 	proxyTransport         http.RoundTripper
 	// Worker queue that keeps the peerDiscoveryInfoCache up-to-date.
 	peerLeaseQueue             workqueue.TypedRateLimitingInterface[string]
 	serializer                 runtime.NegotiatedSerializer
 	cacheInvalidationCallbacks []func()
+}
+
+// PeerDiscoveryCacheEntry holds the GVRs and group-level discovery info for a peer.
+type PeerDiscoveryCacheEntry struct {
+	GVRs           map[schema.GroupVersionResource]bool
+	GroupDiscovery []apidiscoveryv2.APIGroupDiscovery
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
@@ -269,18 +275,18 @@ func (h *peerProxyHandler) findServiceableByPeerFromPeerDiscoveryCache(gvr schem
 		return serviceableByIDs
 	}
 
-	cacheMap, ok := cache.(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+	cacheMap, ok := cache.(map[string]PeerDiscoveryCacheEntry)
 	if !ok {
 		klog.Warning("Invalid cache type in peerDiscoveryInfoCache")
 		return serviceableByIDs
 	}
 
-	for peerID, servedResources := range cacheMap {
+	for peerID, peerData := range cacheMap {
 		// Ignore local apiserver.
 		if peerID == h.serverID {
 			continue
 		}
-		if _, exists := servedResources[gvr]; exists {
+		if _, exists := peerData.GVRs[gvr]; exists {
 			serviceableByIDs = append(serviceableByIDs, peerID)
 		}
 	}
@@ -345,6 +351,7 @@ func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request,
 	delegate := &epmetrics.ResponseWriterDelegator{ResponseWriter: rw}
 	w := responsewriter.WrapForHTTP1Or2(delegate)
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, false, &responder{w: w, ctx: req.Context()})
+	klog.Infof("Proxying request for %s from %s to %s", req.URL.Path, req.Host, location.Host)
 	handler.ServeHTTP(w, newReq)
 	metrics.IncPeerProxiedRequest(req.Context(), strconv.Itoa(delegate.Status()))
 }
@@ -364,28 +371,28 @@ func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 }
 
 // GetPeerResources implements PeerDiscoveryProvider interface
-// Returns a map of serverID -> resources served by peer servers
-func (h *peerProxyHandler) GetPeerResources() map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery {
-	result := make(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+// Returns a map of serverID -> []apidiscoveryv2.APIGroupDiscovery served by peer servers
+func (h *peerProxyHandler) GetPeerResources() map[string][]apidiscoveryv2.APIGroupDiscovery {
+	result := make(map[string][]apidiscoveryv2.APIGroupDiscovery)
 
-	// Only add peer server resources (exclude local)
 	peerCache := h.peerDiscoveryInfoCache.Load()
 	if peerCache == nil {
 		klog.V(4).Infof("GetPeerResources: peer cache is nil")
 		return result
 	}
 
-	cacheMap := peerCache.(map[string]map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
+	cacheMap, ok := peerCache.(map[string]PeerDiscoveryCacheEntry)
+	if !ok {
+		klog.Warning("Invalid cache type in peerDiscoveryGVRCache")
+		return result
+	}
 
-	for serverID, resources := range cacheMap {
+	for serverID, peerData := range cacheMap {
 		if serverID == h.serverID {
 			klog.V(4).Infof("GetPeerResources: skipping local server %s", serverID)
 			continue // Skip local server
 		}
-		result[serverID] = make(map[schema.GroupVersionResource]*apidiscoveryv2.APIResourceDiscovery)
-		for gvr, resourceDetails := range resources {
-			result[serverID][gvr] = resourceDetails.DeepCopy()
-		}
+		result[serverID] = peerData.GroupDiscovery
 	}
 
 	return result
