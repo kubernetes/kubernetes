@@ -3802,8 +3802,7 @@ func TestAllocator(t *testing.T,
 		},
 		"device-binding-conditions": {
 			features: Features{
-				DeviceBinding: true,
-				DeviceStatus:  true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 1))),
@@ -3825,8 +3824,7 @@ func TestAllocator(t *testing.T,
 		},
 		"binding-conditions-multiple-devices": {
 			features: Features{
-				DeviceBinding: true,
-				DeviceStatus:  true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
@@ -3854,34 +3852,7 @@ func TestAllocator(t *testing.T,
 		},
 		"binding-conditions-without-feature-gate": {
 			features: Features{
-				DeviceBinding: false,
-				DeviceStatus:  false,
-			},
-			claimsToAllocate: objects(
-				claimWithRequests(claim0, nil, request(req0, classA, 1))),
-			classes: objects(class(classA, driverA)),
-			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}))),
-			node:          node(node1, region1),
-			expectResults: nil,
-		},
-		"device-binding-conditions-without-binding-conditions-feature-gate": {
-			features: Features{
-				DeviceBinding: false,
-				DeviceStatus:  true,
-			},
-			claimsToAllocate: objects(
-				claimWithRequests(claim0, nil, request(req0, classA, 1))),
-			classes: objects(class(classA, driverA)),
-			slices: unwrap(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, nil).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}))),
-			node:          node(node1, region1),
-			expectResults: nil,
-		},
-		"device-binding-conditions-without-device-status-feature-gate": {
-			features: Features{
-				DeviceBinding: true,
-				DeviceStatus:  false,
+				DeviceBindingAndStatus: false,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 1))),
@@ -3893,8 +3864,7 @@ func TestAllocator(t *testing.T,
 		},
 		"node-restriction": {
 			features: Features{
-				DeviceBinding: true,
-				DeviceStatus:  true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
@@ -3908,9 +3878,8 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 1)),
@@ -3945,9 +3914,8 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions-multiple": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
@@ -3992,9 +3960,8 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions-some-devices-no-conditions": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
@@ -4046,9 +4013,8 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions-multi-slices": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 2)),
@@ -4096,10 +4062,9 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions-and-taints": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
-				DeviceTaints:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
+				DeviceTaints:           true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 2)),
@@ -4136,10 +4101,9 @@ func TestAllocator(t *testing.T,
 		},
 		"partitionable-devices-with-binding-conditions-and-taints-tolerated": {
 			features: Features{
-				PartitionableDevices: true,
-				DeviceBinding:        true,
-				DeviceStatus:         true,
-				DeviceTaints:         true,
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
+				DeviceTaints:           true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 2)).withTolerations(resourceapi.DeviceToleration{
