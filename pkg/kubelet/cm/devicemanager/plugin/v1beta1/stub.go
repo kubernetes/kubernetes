@@ -292,6 +292,7 @@ func (m *Stub) Register(ctx context.Context, kubeletEndpoint, resourceName strin
 	ctxDial, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	//nolint:staticcheck // SA1019: grpc.DialContext is deprecated: use NewClient instead.
 	conn, err := grpc.DialContext(ctxDial, kubeletEndpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
