@@ -676,6 +676,8 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			return device.Name, "name"
 		}, fldPath.Child("devices"))...)
 
+	allErrs = append(allErrs, validateSlice(spec.Taints, resource.DeviceTaintsMaxLength, validateSliceDeviceTaint, fldPath.Child("taints"))...)
+
 	// Size limit for total number of counters in devices enforced here.
 	numDeviceCounters := 0
 	for _, device := range spec.Devices {
@@ -700,6 +702,23 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		func(counterSet resource.CounterSet) (string, string) {
 			return counterSet.Name, "name"
 		}, fldPath.Child("sharedCounters"))...)
+
+	// Enforce ResourceSliceContent one-of.
+	numSliceContent := 0
+	if len(spec.Devices) > 0 {
+		numSliceContent++
+	}
+	if len(spec.Taints) > 0 {
+		numSliceContent++
+	}
+	switch numSliceContent {
+	case 0:
+		// Not an error because "no devices" has been valid in Kubernetes <= 1.34 and has to remain valid!
+		// allErrs = append(allErrs, field.Required(fldPath, "exactly one of `devices` or `taints` is required"))
+	case 1:
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "at most one of `devices` or `taints` is supported, but multiple fields are set"))
+	}
 
 	return allErrs
 }
@@ -763,7 +782,6 @@ func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterTo
 	} else {
 		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
 	}
-	allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength, validateDeviceTaint, fldPath.Child("taints"))...)
 
 	allErrs = append(allErrs, validateSet(device.ConsumesCounters, -1,
 		validateDeviceCounterConsumption,
@@ -1334,7 +1352,16 @@ func validateDeviceTaintSelector(filter, oldFilter *resource.DeviceTaintSelector
 }
 
 var validDeviceTolerationOperators = []resource.DeviceTolerationOperator{resource.DeviceTolerationOpEqual, resource.DeviceTolerationOpExists}
-var validDeviceTaintEffects = sets.New(resource.DeviceTaintEffectNoSchedule, resource.DeviceTaintEffectNoExecute)
+var validDeviceTaintEffects = sets.New(resource.DeviceTaintEffectNone, resource.DeviceTaintEffectNoSchedule, resource.DeviceTaintEffectNoExecute)
+
+func validateSliceDeviceTaint(taint resource.SliceDeviceTaint, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	allErrs = append(allErrs, validateDeviceName(taint.Device, fldPath.Child("device"))...)
+	allErrs = append(allErrs, validateDeviceTaint(taint.Taint, fldPath)...)
+
+	return allErrs
+}
 
 func validateDeviceTaint(taint resource.DeviceTaint, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
@@ -1349,6 +1376,8 @@ func validateDeviceTaint(taint resource.DeviceTaint, fldPath *field.Path) field.
 	case !validDeviceTaintEffects.Has(taint.Effect):
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("effect"), taint.Effect, sets.List(validDeviceTaintEffects)))
 	}
+
+	// TODO: validate new fields
 
 	return allErrs
 }

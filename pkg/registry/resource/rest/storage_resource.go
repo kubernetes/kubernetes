@@ -118,11 +118,12 @@ func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstora
 	storage := map[string]rest.Storage{}
 
 	if resource := "devicetaintrules"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		deviceTaintStorage, err := devicetaintrulestore.NewREST(restOptionsGetter)
+		deviceTaintStorage, deviceTaintStatusStorage, err := devicetaintrulestore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err
 		}
 		storage[resource] = deviceTaintStorage
+		storage[resource+"/status"] = deviceTaintStatusStorage
 	}
 
 	return storage, nil

@@ -19,9 +19,12 @@ package api
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	resourcealpha "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ResourceSlice struct {
 	metav1.TypeMeta
@@ -35,7 +38,8 @@ type ResourceSliceSpec struct {
 	NodeName               *string
 	NodeSelector           *v1.NodeSelector
 	AllNodes               bool
-	Devices                []Device
+	Devices                []SliceDevice // Manual conversion maps this to the public []resourceapi.Device.
+	Taints                 []SliceDeviceTaint
 	PerDeviceNodeSelection *bool
 	SharedCounters         []CounterSet
 }
@@ -50,6 +54,17 @@ type ResourcePool struct {
 	Generation         int64
 	ResourceSliceCount int64
 }
+
+// SliceDevice is an extension of the public type with
+// additional fields which only get set after conversion.
+type SliceDevice struct {
+	Device
+
+	// Taints get added by the ResourceSlice tracker while it converts ResourceSlices and applies DeviceTaintRules.
+	// Each entry has additional information about its origin.
+	Taints []TrackedDeviceTaint
+}
+
 type Device struct {
 	Name                     UniqueString
 	Attributes               map[QualifiedName]DeviceAttribute
@@ -58,7 +73,6 @@ type Device struct {
 	NodeName                 *string
 	NodeSelector             *v1.NodeSelector
 	AllNodes                 *bool
-	Taints                   []resourceapi.DeviceTaint
 	BindsToNode              bool
 	BindingConditions        []string
 	BindingFailureConditions []string
@@ -102,17 +116,37 @@ type Counter struct {
 	Value resource.Quantity
 }
 
-type DeviceTaint struct {
-	Key       string
-	Value     string
-	Effect    DeviceTaintEffect
-	TimeAdded *metav1.Time
+type SliceDeviceTaint struct {
+	Device UniqueString
+	Taint  resourceapi.DeviceTaint
 }
 
-type DeviceTaintEffect string
+// TrackedDeviceTaint is DeviceTaint with additional information provided
+// by the ResourceSlice tracker.
+type TrackedDeviceTaint struct {
+	// Rule points towards the DeviceTaintRule which provided the taint.
+	// Nil if the taint is from a ResourceSlice.
+	Rule *resourcealpha.DeviceTaintRule
 
-const (
-	DeviceTaintEffectNoSchedule DeviceTaintEffect = "NoSchedule"
+	// ID is generated on-the-fly by the ResourceSlice tracker.
+	// Each new taint that has not been seen before is assigned
+	// a new number. During updates, taints from the same rule
+	// (when available) or the same attributes (otherwise)
+	// retain their ID. It does not persist across process restarts.
+	//
+	// Consumers can use this ID to manage their own additional state
+	// for each taint during a program run.
+	ID DeviceTaintID
 
-	DeviceTaintEffectNoExecute DeviceTaintEffect = "NoExecute"
-)
+	resourceapi.DeviceTaint
+}
+
+type DeviceTaintID int64
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type ResourceSliceList struct {
+	metav1.TypeMeta
+	metav1.ListMeta
+	Items []ResourceSlice
+}

@@ -1706,6 +1706,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.ResourceSliceApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &applyconfigurationsresourcev1.ResourceSliceSpecApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("SliceDeviceTaint"):
+		return &applyconfigurationsresourcev1.SliceDeviceTaintApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1alpha3
 	case v1alpha3.SchemeGroupVersion.WithKind("CELDeviceSelector"):
@@ -1718,6 +1720,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceTaintRuleApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRuleSpec"):
 		return &resourcev1alpha3.DeviceTaintRuleSpecApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRuleStatus"):
+		return &resourcev1alpha3.DeviceTaintRuleStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintSelector"):
 		return &resourcev1alpha3.DeviceTaintSelectorApplyConfiguration{}
 
@@ -1800,6 +1804,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.ResourceSliceApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &applyconfigurationsresourcev1beta1.ResourceSliceSpecApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("SliceDeviceTaint"):
+		return &applyconfigurationsresourcev1beta1.SliceDeviceTaintApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1beta2
 	case resourcev1beta2.SchemeGroupVersion.WithKind("AllocatedDeviceStatus"):
@@ -1880,6 +1886,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.ResourceSliceApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &applyconfigurationsresourcev1beta2.ResourceSliceSpecApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("SliceDeviceTaint"):
+		return &applyconfigurationsresourcev1beta2.SliceDeviceTaintApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1
 	case schedulingv1.SchemeGroupVersion.WithKind("PriorityClass"):

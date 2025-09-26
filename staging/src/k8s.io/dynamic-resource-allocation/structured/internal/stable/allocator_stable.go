@@ -58,7 +58,7 @@ type Allocator struct {
 	features         Features
 	allocatedDevices sets.Set[DeviceID]
 	classLister      DeviceClassLister
-	slices           []*resourceapi.ResourceSlice
+	slices           []*draapi.ResourceSlice
 	celCache         *cel.Cache
 	// availableCounters contains the available counters for individual
 	// ResourceSlices. It acts as a cache that is updated the first time
@@ -81,7 +81,7 @@ func NewAllocator(ctx context.Context,
 	features Features,
 	allocatedDevices sets.Set[DeviceID],
 	classLister DeviceClassLister,
-	slices []*resourceapi.ResourceSlice,
+	slices []*draapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
 	return &Allocator{
@@ -424,9 +424,9 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 					}
 					if selectable {
 						device := deviceWithID{
-							id:     DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name},
-							Device: &slice.Spec.Devices[deviceIndex],
-							slice:  slice,
+							id:          DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name},
+							SliceDevice: &slice.Spec.Devices[deviceIndex],
+							slice:       slice,
 						}
 						requestData.allDevices = append(requestData.allDevices, device)
 					}
@@ -518,7 +518,7 @@ type requestData struct {
 }
 
 type deviceWithID struct {
-	*draapi.Device
+	*draapi.SliceDevice
 	id    DeviceID
 	slice *draapi.ResourceSlice
 }
@@ -547,11 +547,11 @@ type constraint interface {
 	// add is called whenever a device is about to be allocated. It must
 	// check whether the device matches the constraint and if yes,
 	// track that it is allocated.
-	add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool
+	add(requestName, subRequestName string, device *draapi.SliceDevice, deviceID DeviceID) bool
 
 	// For every successful add there is exactly one matching removed call
 	// with the exact same parameters.
-	remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID)
+	remove(requestName, subRequestName string, device *draapi.SliceDevice, deviceID DeviceID)
 }
 
 // matchAttributeConstraint compares an attribute value across devices.
@@ -570,7 +570,7 @@ type matchAttributeConstraint struct {
 	numDevices int
 }
 
-func (m *matchAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool {
+func (m *matchAttributeConstraint) add(requestName, subRequestName string, device *draapi.SliceDevice, deviceID DeviceID) bool {
 	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
 		// Device not affected by constraint.
 		m.logger.V(7).Info("Constraint does not apply to request", "request", requestName)
@@ -627,7 +627,7 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 	return true
 }
 
-func (m *matchAttributeConstraint) remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) {
+func (m *matchAttributeConstraint) remove(requestName, subRequestName string, device *draapi.SliceDevice, deviceID DeviceID) {
 	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
 		// Device not affected by constraint.
 		return
@@ -646,7 +646,7 @@ func (m *matchAttributeConstraint) matches(requestName, subRequestName string) b
 	}
 }
 
-func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName draapi.FullyQualifiedName) *draapi.DeviceAttribute {
+func lookupAttribute(device *draapi.SliceDevice, deviceID DeviceID, attributeName draapi.FullyQualifiedName) *draapi.DeviceAttribute {
 	// Fully-qualified match?
 	if attr, ok := device.Attributes[draapi.QualifiedName(attributeName)]; ok {
 		return &attr
@@ -823,9 +823,9 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 
 				// Finally treat as allocated and move on to the next device.
 				device := deviceWithID{
-					id:     deviceID,
-					Device: &slice.Spec.Devices[deviceIndex],
-					slice:  slice,
+					id:          deviceID,
+					SliceDevice: &slice.Spec.Devices[deviceIndex],
+					slice:       slice,
 				}
 				allocated, deallocate, err := alloc.allocateDevice(r, device, false)
 				if err != nil {
@@ -865,7 +865,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 // isSelectable checks whether a device satisfies the request and class selectors.
 func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, slice *draapi.ResourceSlice, deviceIndex int) (bool, error) {
 	device := &slice.Spec.Devices[deviceIndex]
-	if (!alloc.features.DeviceBinding || !alloc.features.DeviceStatus) &&
+	if !alloc.features.DeviceBindingAndStatus &&
 		len(device.BindingConditions) > 0 {
 		// Devices with binding conditions are not supported, feature is off.
 		return false, nil
@@ -879,7 +879,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	if requestData.class != nil {
-		match, err := alloc.selectorsMatch(r, device, deviceID, requestData.class, requestData.class.Spec.Selectors)
+		match, err := alloc.selectorsMatch(r, &device.Device, deviceID, requestData.class, requestData.class.Spec.Selectors)
 		if err != nil {
 			return false, err
 		}
@@ -890,7 +890,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	request := requestData.request
-	match, err := alloc.selectorsMatch(r, device, deviceID, nil, request.selectors())
+	match, err := alloc.selectorsMatch(r, &device.Device, deviceID, nil, request.selectors())
 	if err != nil {
 		return false, err
 	}
@@ -1014,13 +1014,13 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 	// Might be tainted, in which case the taint has to be tolerated.
 	// The check is skipped if the feature is disabled.
-	if alloc.features.DeviceTaints && !allTaintsTolerated(device.Device, request) {
+	if alloc.features.DeviceTaints && !allTaintsTolerated(device.SliceDevice, request) {
 		return false, nil, nil
 	}
 
 	// It's available. Now check constraints.
 	for i, constraint := range alloc.constraints[r.claimIndex] {
-		added := constraint.add(baseRequestName, subRequestName, device.Device, device.id)
+		added := constraint.add(baseRequestName, subRequestName, device.SliceDevice, device.id)
 		if !added {
 			if must {
 				// It does not make sense to declare a claim where a constraint prevents getting
@@ -1030,7 +1030,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 			// Roll back for all previous constraints before we return.
 			for e := 0; e < i; e++ {
-				alloc.constraints[r.claimIndex][e].remove(baseRequestName, subRequestName, device.Device, device.id)
+				alloc.constraints[r.claimIndex][e].remove(baseRequestName, subRequestName, device.SliceDevice, device.id)
 			}
 			return false, nil, nil
 		}
@@ -1049,7 +1049,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		request:       request.name(),
 		parentRequest: parentRequestName,
 		id:            device.id,
-		Device:        device.Device,
+		Device:        &device.Device,
 		slice:         device.slice,
 	}
 	if request.adminAccess() {
@@ -1060,7 +1060,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 	return true, func() {
 		for _, constraint := range alloc.constraints[r.claimIndex] {
-			constraint.remove(baseRequestName, subRequestName, device.Device, device.id)
+			constraint.remove(baseRequestName, subRequestName, device.SliceDevice, device.id)
 		}
 		alloc.allocatingDevices[device.id].Delete(r.claimIndex)
 		if alloc.features.PartitionableDevices && len(device.ConsumesCounters) > 0 {
@@ -1072,7 +1072,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	}, nil
 }
 
-func allTaintsTolerated(device *draapi.Device, request requestAccessor) bool {
+func allTaintsTolerated(device *draapi.SliceDevice, request requestAccessor) bool {
 	for _, taint := range device.Taints {
 		if !taintTolerated(taint, request) {
 			return false

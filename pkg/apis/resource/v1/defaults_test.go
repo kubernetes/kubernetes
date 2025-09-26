@@ -139,22 +139,21 @@ func TestSetDefaultAllocationModeWithSubRequests(t *testing.T) {
 func TestSetDefaultDeviceTaint(t *testing.T) {
 	slice := &v1.ResourceSlice{
 		Spec: v1.ResourceSliceSpec{
-			Devices: []v1.Device{{
-				Name:   "device-0",
-				Taints: []v1.DeviceTaint{{}},
+			Taints: []v1.SliceDeviceTaint{{
+				Device: "device-0",
 			}},
 		},
 	}
 
 	// fields should be defaulted
 	output := roundTrip(t, slice).(*v1.ResourceSlice)
-	assert.WithinDuration(t, time.Now(), ptr.Deref(output.Spec.Devices[0].Taints[0].TimeAdded, metav1.Time{}).Time, time.Minute /* allow for some processing delay */, "time added default")
+	assert.WithinDuration(t, time.Now(), ptr.Deref(output.Spec.Taints[0].Taint.TimeAdded, metav1.Time{}).Time, time.Minute /* allow for some processing delay */, "time added default")
 
 	// field should not change
 	timeAdded, _ := time.ParseInLocation(time.RFC3339, "2006-01-02T15:04:05Z", time.UTC)
-	slice.Spec.Devices[0].Taints[0].TimeAdded = &metav1.Time{Time: timeAdded}
+	slice.Spec.Taints[0].Taint.TimeAdded = &metav1.Time{Time: timeAdded}
 	output = roundTrip(t, slice).(*v1.ResourceSlice)
-	assert.WithinDuration(t, timeAdded, ptr.Deref(output.Spec.Devices[0].Taints[0].TimeAdded, metav1.Time{}).Time, 0 /* semantically the same, different time zone allowed */, "time added fixed")
+	assert.WithinDuration(t, timeAdded, ptr.Deref(output.Spec.Taints[0].Taint.TimeAdded, metav1.Time{}).Time, 0 /* semantically the same, different time zone allowed */, "time added fixed")
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {

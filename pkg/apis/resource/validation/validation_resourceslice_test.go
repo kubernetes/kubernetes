@@ -489,40 +489,52 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"taints": {
 			wantFailures: func() field.ErrorList {
-				fldPath := field.NewPath("spec", "devices").Index(0).Child("taints")
+				fldPath := field.NewPath("spec", "taints")
 				return field.ErrorList{
+					field.Invalid(fldPath.Index(2).Child("device"), "", "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
 					field.Invalid(fldPath.Index(2).Child("key"), "", "name part must be non-empty"),
 					field.Invalid(fldPath.Index(2).Child("key"), "", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
 					field.Required(fldPath.Index(2).Child("effect"), ""),
 
+					field.Invalid(fldPath.Index(3).Child("device"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
 					field.Invalid(fldPath.Index(3).Child("key"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
 					field.Invalid(fldPath.Index(3).Child("value"), badName, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')"),
-					field.NotSupported(fldPath.Index(3).Child("effect"), resourceapi.DeviceTaintEffect("some-other-op"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule}),
+					field.NotSupported(fldPath.Index(3).Child("effect"), resourceapi.DeviceTaintEffect("some-other-op"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule, resourceapi.DeviceTaintEffectNone}),
 				}
 			}(),
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 3)
-				slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{
+				slice.Spec.Devices = nil
+				slice.Spec.Taints = []resourceapi.SliceDeviceTaint{
 					{
-						// Minimal valid taint.
-						Key:    "example.com/taint",
-						Effect: resourceapi.DeviceTaintEffectNoExecute,
+						Device: goodName,
+						Taint: resourceapi.DeviceTaint{
+							// Minimal valid taint.
+							Key:    "example.com/taint",
+							Effect: resourceapi.DeviceTaintEffectNoExecute,
+						},
 					},
 					{
-						// Full valid taint, other key and effect.
-						Key:       "taint",
-						Value:     "tainted",
-						Effect:    resourceapi.DeviceTaintEffectNoSchedule,
-						TimeAdded: ptr.To(metav1.Now()),
+						Device: goodName,
+						Taint: resourceapi.DeviceTaint{
+							// Full valid taint, other key and effect.
+							Key:       "taint",
+							Value:     "tainted",
+							Effect:    resourceapi.DeviceTaintEffectNoSchedule,
+							TimeAdded: ptr.To(metav1.Now()),
+						},
 					},
 					{
 						// Invalid, all empty!
 					},
 					{
-						// Invalid strings.
-						Key:    badName,
-						Value:  badName,
-						Effect: "some-other-op",
+						Device: badName,
+						Taint: resourceapi.DeviceTaint{
+							// Invalid strings.
+							Key:    badName,
+							Value:  badName,
+							Effect: "some-other-op",
+						},
 					},
 				}
 				return slice
@@ -530,14 +542,18 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"too-many-taints": {
 			wantFailures: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("taints"), resourceapi.DeviceTaintsMaxLength+1, resourceapi.DeviceTaintsMaxLength),
+				field.TooMany(field.NewPath("spec", "taints"), resourceapi.DeviceTaintsMaxLength+1, resourceapi.DeviceTaintsMaxLength),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices = nil
 				for i := 0; i < resourceapi.DeviceTaintsMaxLength+1; i++ {
-					slice.Spec.Devices[0].Taints = append(slice.Spec.Devices[0].Taints, resourceapi.DeviceTaint{
-						Key:    "example.com/taint",
-						Effect: resourceapi.DeviceTaintEffectNoExecute,
+					slice.Spec.Taints = append(slice.Spec.Taints, resourceapi.SliceDeviceTaint{
+						Device: goodName,
+						Taint: resourceapi.DeviceTaint{
+							Key:    "example.com/taint",
+							Effect: resourceapi.DeviceTaintEffectNoExecute,
+						},
 					})
 				}
 				return slice
@@ -597,6 +613,28 @@ func TestValidateResourceSlice(t *testing.T) {
 					r := true
 					return &r
 				}()
+				return slice
+			}(),
+		},
+		"content-one-of-empty": {
+			slice: testResourceSlice(goodName, goodName, driverName, 0 /* no devices */),
+		},
+		"content-one-of-devices-and-taints": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), nil, "at most one of `devices` or `taints` is supported, but multiple fields are set"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Taints = []resourceapi.SliceDeviceTaint{
+					{
+						Device: goodName,
+						Taint: resourceapi.DeviceTaint{
+							// Minimal valid taint.
+							Key:    "example.com/taint",
+							Effect: resourceapi.DeviceTaintEffectNoExecute,
+						},
+					},
+				}
 				return slice
 			}(),
 		},

@@ -78,6 +78,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				// does not survive round-tripping.
 				r.TimeAdded = &metav1.Time{Time: time.Now().Truncate(time.Second)}
 			}
+
+			// Match the fuzzer default content for runtime.Object.
+			//
+			// This is necessary because randomly generated content
+			// might be valid JSON which changes during re-encoding.
+			r.Data = &runtime.RawExtension{Raw: []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`)}
 		},
 		func(r *resource.OpaqueDeviceConfiguration, c randfill.Continue) {
 			c.FillNoCustom(r)

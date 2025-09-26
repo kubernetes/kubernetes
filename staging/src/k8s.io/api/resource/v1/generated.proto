@@ -388,18 +388,6 @@ message Device {
   // +featureGate=DRAPartitionableDevices
   optional bool allNodes = 7;
 
-  // If specified, these are the driver-defined taints.
-  //
-  // The maximum number of taints is 4.
-  //
-  // This is an alpha field and requires enabling the DRADeviceTaints
-  // feature gate.
-  //
-  // +optional
-  // +listType=atomic
-  // +featureGate=DRADeviceTaints
-  repeated DeviceTaint taints = 8;
-
   // BindsToNode indicates if the usage of an allocation involving this device
   // has to be limited to exactly the node that was chosen when allocating the claim.
   // If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
@@ -1046,7 +1034,7 @@ message DeviceTaint {
 
   // The effect of the taint on claims that do not tolerate the taint
   // and through such claims on the pods using them.
-  // Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
+  // Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
   // nodes is not valid here.
   //
   // +required
@@ -1057,6 +1045,30 @@ message DeviceTaint {
   //
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
+
+  // Description is a human-readable explanation for the taint.
+  //
+  // The length must be smaller or equal to 1024.
+  //
+  // +optional
+  optional string description = 5;
+
+  // Data contains arbitrary data specific to the taint key.
+  //
+  // The length of the raw data must be smaller or equal to 10 Ki.
+  //
+  // +optional
+  optional .k8s.io.apimachinery.pkg.runtime.RawExtension data = 6;
+
+  // EvictionsPerSecond controls how quickly Pods get evicted if that is
+  // the effect of the taint. If multiple taints cause eviction
+  // of the same set of Pods, then the lowest rate defined in
+  // any of those taints applies.
+  //
+  // The default is 100 Pods/s.
+  //
+  // +optional
+  optional int64 evictionsPerSecond = 7;
 }
 
 // The ResourceClaim this DeviceToleration is attached to tolerates any taint that matches
@@ -1564,8 +1576,22 @@ message ResourceSliceSpec {
   // Must not have more than 128 entries.
   //
   // +optional
+  // +oneOf=ResourceSliceContent
   // +listType=atomic
   repeated Device devices = 6;
+
+  // If specified, these are driver-defined taints.
+  //
+  // The maximum number of taints is 32. Either Devices or Taints may be set, but not both.
+  //
+  // This is an alpha field and requires enabling the DRADeviceTaints
+  // feature gate.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRADeviceTaints
+  // +oneOf=ResourceSliceContent
+  repeated SliceDeviceTaint taints = 9;
 
   // PerDeviceNodeSelection defines whether the access from nodes to
   // resources in the pool is set on the ResourceSlice level or on each
@@ -1590,5 +1616,14 @@ message ResourceSliceSpec {
   // +listType=atomic
   // +featureGate=DRAPartitionableDevices
   repeated CounterSet sharedCounters = 8;
+}
+
+// SliceDeviceTaint defines one taint within a ResourceSlice.
+message SliceDeviceTaint {
+  // Device is the name of the device in the pool that the ResourceSlice belongs to
+  // which is affected by the taint. Multiple taints may affect the same device.
+  optional string device = 1;
+
+  optional DeviceTaint taint = 2;
 }
 
