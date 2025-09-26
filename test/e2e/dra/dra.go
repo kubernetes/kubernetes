@@ -921,14 +921,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", (*resourceapi.AllocationResult)(nil)))
 		})
 
-		// https://github.com/kubernetes/kubernetes/issues/133488
-		// It conflicts with "must run pods with extended resource on dra nodes and device plugin nodes" test case,
-		// because device plugin does not clean up the extended resource "example.com/resource", and kubelet still
-		// keeps "example.com/resource" : 0 in node.status.Capacity.
-		// add WithFlaky to filter out the following test until we can clean up the leaked "example.com/resource" in node.status.
 		if withKubelet {
 			// Serial because the example device plugin can only be deployed with one instance at a time.
-			f.It("supports extended resources together with ResourceClaim", f.WithSerial(), f.WithFlaky(), func(ctx context.Context) {
+			f.It("supports extended resources together with ResourceClaim", f.WithSerial(), func(ctx context.Context) {
 				extendedResourceName := deployDevicePlugin(ctx, f, nodes.NodeNames[0:1])
 
 				pod := b.PodExternal()
@@ -2045,6 +2040,55 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				"container_2_request_2", "true",
 			}
 			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[2].Name, false, containerEnv...)
+		})
+
+		f.It("process extended resources after device plugin uninstall", f.WithSerial(), f.WithFeatureGate(features.DRAExtendedResource), func(ctx context.Context) {
+			resourceName := b.ExtendedResourceName(drautils.SingletonIndex)
+			extendedResourceName := deployDevicePlugin(ctx, f, nodes.NodeNames[0:1])
+			gomega.Expect(string(extendedResourceName)).To(gomega.Equal(resourceName))
+
+			getAllocatable := func() int {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodes.NodeNames[0], metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				for name, quantity := range node.Status.Allocatable {
+					if string(name) == resourceName {
+						return int(quantity.Value())
+					}
+				}
+				return -1
+			}
+			gomega.Eventually(ctx, getAllocatable).WithTimeout(f.Timeouts.PodStart).Should(gomega.Equal(2))
+
+			ginkgo.By("Uninstall Device Plugin")
+			err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).DeleteCollection(
+				ctx,
+				metav1.DeleteOptions{},
+				metav1.ListOptions{LabelSelector: "k8s-app=sample-device-plugin"},
+			)
+			framework.ExpectNoError(err, "uninstall device plugin")
+
+			ginkgo.By("Wait for NodeStatus.Allocatable = 0")
+			gomega.Eventually(ctx, getAllocatable).WithTimeout(f.Timeouts.PodDelete).Should(gomega.BeZero())
+
+			ginkgo.By("Create test pod")
+			pod := b.Pod()
+			pod.Spec.Containers[0].Name = "container0"
+			res := v1.ResourceList{
+				v1.ResourceName(resourceName): resource.MustParse("1"),
+			}
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+
+			b.Create(ctx, b.Class(drautils.SingletonIndex), pod)
+
+			err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+
+			ginkgo.By("Check that pod is processed by the DRA driver")
+			containerEnv := []string{
+				"container_0_request_0", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
 		})
 	})
 
