@@ -313,7 +313,7 @@ func TestValidateClass(t *testing.T) {
 		},
 		"too-many-configs": {
 			wantFailures: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "config"), resource.DeviceConfigMaxSize+1, resource.DeviceConfigMaxSize),
+				field.TooMany(field.NewPath("spec", "config"), resource.DeviceConfigMaxSize+1, resource.DeviceConfigMaxSize).WithOrigin("maxItems").MarkCoveredByDeclarative(),
 			},
 			class: func() *resource.DeviceClass {
 				class := testClass(goodName)

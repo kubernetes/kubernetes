@@ -1692,6 +1692,8 @@ type DeviceClassSpec struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
+	// +k8s:maxItems=32
 	Config []DeviceClassConfiguration `json:"config,omitempty" protobuf:"bytes,2,opt,name=config"`
 
 	// SuitableNodes is tombstoned since Kubernetes 1.32 where
