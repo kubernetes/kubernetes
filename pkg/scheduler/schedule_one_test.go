@@ -1689,7 +1689,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 					NumAllNodes: 1,
 					Diagnosis: framework.Diagnosis{
 						NodeToStatus: framework.NewNodeToStatus(map[string]*fwk.Status{
-							node.Name: fwk.NewStatus(fwk.Unschedulable, nodeports.ErrReason).WithPlugin(nodeports.Name),
+							node.Name: fwk.NewStatus(fwk.Unschedulable, "node(s) port conflict for the requested pod ports (&ContainerPort{Name:,HostPort:8080,ContainerPort:0,Protocol:,HostIP:,})").WithPlugin(nodeports.Name),
 						}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 						UnschedulablePlugins: sets.New(nodeports.Name),
 					},
