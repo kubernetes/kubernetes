@@ -106,3 +106,8 @@ func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, err
 
 	return lw.storage.Watch(ctx, lw.resourcePrefix, opts)
 }
+
+func (c *listerWatcher) IsWatchListSemanticsSupported() bool {
+	// the current etcd impl supports watchlist semantics
+	return true
+}
