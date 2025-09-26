@@ -425,6 +425,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		podInformer.GetIndexer().Add(newPod)
 	}
 
+	go adc.nodeStatusUpdater.Run(tCtx, 1)
 	go adc.reconciler.Run(tCtx)
 	go adc.desiredStateOfWorldPopulator.Run(tCtx)
 
