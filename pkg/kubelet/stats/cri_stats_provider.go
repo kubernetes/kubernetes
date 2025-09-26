@@ -635,6 +635,8 @@ func (p *criStatsProvider) addPodCPUMemoryStats(
 		cpu, memory := cadvisorInfoToCPUandMemoryStats(podCgroupInfo)
 		ps.CPU = cpu
 		ps.Memory = memory
+		cpuInst := cadvisorInfoToCPUInstStats(podCgroupInfo)
+		cs.CPUInst = cpuInst
 		return
 	}
 
@@ -746,6 +748,7 @@ func (p *criStatsProvider) makeContainerStats(
 		// The StartTime in the summary API is the container creation time.
 		StartTime: metav1.NewTime(time.Unix(0, container.CreatedAt)),
 		CPU:       &statsapi.CPUStats{},
+		CPUInst:    &statsapi.CPUInstStats{},
 		Memory:    &statsapi.MemoryStats{},
 		Rootfs:    &statsapi.FsStats{},
 		Swap:      &statsapi.SwapStats{},
