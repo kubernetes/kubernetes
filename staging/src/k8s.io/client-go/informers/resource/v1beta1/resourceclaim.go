@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	resourcev1beta1 "k8s.io/client-go/listers/resource/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ResourceClaimInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredResourceClaimInformer(client kubernetes.Interface, namespace str
 				}
 				return client.ResourceV1beta1().ResourceClaims(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiresourcev1beta1.ResourceClaim{},
 		resyncPeriod,

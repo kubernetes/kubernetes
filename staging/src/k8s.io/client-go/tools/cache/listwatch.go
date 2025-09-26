@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/watchlist"
 )
 
 // Lister is any object that knows how to perform an initial list.
@@ -120,15 +121,23 @@ func ToListerWatcherWithContext(lw ListerWatcher) ListerWatcherWithContext {
 	if lw, ok := lw.(ListerWatcherWithContext); ok {
 		return lw
 	}
+
 	return listerWatcherWrapper{
-		ListerWithContext:  ToListerWithContext(lw),
-		WatcherWithContext: ToWatcherWithContext(lw),
+		ListerWithContext:           ToListerWithContext(lw),
+		WatcherWithContext:          ToWatcherWithContext(lw),
+		watchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(lw),
 	}
 }
 
 type listerWatcherWrapper struct {
 	ListerWithContext
 	WatcherWithContext
+
+	watchListSemanticsSupported bool
+}
+
+func (lw listerWatcherWrapper) IsWatchListSemanticsSupported() bool {
+	return lw.watchListSemanticsSupported
 }
 
 // ListFunc knows how to list resources
@@ -171,6 +180,24 @@ type ListWatch struct {
 
 	// DisableChunking requests no chunking for this list watcher.
 	DisableChunking bool
+
+	// WatchListSemanticsSupported indicates whether a client explicitly supports
+	// WatchList semantics.
+	//
+	// Over the years, unit tests in kube have been written in many different ways.
+	// After enabling the WatchListClient feature by default, existing tests started failing.
+	// To avoid breaking existing client-go users after upgrade,
+	// we introduced this field as an opt-in.
+	//
+	// If a client implements the IsWatchListSemanticsSupported method, this field
+	// is set to true and the reflector will use WatchList if the feature was enabled.
+	// If the method is not defined, the reflector will automatically disable
+	// the WatchList feature.
+	//
+	// This method has been added to all standard clients except for the FakeClient.
+	// Adding support for FakeClient was deliberately avoided, since many existing
+	// unit tests rely on its legacy behavior and would otherwise fail in subtle ways.
+	WatchListSemanticsSupported bool
 }
 
 var (
@@ -279,4 +306,8 @@ func (lw *ListWatch) WatchWithContext(ctx context.Context, options metav1.ListOp
 		return lw.WatchFuncWithContext(ctx, options)
 	}
 	return lw.WatchFunc(options)
+}
+
+func (lw *ListWatch) IsWatchListSemanticsSupported() bool {
+	return lw.WatchListSemanticsSupported
 }

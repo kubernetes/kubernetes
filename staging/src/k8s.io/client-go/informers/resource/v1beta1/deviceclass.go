@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	resourcev1beta1 "k8s.io/client-go/listers/resource/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // DeviceClassInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredDeviceClassInformer(client kubernetes.Interface, resyncPeriod ti
 				}
 				return client.ResourceV1beta1().DeviceClasses().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiresourcev1beta1.DeviceClass{},
 		resyncPeriod,

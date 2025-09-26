@@ -109,6 +109,9 @@ type dynamicResourceClient struct {
 func (c *DynamicClient) Resource(resource schema.GroupVersionResource) NamespaceableResourceInterface {
 	return &dynamicResourceClient{client: c, resource: resource}
 }
+func (c *DynamicClient) IsWatchListSemanticsSupported() bool {
+	return true
+}
 
 func (c *dynamicResourceClient) Namespace(ns string) ResourceInterface {
 	ret := *c

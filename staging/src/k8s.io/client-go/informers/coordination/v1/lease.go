@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	coordinationv1 "k8s.io/client-go/listers/coordination/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // LeaseInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredLeaseInformer(client kubernetes.Interface, namespace string, res
 				}
 				return client.CoordinationV1().Leases(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apicoordinationv1.Lease{},
 		resyncPeriod,
