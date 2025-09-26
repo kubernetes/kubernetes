@@ -236,28 +236,6 @@ const (
 	// scheduler plugin configuration).
 	DRASchedulerFilterTimeout featuregate.Feature = "DRASchedulerFilterTimeout"
 
-	// owner: @jpbetz @aaron-prindle @yongruilin
-	// kep: http://kep.k8s.io/5073
-	// beta: v1.33
-	//
-	// Enables running declarative validation of APIs, where declared. When enabled, APIs with
-	// declarative validation rules will validate objects using the generated
-	// declarative validation code and compare the results to the regular imperative validation.
-	// See DeclarativeValidationTakeover for more.
-	DeclarativeValidation featuregate.Feature = "DeclarativeValidation"
-
-	// owner: @jpbetz @aaron-prindle @yongruilin
-	// kep: http://kep.k8s.io/5073
-	// beta: v1.33
-	//
-	// When enabled, declarative validation errors are returned directly to the caller,
-	// replacing hand-written validation errors for rules that have declarative implementations.
-	// When disabled, hand-written validation errors are always returned, effectively putting
-	// declarative validation in a "shadow mode" that monitors but does not affect API responses.
-	// Note: Although declarative validation aims for functional equivalence with hand-written validation,
-	// the exact number, format, and content of error messages may differ between the two approaches.
-	DeclarativeValidationTakeover featuregate.Feature = "DeclarativeValidationTakeover"
-
 	// owner: @atiratree
 	// kep: http://kep.k8s.io/3973
 	//
@@ -1198,14 +1176,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	DeclarativeValidation: {
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	DeclarativeValidationTakeover: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
-	},
-
 	DeploymentReplicaSetTerminatingReplicas: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -1887,6 +1857,14 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	genericfeatures.CoordinatedLeaderElection: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.DeclarativeValidation: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.DeclarativeValidationTakeover: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 	},
 
