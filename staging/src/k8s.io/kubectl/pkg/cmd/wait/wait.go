@@ -322,7 +322,7 @@ func (o *WaitOptions) RunWait() error {
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
 	defer cancel()
 
-	if strings.ToLower(o.ForCondition) == "create" {
+	if strings.EqualFold(o.ForCondition, "create") {
 		// TODO(soltysh): this is not ideal solution, because we're polling every .5s,
 		// and we have to use ResourceFinder, which contains the resource name.
 		// In the long run, we should expose resource information from ResourceFinder,
@@ -367,7 +367,7 @@ func (o *WaitOptions) RunWait() error {
 		return err
 	}
 	visitor := o.ResourceFinder.Do()
-	isForDelete := strings.ToLower(o.ForCondition) == "delete"
+	isForDelete := strings.EqualFold(o.ForCondition, "delete")
 	if visitor, ok := visitor.(*resource.Result); ok && isForDelete {
 		visitor.IgnoreErrors(apierrors.IsNotFound)
 	}
