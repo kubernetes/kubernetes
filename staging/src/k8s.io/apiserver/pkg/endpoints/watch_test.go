@@ -25,17 +25,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -55,16 +53,12 @@ type watchJSON struct {
 	Object json.RawMessage `json:"object,omitempty"`
 }
 
-// roundTripOrDie round trips an object to get defaults set.
-func roundTripOrDie(codec runtime.Codec, object runtime.Object) runtime.Object {
+// requireRoundTrip round trips an object to get defaults set.
+func requireRoundTrip(t *testing.T, codec runtime.Codec, object runtime.Object) runtime.Object {
 	data, err := runtime.Encode(codec, object)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	obj, err := runtime.Decode(codec, data)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	return obj
 }
 
@@ -77,7 +71,7 @@ var watchTestTable = []struct {
 	{watch.Deleted, &endpointstesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}},
 }
 
-func podWatchTestTable() []struct {
+func podWatchTestTable(t *testing.T) []struct {
 	t   watch.EventType
 	obj runtime.Object
 } {
@@ -86,9 +80,9 @@ func podWatchTestTable() []struct {
 		t   watch.EventType
 		obj runtime.Object
 	}{
-		{watch.Added, roundTripOrDie(codec, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
-		{watch.Modified, roundTripOrDie(codec, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})},
-		{watch.Deleted, roundTripOrDie(codec, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})},
+		{watch.Added, requireRoundTrip(t, codec, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
+		{watch.Modified, requireRoundTrip(t, codec, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})},
+		{watch.Deleted, requireRoundTrip(t, codec, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})},
 	}
 }
 
@@ -99,15 +93,14 @@ func TestWatchWebsocket(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	dest, _ := url.Parse(server.URL)
+	dest, err := url.Parse(server.URL)
+	require.NoError(t, err)
 	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
 	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
 	dest.RawQuery = ""
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	defer apitesting.Close(t, ws)
 
 	try := func(action watch.EventType, object runtime.Object) {
@@ -116,19 +109,11 @@ func TestWatchWebsocket(t *testing.T) {
 		// Test receive
 		var got watchJSON
 		err := websocket.JSON.Receive(ws, &got)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		if got.Type != action {
-			t.Errorf("Unexpected type: %v", got.Type)
-		}
+		require.NoError(t, err)
+		require.Equal(t, action, got.Type)
 		gotObj, err := runtime.Decode(codec, got.Object)
-		if err != nil {
-			t.Fatalf("Decode error: %v\n%v", err, got)
-		}
-		if e, a := object, gotObj; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %#v, got %#v", e, a)
-		}
+		require.NoError(t, err)
+		require.Equal(t, object, gotObj)
 	}
 
 	for _, item := range watchTestTable {
@@ -138,9 +123,7 @@ func TestWatchWebsocket(t *testing.T) {
 
 	var got watchJSON
 	err = websocket.JSON.Receive(ws, &got)
-	if err == nil {
-		t.Errorf("Unexpected non-error")
-	}
+	require.Equal(t, io.EOF, err)
 }
 
 func TestWatchWebsocketClientClose(t *testing.T) {
@@ -150,15 +133,14 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	dest, _ := url.Parse(server.URL)
+	dest, err := url.Parse(server.URL)
+	require.NoError(t, err)
 	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
 	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
 	dest.RawQuery = ""
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	// Ensure the websocket is closed without error
 	closeWebSocket := apitesting.Close
 	defer func() {
@@ -171,19 +153,11 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 		// Test receive
 		var got watchJSON
 		err := websocket.JSON.Receive(ws, &got)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		if got.Type != action {
-			t.Errorf("Unexpected type: %v", got.Type)
-		}
+		require.NoError(t, err)
+		require.Equal(t, action, got.Type)
 		gotObj, err := runtime.Decode(codec, got.Object)
-		if err != nil {
-			t.Fatalf("Decode error: %v\n%v", err, got)
-		}
-		if e, a := object, gotObj; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %#v, got %#v", e, a)
-		}
+		require.NoError(t, err)
+		require.Equal(t, object, gotObj)
 	}
 
 	// Send/receive should work
@@ -227,32 +201,28 @@ func TestWatchClientClose(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	dest, _ := url.Parse(server.URL)
+	dest, err := url.Parse(server.URL)
+	require.NoError(t, err)
 	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
 	dest.RawQuery = "watch=1"
 
 	request, err := http.NewRequestWithContext(ctx, request.MethodGet, dest.String(), nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	request.Header.Add("Accept", "application/json")
 
 	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	// Ensure the response body is closed without error
 	defer apitesting.Close(t, response.Body)
 
 	if response.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(response.Body)
+		b, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
 		t.Fatalf("Unexpected response: %#v\n%s", response, string(b))
 	}
 
 	// Close response to cause a cancel on the server
-	if err := response.Body.Close(); err != nil {
-		t.Fatalf("Unexpected close client err: %v", err)
-	}
+	require.NoError(t, response.Body.Close())
 
 	select {
 	case data, ok := <-simpleStorage.fakeWatch.ResultChan():
@@ -275,25 +245,23 @@ func TestWatchRead(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	dest, _ := url.Parse(server.URL)
+	dest, err := url.Parse(server.URL)
+	require.NoError(t, err)
 	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
 	dest.RawQuery = "watch=1"
 
 	connectHTTP := func(ctx context.Context, accept string) (io.ReadCloser, string) {
 		client := http.Client{}
 		request, err := http.NewRequestWithContext(ctx, request.MethodGet, dest.String(), nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 		request.Header.Add("Accept", accept)
 
 		response, err := client.Do(request)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 
 		if response.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(response.Body)
+			b, err := io.ReadAll(response.Body)
+			require.NoError(t, err)
 			t.Fatalf("Unexpected response for accept: %q: %#v\n%s", accept, response, string(b))
 		}
 		return response.Body, response.Header.Get("Content-Type")
@@ -303,14 +271,10 @@ func TestWatchRead(t *testing.T) {
 		dest := *dest
 		dest.Scheme = "ws" // Required by websocket, though the server never sees it.
 		config, err := websocket.NewConfig(dest.String(), "http://localhost")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 		config.Header.Add("Accept", accept)
 		ws, err := config.DialContext(ctx)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 		return ws, "__default__"
 	}
 
@@ -351,10 +315,17 @@ func TestWatchRead(t *testing.T) {
 	protocols := []struct {
 		name        string
 		selfFraming bool
-		fn          func(context.Context, string) (io.ReadCloser, string)
+		openFn      func(context.Context, string) (io.ReadCloser, string)
 	}{
-		{name: "http", fn: connectHTTP},
-		{name: "websocket", selfFraming: true, fn: connectWebSocket},
+		{
+			name:   "http",
+			openFn: connectHTTP,
+		},
+		{
+			name:        "websocket",
+			selfFraming: true,
+			openFn:      connectWebSocket,
+		},
 	}
 
 	for _, protocol := range protocols {
@@ -368,7 +339,7 @@ func TestWatchRead(t *testing.T) {
 				}
 				streamSerializer := info.StreamSerializer
 
-				r, contentType := protocol.fn(ctx, test.Accept)
+				r, contentType := protocol.openFn(ctx, test.Accept)
 				closeBody := apitesting.Close
 				defer func() {
 					closeBody(t, r)
@@ -395,7 +366,7 @@ func TestWatchRead(t *testing.T) {
 					time.Sleep(time.Millisecond)
 				}
 
-				for i, item := range podWatchTestTable() {
+				for i, item := range podWatchTestTable(t) {
 					action, object := item.t, item.obj
 					name := fmt.Sprintf("%s-%s-%d", protocol.name, test.MediaType, i)
 
@@ -404,28 +375,18 @@ func TestWatchRead(t *testing.T) {
 					// Test receive
 					var got metav1.WatchEvent
 					_, _, err := d.Decode(nil, &got)
-					if err != nil {
-						t.Fatalf("%s: Unexpected error: %v", name, err)
-					}
-					if got.Type != string(action) {
-						t.Errorf("%s: Unexpected type: %v", name, got.Type)
-					}
+					require.NoError(t, err, name)
+					require.Equal(t, action, watch.EventType(got.Type), name)
 
 					gotObj, err := runtime.Decode(objectCodec, got.Object.Raw)
-					if err != nil {
-						t.Fatalf("%s: Decode error: %v", name, err)
-					}
-					if e, a := object, gotObj; !apiequality.Semantic.DeepEqual(e, a) {
-						t.Errorf("%s: different: %s", name, cmp.Diff(e, a))
-					}
+					require.NoError(t, err, name)
+					require.Equal(t, object, gotObj, name)
 				}
 				w.Stop()
 
 				var got metav1.WatchEvent
 				_, _, err := d.Decode(nil, &got)
-				if err == nil {
-					t.Errorf("Unexpected non-error")
-				}
+				require.Equal(t, io.EOF, err)
 			})
 		}
 	}
@@ -439,27 +400,23 @@ func TestWatchHTTPAccept(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	dest, _ := url.Parse(server.URL)
+	dest, err := url.Parse(server.URL)
+	require.NoError(t, err)
 	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
 	dest.RawQuery = ""
 
 	request, err := http.NewRequestWithContext(ctx, request.MethodGet, dest.String(), nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	request.Header.Set("Accept", "application/XYZ")
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// TODO: once this is fixed, this test will change
 	if response.StatusCode != http.StatusNotAcceptable {
 		t.Errorf("Unexpected response %#v", response)
 	}
 }
-
 func TestWatchParamParsing(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := handle(map[string]rest.Storage{
@@ -469,7 +426,8 @@ func TestWatchParamParsing(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	dest, _ := url.Parse(server.URL)
+	dest, err := url.Parse(server.URL)
+	require.NoError(t, err)
 
 	rootPath := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
 	namespacedPath := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/namespaces/other/simpleroots"
@@ -556,9 +514,7 @@ func TestWatchParamParsing(t *testing.T) {
 			req, err := http.NewRequestWithContext(ctx, request.MethodGet, dest.String(), nil)
 			require.NoError(t, err)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatalf("%v: unexpected error: %v", test.rawQuery, err)
-			}
+			require.NoError(t, err)
 			defer apitesting.Close(t, resp.Body)
 			if e, a := test.namespace, simpleStorage.requestedResourceNamespace; e != a {
 				t.Errorf("%v: expected %v, got %v", test.rawQuery, e, a)
@@ -584,7 +540,8 @@ func TestWatchProtocolSelection(t *testing.T) {
 	defer server.CloseClientConnections()
 	client := http.Client{}
 
-	dest, _ := url.Parse(server.URL)
+	dest, err := url.Parse(server.URL)
+	require.NoError(t, err)
 	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
 	dest.RawQuery = ""
 
@@ -603,16 +560,12 @@ func TestWatchProtocolSelection(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			ctx := t.Context()
 			request, err := http.NewRequestWithContext(ctx, request.MethodGet, dest.String(), nil)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 			request.Header.Set("Connection", test.connHeader)
 			request.Header.Set("Upgrade", "websocket")
 
 			response, err := client.Do(request)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			// The requests recognized as websocket requests based on connection
 			// and upgrade headers will not also have the necessary Sec-Websocket-*
@@ -672,7 +625,8 @@ func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType str
 	defer server.Close()
 	client := http.Client{}
 
-	dest, _ := url.Parse(server.URL)
+	dest, err := url.Parse(server.URL)
+	require.NoError(b, err)
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/watch/simples"
 	dest.RawQuery = ""
 
@@ -682,21 +636,16 @@ func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType str
 	}
 	req.Header.Add("Accept", contentType)
 
-	response, err := client.Do(req)
-	if err != nil {
-		b.Fatalf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusOK {
-		b.Fatalf("Unexpected response %#v", response)
-	}
+	resp, err := client.Do(req)
+	require.NoError(b, err)
+	require.Equal(b, http.StatusOK, resp.StatusCode)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		defer apitesting.Close(b, response.Body)
-		if _, err := io.Copy(io.Discard, response.Body); err != nil {
-			b.Error(err)
-		}
+		defer apitesting.Close(b, resp.Body)
+		_, err := io.Copy(io.Discard, resp.Body)
+		assert.NoError(b, err)
 		wg.Done()
 	}()
 
@@ -720,23 +669,21 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	dest, _ := url.Parse(server.URL)
+	dest, err := url.Parse(server.URL)
+	require.NoError(b, err)
 	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/watch/simples"
 	dest.RawQuery = ""
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
-	if err != nil {
-		b.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(b, err)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer apitesting.Close(b, ws)
-		if _, err := io.Copy(io.Discard, ws); err != nil {
-			b.Error(err)
-		}
+		_, err := io.Copy(io.Discard, ws)
+		assert.NoError(b, err)
 		wg.Done()
 	}()
 
