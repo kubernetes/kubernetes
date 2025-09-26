@@ -92,6 +92,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 		sw.Do(clientsetInterfaceImplTemplate, g)
 	}
 	sw.Do(getDiscoveryTemplate, m)
+	sw.Do(getWatchListSemanticsTemplate, m)
 	sw.Do(newClientsetForConfigTemplate, m)
 	sw.Do(newClientsetForConfigAndClientTemplate, m)
 	sw.Do(newClientsetForConfigOrDieTemplate, m)
@@ -131,6 +132,12 @@ func (c *Clientset) Discovery() $.DiscoveryInterface|raw$ {
 		return nil
 	}
 	return c.DiscoveryClient
+}
+`
+
+var getWatchListSemanticsTemplate = `
+func (c *Clientset) IsWatchListSemanticsSupported() bool {
+	return true
 }
 `
 
