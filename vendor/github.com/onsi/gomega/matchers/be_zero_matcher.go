@@ -9,7 +9,7 @@ import (
 type BeZeroMatcher struct {
 }
 
-func (matcher *BeZeroMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *BeZeroMatcher) Match(actual any) (success bool, err error) {
 	if actual == nil {
 		return true, nil
 	}
@@ -19,10 +19,10 @@ func (matcher *BeZeroMatcher) Match(actual interface{}) (success bool, err error
 
 }
 
-func (matcher *BeZeroMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *BeZeroMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, "to be zero-valued")
 }
 
-func (matcher *BeZeroMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *BeZeroMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not to be zero-valued")
 }
