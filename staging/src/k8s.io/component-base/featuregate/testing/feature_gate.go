@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -124,16 +125,35 @@ func SetFeatureGateEmulationVersionDuringTest(tb TB, gate featuregate.FeatureGat
 	tb.Helper()
 	detectParallelOverrideCleanup := detectParallelOverrideEmulationVersion(tb, ver)
 	originalEmuVer := gate.(featuregate.MutableVersionedFeatureGate).EmulationVersion()
-	if err := gate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersion(ver); err != nil {
+
+	if err := setEmulationVersionForTest(gate.(featuregate.MutableVersionedFeatureGate), ver, tb); err != nil {
 		tb.Fatalf("failed to set emulation version to %s during test: %v", ver.String(), err)
 	}
 	tb.Cleanup(func() {
 		tb.Helper()
 		detectParallelOverrideCleanup()
-		if err := gate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersion(originalEmuVer); err != nil {
+		if err := setEmulationVersionForTest(gate.(featuregate.MutableVersionedFeatureGate), originalEmuVer, tb); err != nil {
 			tb.Fatalf("failed to restore emulation version to %s during test", originalEmuVer.String())
 		}
 	})
+}
+
+// setEmulationVersionForTest sets emulation version with test-friendly warning handling.
+// This uses context to redirect warnings to test output.
+func setEmulationVersionForTest(gate featuregate.MutableVersionedFeatureGate, ver *version.Version, tb TB) error {
+	// Check if this gate supports context-aware emulation version setting
+	type contextAwareGate interface {
+		SetEmulationVersionWithContext(ctx context.Context, emulationVersion *version.Version) error
+	}
+
+	if contextGate, ok := gate.(contextAwareGate); ok {
+		// Use context with test logger to redirect warnings to test output
+		ctx := featuregate.WithTestLoggerContext(context.Background(), tb)
+		return contextGate.SetEmulationVersionWithContext(ctx, ver)
+	}
+
+	// Fallback to regular method for implementations that don't support context
+	return gate.SetEmulationVersion(ver)
 }
 
 func detectParallelOverride(tb TB, f featuregate.Feature) func() {
@@ -196,5 +216,6 @@ type TB interface {
 	Fatal(args ...any)
 	Fatalf(format string, args ...any)
 	Helper()
+	Logf(format string, args ...interface{})
 	Name() string
 }
