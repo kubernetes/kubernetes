@@ -242,7 +242,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			}
 		}
 
-		go namingController.Run(hookContext.Done())
+		go namingController.RunWithContext(hookContext)
 		go establishingController.RunWithContext(hookContext)
 		go nonStructuralSchemaController.Run(5, hookContext.Done())
 		go apiApprovalController.Run(5, hookContext.Done())
