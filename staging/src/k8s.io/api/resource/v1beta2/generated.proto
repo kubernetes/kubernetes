@@ -654,6 +654,8 @@ message DeviceClassSpec {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:maxItems=32
   repeated DeviceClassConfiguration config = 2;
 
   // ExtendedResourceName is the extended resource name for the devices of this class.

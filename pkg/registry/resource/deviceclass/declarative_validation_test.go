@@ -55,6 +55,12 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.TooMany(field.NewPath("spec", "selectors"), 33, 32).WithOrigin("maxItems"),
 					},
 				},
+				"too many configs": {
+					input: mkDeviceClass(tweakConfig(33)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "config"), 33, 32).WithOrigin("maxItems"),
+					},
+				},
 				// TODO: Add more test cases
 			}
 
@@ -92,6 +98,14 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					update: mkDeviceClass(tweakSelectors(33)),
 					expectedErrs: field.ErrorList{
 						field.TooMany(field.NewPath("spec", "selectors"), 33, 32).WithOrigin("maxItems"),
+					},
+				},
+
+				"update with too many configs": {
+					old:    mkDeviceClass(),
+					update: mkDeviceClass(tweakConfig(33)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "config"), 33, 32).WithOrigin("maxItems"),
 					},
 				},
 				// TODO: Add more test cases
@@ -148,6 +162,23 @@ func tweakSelectors(count int) func(*resource.DeviceClass) {
 			dc.Spec.Selectors = append(dc.Spec.Selectors, resource.DeviceSelector{
 				CEL: &resource.CELDeviceSelector{
 					Expression: fmt.Sprintf("device.driver == \"test.driver.io%d\"", i),
+				},
+			})
+		}
+	}
+}
+
+func tweakConfig(count int) func(*resource.DeviceClass) {
+	return func(dc *resource.DeviceClass) {
+		for i := 0; i < count; i++ {
+			dc.Spec.Config = append(dc.Spec.Config, resource.DeviceClassConfiguration{
+				DeviceConfiguration: resource.DeviceConfiguration{
+					Opaque: &resource.OpaqueDeviceConfiguration{
+						Driver: "test.driver.io",
+						Parameters: runtime.RawExtension{
+							Raw: []byte(fmt.Sprintf(`{"key":"value%d"}`, i)),
+						},
+					},
 				},
 			})
 		}
