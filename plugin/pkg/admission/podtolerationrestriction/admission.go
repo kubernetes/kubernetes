@@ -35,6 +35,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	qoshelper "k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/util/affinities"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
@@ -57,6 +58,7 @@ func Register(plugins *admission.Plugins) {
 const (
 	NSDefaultTolerations string = "scheduler.alpha.kubernetes.io/defaultTolerations"
 	NSWLTolerations      string = "scheduler.alpha.kubernetes.io/tolerationsWhitelist"
+	NSDefaultAffinities  string = "scheduler.alpha.kubernetes.io/defaultAffinities"
 )
 
 var _ admission.MutationInterface = &Plugin{}
@@ -97,6 +99,15 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		}
 
 		extraTolerations = ts
+
+		// Merge affinities
+		defaultAffinity, err := p.getNamespaceDefaultAffinities(a.GetNamespace())
+		if err != nil {
+			return err
+		}
+		if defaultAffinity != nil {
+			pod.Spec.Affinity = affinities.MergePodAffinities(pod.Spec.Affinity, defaultAffinity)
+		}
 	}
 
 	if qoshelper.GetPodQOS(pod) != api.PodQOSBestEffort {
@@ -229,12 +240,47 @@ func (p *Plugin) getNamespaceDefaultTolerations(nsName string) ([]api.Toleration
 	return extractNSTolerations(ns, NSDefaultTolerations)
 }
 
+func (p *Plugin) getNamespaceDefaultAffinities(nsName string) (*api.Affinity, error) {
+	ns, err := p.getNamespace(nsName)
+	if err != nil {
+		return nil, err
+	}
+	return extractNSAffinities(ns, NSDefaultAffinities)
+}
+
 func (p *Plugin) getNamespaceTolerationsWhitelist(nsName string) ([]api.Toleration, error) {
 	ns, err := p.getNamespace(nsName)
 	if err != nil {
 		return nil, err
 	}
 	return extractNSTolerations(ns, NSWLTolerations)
+}
+
+// extractNSAffinities extracts default affinity from namespace annotations.
+func extractNSAffinities(ns *corev1.Namespace, key string) (*api.Affinity, error) {
+	if len(ns.Annotations) == 0 {
+		return nil, nil
+	}
+	val, ok := ns.Annotations[key]
+	if !ok {
+		return nil, nil
+	}
+	if len(val) == 0 {
+		return &api.Affinity{}, nil
+	}
+
+	var v1Affinity corev1.Affinity
+	err := json.Unmarshal([]byte(val), &v1Affinity)
+	if err != nil {
+		return nil, err
+	}
+
+	affinity := &api.Affinity{}
+	if err := k8s_api_v1.Convert_v1_Affinity_To_core_Affinity(&v1Affinity, affinity, nil); err != nil {
+		return nil, err
+	}
+
+	return affinity, nil
 }
 
 // extractNSTolerations extracts default or whitelist of tolerations from
