@@ -40,12 +40,6 @@ var DefaultSysSpec = SysSpec{
 			{Name: "IPC_NS"},
 			{Name: "UTS_NS"},
 			{Name: "CGROUPS"},
-			{Name: "CGROUP_BPF"},     // cgroups v2
-			{Name: "CGROUP_CPUACCT"}, // cgroups v1 cpuacct
-			{Name: "CGROUP_DEVICE"},
-			{Name: "CGROUP_FREEZER"}, // cgroups v1 freezer
-			{Name: "CGROUP_PIDS"},
-			{Name: "CGROUP_SCHED"}, // cgroups v1 & v2 cpu
 			{Name: "CPUSETS"},
 			{Name: "MEMCG"},
 			{Name: "INET"},
@@ -60,7 +54,6 @@ var DefaultSysSpec = SysSpec{
 			{Name: "AUFS_FS", Description: "Required for aufs."},
 			{Name: "BLK_DEV_DM", Description: "Required for devicemapper."},
 			{Name: "CFS_BANDWIDTH", Description: "Required for CPU quota."},
-			{Name: "CGROUP_HUGETLB", Description: "Required for hugetlb cgroup."},
 			{Name: "SECCOMP", Description: "Required for seccomp."},
 			{Name: "SECCOMP_FILTER", Description: "Required for seccomp mode 2."},
 		},
