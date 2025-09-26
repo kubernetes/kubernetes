@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
+	"testing"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -32,6 +32,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/configz"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
@@ -65,7 +66,7 @@ type TestServer struct {
 //
 //	files that because Golang testing's call to os.Exit will not give a stop channel go routine
 //	enough time to remove temporary files.
-func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
+func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (result TestServer, err error) {
 	logger := klog.FromContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -81,9 +82,6 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 				logger.Error(err, "Failed to shutdown test server clearly")
 			}
 		}
-		if len(result.TmpDir) != 0 {
-			os.RemoveAll(result.TmpDir)
-		}
 		configz.Delete("componentconfig")
 	}
 	defer func() {
@@ -92,10 +90,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		}
 	}()
 
-	result.TmpDir, err = os.MkdirTemp("", "kube-scheduler")
-	if err != nil {
-		return result, fmt.Errorf("failed to create temp dir: %v", err)
-	}
+	result.TmpDir = t.TempDir()
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
@@ -121,17 +116,14 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	// If the local ComponentGlobalsRegistry is changed by the flags,
 	// we need to copy the new feature values back to the DefaultFeatureGate because most feature checks still use the DefaultFeatureGate.
 	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
-		if err := utilfeature.DefaultMutableFeatureGate.SetEmulationVersion(effectiveVersion.EmulationVersion()); err != nil {
-			return result, err
-		}
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
 	}
 	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
 		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
-			if err := utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", f, featureGate.Enabled(f))); err != nil {
-				return result, err
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, featureGate.Enabled(f))
 		}
 	}
+	utilfeature.DefaultMutableFeatureGate.AddMetrics()
 
 	if opts.SecureServing.BindPort != 0 {
 		opts.SecureServing.Listener, opts.SecureServing.BindPort, err = createListenerOnFreePort()
@@ -190,13 +182,12 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 }
 
 // StartTestServerOrDie calls StartTestServer panic if it does not succeed.
-func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
-	result, err := StartTestServer(ctx, flags)
-	if err == nil {
-		return &result
+func StartTestServerOrDie(t *testing.T, ctx context.Context, flags []string) *TestServer {
+	result, err := StartTestServer(t, ctx, flags)
+	if err != nil {
+		t.Fatalf("failed to launch server: %v", err)
 	}
-
-	panic(fmt.Errorf("failed to launch server: %v", err))
+	return &result
 }
 
 func createListenerOnFreePort() (net.Listener, int, error) {
