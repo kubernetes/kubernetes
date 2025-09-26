@@ -184,8 +184,12 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPree
 			updated := apipod.UpdatePodCondition(newStatus, condition)
 			if updated {
 				if err := util.PatchPodStatus(ctx, ev.Handler.ClientSet(), victim.Name, victim.Namespace, &victim.Status, newStatus); err != nil {
-					logger.Error(err, "Could not add DisruptionTarget condition due to preemption", "pod", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
-					return err
+					if !apierrors.IsNotFound(err) {
+						logger.Error(err, "Could not add DisruptionTarget condition due to preemption", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim))
+						return err
+					}
+					logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
+					return nil
 				}
 			}
 			if err := util.DeletePod(ctx, ev.Handler.ClientSet(), victim); err != nil {
