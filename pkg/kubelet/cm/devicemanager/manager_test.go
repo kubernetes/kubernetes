@@ -112,9 +112,11 @@ func TestNewManagerImplStart(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
 	m, _, p := setup(tCtx, t, []*pluginapi.Device{}, func(_ klog.Logger, n string, d []*pluginapi.Device) {}, socketName, pluginSocketName)
-	cleanup(logger, m, p)
+	err = cleanup(logger, m, p)
+	require.NoError(t, err)
 	// Stop should tolerate being called more than once.
-	cleanup(logger, m, p)
+	err = cleanup(logger, m, p)
+	require.NoError(t, err)
 }
 
 func TestNewManagerImplStartProbeMode(t *testing.T) {
@@ -123,7 +125,8 @@ func TestNewManagerImplStartProbeMode(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
 	m, _, p, _ := setupInProbeMode(tCtx, t, []*pluginapi.Device{}, func(_ klog.Logger, n string, d []*pluginapi.Device) {}, socketName, pluginSocketName)
-	cleanup(logger, m, p)
+	err = cleanup(logger, m, p)
+	require.NoError(t, err)
 }
 
 // Tests that the device plugin manager correctly handles registration and re-registration by
@@ -148,7 +151,8 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	for _, preStartContainerFlag := range []bool{false, true} {
 		for _, getPreferredAllocationFlag := range []bool{false, true} {
 			m, ch, p1 := setup(tCtx, t, devs, nil, socketName, pluginSocketName)
-			p1.Register(tCtx, socketName, testResourceName, "")
+			err = p1.Register(tCtx, socketName, testResourceName, "")
+			require.NoError(t, err)
 
 			select {
 			case <-ch:
@@ -164,7 +168,8 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			p2 := plugin.NewDevicePluginStub(logger, devs, pluginSocketName+".new", testResourceName, preStartContainerFlag, getPreferredAllocationFlag)
 			err = p2.Start(tCtx)
 			require.NoError(t, err)
-			p2.Register(tCtx, socketName, testResourceName, "")
+			err = p2.Register(tCtx, socketName, testResourceName, "")
+			require.NoError(t, err)
 
 			select {
 			case <-ch:
@@ -181,7 +186,8 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			p3 := plugin.NewDevicePluginStub(logger, devsForRegistration, pluginSocketName+".third", testResourceName, preStartContainerFlag, getPreferredAllocationFlag)
 			err = p3.Start(tCtx)
 			require.NoError(t, err)
-			p3.Register(tCtx, socketName, testResourceName, "")
+			err = p3.Register(tCtx, socketName, testResourceName, "")
+			require.NoError(t, err)
 
 			select {
 			case <-ch:
@@ -193,9 +199,12 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
 			require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
 			require.Equal(t, int64(1), resourceAllocatable.Value(), "Devices of plugin previously registered should be removed.")
-			p2.Stop(logger)
-			p3.Stop(logger)
-			cleanup(logger, m, p1)
+			err = p2.Stop(logger)
+			require.NoError(t, err)
+			err = p3.Stop(logger)
+			require.NoError(t, err)
+			err = cleanup(logger, m, p1)
+			require.NoError(t, err)
 		}
 	}
 }
@@ -268,9 +277,12 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
 	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
 	require.Equal(t, int64(1), resourceAllocatable.Value(), "Devices of previous registered should be removed")
-	p2.Stop(logger)
-	p3.Stop(logger)
-	cleanup(logger, m, p1)
+	err = p2.Stop(logger)
+	require.NoError(t, err)
+	err = p3.Stop(logger)
+	require.NoError(t, err)
+	err = cleanup(logger, m, p1)
+	require.NoError(t, err)
 }
 
 func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string,
@@ -342,9 +354,11 @@ func setupInProbeMode(ctx context.Context, t *testing.T, devs []*pluginapi.Devic
 	return m, updateChan, p, pm
 }
 
-func cleanup(logger klog.Logger, m Manager, p *plugin.Stub) {
-	p.Stop(logger)
-	m.Stop(logger)
+func cleanup(logger klog.Logger, m Manager, p *plugin.Stub) error {
+	if err := p.Stop(logger); err != nil {
+		return err
+	}
+	return m.Stop(logger)
 }
 
 func TestUpdateCapacityAllocatable(t *testing.T) {
@@ -449,7 +463,8 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 
 	// Stops resourceName2 endpoint. Verifies its stopTime is set, allocate and
 	// preStartContainer calls return errors.
-	e2.client.Disconnect(logger)
+	err = e2.client.Disconnect(logger)
+	require.NoError(t, err)
 	as.False(e2.stopTime.IsZero())
 	_, err = e2.allocate(tCtx, []string{"Device1"})
 	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
@@ -1843,7 +1858,10 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.description, func(t *testing.T) {
 			m, _ := setupDeviceManager(t, nil, nil, socketName, topology, logger)
-			defer m.Stop(logger)
+			defer func() {
+				err := m.Stop(logger)
+				require.NoError(t, err)
+			}()
 			mimpl := m.(*wrappedManagerImpl)
 
 			wg := sync.WaitGroup{}
