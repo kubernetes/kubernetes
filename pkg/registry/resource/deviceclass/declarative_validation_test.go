@@ -17,6 +17,7 @@ limitations under the License.
 package deviceclass
 
 import (
+	"fmt"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,6 +48,12 @@ func TestDeclarativeValidate(t *testing.T) {
 			}{
 				"valid": {
 					input: mkDeviceClass(),
+				},
+				"too many selectors": {
+					input: mkDeviceClass(tweakSelectors(33)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "selectors"), 33, 32).WithOrigin("maxItems"),
+					},
 				},
 				// TODO: Add more test cases
 			}
@@ -80,6 +87,17 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(),
 				},
+				"valid with too many selectors": {
+					old:    mkDeviceClass(tweakSelectors(33)),
+					update: mkDeviceClass(tweakSelectors(33)),
+				},
+				"update with too many selectors": {
+					old:    mkDeviceClass(),
+					update: mkDeviceClass(tweakSelectors(33)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "selectors"), 33, 32).WithOrigin("maxItems"),
+					},
+				},
 				// TODO: Add more test cases
 			}
 
@@ -101,13 +119,6 @@ func mkDeviceClass(mutators ...func(*resource.DeviceClass)) resource.DeviceClass
 			Name: "test-class",
 		},
 		Spec: resource.DeviceClassSpec{
-			Selectors: []resource.DeviceSelector{
-				{
-					CEL: &resource.CELDeviceSelector{
-						Expression: "device.driver == \"test.driver.io\"",
-					},
-				},
-			},
 			Config: []resource.DeviceClassConfiguration{
 				{
 					DeviceConfiguration: resource.DeviceConfiguration{
@@ -126,4 +137,16 @@ func mkDeviceClass(mutators ...func(*resource.DeviceClass)) resource.DeviceClass
 		mutate(&dc)
 	}
 	return dc
+}
+
+func tweakSelectors(count int) func(*resource.DeviceClass) {
+	return func(dc *resource.DeviceClass) {
+		for i := 0; i < count; i++ {
+			dc.Spec.Selectors = append(dc.Spec.Selectors, resource.DeviceSelector{
+				CEL: &resource.CELDeviceSelector{
+					Expression: fmt.Sprintf("device.driver == \"test.driver.io%d\"", i),
+				},
+			})
+		}
+	}
 }
