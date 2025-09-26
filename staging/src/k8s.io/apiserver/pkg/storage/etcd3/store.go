@@ -778,22 +778,49 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		metrics.RecordStorageListMetrics(s.groupResource, numFetched, numEvald, numReturn)
 	}()
 
-	metricsOp := "get"
-	if opts.Recursive {
-		metricsOp = "list"
+	aggregator := s.listErrAggrFactory()
+
+	processListItem := func(kv *mvccpb.KeyValue) error {
+		data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
+		if err != nil {
+			if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
+				return aggregator.Err()
+			}
+			return nil
+		}
+
+		// Check if the request has already timed out before decode object
+		select {
+		case <-ctx.Done():
+			// parent context is canceled or timed out, no point in continuing
+			return storage.NewTimeoutError(string(kv.Key), "request did not complete within requested timeout")
+		default:
+		}
+
+		obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
+		if err != nil {
+			recordDecodeError(s.groupResource, string(kv.Key))
+			if done := aggregator.Aggregate(string(kv.Key), err); done {
+				return aggregator.Err()
+			}
+			return nil
+		}
+
+		// being unable to set the version does not prevent the object from being extracted
+		if matched, err := opts.Predicate.Matches(obj); err == nil && matched {
+			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
+		}
+
+		numEvald++
+		return nil
 	}
 
-	stats := s.getResourceSizeEstimator()
-
-	aggregator := s.listErrAggrFactory()
 	for {
-		startTime := time.Now()
 		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
 			Revision: withRev,
 			Limit:    limit,
 			Continue: continueKey,
 		})
-		metrics.RecordEtcdRequest(metricsOp, s.groupResource, err, startTime)
 		if err != nil {
 			if errors.Is(err, etcdrpc.ErrFutureRev) {
 				currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
@@ -826,9 +853,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		} else {
 			growSlice(v, 2048, len(getResp.Kvs))
 		}
-		if stats != nil {
-			stats.Update(getResp.Kvs)
-		}
 
 		// take items from the response until the bucket is full, filtering as we go
 		for i, kv := range getResp.Kvs {
@@ -838,37 +862,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			}
 			lastKey = kv.Key
 
-			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
-			if err != nil {
-				if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
-					return aggregator.Err()
-				}
-				continue
+			if err := processListItem(kv); err != nil {
+				return err
 			}
-
-			// Check if the request has already timed out before decode object
-			select {
-			case <-ctx.Done():
-				// parent context is canceled or timed out, no point in continuing
-				return storage.NewTimeoutError(string(kv.Key), "request did not complete within requested timeout")
-			default:
-			}
-
-			obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
-			if err != nil {
-				recordDecodeError(s.groupResource, string(kv.Key))
-				if done := aggregator.Aggregate(string(kv.Key), err); done {
-					return aggregator.Err()
-				}
-				continue
-			}
-
-			// being unable to set the version does not prevent the object from being extracted
-			if matched, err := opts.Predicate.Matches(obj); err == nil && matched {
-				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
-			}
-
-			numEvald++
 
 			// free kv early. Long lists can take O(seconds) to decode.
 			getResp.Kvs[i] = nil
@@ -910,22 +906,31 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	return s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount)
 }
 
-func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (kubernetes.ListResponse, error) {
+func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
+	startTime := time.Now()
 	if recursive {
-		return s.client.Kubernetes.List(ctx, keyPrefix, options)
-	}
-	getResp, err := s.client.Kubernetes.Get(ctx, keyPrefix, kubernetes.GetOptions{
-		Revision: options.Revision,
-	})
-	var resp kubernetes.ListResponse
-	if getResp.KV != nil {
-		resp.Kvs = []*mvccpb.KeyValue{getResp.KV}
-		resp.Count = 1
-		resp.Revision = getResp.Revision
+		resp, err = s.client.Kubernetes.List(ctx, keyPrefix, options)
+		metrics.RecordEtcdRequest("list", s.groupResource, err, startTime)
 	} else {
-		resp.Kvs = []*mvccpb.KeyValue{}
-		resp.Count = 0
-		resp.Revision = getResp.Revision
+		var getResp kubernetes.GetResponse
+		getResp, err = s.client.Kubernetes.Get(ctx, keyPrefix, kubernetes.GetOptions{
+			Revision: options.Revision,
+		})
+		metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
+		if getResp.KV != nil {
+			resp.Kvs = []*mvccpb.KeyValue{getResp.KV}
+			resp.Count = 1
+			resp.Revision = getResp.Revision
+		} else {
+			resp.Kvs = []*mvccpb.KeyValue{}
+			resp.Count = 0
+			resp.Revision = getResp.Revision
+		}
+	}
+
+	stats := s.getResourceSizeEstimator()
+	if len(resp.Kvs) > 0 && stats != nil {
+		stats.Update(resp.Kvs)
 	}
 	return resp, err
 }
