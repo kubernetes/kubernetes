@@ -22,9 +22,11 @@ import (
 	"sync"
 	"testing"
 
+	authnv1 "k8s.io/api/authentication/v1"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEnabled(t *testing.T) {
@@ -173,6 +175,208 @@ func TestAuditAnnotationsWithAuditLoggingSetup(t *testing.T) {
 	}
 	actual := AuditContextFrom(ctx).event.Annotations
 	assert.Equal(t, expected, actual)
+}
+
+func TestGetEventUser(t *testing.T) {
+	tests := []struct {
+		name           string
+		auditEventUser authnv1.UserInfo
+		wantUser       authnv1.UserInfo
+	}{
+		{
+			name:           "fields with zero values are returned as fields with zero values",
+			auditEventUser: authnv1.UserInfo{},
+			wantUser:       authnv1.UserInfo{},
+		},
+		{
+			name: "fields with non-zero values are returned as copies",
+			auditEventUser: authnv1.UserInfo{
+				Username: "test-user",
+				UID:      "test-uid",
+				Groups:   []string{"test-group1", "test-group2"},
+				Extra: map[string]authnv1.ExtraValue{
+					"test-extra1": {"test-extra1-val1", "test-extra1-val2"},
+					"test-extra2": {"test-extra2-val1", "test-extra2-val2"},
+				},
+			},
+			wantUser: authnv1.UserInfo{
+				Username: "test-user",
+				UID:      "test-uid",
+				Groups:   []string{"test-group1", "test-group2"},
+				Extra: map[string]authnv1.ExtraValue{
+					"test-extra1": {"test-extra1-val1", "test-extra1-val2"},
+					"test-extra2": {"test-extra2-val1", "test-extra2-val2"},
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ac := AuditContext{event: auditinternal.Event{User: test.auditEventUser}}
+			got := ac.GetEventUser()
+			require.Equal(t, test.wantUser, got)
+		})
+	}
+
+	t.Run("mutating the returned groups does not change the audit event's User's groups", func(t *testing.T) {
+		ac := AuditContext{
+			event: auditinternal.Event{
+				User: authnv1.UserInfo{
+					Groups: []string{"test-group1", "test-group2"},
+				},
+			},
+		}
+		got := ac.GetEventUser()
+		require.Equal(t, []string{"test-group1", "test-group2"}, got.Groups)
+		got.Groups[0] = "mutated group"
+		require.Equal(t, []string{"mutated group", "test-group2"}, got.Groups)
+		// The event's groups are not changed.
+		require.Equal(t, []string{"test-group1", "test-group2"}, ac.event.User.Groups)
+	})
+
+	t.Run("mutating the returned extras does not change the audit event's User's extras", func(t *testing.T) {
+		ac := AuditContext{
+			event: auditinternal.Event{
+				User: authnv1.UserInfo{
+					Extra: map[string]authnv1.ExtraValue{"test-extra": {"test-extra-val"}},
+				},
+			},
+		}
+		got := ac.GetEventUser()
+		require.Equal(t, map[string]authnv1.ExtraValue{"test-extra": {"test-extra-val"}}, got.Extra)
+		got.Extra["test-extra"] = authnv1.ExtraValue{"mutated value"}
+		require.Equal(t, map[string]authnv1.ExtraValue{"test-extra": {"mutated value"}}, got.Extra)
+		// The event's extras are not changed.
+		require.Equal(t, map[string]authnv1.ExtraValue{"test-extra": {"test-extra-val"}}, ac.event.User.Extra)
+	})
+}
+
+func TestGetEventImpersonatedUser(t *testing.T) {
+	tests := []struct {
+		name                       string
+		auditEventImpersonatedUser *authnv1.UserInfo
+		wantUser                   *authnv1.UserInfo
+	}{
+		{
+			name:                       "nil ImpersonatedUser returns nil",
+			auditEventImpersonatedUser: nil,
+			wantUser:                   nil,
+		},
+		{
+			name:                       "fields with zero values are returned as fields with zero values",
+			auditEventImpersonatedUser: &authnv1.UserInfo{},
+			wantUser:                   &authnv1.UserInfo{},
+		},
+		{
+			name: "fields with non-zero values are returned as copies",
+			auditEventImpersonatedUser: &authnv1.UserInfo{
+				Username: "test-user",
+				UID:      "test-uid",
+				Groups:   []string{"test-group1", "test-group2"},
+				Extra: map[string]authnv1.ExtraValue{
+					"test-extra1": {"test-extra1-val1", "test-extra1-val2"},
+					"test-extra2": {"test-extra2-val1", "test-extra2-val2"},
+				},
+			},
+			wantUser: &authnv1.UserInfo{
+				Username: "test-user",
+				UID:      "test-uid",
+				Groups:   []string{"test-group1", "test-group2"},
+				Extra: map[string]authnv1.ExtraValue{
+					"test-extra1": {"test-extra1-val1", "test-extra1-val2"},
+					"test-extra2": {"test-extra2-val1", "test-extra2-val2"},
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ac := AuditContext{event: auditinternal.Event{ImpersonatedUser: test.auditEventImpersonatedUser}}
+			got := ac.GetEventImpersonatedUser()
+			require.Equal(t, test.wantUser, got)
+		})
+	}
+
+	t.Run("mutating the returned groups does not change the audit event's ImpersonatedUser's groups", func(t *testing.T) {
+		ac := AuditContext{
+			event: auditinternal.Event{
+				ImpersonatedUser: &authnv1.UserInfo{
+					Groups: []string{"test-group1", "test-group2"},
+				},
+			},
+		}
+		got := ac.GetEventImpersonatedUser()
+		require.Equal(t, []string{"test-group1", "test-group2"}, got.Groups)
+		got.Groups[0] = "mutated group"
+		require.Equal(t, []string{"mutated group", "test-group2"}, got.Groups)
+		// The event's groups are not changed.
+		require.Equal(t, []string{"test-group1", "test-group2"}, ac.event.ImpersonatedUser.Groups)
+	})
+
+	t.Run("mutating the returned extras does not change the audit event's ImpersonatedUser's extras", func(t *testing.T) {
+		ac := AuditContext{
+			event: auditinternal.Event{
+				ImpersonatedUser: &authnv1.UserInfo{
+					Extra: map[string]authnv1.ExtraValue{"test-extra": {"test-extra-val"}},
+				},
+			},
+		}
+		got := ac.GetEventImpersonatedUser()
+		require.Equal(t, map[string]authnv1.ExtraValue{"test-extra": {"test-extra-val"}}, got.Extra)
+		got.Extra["test-extra"] = authnv1.ExtraValue{"mutated value"}
+		require.Equal(t, map[string]authnv1.ExtraValue{"test-extra": {"mutated value"}}, got.Extra)
+		// The event's extras are not changed.
+		require.Equal(t, map[string]authnv1.ExtraValue{"test-extra": {"test-extra-val"}}, ac.event.ImpersonatedUser.Extra)
+	})
+}
+
+func TestAuditEventCopyFrom(t *testing.T) {
+	t.Run("no audit context data in the request context", func(t *testing.T) {
+		ctx := context.Background()
+		assert.Nil(t, AuditEventCopyFrom(ctx))
+	})
+
+	t.Run("with level other than none", func(t *testing.T) {
+		ctx := context.Background()
+		ctx = WithAuditContext(ctx)
+		assert.Equal(t, &auditinternal.Event{Stage: auditinternal.StageResponseStarted}, AuditEventCopyFrom(ctx))
+
+		if err := AuditContextFrom(ctx).Init(RequestAuditConfig{Level: auditinternal.LevelMetadata}, nil); err != nil {
+			t.Fatal(err)
+		}
+
+		actual := AuditEventCopyFrom(ctx)
+		want := &auditinternal.Event{Level: auditinternal.LevelMetadata, Stage: auditinternal.StageResponseStarted}
+		assert.Equal(t, want, actual)
+	})
+
+	t.Run("with level none", func(t *testing.T) {
+		ctx := context.Background()
+		ctx = WithAuditContext(ctx)
+		assert.Equal(t, &auditinternal.Event{Stage: auditinternal.StageResponseStarted}, AuditEventCopyFrom(ctx))
+
+		if err := AuditContextFrom(ctx).Init(RequestAuditConfig{Level: auditinternal.LevelNone}, nil); err != nil {
+			t.Fatal(err)
+		}
+		assert.Nil(t, AuditEventCopyFrom(ctx))
+	})
+
+	t.Run("returned audit event is a deep copy to keep the context's audit event effectively immutable", func(t *testing.T) {
+		ctx := context.Background()
+		ctx = WithAuditContext(ctx)
+		assert.Equal(t, &auditinternal.Event{Stage: auditinternal.StageResponseStarted}, AuditEventCopyFrom(ctx))
+
+		actual := AuditEventCopyFrom(ctx)
+		want := &auditinternal.Event{Stage: auditinternal.StageResponseStarted}
+		assert.Equal(t, want, actual)
+
+		// Mutate fields within the previously returned event to show that the mutation does not affect the context's event
+		actual.SourceIPs = append(actual.SourceIPs, "127.0.0.1")
+		actual.RequestURI = "foo"
+
+		updatedActual := AuditEventCopyFrom(ctx)
+		assert.Equal(t, want, updatedActual) // has not changed, thus does not contain the above mutations
+	})
 }
 
 func withAuditContextAndLevel(ctx context.Context, t *testing.T, l auditinternal.Level) context.Context {
