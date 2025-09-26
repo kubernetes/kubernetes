@@ -285,7 +285,7 @@ func (o TaintOptions) RunTaint() error {
 		if err != nil {
 			return err
 		}
-		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, strategicpatch.WithDuplicateMergeKeySupport(true))
 		createdPatch := err == nil
 		if err != nil {
 			klog.V(2).Infof("couldn't compute patch: %v", err)
