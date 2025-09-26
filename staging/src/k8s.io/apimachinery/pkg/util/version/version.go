@@ -333,6 +333,16 @@ func (v *Version) String() string {
 	return buffer.String()
 }
 
+// MajorMinorPatch returns a copy with only major, minor, patch (3 components), no metadata.
+func (v *Version) MajorMinorPatch() *Version {
+	if v == nil || len(v.components) < 3 {
+		return nil
+	}
+	return &Version{
+		components: v.components[:3],
+	}
+}
+
 // compareInternal returns -1 if v is less than other, 1 if it is greater than other, or 0
 // if they are equal
 func (v *Version) compareInternal(other *Version) int {
