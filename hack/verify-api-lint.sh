@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script runs API lint tools.
-#
-# Usage: `hack/verify-api-lint.sh`.
+# This script lints declarative validation comment tags on API resource files
+# that have opted-in. It uses a specific golangci-lint configuration to invoke
+# the kube-api-linter plugin for targeted checks.
 
 set -o errexit
 set -o nounset
@@ -27,4 +27,19 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 cd "${KUBE_ROOT}"
 
-LINT=true hack/update-codegen.sh
+# The logic below is a replica of how hack/update-codegen.sh discovers files
+# with '+k8s:validation-gen' tags, but simplified for this script.
+# It finds all go files with the validation-gen tag, excluding vendor and testdata.
+mapfile -t dirs < <(git grep --untracked -l '+k8s:validation-gen=' -- '**/*.go' ':!:*/testdata/*' ':!:vendor/*' | xargs -n1 dirname | sort -u)
+if [[ ${#dirs[@]} -eq 0 ]]; then
+  kube::log::status "No files with '+k8s:validation-gen' found to lint with kube-api-linter."
+  exit 0
+fi
+
+packages=()
+for dir in "${dirs[@]}"; do
+  packages+=("./${dir}")
+done
+
+kube::log::status "Verifying API linting rules for packages with declarative validation using kube-api-linter..."
+"${KUBE_ROOT}/hack/verify-golangci-lint.sh" -c "${KUBE_ROOT}/hack/kube-api-linter/validation-gen.golangci.yaml" "${packages[@]}"
