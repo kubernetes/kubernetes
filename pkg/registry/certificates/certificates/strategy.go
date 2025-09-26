@@ -122,7 +122,7 @@ func (csrStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
-		const validationIdentifier = "csr_create"
+		const validationIdentifier = "certificatesigningrequest_create"
 		// Run declarative validation with panic recovery
 		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, csr, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
 
@@ -153,7 +153,7 @@ func (csrStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
-		const validationIdentifier = "csr_update"
+		const validationIdentifier = "certificatesigningrequest_update"
 		// Run declarative update validation with panic recovery
 		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
 
@@ -286,7 +286,7 @@ func (csrStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
-		const validationIdentifier = "csr_status_update"
+		const validationIdentifier = "certificatesigningrequest_status_update"
 		// Run declarative update validation with panic recovery
 		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
 
@@ -357,7 +357,7 @@ func (csrApprovalStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
-		const validationIdentifier = "csr_approval_update"
+		const validationIdentifier = "certificatesigningrequest_approval_update"
 		// Run declarative update validation with panic recovery
 		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newCSR, oldCSR, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
 

@@ -134,7 +134,7 @@ func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorL
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-		const validationIdentifier = "rc_create"
+		const validationIdentifier = "replicationcontroller_create"
 
 		// Run declarative validation with panic recovery
 		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, controller, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
@@ -203,7 +203,7 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-		const validationIdentifier = "rc_update"
+		const validationIdentifier = "replicationcontroller_update"
 
 		// Run declarative update validation with panic recovery
 		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newRc, oldRc, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
