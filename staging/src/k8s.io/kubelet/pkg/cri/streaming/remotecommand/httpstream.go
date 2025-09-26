@@ -126,7 +126,6 @@ func createStreams(req *http.Request, w http.ResponseWriter, opts *Options, supp
 func createHTTPStreamStreams(req *http.Request, w http.ResponseWriter, opts *Options, supportedStreamProtocols []string, idleTimeout, streamCreationTimeout time.Duration) (*connectionContext, bool) {
 	protocol, err := httpstream.Handshake(req, w, supportedStreamProtocols)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return nil, false
 	}
 
