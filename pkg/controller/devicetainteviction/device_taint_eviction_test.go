@@ -1852,3 +1852,19 @@ func BenchmarkTaintUntaint(b *testing.B) {
 		tContext.handleSliceChange(slice, nil)
 	}
 }
+
+func TestLimiter(t *testing.T) {
+	limiter := rate.NewLimiter(20, 10)
+	start := time.Now()
+	for i := 0; i < 100; i++ {
+		reservation := limiter.Reserve()
+		if !reservation.OK() {
+			t.Fatalf("limiter failed after %d tokens and %s", i, time.Since(start))
+		}
+		delay := reservation.Delay()
+		if delay > 0 {
+			t.Logf("%s: limiter asked to slow down by %s after %d tokens", time.Since(start), delay, i)
+			time.Sleep(delay)
+		}
+	}
+}
