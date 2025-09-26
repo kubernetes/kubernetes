@@ -19,8 +19,10 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -568,24 +570,26 @@ func (d *initData) Client() (clientset.Interface, error) {
 	return d.client, nil
 }
 
-// ClientWithoutBootstrap returns a dry-run client or a regular client from admin.conf.
-// Unlike Client(), it does not call EnsureAdminClusterRoleBinding() or sets d.client.
-// This means the client only has anonymous permissions and does not persist in initData.
-func (d *initData) ClientWithoutBootstrap() (clientset.Interface, error) {
-	var (
-		client clientset.Interface
-		err    error
-	)
-	if d.dryRun {
-		client, err = getDryRunClient(d)
-		if err != nil {
-			return nil, err
-		}
-	} else { // Use a real client
-		client, err = kubeconfigutil.ClientSetFromFile(d.KubeConfigPath())
-		if err != nil {
-			return nil, err
-		}
+// WaitControlPlaneClient returns a basic client used for the purpose of waiting
+// for control plane components to report 'ok' on their respective health check endpoints.
+// It uses the admin.conf as the base, but modifies it to point at the local API server instead
+// of the control plane endpoint.
+func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
+	config, err := clientcmd.LoadFromFile(d.KubeConfigPath())
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range config.Clusters {
+		v.Server = fmt.Sprintf("https://%s",
+			net.JoinHostPort(
+				d.Cfg().LocalAPIEndpoint.AdvertiseAddress,
+				strconv.Itoa(int(d.Cfg().LocalAPIEndpoint.BindPort)),
+			),
+		)
+	}
+	client, err := kubeconfigutil.ToClientSet(config)
+	if err != nil {
+		return nil, err
 	}
 	return client, nil
 }
