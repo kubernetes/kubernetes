@@ -18,6 +18,7 @@ package tainteviction
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -97,8 +98,18 @@ type TimedWorkerQueue struct {
 	clock    clock.WithDelayedExecution
 }
 
+// AgainError indicates that a work item needs to be processed again.
+// Use with `fmt.Errors("tried to process, need to rescheduled%w", &AgainError{FireAt: <time of next attempt>}`.
+type AgainError struct {
+	FireAt time.Time
+}
+
+func (err AgainError) Error() string { return "" }
+
 // CreateWorkerQueue creates a new TimedWorkerQueue for workers that will execute
-// given function `f`.
+// given function `f`. The function may return an error which can be converted to
+// an AgainError with error.As. In that case the error is not logged and the
+// work item gets queue again immediately.
 func CreateWorkerQueue(f func(ctx context.Context, fireAt time.Time, args *WorkArgs) error) *TimedWorkerQueue {
 	return &TimedWorkerQueue{
 		workers:  make(map[string]*TimedWorker),
@@ -114,8 +125,15 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(ctx context.Con
 		err := q.workFunc(ctx, fireAt, args)
 		q.Lock()
 		defer q.Unlock()
+		var errAgain AgainError
+		if errors.As(err, &errAgain) {
+			logger.V(4).Info("Worker finished, wants to be rescheduled", "item", key, "fireTime", errAgain.FireAt, "err", err)
+			q.workers[key] = createWorker(ctx, args, time.Now(), errAgain.FireAt, q.getWrappedWorkerFunc(key), q.clock)
+			return nil
+		}
 		logger.V(4).Info("Worker finished, removing", "item", key, "err", err)
 		delete(q.workers, key)
+
 		return err
 	}
 }
