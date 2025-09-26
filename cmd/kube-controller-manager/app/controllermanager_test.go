@@ -121,8 +121,9 @@ func TestNewControllerDescriptorsAlwaysReturnsDescriptorsForAllControllers(t *te
 
 	controllersWithoutFeatureGates := KnownControllers()
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
+	// AllBeta must be enabled before AllAlpha to resolve dependencies.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
 
 	controllersWithFeatureGates := KnownControllers()
 
