@@ -17,6 +17,8 @@ limitations under the License.
 package aggregated
 
 import (
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -29,8 +31,28 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	MergedRequestCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "aggregator_discovery_merged_count_total",
+			Help:           "Counter of number of times discovery was merged across all API servers",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	UnmergedRequestCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "aggregator_discovery_unmerged_count_total",
+			Help:           "Counter of number of times unmerged discovery was requested",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 func init() {
 	legacyregistry.MustRegister(regenerationCounter)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
+		legacyregistry.MustRegister(MergedRequestCounter)
+		legacyregistry.MustRegister(UnmergedRequestCounter)
+	}
 }
