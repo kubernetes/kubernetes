@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	ctbpublisher "k8s.io/kubernetes/pkg/controller/certificates/clustertrustbundlepublisher"
@@ -41,17 +40,21 @@ import (
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
+
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller/run"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
 
-func newCertificateSigningRequestSigningControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.CertificateSigningRequestSigningController,
-		aliases:     []string{"csrsigning"},
-		constructor: newCertificateSigningRequestSigningController,
+func newCertificateSigningRequestSigningControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.CertificateSigningRequestSigningController,
+		Aliases:     []string{"csrsigning"},
+		Constructor: newCertificateSigningRequestSigningController,
 	}
 }
 
-func newCertificateSigningRequestSigningController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newCertificateSigningRequestSigningController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	logger := klog.FromContext(ctx)
 	missingSingleSigningFile := controllerContext.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || controllerContext.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == ""
 	if missingSingleSigningFile && !anySpecificFilesSet(controllerContext.ComponentConfig.CSRSigningController) {
@@ -70,7 +73,7 @@ func newCertificateSigningRequestSigningController(ctx context.Context, controll
 	csrInformer := controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests()
 	certTTL := controllerContext.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration
 
-	var rx []runFunc
+	var rx []run.Func
 	if kubeletServingSignerCertFile, kubeletServingSignerKeyFile := getKubeletServingSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeletServingSignerCertFile) > 0 || len(kubeletServingSignerKeyFile) > 0 {
 		kubeletServingSigner, err := signer.NewKubeletServingCSRSigningController(ctx, c, csrInformer, kubeletServingSignerCertFile, kubeletServingSignerKeyFile, certTTL)
 		if err != nil {
@@ -123,7 +126,7 @@ func newCertificateSigningRequestSigningController(ctx context.Context, controll
 		logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/legacy-unknown")
 	}
 
-	return newControllerLoop(concurrentRun(rx...), controllerName), nil
+	return run.NewControllerLoop(run.Concurrent(rx...), controllerName), nil
 }
 
 func areKubeletServingSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
@@ -184,14 +187,14 @@ func getLegacyUnknownSignerFiles(config csrsigningconfig.CSRSigningControllerCon
 	return config.ClusterSigningCertFile, config.ClusterSigningKeyFile
 }
 
-func newCertificateSigningRequestApprovingControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.CertificateSigningRequestApprovingController,
-		aliases:     []string{"csrapproving"},
-		constructor: newCertificateSigningRequestApprovingController,
+func newCertificateSigningRequestApprovingControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.CertificateSigningRequestApprovingController,
+		Aliases:     []string{"csrapproving"},
+		Constructor: newCertificateSigningRequestApprovingController,
 	}
 }
-func newCertificateSigningRequestApprovingController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newCertificateSigningRequestApprovingController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	client, err := controllerContext.NewClient("certificate-controller")
 	if err != nil {
 		return nil, err
@@ -202,19 +205,19 @@ func newCertificateSigningRequestApprovingController(ctx context.Context, contro
 		client,
 		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		ac.Run(ctx, 5)
 	}, controllerName), nil
 }
 
-func newCertificateSigningRequestCleanerControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.CertificateSigningRequestCleanerController,
-		aliases:     []string{"csrcleaner"},
-		constructor: newCertificateSigningRequestCleanerController,
+func newCertificateSigningRequestCleanerControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.CertificateSigningRequestCleanerController,
+		Aliases:     []string{"csrcleaner"},
+		Constructor: newCertificateSigningRequestCleanerController,
 	}
 }
-func newCertificateSigningRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newCertificateSigningRequestCleanerController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	client, err := controllerContext.NewClient("certificate-controller")
 	if err != nil {
 		return nil, err
@@ -224,22 +227,22 @@ func newCertificateSigningRequestCleanerController(ctx context.Context, controll
 		client.CertificatesV1().CertificateSigningRequests(),
 		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		cc.Run(ctx, 1)
 	}, controllerName), nil
 }
 
-func newPodCertificateRequestCleanerControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.PodCertificateRequestCleanerController,
-		constructor: newPodCertificateRequestCleanerController,
-		requiredFeatureGates: []featuregate.Feature{
+func newPodCertificateRequestCleanerControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.PodCertificateRequestCleanerController,
+		Constructor: newPodCertificateRequestCleanerController,
+		RequiredFeatureGates: []featuregate.Feature{
 			features.PodCertificateRequest,
 		},
 	}
 }
 
-func newPodCertificateRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newPodCertificateRequestCleanerController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	cleaner := cleaner.NewPCRCleanerController(
 		controllerContext.ClientBuilder.ClientOrDie("podcertificaterequestcleaner"),
 		controllerContext.InformerFactory.Certificates().V1alpha1().PodCertificateRequests(),
@@ -247,20 +250,20 @@ func newPodCertificateRequestCleanerController(ctx context.Context, controllerCo
 		15*time.Minute, // We expect all PodCertificateRequest flows to complete faster than this.
 		5*time.Minute,
 	)
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		cleaner.Run(ctx, 1)
 	}, controllerName), nil
 }
 
-func newRootCACertificatePublisherControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.RootCACertificatePublisherController,
-		aliases:     []string{"root-ca-cert-publisher"},
-		constructor: newRootCACertificatePublisherController,
+func newRootCACertificatePublisherControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.RootCACertificatePublisherController,
+		Aliases:     []string{"root-ca-cert-publisher"},
+		Constructor: newRootCACertificatePublisherController,
 	}
 }
 
-func newRootCACertificatePublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newRootCACertificatePublisherController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	rootCA, err := getKubeAPIServerCAFileContents(controllerContext)
 	if err != nil {
 		return nil, err
@@ -281,24 +284,24 @@ func newRootCACertificatePublisherController(ctx context.Context, controllerCont
 		return nil, fmt.Errorf("error creating root CA certificate publisher: %w", err)
 	}
 
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		sac.Run(ctx, 1)
 	}, controllerName), nil
 }
 
-func newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:                 names.KubeAPIServerClusterTrustBundlePublisherController,
-		constructor:          newKubeAPIServerSignerClusterTrustBundledPublisherController,
-		requiredFeatureGates: []featuregate.Feature{features.ClusterTrustBundle},
+func newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:                 names.KubeAPIServerClusterTrustBundlePublisherController,
+		Constructor:          newKubeAPIServerSignerClusterTrustBundledPublisherController,
+		RequiredFeatureGates: []featuregate.Feature{features.ClusterTrustBundle},
 	}
 }
 
 type controllerConstructor func(string, dynamiccertificates.CAContentProvider, kubernetes.Interface) (ctbpublisher.PublisherRunner, error)
 
 func newKubeAPIServerSignerClusterTrustBundledPublisherController(
-	ctx context.Context, controllerContext ControllerContext, controllerName string,
-) (Controller, error) {
+	ctx context.Context, controllerContext controller.Context, controllerName string,
+) (controller.Controller, error) {
 	rootCA, err := getKubeAPIServerCAFileContents(controllerContext)
 	if err != nil {
 		return nil, err
@@ -349,7 +352,7 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 		return nil, nil
 	}
 
-	return newControllerLoop(runner.Run, controllerName), nil
+	return run.NewControllerLoop(runner.Run, controllerName), nil
 }
 
 func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion schema.GroupVersion) (bool, error) {
@@ -370,7 +373,7 @@ func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion sch
 	return false, err
 }
 
-func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte, error) {
+func getKubeAPIServerCAFileContents(controllerContext controller.Context) ([]byte, error) {
 	if controllerContext.ComponentConfig.SAController.RootCAFile == "" {
 		config, err := controllerContext.NewClientConfig("root-ca-cert-publisher")
 		if err != nil {

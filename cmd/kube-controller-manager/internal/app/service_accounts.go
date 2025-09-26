@@ -23,29 +23,32 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/controller-manager/pkg/clientbuilder"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller/run"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
 
 // serviceAccountTokenController is special because it must run first to set up permissions for other controllers.
 // It cannot use the "normal" client builder, so it tracks its own.
-func newServiceAccountTokenControllerDescriptor(rootClientBuilder clientbuilder.ControllerClientBuilder) *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:    names.ServiceAccountTokenController,
-		aliases: []string{"serviceaccount-token"},
-		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newServiceAccountTokenControllerDescriptor(rootClientBuilder clientbuilder.ControllerClientBuilder) *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:    names.ServiceAccountTokenController,
+		Aliases: []string{"serviceaccount-token"},
+		Constructor: func(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 			return newServiceAccountTokenController(ctx, controllerContext, controllerName, rootClientBuilder)
 		},
 		// This controller is started manually before any other controller.
-		requiresSpecialHandling: true,
+		RequiresSpecialHandling: true,
 	}
 }
 
 func newServiceAccountTokenController(
-	ctx context.Context, controllerContext ControllerContext, controllerName string,
+	ctx context.Context, controllerContext controller.Context, controllerName string,
 	rootClientBuilder clientbuilder.ControllerClientBuilder,
-) (Controller, error) {
+) (controller.Controller, error) {
 	if len(controllerContext.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
 		klog.FromContext(ctx).Info("Controller is disabled because there is no private key", "controller", controllerName)
 		return nil, nil
@@ -92,7 +95,7 @@ func newServiceAccountTokenController(
 		return nil, fmt.Errorf("error creating Tokens controller: %w", err)
 	}
 
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		tokenController.Run(ctx, int(controllerContext.ComponentConfig.SAController.ConcurrentSATokenSyncs))
 	}, controllerName), nil
 }
