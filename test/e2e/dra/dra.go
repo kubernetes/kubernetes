@@ -1540,6 +1540,14 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			emptySlice := gomega.HaveField("Spec.Devices", gomega.BeEmpty())
 			gomega.Eventually(ctx, listSlices).WithTimeout(time.Minute).Should(gomega.HaveField("Items", gomega.ConsistOf(emptySlice)))
 			expectStats = resourceslice.Stats{NumCreates: int64(numSlices) + 1, NumDeletes: int64(numSlices)}
+
+			// There is a window of time where the ResourceSlice exists and is
+			// returned in a list but before that ResourceSlice is accounted for
+			// in the controller's stats, consisting mostly of network latency
+			// between this test process and the API server. Wait for the stats
+			// to converge before asserting there are no further changes.
+			gomega.Eventually(ctx, controller.GetStats).WithTimeout(30 * time.Second).Should(gomega.Equal(expectStats))
+
 			gomega.Consistently(ctx, controller.GetStats).WithTimeout(2 * mutationCacheTTL).Should(gomega.Equal(expectStats))
 		})
 	})
