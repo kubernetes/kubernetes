@@ -117,6 +117,7 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 	resourceQuotaControllerOptions := &ControllerOptions{
 		QuotaClient:               kubeClient.CoreV1(),
 		ResourceQuotaInformer:     informerFactory.Core().V1().ResourceQuotas(),
+		DeviceClassInformer:       informerFactory.Resource().V1().DeviceClasses(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
