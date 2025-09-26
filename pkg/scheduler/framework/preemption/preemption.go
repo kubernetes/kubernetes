@@ -139,6 +139,8 @@ type Evaluator struct {
 	// which is used to prevent the pods from entering the scheduling cycle meanwhile.
 	preempting sets.Set[types.UID]
 
+	preemptingLast sets.Set[types.UID]
+
 	// PreemptPod is a function that actually makes API calls to preempt a specific Pod.
 	// This is exposed to be replaced during tests.
 	PreemptPod func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) error
@@ -158,6 +160,7 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPree
 		Interface:             i,
 		enableAsyncPreemption: enableAsyncPreemption,
 		preempting:            sets.New[types.UID](),
+		preemptingLast:        sets.New[types.UID](),
 	}
 
 	// PreemptPod actually makes API calls to preempt a specific Pod.
@@ -506,6 +509,10 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 	}
 
 	ev.mu.Lock()
+	if ev.preempting.Has(pod.UID) || ev.preemptingLast.Has(pod.UID) {
+		ev.mu.Unlock()
+		return
+	}
 	ev.preempting.Insert(pod.UID)
 	ev.mu.Unlock()
 
@@ -558,12 +565,17 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 
 		ev.mu.Lock()
 		delete(ev.preempting, pod.UID)
+		ev.preemptingLast.Insert(pod.UID)
 		ev.mu.Unlock()
 
 		if err := ev.PreemptPod(ctx, c, pod, c.Victims().Pods[len(c.Victims().Pods)-1], pluginName); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
 			result = metrics.GoroutineResultError
 		}
+
+		ev.mu.Lock()
+		ev.preemptingLast.Delete(pod.UID)
+		ev.mu.Unlock()
 
 		logger.V(2).Info("Async Preemption finished completely", "preemptor", klog.KObj(pod), "node", c.Name(), "result", result)
 	}()
