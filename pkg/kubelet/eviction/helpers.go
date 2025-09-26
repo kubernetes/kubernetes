@@ -114,12 +114,12 @@ func validSignal(signal evictionapi.Signal) bool {
 }
 
 // getReclaimableThreshold finds the threshold and resource to reclaim
-func getReclaimableThreshold(thresholds []evictionapi.Threshold) (evictionapi.Threshold, v1.ResourceName, bool) {
+func getReclaimableThreshold(logger klog.Logger, thresholds []evictionapi.Threshold) (evictionapi.Threshold, v1.ResourceName, bool) {
 	for _, thresholdToReclaim := range thresholds {
 		if resourceToReclaim, ok := signalToResource[thresholdToReclaim.Signal]; ok {
 			return thresholdToReclaim, resourceToReclaim, true
 		}
-		klog.V(3).InfoS("Eviction manager: threshold was crossed, but reclaim is not implemented for this threshold.", "threshold", thresholdToReclaim.Signal)
+		logger.V(3).Info("Eviction manager: threshold was crossed, but reclaim is not implemented for this threshold.", "threshold", thresholdToReclaim.Signal)
 	}
 	return evictionapi.Threshold{}, "", false
 }
@@ -845,19 +845,19 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summary *statsapi.Summary) (signalObservations, statsFunc) {
+func makeSignalObservations(logger klog.Logger, summary *statsapi.Summary) (signalObservations, statsFunc) {
 	// build the function to work against for pod stats
 	statsFunc := cachedStatsFunc(summary.Pods)
 	// build an evaluation context for current eviction signals
 	result := signalObservations{}
 
-	memoryAvailableSignal := makeMemoryAvailableSignalObservation(summary)
+	memoryAvailableSignal := makeMemoryAvailableSignalObservation(logger, summary)
 	if memoryAvailableSignal != nil {
 		result[evictionapi.SignalMemoryAvailable] = *memoryAvailableSignal
 	}
 
 	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
-		klog.ErrorS(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalAllocatableMemoryAvailable)
+		logger.Error(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalAllocatableMemoryAvailable)
 	} else {
 		if memory := allocatableContainer.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
 			result[evictionapi.SignalAllocatableMemoryAvailable] = signalObservation{
@@ -940,13 +940,13 @@ func getSysContainer(sysContainers []statsapi.ContainerStats, name string) (*sta
 }
 
 // thresholdsMet returns the set of thresholds that were met independent of grace period
-func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObservations, enforceMinReclaim bool) []evictionapi.Threshold {
+func thresholdsMet(logger klog.Logger, thresholds []evictionapi.Threshold, observations signalObservations, enforceMinReclaim bool) []evictionapi.Threshold {
 	results := []evictionapi.Threshold{}
 	for i := range thresholds {
 		threshold := thresholds[i]
 		observed, found := observations[threshold.Signal]
 		if !found {
-			klog.InfoS("Eviction manager: no observation found for eviction signal", "signal", threshold.Signal)
+			logger.Info("Eviction manager: no observation found for eviction signal", "signal", threshold.Signal)
 			continue
 		}
 		// determine if we have met the specified threshold
@@ -968,23 +968,21 @@ func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObserv
 	return results
 }
 
-func debugLogObservations(logPrefix string, observations signalObservations) {
-	klogV := klog.V(3)
-	if !klogV.Enabled() {
+func debugLogObservations(logger klog.Logger, logPrefix string, observations signalObservations) {
+	if !logger.V(3).Enabled() {
 		return
 	}
 	for k, v := range observations {
 		if !v.time.IsZero() {
-			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity, "time", v.time)
+			logger.V(3).Info("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity, "time", v.time)
 		} else {
-			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity)
+			logger.V(3).Info("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity)
 		}
 	}
 }
 
-func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionapi.Threshold, observations signalObservations) {
-	klogV := klog.V(3)
-	if !klogV.Enabled() {
+func debugLogThresholdsWithObservation(logger klog.Logger, logPrefix string, thresholds []evictionapi.Threshold, observations signalObservations) {
+	if !logger.V(3).Enabled() {
 		return
 	}
 	for i := range thresholds {
@@ -992,20 +990,20 @@ func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionap
 		observed, found := observations[threshold.Signal]
 		if found {
 			quantity := evictionapi.GetThresholdQuantity(threshold.Value, observed.capacity)
-			klogV.InfoS("Eviction manager: threshold observed resource", "log", logPrefix, "signal", threshold.Signal, "resourceName", signalToResource[threshold.Signal], "quantity", quantity, "available", observed.available)
+			logger.V(3).Info("Eviction manager: threshold observed resource", "log", logPrefix, "signal", threshold.Signal, "resourceName", signalToResource[threshold.Signal], "quantity", quantity, "available", observed.available)
 		} else {
-			klogV.InfoS("Eviction manager: threshold had no observation", "log", logPrefix, "signal", threshold.Signal)
+			logger.V(3).Info("Eviction manager: threshold had no observation", "log", logPrefix, "signal", threshold.Signal)
 		}
 	}
 }
 
-func thresholdsUpdatedStats(thresholds []evictionapi.Threshold, observations, lastObservations signalObservations) []evictionapi.Threshold {
+func thresholdsUpdatedStats(logger klog.Logger, thresholds []evictionapi.Threshold, observations, lastObservations signalObservations) []evictionapi.Threshold {
 	results := []evictionapi.Threshold{}
 	for i := range thresholds {
 		threshold := thresholds[i]
 		observed, found := observations[threshold.Signal]
 		if !found {
-			klog.InfoS("Eviction manager: no observation found for eviction signal", "signal", threshold.Signal)
+			logger.Info("Eviction manager: no observation found for eviction signal", "signal", threshold.Signal)
 			continue
 		}
 		last, found := lastObservations[threshold.Signal]
@@ -1030,12 +1028,12 @@ func thresholdsFirstObservedAt(thresholds []evictionapi.Threshold, lastObservedA
 }
 
 // thresholdsMetGracePeriod returns the set of thresholds that have satisfied associated grace period
-func thresholdsMetGracePeriod(observedAt thresholdsObservedAt, now time.Time) []evictionapi.Threshold {
+func thresholdsMetGracePeriod(logger klog.Logger, observedAt thresholdsObservedAt, now time.Time) []evictionapi.Threshold {
 	results := []evictionapi.Threshold{}
 	for threshold, at := range observedAt {
 		duration := now.Sub(at)
 		if duration < threshold.GracePeriod {
-			klog.V(2).InfoS("Eviction manager: eviction criteria not yet met", "threshold", formatThreshold(threshold), "duration", duration)
+			logger.V(2).Info("Eviction manager: eviction criteria not yet met", "threshold", formatThreshold(threshold), "duration", duration)
 			continue
 		}
 		results = append(results, threshold)
