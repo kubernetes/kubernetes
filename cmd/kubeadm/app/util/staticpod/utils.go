@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/dump"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -70,6 +71,7 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume, annotati
 			Annotations: annotations,
 		},
 		Spec: v1.PodSpec{
+			HostUsers:         ptr.To(false),
 			Containers:        []v1.Container{container},
 			Priority:          &priority,
 			PriorityClassName: "system-node-critical",
