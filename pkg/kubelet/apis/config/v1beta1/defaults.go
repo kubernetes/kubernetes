@@ -290,7 +290,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.SeccompDefault = ptr.To(false)
 	}
 	if obj.FailCgroupV1 == nil {
-		obj.FailCgroupV1 = ptr.To(false)
+		obj.FailCgroupV1 = ptr.To(true)
 	}
 	if obj.MemoryThrottlingFactor == nil {
 		obj.MemoryThrottlingFactor = ptr.To(DefaultMemoryThrottlingFactor)
