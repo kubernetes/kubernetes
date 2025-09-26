@@ -273,6 +273,7 @@ linters:
             contextual k8s.io/kubernetes/pkg/kubelet/volumemanager/.*
             contextual k8s.io/kubernetes/pkg/kubelet/util/.*
             contextual k8s.io/kubernetes/pkg/kubelet/logs/.*
+            contextual k8s.io/kubernetes/test/images/sample-device-plugin/.*
             
             # As long as contextual logging is alpha or beta, all WithName, WithValues,
             # NewContext calls have to go through klog. Once it is GA, we can lift
