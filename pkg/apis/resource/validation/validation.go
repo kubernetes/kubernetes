@@ -544,7 +544,7 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
 			return validateSelector(selector, fldPath, stored)
 		},
-		fldPath.Child("selectors"))...)
+		fldPath.Child("selectors"), sizeCovered)...)
 	// Same logic as above for configs.
 	if oldSpec != nil {
 		stored = apiequality.Semantic.DeepEqual(spec.Config, oldSpec.Config)
@@ -1128,7 +1128,7 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 		// just shows the number of entries.
 		err := field.TooMany(fldPath, len(slice), maxSize).WithOrigin("maxItems")
 		if slices.Contains(opts, sizeCovered) {
-			err = err.MarkCoveredByDeclarative()
+			err = err.MarkCoveredByDeclarative().WithOrigin("maxItems")
 		}
 		allErrs = append(allErrs, err)
 	}
