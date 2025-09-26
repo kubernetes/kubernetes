@@ -19,8 +19,10 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -622,6 +624,31 @@ func (j *joinData) Client() (clientset.Interface, error) {
 		return nil, errors.Wrap(err, "[preflight] couldn't create Kubernetes client")
 	}
 	j.client = client
+	return client, nil
+}
+
+// WaitControlPlaneClient returns a basic client used for the purpose of waiting
+// for control plane components to report 'ok' on their respective health check endpoints.
+// It uses the admin.conf as the base, but modifies it to point at the local API server instead
+// of the control plane endpoint.
+func (j *joinData) WaitControlPlaneClient() (clientset.Interface, error) {
+	pathAdmin := filepath.Join(j.KubeConfigDir(), kubeadmconstants.AdminKubeConfigFileName)
+	config, err := clientcmd.LoadFromFile(pathAdmin)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range config.Clusters {
+		v.Server = fmt.Sprintf("https://%s",
+			net.JoinHostPort(
+				j.Cfg().ControlPlane.LocalAPIEndpoint.AdvertiseAddress,
+				strconv.Itoa(int(j.Cfg().ControlPlane.LocalAPIEndpoint.BindPort)),
+			),
+		)
+	}
+	client, err := kubeconfigutil.ToClientSet(config)
+	if err != nil {
+		return nil, err
+	}
 	return client, nil
 }
 
