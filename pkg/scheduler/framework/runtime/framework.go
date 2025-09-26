@@ -37,7 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -1372,15 +1372,23 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state fwk.CycleState
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Bind, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	if len(f.bindPlugins) == 0 {
-		return fwk.NewStatus(fwk.Skip, "")
-	}
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {
 		logger = klog.LoggerWithName(logger, "Bind")
 	}
+	if len(f.bindPlugins) == 0 {
+		logger.Error(nil, "No bind plugins found no fakeBind")
+		return fwk.NewStatus(fwk.Skip, "")
+	}
+
+	logger.Error(nil, "all bind plugins")
 	for _, pl := range f.bindPlugins {
+		logger.Error(nil, "bind plugin name %s", pl.Name())
+	}
+
+	for _, pl := range f.bindPlugins {
+		logger.Error(nil, "bind plugin %s", pl.Name())
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())

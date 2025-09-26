@@ -21,6 +21,7 @@ package preemption
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -998,3 +1000,614 @@ func podInUnschedulablePodPool(t *testing.T, queue queue.SchedulingQueue, podNam
 	}
 	return false
 }
+
+// unschedulablePod checks if the given Pod is in the unschedulable queue and returns it.
+func unschedulablePod(t *testing.T, queue queue.SchedulingQueue, podName string) *v1.Pod {
+	t.Helper()
+	unschedPods := queue.UnschedulablePods()
+	for _, pod := range unschedPods {
+		if pod.Name == podName {
+			return pod
+		}
+	}
+	return nil
+}
+
+func TestAsyncPreemptionBind(t *testing.T) {
+	type createPod struct {
+		pod *v1.Pod
+		// count is the number of times the pod should be created by this action.
+		// i.e., if you use it, you have to use GenerateName.
+		// By default, it's 1.
+		count *int
+	}
+
+	type schedulePod struct {
+		podName             string
+		expectSuccess       bool
+		expectUnschedulable bool
+	}
+
+	type activatePod struct {
+		podName string
+	}
+
+	type scenario struct {
+		// name is this step's name, just for the debugging purpose.
+		name string
+
+		// Only one of the following actions should be set.
+
+		// createPod creates a Pod.
+		createPod *createPod
+		// schedulePod schedules one Pod that is at the top of the activeQ.
+		// You should give a Pod name that is supposed to be scheduled.
+		schedulePod *schedulePod
+		// completePreemption completes the preemption that is currently on-going.
+		// You should give a Pod name.
+		completePreemption string
+		// podGatedInQueue checks if the given Pod is in the scheduling queue and gated by the preemption.
+		// You should give a Pod name.
+		podGatedInQueue string
+		// podRunningPreemption checks if the given Pod is running preemption.
+		// You should give a Pod index representing the order of Pod creation.
+		// e.g., if you want to check the Pod created first in the test case, you should give 0.
+		podRunningPreemption *int
+		// activatePod moves the pod from unschedulable to active or backoff
+		activatePod *activatePod
+	}
+
+	tests := []struct {
+		name string
+		// scenarios after the first attempt of scheduling the pod.
+		scenarios []scenario
+	}{
+		{
+			// Very basic test case: if it fails, the basic scenario is broken somewhere.
+			name: "basic: async preemption happens expectedly",
+			scenarios: []scenario{
+				{
+					name: "create victim Pod",
+					createPod: &createPod{
+						pod:   st.MakePod().Name("pod-blocked-in-binding").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						count: ptr.To(1),
+					},
+				},
+				{
+					name: "create victim Pod2",
+					createPod: &createPod{
+						pod:   st.MakePod().Name("victim-pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						count: ptr.To(1),
+					},
+				},
+				{
+					name: "schedule victim Pod",
+					schedulePod: &schedulePod{
+						podName: "pod-blocked-in-binding",
+					},
+				},
+				{
+					name: "schedule victim Pod2",
+					schedulePod: &schedulePod{
+						podName:       "victim-pod2",
+						expectSuccess: true,
+					},
+				},
+				{
+					name: "create a preemptor Pod",
+					createPod: &createPod{
+						pod: st.MakePod().Name("anias-preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					},
+				},
+				{
+					name: "schedule the preemptor Pod",
+					schedulePod: &schedulePod{
+						podName:             "anias-preemptor",
+						expectUnschedulable: true,
+					},
+				},
+				{
+					name: "activate preemptor Pod",
+					activatePod: &activatePod{
+						podName: "anias-preemptor",
+					},
+				},
+				{
+					name: "schedule the preemptor Pod again and expect it to be unschedulable (waiting for preemption to finish)",
+					schedulePod: &schedulePod{
+						podName:             "anias-preemptor",
+						expectUnschedulable: true,
+					},
+				},
+				/*{
+					name:            "check the pod is in the queue and gated",
+					podGatedInQueue: "preemptor",
+				},
+				{
+					name:                 "check the preemptor Pod making the preemption API calls",
+					podRunningPreemption: ptr.To(2),
+				},
+				{
+					name:               "complete the preemption API calls",
+					completePreemption: "preemptor",
+				},
+				{
+					name: "schedule the preemptor Pod after the preemption",
+					schedulePod: &schedulePod{
+						podName:       "preemptor",
+						expectSuccess: true,
+					},
+				},*/
+			},
+		},
+		/*{
+			name: "Lower priority Pod doesn't take over the place for higher priority Pod that is running the preemption",
+			scenarios: []scenario{
+				{
+					name: "create scheduled Pod",
+					createPod: &createPod{
+						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						count: ptr.To(2),
+					},
+				},
+				{
+					name: "create a preemptor Pod",
+					createPod: &createPod{
+						pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					},
+				},
+				{
+					name: "schedule the preemptor Pod",
+					schedulePod: &schedulePod{
+						podName: "preemptor-high-priority",
+					},
+				},
+				{
+					name:            "check the pod is in the queue and gated",
+					podGatedInQueue: "preemptor-high-priority",
+				},
+				{
+					name:                 "check the preemptor Pod making the preemption API calls",
+					podRunningPreemption: ptr.To(2),
+				},
+				{
+					// This Pod is lower priority than the preemptor Pod.
+					// Given the preemptor Pod is nominated to the node, this Pod should be unschedulable.
+					name: "create a second Pod that is lower priority than the first preemptor Pod",
+					createPod: &createPod{
+						pod: st.MakePod().Name("pod-mid-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(50).Obj(),
+					},
+				},
+				{
+					name: "schedule the mid-priority Pod",
+					schedulePod: &schedulePod{
+						podName: "pod-mid-priority",
+					},
+				},
+				{
+					name:               "complete the preemption API calls",
+					completePreemption: "preemptor-high-priority",
+				},
+				{
+					// the preemptor pod should be popped from the queue before the mid-priority pod.
+					name: "schedule the preemptor Pod again",
+					schedulePod: &schedulePod{
+						podName:       "preemptor-high-priority",
+						expectSuccess: true,
+					},
+				},
+				{
+					name: "schedule the mid-priority Pod again",
+					schedulePod: &schedulePod{
+						podName: "pod-mid-priority",
+					},
+				},
+			},
+		},
+		{
+			name: "Higher priority Pod takes over the place for lower priority Pod that is running the preemption",
+			scenarios: []scenario{
+				{
+					name: "create scheduled Pod",
+					createPod: &createPod{
+						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						count: ptr.To(4),
+					},
+				},
+				{
+					name: "create a preemptor Pod",
+					createPod: &createPod{
+						pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					},
+				},
+				{
+					name: "schedule the preemptor Pod",
+					schedulePod: &schedulePod{
+						podName: "preemptor-high-priority",
+					},
+				},
+				{
+					name:            "check the pod is in the queue and gated",
+					podGatedInQueue: "preemptor-high-priority",
+				},
+				{
+					name:                 "check the preemptor Pod making the preemption API calls",
+					podRunningPreemption: ptr.To(4),
+				},
+				{
+					// This Pod is higher priority than the preemptor Pod.
+					// Even though the preemptor Pod is nominated to the node, this Pod can take over the place.
+					name: "create a second Pod that is higher priority than the first preemptor Pod",
+					createPod: &createPod{
+						pod: st.MakePod().Name("preemptor-super-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(200).Obj(),
+					},
+				},
+				{
+					name: "schedule the super-high-priority Pod",
+					schedulePod: &schedulePod{
+						podName: "preemptor-super-high-priority",
+					},
+				},
+				{
+					name:                 "check the super-high-priority Pod making the preemption API calls",
+					podRunningPreemption: ptr.To(5),
+				},
+				{
+					// the super-high-priority preemptor should enter the preemption
+					// and select the place where the preemptor-high-priority selected.
+					// So, basically both goroutines are preempting the same Pods.
+					name:            "check the super-high-priority pod is in the queue and gated",
+					podGatedInQueue: "preemptor-super-high-priority",
+				},
+				{
+					name:               "complete the preemption API calls of super-high-priority",
+					completePreemption: "preemptor-super-high-priority",
+				},
+				{
+					name:               "complete the preemption API calls of high-priority",
+					completePreemption: "preemptor-high-priority",
+				},
+				{
+					name: "schedule the super-high-priority Pod",
+					schedulePod: &schedulePod{
+						podName:       "preemptor-super-high-priority",
+						expectSuccess: true,
+					},
+				},
+				{
+					name: "schedule the high-priority Pod",
+					schedulePod: &schedulePod{
+						podName: "preemptor-high-priority",
+					},
+				},
+			},
+		},
+		{
+			name: "Lower priority Pod can select the same place where the higher priority Pod is preempting if the node is big enough",
+			scenarios: []scenario{
+				{
+					name: "create scheduled Pod",
+					createPod: &createPod{
+						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						count: ptr.To(4),
+					},
+				},
+				{
+					// It will preempt two victims.
+					name: "create a preemptor Pod",
+					createPod: &createPod{
+						pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(100).Obj(),
+					},
+				},
+				{
+					name: "schedule the preemptor Pod",
+					schedulePod: &schedulePod{
+						podName: "preemptor-high-priority",
+					},
+				},
+				{
+					name:            "check the pod is in the queue and gated",
+					podGatedInQueue: "preemptor-high-priority",
+				},
+				{
+					name:                 "check the preemptor Pod making the preemption API calls",
+					podRunningPreemption: ptr.To(4),
+				},
+				{
+					// This Pod is lower priority than the preemptor Pod.
+					// Given the preemptor Pod is nominated to the node, this Pod should be unschedulable.
+					// This Pod will trigger the preemption to target the two victims that the first Pod doesn't target.
+					name: "create a second Pod that is lower priority than the first preemptor Pod",
+					createPod: &createPod{
+						pod: st.MakePod().Name("preemptor-mid-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(50).Obj(),
+					},
+				},
+				{
+					name: "schedule the mid-priority Pod",
+					schedulePod: &schedulePod{
+						podName: "preemptor-mid-priority",
+					},
+				},
+				{
+					name:            "check the mid-priority pod is in the queue and gated",
+					podGatedInQueue: "preemptor-mid-priority",
+				},
+				{
+					name:                 "check the mid-priority Pod making the preemption API calls",
+					podRunningPreemption: ptr.To(5),
+				},
+				{
+					name:               "complete the preemption API calls",
+					completePreemption: "preemptor-mid-priority",
+				},
+				{
+					name:               "complete the preemption API calls",
+					completePreemption: "preemptor-high-priority",
+				},
+				{
+					// the preemptor pod should be popped from the queue before the mid-priority pod.
+					name: "schedule the preemptor Pod again",
+					schedulePod: &schedulePod{
+						podName:       "preemptor-high-priority",
+						expectSuccess: true,
+					},
+				},
+				{
+					name: "schedule the mid-priority Pod again",
+					schedulePod: &schedulePod{
+						podName:       "preemptor-mid-priority",
+						expectSuccess: true,
+					},
+				},
+			},
+		},*/
+	}
+
+	// All test cases have the same node.
+	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+	for _, asyncAPICallsEnabled := range []bool{ /*true,*/ false} {
+		for _, test := range tests {
+			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", test.name, asyncAPICallsEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
+
+				// We need to use a custom preemption plugin to test async preemption behavior
+				delayedPreemptionPluginName := "delay-preemption"
+				var lock sync.Mutex
+				// keyed by the pod name
+				preemptionDoneChannels := make(map[string]chan struct{})
+				defer func() {
+					lock.Lock()
+					defer lock.Unlock()
+					for _, ch := range preemptionDoneChannels {
+						close(ch)
+					}
+				}()
+				registry := make(frameworkruntime.Registry)
+				var preemptionPlugin *defaultpreemption.DefaultPreemption
+				err := registry.Register(delayedPreemptionPluginName, func(c context.Context, r runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+					p, err := frameworkruntime.FactoryAdapter(plfeature.Features{EnableAsyncPreemption: true}, defaultpreemption.New)(c, &config.DefaultPreemptionArgs{
+						// Set default values to pass the validation at the initialization, not related to the test.
+						MinCandidateNodesPercentage: 10,
+						MinCandidateNodesAbsolute:   100,
+					}, fh)
+					if err != nil {
+						return nil, fmt.Errorf("error creating default preemption plugin: %w", err)
+					}
+
+					var ok bool
+					preemptionPlugin, ok = p.(*defaultpreemption.DefaultPreemption)
+					if !ok {
+						return nil, fmt.Errorf("unexpected plugin type %T", p)
+					}
+
+					preemptPodFn := preemptionPlugin.Evaluator.PreemptPod
+					preemptionPlugin.Evaluator.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor, victim *v1.Pod, pluginName string) error {
+						// block the preemption goroutine to complete until the test case allows it to proceed.
+						lock.Lock()
+						ch, ok := preemptionDoneChannels[preemptor.Name]
+						lock.Unlock()
+						if ok {
+							<-ch
+						}
+						return preemptPodFn(ctx, c, preemptor, victim, pluginName)
+					}
+
+					return preemptionPlugin, nil
+				})
+				if err != nil {
+					t.Fatalf("Error registering a filter: %v", err)
+				}
+				fakeName := "fakeBindPluginLongBind"
+				err = registry.Register(fakeName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+					db, err := defaultbinder.New(ctx, o, fh)
+					if err != nil {
+						t.Fatalf("Error creating a default binder plugin: %v", err)
+					}
+					var bindPlugin = FakeBindPluginLongBind{name: fakeName, bindingDuration: 1 * time.Minute, nameOfPodToHold: "pod-blocked-in-binding", realPlugin: db.(fwk.BindPlugin)}
+					return &bindPlugin, nil
+				})
+				if err != nil {
+					t.Fatalf("Error registering a bind plugin: %v", err)
+				}
+
+				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+					Profiles: []configv1.KubeSchedulerProfile{{
+						SchedulerName: ptr.To(v1.DefaultSchedulerName),
+						Plugins: &configv1.Plugins{
+							MultiPoint: configv1.PluginSet{
+								Enabled: []configv1.Plugin{
+									{Name: fakeName},
+									{Name: delayedPreemptionPluginName},
+								},
+								Disabled: []configv1.Plugin{
+									{Name: names.DefaultPreemption},
+									{Name: names.DefaultBinder},
+								},
+							},
+						},
+					}},
+				})
+
+				// It initializes the scheduler, but doesn't start.
+				// We manually trigger the scheduling cycle.
+				testCtx := testutils.InitTestSchedulerWithOptions(t,
+					testutils.InitTestAPIServer(t, "preemption", nil),
+					0,
+					scheduler.WithProfiles(cfg.Profiles...),
+					scheduler.WithFrameworkOutOfTreeRegistry(registry),
+					// disable backoff
+					scheduler.WithPodMaxBackoffSeconds(0),
+					scheduler.WithPodInitialBackoffSeconds(0),
+				)
+				testutils.SyncSchedulerInformerFactory(testCtx)
+				cs := testCtx.ClientSet
+
+				if preemptionPlugin == nil {
+					t.Fatalf("the preemption plugin should be initialized")
+				}
+
+				logger, _ := ktesting.NewTestContext(t)
+				if testCtx.Scheduler.APIDispatcher != nil {
+					testCtx.Scheduler.APIDispatcher.Run(logger)
+					defer testCtx.Scheduler.APIDispatcher.Close()
+				}
+				testCtx.Scheduler.SchedulingQueue.Run(logger)
+				defer testCtx.Scheduler.SchedulingQueue.Close()
+
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, true)
+
+				createdPods := []*v1.Pod{}
+				defer testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create an initial Node %q: %v", node.Name, err)
+				}
+				defer func() {
+					if err := cs.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{}); err != nil {
+						t.Fatalf("Failed to delete the Node %q: %v", node.Name, err)
+					}
+				}()
+
+				for _, scenario := range test.scenarios {
+					t.Logf("Running scenario: %s", scenario.name)
+					switch {
+					case scenario.createPod != nil:
+						if scenario.createPod.count == nil {
+							scenario.createPod.count = ptr.To(1)
+						}
+
+						for i := 0; i < *scenario.createPod.count; i++ {
+							pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(ctx, scenario.createPod.pod, metav1.CreateOptions{})
+							if err != nil {
+								t.Fatalf("Failed to create a Pod %q: %v", pod.Name, err)
+							}
+							createdPods = append(createdPods, pod)
+						}
+					case scenario.schedulePod != nil:
+						lastFailure := ""
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+							if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0 {
+								lastFailure = fmt.Sprintf("Expected the pod %s to be scheduled, but no pod arrives at the activeQ", scenario.schedulePod.podName)
+								return false, nil
+							}
+
+							if testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name != scenario.schedulePod.podName {
+								// need to wait more because maybe the queue will get another Pod that higher priority than the current top pod.
+								lastFailure = fmt.Sprintf("The pod %s is expected to be scheduled, but the top Pod is %s", scenario.schedulePod.podName, testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name)
+								return false, nil
+							}
+
+							return true, nil
+						}); err != nil {
+							t.Fatal(lastFailure)
+						}
+
+						lock.Lock()
+						preemptionDoneChannels[scenario.schedulePod.podName] = make(chan struct{})
+						lock.Unlock()
+						testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+						if scenario.schedulePod.expectSuccess {
+							if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
+								t.Fatalf("Expected the pod %s to be scheduled", scenario.schedulePod.podName)
+							}
+						} else if scenario.schedulePod.expectUnschedulable {
+							if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.schedulePod.podName) {
+								t.Fatalf("Expected the pod %s to be in the queue after the scheduling attempt", scenario.schedulePod.podName)
+							}
+						}
+					case scenario.activatePod != nil:
+						lastFailure := ""
+
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+							pod := unschedulablePod(t, testCtx.Scheduler.SchedulingQueue, scenario.activatePod.podName)
+							if pod == nil {
+								lastFailure = fmt.Sprintf("Expected the pod %s to be unschedulable, but it's not there", scenario.activatePod.podName)
+								return false, nil
+							}
+							m := make(map[string]*v1.Pod)
+							m[scenario.activatePod.podName] = pod
+							testCtx.Scheduler.SchedulingQueue.Activate(logger, m)
+							return true, nil
+						}); err != nil {
+							t.Fatal(lastFailure)
+						}
+					case scenario.completePreemption != "":
+						lock.Lock()
+						if _, ok := preemptionDoneChannels[scenario.completePreemption]; !ok {
+							t.Fatalf("The preemptor Pod %q is not running preemption", scenario.completePreemption)
+						}
+
+						close(preemptionDoneChannels[scenario.completePreemption])
+						delete(preemptionDoneChannels, scenario.completePreemption)
+						lock.Unlock()
+					case scenario.podGatedInQueue != "":
+						// make sure the Pod is in the queue in the first place.
+						if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.podGatedInQueue) {
+							t.Fatalf("Expected the pod %s to be in the queue", scenario.podGatedInQueue)
+						}
+
+						// Make sure this Pod is gated by the preemption at PreEnqueue extension point
+						// by activating the Pod and see if it's still in the unsched pod pool.
+						testCtx.Scheduler.SchedulingQueue.Activate(logger, map[string]*v1.Pod{scenario.podGatedInQueue: st.MakePod().Namespace(testCtx.NS.Name).Name(scenario.podGatedInQueue).Obj()})
+						if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.podGatedInQueue) {
+							t.Fatalf("Expected the pod %s to be in the queue even after the activation", scenario.podGatedInQueue)
+						}
+					case scenario.podRunningPreemption != nil:
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+							return preemptionPlugin.Evaluator.IsPodRunningPreemption(createdPods[*scenario.podRunningPreemption].GetUID()), nil
+						}); err != nil {
+							t.Fatalf("Expected the pod %s to be running preemption", createdPods[*scenario.podRunningPreemption].Name)
+						}
+					}
+				}
+			})
+		}
+	}
+}
+
+type FakeBindPluginLongBind struct {
+	name            string
+	bindingDuration time.Duration // 5 * time.Second
+	nameOfPodToHold string
+	realPlugin      fwk.BindPlugin
+}
+
+func NewFakeBindPluginLongBind(name string, bindingDuration time.Duration, podToHold string, realPlugin fwk.BindPlugin) *FakeBindPluginLongBind {
+	return &FakeBindPluginLongBind{name, bindingDuration, podToHold, realPlugin}
+}
+
+func (bp *FakeBindPluginLongBind) Name() string {
+	return bp.name
+}
+
+func (bp *FakeBindPluginLongBind) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+	if strings.Contains(p.Name, bp.nameOfPodToHold) {
+		time.Sleep(bp.bindingDuration)
+	}
+	return bp.realPlugin.Bind(ctx, state, p, nodeName)
+}
+
+var _ fwk.BindPlugin = &FakeBindPluginLongBind{}
