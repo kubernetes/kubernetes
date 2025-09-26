@@ -313,10 +313,14 @@ aliases:
   # - tnozicka
 
   sig-autoscaling-maintainers:
+    - adrianmoisey
     - gjtempleton
     - jackfrancis
-    - raywainman
     - towca
+  # emeritus
+  # - maciekpytel
+  # - mwielgus
+  # - raywainman
   sig-instrumentation-approvers:
     - logicalhan
     - dashpole
@@ -515,6 +519,7 @@ aliases:
   dep-reviewers:
     - logicalhan
   feature-approvers:
+    - adrianmoisey # Autoscaling
     - andrewsykim # Cloud Provider
     - ahg-g # Scheduling
     - ardaguclu # CLI
@@ -529,6 +534,7 @@ aliases:
     - eddiezane # CLI
     - enj # Auth
     - gjtempleton # Autoscaling
+    - jackfrancis # Autoscaling
     - janetkuo # Apps
     - jayunit100 # Windows
     - jpbetz # API Machinery
@@ -539,7 +545,6 @@ aliases:
     - liggitt # Auth
     - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
-    - maciekpytel # Autoscaling
     - marosset # Windows
     - mikezappa87 # Network
     - mrunalp # Node
@@ -553,6 +558,7 @@ aliases:
     - sttts # API Machinery
     - tallclair # Auth
     - thockin # Network
+    - towca # Autoscaling
     - xing-yang # Storage
     - wojtek-t # Scalability
   # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
