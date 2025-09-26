@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -79,7 +80,7 @@ func makePodToVerifyCgroups(cgroupNames []string) *v1.Pod {
 
 	for _, cgroupFsName := range cgroupFsNames {
 		localCommand := ""
-		if IsCgroup2UnifiedMode() {
+		if e2enode.IsCgroup2UnifiedMode() {
 			localCommand = "if [ ! -d /tmp/" + cgroupFsName + " ]; then exit 1; fi; "
 		} else {
 			localCommand = "if [ ! -d /tmp/memory/" + cgroupFsName + " ] || [ ! -d /tmp/cpu/" + cgroupFsName + " ]; then exit 1; fi; "
@@ -126,7 +127,7 @@ func makePodToVerifyCgroupRemoved(baseName string) *v1.Pod {
 	cgroupFsName := toCgroupFsName(cgroupName)
 
 	command := ""
-	if IsCgroup2UnifiedMode() {
+	if e2enode.IsCgroup2UnifiedMode() {
 		command = "for i in `seq 1 10`; do if [ ! -d /tmp/" + cgroupFsName + " ]; then exit 0; else sleep 10; fi; done; exit 1"
 	} else {
 		command = "for i in `seq 1 10`; do if [ ! -d /tmp/memory/" + cgroupFsName + " ] && [ ! -d /tmp/cpu/" + cgroupFsName + " ]; then exit 0; else sleep 10; fi; done; exit 1"

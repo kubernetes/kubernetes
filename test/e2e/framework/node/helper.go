@@ -24,6 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	libcontainercgroups "github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -221,4 +222,9 @@ func RemoveExtendedResource(ctx context.Context, clientSet clientset.Interface, 
 		return err
 	})
 	framework.ExpectNoError(err)
+}
+
+// IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
+func IsCgroup2UnifiedMode() bool {
+	return libcontainercgroups.IsCgroup2UnifiedMode()
 }

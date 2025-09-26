@@ -250,3 +250,10 @@ func SkipIfIPv6(unsupportedProviders ...string) {
 		skipInternalf(1, "Not supported for IPv6 clusters and providers %v (found %s)", unsupportedProviders, framework.TestContext.Provider)
 	}
 }
+
+// SkipIfNotCgroupv2 skips if the cluster is not using Cgroupv2.
+func SkipIfNotCgroupv2(unsupportedProviders ...string) {
+	if !e2enode.IsCgroup2UnifiedMode() {
+		skipInternalf(1, "Not supported for non-Cgroupv2 clusters and providers %v (found %s)", unsupportedProviders, framework.TestContext.Provider)
+	}
+}
