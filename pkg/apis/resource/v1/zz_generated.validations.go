@@ -245,7 +245,24 @@ func Validate_DeviceClassSpec(ctx context.Context, op operation.Operation, fldPa
 			return
 		}(fldPath.Child("selectors"), obj.Selectors, safe.Field(oldObj, func(oldObj *resourcev1.DeviceClassSpec) []resourcev1.DeviceSelector { return oldObj.Selectors }))...)
 
-	// field resourcev1.DeviceClassSpec.Config has no validation
+	// field resourcev1.DeviceClassSpec.Config
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1.DeviceClassConfiguration) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("config"), obj.Config, safe.Field(oldObj, func(oldObj *resourcev1.DeviceClassSpec) []resourcev1.DeviceClassConfiguration { return oldObj.Config }))...)
+
 	// field resourcev1.DeviceClassSpec.ExtendedResourceName has no validation
 	return errs
 }
