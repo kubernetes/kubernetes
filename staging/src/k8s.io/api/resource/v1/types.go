@@ -1067,6 +1067,7 @@ const (
 	DeviceTolerationsMaxLength         = 16
 )
 
+// +enum
 type DeviceAllocationMode string
 
 // Valid [DeviceRequest.CountMode] values.
