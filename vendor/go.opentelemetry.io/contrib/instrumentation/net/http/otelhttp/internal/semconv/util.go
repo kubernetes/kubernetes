@@ -14,7 +14,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	semconvNew "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconvNew "go.opentelemetry.io/otel/semconv/v1.37.0"
 )
 
 // SplitHostPort splits a network address hostport of the form "host",
@@ -53,10 +53,10 @@ func SplitHostPort(hostport string) (host string, port int) {
 	if err != nil {
 		return
 	}
-	return host, int(p) // nolint: gosec  // Byte size checked 16 above.
+	return host, int(p) //nolint:gosec  // Byte size checked 16 above.
 }
 
-func requiredHTTPPort(https bool, port int) int { // nolint:revive
+func requiredHTTPPort(https bool, port int) int { //nolint:revive // ignore linter
 	if https {
 		if port > 0 && port != 443 {
 			return port

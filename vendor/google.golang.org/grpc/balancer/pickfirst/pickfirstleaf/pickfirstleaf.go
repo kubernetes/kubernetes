@@ -54,18 +54,9 @@ func init() {
 	balancer.Register(pickfirstBuilder{})
 }
 
-type (
-	// enableHealthListenerKeyType is a unique key type used in resolver
-	// attributes to indicate whether the health listener usage is enabled.
-	enableHealthListenerKeyType struct{}
-	// managedByPickfirstKeyType is an attribute key type to inform Outlier
-	// Detection that the generic health listener is being used.
-	// TODO: https://github.com/grpc/grpc-go/issues/7915 - Remove this when
-	// implementing the dualstack design. This is a hack. Once Dualstack is
-	// completed, outlier detection will stop sending ejection updates through
-	// the connectivity listener.
-	managedByPickfirstKeyType struct{}
-)
+// enableHealthListenerKeyType is a unique key type used in resolver
+// attributes to indicate whether the health listener usage is enabled.
+type enableHealthListenerKeyType struct{}
 
 var (
 	logger = grpclog.Component("pick-first-leaf-lb")
@@ -76,21 +67,21 @@ var (
 	disconnectionsMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
 		Name:        "grpc.lb.pick_first.disconnections",
 		Description: "EXPERIMENTAL. Number of times the selected subchannel becomes disconnected.",
-		Unit:        "disconnection",
+		Unit:        "{disconnection}",
 		Labels:      []string{"grpc.target"},
 		Default:     false,
 	})
 	connectionAttemptsSucceededMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
 		Name:        "grpc.lb.pick_first.connection_attempts_succeeded",
 		Description: "EXPERIMENTAL. Number of successful connection attempts.",
-		Unit:        "attempt",
+		Unit:        "{attempt}",
 		Labels:      []string{"grpc.target"},
 		Default:     false,
 	})
 	connectionAttemptsFailedMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
 		Name:        "grpc.lb.pick_first.connection_attempts_failed",
 		Description: "EXPERIMENTAL. Number of failed connection attempts.",
-		Unit:        "attempt",
+		Unit:        "{attempt}",
 		Labels:      []string{"grpc.target"},
 		Default:     false,
 	})
@@ -149,17 +140,6 @@ func EnableHealthListener(state resolver.State) resolver.State {
 	return state
 }
 
-// IsManagedByPickfirst returns whether an address belongs to a SubConn
-// managed by the pickfirst LB policy.
-// TODO: https://github.com/grpc/grpc-go/issues/7915 - This is a hack to disable
-// outlier_detection via the with connectivity listener when using pick_first.
-// Once Dualstack changes are complete, all SubConns will be created by
-// pick_first and outlier detection will only use the health listener for
-// ejection. This hack can then be removed.
-func IsManagedByPickfirst(addr resolver.Address) bool {
-	return addr.BalancerAttributes.Value(managedByPickfirstKeyType{}) != nil
-}
-
 type pfConfig struct {
 	serviceconfig.LoadBalancingConfig `json:"-"`
 
@@ -186,7 +166,6 @@ type scData struct {
 }
 
 func (b *pickfirstBalancer) newSCData(addr resolver.Address) (*scData, error) {
-	addr.BalancerAttributes = addr.BalancerAttributes.WithValue(managedByPickfirstKeyType{}, true)
 	sd := &scData{
 		rawConnectivityState: connectivity.Idle,
 		effectiveState:       connectivity.Idle,

@@ -137,6 +137,9 @@ type Reader interface {
 	Close() error
 	// Remaining returns the number of unread bytes remaining in the slice.
 	Remaining() int
+	// Reset frees the currently held buffer slice and starts reading from the
+	// provided slice. This allows reusing the reader object.
+	Reset(s BufferSlice)
 }
 
 type sliceReader struct {
@@ -148,6 +151,14 @@ type sliceReader struct {
 
 func (r *sliceReader) Remaining() int {
 	return r.len
+}
+
+func (r *sliceReader) Reset(s BufferSlice) {
+	r.data.Free()
+	s.Ref()
+	r.data = s
+	r.len = s.Len()
+	r.bufferIdx = 0
 }
 
 func (r *sliceReader) Close() error {
