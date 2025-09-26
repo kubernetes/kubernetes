@@ -46,6 +46,7 @@ type Generator struct {
 	Clean                bool
 	OnlyIDL              bool
 	KeepGogoproto        bool
+	DropGogoGo           bool
 	SkipGeneratedRewrite bool
 	DropEmbeddedFields   string
 }
@@ -65,6 +66,7 @@ func New() *Generator {
 		}, ","),
 		Packages:           "",
 		DropEmbeddedFields: "k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta",
+		DropGogoGo:         true,
 	}
 }
 
@@ -79,6 +81,7 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 	flag.BoolVar(&g.OnlyIDL, "only-idl", g.OnlyIDL, "If true, only generate the IDL for each package.")
 	flag.BoolVar(&g.KeepGogoproto, "keep-gogoproto", g.KeepGogoproto, "If true, the generated IDL will contain gogoprotobuf extensions which are normally removed")
 	flag.BoolVar(&g.SkipGeneratedRewrite, "skip-generated-rewrite", g.SkipGeneratedRewrite, "If true, skip fixing up the generated.pb.go file (debugging only).")
+	flag.BoolVar(&g.DropGogoGo, "drop-gogo-go", g.DropGogoGo, "Drop all references to gogo packages in generated code")
 	flag.StringVar(&g.DropEmbeddedFields, "drop-embedded-fields", g.DropEmbeddedFields, "Comma-delimited list of embedded Go types to omit from generated protobufs")
 }
 
@@ -97,6 +100,10 @@ func Run(g *Generator) {
 	}
 	if len(allInputs) == 0 {
 		log.Fatalf("Both apimachinery-packages and packages are empty. At least one package must be specified.")
+	}
+
+	if g.DropGogoGo && g.SkipGeneratedRewrite {
+		log.Fatalf("--drop-gogo-go=true and --skip-generated-rewrite=true are mutually exclusive")
 	}
 
 	// Build up a list of packages to load from all the inputs.  Track the
@@ -288,7 +295,7 @@ func Run(g *Generator) {
 
 		// alter the generated protobuf file to remove the generated types (but leave the serializers) and rewrite the
 		// package statement to match the desired package name
-		if err := RewriteGeneratedGogoProtobufFile(outputPath, p.ExtractGeneratedType, p.OptionalTypeName, buf.Bytes()); err != nil {
+		if err := RewriteGeneratedGogoProtobufFile(outputPath, p.ExtractGeneratedType, p.OptionalTypeName, buf.Bytes(), g.DropGogoGo); err != nil {
 			log.Fatalf("Unable to rewrite generated %s: %v", outputPath, err)
 		}
 
