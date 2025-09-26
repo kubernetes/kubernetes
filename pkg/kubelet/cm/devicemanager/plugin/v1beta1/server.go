@@ -42,8 +42,8 @@ import (
 type Server interface {
 	cache.PluginHandler
 	healthz.HealthChecker
-	Start() error
-	Stop() error
+	Start(klog.Logger) error
+	Stop(klog.Logger) error
 	SocketPath() string
 }
 
@@ -64,14 +64,14 @@ type server struct {
 }
 
 // NewServer returns an initialized device plugin registration server.
-func NewServer(socketPath string, rh RegistrationHandler, ch ClientHandler) (Server, error) {
+func NewServer(logger klog.Logger, socketPath string, rh RegistrationHandler, ch ClientHandler) (Server, error) {
 	if socketPath == "" || !filepath.IsAbs(socketPath) {
 		return nil, fmt.Errorf(errBadSocket+" %s", socketPath)
 	}
 
 	dir, name := filepath.Split(socketPath)
 
-	klog.V(2).InfoS("Creating device plugin registration server", "version", api.Version, "socket", socketPath)
+	logger.V(2).Info("Creating device plugin registration server", "version", api.Version, "socket", socketPath)
 	s := &server{
 		socketName: name,
 		socketDir:  dir,
@@ -83,31 +83,31 @@ func NewServer(socketPath string, rh RegistrationHandler, ch ClientHandler) (Ser
 	return s, nil
 }
 
-func (s *server) Start() error {
-	klog.V(2).InfoS("Starting device plugin registration server")
+func (s *server) Start(logger klog.Logger) error {
+	logger.V(2).Info("Starting device plugin registration server")
 
 	if err := os.MkdirAll(s.socketDir, 0750); err != nil {
-		klog.ErrorS(err, "Failed to create the device plugin socket directory", "directory", s.socketDir)
+		logger.Error(err, "Failed to create the device plugin socket directory", "directory", s.socketDir)
 		return err
 	}
 
 	if selinux.GetEnabled() {
 		if err := selinux.SetFileLabel(s.socketDir, kubeletconfig.KubeletPluginsDirSELinuxLabel); err != nil {
-			klog.ErrorS(err, "Unprivileged containerized plugins might not work. Could not set selinux context on socket dir", "path", s.socketDir)
+			logger.Error(err, "Unprivileged containerized plugins might not work. Could not set selinux context on socket dir", "path", s.socketDir)
 		}
 	}
 
 	// For now, we leave cleanup of the *entire* directory up to the Handler
 	// (even though we should in theory be able to just wipe the whole directory)
 	// because the Handler stores its checkpoint file (amongst others) in here.
-	if err := s.rhandler.CleanupPluginDirectory(s.socketDir); err != nil {
-		klog.ErrorS(err, "Failed to cleanup the device plugin directory", "directory", s.socketDir)
+	if err := s.rhandler.CleanupPluginDirectory(logger, s.socketDir); err != nil {
+		logger.Error(err, "Failed to cleanup the device plugin directory", "directory", s.socketDir)
 		return err
 	}
 
 	ln, err := net.Listen("unix", s.SocketPath())
 	if err != nil {
-		klog.ErrorS(err, "Failed to listen to socket while starting device plugin registry")
+		logger.Error(err, "Failed to listen to socket while starting device plugin registry")
 		return err
 	}
 
@@ -120,17 +120,17 @@ func (s *server) Start() error {
 		s.setHealthy()
 		if err = s.grpc.Serve(ln); err != nil {
 			s.setUnhealthy()
-			klog.ErrorS(err, "Error while serving device plugin registration grpc server")
+			logger.Error(err, "Error while serving device plugin registration grpc server")
 		}
 	}()
 
 	return nil
 }
 
-func (s *server) Stop() error {
+func (s *server) Stop(logger klog.Logger) error {
 	s.visitClients(func(r string, c Client) {
-		if err := s.disconnectClient(r, c); err != nil {
-			klog.ErrorS(err, "Failed to disconnect device plugin client", "resourceName", r)
+		if err := s.disconnectClient(logger, r, c); err != nil {
+			logger.Error(err, "Failed to disconnect device plugin client", "resourceName", r)
 		}
 	})
 
@@ -147,7 +147,7 @@ func (s *server) Stop() error {
 	// During kubelet termination, we do not need the registration server,
 	// and we consider the kubelet to be healthy even when it is down.
 	s.setHealthy()
-	klog.V(2).InfoS("Stopping device plugin registration server")
+	logger.V(2).Info("Stopping device plugin registration server")
 
 	return nil
 }
@@ -157,23 +157,24 @@ func (s *server) SocketPath() string {
 }
 
 func (s *server) Register(ctx context.Context, r *api.RegisterRequest) (*api.Empty, error) {
-	klog.InfoS("Got registration request from device plugin with resource", "resourceName", r.ResourceName)
+	logger := klog.FromContext(ctx)
+	logger.Info("Got registration request from device plugin with resource", "resourceName", r.ResourceName)
 	metrics.DevicePluginRegistrationCount.WithLabelValues(r.ResourceName).Inc()
 
 	if !s.isVersionCompatibleWithPlugin(r.Version) {
 		err := fmt.Errorf(errUnsupportedVersion, r.Version, api.SupportedVersions)
-		klog.ErrorS(err, "Bad registration request from device plugin with resource", "resourceName", r.ResourceName)
+		logger.Error(err, "Bad registration request from device plugin with resource", "resourceName", r.ResourceName)
 		return &api.Empty{}, err
 	}
 
 	if !v1helper.IsExtendedResourceName(core.ResourceName(r.ResourceName)) {
 		err := fmt.Errorf(errInvalidResourceName, r.ResourceName)
-		klog.ErrorS(err, "Bad registration request from device plugin")
+		logger.Error(err, "Bad registration request from device plugin")
 		return &api.Empty{}, err
 	}
 
-	if err := s.connectClient(r.ResourceName, filepath.Join(s.socketDir, r.Endpoint)); err != nil {
-		klog.ErrorS(err, "Error connecting to device plugin client")
+	if err := s.connectClient(ctx, r.ResourceName, filepath.Join(s.socketDir, r.Endpoint)); err != nil {
+		logger.Error(err, "Error connecting to device plugin client")
 		return &api.Empty{}, err
 	}
 

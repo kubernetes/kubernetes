@@ -92,11 +92,11 @@ func defaultRegisterControlFunc() bool {
 }
 
 // NewDevicePluginStub returns an initialized DevicePlugin Stub.
-func NewDevicePluginStub(devs []*pluginapi.Device, socket string, name string, preStartContainerFlag bool, getPreferredAllocationFlag bool) *Stub {
+func NewDevicePluginStub(logger klog.Logger, devs []*pluginapi.Device, socket string, name string, preStartContainerFlag bool, getPreferredAllocationFlag bool) *Stub {
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		klog.ErrorS(err, "Watcher creation failed")
+		logger.Error(err, "Watcher creation failed")
 		panic(err)
 	}
 
@@ -134,8 +134,9 @@ func (m *Stub) SetRegisterControlFunc(f stubRegisterControlFunc) {
 
 // Start starts the gRPC server of the device plugin. Can only
 // be called once.
-func (m *Stub) Start() error {
-	klog.InfoS("Starting device plugin server")
+func (m *Stub) Start(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting device plugin server")
 	err := m.cleanup()
 	if err != nil {
 		return err
@@ -153,21 +154,21 @@ func (m *Stub) Start() error {
 
 	err = m.kubeletRestartWatcher.Add(filepath.Dir(m.socket))
 	if err != nil {
-		klog.ErrorS(err, "Failed to add watch", "devicePluginPath", pluginapi.DevicePluginPath)
+		logger.Error(err, "Failed to add watch", "devicePluginPath", pluginapi.DevicePluginPath)
 		return err
 	}
 
 	go func() {
 		defer m.wg.Done()
 		if err = m.server.Serve(sock); err != nil {
-			klog.ErrorS(err, "Error while serving device plugin registration grpc server")
+			logger.Error(err, "Error while serving device plugin registration grpc server")
 		}
 	}()
 
 	var lastDialErr error
 	wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
 		var conn *grpc.ClientConn
-		_, conn, lastDialErr = dial(m.socket)
+		_, conn, lastDialErr = dial(ctx, m.socket)
 		if lastDialErr != nil {
 			return false, nil
 		}
@@ -178,12 +179,12 @@ func (m *Stub) Start() error {
 		return lastDialErr
 	}
 
-	klog.InfoS("Starting to serve on socket", "socket", m.socket)
+	logger.Info("Starting to serve on socket", "socket", m.socket)
 	return nil
 }
 
-func (m *Stub) Restart() error {
-	klog.InfoS("Restarting Device Plugin server")
+func (m *Stub) Restart(ctx context.Context) error {
+	klog.FromContext(ctx).Info("Restarting Device Plugin server")
 	if m.server == nil {
 		return nil
 	}
@@ -191,14 +192,14 @@ func (m *Stub) Restart() error {
 	m.server.Stop()
 	m.server = nil
 
-	return m.Start()
+	return m.Start(ctx)
 }
 
 // Stop stops the gRPC server. Can be called without a prior Start
 // and more than once. Not safe to be called concurrently by different
 // goroutines!
-func (m *Stub) Stop() error {
-	klog.InfoS("Stopping device plugin server")
+func (m *Stub) Stop(logger klog.Logger) error {
+	logger.Info("Stopping device plugin server")
 	if m.server == nil {
 		return nil
 	}
@@ -213,7 +214,8 @@ func (m *Stub) Stop() error {
 	return m.cleanup()
 }
 
-func (m *Stub) Watch(kubeletEndpoint, resourceName, pluginSockDir string) {
+func (m *Stub) Watch(ctx context.Context, kubeletEndpoint, resourceName, pluginSockDir string) {
+	logger := klog.FromContext(ctx)
 	for {
 		select {
 		// Detect a kubelet restart by watching for a newly created
@@ -221,26 +223,26 @@ func (m *Stub) Watch(kubeletEndpoint, resourceName, pluginSockDir string) {
 		// the device plugin server
 		case event := <-m.kubeletRestartWatcher.Events:
 			if event.Name == kubeletEndpoint && event.Op&fsnotify.Create == fsnotify.Create {
-				klog.InfoS("inotify: file created, restarting", "kubeletEndpoint", kubeletEndpoint)
+				logger.Info("inotify: file created, restarting", "kubeletEndpoint", kubeletEndpoint)
 				var lastErr error
 
-				err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 2*time.Minute, false, func(context.Context) (done bool, err error) {
-					restartErr := m.Restart()
+				err := wait.PollUntilContextTimeout(ctx, 10*time.Second, 2*time.Minute, false, func(context.Context) (done bool, err error) {
+					restartErr := m.Restart(ctx)
 					if restartErr == nil {
 						return true, nil
 					}
-					klog.ErrorS(restartErr, "Retrying after error")
+					logger.Error(restartErr, "Retrying after error")
 					lastErr = restartErr
 					return false, nil
 				})
 				if err != nil {
-					klog.ErrorS(err, "Unable to restart server: wait timed out", "lastErr", lastErr.Error())
+					logger.Error(err, "Unable to restart server: wait timed out", "lastErr", lastErr.Error())
 					panic(err)
 				}
 
 				if ok := m.registerControlFunc(); ok {
-					if err := m.Register(kubeletEndpoint, resourceName, pluginSockDir); err != nil {
-						klog.ErrorS(err, "Unable to register to kubelet")
+					if err := m.Register(ctx, kubeletEndpoint, resourceName, pluginSockDir); err != nil {
+						logger.Error(err, "Unable to register to kubelet")
 						panic(err)
 					}
 				}
@@ -248,14 +250,14 @@ func (m *Stub) Watch(kubeletEndpoint, resourceName, pluginSockDir string) {
 
 		// Watch for any other fs errors and log them.
 		case err := <-m.kubeletRestartWatcher.Errors:
-			klog.ErrorS(err, "inotify error")
+			logger.Error(err, "inotify error")
 		}
 	}
 }
 
 // GetInfo is the RPC which return pluginInfo
 func (m *Stub) GetInfo(ctx context.Context, req *watcherapi.InfoRequest) (*watcherapi.PluginInfo, error) {
-	klog.InfoS("GetInfo")
+	klog.FromContext(ctx).Info("GetInfo")
 	return &watcherapi.PluginInfo{
 		Type:              watcherapi.DevicePlugin,
 		Name:              m.resourceName,
@@ -265,30 +267,33 @@ func (m *Stub) GetInfo(ctx context.Context, req *watcherapi.InfoRequest) (*watch
 
 // NotifyRegistrationStatus receives the registration notification from watcher
 func (m *Stub) NotifyRegistrationStatus(ctx context.Context, status *watcherapi.RegistrationStatus) (*watcherapi.RegistrationStatusResponse, error) {
+	logger := klog.FromContext(ctx)
 	if m.registrationStatus != nil {
 		m.registrationStatus <- *status
 	}
 	if !status.PluginRegistered {
-		klog.InfoS("Registration failed", "err", status.Error)
+		logger.Info("Registration failed", "err", status.Error)
 	}
 	return &watcherapi.RegistrationStatusResponse{}, nil
 }
 
 // Register registers the device plugin for the given resourceName with Kubelet.
-func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir string) error {
-	klog.InfoS("Register", "kubeletEndpoint", kubeletEndpoint, "resourceName", resourceName, "socket", pluginSockDir)
+func (m *Stub) Register(ctx context.Context, kubeletEndpoint, resourceName string, pluginSockDir string) error {
+	logger := klog.FromContext(ctx)
+	logger.Info("Register", "kubeletEndpoint", kubeletEndpoint, "resourceName", resourceName, "socket", pluginSockDir)
 
 	if pluginSockDir != "" {
 		if _, err := os.Stat(pluginSockDir + "DEPRECATION"); err == nil {
-			klog.InfoS("Deprecation file found. Skip registration")
+			logger.Info("Deprecation file found. Skip registration")
 			return nil
 		}
 	}
-	klog.InfoS("Deprecation file not found. Invoke registration")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	logger.Info("Deprecation file not found. Invoke registration")
+	ctxDial, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, kubeletEndpoint,
+	//nolint:staticcheck // SA1019: grpc.DialContext is deprecated: use NewClient instead.
+	conn, err := grpc.DialContext(ctxDial, kubeletEndpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
@@ -309,14 +314,14 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir stri
 		},
 	}
 
-	_, err = client.Register(context.Background(), reqt)
+	_, err = client.Register(ctx, reqt)
 	if err != nil {
 		// Stop server
 		m.server.Stop()
-		klog.ErrorS(err, "Client unable to register to kubelet")
+		logger.Error(err, "Client unable to register to kubelet")
 		return err
 	}
-	klog.InfoS("Device Plugin registered with the Kubelet")
+	logger.Info("Device Plugin registered with the Kubelet")
 	return err
 }
 
@@ -331,13 +336,15 @@ func (m *Stub) GetDevicePluginOptions(ctx context.Context, e *pluginapi.Empty) (
 
 // PreStartContainer resets the devices received
 func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
-	klog.InfoS("PreStartContainer", "request", r)
+	klog.FromContext(ctx).Info("PreStartContainer", "request", r)
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
 // ListAndWatch lists devices and update that list according to the Update call
 func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
-	klog.InfoS("ListAndWatch")
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a logger parameter.
+	klog.TODO().Info("ListAndWatch")
 
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: m.devs})
 
@@ -358,7 +365,7 @@ func (m *Stub) Update(devs []*pluginapi.Device) {
 
 // GetPreferredAllocation gets the preferred allocation from a set of available devices
 func (m *Stub) GetPreferredAllocation(ctx context.Context, r *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
-	klog.InfoS("GetPreferredAllocation", "request", r)
+	klog.FromContext(ctx).Info("GetPreferredAllocation", "request", r)
 
 	devs := make(map[string]*pluginapi.Device)
 
@@ -371,7 +378,7 @@ func (m *Stub) GetPreferredAllocation(ctx context.Context, r *pluginapi.Preferre
 
 // Allocate does a mock allocation
 func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
-	klog.InfoS("Allocate", "request", r)
+	klog.FromContext(ctx).Info("Allocate", "request", r)
 
 	devs := make(map[string]*pluginapi.Device)
 
