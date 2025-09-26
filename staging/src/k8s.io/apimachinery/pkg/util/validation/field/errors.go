@@ -341,6 +341,14 @@ func (list ErrorList) MarkCoveredByDeclarative() ErrorList {
 	return list
 }
 
+// PrefixDetail adds a prefix to the Detail for all errors in the list and returns the updated list.
+func (list ErrorList) PrefixDetail(prefix string) ErrorList {
+	for _, err := range list {
+		err.Detail = prefix + err.Detail
+	}
+	return list
+}
+
 // ToAggregate converts the ErrorList into an errors.Aggregate.
 func (list ErrorList) ToAggregate() utilerrors.Aggregate {
 	if len(list) == 0 {
