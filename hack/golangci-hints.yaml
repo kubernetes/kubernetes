@@ -236,6 +236,7 @@ linters:
             contextual k8s.io/kubernetes/pkg/securitycontext/.*
             contextual k8s.io/kubernetes/test/e2e/dra/.*
             contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/.*
             contextual k8s.io/kubernetes/pkg/kubelet/cm/dra/.*
             contextual k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/.*
             contextual k8s.io/kubernetes/pkg/kubelet/lifecycle/.*
