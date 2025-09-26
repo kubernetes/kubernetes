@@ -106,5 +106,19 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("atomicListUniqueMap"), obj.AtomicListUniqueMap, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.AtomicListUniqueMap }))...)
 
+	// field Struct.CustomUniqueListWithTypeSet
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
+			// Uniqueness validation is implemented via custom, handwritten validation
+			return
+		}(fldPath.Child("customUniqueListWithTypeSet"), obj.CustomUniqueListWithTypeSet, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.CustomUniqueListWithTypeSet }))...)
+
+	// field Struct.CustomUniqueListWithTypeMap
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []Item) (errs field.ErrorList) {
+			// Uniqueness validation is implemented via custom, handwritten validation
+			return
+		}(fldPath.Child("customUniqueListWithTypeMap"), obj.CustomUniqueListWithTypeMap, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.CustomUniqueListWithTypeMap }))...)
+
 	return errs
 }
