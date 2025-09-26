@@ -185,6 +185,11 @@ func (p *pvcEvaluator) MatchingResources(items []corev1.ResourceName) []corev1.R
 	return result
 }
 
+// UsageWithDeivceClass knows how to measure usage associated with item.
+func (p *pvcEvaluator) UsageWithDeviceClass(item runtime.Object, deviceClassMap map[string]string) (corev1.ResourceList, error) {
+	return p.Usage(item)
+}
+
 // Usage knows how to measure usage associated with item.
 func (p *pvcEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 	result := corev1.ResourceList{}
@@ -249,9 +254,9 @@ func (p *pvcEvaluator) getStorageUsage(pvc *corev1.PersistentVolumeClaim) *resou
 // UsageStats calculates aggregate usage for the object.
 func (p *pvcEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.VolumeAttributesClass) {
-		return generic.CalculateUsageStats(options, p.listFuncByNamespace, pvcMatchesScopeFunc, p.Usage)
+		return generic.CalculateUsageStats(options, p.listFuncByNamespace, pvcMatchesScopeFunc, p.UsageWithDeviceClass)
 	}
-	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
+	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.UsageWithDeviceClass)
 }
 
 // ensure we implement required interface

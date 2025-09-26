@@ -24,8 +24,10 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 
 	corev1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,6 +39,7 @@ import (
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -405,12 +408,24 @@ func (e *quotaEvaluator) checkRequest(quotas []corev1.ResourceQuota, a admission
 	if evaluator == nil {
 		return quotas, nil
 	}
-	return CheckRequest(quotas, a, evaluator, e.config.LimitedResources)
+	var deviceClassMap map[string]string
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		// only resource claims evaluator needs device class map
+		if a.GetResource().GroupResource() == resourceapi.SchemeGroupVersion.WithResource("resourceclaims").GroupResource() {
+			dcm, err := e.quotaAccessor.GetDeviceClassMap()
+			if err != nil {
+				return quotas, err
+			}
+			deviceClassMap = dcm
+		}
+	}
+
+	return CheckRequest(quotas, a, evaluator, e.config.LimitedResources, deviceClassMap)
 }
 
 // CheckRequest is a static version of quotaEvaluator.checkRequest, possible to be called from outside.
 func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluator quota.Evaluator,
-	limited []resourcequotaapi.LimitedResource) ([]corev1.ResourceQuota, error) {
+	limited []resourcequotaapi.LimitedResource, deviceClassMap map[string]string) ([]corev1.ResourceQuota, error) {
 	if !evaluator.Handles(a) {
 		return quotas, nil
 	}
@@ -428,7 +443,7 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 	limitedResourceNames := []corev1.ResourceName{}
 	limitedResources := filterLimitedResourcesByGroupResource(limited, a.GetResource().GroupResource())
 	if len(limitedResources) > 0 {
-		deltaUsage, err := evaluator.Usage(inputObject)
+		deltaUsage, err := evaluator.UsageWithDeviceClass(inputObject, deviceClassMap)
 		if err != nil {
 			return quotas, err
 		}
@@ -492,7 +507,7 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 	// as a result, we need to measure the usage of this object for quota
 	// on updates, we need to subtract the previous measured usage
 	// if usage shows no change, just return since it has no impact on quota
-	inputUsage, err := evaluator.Usage(inputObject)
+	inputUsage, err := evaluator.UsageWithDeviceClass(inputObject, deviceClassMap)
 	if err != nil {
 		return quotas, err
 	}
@@ -523,7 +538,7 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		metadata, err := meta.Accessor(prevItem)
 		if err == nil {
 			if len(metadata.GetResourceVersion()) > 0 {
-				prevUsage, innerErr := evaluator.Usage(prevItem)
+				prevUsage, innerErr := evaluator.UsageWithDeviceClass(prevItem, deviceClassMap)
 				if innerErr != nil {
 					return quotas, innerErr
 				}
