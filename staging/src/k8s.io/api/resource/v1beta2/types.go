@@ -1672,6 +1672,8 @@ type DeviceClassSpec struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:optional
+	// +k8s:maxItems=32
 	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,1,opt,name=selectors"`
 
 	// Config defines configuration parameters that apply to each device that is claimed via this class.
