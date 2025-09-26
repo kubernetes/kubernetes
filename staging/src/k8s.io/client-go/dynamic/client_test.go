@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	restclientwatch "k8s.io/client-go/rest/watch"
+	"k8s.io/client-go/util/watchlist"
 )
 
 func getJSON(version, kind, name string) []byte {
@@ -76,6 +77,13 @@ func getClientServer(h func(http.ResponseWriter, *http.Request)) (Interface, *ht
 		return nil, nil, err
 	}
 	return cl, srv, nil
+}
+
+func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	target := &DynamicClient{}
+	if !watchlist.DoesClientSupportWatchListSemantics(target) {
+		t.Fatalf("Client should support WatchList semantics")
+	}
 }
 
 func TestList(t *testing.T) {
