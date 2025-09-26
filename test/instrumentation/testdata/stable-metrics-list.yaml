@@ -50,6 +50,26 @@
   help: CEL evaluation time in seconds.
   type: Histogram
   stabilityLevel: BETA
+- name: automatic_reload_last_timestamp_seconds
+  subsystem: encryption_config_controller
+  namespace: apiserver
+  help: Timestamp of the last successful or failed automatic reload of encryption
+    configuration split by apiserver identity.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - apiserver_id_hash
+  - status
+- name: automatic_reloads_total
+  subsystem: encryption_config_controller
+  namespace: apiserver
+  help: Total number of reload successes and failures of encryption configuration
+    split by apiserver identity.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - apiserver_id_hash
+  - status
 - name: current_executing_requests
   subsystem: flowcontrol
   namespace: apiserver
