@@ -54,6 +54,7 @@ var (
 	labelValueValidator       = types.Name{Package: libValidationPkg, Name: "LabelValue"}
 	longNameCaselessValidator = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
 	longNameValidator         = types.Name{Package: libValidationPkg, Name: "LongName"}
+	resourcePoolNameValidator = types.Name{Package: libValidationPkg, Name: "ResourcePoolName"}
 	shortNameValidator        = types.Name{Package: libValidationPkg, Name: "ShortName"}
 	uuidValidator             = types.Name{Package: libValidationPkg, Name: "UUID"}
 )
@@ -92,6 +93,8 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 		return Function(formatTagName, DefaultFlags, longNameValidator), nil
 	case "k8s-long-name-caseless":
 		return Function(formatTagName, DefaultFlags, longNameCaselessValidator), nil
+	case "k8s-resource-pool-name":
+		return Function(formatTagName, DefaultFlags, resourcePoolNameValidator), nil
 	case "k8s-short-name":
 		return Function(formatTagName, DefaultFlags, shortNameValidator), nil
 	case "k8s-uuid":
@@ -122,6 +125,9 @@ func (ftv formatTagValidator) Docs() TagDoc {
 		}, {
 			Description: "k8s-long-name-caseless",
 			Docs:        "Deprecated: This field holds a case-insensitive Kubernetes \"long name\", aka a \"DNS subdomain\" value.",
+		}, {
+			Description: "k8s-resource-pool-name",
+			Docs:        "This field holds value with one or more Kubernetes \"long name\" parts separated by `/` and no longer than 253 characters.",
 		}, {
 			Description: "k8s-short-name",
 			Docs:        "This field holds a Kubernetes \"short name\", aka a \"DNS label\" value.",
