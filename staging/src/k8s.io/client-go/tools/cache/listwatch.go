@@ -171,6 +171,8 @@ type ListWatch struct {
 
 	// DisableChunking requests no chunking for this list watcher.
 	DisableChunking bool
+
+	UnsupportedWatchListSemantics bool
 }
 
 var (
@@ -279,4 +281,8 @@ func (lw *ListWatch) WatchWithContext(ctx context.Context, options metav1.ListOp
 		return lw.WatchFuncWithContext(ctx, options)
 	}
 	return lw.WatchFunc(options)
+}
+
+func (lw *ListWatch) IsWatchListSemanticsUnsupported() bool {
+	return lw.UnsupportedWatchListSemantics
 }

@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	certificatesv1alpha1 "k8s.io/client-go/listers/certificates/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // PodCertificateRequestInformer provides access to a shared informer and lister for
@@ -56,6 +57,10 @@ func NewPodCertificateRequestInformer(client kubernetes.Interface, namespace str
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredPodCertificateRequestInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -82,6 +87,7 @@ func NewFilteredPodCertificateRequestInformer(client kubernetes.Interface, names
 				}
 				return client.CertificatesV1alpha1().PodCertificateRequests(namespace).Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apicertificatesv1alpha1.PodCertificateRequest{},
 		resyncPeriod,

@@ -80,3 +80,12 @@ func PrepareWatchListOptionsFromListOptions(listOptions metav1.ListOptions) (met
 
 	return watchListOptions, true, nil
 }
+
+type unsupportedWatchListSemantics interface {
+	WatchListNotSupported()
+}
+
+func IsUnsupportedWatchListSemantics(client any) bool {
+	_, ok := client.(unsupportedWatchListSemantics)
+	return ok
+}

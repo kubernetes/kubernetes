@@ -18,6 +18,7 @@ package metadatainformer
 
 import (
 	"context"
+	"k8s.io/client-go/util/watchlist"
 	"sync"
 	"time"
 
@@ -175,6 +176,10 @@ func (f *metadataSharedInformerFactory) Shutdown() {
 
 // NewFilteredMetadataInformer constructs a new informer for a metadata type.
 func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return &metadataInformer{
 		gvr: gvr,
 		informer: cache.NewSharedIndexInformer(
@@ -203,6 +208,7 @@ func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVers
 					}
 					return client.Resource(gvr).Namespace(namespace).Watch(ctx, options)
 				},
+				UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 			},
 			&metav1.PartialObjectMetadata{},
 			resyncPeriod,

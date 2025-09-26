@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	storagev1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // CSIStorageCapacityInformer provides access to a shared informer and lister for
@@ -56,6 +57,10 @@ func NewCSIStorageCapacityInformer(client kubernetes.Interface, namespace string
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredCSIStorageCapacityInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -82,6 +87,7 @@ func NewFilteredCSIStorageCapacityInformer(client kubernetes.Interface, namespac
 				}
 				return client.StorageV1alpha1().CSIStorageCapacities(namespace).Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apistoragev1alpha1.CSIStorageCapacity{},
 		resyncPeriod,

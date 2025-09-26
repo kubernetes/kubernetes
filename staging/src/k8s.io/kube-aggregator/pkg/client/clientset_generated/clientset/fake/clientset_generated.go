@@ -85,6 +85,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
+func (c *Clientset) WatchListNotSupported() {
+	/*no-op*/
+}
+
 var (
 	_ clientset.Interface = &Clientset{}
 	_ testing.FakeClient  = &Clientset{}

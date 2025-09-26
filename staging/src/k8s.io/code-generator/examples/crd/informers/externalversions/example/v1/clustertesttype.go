@@ -26,6 +26,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 	apisexamplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 	versioned "k8s.io/code-generator/examples/crd/clientset/versioned"
 	internalinterfaces "k8s.io/code-generator/examples/crd/informers/externalversions/internalinterfaces"
@@ -55,6 +56,10 @@ func NewClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Du
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+	var unsupportedWatchListSemantics bool
+	if ok := watchlist.IsUnsupportedWatchListSemantics(client); ok {
+		unsupportedWatchListSemantics = true
+	}
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -81,6 +86,7 @@ func NewFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod
 				}
 				return client.ExampleV1().ClusterTestTypes().Watch(ctx, options)
 			},
+			UnsupportedWatchListSemantics: unsupportedWatchListSemantics,
 		},
 		&apisexamplev1.ClusterTestType{},
 		resyncPeriod,
