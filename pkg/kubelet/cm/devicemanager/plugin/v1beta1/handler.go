@@ -56,7 +56,9 @@ func (s *server) DeRegisterPlugin(pluginName, endpoint string) {
 	logger.V(2).Info("Deregistering plugin", "plugin", pluginName, "endpoint", endpoint)
 	client := s.getClient(pluginName)
 	if client != nil {
-		s.disconnectClient(logger, pluginName, client)
+		if err := s.disconnectClient(logger, pluginName, client); err != nil {
+			logger.Error(err, "disconnecting client", "plugin", pluginName, "endpoing", endpoint)
+		}
 	}
 }
 

@@ -84,7 +84,10 @@ func TestNewEndpoint(t *testing.T) {
 	}
 
 	p, e := esetup(tCtx, t, devs, socket, "mock", func(logger klog.Logger, n string, d []*pluginapi.Device) {})
-	defer ecleanup(logger, p, e)
+	defer func() {
+		err := ecleanup(logger, p, e)
+		require.NoError(t, err)
+	}()
 }
 
 func TestRun(t *testing.T) {
@@ -139,7 +142,10 @@ func TestRun(t *testing.T) {
 	}
 
 	p, e := esetup(tCtx, t, devs, socket, "mock", callback)
-	defer ecleanup(logger, p, e)
+	defer func() {
+		err := ecleanup(logger, p, e)
+		require.NoError(t, err)
+	}()
 
 	go e.client.Run(tCtx)
 	// Wait for the first callback to be issued.
@@ -165,7 +171,10 @@ func TestAllocate(t *testing.T) {
 		callbackCount++
 		callbackChan <- callbackCount
 	})
-	defer ecleanup(logger, p, e)
+	defer func() {
+		err := ecleanup(logger, p, e)
+		require.NoError(t, err)
+	}()
 
 	resp := new(pluginapi.AllocateResponse)
 	contResp := new(pluginapi.ContainerAllocateResponse)
@@ -216,7 +225,10 @@ func TestGetPreferredAllocation(t *testing.T) {
 		callbackCount++
 		callbackChan <- callbackCount
 	})
-	defer ecleanup(logger, p, e)
+	defer func() {
+		err := ecleanup(logger, p, e)
+		require.NoError(t, err)
+	}()
 
 	resp := &pluginapi.PreferredAllocationResponse{
 		ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{
@@ -283,7 +295,9 @@ func esetup(ctx context.Context, t *testing.T, devs []*pluginapi.Device, socket,
 	return p, e
 }
 
-func ecleanup(logger klog.Logger, p *plugin.Stub, e *endpointImpl) {
-	p.Stop(logger)
-	e.client.Disconnect(logger)
+func ecleanup(logger klog.Logger, p *plugin.Stub, e *endpointImpl) error {
+	if err := p.Stop(logger); err != nil {
+		return err
+	}
+	return e.client.Disconnect(logger)
 }
