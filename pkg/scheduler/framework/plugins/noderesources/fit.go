@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/resource"
+	"k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -174,6 +176,24 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy)
 	}
 
+	scorer := scorePlugin(args)
+	if fts.EnableDRAExtendedResource {
+		scorer.enableDRAExtendedResource = fts.EnableDRAExtendedResource
+		scorer.draFeatures = structured.Features{
+			AdminAccess:          fts.EnableDRAAdminAccess,
+			ConsumableCapacity:   fts.EnableConsumableCapacity,
+			DeviceBinding:        fts.EnableDRADeviceBindingConditions,
+			DeviceStatus:         fts.EnableDRAResourceClaimDeviceStatus,
+			DeviceTaints:         fts.EnableDRADeviceTaints,
+			PartitionableDevices: fts.EnablePartitionableDevices,
+			PrioritizedList:      fts.EnableDRAPrioritizedList,
+		}
+		scorer.draManager = h.SharedDRAManager()
+		// Create a CEL cache for device class selector compilation
+		// This cache improves performance by avoiding recompilation of the same CEL expressions
+		scorer.celCache = cel.NewCache(10, cel.Features{EnableConsumableCapacity: fts.EnableConsumableCapacity})
+	}
+
 	return &Fit{
 		ignoredResources:                sets.New(args.IgnoredResources...),
 		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
@@ -183,7 +203,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		handle:                          h,
 		enablePodLevelResources:         fts.EnablePodLevelResources,
 		enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
-		resourceAllocationScorer:        *scorePlugin(args),
+		resourceAllocationScorer:        *scorer,
 	}, nil
 }
 
