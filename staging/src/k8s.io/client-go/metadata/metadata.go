@@ -126,6 +126,10 @@ func (c *Client) Resource(resource schema.GroupVersionResource) Getter {
 	return &client{client: c, resource: resource}
 }
 
+func (c *Client) IsWatchListSemanticsSupported() bool {
+	return true
+}
+
 // Namespace returns an interface that can access namespace-scoped instances of the
 // provided resource.
 func (c *client) Namespace(ns string) ResourceInterface {
