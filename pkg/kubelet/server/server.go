@@ -598,7 +598,7 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 
 	s.addMetricsBucketMatcher("configz")
 	configz.InstallHandler(s.restfulCont)
-
+  
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 		if s.flagz != nil {
 			s.addMetricsBucketMatcher("flagz")
