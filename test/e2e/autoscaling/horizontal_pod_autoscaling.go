@@ -221,10 +221,15 @@ func (st *HPAScaleTest) run(ctx context.Context, name string, kind schema.GroupV
 	hpa := e2eautoscaling.CreateResourceHorizontalPodAutoscaler(ctx, rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
 	ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
 
-	rc.WaitForReplicas(ctx, st.firstScale, timeToWait)
+	stabilizationTimeout := 3 * time.Minute
 	if st.firstScaleStasis > 0 {
-		rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, st.firstScale+1, st.firstScaleStasis, hpa.Name)
+		stabilizationTimeout = st.firstScaleStasis
 	}
+
+	framework.Logf("Waiting up to %v for replicas to stabilize in range [%d, %d]", stabilizationTimeout, st.firstScale, st.firstScale+1)
+	rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, st.firstScale+1, stabilizationTimeout, hpa.Name)
+	rc.WaitForReplicas(ctx, st.firstScale, 1*time.Minute)
+
 	if st.resourceType == cpuResource && st.cpuBurst > 0 && st.secondScale > 0 {
 		rc.ConsumeCPU(st.cpuBurst)
 		rc.WaitForReplicas(ctx, int(st.secondScale), timeToWait)
