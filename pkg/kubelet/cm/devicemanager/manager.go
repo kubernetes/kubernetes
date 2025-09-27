@@ -866,6 +866,9 @@ func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Po
 		}
 		allocDevices, err := m.devicesToAllocate(ctx, podUID, contName, resource, needed, devicesToReuse[resource])
 		if err != nil {
+			m.mutex.Lock()
+			m.allocatedDevices = m.podDevices.devices()
+			m.mutex.Unlock()
 			return err
 		}
 		if allocDevices == nil || len(allocDevices) <= 0 {
