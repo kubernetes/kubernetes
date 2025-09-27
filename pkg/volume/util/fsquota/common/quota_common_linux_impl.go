@@ -71,9 +71,11 @@ var (
 type VolumeProvider struct {
 }
 
-var quotaCmds = []string{"/sbin/xfs_quota",
+var quotaCmds = []string{
+	"/sbin/xfs_quota",
 	"/usr/sbin/xfs_quota",
-	"/bin/xfs_quota"}
+	"/bin/xfs_quota",
+}
 
 var quotaParseRegexp = regexp.MustCompilePOSIX("^[^ \t]*[ \t]*([0-9]+)")
 
