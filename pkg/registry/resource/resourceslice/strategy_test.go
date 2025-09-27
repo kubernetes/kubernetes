@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -666,6 +667,77 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			expectObj := tc.expectObj.DeepCopy()
 			assert.Equal(t, expectObj, newObj)
 
+		})
+	}
+}
+
+func TestWarningsOnCreate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+
+	testCases := map[string]struct {
+		obj                 *resource.ResourceSlice
+		wantWarningMessages []string
+	}{
+		"valid driver": {
+			obj:                 slice,
+			wantWarningMessages: []string{},
+		},
+		"uppercase driver warning": {
+			obj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.Spec.Driver = "Foo.COM"
+				return obj
+			}(),
+			wantWarningMessages: []string{
+				`spec.driver: driver names should be lowercase; "Foo.COM" contains uppercase characters`,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			warnings := Strategy.WarningsOnCreate(ctx, tc.obj)
+			if warnings == nil {
+				warnings = []string{}
+			}
+			require.Equal(t, tc.wantWarningMessages, warnings)
+		})
+	}
+}
+
+func TestWarningsOnUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+
+	testCases := map[string]struct {
+		newObj              *resource.ResourceSlice
+		oldObj              *resource.ResourceSlice
+		wantWarningMessages []string
+	}{
+		"valid driver update": {
+			newObj:              slice.DeepCopy(),
+			oldObj:              slice.DeepCopy(),
+			wantWarningMessages: []string{},
+		},
+		"uppercase driver warning on update": {
+			newObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.Spec.Driver = "Foo.COM"
+				return obj
+			}(),
+			oldObj: slice.DeepCopy(),
+			wantWarningMessages: []string{
+				`spec.driver: driver names should be lowercase; "Foo.COM" contains uppercase characters`,
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			warnings := Strategy.WarningsOnUpdate(ctx, tc.newObj, tc.oldObj)
+			if warnings == nil {
+				warnings = []string{}
+			}
+			require.Equal(t, tc.wantWarningMessages, warnings)
 		})
 	}
 }

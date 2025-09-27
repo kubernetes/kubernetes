@@ -67,9 +67,16 @@ func IsDNS1123Subdomain(value string) []string {
 
 // IsDNS1123SubdomainCaseless tests for a string that conforms to the definition of a
 // subdomain in DNS (RFC 1123).
-// Deprecated: Use IsDNS1123Subdomain for strict, lowercase validation.
-// Case-insensitive names are not recommended as they can lead to ambiguity
-// (e.g., 'Foo', 'FOO', and 'foo' would be allowed names for foo).
+//
+// Deprecated: API validation should never be caseless. Caseless validation is a vector
+// for bugs and failed uniqueness assumptions. For example, names like "foo.com" and
+// "FOO.COM" are both accepted as valid, but they are typically not treated as equal by
+// consumers (e.g. CSI and DRA driver names). This fails the "least surprise" principle and
+// can cause inconsistent behaviors.
+//
+// Note: This allows uppercase names but is not caseless — uppercase and lowercase are
+// treated as different values. Use IsDNS1123Subdomain for strict, lowercase validation
+// instead.
 func IsDNS1123SubdomainCaseless(value string) []string {
 	return isDNS1123Subdomain(value, true)
 }

@@ -19,6 +19,7 @@ package resourceslice
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
@@ -60,8 +61,17 @@ func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) f
 	return validation.ValidateResourceSlice(slice)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
 func (resourceSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	newResourceSlice := obj.(*resource.ResourceSlice)
+	var warnings []string
+
+	if newResourceSlice.Spec.Driver != strings.ToLower(newResourceSlice.Spec.Driver) {
+		warnings = append(warnings,
+			fmt.Sprintf("spec.driver: driver names should be lowercase; %q contains uppercase characters", newResourceSlice.Spec.Driver))
+	}
+
+	return warnings
 }
 
 func (resourceSliceStrategy) Canonicalize(obj runtime.Object) {
@@ -87,8 +97,17 @@ func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtim
 	return validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
 }
 
+// WarningsOnUpdate returns warnings for the given update.
 func (resourceSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	newResourceSlice := obj.(*resource.ResourceSlice)
+	var warnings []string
+
+	if newResourceSlice.Spec.Driver != strings.ToLower(newResourceSlice.Spec.Driver) {
+		warnings = append(warnings,
+			fmt.Sprintf("spec.driver: driver names should be lowercase; %q contains uppercase characters", newResourceSlice.Spec.Driver))
+	}
+
+	return warnings
 }
 
 func (resourceSliceStrategy) AllowUnconditionalUpdate() bool {

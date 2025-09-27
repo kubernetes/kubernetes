@@ -32,7 +32,8 @@ type ResourceSliceSpecApplyConfiguration struct {
 	// objects with a certain driver name.
 	//
 	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver. This field is immutable.
+	// vendor of the driver. It should use only lower case characters.
+	// This field is immutable.
 	Driver *string `json:"driver,omitempty"`
 	// Pool describes the pool that this ResourceSlice belongs to.
 	Pool *ResourcePoolApplyConfiguration `json:"pool,omitempty"`

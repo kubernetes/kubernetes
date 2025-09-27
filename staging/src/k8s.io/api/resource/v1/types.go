@@ -101,7 +101,8 @@ type ResourceSliceSpec struct {
 	// objects with a certain driver name.
 	//
 	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver. This field is immutable.
+	// vendor of the driver. It should use only lower case characters.
+	// This field is immutable.
 	//
 	// +required
 	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
@@ -1268,7 +1269,7 @@ type OpaqueDeviceConfiguration struct {
 	// to decide whether it needs to validate them.
 	//
 	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver.
+	// vendor of the driver. It should use only lower case characters.
 	//
 	// +required
 	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
@@ -1494,7 +1495,7 @@ type DeviceRequestAllocationResult struct {
 	// needed on a node.
 	//
 	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver.
+	// vendor of the driver. It should use only lower case characters.
 	//
 	// +required
 	Driver string `json:"driver" protobuf:"bytes,2,name=driver"`
@@ -1797,7 +1798,7 @@ type AllocatedDeviceStatus struct {
 	// needed on a node.
 	//
 	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver.
+	// vendor of the driver. It should use only lower case characters.
 	//
 	// +required
 	Driver string `json:"driver" protobuf:"bytes,1,rep,name=driver"`
