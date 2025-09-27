@@ -84,7 +84,7 @@ func Validate_ItemList(ctx context.Context, op operation.Operation, fldPath *fie
 	errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
 	func() { // cohort {"key": "immutable"}
 		earlyReturn := false
-		if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "immutable" }, validate.DirectEqual, validate.ImmutableByCompare); len(e) != 0 {
+		if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "immutable" }, validate.DirectEqual, validate.Immutable); len(e) != 0 {
 			errs = append(errs, e...)
 			earlyReturn = true
 		}

@@ -56,8 +56,10 @@ func UpdateValueByCompare[T comparable](_ context.Context, op operation.Operatio
 				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
 			}
 		case NoModify:
-			// Allow transitions between set/unset
-			if *oldValue != zero && *value != zero && *value != *oldValue {
+			// Rely on validation ratcheting to detect that the value has changed.
+			// This check only verifies that the field was set in both the old and
+			// new objects, confirming it was a modification, not a set/unset.
+			if *oldValue != zero && *value != zero {
 				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be modified once set").WithOrigin("update"))
 			}
 		}
@@ -85,8 +87,10 @@ func UpdatePointer[T any](_ context.Context, op operation.Operation, fldPath *fi
 				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
 			}
 		case NoModify:
-			// Allow transitions between set/unset
-			if oldValue != nil && value != nil && !equality.Semantic.DeepEqual(value, oldValue) {
+			// Rely on validation ratcheting to detect that the value has changed.
+			// This check only verifies that the field was non-nil in both the old
+			// and new objects, confirming it was a modification, not a set/unset.
+			if oldValue != nil && value != nil {
 				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be modified once set").WithOrigin("update"))
 			}
 		}
@@ -117,8 +121,10 @@ func UpdateValueByReflect[T any](_ context.Context, op operation.Operation, fldP
 				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
 			}
 		case NoModify:
-			// Allow transitions between set/unset
-			if !oldValueIsZero && !valueIsZero && !equality.Semantic.DeepEqual(*value, *oldValue) {
+			// Rely on validation ratcheting to detect that the value has changed.
+			// This check only verifies that the field was set in both the old and
+			// new objects, confirming it was a modification, not a set/unset.
+			if !oldValueIsZero && !valueIsZero {
 				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be modified once set").WithOrigin("update"))
 			}
 		}
@@ -143,9 +149,10 @@ func UpdateStruct[T any](_ context.Context, op operation.Operation, fldPath *fie
 			// as they can't be unset. This should be caught at generation time.
 			continue
 		case NoModify:
-			if !equality.Semantic.DeepEqual(value, oldValue) {
-				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be modified once set").WithOrigin("update"))
-			}
+			// Non-pointer structs are always considered "set". Therefore, any
+			// change detected by validation ratcheting is a modification.
+			// The deep equality check is redundant and has been removed.
+			errs = append(errs, field.Invalid(fldPath, nil, "field cannot be modified once set").WithOrigin("update"))
 		}
 	}
 

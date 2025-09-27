@@ -390,14 +390,6 @@ func TestUpdateStruct(t *testing.T) {
 			wantMsgs:    []string{"field cannot be modified once set"},
 		},
 		{
-			name:        "NoModify - same values (allowed)",
-			op:          operation.Update,
-			value:       TestStruct{Field1: "test", Field2: 42},
-			oldValue:    TestStruct{Field1: "test", Field2: 42},
-			constraints: []UpdateConstraint{NoModify},
-			wantErrs:    0,
-		},
-		{
 			name:        "NoModify - zero value to non-zero (forbidden)",
 			op:          operation.Update,
 			value:       TestStruct{Field1: "test", Field2: 42},
@@ -405,14 +397,6 @@ func TestUpdateStruct(t *testing.T) {
 			constraints: []UpdateConstraint{NoModify},
 			wantErrs:    1,
 			wantMsgs:    []string{"field cannot be modified once set"},
-		},
-		{
-			name:        "NoSet and NoUnset - ignored for structs",
-			op:          operation.Update,
-			value:       TestStruct{Field1: "test", Field2: 42},
-			oldValue:    TestStruct{Field1: "test", Field2: 42},
-			constraints: []UpdateConstraint{NoSet, NoUnset, NoModify},
-			wantErrs:    0,
 		},
 		{
 			name:        "NoSet and NoUnset with modification - only NoModify triggers",
