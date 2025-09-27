@@ -825,6 +825,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 	contName := container.Name
 	allocatedDevicesUpdated := false
 	needsUpdateCheckpoint := false
+
 	// Extended resources are not allowed to be overcommitted.
 	// Since device plugin advertises extended resources,
 	// therefore Requests must be equal to Limits and iterating
@@ -836,17 +837,17 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		if !m.isDevicePluginResource(resource) {
 			continue
 		}
+
 		// Updates allocatedDevices to garbage collect any stranded resources
 		// before doing the device plugin allocation.
 		if !allocatedDevicesUpdated {
 			m.UpdateAllocatedDevices()
 			allocatedDevicesUpdated = true
 		}
+
 		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource])
 		if err != nil {
-			m.mutex.Lock()
-			m.allocatedDevices = m.podDevices.devices()
-			m.mutex.Unlock()
+			m.restoreAllocatedDevices()
 			return err
 		}
 		if allocDevices == nil || len(allocDevices) <= 0 {
@@ -868,14 +869,10 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		// in real use as the result of this. Should also consider to parallelize device
 		// plugin Allocate grpc calls if it becomes common that a container may require
 		// resources from multiple device plugins.
-		m.mutex.Lock()
-		eI, ok := m.endpoints[resource]
-		m.mutex.Unlock()
-		if !ok {
-			m.mutex.Lock()
-			m.allocatedDevices = m.podDevices.devices()
-			m.mutex.Unlock()
-			return fmt.Errorf("unknown Device Plugin %s", resource)
+		eI, err := m.getEndpointInfo(resource)
+		if err != nil {
+			m.restoreAllocatedDevices()
+			return err
 		}
 
 		devs := allocDevices.UnsortedList()
@@ -887,9 +884,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		if err != nil {
 			// In case of allocation failure, we want to restore m.allocatedDevices
 			// to the actual allocated state from m.podDevices.
-			m.mutex.Lock()
-			m.allocatedDevices = m.podDevices.devices()
-			m.mutex.Unlock()
+			m.restoreAllocatedDevices()
 			return err
 		}
 
@@ -897,27 +892,55 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			return fmt.Errorf("no containers return in allocation response %v", resp)
 		}
 
-		allocDevicesWithNUMA := checkpoint.NewDevicesPerNUMA()
-		// Update internal cached podDevices state.
-		m.mutex.Lock()
-		for dev := range allocDevices {
-			if m.allDevices[resource][dev].Topology == nil || len(m.allDevices[resource][dev].Topology.Nodes) == 0 {
-				allocDevicesWithNUMA[nodeWithoutTopology] = append(allocDevicesWithNUMA[nodeWithoutTopology], dev)
-				continue
-			}
-			for idx := range m.allDevices[resource][dev].Topology.Nodes {
-				node := m.allDevices[resource][dev].Topology.Nodes[idx]
-				allocDevicesWithNUMA[node.ID] = append(allocDevicesWithNUMA[node.ID], dev)
-			}
+		if err := m.updatePodDevices(podUID, contName, resource, allocDevices, resp.ContainerResponses[0]); err != nil {
+			return err
 		}
-		m.mutex.Unlock()
-		m.podDevices.insert(podUID, contName, resource, allocDevicesWithNUMA, resp.ContainerResponses[0])
 	}
 
 	if needsUpdateCheckpoint {
 		return m.writeCheckpoint()
 	}
 
+	return nil
+}
+
+// getEndpointInfo safely retrieves endpoint information for a resource
+func (m *ManagerImpl) getEndpointInfo(resource string) (endpointInfo, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	eI, ok := m.endpoints[resource]
+	if !ok {
+		return endpointInfo{}, fmt.Errorf("unknown Device Plugin %s", resource)
+	}
+	return eI, nil
+}
+
+// restoreAllocatedDevices restores allocated devices to the actual allocated state from podDevices
+func (m *ManagerImpl) restoreAllocatedDevices() {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.allocatedDevices = m.podDevices.devices()
+}
+
+// updatePodDevices updates the internal cached podDevices state
+func (m *ManagerImpl) updatePodDevices(podUID, contName, resource string, allocDevices sets.Set[string], containerResp *pluginapi.ContainerAllocateResponse) error {
+	allocDevicesWithNUMA := checkpoint.NewDevicesPerNUMA()
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	for dev := range allocDevices {
+		if m.allDevices[resource][dev].Topology == nil || len(m.allDevices[resource][dev].Topology.Nodes) == 0 {
+			allocDevicesWithNUMA[nodeWithoutTopology] = append(allocDevicesWithNUMA[nodeWithoutTopology], dev)
+			continue
+		}
+		for idx := range m.allDevices[resource][dev].Topology.Nodes {
+			node := m.allDevices[resource][dev].Topology.Nodes[idx]
+			allocDevicesWithNUMA[node.ID] = append(allocDevicesWithNUMA[node.ID], dev)
+		}
+	}
+
+	m.podDevices.insert(podUID, contName, resource, allocDevicesWithNUMA, containerResp)
 	return nil
 }
 
