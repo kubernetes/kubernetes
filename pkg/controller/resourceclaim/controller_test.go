@@ -34,15 +34,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	k8stesting "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -1125,5 +1128,197 @@ func (em numMetrics) withUpdates(notAllocatedDelta, notAllocatedWithAdminDelta, 
 		allocated:                   em.allocated + allocatedDelta,
 		allocatedWithAdminAccess:    em.allocatedWithAdminAccess + allocatedWithAdminDelta,
 		lister:                      em.lister,
+	}
+}
+
+func TestEnqueuePodExtendedResourceClaims(t *testing.T) {
+	tests := []struct {
+		name                        string
+		pod                         *v1.Pod
+		featureGateEnabled          bool
+		deleted                     bool
+		expectEarlyReturn           bool
+		expectExtendedClaimEnqueued bool
+	}{
+		{
+			name: "pod with no resource claims",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+				Spec:       v1.PodSpec{},
+				Status:     v1.PodStatus{},
+			},
+			featureGateEnabled:          true,
+			expectEarlyReturn:           true,
+			expectExtendedClaimEnqueued: false,
+		},
+		{
+			name: "pod with regular resource claims only",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+				Spec: v1.PodSpec{
+					ResourceClaims: []v1.PodResourceClaim{{Name: "regular-claim"}},
+				},
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+			},
+			featureGateEnabled:          true,
+			expectEarlyReturn:           false,
+			expectExtendedClaimEnqueued: false,
+		},
+		{
+			name: "pod with extended resource claim, feature enabled, running pod",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+				Spec:       v1.PodSpec{},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+						ResourceClaimName: "test-extended-claim",
+					},
+				},
+			},
+			featureGateEnabled:          true,
+			expectEarlyReturn:           false,
+			expectExtendedClaimEnqueued: false,
+		},
+		{
+			name: "pod with extended resource claim, feature enabled, completed pod",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+				Spec:       v1.PodSpec{},
+				Status: v1.PodStatus{
+					Phase: v1.PodSucceeded,
+					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+						ResourceClaimName: "test-extended-claim",
+					},
+				},
+			},
+			featureGateEnabled:          true,
+			expectEarlyReturn:           false,
+			expectExtendedClaimEnqueued: true,
+		},
+		{
+			name: "pod with extended resource claim, feature enabled, failed pod",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+				Spec:       v1.PodSpec{},
+				Status: v1.PodStatus{
+					Phase: v1.PodFailed, // Failed pod
+					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+						ResourceClaimName: "test-extended-claim",
+					},
+				},
+			},
+			featureGateEnabled:          true,
+			expectEarlyReturn:           false,
+			expectExtendedClaimEnqueued: true,
+		},
+		{
+			name: "pod with extended resource claim, feature disabled",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+				Spec:       v1.PodSpec{},
+				Status: v1.PodStatus{
+					Phase: v1.PodSucceeded,
+					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+						ResourceClaimName: "test-extended-claim",
+					},
+				},
+			},
+			featureGateEnabled:          false,
+			expectEarlyReturn:           false,
+			expectExtendedClaimEnqueued: true,
+		},
+		{
+			name: "deleted pod with extended resource claim",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+				Spec:       v1.PodSpec{},
+				Status: v1.PodStatus{
+					Phase: v1.PodSucceeded,
+					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+						ResourceClaimName: "test-extended-claim",
+					},
+				},
+			},
+			featureGateEnabled:          true,
+			deleted:                     true,
+			expectEarlyReturn:           false,
+			expectExtendedClaimEnqueued: true,
+		},
+		{
+			name: "pod with both regular and extended resource claims, completed",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+				Spec: v1.PodSpec{
+					ResourceClaims: []v1.PodResourceClaim{{Name: "regular-claim"}},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodSucceeded,
+					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+						ResourceClaimName: "test-extended-claim",
+					},
+				},
+			},
+			featureGateEnabled:          true,
+			expectEarlyReturn:           false,
+			expectExtendedClaimEnqueued: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.featureGateEnabled)
+
+			tCtx := ktesting.Init(t)
+			tCtx = ktesting.WithCancel(tCtx)
+
+			fakeKubeClient := createTestClient()
+			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+			podInformer := informerFactory.Core().V1().Pods()
+			claimInformer := informerFactory.Resource().V1().ResourceClaims()
+			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
+
+			setupMetrics()
+
+			ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, claimInformer, templateInformer)
+			if err != nil {
+				t.Fatalf("error creating controller: %v", err)
+			}
+
+			ec.enqueuePod(tCtx.Logger(), test.pod, test.deleted)
+
+			var keys []string
+			for ec.queue.Len() > 0 {
+				k, _ := ec.queue.Get()
+				keys = append(keys, k)
+				ec.queue.Forget(k)
+				ec.queue.Done(k)
+			}
+
+			if test.expectEarlyReturn {
+				if len(keys) != 0 {
+					t.Errorf("expected no keys enqueued on early return, got: %v", keys)
+				}
+				return
+			}
+
+			var expectedClaimKey string
+			if test.pod.Status.ExtendedResourceClaimStatus != nil {
+				expectedClaimKey = claimKeyPrefix + test.pod.Namespace + "/" + test.pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
+			}
+			found := false
+			for _, k := range keys {
+				if k == expectedClaimKey {
+					found = true
+					break
+				}
+			}
+			if test.expectExtendedClaimEnqueued && !found {
+				t.Errorf("expected extended claim key %q to be enqueued, got keys: %v", expectedClaimKey, keys)
+			}
+			if !test.expectExtendedClaimEnqueued && found {
+				t.Errorf("did not expect extended claim key %q to be enqueued, got keys: %v", expectedClaimKey, keys)
+			}
+		})
 	}
 }
