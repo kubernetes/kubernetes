@@ -255,6 +255,28 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
 			testPodWithHook(ctx, podWithHook)
 		})
+		/*
+			Release : v1.34
+			Testname: Pod Lifecycle, prestop http hook with hostNetwork
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'HttpGet' action and no Host field, then the handler MUST be invoked before the container is terminated. A server pod with hostNetwork is created that will serve http requests, create a second pod on the same node with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
+		*/
+		framework.ConformanceIt("should execute prestop http hook properly with hostNetwork", f.WithNodeConformance(), func(ctx context.Context) {
+			lifecycle := &v1.Lifecycle{
+				PreStop: &v1.LifecycleHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Path: "/echo?msg=prestop",
+						Port: intstr.FromInt32(8080),
+					},
+				},
+			}
+			podWithHook := getPodWithHook("hostnetwork-pod-with-prestop-http-hook", imageutils.GetPauseImageName(), lifecycle)
+			podWithHook.Spec.HostNetwork = true
+			// make sure we spawn the test pod on the same node as the webserver.
+			nodeSelection := e2epod.NodeSelection{}
+			e2epod.SetAffinity(&nodeSelection, targetNode)
+			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
+			testPodWithHook(ctx, podWithHook)
+		})
 	})
 })
 
