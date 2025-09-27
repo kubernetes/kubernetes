@@ -146,6 +146,7 @@ type testCase struct {
 	expectedReportedReconciliationErrorLabel      monitor.ErrorLabel
 	expectedReportedMetricComputationActionLabels map[autoscalingv2.MetricSourceType]monitor.ActionLabel
 	expectedReportedMetricComputationErrorLabels  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel
+	checkDesiredReplicaMetric                     bool
 
 	// Target resource information.
 	resource *fakeResource
@@ -727,6 +728,14 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T, m *m
 		}
 		assert.Equal(t, l, m.metricComputationErrorLabels[metricType][0], "the metric computation error should be recorded in monitor expectedly")
 	}
+
+	// TODO: Retrieve the namespace and HPA names from the test case (tc) to replace hardcoded values below (and check).
+	if tc.checkDesiredReplicaMetric {
+		currentValue := m.GetDesiredReplicasValue("test-namespace", "test-hpa")
+		assert.Equal(t, tc.expectedDesiredReplicas, currentValue,
+			"the desired replicas should be recorded in monitor expectedly")
+	}
+
 }
 
 func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
@@ -862,12 +871,14 @@ type mockMonitor struct {
 	metricComputationActionLabels map[autoscalingv2.MetricSourceType][]monitor.ActionLabel
 	metricComputationErrorLabels  map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel
 	metricObjectsCount            int
+	desiredReplicasValues         map[string]int32 // key is "namespace/name"
 }
 
 func newMockMonitor() *mockMonitor {
 	return &mockMonitor{
 		metricComputationActionLabels: make(map[autoscalingv2.MetricSourceType][]monitor.ActionLabel),
 		metricComputationErrorLabels:  make(map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel),
+		desiredReplicasValues:         make(map[string]int32),
 	}
 }
 
@@ -918,6 +929,21 @@ func (m *mockMonitor) GetObjectsCount() int {
 	return m.metricObjectsCount
 }
 
+func (m *mockMonitor) ObserveDesiredReplicas(namespace, hpaName string, desiredReplicas int32) {
+	fmt.Printf("putting %s/%s with %v", namespace, hpaName, desiredReplicas)
+	m.Lock()
+	defer m.Unlock()
+	key := fmt.Sprintf("%s/%s", namespace, hpaName)
+	m.desiredReplicasValues[key] = desiredReplicas
+}
+
+func (m *mockMonitor) GetDesiredReplicasValue(namespace, hpaName string) int32 {
+	m.RLock()
+	defer m.RUnlock()
+	key := fmt.Sprintf("%s/%s", namespace, hpaName)
+	return m.desiredReplicasValues[key]
+}
+
 func TestScaleUp(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
@@ -938,6 +964,7 @@ func TestScaleUp(t *testing.T) {
 		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
 			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
 		},
+		checkDesiredReplicaMetric: true,
 	}
 	tc.runTest(t)
 }

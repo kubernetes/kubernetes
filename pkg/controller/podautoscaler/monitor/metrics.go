@@ -68,6 +68,13 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+	desiredReplicasCount = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      hpaControllerSubsystem,
+			Name:           "desired_replicas",
+			Help:           "Current desired replica count for HPA objects.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"namespace", "hpa_name"})
 
 	metricsList = []metrics.Registerable{
 		reconciliationsTotal,
@@ -75,6 +82,7 @@ var (
 		metricComputationTotal,
 		metricComputationDuration,
 		numHorizontalPodAutoscalers,
+		desiredReplicasCount,
 	}
 )
 
