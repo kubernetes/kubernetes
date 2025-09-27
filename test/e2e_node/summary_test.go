@@ -30,7 +30,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -368,11 +367,8 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 		})
 	})
 
-	framework.Context("when querying /stats/summary under pressure", feature.KubeletPSI, framework.WithSerial(), func() {
+	framework.Context("when querying /stats/summary under pressure", framework.WithSerial(), framework.WithFeatureGate(features.KubeletPSI), func() {
 		ginkgo.BeforeEach(func() {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
-				ginkgo.Skip("KubeletPSI feature gate is not enabled")
-			}
 			if !IsCgroup2UnifiedMode() {
 				ginkgo.Skip("Skipping since CgroupV2 not used")
 			}
