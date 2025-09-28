@@ -19,14 +19,12 @@ package upgrade
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
@@ -40,6 +38,7 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 // nodeOptions defines all the options exposed via flags by kubeadm upgrade node.
@@ -164,13 +163,8 @@ func addUpgradeNodeFlags(flagSet *flag.FlagSet, nodeOptions *nodeOptions) {
 // This func takes care of validating nodeOptions passed to the command, and then it converts
 // options into the internal InitConfiguration type that is used as input all the phases in the kubeadm upgrade node workflow
 func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*nodeData, error) {
-	// Checks if a node is a control-plane node by looking up the kube-apiserver manifest file
-	isControlPlaneNode := true
-	filepath := constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())
-	if _, err := os.Stat(filepath); os.IsNotExist(err) {
-		klog.V(1).Infof("assuming this is not a control plane node because %q is missing", filepath)
-		isControlPlaneNode = false
-	}
+	isControlPlaneNode := staticpodutil.IsControlPlaneNode()
+
 	if len(nodeOptions.kubeConfigPath) == 0 {
 		// Update the kubeconfig path depending on whether this is a control plane node or not.
 		nodeOptions.kubeConfigPath = constants.GetKubeletKubeConfigPath()
@@ -198,9 +192,10 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 	}
 
 	// Fetches the cluster configuration
-	// NB in case of control-plane node, we are reading all the info for the node; in case of NOT control-plane node
-	//    (worker node), we are not reading local API address and the CRI socket from the node object
-	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", !isControlPlaneNode, false)
+	getNodeRegistration := true
+	getAPIEndpoint := isControlPlaneNode
+	getComponentConfigs := true
+	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", getNodeRegistration, getAPIEndpoint, getComponentConfigs)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
