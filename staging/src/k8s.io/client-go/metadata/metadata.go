@@ -126,6 +126,13 @@ func (c *Client) Resource(resource schema.GroupVersionResource) Getter {
 	return &client{client: c, resource: resource}
 }
 
+// IsWatchListSemanticsSupported informs the reflector that this client
+// explicitly supports WatchList semantics.
+//
+// This is a synthetic method whose sole purpose is to satisfy the optional
+// interface check performed by the reflector.
+// Returning true signals that WatchList can be used.
+// No additional logic is implemented here.
 func (c *Client) IsWatchListSemanticsSupported() bool {
 	return true
 }
