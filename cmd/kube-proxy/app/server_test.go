@@ -28,8 +28,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/util/compatibility"
-	"k8s.io/component-base/zpages/statusz"
 
 	v1 "k8s.io/api/core/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
