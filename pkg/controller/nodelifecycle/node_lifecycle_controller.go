@@ -1259,7 +1259,8 @@ func (nc *Controller) markNodeAsReachable(ctx context.Context, node *v1.Node) (b
 	return nc.zoneNoExecuteTainter[nodetopology.GetZoneKey(node)].Remove(node.Name), nil
 }
 
-// ComputeZoneState returns a slice of NodeReadyConditions for all Nodes in a given zone.
+// ComputeZoneState computes the state of a zone based on node ready conditions.
+// It returns the number of not-ready nodes and the zone state.
 // The zone is considered:
 // - fullyDisrupted if there're no Ready Nodes,
 // - partiallyDisrupted if at least than nc.unhealthyZoneThreshold percent of Nodes are not Ready,
