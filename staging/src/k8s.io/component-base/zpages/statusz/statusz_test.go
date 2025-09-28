@@ -17,6 +17,7 @@ limitations under the License.
 package statusz
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/util/version"
+	v1 "k8s.io/component-base/zpages/statusz/v1"
 )
 
 const wantTmpl = `
@@ -36,7 +38,7 @@ Up: %s
 Go version: %s
 Binary version: %v
 Emulation version: %v
-Paths:  /livez /readyz
+Paths: /livez /readyz
 `
 
 const wantTmplWithoutEmulation = `
@@ -48,22 +50,10 @@ Up: %s
 Go version: %s
 Binary version: %v
 
-Paths:  /livez /readyz
+Paths: /livez /readyz
 `
 
-const wantTmplWithKubeApiserverComp = `
-%s statusz
-Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.
-
-Started: %v
-Up: %s
-Go version: %s
-Binary version: %v
-
-Paths:  /livez /readyz
-`
-
-func TestStatusz(t *testing.T) {
+func TestPlainTextStatusz(t *testing.T) {
 	delimiters = []string{":"}
 	fakeStartTime := time.Now()
 	fakeUptime := uptime(fakeStartTime)
@@ -76,20 +66,13 @@ func TestStatusz(t *testing.T) {
 	tests := []struct {
 		name           string
 		componentName  string
-		reqHeader      string
 		registry       fakeRegistry
 		wantStatusCode int
 		wantBody       string
 	}{
 		{
-			name:           "invalid header",
-			reqHeader:      "some header",
-			wantStatusCode: http.StatusNotAcceptable,
-		},
-		{
-			name:          "valid request",
+			name:          "valid request for text/plain",
 			componentName: "test-server",
-			reqHeader:     "text/plain; charset=utf-8",
 			registry: fakeRegistry{
 				startTime:    fakeStartTime,
 				goVer:        fakeGoVersion,
@@ -111,7 +94,6 @@ func TestStatusz(t *testing.T) {
 		{
 			name:          "missing emulation version",
 			componentName: "test-server",
-			reqHeader:     "text/plain; charset=utf-8",
 			registry: fakeRegistry{
 				startTime:    fakeStartTime,
 				goVer:        fakeGoVersion,
@@ -129,33 +111,11 @@ func TestStatusz(t *testing.T) {
 				fakeBinaryVersion,
 			),
 		},
-		{
-			name:          "valid request for kube-apiserver",
-			componentName: "kube-apiserver",
-			reqHeader:     "text/plain; charset=utf-8",
-			registry: fakeRegistry{
-				startTime:    fakeStartTime,
-				goVer:        fakeGoVersion,
-				binaryVer:    fakeBinaryVersion,
-				emulationVer: nil,
-				listedPaths:  fakeListedPaths,
-			},
-			wantStatusCode: http.StatusOK,
-			wantBody: fmt.Sprintf(
-				wantTmplWithKubeApiserverComp,
-				"kube-apiserver",
-				fakeStartTime.Format(time.UnixDate),
-				fakeUptime,
-				fakeGoVersion,
-				fakeBinaryVersion,
-			),
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mux := http.NewServeMux()
-
 			Install(mux, tt.componentName, tt.registry)
 
 			path := "/statusz"
@@ -163,11 +123,7 @@ func TestStatusz(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error while creating request: %v", err)
 			}
-
-			req.Header.Set("Accept", "text/plain; charset=utf-8")
-			if tt.reqHeader != "" {
-				req.Header.Set("Accept", tt.reqHeader)
-			}
+			req.Header.Set("Accept", "text/plain")
 
 			w := httptest.NewRecorder()
 			mux.ServeHTTP(w, req)
@@ -179,10 +135,87 @@ func TestStatusz(t *testing.T) {
 			if tt.wantStatusCode == http.StatusOK {
 				c := w.Header().Get("Content-Type")
 				if c != "text/plain; charset=utf-8" {
-					t.Fatalf("want header: %v, got: %v", "text/plain", c)
+					t.Fatalf("want header: %v, got: %v", "text/plain; charset=utf-8", c)
+				}
+				if diff := cmp.Diff(tt.wantBody, string(w.Body.String())); diff != "" {
+					t.Errorf("Unexpected diff on response (-want,+got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestJSONStatusz(t *testing.T) {
+	delimiters = []string{":"}
+	fakeStartTime := time.Now()
+	fakeUptime := uptime(fakeStartTime)
+	fakeGoVersion := "1.21"
+	fakeBvStr := "1.31"
+	fakeEvStr := "1.30"
+	fakeBinaryVersion := parseVersion(t, fakeBvStr)
+	fakeEmulationVersion := parseVersion(t, fakeEvStr)
+	fakeListedPaths := []string{"/livez/poststarthook/peer-discovery-cache-sync", "/livez/post", "/readyz/informer-sync", "/readyz/log", "/readyz/ping"}
+	tests := []struct {
+		name           string
+		componentName  string
+		registry       fakeRegistry
+		wantStatusCode int
+		wantBody       *v1.Statusz
+	}{
+		{
+			name:          "valid request for v1",
+			componentName: "test-server",
+			registry: fakeRegistry{
+				startTime:    fakeStartTime,
+				goVer:        fakeGoVersion,
+				binaryVer:    fakeBinaryVersion,
+				emulationVer: fakeEmulationVersion,
+				listedPaths:  fakeListedPaths,
+			},
+			wantStatusCode: http.StatusOK,
+			wantBody: &v1.Statusz{
+				APIVersion:       "v1",
+				ComponentName:    "test-server",
+				StartTime:        fakeStartTime.Format(time.UnixDate),
+				UpTime:           fakeUptime,
+				GoVersion:        fakeGoVersion,
+				BinaryVersion:    fakeBvStr,
+				EmulationVersion: fakeEvStr,
+				Paths:            []string{"/livez", "/readyz"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mux := http.NewServeMux()
+			Install(mux, tt.componentName, tt.registry)
+
+			path := "/statusz"
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://example.com%s", path), nil)
+			if err != nil {
+				t.Fatalf("unexpected error while creating request: %v", err)
+			}
+
+			req.Header.Set("Accept", "application/json")
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, req)
+
+			if w.Code != tt.wantStatusCode {
+				t.Fatalf("want status code: %v, got: %v", tt.wantStatusCode, w.Code)
+			}
+
+			if tt.wantStatusCode == http.StatusOK {
+				c := w.Header().Get("Content-Type")
+				if c != "application/json" {
+					t.Fatalf("want header: %v, got: %v", "application/json", c)
 				}
 
-				if diff := cmp.Diff(tt.wantBody, string(w.Body.String())); diff != "" {
+				var got v1.Statusz
+				if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+					t.Fatalf("unexpected error while unmarshalling response: %v", err)
+				}
+				if diff := cmp.Diff(*tt.wantBody, got); diff != "" {
 					t.Errorf("Unexpected diff on response (-want,+got):\n%s", diff)
 				}
 			}

@@ -28,6 +28,8 @@ import (
 	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/zpages/httputil"
 	"k8s.io/klog/v2"
+
+	v1 "k8s.io/component-base/zpages/statusz/v1"
 )
 
 var (
@@ -41,7 +43,13 @@ var (
 	}
 )
 
-const DefaultStatuszPath = "/statusz"
+const (
+	DefaultStatuszPath = "/statusz"
+)
+
+var (
+	v1SupportedMediaTypes = []string{"application/json", "text/plain"}
+)
 
 const headerFmt = `
 %s statusz
@@ -69,25 +77,29 @@ func Install(m mux, componentName string, reg statuszRegistry) {
 
 func handleStatusz(componentName string, reg statuszRegistry) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !httputil.AcceptableMediaType(r) {
-			http.Error(w, httputil.ErrUnsupportedMediaType.Error(), http.StatusNotAcceptable)
-			return
-		}
-
-		fmt.Fprintf(w, headerFmt, componentName)
-		data, err := populateStatuszData(reg, componentName)
+		mediaType, err := httputil.NegotiateMediaType(r, v1SupportedMediaTypes)
 		if err != nil {
-			klog.Errorf("error while populating statusz data: %v", err)
-			http.Error(w, "error while populating statusz data", http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("%s, supported media types: %v", err.Error(), v1SupportedMediaTypes), http.StatusNotAcceptable)
 			return
 		}
+		if mediaType == "" {
+			mediaType = "application/json"
+		}
 
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		fmt.Fprint(w, data)
+		switch mediaType {
+		case "text/plain":
+			writePlainTextResponse(componentName, reg, w)
+		case "application/json":
+			writeV1Response(componentName, reg, w)
+		default:
+			writeV1Response(componentName, reg, w)
+		}
 	}
 }
 
-func populateStatuszData(reg statuszRegistry, componentName string) (string, error) {
+func writePlainTextResponse(componentName string, reg statuszRegistry, w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintf(w, headerFmt, componentName)
 	randomIndex := rand.Intn(len(delimiters))
 	delim := html.EscapeString(delimiters[randomIndex])
 	startTime := html.EscapeString(reg.processStartTime().Format(time.UnixDate))
@@ -99,7 +111,7 @@ func populateStatuszData(reg statuszRegistry, componentName string) (string, err
 	if reg.emulationVersion() != nil {
 		emulationVersion = fmt.Sprintf(`Emulation version%s %s`, delim, html.EscapeString(reg.emulationVersion().String()))
 	}
-	paths := aggregatePaths(reg.paths())
+	paths := strings.Join(aggregatePaths(reg.paths()), " ")
 	if paths != "" {
 		paths = fmt.Sprintf(`Paths%s %s`, delim, html.EscapeString(paths))
 	}
@@ -113,7 +125,27 @@ Binary version%[1]s %[5]s
 %[7]s
 `, delim, startTime, uptime, goVersion, binaryVersion, emulationVersion, paths)
 
-	return status, nil
+	fmt.Fprint(w, status)
+}
+
+func writeV1Response(componentName string, reg statuszRegistry, w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	startTime := reg.processStartTime().Format(time.UnixDate)
+	upTime := uptime(reg.processStartTime())
+	goVersion := reg.goVersion()
+	binaryVersion := reg.binaryVersion().String()
+	var emulationVersion string
+	if reg.emulationVersion() != nil {
+		emulationVersion = reg.emulationVersion().String()
+	}
+	paths := aggregatePaths(reg.paths())
+	data, err := v1.PopulateStatuszDataV1(componentName, startTime, upTime, goVersion, binaryVersion, emulationVersion, paths)
+	if err != nil {
+		klog.Errorf("error while populating statusz data for v1: %v", err)
+		http.Error(w, "error while populating statusz data for v1", http.StatusInternalServerError)
+		return
+	}
+	w.Write(data)
 }
 
 func uptime(t time.Time) string {
@@ -122,7 +154,7 @@ func uptime(t time.Time) string {
 		upSince/3600, (upSince/60)%60, upSince%60)
 }
 
-func aggregatePaths(listedPaths []string) string {
+func aggregatePaths(listedPaths []string) []string {
 	paths := make(map[string]bool)
 	for _, listedPath := range listedPaths {
 		folder := "/" + strings.Split(listedPath, "/")[1]
@@ -137,10 +169,5 @@ func aggregatePaths(listedPaths []string) string {
 	}
 	sort.Strings(sortedPaths)
 
-	var path string
-	for _, p := range sortedPaths {
-		path += " " + p
-	}
-
-	return path
+	return sortedPaths
 }

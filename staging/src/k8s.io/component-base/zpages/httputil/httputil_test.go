@@ -21,54 +21,62 @@ import (
 	"testing"
 )
 
-func TestAcceptableMediaTypes(t *testing.T) {
+func TestNegotiateMediaType(t *testing.T) {
 	tests := []struct {
-		name      string
-		reqHeader string
-		want      bool
+		name           string
+		reqHeader      string
+		supportedTypes []string
+		want           string
+		wantErr        bool
 	}{
 		{
-			name:      "valid text/plain header",
-			reqHeader: "text/plain",
-			want:      true,
+			name:           "valid application/json header",
+			reqHeader:      "application/json",
+			supportedTypes: []string{"application/json", "text/plain"},
+			want:           "application/json",
 		},
 		{
-			name:      "valid text/* header",
-			reqHeader: "text/*",
-			want:      true,
+			name:           "valid text/plain header",
+			reqHeader:      "text/plain",
+			supportedTypes: []string{"application/json", "text/plain"},
+			want:           "text/plain",
 		},
 		{
-			name:      "valid */plain header",
-			reqHeader: "*/plain",
-			want:      true,
+			name:           "no header",
+			reqHeader:      "",
+			supportedTypes: []string{"application/json", "text/plain"},
+			want:           "",
 		},
 		{
-			name:      "valid accept args",
-			reqHeader: "text/plain; charset=utf-8",
-			want:      true,
+			name:           "wildcard header",
+			reqHeader:      "*/*",
+			supportedTypes: []string{"application/json", "text/plain"},
+			want:           "application/json",
 		},
 		{
-			name:      "invalid text/foo header",
-			reqHeader: "text/foo",
-			want:      false,
-		},
-		{
-			name:      "invalid text/plain params",
-			reqHeader: "text/plain; foo=bar",
-			want:      false,
+			name:           "invalid header",
+			reqHeader:      "application/xml",
+			supportedTypes: []string{"application/json", "text/plain"},
+			wantErr:        true,
 		},
 	}
 	for _, tt := range tests {
-		req, err := http.NewRequest(http.MethodGet, "http://example.com/statusz", nil)
-		if err != nil {
-			t.Fatalf("Unexpected error while creating request: %v", err)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, "http://example.com/statusz", nil)
+			if err != nil {
+				t.Fatalf("Unexpected error while creating request: %v", err)
+			}
 
-		req.Header.Set("Accept", tt.reqHeader)
-		got := AcceptableMediaType(req)
+			req.Header.Set("Accept", tt.reqHeader)
+			got, err := NegotiateMediaType(req, tt.supportedTypes)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NegotiateMediaType() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
 
-		if got != tt.want {
-			t.Errorf("Unexpected response from AcceptableMediaType(), want %v, got = %v", tt.want, got)
-		}
+			if got != tt.want {
+				t.Errorf("Unexpected response from NegotiateMediaType(), want %v, got = %v", tt.want, got)
+			}
+		})
 	}
 }

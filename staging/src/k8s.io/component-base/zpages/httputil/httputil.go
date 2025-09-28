@@ -52,3 +52,29 @@ func mediaTypeMatches(a goautoneg.Accept) bool {
 	return (a.Type == "text" || a.Type == "*") &&
 		(a.SubType == "plain" || a.SubType == "*")
 }
+
+// NegotiateMediaType negotiates the media type from the request Accept header.
+// It returns the best matching media type or an error if no match is found.
+func NegotiateMediaType(r *http.Request, supportedTypes []string) (string, error) {
+	acceptHeader := r.Header.Get("Accept")
+	if acceptHeader == "" {
+		return "", nil
+	}
+
+	accepts := goautoneg.ParseAccept(acceptHeader)
+	for _, accept := range accepts {
+		for _, supportedType := range supportedTypes {
+			if accept.Type == "*" && accept.SubType == "*" {
+				return supportedType, nil
+			}
+			if accept.Type == strings.Split(supportedType, "/")[0] && accept.SubType == "*" {
+				return supportedType, nil
+			}
+			if accept.Type == strings.Split(supportedType, "/")[0] && accept.SubType == strings.Split(supportedType, "/")[1] {
+				return supportedType, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no supported media type found")
+}
