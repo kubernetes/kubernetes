@@ -20,16 +20,20 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"os"
 	"path"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
 
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
@@ -296,7 +300,6 @@ func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
 }
 
 func TestKubeControllerManagerServingStatusz(t *testing.T) {
-
 	// authenticate to apiserver via bearer token
 	token := "flwqkenfjasasdfmwerasd" // Fake token for testing.
 	tokenFile, err := os.CreateTemp("", "kubeconfig")
@@ -349,131 +352,161 @@ users:
 		t.Fatal(err)
 	}
 
-	tests := []struct {
-		name           string
-		flags          []string
-		path           string
-		anonymous      bool // to use the token or not
-		wantErr        bool
-		wantSecureCode *int
-		wantPaths      []string
+	wantBodyStr := "kube-controller-manager statusz\nWarning: This endpoint is not meant to be machine parseable"
+	wantBodyJSON := &v1alpha1.Statusz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Statusz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-controller-manager",
+		},
+		Paths: []string{"/configz", "/healthz", "/metrics"},
+	}
+
+	testCases := []struct {
+		name         string
+		acceptHeader string
+		wantStatus   int
+		wantBodySub  string            // for text/plain
+		wantJSON     *v1alpha1.Statusz // for structured json
 	}{
 		{
-			name: "serving /statusz",
-			flags: []string{
-				"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
-				"--authentication-kubeconfig", apiserverConfig.Name(),
-				"--authorization-kubeconfig", apiserverConfig.Name(),
-				"--authorization-always-allow-paths", "/statusz",
-				"--kubeconfig", apiserverConfig.Name(),
-				"--leader-elect=false",
-			},
-			path:           "/statusz",
-			anonymous:      false,
-			wantErr:        false,
-			wantSecureCode: ptr.To(http.StatusOK),
-			wantPaths:      []string{"/configz", "/healthz", "/metrics"},
+			name:         "text plain response",
+			acceptHeader: "text/plain",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
+		},
+		{
+			name:         "structured json response",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			wantStatus:   http.StatusOK,
+			wantJSON:     wantBodyJSON,
+		},
+		{
+			name:         "no accept header (defaults to text)",
+			acceptHeader: "",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
+		},
+		{
+			name:         "invalid accept header",
+			acceptHeader: "application/xml",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json without params",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json with missing as",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "wildcard accept header",
+			acceptHeader: "*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
+		},
+		{
+			name:         "bad json header fall back wildcard",
+			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
+			wantStatus:   http.StatusOK,
+			wantBodySub:  wantBodyStr,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
-			_, ctx := ktesting.NewTestContext(t)
-			secureOptions, secureInfo, tearDownFn, err := kubeControllerManagerTester{}.StartTestServer(t, ctx, slices.Concat(tt.flags, []string{}))
-			if tearDownFn != nil {
-				defer tearDownFn()
-			}
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("StartTestServer() error = %v, wantErr %v", err, tt.wantErr)
-			}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+	_, ctx := ktesting.NewTestContext(t)
+	flags := []string{
+		"--authentication-skip-lookup",
+		"--authentication-kubeconfig", apiserverConfig.Name(),
+		"--authorization-kubeconfig", apiserverConfig.Name(),
+		"--authorization-always-allow-paths", "/statusz",
+		"--kubeconfig", apiserverConfig.Name(),
+		"--leader-elect=false",
+	}
+	secureOptions, secureInfo, tearDownFn, err := kubeControllerManagerTester{}.StartTestServer(t, ctx, flags)
+	if tearDownFn != nil {
+		defer tearDownFn()
+	}
+	if err != nil {
+		t.Fatalf("StartTestServer() error = %v", err)
+	}
+	if secureInfo == nil {
+		t.Fatalf("SecureServing not enabled")
+	}
+	_, port, err := net.SplitHostPort(secureInfo.Listener.Addr().String())
+	if err != nil {
+		t.Fatalf("could not get host and port from %s : %v", secureInfo.Listener.Addr().String(), err)
+	}
+	url := fmt.Sprintf("https://127.0.0.1:%s/statusz", port)
+
+	// read self-signed server cert disk
+	pool := x509.NewCertPool()
+	serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
+	serverCert, err := os.ReadFile(serverCertPath)
+	if err != nil {
+		t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
+	}
+	pool.AppendCertsFromPEM(serverCert)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: pool,
+		},
+	}
+	client := &http.Client{Transport: tr}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, url, nil)
 			if err != nil {
-				return
+				t.Fatal(err)
 			}
 
-			if want, got := tt.wantSecureCode != nil, secureInfo != nil; want != got {
-				t.Errorf("SecureServing enabled: expected=%v got=%v", want, got)
-			} else if want {
-				// only interested on the port, because we are using always localhost
-				_, port, err := net.SplitHostPort(secureInfo.Listener.Addr().String())
-				if err != nil {
-					t.Fatalf("could not get host and port from %s : %v", secureInfo.Listener.Addr().String(), err)
-				}
-				// use IPv4 because the self-signed cert does not support [::]
-				url := fmt.Sprintf("https://127.0.0.1:%s%s", port, tt.path)
+			req.Header.Set("Accept", tc.acceptHeader)
+			req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+			r, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("failed to GET /statusz: %v", err)
+			}
 
-				// read self-signed server cert disk
-				pool := x509.NewCertPool()
-				serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
-				serverCert, err := os.ReadFile(serverCertPath)
-				if err != nil {
-					t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
-				}
-				pool.AppendCertsFromPEM(serverCert)
-				tr := &http.Transport{
-					TLSClientConfig: &tls.Config{
-						RootCAs: pool,
-					},
-				}
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
 
-				client := &http.Client{Transport: tr}
-				req, err := http.NewRequest(http.MethodGet, url, nil)
-				req.Header.Set("Accept", "text/plain")
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !tt.anonymous {
-					req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
-				}
-				r, err := client.Do(req)
-				if err != nil {
-					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
-				}
+			if err = r.Body.Close(); err != nil {
+				t.Fatalf("failed to close response body: %v", err)
+			}
 
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					t.Fatalf("failed to read response body: %v", err)
-				}
-				defer func() {
-					if err := r.Body.Close(); err != nil {
-						t.Fatalf("Error closing response body: %v", err)
-					}
-				}()
+			if r.StatusCode != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, r.StatusCode)
+			}
 
-				if got, expected := r.StatusCode, *tt.wantSecureCode; got != expected {
-					t.Fatalf("expected http %d at %s of component, got: %d", expected, tt.path, got)
-				}
-
-				bodyStr := string(body)
-
-				if !strings.Contains(bodyStr, "Paths") {
-					t.Error("response does not contain Paths section")
-				}
-
-				var foundPathsRaw []string
-				for line := range strings.SplitSeq(bodyStr, "\n") {
-					if strings.HasPrefix(line, "Paths") {
-						parts := strings.Fields(line)
-						if len(parts) > 1 {
-							foundPathsRaw = parts[1:] // Skip "Paths" label
-						}
-						break
+			if tc.wantStatus == http.StatusOK {
+				if tc.wantBodySub != "" {
+					if !strings.Contains(string(body), tc.wantBodySub) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
 					}
 				}
-
-				expectedPaths := tt.wantPaths
-
-				foundPathsSet := make(map[string]struct{})
-				for _, p := range foundPathsRaw {
-					foundPathsSet[p] = struct{}{}
-				}
-
-				expectedPathsSet := make(map[string]struct{})
-				for _, p := range expectedPaths {
-					expectedPathsSet[p] = struct{}{}
-				}
-
-				if !reflect.DeepEqual(foundPathsSet, expectedPathsSet) {
-					t.Errorf("path mismatch:\n- want: %v\n- got:  %v", expectedPaths, foundPathsRaw)
+				if tc.wantJSON != nil {
+					var got v1alpha1.Statusz
+					if err := json.Unmarshal(body, &got); err != nil {
+						t.Fatalf("error unmarshalling JSON: %v", err)
+					}
+					// Only check static fields, since others are dynamic
+					if got.TypeMeta != tc.wantJSON.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					}
+					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
+					}
+					if diff := cmp.Diff(tc.wantJSON.Paths, got.Paths); diff != "" {
+						t.Errorf("Paths mismatch (-want,+got):\n%s", diff)
+					}
 				}
 			}
 		})
