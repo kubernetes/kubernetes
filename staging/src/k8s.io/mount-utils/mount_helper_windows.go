@@ -20,12 +20,14 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"syscall"
 
+	"golang.org/x/sys/windows"
 	"k8s.io/klog/v2"
 )
 
@@ -84,11 +86,12 @@ func NormalizeWindowsPath(path string) string {
 }
 
 // ValidateDiskNumber : disk number should be a number in [0, 99]
-func ValidateDiskNumber(disk string) error {
-	if _, err := strconv.Atoi(disk); err != nil {
-		return fmt.Errorf("wrong disk number format: %q, err: %v", disk, err)
+func ValidateDiskNumber(disk string) (uint32, error) {
+	n, err := strconv.Atoi(disk)
+	if err != nil {
+		return 0, fmt.Errorf("wrong disk number format: %q, err: %v", disk, err)
 	}
-	return nil
+	return uint32(n), err
 }
 
 // isMountPointMatch determines if the mountpoint matches the dir
@@ -108,4 +111,37 @@ func PathExists(path string) (bool, error) {
 		return true, err
 	}
 	return false, err
+}
+
+// IsMountedFolder checks whether the `path` is a mounted folder.
+func IsMountedFolder(path string) (bool, error) {
+	// https://learn.microsoft.com/en-us/windows/win32/fileio/determining-whether-a-directory-is-a-volume-mount-point
+	utf16Path, _ := windows.UTF16PtrFromString(path)
+	attrs, err := windows.GetFileAttributes(utf16Path)
+	if err != nil {
+		return false, err
+	}
+
+	if (attrs & windows.FILE_ATTRIBUTE_REPARSE_POINT) == 0 {
+		return false, nil
+	}
+
+	var findData windows.Win32finddata
+	findHandle, err := windows.FindFirstFile(utf16Path, &findData)
+	if err != nil && !errors.Is(err, windows.ERROR_NO_MORE_FILES) {
+		return false, err
+	}
+
+	for err == nil {
+		if findData.Reserved0&windows.IO_REPARSE_TAG_MOUNT_POINT != 0 {
+			return true, nil
+		}
+
+		err = windows.FindNextFile(findHandle, &findData)
+		if err != nil && !errors.Is(err, windows.ERROR_NO_MORE_FILES) {
+			return false, err
+		}
+	}
+
+	return false, nil
 }
