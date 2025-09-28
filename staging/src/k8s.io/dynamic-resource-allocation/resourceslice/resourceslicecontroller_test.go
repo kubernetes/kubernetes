@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/dynamic-resource-allocation/internal/workqueue"
@@ -1030,6 +1031,139 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedError: `create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceBindingConditions`,
 		},
+		"detect-resource-pools-with-duplicate-counter-sets": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								SharedCounters: []resourceapi.CounterSet{
+									{
+										Name: "counterset",
+									},
+								},
+							},
+							{
+								SharedCounters: []resourceapi.CounterSet{
+									{
+										Name: "counterset",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 0,
+			},
+			expectedError: `pool validation failed: found duplicate counter set "counterset" in pool "pool"`,
+		},
+		"detect-duplicate-devices": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								Devices: []resourceapi.Device{
+									{
+										Name: deviceName,
+									},
+								},
+							},
+							{
+								Devices: []resourceapi.Device{
+									{
+										Name: deviceName,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 0,
+			},
+			expectedError: `pool validation failed: found duplicate device "device" in pool "pool"`,
+		},
+		"detect-device-referencing-unknown-counter-set": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								Devices: []resourceapi.Device{
+									{
+										Name: deviceName,
+										ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+											{
+												CounterSet: "counterset",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 0,
+			},
+			expectedError: `pool validation failed: counter set "counterset" referenced by device "device" not found`,
+		},
+		"detect-device-referencing-unknown-counter-in-counter-set": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								SharedCounters: []resourceapi.CounterSet{
+									{
+										Name: "counterset",
+										Counters: map[string]resourceapi.Counter{
+											"memory": {
+												Value: resource.MustParse("8Gi"),
+											},
+										},
+									},
+								},
+							},
+							{
+								Devices: []resourceapi.Device{
+									{
+										Name: "device",
+										ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+											{
+												CounterSet: "counterset",
+												Counters: map[string]resourceapi.Counter{
+													"cpu": {
+														Value: resource.MustParse("4"),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 0,
+			},
+			expectedError: `pool validation failed: counter "cpu" referenced by device "device" not found in counter set "counterset"`,
+		},
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -1115,32 +1249,46 @@ func TestControllerSyncPool(t *testing.T) {
 				assert.Equal(t, test.expectedStats, ctrl.GetStats(), "statistics after re-sync")
 			}
 
+			// Dedup the list of errors since we synced the pool twice.
+			var dedupedControllerErrors []error
+			errorMsgs := sets.New[string]()
+			for _, err := range controllerErrors {
+				errorMsg := err.Error()
+				if errorMsgs.Has(errorMsg) {
+					continue
+				}
+				errorMsgs.Insert(errorMsg)
+				dedupedControllerErrors = append(dedupedControllerErrors, err)
+			}
+
 			ctrl.Stop()
 			switch {
-			case test.expectedError != "" && len(controllerErrors) == 0:
+			case test.expectedError != "" && len(dedupedControllerErrors) == 0:
 				t.Errorf("expected error, got none: %s", test.expectedError)
-			case test.expectedError == "" && len(controllerErrors) > 0:
+			case test.expectedError == "" && len(dedupedControllerErrors) > 0:
 				t.Errorf("expected no error, got:\n  %s", strings.Join(formatErrors(controllerErrors), "\n  "))
-			case test.expectedError != "" && len(controllerErrors) != 1:
-				t.Errorf("expected one error %q, got:\n  %s", test.expectedError, strings.Join(formatErrors(controllerErrors), "\n  "))
+			case test.expectedError != "" && len(dedupedControllerErrors) != 1:
+				t.Errorf("expected one error %q, got:\n  %s", test.expectedError, strings.Join(formatErrors(dedupedControllerErrors), "\n  "))
 			case test.expectedError != "":
-				assert.Equal(t, test.expectedError, controllerErrors[0].Error())
+				assert.Equal(t, test.expectedError, dedupedControllerErrors[0].Error())
 			}
 		})
+	}
+}
+
+func formatError(err error) string {
+	var droppedFields *DroppedFieldsError
+	if errors.As(err, &droppedFields) {
+		return fmt.Sprintf("%v\n%s", err, cmp.Diff(droppedFields.DesiredSlice.Spec, droppedFields.ActualSlice.Spec))
+	} else {
+		return err.Error()
 	}
 }
 
 func formatErrors(errs []error) []string {
 	var errMsgs []string
 	for _, err := range errs {
-		var droppedFields *DroppedFieldsError
-		var errMsg string
-		if errors.As(err, &droppedFields) {
-			errMsg = fmt.Sprintf("%v\n%s", err, cmp.Diff(droppedFields.DesiredSlice.Spec, droppedFields.ActualSlice.Spec))
-		} else {
-			errMsg = err.Error()
-		}
-		errMsgs = append(errMsgs, errMsg)
+		errMsgs = append(errMsgs, formatError(err))
 	}
 	return errMsgs
 }
