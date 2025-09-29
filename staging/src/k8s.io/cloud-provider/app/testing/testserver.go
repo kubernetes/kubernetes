@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"strings"
+	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -71,14 +71,15 @@ type TestServer struct {
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
-func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
-	return StartTestServerWithOptions(ctx, customFlags, app.DefaultInitFuncConstructors, names.CCMControllerAliases())
+func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (result TestServer, err error) {
+	return StartTestServerWithOptions(t, ctx, customFlags, app.DefaultInitFuncConstructors, names.CCMControllerAliases())
 }
 
 // StartTestServerWithOptions starts a cloud-controller-manager with extra controller loop initializer constructors
 // and controller loop aliaes. Within the returned TestServer, a rest client config, a tear-down func,
 // and location of the tmpdir are returned; or an error if one occurred.
-func StartTestServerWithOptions(ctx context.Context,
+func StartTestServerWithOptions(t *testing.T,
+	ctx context.Context,
 	customFlags []string,
 	constructors map[string]app.ControllerInitFuncConstructor,
 	aliases map[string]string) (result TestServer, err error) {
@@ -98,9 +99,6 @@ func StartTestServerWithOptions(ctx context.Context,
 				klog.Errorf("Failed to shutdown test server clearly: %v", err)
 			}
 		}
-		if len(result.TmpDir) != 0 {
-			os.RemoveAll(result.TmpDir)
-		}
 	}
 	defer func() {
 		if result.TearDownFn == nil {
@@ -108,10 +106,7 @@ func StartTestServerWithOptions(ctx context.Context,
 		}
 	}()
 
-	result.TmpDir, err = os.MkdirTemp("", "cloud-controller-manager")
-	if err != nil {
-		return result, fmt.Errorf("failed to create temp dir: %v", err)
-	}
+	result.TmpDir = t.TempDir()
 
 	// Do not run leader election.
 	s, err := options.NewCloudControllerManagerOptions()
@@ -241,13 +236,12 @@ func StartTestServerWithOptions(ctx context.Context,
 }
 
 // StartTestServerOrDie calls StartTestServer panic if it does not succeed.
-func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
-	result, err := StartTestServer(ctx, flags)
-	if err == nil {
-		return &result
+func StartTestServerOrDie(t *testing.T, ctx context.Context, flags []string) *TestServer {
+	result, err := StartTestServer(t, ctx, flags)
+	if err != nil {
+		t.Fatalf("failed to launch server: %v", err)
 	}
-
-	panic(fmt.Errorf("failed to launch server: %v", err))
+	return &result
 }
 
 func createListenerOnFreePort() (net.Listener, int, error) {

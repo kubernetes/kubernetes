@@ -282,7 +282,7 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 
 	kubeConfigFile := createKubeConfigFileForRestConfig(t, server.ClientConfig)
 
-	kcm := kubecontrollermanagertesting.StartTestServerOrDie(ctx, []string{
+	kcm := kubecontrollermanagertesting.StartTestServerOrDie(t, ctx, []string{
 		"--kubeconfig=" + kubeConfigFile,
 		"--controllers=garbagecollector,svm",     // these are the only controllers needed for this test
 		"--use-service-account-credentials=true", // exercise RBAC of SVM controller
