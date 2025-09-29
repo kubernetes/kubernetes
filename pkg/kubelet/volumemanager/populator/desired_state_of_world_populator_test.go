@@ -615,12 +615,11 @@ func TestEphemeralVolumeOwnerCheck(t *testing.T) {
 	if dswp.pods.processedPods[podName] {
 		t.Fatalf("%s should not have been processed by the populator", podName)
 	}
-	require.Equal(t,
-		[]string{fmt.Sprintf("PVC %s/%s was not created for pod %s/%s (pod is not owner)",
+	require.EqualError(t, dswp.desiredStateOfWorld.PopPodError(podName),
+		fmt.Sprintf("PVC %s/%s was not created for pod %s/%s (pod is not owner)",
 			pvc.Namespace, pvc.Name,
 			pod.Namespace, pod.Name,
-		)},
-		dswp.desiredStateOfWorld.PopPodErrors(podName),
+		),
 	)
 }
 

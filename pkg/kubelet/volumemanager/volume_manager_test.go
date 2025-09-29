@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -330,12 +331,10 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 
 	require.Error(t, err, "Expected an error but got none")
 
-	var attachErr *VolumeAttachLimitExceededError
-	require.ErrorAs(t, err, &attachErr, "Error should be of type VolumeAttachLimitExceededError")
-	require.Equal(t, []string{"vol1"}, attachErr.UnmountedVolumes, "UnmountedVolumes mismatch")
-	require.Equal(t, []string{"vol1"}, attachErr.UnattachedVolumes, "UnattachedVolumes mismatch")
-	require.Empty(t, attachErr.VolumesNotInDSW, "VolumesNotInDSW should be empty")
-	require.ErrorIs(t, attachErr.OriginalError, context.DeadlineExceeded, "OriginalError should be context.DeadlineExceeded")
+	var attachErr *RejectingPodError
+	require.ErrorAs(t, err, &attachErr, "Error should be of type PredicateFailureError")
+	assert.Equal(t, VolumeAttachmentLimitExceededReason, attachErr.Reason)
+	assert.Equal(t, "Node has reached its volume attachment limit", attachErr.Desc)
 }
 
 func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
