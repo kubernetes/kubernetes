@@ -1209,8 +1209,8 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 	var numWatches atomic.Int32
 	clientSet.PrependWatchReactor("*", func(action core.Action) (handled bool, ret watch.Interface, err error) {
 		var opts metav1.ListOptions
-		if watchActcion, ok := action.(core.WatchActionImpl); ok {
-			opts = watchActcion.ListOptions
+		if watchAction, ok := action.(core.WatchActionImpl); ok {
+			opts = watchAction.ListOptions
 		}
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
