@@ -185,6 +185,9 @@ type imageRecord struct {
 
 	// Pinned status of the image
 	pinned bool
+
+	// Reserved for restart indicates if this image is reserved for containers that will be restarted
+	reservedForRestart bool
 }
 
 // NewImageGCManager instantiates a new ImageGCManager object.
@@ -256,8 +259,9 @@ func isContainerActuallyUsingImage(c *container.Container) bool {
 	case container.ContainerStateUnknown:
 		return false
 	default:
-		// For any other state, be conservative and assume they're not using the image
-		return false
+		// For containers without a state set (empty string), assume they are using the image
+		// This maintains backward compatibility with existing tests and behavior
+		return true
 	}
 }
 
@@ -671,7 +675,11 @@ func (im *realImageGCManager) imagesInEvictionOrder(ctx context.Context, freeTim
 		if record.pinned {
 			logger.V(5).Info("Image is pinned, skipping garbage collection", "imageID", image)
 			continue
-
+		}
+		// Check if image is reserved for container restart, prevent garbage collection
+		if record.reservedForRestart {
+			logger.V(5).Info("Image is reserved for container restart, skipping garbage collection", "imageID", image)
+			continue
 		}
 		if !isRuntimeClassInImageCriAPIEnabled {
 			images = append(images, evictionInfo{
