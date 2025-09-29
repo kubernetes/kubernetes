@@ -3274,11 +3274,6 @@ func validateInitContainerRestartPolicy(restartPolicy *core.ContainerRestartPoli
 	}
 	if opts.AllowContainerRestartPolicyRules {
 		switch *restartPolicy {
-		case core.ContainerRestartPolicyAlways:
-			// Sidecar containers should not have restart policy rules
-			if len(restartRules) > 0 {
-				allErrors = append(allErrors, field.Forbidden(fldPath.Child("restartPolicyRules"), "restartPolicyRules are not allowed for init containers with restart policy Always"))
-			}
 		default:
 			allErrors = append(allErrors, validateContainerRestartPolicy(restartPolicy, restartRules, fldPath)...)
 		}
@@ -3613,6 +3608,11 @@ var supportedContainerRestartPolicies = sets.New(
 	core.ContainerRestartPolicyOnFailure,
 )
 
+var supportedContainerRestartRuleActions = sets.New(
+	core.ContainerRestartRuleActionRestart,
+	core.ContainerRestartRuleActionRestartPod,
+)
+
 var supportedContainerRestartPolicyOperators = sets.New(
 	core.ContainerRestartRuleOnExitCodesOpIn,
 	core.ContainerRestartRuleOnExitCodesOpNotIn,
@@ -3638,10 +3638,8 @@ func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules [
 	}
 	for i, rule := range rules {
 		policyRulesFld := fldPath.Child("restartPolicyRules").Index(i)
-
-		if rule.Action != core.ContainerRestartRuleActionRestart {
-			validActions := []core.ContainerRestartRuleAction{core.ContainerRestartRuleActionRestart}
-			allErrs = append(allErrs, field.NotSupported(policyRulesFld.Child("action"), rule.Action, validActions))
+		if !supportedContainerRestartRuleActions.Has(rule.Action) {
+			allErrs = append(allErrs, field.NotSupported(policyRulesFld.Child("action"), rule.Action, sets.List(supportedContainerRestartRuleActions)))
 		}
 
 		if rule.ExitCodes != nil {
@@ -5743,11 +5741,11 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 }
 
 // ValidateContainerStateTransition test to if any illegal container state transitions are being attempted
-func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerStatus, fldPath *field.Path, podSpec core.PodSpec) field.ErrorList {
+func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerStatus, fldPath *field.Path, pod core.Pod) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-		v1PodSpec := &v1.PodSpec{}
-		err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&podSpec, v1PodSpec, nil)
+		v1Pod := &v1.Pod{}
+		err := corev1.Convert_core_Pod_To_v1_Pod(&pod, v1Pod, nil)
 		if err != nil {
 			allErrs = append(allErrs, field.InternalError(fldPath, fmt.Errorf("invalid %q: %v", fldPath, err.Error())))
 		}
@@ -5759,9 +5757,9 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 			for _, newStatus := range newStatuses {
 				if newStatus.Name == oldStatus.Name && newStatus.State.Terminated == nil {
 					allowed := false
-					for _, c := range v1PodSpec.Containers {
+					for _, c := range v1Pod.Spec.Containers {
 						if c.Name == oldStatus.Name {
-							allowed = podutil.ContainerShouldRestart(c, *v1PodSpec, oldStatus.State.Terminated.ExitCode)
+							allowed = podutil.ContainerShouldRestart(c, *v1Pod, oldStatus.State.Terminated.ExitCode)
 							break
 						}
 					}
@@ -5774,7 +5772,7 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 		}
 		return allErrs
 	}
-	restartPolicy := podSpec.RestartPolicy
+	restartPolicy := pod.Spec.RestartPolicy
 	// If we should always restart, containers are allowed to leave the terminated state
 	if restartPolicy == core.RestartPolicyAlways {
 		return allErrs
@@ -5798,8 +5796,19 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 }
 
 // ValidateInitContainerStateTransition test to if any illegal init container state transitions are being attempted
-func ValidateInitContainerStateTransition(newStatuses, oldStatuses []core.ContainerStatus, fldpath *field.Path, podSpec *core.PodSpec) field.ErrorList {
+func ValidateInitContainerStateTransition(newStatuses, oldStatuses []core.ContainerStatus, fldpath *field.Path, pod core.Pod) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+		v1PodStatus := &v1.PodStatus{}
+		err := corev1.Convert_core_PodStatus_To_v1_PodStatus(&pod.Status, v1PodStatus, nil)
+		if err != nil {
+			allErrs = append(allErrs, field.InternalError(fldpath, fmt.Errorf("invalid %q: %v", fldpath, err.Error())))
+		}
+		if podutil.PodRestartInPlace(*v1PodStatus) {
+			return allErrs
+		}
+	}
+	podSpec := pod.Spec
 	// If we should always restart, containers are allowed to leave the terminated state
 	if podSpec.RestartPolicy == core.RestartPolicyAlways {
 		return allErrs
@@ -5896,8 +5905,8 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	//
 	// If pod should not restart, make sure the status update does not transition
 	// any terminated containers to a non-terminated state.
-	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.ContainerStatuses, oldPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), oldPod.Spec)...)
-	allErrs = append(allErrs, ValidateInitContainerStateTransition(newPod.Status.InitContainerStatuses, oldPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), &oldPod.Spec)...)
+	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.ContainerStatuses, oldPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), *oldPod)...)
+	allErrs = append(allErrs, ValidateInitContainerStateTransition(newPod.Status.InitContainerStatuses, oldPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), *oldPod)...)
 	allErrs = append(allErrs, ValidateEphemeralContainerStateTransition(newPod.Status.EphemeralContainerStatuses, oldPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"))...)
 	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
 	allErrs = append(allErrs, validatePodExtendedResourceClaimStatus(newPod.Status.ExtendedResourceClaimStatus, &newPod.Spec, fldPath.Child("extendedResourceClaimStatus"))...)

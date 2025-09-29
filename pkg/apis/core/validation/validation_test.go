@@ -29420,8 +29420,10 @@ func TestValidateContainerStateTransition(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
-
-			errs := ValidateContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), tc.podSpec)
+			pod := core.Pod{
+				Spec: tc.podSpec,
+			}
+			errs := ValidateContainerStateTransition(tc.newStatuses, tc.oldStatuses, field.NewPath("field"), pod)
 
 			if tc.expectErr && len(errs) == 0 {
 				t.Errorf("Unexpected success")

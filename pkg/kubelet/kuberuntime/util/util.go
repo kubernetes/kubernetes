@@ -20,8 +20,11 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -63,6 +66,14 @@ func PodSandboxChanged(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, u
 	if !kubecontainer.IsHostNetworkPod(pod) && sandboxStatus.Network != nil && sandboxStatus.Network.Ip == "" {
 		logger.V(2).Info("Sandbox for pod has no IP address. Need to start a new one", "pod", klog.KObj(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
+	}
+
+	// Needs to create a new sandbox when the pod is marked for in-place restart
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+		if podutil.PodRestartInPlace(pod.Status) {
+			logger.V(2).Info("Pod marked for in-place restart.", "pod", klog.KObj(pod))
+			return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
+		}
 	}
 
 	return false, sandboxStatus.Metadata.Attempt, sandboxStatus.Id

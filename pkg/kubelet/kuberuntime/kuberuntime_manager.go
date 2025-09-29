@@ -1014,9 +1014,51 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		ContainersToKill:  make(map[kubecontainer.ContainerID]containerToKillInfo),
 	}
 
+	// Needs to create a new sandbox when the pod is marked for in-place restart
+	// if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+	// 	if podutil.PodRestartInPlace(pod.Status) {
+	// 		logger.V(2).Info("Pod marked for in-place restart.", "pod", klog.KObj(pod))
+	// 		changes.KillPod = false
+	// 		changes.CreateSandbox = false
+	// 		for idx, initContainer := range pod.Spec.InitContainers {
+	// 			containerStatus := podStatus.FindContainerStatusByName(initContainer.Name)
+	// 			if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateExited {
+	// 				changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
+	// 					name:      containerStatus.Name,
+	// 					container: &pod.Spec.InitContainers[idx],
+	// 					message: fmt.Sprintf("Container is in %q state, try killing it before restart",
+	// 						containerStatus.State),
+	// 					reason: reasonUnknown,
+	// 				}
+	// 			}
+	// 		}
+	// 		for idx, container := range pod.Spec.Containers {
+	// 			containerStatus := podStatus.FindContainerStatusByName(container.Name)
+	// 			if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateExited {
+	// 				changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
+	// 					name:      containerStatus.Name,
+	// 					container: &pod.Spec.Containers[idx],
+	// 					message: fmt.Sprintf("Container is in %q state, try killing it before restart",
+	// 						containerStatus.State),
+	// 					reason: reasonUnknown,
+	// 				}
+	// 			}
+	// 		}
+	// 		return changes
+	// 	}
+	// }
+
 	// If we need to (re-)create the pod sandbox, everything will need to be
 	// killed and recreated, and init containers should be purged.
 	if createPodSandbox {
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+			// For in-place restarts, all containers will be restarted.
+			if podutil.PodRestartInPlace(pod.Status) {
+				changes.CreateSandbox = false
+				return changes
+			}
+		}
+
 		if !shouldRestartOnFailure(pod) && attempt != 0 && len(podStatus.ContainerStatuses) != 0 {
 			// Should not restart the pod, just return.
 			// we should not create a sandbox, and just kill the pod if it is already done.

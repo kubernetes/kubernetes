@@ -416,9 +416,14 @@ func IsContainerRestartable(pod v1.PodSpec, container v1.Container) bool {
 // First, the container-level restartPolicyRules are evaluated in order. An action is taken if any
 // rules are matched. Second, the container-level restart policy is used. Lastly, if no container
 // level policy are specified, pod-level restart policy is used.
-func ContainerShouldRestart(container v1.Container, pod v1.PodSpec, exitCode int32) bool {
+func ContainerShouldRestart(container v1.Container, pod v1.Pod, exitCode int32) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+		if PodRestartInPlace(pod.Status) {
+			return true
+		}
+	}
 	if container.RestartPolicy != nil {
-		rule, ok := findMatchingContainerRestartRule(container, exitCode)
+		rule, ok := FindMatchingContainerRestartRule(container, exitCode)
 		if ok {
 			switch rule.Action {
 			case v1.ContainerRestartRuleActionRestart:
@@ -441,7 +446,7 @@ func ContainerShouldRestart(container v1.Container, pod v1.PodSpec, exitCode int
 		}
 	}
 
-	switch pod.RestartPolicy {
+	switch pod.Spec.RestartPolicy {
 	case v1.RestartPolicyAlways:
 		return true
 	case v1.RestartPolicyOnFailure:
@@ -454,10 +459,10 @@ func ContainerShouldRestart(container v1.Container, pod v1.PodSpec, exitCode int
 	}
 }
 
-// findMatchingContainerRestartRule returns a rule and true if the exitCode matched
+// FindMatchingContainerRestartRule returns a rule and true if the exitCode matched
 // one of the restart rules for the given container. Returns and empty rule and
 // false if no rules matched.
-func findMatchingContainerRestartRule(container v1.Container, exitCode int32) (rule v1.ContainerRestartRule, found bool) {
+func FindMatchingContainerRestartRule(container v1.Container, exitCode int32) (rule v1.ContainerRestartRule, found bool) {
 	for _, rule := range container.RestartPolicyRules {
 		if rule.ExitCodes != nil {
 			exitCodeMatched := false
@@ -481,6 +486,15 @@ func findMatchingContainerRestartRule(container v1.Container, exitCode int32) (r
 		}
 	}
 	return v1.ContainerRestartRule{}, false
+}
+
+func PodRestartInPlace(podStatus v1.PodStatus) bool {
+	for _, cond := range podStatus.Conditions {
+		if cond.Type == v1.PodRestartInPlace && cond.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 // CalculatePodStatusObservedGeneration calculates the observedGeneration for the pod status.

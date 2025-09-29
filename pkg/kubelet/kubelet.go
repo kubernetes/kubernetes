@@ -1959,6 +1959,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Generate final API pod status with pod and status manager status
+	// todo: remove this comment; PodCondition is calculated here
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, false)
 	// The pod IP may be changed in generateAPIPodStatus if the pod is using host network. (See #24576)
 	// TODO(random-liu): After writing pod spec into container labels, check whether pod is using host network, and
@@ -2075,6 +2076,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		klog.ErrorS(err, "Unable to make pod data directories for pod", "pod", klog.KObj(pod))
 		return false, err
 	}
+
+	// TODO: handle data volume here.
 
 	// Wait for volumes to attach/mount
 	if err := kl.volumeManager.WaitForAttachAndMount(ctx, pod); err != nil {
