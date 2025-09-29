@@ -2268,7 +2268,8 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 	allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 
 	// Allow setting NodeAffinity if oldPv NodeAffinity was not set
-	if oldPv.Spec.NodeAffinity != nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MutablePVNodeAffinity) &&
+		oldPv.Spec.NodeAffinity != nil {
 		allErrs = append(allErrs, validatePvNodeAffinity(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
 	}
 

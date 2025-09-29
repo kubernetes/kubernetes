@@ -1240,9 +1240,10 @@ func multipleVolumeNodeAffinity(terms [][]topologyPair) *core.VolumeNodeAffinity
 
 func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 	scenarios := map[string]struct {
-		isExpectedFailure bool
-		oldPV             *core.PersistentVolume
-		newPV             *core.PersistentVolume
+		mutablePVNodeAffinity bool
+		isExpectedFailure     bool
+		oldPV                 *core.PersistentVolume
+		newPV                 *core.PersistentVolume
 	}{
 		"nil-nothing-changed": {
 			isExpectedFailure: false,
@@ -1507,9 +1508,16 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "-1")),
 			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceTypeStable, "-1")),
 		},
+		"MutablePVNodeAffinity": {
+			mutablePVNodeAffinity: true,
+			isExpectedFailure:     false,
+			oldPV:                 testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+			newPV:                 testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "baz")),
+		},
 	}
 
 	for name, scenario := range scenarios {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePVNodeAffinity, scenario.mutablePVNodeAffinity)
 		originalNewPV := scenario.newPV.DeepCopy()
 		originalOldPV := scenario.oldPV.DeepCopy()
 		opts := ValidationOptionsForPersistentVolume(scenario.newPV, scenario.oldPV)
