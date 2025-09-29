@@ -120,6 +120,7 @@ func setupTest(ctx context.Context, customReconciler func(string, string, runtim
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			return tracker.Watch(fakeGVR, "")
 		},
+		UnsupportedWatchListSemantics: true,
 	}, &unstructured.Unstructured{}, 30*time.Second, nil)}
 
 	reconciler := func(namespace, name string, newObj *unstructured.Unstructured) error {
