@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -131,6 +132,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			return newBytes, nil
 		})
 		gomega.Expect(patchedPDB.Spec.MinAvailable.String()).To(gomega.Equal("3%"))
+		gomega.Expect(resourceversion.CompareResourceVersion(updatedPDB.ResourceVersion, patchedPDB.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		deletePDBOrDie(ctx, cs, ns, defaultName)
 	})

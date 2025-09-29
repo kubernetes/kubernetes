@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -132,6 +133,7 @@ var _ = SIGDescribe("Lease", func() {
 		if !apiequality.Semantic.DeepEqual(patchedLease.Spec, readLease.Spec) {
 			framework.Failf("Leases don't match. Diff (- for expected, + for actual):\n%s", cmp.Diff(patchedLease.Spec, readLease.Spec))
 		}
+		gomega.Expect(resourceversion.CompareResourceVersion(createdLease.ResourceVersion, readLease.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		name2 := "lease2"
 		lease2 := &coordinationv1.Lease{

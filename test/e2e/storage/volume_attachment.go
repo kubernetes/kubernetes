@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -71,6 +72,7 @@ var _ = utils.SIGDescribe("VolumeAttachment", func() {
 			patchedVA, err := vaClient.Patch(ctx, retrievedVA.Name, types.MergePatchType, []byte(payload), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "failed to patch PV %q", firstVA)
 			gomega.Expect(patchedVA.Labels).To(gomega.HaveKeyWithValue(patchedVA.Name, "patched"), "Checking that patched label has been applied")
+			gomega.Expect(resourceversion.CompareResourceVersion(retrievedVA.ResourceVersion, patchedVA.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 			patchedSelector := labels.Set{patchedVA.Name: "patched"}.AsSelector().String()
 			ginkgo.By(fmt.Sprintf("List VolumeAttachments with %q label", patchedSelector))

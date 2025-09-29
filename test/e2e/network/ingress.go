@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
@@ -202,6 +203,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ginkgo.By("patching")
 		patchedIngress, err := ingClient.Patch(ctx, createdIngress.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
+		gomega.Expect(resourceversion.CompareResourceVersion(createdIngress.ResourceVersion, patchedIngress.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 		gomega.Expect(patchedIngress.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")

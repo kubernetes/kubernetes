@@ -21,11 +21,13 @@ import (
 	"net/netip"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -242,7 +244,7 @@ var _ = common.SIGDescribe("ServiceCIDR and IPAddress API", func() {
 		}
 
 		ginkgo.By("creating")
-		_, err := f.ClientSet.NetworkingV1().IPAddresses().Create(ctx, ip, metav1.CreateOptions{})
+		createdIP, err := f.ClientSet.NetworkingV1().IPAddresses().Create(ctx, ip, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("unexpected error getting IPAddress: %v", err)
 		}
@@ -259,6 +261,7 @@ var _ = common.SIGDescribe("ServiceCIDR and IPAddress API", func() {
 		if v, ok := patchedIP.Annotations["patched"]; !ok || v != "true" {
 			framework.Failf("patched object should have the applied annotation")
 		}
+		gomega.Expect(resourceversion.CompareResourceVersion(createdIP.ResourceVersion, patchedIP.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		var ipToUpdate, updatedIP *networkingv1.IPAddress

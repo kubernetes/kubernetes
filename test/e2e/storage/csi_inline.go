@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -214,6 +215,7 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		patchedCSIDriver, err := client.Patch(ctx, createdDriver2.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch CSIDriver %q", createdDriver2.Name)
 		gomega.Expect(patchedCSIDriver.Labels[createdDriver2.Name]).To(gomega.ContainSubstring("patched"), "Checking that patched label has been applied")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdDriver2.ResourceVersion, patchedCSIDriver.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By(fmt.Sprintf("Updating the CSIDriver %q", createdDriver2.Name))
 		var updatedCSIDriver *storagev1.CSIDriver
