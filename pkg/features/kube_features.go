@@ -120,6 +120,14 @@ const (
 	// Enables kubelet to detect CSI volume condition and send the event of the abnormal volume to the corresponding pod that is using it.
 	CSIVolumeHealth featuregate.Feature = "CSIVolumeHealth"
 
+	// owner: @yongruilin
+	// alpha: v1.35
+	//
+	// Enables stricter validation for CertificateSigningRequest conditions.
+	// When enabled, duplicate conditions are only tolerated on updates if the entire conditions list is unchanged.
+	// This aligns handwritten validation with declarative validation ratcheting behavior.
+	CSRStrictConditionUniquenessOnUpdate featuregate.Feature = "CSRStrictConditionUniquenessOnUpdate"
+
 	// owner: @sanposhiho @wojtek-t
 	// kep: https://kep.k8s.io/5278
 	//
@@ -1087,6 +1095,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	CPUManagerPolicyBetaOptions: {
 		{Version: version.MustParse("1.23"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	CSRStrictConditionUniquenessOnUpdate: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	CPUManagerPolicyOptions: {
