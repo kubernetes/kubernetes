@@ -159,27 +159,27 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	// Make an informer for our policies and bindings
 
 	policyInformer := cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return policiesAndBindingsTracker.List(fakePolicyGVR, fakePolicyGVK, "")
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return policiesAndBindingsTracker.Watch(fakePolicyGVR, "")
 			},
-		},
+		}, policiesAndBindingsTracker),
 		Pexample,
 		30*time.Second,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	bindingInformer := cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return policiesAndBindingsTracker.List(fakeBindingGVR, fakeBindingGVK, "")
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return policiesAndBindingsTracker.Watch(fakeBindingGVR, "")
 			},
-		},
+		}, policiesAndBindingsTracker),
 		Bexample,
 		30*time.Second,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
