@@ -294,12 +294,12 @@ func willContainerRestart(c *container.Container) bool {
 func (im *realImageGCManager) reserveImageForRestart(imageID, runtimeHandler string, isRuntimeClassInImageCriAPIEnabled bool) {
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
-	
+
 	imageKey := imageID
 	if isRuntimeClassInImageCriAPIEnabled {
 		imageKey = getImageTuple(imageID, runtimeHandler)
 	}
-	
+
 	if record, exists := im.imageRecords[imageKey]; exists {
 		record.reservedForRestart = true
 		record.lastUsed = time.Now() // Update last used time to prevent immediate GC
@@ -310,7 +310,7 @@ func (im *realImageGCManager) reserveImageForRestart(imageID, runtimeHandler str
 func (im *realImageGCManager) clearReservationsForImagesInUse(imagesInUse sets.Set[string]) {
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
-	
+
 	for imageKey := range im.imageRecords {
 		if isImageUsed(imageKey, imagesInUse) {
 			if record, exists := im.imageRecords[imageKey]; exists && record.reservedForRestart {
@@ -339,10 +339,10 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 		for _, container := range pod.Containers {
 			// Check if container is actually using the image
 			containerUsingImage := isContainerActuallyUsingImage(container)
-			
+
 			// Check if container will be restarted (needs image reservation)
 			containerWillRestart := willContainerRestart(container)
-			
+
 			if containerUsingImage {
 				// Container is actively using the image - mark as in use
 				if err := im.handleImageVolumes(ctx, imagesInUse, container, pod, images); err != nil {
@@ -359,12 +359,12 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 				}
 			} else if containerWillRestart {
 				// Container is not using the image but will be restarted - reserve the image
-				logger.V(5).Info("Reserving image for container restart", 
+				logger.V(5).Info("Reserving image for container restart",
 					"pod", klog.KRef(pod.Namespace, pod.Name),
 					"containerName", container.Name,
 					"containerState", container.State,
 					"imageID", container.ImageID)
-				
+
 				// Mark image as reserved for restart
 				im.reserveImageForRestart(container.ImageID, container.ImageRuntimeHandler, isRuntimeClassInImageCriAPIEnabled)
 			} else {
