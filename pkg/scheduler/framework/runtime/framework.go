@@ -18,6 +18,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -69,6 +70,7 @@ type frameworkImpl struct {
 	bindPlugins          []fwk.BindPlugin
 	postBindPlugins      []fwk.PostBindPlugin
 	permitPlugins        []fwk.PermitPlugin
+	batchablePlugins     []fwk.SignPlugin
 
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
@@ -94,6 +96,8 @@ type frameworkImpl struct {
 	apiCacher     fwk.APICacher
 
 	parallelizer fwk.Parallelizer
+
+	enableSignatures bool
 }
 
 // extensionPoint encapsulates desired and applied set of plugins at a specific extension
@@ -418,6 +422,11 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		}
 	}
 
+	err := f.computeBatchablePlugins()
+	if err != nil {
+		return nil, err
+	}
+
 	if options.captureProfile != nil {
 		if len(outputProfile.PluginConfig) != 0 {
 			sort.Slice(outputProfile.PluginConfig, func(i, j int) bool {
@@ -736,6 +745,95 @@ func (f *frameworkImpl) QueueSortFunc() fwk.LessFunc {
 
 	// Only one QueueSort plugin can be enabled.
 	return f.queueSortPlugins[0].Less
+}
+
+// If any of our preFilter, filter, preScore or score plugins haven't
+// implemented a signature, then disable the cache.
+func (f *frameworkImpl) computeBatchablePlugins() error {
+	f.enableSignatures = true
+
+	// Get all plugins of compatible types.
+	candidatePlugins := []fwk.Plugin{}
+	for _, pl := range f.preFilterPlugins {
+		candidatePlugins = append(candidatePlugins, pl)
+	}
+	for _, pl := range f.filterPlugins {
+		candidatePlugins = append(candidatePlugins, pl)
+	}
+	for _, pl := range f.preScorePlugins {
+		candidatePlugins = append(candidatePlugins, pl)
+	}
+	for _, pl := range f.scorePlugins {
+		candidatePlugins = append(candidatePlugins, pl)
+	}
+
+	// Get signature elements from plugins.
+	plugins := map[string]fwk.SignPlugin{}
+	unsupportedPlugins := sets.New[string]()
+	for _, pl := range candidatePlugins {
+		if _, found := plugins[pl.Name()]; !found {
+			if _, implements := pl.(fwk.SignPlugin); implements {
+				f.batchablePlugins = append(f.batchablePlugins, pl.(fwk.SignPlugin))
+			} else {
+				unsupportedPlugins.Insert(pl.Name())
+				f.enableSignatures = false
+			}
+		}
+	}
+
+	if !f.enableSignatures {
+		f.logger.Info("Disabling signatures for profile because plugins do not support it.",
+			"profile", f.profileName, "plugins", unsupportedPlugins.UnsortedList())
+	}
+
+	for _, plugin := range plugins {
+		f.batchablePlugins = append(f.batchablePlugins, plugin)
+	}
+
+	return nil
+}
+
+// SignPod returns a signature for a given pod. Any two pods with the same signature should get
+// the same feasibility and scoring for the same set of nodes in the same state. If one or more plugins
+// is unable to construct a signature for the pod, the result will have "Signable" set to false, which means
+// there is no way to compare this pod against others, and will turn off a number of optimizations
+// for this pod.
+func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, *fwk.Status) {
+	logger := klog.FromContext(ctx)
+
+	if !f.enableSignatures {
+		return fwk.Unsignable, nil
+	}
+
+	sig := map[string]any{
+		fwk.SchedulerNameSignerName: pod.Spec.SchedulerName,
+	}
+
+	for _, plugin := range f.batchablePlugins {
+		startTime := time.Now()
+		fragments, status := plugin.SignPod(ctx, pod)
+		f.metricsRecorder.ObservePluginDurationAsync(metrics.Sign, plugin.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
+
+		if !status.IsSuccess() {
+			if status.Code() == fwk.Error {
+				logger.V(4).Info("SignPod failed for plugin", "plugin", plugin.Name(), "error", status.AsError())
+			}
+			return fwk.Unsignable, fwk.NewStatus(fwk.Success)
+		}
+
+		for _, elem := range fragments {
+			sig[elem.Key] = elem.Value
+		}
+	}
+
+	startTime := time.Now()
+	sigBytes, err := json.Marshal(sig)
+	if err != nil {
+		return "", fwk.AsStatus(fmt.Errorf("error marshalling signature object %w", err))
+	}
+	f.metricsRecorder.ObservePluginDurationAsync(metrics.Sign, "_Json", "Success", metrics.SinceInSeconds(startTime))
+
+	return string(sigBytes), nil
 }
 
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
