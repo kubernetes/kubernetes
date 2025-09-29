@@ -25,6 +25,7 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	typedeventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
@@ -99,7 +100,7 @@ var _ = common.SIGDescribe("Events API", func() {
 		eventName := "event-test"
 
 		ginkgo.By("creating a test event")
-		_, err := client.Create(ctx, newTestEvent(f.Namespace.Name, eventName, "testevent-constant"), metav1.CreateOptions{})
+		createdEvent, err := client.Create(ctx, newTestEvent(f.Namespace.Name, eventName, "testevent-constant"), metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create test event")
 
 		ginkgo.By("listing events in all namespaces")
@@ -152,6 +153,7 @@ var _ = common.SIGDescribe("Events API", func() {
 		ginkgo.By("getting the test event")
 		event, err := client.Get(ctx, eventName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get test event")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdEvent.ResourceVersion, event.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 		// clear ResourceVersion and ManagedFields which are set by control-plane
 		event.ObjectMeta.ResourceVersion = ""
 		testEvent.ObjectMeta.ResourceVersion = ""

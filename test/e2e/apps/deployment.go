@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
@@ -213,7 +214,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeployment.ObjectMeta.Labels = map[string]string{"test-deployment-static": "true"}
 		testDeployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
 
-		_, err = f.ClientSet.AppsV1().Deployments(testNamespaceName).Create(ctx, testDeployment, metav1.CreateOptions{})
+		createdDeployment, err := f.ClientSet.AppsV1().Deployments(testNamespaceName).Create(ctx, testDeployment, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Deployment %v in namespace %v", testDeploymentName, testNamespaceName)
 
 		ginkgo.By("waiting for Deployment to be created")
@@ -271,8 +272,9 @@ var _ = SIGDescribe("Deployment", func() {
 			},
 		})
 		framework.ExpectNoError(err, "failed to Marshal Deployment JSON patch")
-		_, err = f.ClientSet.AppsV1().Deployments(testNamespaceName).Patch(ctx, testDeploymentName, types.StrategicMergePatchType, []byte(deploymentPatch), metav1.PatchOptions{})
+		patchedDeployment, err := f.ClientSet.AppsV1().Deployments(testNamespaceName).Patch(ctx, testDeploymentName, types.StrategicMergePatchType, []byte(deploymentPatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Deployment")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdDeployment.ResourceVersion, patchedDeployment.ResourceVersion)).To(gomega.BeNumerically("==", -1), "updated object should have a larger resource version")
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		_, err = watchtools.Until(ctxUntil, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
