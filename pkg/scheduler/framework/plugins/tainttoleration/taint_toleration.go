@@ -41,6 +41,7 @@ var _ fwk.FilterPlugin = &TaintToleration{}
 var _ fwk.PreScorePlugin = &TaintToleration{}
 var _ fwk.ScorePlugin = &TaintToleration{}
 var _ fwk.EnqueueExtensions = &TaintToleration{}
+var _ fwk.BatchablePlugin = &TaintToleration{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -54,6 +55,11 @@ const (
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *TaintToleration) Name() string {
 	return Name
+}
+
+// Feasibility and scoring based on the pod's tolerations.
+func (pl *TaintToleration) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+	return signature.AddPodElement("Spec.Tolerations", pod.Spec.Tolerations)
 }
 
 // EventsToRegister returns the possible events that may make a Pod

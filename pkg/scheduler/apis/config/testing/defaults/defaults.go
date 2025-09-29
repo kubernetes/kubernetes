@@ -153,6 +153,25 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.DefaultBinder},
 		},
 	},
+	Batchable: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.DynamicResources},
+			{Name: names.ImageLocality},
+			{Name: names.InterPodAffinity},
+			{Name: names.NodeAffinity},
+			{Name: names.NodeName},
+			{Name: names.NodePorts},
+			{Name: names.NodeResourcesBalancedAllocation},
+			{Name: names.NodeResourcesFit},
+			{Name: names.NodeUnschedulable},
+			{Name: names.NodeVolumeLimits},
+			{Name: names.PodTopologySpread},
+			{Name: names.TaintToleration},
+			{Name: names.VolumeBinding},
+			{Name: names.VolumeRestrictions},
+			{Name: names.VolumeZone},
+		},
+	},
 }
 
 // PluginConfigsV1 default plugin configurations.

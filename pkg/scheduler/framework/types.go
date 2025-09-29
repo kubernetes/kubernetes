@@ -604,6 +604,7 @@ type PodInfo struct {
 	RequiredAntiAffinityTerms  []fwk.AffinityTerm
 	PreferredAffinityTerms     []fwk.WeightedAffinityTerm
 	PreferredAntiAffinityTerms []fwk.WeightedAffinityTerm
+	Signature                  string
 	// cachedResource contains precomputed resources for Pod (podResource).
 	// The value can change only if InPlacePodVerticalScaling is enabled.
 	// In that case, the whole PodInfo object is recreated (for assigned pods in cache).

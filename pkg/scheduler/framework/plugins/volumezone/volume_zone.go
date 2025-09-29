@@ -49,6 +49,7 @@ type VolumeZone struct {
 var _ fwk.FilterPlugin = &VolumeZone{}
 var _ fwk.PreFilterPlugin = &VolumeZone{}
 var _ fwk.EnqueueExtensions = &VolumeZone{}
+var _ fwk.BatchablePlugin = &VolumeZone{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -100,6 +101,11 @@ func translateToGALabel(label string) string {
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeZone) Name() string {
 	return Name
+}
+
+// Feasibility and scoring are based on the pod's volume definitions.
+func (pl *VolumeZone) SignPod(pod *v1.Pod, signature fwk.PodSignatureMaker) error {
+	return signature.AddSignatureVolumes(pod)
 }
 
 // PreFilter invoked at the prefilter extension point

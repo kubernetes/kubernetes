@@ -37,7 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -69,6 +69,7 @@ type frameworkImpl struct {
 	bindPlugins          []fwk.BindPlugin
 	postBindPlugins      []fwk.PostBindPlugin
 	permitPlugins        []fwk.PermitPlugin
+	batchablePlugins     []fwk.BatchablePlugin
 
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
@@ -83,6 +84,7 @@ type frameworkImpl struct {
 	metricsRecorder          *metrics.MetricAsyncRecorder
 	profileName              string
 	percentageOfNodesToScore *int32
+	enableBatching           bool
 
 	extenders []fwk.Extender
 	fwk.PodNominator
@@ -118,6 +120,7 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.Permit, &f.permitPlugins},
 		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
 		{&plugins.QueueSort, &f.queueSortPlugins},
+		{&plugins.Batchable, &f.batchablePlugins},
 	}
 }
 
@@ -396,6 +399,9 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 			return nil, fmt.Errorf("score plugin %q is not configured with weight", scorePlugin.Name())
 		}
 	}
+
+	// Disable signatures if we don't have the full support of all the needed plugins
+	f.checkPluginSignatures()
 
 	if options.captureProfile != nil {
 		if len(outputProfile.PluginConfig) != 0 {
@@ -715,6 +721,65 @@ func (f *frameworkImpl) QueueSortFunc() fwk.LessFunc {
 
 	// Only one QueueSort plugin can be enabled.
 	return f.queueSortPlugins[0].Less
+}
+
+// If any of our preFilter, filter, preScore or score plugins haven't
+// implemented a signature, then disable the cache.
+func (f *frameworkImpl) checkPluginSignatures() {
+	for _, pl := range f.preFilterPlugins {
+		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableBatching {
+			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
+			f.enableBatching = false
+			return
+		}
+	}
+	for _, pl := range f.filterPlugins {
+		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableBatching {
+			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
+			f.enableBatching = false
+			return
+		}
+	}
+	for _, pl := range f.preScorePlugins {
+		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableBatching {
+			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
+			f.enableBatching = false
+			return
+		}
+	}
+	for _, pl := range f.scorePlugins {
+		if _, implements := pl.(fwk.BatchablePlugin); !implements && f.enableBatching {
+			f.logger.Info("Disabling batching for profile %s because plugin %s does not support it", f.profileName, pl.Name())
+			f.enableBatching = false
+			return
+		}
+	}
+}
+
+// SignPod returns a signature for a given pod. Any two pods with the same signature should get
+// the same feasibility and scoring for the same set of nodes in the same state. If one or more plugins
+// is unable to construct a signature for the pod, the result will have "Signable" set to false, which means
+// there is no way to compare this pod against others, and will turn off a number of optimizations
+// for this pod.
+func (f *frameworkImpl) SignPod(ctx context.Context, pod *v1.Pod) (string, error) {
+	if !f.enableBatching {
+		return fwk.Unsignable, nil
+	}
+
+	signatureMaker := newPodSignatureMaker()
+	for _, pl := range f.batchablePlugins {
+		err := pl.SignPod(pod, signatureMaker)
+		if err != nil {
+			return fwk.Unsignable, err
+		}
+		if !signatureMaker.signable {
+			return fwk.Unsignable, nil
+		}
+	}
+	signatureMaker.AddNonPluginElements(pod)
+
+	marshalled, err := signatureMaker.Marshal()
+	return string(marshalled), err
 }
 
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
