@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -89,6 +88,9 @@ const (
 	// VolumeAttachmentLimitExceededReason is the reason for rejecting a pod
 	// when the node has reached its volume attachment limit.
 	VolumeAttachmentLimitExceededReason = "VolumeAttachmentLimitExceeded"
+	// VolumeNodeAffinityReason is the reason for rejecting a pod when the node
+	// does not match the volume's node affinity.
+	VolumeNodeAffinityReason = "VolumeNodeAffinity"
 )
 
 // VolumeManager runs a set of asynchronous loops that figure out which volumes
@@ -283,16 +285,13 @@ type volumeManager struct {
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
 }
 
-type VolumeAttachLimitExceededError struct {
-	UnmountedVolumes  []string
-	UnattachedVolumes []string
-	VolumesNotInDSW   []string
-	OriginalError     error
+type RejectingPodError struct {
+	Reason string
+	Desc   string
 }
 
-func (e *VolumeAttachLimitExceededError) Error() string {
-	return fmt.Sprintf("Node has reached its volume attachment limit, rejecting pod. unmounted volumes=%v, unattached volumes=%v, failed to process volumes=%v: %v",
-		e.UnmountedVolumes, e.UnattachedVolumes, e.VolumesNotInDSW, e.OriginalError)
+func (e *RejectingPodError) Error() string {
+	return fmt.Sprintf("Volume predicate %s failed: %s", e.Reason, e.Desc)
 }
 
 func (vm *volumeManager) Run(ctx context.Context, sourcesReady config.SourcesReady) {
@@ -449,11 +448,9 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 				}
 				if attachablePlugin.VerifyExhaustedResource(volumeToMount.VolumeSpec) {
 					// Return error to the kubelet, which will then trigger the pod termination logic.
-					return &VolumeAttachLimitExceededError{
-						UnmountedVolumes:  unmountedVolumes,
-						UnattachedVolumes: unattachedVolumes,
-						VolumesNotInDSW:   volumesNotInDSW,
-						OriginalError:     err,
+					err = &RejectingPodError{
+						Reason: VolumeAttachmentLimitExceededReason,
+						Desc:   "Node has reached its volume attachment limit",
 					}
 				}
 			}
@@ -554,8 +551,14 @@ func (vm *volumeManager) getUnattachedVolumes(uniquePodName types.UniquePodName)
 // volumes are mounted.
 func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, expectedVolumes []string) wait.ConditionWithContextFunc {
 	return func(_ context.Context) (done bool, err error) {
-		if errs := vm.desiredStateOfWorld.PopPodErrors(podName); len(errs) > 0 {
-			return true, errors.New(strings.Join(errs, "; "))
+		if err := vm.desiredStateOfWorld.PopPodError(podName); err != nil {
+			if errors.Is(err, reconciler.ErrNodeAffinityMismatch) {
+				err = &RejectingPodError{
+					Reason: VolumeNodeAffinityReason,
+					Desc:   err.Error(),
+				}
+			}
+			return true, err
 		}
 		return len(vm.getUnmountedVolumes(podName, expectedVolumes)) == 0, nil
 	}
@@ -565,8 +568,8 @@ func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, e
 // pod.
 func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName) wait.ConditionWithContextFunc {
 	return func(_ context.Context) (done bool, err error) {
-		if errs := vm.desiredStateOfWorld.PopPodErrors(podName); len(errs) > 0 {
-			return true, errors.New(strings.Join(errs, "; "))
+		if err := vm.desiredStateOfWorld.PopPodError(podName); err != nil {
+			return true, err
 		}
 		return !vm.actualStateOfWorld.PodHasMountedVolumes(podName), nil
 	}

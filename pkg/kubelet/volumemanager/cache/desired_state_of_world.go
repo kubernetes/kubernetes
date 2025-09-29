@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/sets"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
@@ -120,14 +120,13 @@ type DesiredStateOfWorld interface {
 	// volume, false is returned.
 	VolumeExistsWithSpecName(podName types.UniquePodName, volumeSpecName string) bool
 
-	// AddErrorToPod adds the given error to the given pod in the cache.
-	// It will be returned by subsequent GetPodErrors().
-	// Each error string is stored only once.
-	AddErrorToPod(podName types.UniquePodName, err string)
+	// MarkPodError marks the given pod with the given error for the volumeName in the cache.
+	// It will be returned by subsequent [PopPodError].
+	// Only the latest error for each volume is preserved.
+	MarkPodError(podName types.UniquePodName, volumeName string, err error)
 
-	// PopPodErrors returns accumulated errors on a given pod and clears
-	// them.
-	PopPodErrors(podName types.UniquePodName) []string
+	// PopPodError returns the latest error on a given pod and clears it.
+	PopPodError(podName types.UniquePodName) error
 
 	// GetPodsWithErrors returns names of pods that have stored errors.
 	GetPodsWithErrors() []types.UniquePodName
@@ -155,7 +154,7 @@ func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr, seLinuxTran
 	return &desiredStateOfWorld{
 		volumesToMount:    make(map[v1.UniqueVolumeName]volumeToMount),
 		volumePluginMgr:   volumePluginMgr,
-		podErrors:         make(map[types.UniquePodName]sets.Set[string]),
+		podErrors:         make(map[types.UniquePodName]map[string]error),
 		seLinuxTranslator: seLinuxTranslator,
 	}
 }
@@ -170,7 +169,7 @@ type desiredStateOfWorld struct {
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
 	// podErrors are errors caught by desiredStateOfWorldPopulator about volumes for a given pod.
-	podErrors map[types.UniquePodName]sets.Set[string]
+	podErrors map[types.UniquePodName]map[string]error
 	// seLinuxTranslator translates v1.SELinuxOptions to a file SELinux label.
 	seLinuxTranslator util.SELinuxLabelTranslator
 
@@ -251,12 +250,6 @@ type podToMount struct {
 	// mountRequestTime stores time at which mount was requested
 	mountRequestTime time.Time
 }
-
-const (
-	// Maximum errors to be stored per pod in desiredStateOfWorld.podErrors to
-	// prevent unbound growth.
-	maxPodErrors = 10
-)
 
 func (dsw *desiredStateOfWorld) AddPodToVolume(
 	logger klog.Logger,
@@ -615,28 +608,40 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 	return volumesToMount
 }
 
-func (dsw *desiredStateOfWorld) AddErrorToPod(podName types.UniquePodName, err string) {
+func (dsw *desiredStateOfWorld) MarkPodError(podName types.UniquePodName, volumeName string, err error) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
 	if errs, found := dsw.podErrors[podName]; found {
-		if errs.Len() <= maxPodErrors {
-			errs.Insert(err)
-		}
-		return
+		errs[volumeName] = err
+	} else {
+		dsw.podErrors[podName] = map[string]error{volumeName: err}
 	}
-	dsw.podErrors[podName] = sets.New[string](err)
 }
 
-func (dsw *desiredStateOfWorld) PopPodErrors(podName types.UniquePodName) []string {
+func (dsw *desiredStateOfWorld) PopPodError(podName types.UniquePodName) error {
 	dsw.Lock()
 	defer dsw.Unlock()
 
 	if errs, found := dsw.podErrors[podName]; found {
 		delete(dsw.podErrors, podName)
-		return sets.List(errs)
+		if len(errs) == 1 { // special case for single error to avoid sorting
+			for _, err := range errs {
+				return err
+			}
+		}
+		names := make([]string, 0, len(errs))
+		for name := range errs {
+			names = append(names, name)
+		}
+		slices.Sort(names)
+		errorList := make([]error, 0, len(errs))
+		for _, name := range names {
+			errorList = append(errorList, errs[name])
+		}
+		return utilerrors.NewAggregate(errorList)
 	}
-	return []string{}
+	return nil
 }
 
 func (dsw *desiredStateOfWorld) GetPodsWithErrors() []types.UniquePodName {

@@ -2216,10 +2216,11 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	// Wait for volumes to attach/mount
 	if err := kl.volumeManager.WaitForAttachAndMount(ctx, pod); err != nil {
-		var volumeAttachLimitErr *volumemanager.VolumeAttachLimitExceededError
-		if errors.As(err, &volumeAttachLimitErr) {
-			kl.rejectPod(ctx, pod, volumemanager.VolumeAttachmentLimitExceededReason, volumeAttachLimitErr.Error())
-			recordAdmissionRejection(volumemanager.VolumeAttachmentLimitExceededReason)
+		var rejectError *volumemanager.RejectingPodError
+		if errors.As(err, &rejectError) {
+			reason := rejectError.Reason
+			kl.rejectPod(ctx, pod, reason, err.Error())
+			recordAdmissionRejection(reason)
 			return true, nil, nil
 		}
 		if !wait.Interrupted(err) {

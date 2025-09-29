@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"maps"
 	"slices"
 	"testing"
@@ -1578,5 +1579,49 @@ func verifyDesiredSizeLimitInVolumeDsw(
 				}
 			}
 		}
+	}
+}
+
+func TestPodError(t *testing.T) {
+	cases := []struct {
+		name string
+		mark map[string]error
+		pop  string
+	}{
+		{
+			name: "no",
+		},
+		{
+			name: "single",
+			mark: map[string]error{"vol1": errors.New("single error")},
+			pop:  "single error",
+		},
+		{
+			name: "multiple",
+			mark: map[string]error{
+				"vol1": errors.New("first error"),
+				"vol2": errors.New("second error"),
+			},
+			pop: "[first error, second error]",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			volumePluginMgr := volume.VolumePluginMgr{}
+			seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+			dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
+
+			for vol, err := range c.mark {
+				dsw.MarkPodError("test-pod", vol, err)
+			}
+			poped := dsw.PopPodError("test-pod")
+			if poped != nil {
+				if c.pop != poped.Error() {
+					t.Errorf("expected pop error %q, got %q", c.pop, poped.Error())
+				}
+			} else if c.pop != "" {
+				t.Errorf("expected pop error %q, got nil", c.pop)
+			}
+		})
 	}
 }
