@@ -496,6 +496,12 @@ const (
 	// Restores previous behavior where Kubelet fails self registration if node create returns 403 Forbidden.
 	KubeletRegistrationGetOnExistsOnly featuregate.Feature = "KubeletRegistrationGetOnExistsOnly"
 
+	// owner: @yuanwangyw
+	// kep: https://kep.k8s.io/5532
+	//
+	// Restart the pod in-place on the same node.
+	KubeletRestartPodInPlace featuregate.Feature = "KubeletRestartPodInPlace"
+
 	// owner: @kannon92
 	// kep: https://kep.k8s.io/4191
 	//
@@ -1352,6 +1358,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	KubeletRegistrationGetOnExistsOnly: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	KubeletRestartPodInPlace: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	KubeletSeparateDiskGC: {

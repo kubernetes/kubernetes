@@ -44,6 +44,11 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 			return true
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+		if conditionType == v1.PodRestartInPlace {
+			return true
+		}
+	}
 	return false
 }
 

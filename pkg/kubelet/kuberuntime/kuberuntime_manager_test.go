@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -865,6 +866,117 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	verifyContainerStatuses(t, fakeRuntime, expected, "kill all app containers, purge the existing init container, and restart a new one")
 }
 
+func TestSyncPodWithRestartPod(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletRestartPodInPlace, true)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	assert.NoError(t, err)
+
+	restartPolicyAlways := v1.ContainerRestartPolicyAlways
+	initContainers := []v1.Container{
+		{
+			Name:            "init1",
+			Image:           "init",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+	containers := []v1.Container{
+		{
+			Name:            "foo1",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+		{
+			Name:            "foo2",
+			Image:           "alpine",
+			ImagePullPolicy: v1.PullIfNotPresent,
+			RestartPolicy:   &restartPolicyAlways,
+			RestartPolicyRules: []v1.ContainerRestartRule{
+				{
+					Action: v1.ContainerRestartRuleActionRestartPod,
+					ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+						Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+						Values:   []int32{42},
+					},
+				},
+			},
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers:     containers,
+			InitContainers: initContainers,
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+
+	// 1. Run the pod first. First SyncPod should execute the init container.
+	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	expected := []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "start only the init container")
+
+	// 2. should run all app containers because init container finished.
+	// Stop init container instance 0.
+	sandboxIDs, err := m.getSandboxIDByPodUID(tCtx, pod.UID, nil)
+	require.NoError(t, err)
+	sandboxID := sandboxIDs[0]
+	initID0, err := fakeRuntime.GetContainerID(sandboxID, initContainers[0].Name, 0)
+	require.NoError(t, err)
+	err = fakeRuntime.StopContainer(tCtx, initID0, 0)
+	require.NoError(t, err)
+	// Sync again.
+	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	expected = []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{name: containers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+		{name: containers[1].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "init container completed; all app containers should be running")
+
+	// 3. Exits the container foo2 with code 42, the pod should be marked for in place restart, and
+	// should remove all containers.
+	sandboxIDs, err = m.getSandboxIDByPodUID(tCtx, pod.UID, nil)
+	require.NoError(t, err)
+	sandboxID = sandboxIDs[0]
+	foo2ID, err := fakeRuntime.GetContainerID(sandboxID, containers[1].Name, 0)
+	require.NoError(t, err)
+	failedFoo2 := fakeRuntime.Containers[foo2ID]
+	failedFoo2.State = runtimeapi.ContainerState_CONTAINER_EXITED
+	failedFoo2.ExitCode = 42
+	fakeRuntime.Containers[foo2ID] = failedFoo2
+
+	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	expected = []*cRecord{}
+	verifyContainerStatuses(t, fakeRuntime, expected, "kill all containers")
+
+	// 4. Unmark the pod. Now it should start the init container first.
+	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	expected = []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "start only the init container")
+}
+
 // A helper function to get a basic pod and its status assuming all sandbox and
 // containers are running and ready.
 func makeBasePodAndStatus() (*v1.Pod, *kubecontainer.PodStatus) {
@@ -1237,6 +1349,124 @@ func TestComputePodActions(t *testing.T) {
 	}
 }
 
+func TestComputePodActionsForRestartPod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletRestartPodInPlace, true)
+	TestComputePodActions(t)
+	TestComputePodActionsWithInitContainers(t)
+
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	podRestartTrue := []v1.PodCondition{
+		{
+			Type:   v1.PodRestartInPlace,
+			Status: v1.ConditionTrue,
+		},
+	}
+
+	podRestartFalse := []v1.PodCondition{
+		{
+			Type:   v1.PodRestartInPlace,
+			Status: v1.ConditionFalse,
+		},
+	}
+	for desc, test := range map[string]struct {
+		podFunc                          func() *v1.Pod
+		podStatusFunc                    func() *kubecontainer.PodStatus
+		containersToRemove               []int
+		containersToKillBeforeRemove     []int
+		initContainersToRemove           []int
+		initContainersToKillBeforeRemove []int
+	}{
+		"pod not marked for in place restart": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatus()
+				pod.Status.Conditions = podRestartFalse
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatus()
+				return status
+			},
+		},
+		"pod marked for in place restart": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatus()
+				pod.Status.Conditions = podRestartTrue
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatus()
+				return status
+			},
+			containersToRemove:           []int{0, 1, 2},
+			containersToKillBeforeRemove: []int{0, 1, 2},
+		},
+		"pod marked for in place restart with init containers": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatusWithInitContainers()
+				pod.Status.Conditions = podRestartTrue
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatusWithInitContainers()
+				return status
+			},
+			initContainersToRemove:           []int{0, 1, 2},
+			initContainersToKillBeforeRemove: []int{},
+		},
+		"pod marked for in place restart with restartable init containers": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatusWithRestartableInitContainers()
+				pod.Status.Conditions = podRestartTrue
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatusWithRestartableInitContainers()
+				return status
+			},
+			initContainersToRemove:           []int{0, 1, 2},
+			initContainersToKillBeforeRemove: []int{0, 1, 2},
+		},
+	} {
+		pod := test.podFunc()
+		status := test.podStatusFunc()
+		tCtx := ktesting.Init(t)
+		actions := m.computePodActions(tCtx, pod, status)
+
+		expected := &podActions{
+			CreateSandbox:      false,
+			KillPod:            false,
+			SandboxID:          status.SandboxStatuses[0].Id,
+			ContainersToStart:  []int{},
+			ContainersToKill:   map[kubecontainer.ContainerID]containerToKillInfo{},
+			ContainersToRemove: map[kubecontainer.ContainerID]containerToRemoveInfo{},
+		}
+		for _, idx := range test.containersToRemove {
+			cStatus := status.ContainerStatuses[idx]
+			kill := slices.Contains(test.containersToKillBeforeRemove, idx)
+			expected.ContainersToRemove[cStatus.ID] = containerToRemoveInfo{
+				container: &pod.Spec.Containers[idx],
+				name:      status.ContainerStatuses[idx].Name,
+				kill:      kill,
+			}
+		}
+		for _, idx := range test.initContainersToRemove {
+			cStatus := status.ContainerStatuses[idx]
+			kill := slices.Contains(test.initContainersToKillBeforeRemove, idx)
+			expected.ContainersToRemove[cStatus.ID] = containerToRemoveInfo{
+				container: &pod.Spec.InitContainers[idx],
+				name:      status.ContainerStatuses[idx].Name,
+				kill:      kill,
+			}
+		}
+		verifyActions(t, expected, &actions, desc)
+	}
+
+}
+
 func getKillMap(pod *v1.Pod, status *kubecontainer.PodStatus, cIndexes []int) map[kubecontainer.ContainerID]containerToKillInfo {
 	m := map[kubecontainer.ContainerID]containerToKillInfo{}
 	for _, i := range cIndexes {
@@ -1284,6 +1514,9 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 	if expected.ContainersToUpdate == nil && actual.ContainersToUpdate != nil {
 		// No need to distinguish empty and nil maps for the test.
 		expected.ContainersToUpdate = map[v1.ResourceName][]containerToUpdateInfo{}
+	}
+	if expected.ContainersToRemove == nil && actual.ContainersToRemove != nil {
+		expected.ContainersToRemove = map[kubecontainer.ContainerID]containerToRemoveInfo{}
 	}
 	assert.Equal(t, expected, actual, desc)
 }
