@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -405,9 +406,11 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		checkDaemonSetPodsLabels(listDaemonPods(ctx, c, ns, label), hash)
 
 		ginkgo.By("Update daemon pods image.")
+		oldDsResourceVersion := ds.ResourceVersion
 		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, PrevAgnhostImage)
 		ds, err = c.AppsV1().DaemonSets(ns).Patch(ctx, dsName, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
+		gomega.Expect(resourceversion.CompareResourceVersion(oldDsResourceVersion, ds.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		// Time to complete the rolling upgrade is proportional to the number of nodes in the cluster.
 		// Get the number of nodes, and set the timeout appropriately.

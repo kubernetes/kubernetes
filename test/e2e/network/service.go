@@ -46,6 +46,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -3281,7 +3282,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to list Endpoints")
 
 		ginkgo.By("creating an Endpoint")
-		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Create(ctx, &testEndpoints, metav1.CreateOptions{})
+		createdEP, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Create(ctx, &testEndpoints, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Endpoint")
 		ginkgo.By("waiting for available Endpoint")
 		ctxUntil, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -3368,8 +3369,10 @@ var _ = common.SIGDescribe("Services", func() {
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON for WatchEvent patch")
 		ginkgo.By("patching the Endpoint")
-		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Patch(ctx, testEndpointName, types.StrategicMergePatchType, []byte(endpointPatch), metav1.PatchOptions{})
+		patchedEP, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Patch(ctx, testEndpointName, types.StrategicMergePatchType, []byte(endpointPatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Endpoint")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdEP.ResourceVersion, patchedEP.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
+
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		_, err = watchtools.Until(ctxUntil, endpoints.ResourceVersion, w, func(event watch.Event) (bool, error) {

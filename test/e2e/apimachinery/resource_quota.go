@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	quota "k8s.io/apiserver/pkg/quota/v1"
@@ -1044,6 +1045,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err, "failed to patch ResourceQuota %s in namespace %s", rqName, ns)
 		gomega.Expect(patchedResourceQuota.Labels[rqName]).To(gomega.Equal("patched"), "Failed to find the label for this ResourceQuota. Current labels: %v", patchedResourceQuota.Labels)
 		gomega.Expect(*patchedResourceQuota.Spec.Hard.Memory()).To(gomega.Equal(resource.MustParse("750Mi")), "Hard memory value for ResourceQuota %q is %s not 750Mi.", patchedResourceQuota.ObjectMeta.Name, patchedResourceQuota.Spec.Hard.Memory().String())
+		gomega.Expect(resourceversion.CompareResourceVersion(rq.Items[0].ResourceVersion, patchedResourceQuota.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("Deleting a Collection of ResourceQuotas")
 		err = client.CoreV1().ResourceQuotas(ns).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector})

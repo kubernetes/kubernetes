@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 
@@ -1002,6 +1003,7 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectNoError(err, "failed to fetch Pod %s in namespace %s", testPodName, testNamespaceName)
 		gomega.Expect(pod.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-pod", "patched"), "failed to patch Pod - missing label")
 		gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(testPodImage2), "failed to patch Pod - wrong image")
+		gomega.Expect(resourceversion.CompareResourceVersion(p.ResourceVersion, pod.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("replacing the Pod's status Ready condition to False")
 		var podStatusUpdate *v1.Pod
