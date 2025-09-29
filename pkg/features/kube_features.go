@@ -596,6 +596,13 @@ const (
 	// update the number of volumes that can be allocated on a node
 	MutableCSINodeAllocatableCount featuregate.Feature = "MutableCSINodeAllocatableCount"
 
+	// owner: huww98
+	// kep: https://kep.k8s.io/5381
+	//
+	// Makes PersistentVolume.Spec.NodeAffinity mutable, allowing CSI drivers to
+	// update the topology info when the data is migrated
+	MutablePVNodeAffinity featuregate.Feature = "MutablePVNodeAffinity"
+
 	// owner: @kannon92
 	// kep: https://kep.k8s.io/5440
 	//
@@ -1474,6 +1481,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	MutablePVNodeAffinity: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	MutablePodResourcesForSuspendedJobs: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2233,6 +2244,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	MultiCIDRServiceAllocator: {},
 
 	MutableCSINodeAllocatableCount: {},
+
+	MutablePVNodeAffinity: {},
 
 	MutablePodResourcesForSuspendedJobs: {},
 
