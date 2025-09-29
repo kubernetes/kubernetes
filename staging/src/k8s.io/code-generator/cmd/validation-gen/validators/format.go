@@ -49,9 +49,14 @@ func (formatTagValidator) ValidScopes() sets.Set[Scope] {
 
 var (
 	// Keep this list alphabetized.
-	longNameValidator  = types.Name{Package: libValidationPkg, Name: "LongName"}
-	shortNameValidator = types.Name{Package: libValidationPkg, Name: "ShortName"}
-	uuidValidator      = types.Name{Package: libValidationPkg, Name: "UUID"}
+	ipSloppyValidator         = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
+	labelKeyValidator         = types.Name{Package: libValidationPkg, Name: "LabelKey"}
+	labelValueValidator       = types.Name{Package: libValidationPkg, Name: "LabelValue"}
+	longNameCaselessValidator = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
+	longNameValidator         = types.Name{Package: libValidationPkg, Name: "LongName"}
+	resourcePoolNameValidator = types.Name{Package: libValidationPkg, Name: "ResourcePoolName"}
+	shortNameValidator        = types.Name{Package: libValidationPkg, Name: "ShortName"}
+	uuidValidator             = types.Name{Package: libValidationPkg, Name: "UUID"}
 )
 
 func (formatTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -78,8 +83,18 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 
 	switch format {
 	// Keep this sequence alphabetized.
+	case "k8s-ip":
+		return Function(formatTagName, DefaultFlags, ipSloppyValidator), nil
+	case "k8s-label-key":
+		return Function(formatTagName, DefaultFlags, labelKeyValidator), nil
+	case "k8s-label-value":
+		return Function(formatTagName, DefaultFlags, labelValueValidator), nil
 	case "k8s-long-name":
 		return Function(formatTagName, DefaultFlags, longNameValidator), nil
+	case "k8s-long-name-caseless":
+		return Function(formatTagName, DefaultFlags, longNameCaselessValidator), nil
+	case "k8s-resource-pool-name":
+		return Function(formatTagName, DefaultFlags, resourcePoolNameValidator), nil
 	case "k8s-short-name":
 		return Function(formatTagName, DefaultFlags, shortNameValidator), nil
 	case "k8s-uuid":
@@ -96,8 +111,23 @@ func (ftv formatTagValidator) Docs() TagDoc {
 		Scopes:      ftv.ValidScopes().UnsortedList(),
 		Description: "Indicates that a string field has a particular format.",
 		Payloads: []TagPayloadDoc{{ // Keep this list alphabetized.
+			Description: "k8s-ip",
+			Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
+		}, {
+			Description: "k8s-label-key",
+			Docs:        "This field holds a Kubernetes label key.",
+		}, {
+			Description: "k8s-label-value",
+			Docs:        "This field holds a Kubernetes label value.",
+		}, {
 			Description: "k8s-long-name",
 			Docs:        "This field holds a Kubernetes \"long name\", aka a \"DNS subdomain\" value.",
+		}, {
+			Description: "k8s-long-name-caseless",
+			Docs:        "Deprecated: This field holds a case-insensitive Kubernetes \"long name\", aka a \"DNS subdomain\" value.",
+		}, {
+			Description: "k8s-resource-pool-name",
+			Docs:        "This field holds value with one or more Kubernetes \"long name\" parts separated by `/` and no longer than 253 characters.",
 		}, {
 			Description: "k8s-short-name",
 			Docs:        "This field holds a Kubernetes \"short name\", aka a \"DNS label\" value.",

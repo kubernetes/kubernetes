@@ -51,7 +51,6 @@ type CertificateSigningRequest struct {
 // CertificateSigningRequestSpec contains the certificate request.
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
-	// +listType=atomic
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
 	// Requested signer for the request. It is a qualified name in the form:
@@ -179,13 +178,13 @@ type CertificateSigningRequestStatus struct {
 	// +optional
 	// +k8s:listType=map
 	// +k8s:listMapKey=type
+	// +k8s:customUnique
 	// +k8s:optional
 	// +k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
 	// +k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// If request was approved, the controller will place the issued certificate here.
-	// +listType=atomic
 	// +optional
 	Certificate []byte `json:"certificate,omitempty" protobuf:"bytes,2,opt,name=certificate"`
 }

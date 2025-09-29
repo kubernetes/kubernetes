@@ -205,7 +205,7 @@ func (a *HorizontalController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting HPA controller")
 	defer logger.Info("Shutting down HPA controller")
 
-	if !cache.WaitForNamedCacheSync("HPA", ctx.Done(), a.hpaListerSynced, a.podListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, a.hpaListerSynced, a.podListerSynced) {
 		return
 	}
 
@@ -241,6 +241,8 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 	defer a.hpaSelectorsMux.Unlock()
 	if hpaKey := selectors.Parse(key); !a.hpaSelectors.SelectorExists(hpaKey) {
 		a.hpaSelectors.PutSelector(hpaKey, labels.Nothing())
+		// Observe HPA addition - only when it's a new HPA
+		a.monitor.ObserveHPAAddition()
 	}
 }
 
@@ -258,6 +260,8 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 	a.hpaSelectorsMux.Lock()
 	defer a.hpaSelectorsMux.Unlock()
 	a.hpaSelectors.DeleteSelector(selectors.Parse(key))
+	// Observe HPA deletion
+	a.monitor.ObserveHPADeletion()
 }
 
 func (a *HorizontalController) worker(ctx context.Context) {

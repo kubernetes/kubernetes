@@ -6,9 +6,9 @@
 
 module k8s.io/kubernetes
 
-go 1.24.0
+go 1.25.0
 
-godebug default=go1.24
+godebug default=go1.25
 
 require (
 	bitbucket.org/bertimus9/systemstat v0.5.0
@@ -31,7 +31,6 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/go-openapi/jsonreference v0.20.2
 	github.com/godbus/dbus/v5 v5.1.0
-	github.com/gogo/protobuf v1.3.2
 	github.com/google/cadvisor v0.53.0
 	github.com/google/cel-go v0.26.0
 	github.com/google/gnostic-models v0.7.0
@@ -117,7 +116,7 @@ require (
 	k8s.io/mount-utils v0.0.0
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/sample-apiserver v0.0.0
-	k8s.io/system-validators v1.10.1
+	k8s.io/system-validators v1.11.1
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/knftables v0.0.17
 	sigs.k8s.io/randfill v1.0.0
@@ -156,6 +155,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
@@ -215,9 +215,9 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/gengo/v2 v2.0.0-20250903151518-081d64401ab4 // indirect
+	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
-	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
+	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/api v0.20.1 // indirect
 	sigs.k8s.io/kustomize/kustomize/v5 v5.7.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.20.1 // indirect

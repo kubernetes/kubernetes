@@ -51,6 +51,13 @@ func WithTakeover(takeover bool) ValidationConfig {
 	}
 }
 
+// WithValidationIdentifier sets the validation identifier, which is used to determine the source of a mismatch in metrics.
+func WithValidationIdentifier(identifier string) ValidationConfig {
+	return func(config *validationConfigOption) {
+		config.validationIdentifier = identifier
+	}
+}
+
 // WithSubresourceMapper sets the subresource mapper for validation.
 // This should be used when registering validation for polymorphic subresources like /scale.
 //
@@ -79,6 +86,7 @@ type validationConfigOption struct {
 	options              []string
 	takeover             bool
 	subresourceGVKMapper GroupVersionKindProvider
+	validationIdentifier string
 }
 
 // ValidateDeclaratively validates obj against declarative validation tags
@@ -99,7 +107,7 @@ func ValidateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj runt
 		o(cfg)
 	}
 
-	return panicSafeValidateFunc(validateDeclaratively, cfg.takeover)(ctx, scheme, obj, nil, cfg)
+	return panicSafeValidateFunc(validateDeclaratively, cfg.takeover, cfg.validationIdentifier)(ctx, scheme, obj, nil, cfg)
 }
 
 // ValidateUpdateDeclaratively validates obj and oldObj against declarative
@@ -119,7 +127,7 @@ func ValidateUpdateDeclaratively(ctx context.Context, scheme *runtime.Scheme, ob
 	for _, o := range configOpts {
 		o(cfg)
 	}
-	return panicSafeValidateFunc(validateDeclaratively, cfg.takeover)(ctx, scheme, obj, oldObj, cfg)
+	return panicSafeValidateFunc(validateDeclaratively, cfg.takeover, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
 }
 
 func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList {
@@ -180,7 +188,7 @@ func parseSubresourcePath(subresourcePath string) ([]string, error) {
 
 // CompareDeclarativeErrorsAndEmitMismatches checks for mismatches between imperative and declarative validation
 // and logs + emits metrics when inconsistencies are found
-func CompareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, takeover bool) {
+func CompareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, takeover bool, validationIdentifier string) {
 	logger := klog.FromContext(ctx)
 	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, takeover)
 	for _, detail := range mismatchDetails {
@@ -188,7 +196,7 @@ func CompareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeEr
 		logger.Error(nil, detail)
 
 		// Increment the metric for the mismatch
-		validationmetrics.Metrics.IncDeclarativeValidationMismatchMetric()
+		validationmetrics.Metrics.IncDeclarativeValidationMismatchMetric(validationIdentifier)
 	}
 }
 
@@ -288,12 +296,12 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 
 // createDeclarativeValidationPanicHandler returns a function with panic recovery logic
 // that will increment the panic metric and either log or append errors based on the takeover parameter.
-func createDeclarativeValidationPanicHandler(ctx context.Context, errs *field.ErrorList, takeover bool) func() {
+func createDeclarativeValidationPanicHandler(ctx context.Context, errs *field.ErrorList, takeover bool, validationIdentifier string) func() {
 	logger := klog.FromContext(ctx)
 	return func() {
 		if r := recover(); r != nil {
 			// Increment the panic metric counter
-			validationmetrics.Metrics.IncDeclarativeValidationPanicMetric()
+			validationmetrics.Metrics.IncDeclarativeValidationPanicMetric(validationIdentifier)
 
 			const errorFmt = "panic during declarative validation: %v"
 			if takeover {
@@ -313,10 +321,10 @@ func createDeclarativeValidationPanicHandler(ctx context.Context, errs *field.Er
 // if takeover=false, and adding a validation error if takeover=true.
 func panicSafeValidateFunc(
 	validateUpdateFunc func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList,
-	takeover bool,
+	takeover bool, validationIdentifier string,
 ) func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList {
 	return func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) (errs field.ErrorList) {
-		defer createDeclarativeValidationPanicHandler(ctx, &errs, takeover)()
+		defer createDeclarativeValidationPanicHandler(ctx, &errs, takeover, validationIdentifier)()
 
 		return validateUpdateFunc(ctx, scheme, obj, oldObj, o)
 	}

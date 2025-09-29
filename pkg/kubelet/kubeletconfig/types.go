@@ -14,11 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
-
-import (
-	"github.com/spf13/pflag"
-)
+package kubeletconfig
 
 // ContainerRuntimeOptions defines options for the container runtime.
 type ContainerRuntimeOptions struct {
@@ -40,17 +36,4 @@ type ContainerRuntimeOptions struct {
 	// specified in imageCredentialProviderConfigFile.
 	// +optional
 	ImageCredentialProviderBinDir string
-}
-
-// AddFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
-func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
-	var tmp string
-	// General settings.
-	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
-	fs.StringVar(&tmp, "pod-infra-container-image", "", "Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image.")
-	_ = fs.MarkDeprecated("pod-infra-container-image", "will be removed in 1.35. Image garbage collector will get sandbox image information from CRI.")
-
-	// Image credential provider settings.
-	fs.StringVar(&s.ImageCredentialProviderConfigPath, "image-credential-provider-config", s.ImageCredentialProviderConfigPath, "Path to a credential provider plugin config file (JSON/YAML/YML) or a directory of such files (merged in lexicographical order; non-recursive search).")
-	fs.StringVar(&s.ImageCredentialProviderBinDir, "image-credential-provider-bin-dir", s.ImageCredentialProviderBinDir, "The path to the directory where credential provider plugin binaries are located.")
 }

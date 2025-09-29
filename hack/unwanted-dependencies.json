@@ -151,10 +151,8 @@
         "k8s.io/apiextensions-apiserver",
         "k8s.io/apimachinery",
         "k8s.io/apiserver",
-        "k8s.io/client-go",
         "k8s.io/code-generator",
         "k8s.io/kube-aggregator",
-        "k8s.io/kubernetes",
         "k8s.io/metrics"
       ],
       "github.com/golang/groupcache": [

@@ -257,7 +257,7 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting job controller")
 	defer logger.Info("Shutting down job controller")
 
-	if !cache.WaitForNamedCacheSync("job", ctx.Done(), jm.podStoreSynced, jm.jobStoreSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, jm.podStoreSynced, jm.jobStoreSynced) {
 		return
 	}
 
