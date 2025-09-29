@@ -25,11 +25,20 @@ import (
 
 // TaintApplyConfiguration represents a declarative configuration of the Taint type for use
 // with apply.
+//
+// The node this Taint is attached to has the "effect" on
+// any pod that does not tolerate the Taint.
 type TaintApplyConfiguration struct {
-	Key       *string             `json:"key,omitempty"`
-	Value     *string             `json:"value,omitempty"`
-	Effect    *corev1.TaintEffect `json:"effect,omitempty"`
-	TimeAdded *metav1.Time        `json:"timeAdded,omitempty"`
+	// Required. The taint key to be applied to a node.
+	Key *string `json:"key,omitempty"`
+	// The taint value corresponding to the taint key.
+	Value *string `json:"value,omitempty"`
+	// Required. The effect of the taint on pods
+	// that do not tolerate the taint.
+	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
+	Effect *corev1.TaintEffect `json:"effect,omitempty"`
+	// TimeAdded represents the time at which the taint was added.
+	TimeAdded *metav1.Time `json:"timeAdded,omitempty"`
 }
 
 // TaintApplyConfiguration constructs a declarative configuration of the Taint type for use with
@@ -37,7 +46,6 @@ type TaintApplyConfiguration struct {
 func Taint() *TaintApplyConfiguration {
 	return &TaintApplyConfiguration{}
 }
-func (b TaintApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKey sets the Key field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

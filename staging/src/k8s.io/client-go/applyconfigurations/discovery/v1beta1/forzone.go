@@ -20,7 +20,10 @@ package v1beta1
 
 // ForZoneApplyConfiguration represents a declarative configuration of the ForZone type for use
 // with apply.
+//
+// ForZone provides information about which zones should consume this endpoint.
 type ForZoneApplyConfiguration struct {
+	// name represents the name of the zone.
 	Name *string `json:"name,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type ForZoneApplyConfiguration struct {
 func ForZone() *ForZoneApplyConfiguration {
 	return &ForZoneApplyConfiguration{}
 }
-func (b ForZoneApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

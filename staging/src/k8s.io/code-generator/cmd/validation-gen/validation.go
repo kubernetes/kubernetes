@@ -71,7 +71,7 @@ type genValidations struct {
 	schemeRegistry types.Name
 }
 
-// NewGenValidations cretes a new generator for the specified package.
+// NewGenValidations creates a new generator for the specified package.
 func NewGenValidations(outputFilename, outputPackage string, rootTypes []*types.Type, discovered *typeDiscoverer, inputToPkg map[string]string, schemeRegistry types.Name) generator.Generator {
 	return &genValidations{
 		GoGenerator: generator.GoGenerator{
@@ -148,21 +148,60 @@ func (g *genValidations) GenerateType(c *generator.Context, t *types.Type, w io.
 
 // typeDiscoverer contains fields necessary to build graphs of types.
 type typeDiscoverer struct {
-	validator  validators.Validator
-	inputToPkg map[string]string
+	initialized bool
+	validator   validators.Validator
+	inputToPkg  map[string]string
+
+	// constantsByType holds a map of type to constants of that type.
+	constantsByType map[*types.Type][]*validators.Constant
 
 	// typeNodes holds a map of gengo Type to typeNode for all of the types
 	// encountered during discovery.
 	typeNodes map[*types.Type]*typeNode
 }
 
-// NewTypeDiscoverer creates and initializes a NewTypeDiscoverer.
+// NewTypeDiscoverer creates a NewTypeDiscoverer.
+// Init must be called before calling DiscoverType.
 func NewTypeDiscoverer(validator validators.Validator, inputToPkg map[string]string) *typeDiscoverer {
 	return &typeDiscoverer{
-		validator:  validator,
-		inputToPkg: inputToPkg,
-		typeNodes:  map[*types.Type]*typeNode{},
+		validator:       validator,
+		inputToPkg:      inputToPkg,
+		constantsByType: map[*types.Type][]*validators.Constant{},
+		typeNodes:       map[*types.Type]*typeNode{},
 	}
+}
+
+// Init uses the generator context to prepare for type discovery.
+func (td *typeDiscoverer) Init(c *generator.Context) error {
+	packages := c.Universe
+	for _, pkg := range packages {
+		// We only care about packages we are generating for or are readonly.
+		if _, ok := td.inputToPkg[pkg.Path]; !ok {
+			continue
+		}
+		for _, cnst := range pkg.Constants {
+			context := validators.Context{
+				Scope:      validators.ScopeConst,
+				Type:       cnst.Underlying,
+				Path:       nil, // NA when discovering a constant
+				Member:     nil, // NA when discovering a constant
+				ParentPath: nil, // NA when discovering a constant
+			}
+			tgs, err := td.validator.ExtractTags(context, cnst.CommentLines)
+			if err != nil {
+				return fmt.Errorf("constant %s: %w", cnst.Name, err)
+			}
+			if len(tgs) > 0 {
+				// Also check that the tgs are valid.
+				if _, err := td.validator.ExtractValidations(context, tgs...); err != nil {
+					return fmt.Errorf("constant %s: %w", cnst.Name, err)
+				}
+			}
+			td.constantsByType[cnst.Underlying] = append(td.constantsByType[cnst.Underlying], &validators.Constant{Constant: cnst, Tags: tgs})
+		}
+	}
+	td.initialized = true
+	return nil
 }
 
 // childNode represents a type which is used in another type (e.g. a struct
@@ -210,6 +249,9 @@ type typeNode struct {
 // typeDiscoverer.  If this is called multiple times for different types, the
 // graphs will be will be merged.
 func (td *typeDiscoverer) DiscoverType(t *types.Type) error {
+	if !td.initialized {
+		return fmt.Errorf("typeDiscoverer not initialized")
+	}
 	if t.Kind == types.Pointer {
 		return fmt.Errorf("type %v: pointer root-types are not supported", t)
 	}
@@ -237,56 +279,10 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		}
 	}
 
-	// Catch some edge cases that we don't want to handle (yet?).  This happens
+	// Catch some cases that we don't want to handle (yet?).  This happens
 	// as early as possible to make all the other code simpler.
-	switch t.Kind {
-	case types.Builtin, types.Struct:
-		// Allowed
-	case types.Interface:
-		// We can't do much with interfaces, but they pop up in some places
-		// like RawExtension.
-	case types.Alias:
-		if t.Underlying.Kind == types.Pointer {
-			return nil, fmt.Errorf("field %s (%s): typedefs to pointers are not supported", fldPath.String(), t)
-		}
-	case types.Pointer:
-		pointee := util.NativeType(t.Elem)
-		switch pointee.Kind {
-		case types.Pointer:
-			return nil, fmt.Errorf("field %s (%s): pointers to pointers are not supported", fldPath.String(), t)
-		case types.Slice, types.Array:
-			return nil, fmt.Errorf("field %s (%s): pointers to lists are not supported", fldPath.String(), t)
-		case types.Map:
-			return nil, fmt.Errorf("field %s (%s): pointers to maps are not supported", fldPath.String(), t)
-		}
-	case types.Array:
-		return nil, fmt.Errorf("field %s (%s): fixed-size arrays are not supported", fldPath.String(), t)
-	case types.Slice:
-		elem := util.NativeType(t.Elem)
-		switch elem.Kind {
-		case types.Pointer:
-			return nil, fmt.Errorf("field %s (%s): lists of pointers are not supported", fldPath.String(), t)
-		case types.Slice:
-			if util.NativeType(elem.Elem) != types.Byte {
-				return nil, fmt.Errorf("field %s (%s): lists of lists are not supported", fldPath.String(), t)
-			}
-		case types.Map:
-			return nil, fmt.Errorf("field %s (%s): lists of maps are not supported", fldPath.String(), t)
-		}
-	case types.Map:
-		key := util.NativeType(t.Key)
-		if key != types.String {
-			return nil, fmt.Errorf("field %s (%s): maps with non-string keys are not supported", fldPath.String(), t)
-		}
-		elem := util.NativeType(t.Elem)
-		switch elem.Kind {
-		case types.Pointer:
-			return nil, fmt.Errorf("field %s (%s): maps of pointers are not supported", fldPath.String(), t)
-		case types.Map:
-			return nil, fmt.Errorf("field %s (%s): maps of maps are not supported", fldPath.String(), t)
-		}
-	default:
-		return nil, fmt.Errorf("field %s (%v, kind %v) is not supported", fldPath.String(), t, t.Kind)
+	if err := td.verifySupportedType(t); err != nil {
+		return nil, fmt.Errorf("field %s (%s): %w", fldPath.String(), t, err)
 	}
 
 	// Discovery applies to values, not pointers.
@@ -392,11 +388,17 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	// are called in emitted code, just how we evaluate what to emit.
 	switch t.Kind {
 	case types.Alias, types.Struct:
+		if fldPath.String() != t.String() {
+			panic(fmt.Sprintf("path for type != the type name: %s, %s", t.String(), fldPath.String()))
+		}
+		consts := td.constantsByType[t]
 		context := validators.Context{
-			Scope:  validators.ScopeType,
-			Type:   t,
-			Parent: nil,
-			Path:   fldPath,
+			Scope:      validators.ScopeType,
+			Type:       t,
+			Path:       fldPath,
+			Member:     nil, // NA when discovering a type
+			ParentPath: nil, // NA when discovering a type
+			Constants:  consts,
 		}
 		extractedTags, err := td.validator.ExtractTags(context, t.CommentLines)
 		if err != nil {
@@ -407,11 +409,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		} else if validations.Empty() {
 			klog.V(6).InfoS("no type-attached validations", "type", t)
 		} else {
-			// TODO: This check is placed here to allow map-of-slices fields to exist in the type
-			// system, while preventing validation on them since that functionality is not yet
-			// implemented. Once validation support for map-of-slices is added, this check should
-			// be removed.
-			if util.NativeType(t).Kind == types.Map && util.NativeType(t).Elem.Kind == types.Slice {
+			if util.NonPointer(util.NativeType(t)).Kind == types.Map && util.NonPointer(util.NativeType(t)).Elem.Kind == types.Slice {
 				return nil, fmt.Errorf("field %s: validation for map of slices is not supported", fldPath)
 			}
 			klog.V(5).InfoS("found type-attached validations", "n", validations.Len(), "type", t)
@@ -452,8 +450,9 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 						//
 						// Note: the first argument to Function() is really
 						// only for debugging.
-						v, err := validators.ForEachVal(fldPath, underlying.childType,
-							validators.Function("iterateListValues", validators.DefaultFlags, funcName))
+						v, err := validators.ForEachVal(fldPath, thisNode.valueType,
+							validators.Function("iterateListValues", validators.DefaultFlags, funcName).
+								WithComment("iterate the list and call the type's validation function"))
 						if err != nil {
 							return nil, fmt.Errorf("generating list iteration: %w", err)
 						} else {
@@ -484,7 +483,8 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 						// Note: the first argument to Function() is really
 						// only for debugging.
 						v, err := validators.ForEachKey(fldPath, underlying.childType,
-							validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
+							validators.Function("iterateMapKeys", validators.DefaultFlags, funcName).
+								WithComment("iterate the map and call the key type's validation function"))
 						if err != nil {
 							return nil, fmt.Errorf("generating map key iteration: %w", err)
 						} else {
@@ -514,7 +514,8 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 						// Note: the first argument to Function() is really
 						// only for debugging.
 						v, err := validators.ForEachVal(fldPath, underlying.childType,
-							validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
+							validators.Function("iterateMapValues", validators.DefaultFlags, funcName).
+								WithComment("iterate the map and call the value type's validation function"))
 						if err != nil {
 							return nil, fmt.Errorf("generating map value iteration: %w", err)
 						} else {
@@ -527,6 +528,61 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	}
 
 	return thisNode, nil
+}
+
+// verifySupportedType checks whether the given type is supported.
+func (td *typeDiscoverer) verifySupportedType(t *types.Type) error {
+	switch t.Kind {
+	case types.Builtin, types.Struct:
+		// Allowed
+	case types.Interface:
+		// We can't do much with interfaces, but they pop up in some places
+		// like RawExtension.
+	case types.Alias:
+		if t.Underlying.Kind == types.Pointer {
+			return fmt.Errorf("typedefs to pointers are not supported")
+		}
+	case types.Pointer:
+		pointee := util.NativeType(t.Elem)
+		switch pointee.Kind {
+		case types.Pointer:
+			return fmt.Errorf("pointers to pointers are not supported")
+		case types.Slice, types.Array:
+			return fmt.Errorf("pointers to lists are not supported")
+		case types.Map:
+			return fmt.Errorf("pointers to maps are not supported")
+		}
+	case types.Array:
+		return fmt.Errorf("fixed-size arrays are not supported")
+	case types.Slice:
+		elem := util.NativeType(t.Elem)
+		switch elem.Kind {
+		case types.Pointer:
+			return fmt.Errorf("lists of pointers are not supported")
+		case types.Slice:
+			if util.NativeType(elem.Elem) != types.Byte {
+				return fmt.Errorf("lists of lists are not supported")
+			}
+		case types.Map:
+			return fmt.Errorf("lists of maps are not supported")
+		}
+	case types.Map:
+		key := util.NativeType(t.Key)
+		if key != types.String {
+			return fmt.Errorf("maps with non-string keys are not supported")
+		}
+		elem := util.NativeType(t.Elem)
+		switch elem.Kind {
+		case types.Pointer:
+			return fmt.Errorf("maps of pointers are not supported")
+		case types.Map:
+			return fmt.Errorf("maps of maps are not supported")
+		}
+	default:
+		return fmt.Errorf("kind %v is not supported", t.Kind)
+	}
+
+	return nil
 }
 
 // discoverStruct walks a struct type recursively.
@@ -551,8 +607,14 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			jsonName = commentTags.Name
 		}
 
+		var childPath *field.Path
+		if jsonName != "" {
+			childPath = fldPath.Child(jsonName)
+		} else {
+			childPath = fldPath.Child(name)
+		}
+
 		// Discover the field type.
-		childPath := fldPath.Child(name)
 		klog.V(5).InfoS("field", "name", name, "jsonName", jsonName, "type", memb.Type, "path", childPath)
 		childType := memb.Type
 		var child *childNode
@@ -569,38 +631,33 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 
 		// Extract any field-attached validation rules.
 		context := validators.Context{
-			Scope:  validators.ScopeField,
-			Type:   childType,
-			Parent: thisNode.valueType,
-			Member: &memb,
-			Path:   childPath,
+			Scope:      validators.ScopeField,
+			Type:       childType,
+			Path:       childPath,
+			Member:     &memb,
+			ParentPath: fldPath,
 		}
 
-		Tags, err := td.validator.ExtractTags(context, memb.CommentLines)
+		tags, err := td.validator.ExtractTags(context, memb.CommentLines)
 		if err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
 		}
-		if validations, err := td.validator.ExtractValidations(context, Tags...); err != nil {
+		if validations, err := td.validator.ExtractValidations(context, tags...); err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
 		} else if validations.Empty() {
 			klog.V(6).InfoS("no field-attached validations", "field", childPath)
 		} else {
 			klog.V(5).InfoS("found field-attached validations", "n", validations.Len(), "field", childPath)
-			// TODO: This check is placed here to allow map-of-slices fields to exist in the type
-			// system, while preventing validation on them since that functionality is not yet
-			// implemented. Once validation support for map-of-slices is added, this check should
-			// be removed.
-			if util.NativeType(childType).Kind == types.Map && util.NativeType(childType).Elem.Kind == types.Slice {
+			if util.NonPointer(util.NativeType(childType)).Kind == types.Map && util.NonPointer(util.NativeType(childType)).Elem.Kind == types.Slice {
 				return fmt.Errorf("field %s: validation for map of slices is not supported", childPath)
 			}
 			child.fieldValidations.Add(validations)
-			if len(validations.Variables) > 0 {
-				return fmt.Errorf("%v: variable generation is not supported for field validations", childPath)
-			}
+			// TODO: re-visit erroring on specific cases where variable generation is not supported for field validations
+			// currently there are some cases where we want variable generation for field validations
 		}
 
 		// Handle non-included types.
-		switch nonPtrType(childType).Kind {
+		switch util.NonPointer(childType).Kind {
 		case types.Struct, types.Alias:
 			if child.node == nil { // a non-included type
 				if !child.fieldValidations.OpaqueType {
@@ -647,7 +704,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 					// Note: the first argument to Function() is really
 					// only for debugging.
 					v, err := validators.ForEachVal(childPath, childType,
-						validators.Function("iterateListValues", validators.DefaultFlags, funcName))
+						validators.Function("iterateListValues", validators.DefaultFlags, funcName).
+							WithComment("iterate the list and call the type's validation function"))
 					if err != nil {
 						return fmt.Errorf("generating list iteration: %w", err)
 					} else {
@@ -678,7 +736,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 					// Note: the first argument to Function() is really
 					// only for debugging.
 					v, err := validators.ForEachKey(childPath, childType,
-						validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
+						validators.Function("iterateMapKeys", validators.DefaultFlags, funcName).
+							WithComment("iterate the map and call the key type's validation function"))
 					if err != nil {
 						return fmt.Errorf("generating map key iteration: %w", err)
 					} else {
@@ -708,7 +767,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 					// Note: the first argument to Function() is really
 					// only for debugging.
 					v, err := validators.ForEachVal(childPath, childType,
-						validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
+						validators.Function("iterateMapValues", validators.DefaultFlags, funcName).
+							WithComment("iterate the map and call the value type's validation function"))
 					if err != nil {
 						return fmt.Errorf("generating map value iteration: %w", err)
 					} else {
@@ -723,14 +783,6 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 
 	thisNode.fields = fields
 	return nil
-}
-
-// nonPtrType removes any pointerness from the type.
-func nonPtrType(t *types.Type) *types.Type {
-	for t.Kind == types.Pointer {
-		t = t.Elem
-	}
-	return t
 }
 
 // getValidationFunctionName looks up the name of the specified type's
@@ -839,6 +891,7 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 
 		// This uses a typed nil pointer, rather than a real instance because
 		// we need the type information, but not an instance of the type.
+		sw.Do("// type $.rootType|name$\n", targs)
 		sw.Do("scheme.AddValidationFunc(", targs)
 		sw.Do("    ($.typePfx$$.rootType|raw$)(nil), ", targs)
 		sw.Do("    func(ctx $.context.Context$, op $.operation.Operation|raw$, obj, oldObj interface{}) $.field.ErrorList|raw$ {\n", targs)
@@ -908,6 +961,8 @@ func (g *genValidations) emitValidationFunction(c *generator.Context, t *types.T
 	if node == nil {
 		panic(fmt.Sprintf("found nil node for root-type %v", t))
 	}
+	sw.Do("// $.inType|objectvalidationfn$ validates an instance of $.inType|name$ according\n", targs)
+	sw.Do("// to declarative validation rules in the API schema.\n", targs)
 	sw.Do("func $.inType|objectvalidationfn$(", targs)
 	sw.Do("    ctx $.context.Context|raw$, ", targs)
 	sw.Do("    op $.operation.Operation|raw$, ", targs)
@@ -951,9 +1006,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 		default:
 			panic(fmt.Sprintf("unexpected type-validations on type %v, kind %s", thisNode.valueType, thisNode.valueType.Kind))
 		}
-		sw.Do("// type $.inType|raw$\n", targs)
 		emitComments(validations.Comments, sw)
-		emitRatchetingCheck(c, thisNode.valueType, sw)
 		emitCallsToValidators(c, validations.Functions, sw)
 		if thisNode.valueType.Kind == types.Alias {
 			underlyingNode := thisNode.underlying.node
@@ -1005,15 +1058,59 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			buf := bytes.NewBuffer(nil)
 			bufsw := sw.Dup(buf)
 
-			validations := fld.fieldValidations
+			// On ratcheting checks:
+			//
+			// We emit ratcheting checks ONLY for struct fields and ONLY when
+			// that field has some validations to call.
+			//
+			// We DO NOT emit ratchet checks inside type-specific validation
+			// functions, because that leads to repeated ratchet checking which
+			// is almost never useful work (keep reading).
+			//
+			// The consequence of this is that a caller of a type's validation
+			// function is assumed to have already done a ratchet check (which
+			// is true for all generated code (except root types, keep
+			// reading)). For struct types (our most common case), the type's
+			// function will do ratchet checks on each sub-field anyway.
+			//
+			// This leaves one case where validation is executed unilaterally:
+			// non-pre-checked calls of validation functions for types which have
+			// type-attached validations.  This can happen in two cases:
+			//   1. an external caller of a type's validation function
+			//   2. the generated register function for a package which calls a
+			//      root-type's validation function
+			//
+			// TODO: We are leaving this as a problem for the future. If we
+			// find that we have a root type which has type-attached validation
+			// AND that validation is being ratcheted, then we will need to
+			// address this. Some options:
+			//   1. emit a ratchet check in the package's register function
+			//   2. emit a ratchet check in the type's validation function
+			//      (IFF it has type-attached validation, perhaps only for root
+			//      types)
+			//   3. emit both "safe" (ratchet check the whole object) and
+			//      "fast" (assume the object was already ratchet checked)
+			//      forms of each type's validation function, so that the
+			//      generated code can call the "fast" form while external code
+			//      calls the "safe" form.
+			//   4. implement depth-first traversal of validation, where each
+			//      function returns an additional bool indicating "something
+			//      changed", which gets propagated up the caller to decide if
+			//      it needs to do higher-level validations (e.g. if any field
+			//      in a struct changes, the struct's type-attached validations
+			//      need to be executed, but if no fields changed they can be
+			//      skipped).
 
-			// fldRatchetingChecked is used to avoid emitting the ratcheting check multiple times.
+			validations := fld.fieldValidations
 			fldRatchetingChecked := false
 			if !validations.Empty() {
 				emitComments(validations.Comments, bufsw)
-				emitRatchetingCheck(c, fld.childType, bufsw)
-				emitCallsToValidators(c, validations.Functions, bufsw)
-				fldRatchetingChecked = true
+				if len(validations.Functions) > 0 {
+					emitRatchetingCheck(c, fld.childType, bufsw)
+					fldRatchetingChecked = true
+					bufsw.Do("// call field-attached validations\n", nil)
+					emitCallsToValidators(c, validations.Functions, bufsw)
+				}
 			}
 
 			// If the node is nil, this must be a type in a package we are not
@@ -1022,18 +1119,29 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				// Get to the real type.
 				switch fld.node.valueType.Kind {
 				case types.Alias, types.Struct:
-					// If this field is another type, call its validation function.
-					g.emitCallToOtherTypeFunc(c, fld.node, bufsw)
+					// If this field is another type, we may need to call its
+					// validation function. If it has no validations
+					// (transitively) then we don't need to do anything.
+					if g.hasValidations(fld.node) {
+						if !fldRatchetingChecked {
+							emitRatchetingCheck(c, fld.childType, bufsw)
+							fldRatchetingChecked = true
+						}
+						g.emitCallToOtherTypeFunc(c, fld.node, bufsw)
+					}
 				case types.Slice:
 					// If this field is a list and the value-type has
 					// validations, call its validation function.
 					if validations := fld.fieldValIterations; g.hasValidations(fld.node.elem.node) && !validations.Empty() {
 						emitComments(validations.Comments, bufsw)
-						if !fldRatchetingChecked {
-							emitRatchetingCheck(c, fld.childType, bufsw)
-							fldRatchetingChecked = true
+						if len(validations.Functions) > 0 {
+							if !fldRatchetingChecked {
+								emitRatchetingCheck(c, fld.childType, bufsw)
+								fldRatchetingChecked = true
+							}
+							emitCallsToValidators(c, validations.Functions, bufsw)
 						}
-						emitCallsToValidators(c, validations.Functions, bufsw)
+
 					}
 					// Descend into this field.
 					g.emitValidationForChild(c, fld, bufsw)
@@ -1042,21 +1150,25 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 					// validations, call its validation function.
 					if validations := fld.fieldKeyIterations; g.hasValidations(fld.node.key.node) && !validations.Empty() {
 						emitComments(validations.Comments, bufsw)
-						if !fldRatchetingChecked {
-							emitRatchetingCheck(c, fld.childType, bufsw)
-							fldRatchetingChecked = true
+						if len(validations.Functions) > 0 {
+							if !fldRatchetingChecked {
+								emitRatchetingCheck(c, fld.childType, bufsw)
+								fldRatchetingChecked = true
+							}
+							emitCallsToValidators(c, validations.Functions, bufsw)
 						}
-						emitCallsToValidators(c, validations.Functions, bufsw)
 					}
 					// If this field is a map and the value-type has
 					// validations, call its validation function.
 					if validations := fld.fieldValIterations; g.hasValidations(fld.node.elem.node) && !validations.Empty() {
 						emitComments(validations.Comments, bufsw)
-						if !fldRatchetingChecked {
-							emitRatchetingCheck(c, fld.childType, bufsw)
-							fldRatchetingChecked = true
+						if len(validations.Functions) > 0 {
+							if !fldRatchetingChecked {
+								emitRatchetingCheck(c, fld.childType, bufsw)
+								fldRatchetingChecked = true
+							}
+							emitCallsToValidators(c, validations.Functions, bufsw)
 						}
-						emitCallsToValidators(c, validations.Functions, bufsw)
 					}
 					// Descend into this field.
 					g.emitValidationForChild(c, fld, bufsw)
@@ -1121,36 +1233,36 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 // variables named "obj" and "oldObj", and the field path to this value is
 // named "fldPath".
 func (g *genValidations) emitCallToOtherTypeFunc(c *generator.Context, node *typeNode, sw *generator.SnippetWriter) {
-	// If this type has no validations (transitively) then we don't need to do
-	// anything.
-	if !g.hasValidations(node) {
-		return
-	}
-
 	targs := generator.Args{
 		"funcName": c.Universe.Type(node.funcName),
 	}
+	sw.Do("// call the type's validation function\n", nil)
 	sw.Do("errs = append(errs, $.funcName|raw$(ctx, op, fldPath, obj, oldObj)...)\n", targs)
 }
 
-// emitRachetingCheck emits a equivalence check for default ratcheting.
+// emitRatchetingCheck emits an equivalence check for default ratcheting.
 func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.SnippetWriter) {
 	// Emit equivalence check for default ratcheting.
-	// TODO: Need to have a follow-up PR to handle the default behavior
-	// for slices and maps.
 	targs := generator.Args{
 		"operation": mkSymbolArgs(c, operationPkgSymbols),
 	}
+	sw.Do("// don't revalidate unchanged data\n", nil)
 	// If the type is a builtin, we can use a simpler equality check when they are not nil.
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(t))) {
-		_, exprPfx, _ := getLeafTypeAndPrefixes(t)
-		targs["exprPfx"] = exprPfx
-		sw.Do("if op.Type == $.operation.Update|raw$ && (obj == oldObj || (obj != nil && oldObj != nil && $.exprPfx$obj == $.exprPfx$oldObj)) {\n", targs)
+		// We should never get anything but pointers here, since every other
+		// nilable type is not Comparable.
+		//
+		// This condition looks overly complex, but each case is needed:
+		// - obj == oldObj : handle pointers which are nil in old and new
+		// - obj != nil : handle optional fields which are updated to nil
+		// - oldObj != nil : handle optional fields which are updated from nil
+		// - *obj == *oldObj : compare values
+		sw.Do("if op.Type == $.operation.Update|raw$ && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {\n", targs)
 	} else {
 		targs["equality"] = mkSymbolArgs(c, equalityPkgSymbols)
 		sw.Do("if op.Type == $.operation.Update|raw$ && $.equality.Semantic|raw$.DeepEqual(obj, oldObj) {\n", targs)
 	}
-	sw.Do("   return nil // no changes\n", nil)
+	sw.Do("   return nil\n", nil)
 	sw.Do("}\n", nil)
 }
 
@@ -1213,7 +1325,7 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 			sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
 			for _, arg := range v.Args {
 				sw.Do(", ", nil)
-				toGolangSourceDataLiteral(sw, c, arg)
+				toGolangSourceDataLiteral(sw, emitterContext{Context: c}, arg)
 			}
 			sw.Do(")", targs)
 		}
@@ -1284,43 +1396,37 @@ func emitComments(comments []string, sw *generator.SnippetWriter) {
 func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.Type, sw *generator.SnippetWriter) {
 	tn := g.discovered.typeNodes[t]
 
-	variables := tn.typeValidations.Variables
-	slices.SortFunc(variables, func(a, b validators.VariableGen) int {
-		return cmp.Compare(a.Variable.Name, b.Variable.Name)
-	})
-	for _, variable := range variables {
-		fn := variable.InitFunc
-		targs := generator.Args{
-			"varName": c.Universe.Type(types.Name(variable.Variable)),
-			"initFn":  c.Universe.Type(fn.Function),
-		}
-		for _, comment := range fn.Comments {
-			sw.Do("// $.$\n", comment)
-		}
-		sw.Do("var $.varName|private$ = $.initFn|raw$", targs)
-		if typeArgs := fn.TypeArgs; len(typeArgs) > 0 {
-			sw.Do("[", nil)
-			for i, typeArg := range typeArgs {
-				sw.Do("$.|raw$", c.Universe.Type(typeArg))
-				if i < len(typeArgs)-1 {
-					sw.Do(",", nil)
-				}
+	emit := func(variables []validators.VariableGen) {
+		slices.SortFunc(variables, func(a, b validators.VariableGen) int {
+			return cmp.Compare(a.Variable.Name, b.Variable.Name)
+		})
+		for _, variable := range variables {
+			targs := generator.Args{
+				"varName": c.Universe.Type(types.Name(variable.Variable)),
 			}
-			sw.Do("]", nil)
-		}
-		sw.Do("(", targs)
-		for i, arg := range fn.Args {
-			if i != 0 {
-				sw.Do(", ", nil)
-			}
-			toGolangSourceDataLiteral(sw, c, arg)
-		}
-		sw.Do(")\n", nil)
 
+			sw.Do("var $.varName|private$ = ", targs)
+			toGolangSourceDataLiteral(sw, emitterContext{Context: c}, variable.Initializer)
+			sw.Do("\n", nil)
+		}
+	}
+	// TODO: Handle potential variable name collisions when multiple validators
+	// generate variables with the same name.
+	emit(tn.typeValidations.Variables)
+	for _, field := range tn.fields {
+		if len(field.fieldValidations.Variables) != 0 {
+			emit(field.fieldValidations.Variables)
+		}
 	}
 }
 
-func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context, value any) {
+type emitterContext struct {
+	*generator.Context
+	// True if the literal to be emitted is a slice or array element.
+	isElement bool
+}
+
+func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, value any) {
 	// For safety, be strict in what values we output to visited source, and ensure strings
 	// are quoted.
 
@@ -1337,6 +1443,8 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 	case *types.Type:
 		sw.Do("$.|raw$", v)
 	case types.Member:
+		sw.Do("obj."+v.Name, nil)
+	case *types.Member:
 		sw.Do("obj."+v.Name, nil)
 	case validators.Identifier:
 		sw.Do("$.|raw$", c.Universe.Type(types.Name(v)))
@@ -1362,9 +1470,9 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			// a "standard signature" validation function to wrap it.
 			targs := generator.Args{
 				"funcName":   c.Universe.Type(v.Function.Function),
-				"field":      mkSymbolArgs(c, fieldPkgSymbols),
-				"operation":  mkSymbolArgs(c, operationPkgSymbols),
-				"context":    mkSymbolArgs(c, contextPkgSymbols),
+				"field":      mkSymbolArgs(c.Context, fieldPkgSymbols),
+				"operation":  mkSymbolArgs(c.Context, operationPkgSymbols),
+				"context":    mkSymbolArgs(c.Context, contextPkgSymbols),
 				"objType":    v.ObjType,
 				"objTypePfx": "*",
 			}
@@ -1372,37 +1480,23 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 				targs["objTypePfx"] = ""
 			}
 
-			emitCall := func() {
-				sw.Do("return $.funcName|raw$", targs)
-				typeArgs := v.Function.TypeArgs
-				if len(typeArgs) > 0 {
-					sw.Do("[", nil)
-					for i, typeArg := range typeArgs {
-						sw.Do("$.|raw$", c.Universe.Type(typeArg))
-						if i < len(typeArgs)-1 {
-							sw.Do(",", nil)
-						}
-					}
-					sw.Do("]", nil)
-				}
-				sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
-				for _, arg := range extraArgs {
-					sw.Do(", ", nil)
-					toGolangSourceDataLiteral(sw, c, arg)
-				}
-				sw.Do(")", targs)
-			}
 			sw.Do("func(", targs)
 			sw.Do("    ctx $.context.Context|raw$, ", targs)
 			sw.Do("    op $.operation.Operation|raw$, ", targs)
 			sw.Do("    fldPath *$.field.Path|raw$, ", targs)
 			sw.Do("    obj, oldObj $.objTypePfx$$.objType|raw$ ", targs)
 			sw.Do(")    $.field.ErrorList|raw$ {\n", targs)
-			emitCall()
+			sw.Do("return ", nil)
+			emitFunctionCall(sw, c, v.Function, "ctx", "op", "fldPath", "obj", "oldObj")
 			sw.Do("\n}", targs)
 		}
 	case validators.Literal:
 		sw.Do("$.$", v)
+	case validators.FunctionGen:
+		for _, comment := range v.Comments {
+			sw.Do("// $.$\\n", comment)
+		}
+		emitFunctionCall(sw, c, v)
 	case validators.FunctionLiteral:
 		sw.Do("func(", nil)
 		for i, param := range v.Parameters {
@@ -1433,10 +1527,57 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			sw.Do(")", nil)
 		}
 		sw.Do(" { $.$ }", v.Body)
+	case validators.StructLiteral:
+		targs := generator.Args{
+			"type": c.Universe.Type(v.Type),
+		}
+		if !c.isElement { // To conform to gofmt, omit type names for array/slice elements.
+			sw.Do("$.type|raw$", targs)
+			if len(v.TypeArgs) > 0 {
+				sw.Do("[", nil)
+				for i, typeArg := range v.TypeArgs {
+					if i > 0 {
+						sw.Do(", ", nil)
+					}
+					sw.Do("$.|raw$", typeArg)
+				}
+				sw.Do("]", nil)
+			}
+		}
+		sw.Do("{\n", nil)
+		for _, f := range v.Fields {
+			sw.Do(f.Name, nil)
+			sw.Do(": ", nil)
+			toGolangSourceDataLiteral(sw, c, f.Value)
+			sw.Do(", ", nil)
+		}
+		sw.Do("}", targs)
+	case validators.SliceLiteral:
+		sw.Do("[]", nil)
+		targs := generator.Args{
+			"type": c.Universe.Type(v.ElementType),
+		}
+		sw.Do("$.type|raw$", targs)
+		if len(v.ElementTypeArgs) > 0 {
+			sw.Do("[", nil)
+			for i, typeArg := range v.ElementTypeArgs {
+				if i > 0 {
+					sw.Do(", ", nil)
+				}
+				sw.Do("$.|raw$", typeArg)
+			}
+			sw.Do("]", nil)
+		}
+		sw.Do("{\n", nil)
+		for _, e := range v.Elements {
+			toGolangSourceDataLiteral(sw, emitterContext{Context: c.Context, isElement: true}, e)
+			sw.Do(",\n", nil)
+		}
+		sw.Do("}", nil)
 	default:
 		rv := reflect.ValueOf(value)
 		switch rv.Kind() {
-		case reflect.Slice, reflect.Array:
+		case reflect.Array:
 			arraySize := ""
 			if rv.Kind() == reflect.Array {
 				arraySize = strconv.Itoa(rv.Len())
@@ -1463,6 +1604,37 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			panic(fmt.Sprintf("Unsupported extraArg type: %T", value))
 		}
 	}
+}
+
+func emitFunctionCall(sw *generator.SnippetWriter, c emitterContext, v validators.FunctionGen, leadingArgs ...string) {
+	targs := generator.Args{
+		"funcName": c.Universe.Type(v.Function),
+	}
+	sw.Do("$.funcName|raw$", targs)
+	if typeArgs := v.TypeArgs; len(typeArgs) > 0 {
+		sw.Do("[", nil)
+		for i, typeArg := range typeArgs {
+			sw.Do("$.|raw$", c.Universe.Type(typeArg))
+			if i < len(typeArgs)-1 {
+				sw.Do(",", nil)
+			}
+		}
+		sw.Do("]", nil)
+	}
+	sw.Do("(", nil)
+	if len(leadingArgs) > 0 {
+		sw.Do(strings.Join(leadingArgs, ", "), nil)
+	}
+	if len(leadingArgs) > 0 && len(v.Args) > 0 {
+		sw.Do(", ", nil)
+	}
+	for i, arg := range v.Args {
+		if i != 0 {
+			sw.Do(", ", nil)
+		}
+		toGolangSourceDataLiteral(sw, c, arg)
+	}
+	sw.Do(")", nil)
 }
 
 // getLeafTypeAndPrefixes returns the "leaf value type" for a given type, as

@@ -20,13 +20,23 @@ package v1
 
 // ReplicationControllerStatusApplyConfiguration represents a declarative configuration of the ReplicationControllerStatus type for use
 // with apply.
+//
+// ReplicationControllerStatus represents the current status of a replication
+// controller.
 type ReplicationControllerStatusApplyConfiguration struct {
-	Replicas             *int32                                             `json:"replicas,omitempty"`
-	FullyLabeledReplicas *int32                                             `json:"fullyLabeledReplicas,omitempty"`
-	ReadyReplicas        *int32                                             `json:"readyReplicas,omitempty"`
-	AvailableReplicas    *int32                                             `json:"availableReplicas,omitempty"`
-	ObservedGeneration   *int64                                             `json:"observedGeneration,omitempty"`
-	Conditions           []ReplicationControllerConditionApplyConfiguration `json:"conditions,omitempty"`
+	// Replicas is the most recently observed number of replicas.
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
+	Replicas *int32 `json:"replicas,omitempty"`
+	// The number of pods that have labels matching the labels of the pod template of the replication controller.
+	FullyLabeledReplicas *int32 `json:"fullyLabeledReplicas,omitempty"`
+	// The number of ready replicas for this replication controller.
+	ReadyReplicas *int32 `json:"readyReplicas,omitempty"`
+	// The number of available replicas (ready for at least minReadySeconds) for this replication controller.
+	AvailableReplicas *int32 `json:"availableReplicas,omitempty"`
+	// ObservedGeneration reflects the generation of the most recently observed replication controller.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// Represents the latest available observations of a replication controller's current state.
+	Conditions []ReplicationControllerConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // ReplicationControllerStatusApplyConfiguration constructs a declarative configuration of the ReplicationControllerStatus type for use with
@@ -34,7 +44,6 @@ type ReplicationControllerStatusApplyConfiguration struct {
 func ReplicationControllerStatus() *ReplicationControllerStatusApplyConfiguration {
 	return &ReplicationControllerStatusApplyConfiguration{}
 }
-func (b ReplicationControllerStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithReplicas sets the Replicas field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -84,6 +84,7 @@ func (ContainerRuntimeCheck) Name() string {
 // Check validates the container runtime
 func (crc ContainerRuntimeCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("validating the container runtime")
+	defer crc.runtime.Close()
 	if err := crc.runtime.IsRunning(); err != nil {
 		errorList = append(errorList, err)
 	}
@@ -104,7 +105,7 @@ func (sc ServiceCheck) Name() string {
 	if sc.Label != "" {
 		return sc.Label
 	}
-	return fmt.Sprintf("Service-%s", strings.Title(sc.Service))
+	return fmt.Sprintf("Service-%s", sc.Service)
 }
 
 // Check validates if the service is enabled and active.
@@ -1087,6 +1088,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	if err := containerRuntime.Connect(); err != nil {
 		return handleError(os.Stderr, err.Error())
 	}
+	defer containerRuntime.Close()
 
 	serialPull := true
 	if cfg.NodeRegistration.ImagePullSerial != nil {
@@ -1128,7 +1130,7 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.Set[st
 		}
 	}
 	if errsBuffer.Len() > 0 {
-		return handleError(&errsBuffer, errsBuffer.String())
+		return handleError(ww, errsBuffer.String())
 	}
 	return nil
 }

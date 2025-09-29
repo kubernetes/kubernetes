@@ -17,13 +17,12 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
-	"net"
 	"runtime"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -37,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	"k8s.io/kubernetes/pkg/volume"
@@ -83,10 +83,10 @@ func NewInitializedVolumePluginMgr(
 		configMapManager:          configMapManager,
 		tokenManager:              tokenManager,
 		clusterTrustBundleManager: clusterTrustBundleManager,
+		podCertificateManager:     kubelet.podCertificateManager,
 		informerFactory:           informerFactory,
 		csiDriverLister:           csiDriverLister,
 		csiDriversSynced:          csiDriversSynced,
-		exec:                      utilexec.New(),
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
@@ -113,10 +113,10 @@ type kubeletVolumeHost struct {
 	tokenManager              *token.Manager
 	configMapManager          configmap.Manager
 	clusterTrustBundleManager clustertrustbundle.Manager
+	podCertificateManager     podcertificate.Manager
 	informerFactory           informers.SharedInformerFactory
 	csiDriverLister           storagelisters.CSIDriverLister
 	csiDriversSynced          cache.InformerSynced
-	exec                      utilexec.Interface
 }
 
 func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
@@ -223,14 +223,6 @@ func (kvh *kubeletVolumeHost) GetHostName() string {
 	return kvh.kubelet.hostname
 }
 
-func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
-	hostIPs, err := kvh.kubelet.GetHostIPs()
-	if err != nil {
-		return nil, err
-	}
-	return hostIPs[0], err
-}
-
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	node, err := kvh.kubelet.getNodeAnyWay()
 	if err != nil {
@@ -271,6 +263,10 @@ func (kvh *kubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing bo
 
 func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
 	return kvh.clusterTrustBundleManager.GetTrustAnchorsBySigner(signerName, labelSelector, allowMissing)
+}
+
+func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error) {
+	return kvh.podCertificateManager.GetPodCertificateCredentialBundle(ctx, namespace, podName, podUID, volumeName, sourceIndex)
 }
 
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {

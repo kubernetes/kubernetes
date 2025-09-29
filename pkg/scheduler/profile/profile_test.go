@@ -28,7 +28,6 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
@@ -283,16 +282,16 @@ func (p *fakePlugin) Name() string {
 	return p.name
 }
 
-func (p *fakePlugin) Less(*framework.QueuedPodInfo, *framework.QueuedPodInfo) bool {
+func (p *fakePlugin) Less(fwk.QueuedPodInfo, fwk.QueuedPodInfo) bool {
 	return false
 }
 
-func (p *fakePlugin) Bind(context.Context, fwk.CycleState, *v1.Pod, string) *framework.Status {
+func (p *fakePlugin) Bind(context.Context, fwk.CycleState, *v1.Pod, string) *fwk.Status {
 	return nil
 }
 
-func newFakePlugin(name string) func(ctx context.Context, object runtime.Object, handle framework.Handle) (framework.Plugin, error) {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newFakePlugin(name string) func(ctx context.Context, object runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &fakePlugin{name: name}, nil
 	}
 }

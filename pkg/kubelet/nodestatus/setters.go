@@ -81,17 +81,18 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 	secondaryNodeIPSpecified := secondaryNodeIP != nil && !secondaryNodeIP.IsUnspecified()
 
 	return func(ctx context.Context, node *v1.Node) error {
+		logger := klog.FromContext(ctx)
 		if nodeIPSpecified {
 			if err := validateNodeIPFunc(nodeIP); err != nil {
 				return fmt.Errorf("failed to validate nodeIP: %v", err)
 			}
-			klog.V(4).InfoS("Using node IP", "IP", nodeIP.String())
+			logger.V(4).Info("Using node IP", "IP", nodeIP.String())
 		}
 		if secondaryNodeIPSpecified {
 			if err := validateNodeIPFunc(secondaryNodeIP); err != nil {
 				return fmt.Errorf("failed to validate secondaryNodeIP: %v", err)
 			}
-			klog.V(4).InfoS("Using secondary node IP", "IP", secondaryNodeIP.String())
+			logger.V(4).Info("Using secondary node IP", "IP", secondaryNodeIP.String())
 		}
 
 		if externalCloudProvider && nodeIPSpecified {
@@ -202,6 +203,7 @@ func MachineInfo(nodeName string,
 	localStorageCapacityIsolation bool,
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
+		logger := klog.FromContext(ctx)
 		// Note: avoid blindly overwriting the capacity in case opaque
 		//       resources are being advertised.
 		if node.Status.Capacity == nil {
@@ -221,7 +223,7 @@ func MachineInfo(nodeName string,
 			node.Status.Capacity[v1.ResourceCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
 			node.Status.Capacity[v1.ResourceMemory] = resource.MustParse("0Gi")
 			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(int64(maxPods), resource.DecimalSI)
-			klog.ErrorS(err, "Error getting machine info")
+			logger.Error(err, "Error getting machine info")
 		} else {
 			node.Status.NodeInfo.MachineID = info.MachineID
 			node.Status.NodeInfo.SystemUUID = info.SystemUUID
@@ -263,13 +265,13 @@ func MachineInfo(nodeName string,
 			devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = devicePluginResourceCapacityFunc()
 			for k, v := range devicePluginCapacity {
 				if old, ok := node.Status.Capacity[k]; !ok || old.Value() != v.Value() {
-					klog.V(2).InfoS("Updated capacity for device plugin", "plugin", k, "capacity", v.Value())
+					logger.V(2).Info("Updated capacity for device plugin", "plugin", k, "capacity", v.Value())
 				}
 				node.Status.Capacity[k] = v
 			}
 
 			for _, removedResource := range removedDevicePlugins {
-				klog.V(2).InfoS("Set capacity for removed resource to 0 on device removal", "device", removedResource)
+				logger.V(2).Info("Set capacity for removed resource to 0 on device removal", "device", removedResource)
 				// Set the capacity of the removed resource to 0 instead of
 				// removing the resource from the node status. This is to indicate
 				// that the resource is managed by device plugin and had been
@@ -315,7 +317,7 @@ func MachineInfo(nodeName string,
 
 		for k, v := range devicePluginAllocatable {
 			if old, ok := node.Status.Allocatable[k]; !ok || old.Value() != v.Value() {
-				klog.V(2).InfoS("Updated allocatable", "device", k, "allocatable", v.Value())
+				logger.V(2).Info("Updated allocatable", "device", k, "allocatable", v.Value())
 			}
 			node.Status.Allocatable[k] = v
 		}
@@ -540,7 +542,8 @@ func ReadyCondition(
 				recordEventFunc(v1.EventTypeNormal, events.NodeReady)
 			} else {
 				recordEventFunc(v1.EventTypeNormal, events.NodeNotReady)
-				klog.InfoS("Node became not ready", "node", klog.KObj(node), "condition", newNodeReadyCondition)
+				logger := klog.FromContext(ctx)
+				logger.Info("Node became not ready", "node", klog.KObj(node), "condition", newNodeReadyCondition)
 			}
 		}
 		return nil

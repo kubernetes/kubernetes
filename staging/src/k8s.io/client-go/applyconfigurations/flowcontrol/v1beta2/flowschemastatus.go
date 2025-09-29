@@ -20,7 +20,10 @@ package v1beta2
 
 // FlowSchemaStatusApplyConfiguration represents a declarative configuration of the FlowSchemaStatus type for use
 // with apply.
+//
+// FlowSchemaStatus represents the current state of a FlowSchema.
 type FlowSchemaStatusApplyConfiguration struct {
+	// `conditions` is a list of the current states of FlowSchema.
 	Conditions []FlowSchemaConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type FlowSchemaStatusApplyConfiguration struct {
 func FlowSchemaStatus() *FlowSchemaStatusApplyConfiguration {
 	return &FlowSchemaStatusApplyConfiguration{}
 }
-func (b FlowSchemaStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

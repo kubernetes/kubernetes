@@ -26,9 +26,19 @@ import (
 
 // PersistentVolumeClaimTemplateApplyConfiguration represents a declarative configuration of the PersistentVolumeClaimTemplate type for use
 // with apply.
+//
+// PersistentVolumeClaimTemplate is used to produce
+// PersistentVolumeClaim objects as part of an EphemeralVolumeSource.
 type PersistentVolumeClaimTemplateApplyConfiguration struct {
+	// May contain labels and annotations that will be copied into the PVC
+	// when creating it. No other fields are allowed and will be rejected during
+	// validation.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty"`
+	// The specification for the PersistentVolumeClaim. The entire content is
+	// copied unchanged into the PVC that gets created from this
+	// template. The same fields as in a PersistentVolumeClaim
+	// are also valid here.
+	Spec *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // PersistentVolumeClaimTemplateApplyConfiguration constructs a declarative configuration of the PersistentVolumeClaimTemplate type for use with
@@ -36,7 +46,6 @@ type PersistentVolumeClaimTemplateApplyConfiguration struct {
 func PersistentVolumeClaimTemplate() *PersistentVolumeClaimTemplateApplyConfiguration {
 	return &PersistentVolumeClaimTemplateApplyConfiguration{}
 }
-func (b PersistentVolumeClaimTemplateApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

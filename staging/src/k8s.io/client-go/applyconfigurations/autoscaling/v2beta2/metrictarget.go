@@ -25,11 +25,21 @@ import (
 
 // MetricTargetApplyConfiguration represents a declarative configuration of the MetricTarget type for use
 // with apply.
+//
+// MetricTarget defines the target value, average value, or average utilization of a specific metric
 type MetricTargetApplyConfiguration struct {
-	Type               *autoscalingv2beta2.MetricTargetType `json:"type,omitempty"`
-	Value              *resource.Quantity                   `json:"value,omitempty"`
-	AverageValue       *resource.Quantity                   `json:"averageValue,omitempty"`
-	AverageUtilization *int32                               `json:"averageUtilization,omitempty"`
+	// type represents whether the metric type is Utilization, Value, or AverageValue
+	Type *autoscalingv2beta2.MetricTargetType `json:"type,omitempty"`
+	// value is the target value of the metric (as a quantity).
+	Value *resource.Quantity `json:"value,omitempty"`
+	// averageValue is the target value of the average of the
+	// metric across all relevant pods (as a quantity)
+	AverageValue *resource.Quantity `json:"averageValue,omitempty"`
+	// averageUtilization is the target value of the average of the
+	// resource metric across all relevant pods, represented as a percentage of
+	// the requested value of the resource for the pods.
+	// Currently only valid for Resource metric source type
+	AverageUtilization *int32 `json:"averageUtilization,omitempty"`
 }
 
 // MetricTargetApplyConfiguration constructs a declarative configuration of the MetricTarget type for use with
@@ -37,7 +47,6 @@ type MetricTargetApplyConfiguration struct {
 func MetricTarget() *MetricTargetApplyConfiguration {
 	return &MetricTargetApplyConfiguration{}
 }
-func (b MetricTargetApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -20,7 +20,11 @@ package v1beta1
 
 // IPAddressSpecApplyConfiguration represents a declarative configuration of the IPAddressSpec type for use
 // with apply.
+//
+// IPAddressSpec describe the attributes in an IP Address.
 type IPAddressSpecApplyConfiguration struct {
+	// ParentRef references the resource that an IPAddress is attached to.
+	// An IPAddress must reference a parent object.
 	ParentRef *ParentReferenceApplyConfiguration `json:"parentRef,omitempty"`
 }
 
@@ -29,7 +33,6 @@ type IPAddressSpecApplyConfiguration struct {
 func IPAddressSpec() *IPAddressSpecApplyConfiguration {
 	return &IPAddressSpecApplyConfiguration{}
 }
-func (b IPAddressSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithParentRef sets the ParentRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

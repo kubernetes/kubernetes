@@ -20,7 +20,10 @@ package v1beta1
 
 // RollbackConfigApplyConfiguration represents a declarative configuration of the RollbackConfig type for use
 // with apply.
+//
+// DEPRECATED.
 type RollbackConfigApplyConfiguration struct {
+	// The revision to rollback to. If set to 0, rollback to the last revision.
 	Revision *int64 `json:"revision,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type RollbackConfigApplyConfiguration struct {
 func RollbackConfig() *RollbackConfigApplyConfiguration {
 	return &RollbackConfigApplyConfiguration{}
 }
-func (b RollbackConfigApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRevision sets the Revision field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

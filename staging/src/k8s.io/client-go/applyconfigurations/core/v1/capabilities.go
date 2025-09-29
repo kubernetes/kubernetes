@@ -24,8 +24,12 @@ import (
 
 // CapabilitiesApplyConfiguration represents a declarative configuration of the Capabilities type for use
 // with apply.
+//
+// Adds and removes POSIX capabilities from running containers.
 type CapabilitiesApplyConfiguration struct {
-	Add  []corev1.Capability `json:"add,omitempty"`
+	// Added capabilities
+	Add []corev1.Capability `json:"add,omitempty"`
+	// Removed capabilities
 	Drop []corev1.Capability `json:"drop,omitempty"`
 }
 
@@ -34,7 +38,6 @@ type CapabilitiesApplyConfiguration struct {
 func Capabilities() *CapabilitiesApplyConfiguration {
 	return &CapabilitiesApplyConfiguration{}
 }
-func (b CapabilitiesApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAdd adds the given value to the Add field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

@@ -24,9 +24,13 @@ import (
 
 // NodeAddressApplyConfiguration represents a declarative configuration of the NodeAddress type for use
 // with apply.
+//
+// NodeAddress contains information for the node's address.
 type NodeAddressApplyConfiguration struct {
-	Type    *corev1.NodeAddressType `json:"type,omitempty"`
-	Address *string                 `json:"address,omitempty"`
+	// Node address type, one of Hostname, ExternalIP or InternalIP.
+	Type *corev1.NodeAddressType `json:"type,omitempty"`
+	// The node address.
+	Address *string `json:"address,omitempty"`
 }
 
 // NodeAddressApplyConfiguration constructs a declarative configuration of the NodeAddress type for use with
@@ -34,7 +38,6 @@ type NodeAddressApplyConfiguration struct {
 func NodeAddress() *NodeAddressApplyConfiguration {
 	return &NodeAddressApplyConfiguration{}
 }
-func (b NodeAddressApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

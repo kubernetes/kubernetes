@@ -19,10 +19,14 @@ package builder
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/emicklei/go-restful/v3"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	v1 "k8s.io/api/autoscaling/v1"
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
@@ -55,8 +59,8 @@ const (
 	objectMetaSchemaRef = "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
 	listMetaSchemaRef   = "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
 
-	typeMetaType   = "k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta"
-	objectMetaType = "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"
+	typeMetaType   = "io.k8s.apimachinery.pkg.apis.meta.v1.TypeMeta"
+	objectMetaType = "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
 
 	definitionPrefix   = "#/definitions/"
 	v3DefinitionPrefix = "#/components/schemas/"
@@ -223,7 +227,7 @@ type CRDCanonicalTypeNamer struct {
 
 // OpenAPICanonicalTypeName returns canonical type name for given CRD
 func (c *CRDCanonicalTypeNamer) OpenAPICanonicalTypeName() string {
-	return fmt.Sprintf("%s/%s.%s", c.group, c.version, c.kind)
+	return gvkToModelName(c.group, c.version, c.kind)
 }
 
 // builder contains validation schema and basic naming information for a CRD in
@@ -314,7 +318,7 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		To(func(req *restful.Request, res *restful.Response) {}).
 		Doc(b.descriptionFor(path, operationVerb)).
 		Param(b.ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-		Operation(operationVerb+namespaced+b.kind+strings.Title(subresource(path))).
+		Operation(operationVerb+namespaced+b.kind+cases.Title(language.English).String(subresource(path))).
 		Metadata(endpoints.RouteMetaGVK, metav1.GroupVersionKind{
 			Group:   b.group,
 			Version: b.version,
@@ -381,7 +385,11 @@ func (b *builder) buildKubeNative(crd *apiextensionsv1.CustomResourceDefinition,
 	// and forbid anything outside of apiVersion, kind and metadata. We have to fix kubectl to stop doing this, e.g. by
 	// adding additionalProperties=true support to explicitly allow additional fields.
 	// TODO: fix kubectl to understand additionalProperties=true
-	if schema == nil || (opts.V2 && (schema.XPreserveUnknownFields || crdPreserveUnknownFields)) {
+	if schema == nil {
+		ret = &spec.Schema{
+			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
+		}
+	} else if opts.V2 && (schema.XPreserveUnknownFields || crdPreserveUnknownFields) {
 		ret = &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
 		}
@@ -495,7 +503,7 @@ func addTypeMetaProperties(s *spec.Schema, v2 bool) {
 
 // buildListSchema builds the list kind schema for the CRD
 func (b *builder) buildListSchema(crd *apiextensionsv1.CustomResourceDefinition, opts Options) *spec.Schema {
-	name := definitionPrefix + util.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", b.group, b.version, b.kind))
+	name := definitionPrefix + gvkToModelName(b.group, b.version, b.kind)
 	doc := fmt.Sprintf("List of %s. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md", b.plural)
 	s := new(spec.Schema).
 		Typed("object", "").
@@ -518,6 +526,13 @@ func (b *builder) buildListSchema(crd *apiextensionsv1.CustomResourceDefinition,
 		}
 	}
 	return s
+}
+
+func gvkToModelName(g, v, k string) string {
+	groupParts := strings.Split(g, ".")
+	slices.Reverse(groupParts)
+	g = strings.Join(groupParts, ".")
+	return fmt.Sprintf("%s.%s.%s", g, v, k)
 }
 
 // getOpenAPIConfig builds config which wires up generated definitions for kube-openapi to consume
@@ -544,11 +559,11 @@ func (b *builder) getOpenAPIConfig() *common.Config {
 		},
 		GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 			def := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(ref)
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
+			def[gvkToModelName(b.group, b.version, b.kind)] = common.OpenAPIDefinition{
 				Schema:       *b.schema,
 				Dependencies: []string{objectMetaType},
 			}
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
+			def[gvkToModelName(b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
 				Schema: *b.listSchema,
 			}
 			return def
@@ -578,11 +593,11 @@ func (b *builder) getOpenAPIV3Config() *common.OpenAPIV3Config {
 		},
 		GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 			def := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(ref)
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
+			def[gvkToModelName(b.group, b.version, b.kind)] = common.OpenAPIDefinition{
 				Schema:       *b.schema,
 				Dependencies: []string{objectMetaType},
 			}
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
+			def[gvkToModelName(b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
 				Schema: *b.listSchema,
 			}
 			return def

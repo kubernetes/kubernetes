@@ -20,9 +20,14 @@ package v1
 
 // LinuxContainerUserApplyConfiguration represents a declarative configuration of the LinuxContainerUser type for use
 // with apply.
+//
+// LinuxContainerUser represents user identity information in Linux containers
 type LinuxContainerUserApplyConfiguration struct {
-	UID                *int64  `json:"uid,omitempty"`
-	GID                *int64  `json:"gid,omitempty"`
+	// UID is the primary uid initially attached to the first process in the container
+	UID *int64 `json:"uid,omitempty"`
+	// GID is the primary gid initially attached to the first process in the container
+	GID *int64 `json:"gid,omitempty"`
+	// SupplementalGroups are the supplemental groups initially attached to the first process in the container
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty"`
 }
 
@@ -31,7 +36,6 @@ type LinuxContainerUserApplyConfiguration struct {
 func LinuxContainerUser() *LinuxContainerUserApplyConfiguration {
 	return &LinuxContainerUserApplyConfiguration{}
 }
-func (b LinuxContainerUserApplyConfiguration) IsApplyConfiguration() {}
 
 // WithUID sets the UID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

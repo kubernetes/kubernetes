@@ -41,6 +41,7 @@ func ClusterTestType(name string) *ClusterTestTypeApplyConfiguration {
 	b.WithAPIVersion("example.crd.code-generator.k8s.io/v1")
 	return b
 }
+
 func (b ClusterTestTypeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

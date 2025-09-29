@@ -20,7 +20,15 @@ package v1beta1
 
 // DeviceClaimConfigurationApplyConfiguration represents a declarative configuration of the DeviceClaimConfiguration type for use
 // with apply.
+//
+// DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.
 type DeviceClaimConfigurationApplyConfiguration struct {
+	// Requests lists the names of requests where the configuration applies.
+	// If empty, it applies to all requests.
+	//
+	// References to subrequests must include the name of the main request
+	// and may include the subrequest using the format <main request>[/<subrequest>]. If just
+	// the main request is given, the configuration applies to all subrequests.
 	Requests                              []string `json:"requests,omitempty"`
 	DeviceConfigurationApplyConfiguration `json:",inline"`
 }
@@ -30,7 +38,6 @@ type DeviceClaimConfigurationApplyConfiguration struct {
 func DeviceClaimConfiguration() *DeviceClaimConfigurationApplyConfiguration {
 	return &DeviceClaimConfigurationApplyConfiguration{}
 }
-func (b DeviceClaimConfigurationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRequests adds the given value to the Requests field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

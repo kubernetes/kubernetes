@@ -141,6 +141,12 @@ func tweakPVCTemplate(pvc ...api.PersistentVolumeClaim) statefulSetTweak {
 	}
 }
 
+func tweakVolumes(volumes ...api.Volume) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.Template.Spec.Volumes = volumes
+	}
+}
+
 func tweakUpdateStrategyType(t apps.StatefulSetUpdateStrategyType) statefulSetTweak {
 	return func(ss *apps.StatefulSet) {
 		ss.Spec.UpdateStrategy.Type = t
@@ -201,6 +207,24 @@ func tweakServiceName(name string) statefulSetTweak {
 	}
 }
 
+func tweakSubdomain(name string) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.Template.Spec.Subdomain = name
+	}
+}
+
+func tweakHostname(name string) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.Template.Spec.Hostname = name
+	}
+}
+
+func tweakVolumeClaimTemplates(volumeClaimTemplates []api.PersistentVolumeClaim) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.VolumeClaimTemplates = volumeClaimTemplates
+	}
+}
+
 func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -209,9 +233,10 @@ func TestValidateStatefulSet(t *testing.T) {
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				Containers:                    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
 			},
 		},
 	}
@@ -235,7 +260,24 @@ func TestValidateStatefulSet(t *testing.T) {
 						ContainerPort: 12345,
 						Protocol:      api.ProtocolTCP,
 					}},
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
 				}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
+			},
+		},
+	}
+	validVolumeClaimTemplates := []api.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pvc",
+			},
+			Spec: api.PersistentVolumeClaimSpec{
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				Resources: api.VolumeResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceStorage: resource.MustParse("1Gi"),
+					},
+				},
 			},
 		},
 	}
@@ -253,6 +295,33 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 	}
 
+	podTemplateWithVolumeMounts := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers: []api.Container{{
+					Name:            "abc",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					Ports: []api.ContainerPort{{
+						ContainerPort: 12345,
+						Protocol:      api.ProtocolTCP,
+					}},
+					VolumeMounts: []api.VolumeMount{{
+						Name:      "test",
+						MountPath: "/test",
+					}},
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
+				}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
+			},
+		},
+	}
+
 	invalidTime := int64(60)
 	invalidPodTemplate2 := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -260,9 +329,41 @@ func TestValidateStatefulSet(t *testing.T) {
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy:         api.RestartPolicyAlways,
-				DNSPolicy:             api.DNSClusterFirst,
-				ActiveDeadlineSeconds: &invalidTime,
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				ActiveDeadlineSeconds:         &invalidTime,
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
+			},
+		},
+	}
+	invalidVolumeClaimTemplates := []api.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pvc",
+			},
+			Spec: api.PersistentVolumeClaimSpec{
+				Resources: api.VolumeResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+		},
+	}
+	invalidName := "abc@123"
+	invalidVolumeClaimTemplates2 := []api.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pvc",
+			},
+			Spec: api.PersistentVolumeClaimSpec{
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				Resources: api.VolumeResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceStorage: resource.MustParse("1Gi"),
+					},
+				},
+				VolumeAttributesClassName: &invalidName,
 			},
 		},
 	}
@@ -316,6 +417,114 @@ func TestValidateStatefulSet(t *testing.T) {
 		set: mkStatefulSet(&validPodTemplate,
 			tweakReplicas(3),
 			tweakOrdinalsStart(2),
+		),
+	}, {
+		name: "invalid subdomain",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakSubdomain("NoUppercaseOrSpecialCharsLike=Equals"),
+		),
+	}, {
+		name: "invalid hostname",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakHostname("NoUppercaseOrSpecialCharsLike=Equals"),
+		),
+	}, {
+		name: "both invalid subdomain and hostname",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakSubdomain("NoUppercaseOrSpecialCharsLike=Equals"),
+			tweakHostname("NoUppercaseOrSpecialCharsLike=Equals"),
+		),
+	}, {
+		name: "volume template in pod volumeMounts",
+		set: mkStatefulSet(&podTemplateWithVolumeMounts,
+			tweakPVCTemplate(api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "test"},
+				Spec: api.PersistentVolumeClaimSpec{
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Resources: api.VolumeResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}),
+		),
+	}, {
+		name: "volume templates already present in volumes",
+		set: mkStatefulSet(&podTemplateWithVolumeMounts,
+			tweakVolumes([]api.Volume{
+				{
+					Name: "test1",
+					VolumeSource: api.VolumeSource{
+						EmptyDir: &api.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "test2",
+					VolumeSource: api.VolumeSource{
+						EmptyDir: &api.EmptyDirVolumeSource{},
+					},
+				},
+			}...),
+			tweakPVCTemplate([]api.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test"},
+					Spec: api.PersistentVolumeClaimSpec{
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+						Resources: api.VolumeResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				}, {
+					ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+					Spec: api.PersistentVolumeClaimSpec{
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+						Resources: api.VolumeResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				}, {
+					ObjectMeta: metav1.ObjectMeta{Name: "test2"},
+					Spec: api.PersistentVolumeClaimSpec{
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+						Resources: api.VolumeResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				}}...),
+		),
+	}, {
+		name: "volume templates present in volumes",
+		set: mkStatefulSet(&podTemplateWithVolumeMounts,
+			tweakVolumes([]api.Volume{
+				{
+					Name: "test",
+					VolumeSource: api.VolumeSource{
+						EmptyDir: &api.EmptyDirVolumeSource{},
+					},
+				}}...),
+			tweakPVCTemplate(api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "test"},
+				Spec: api.PersistentVolumeClaimSpec{
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Resources: api.VolumeResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}),
+		),
+	}, {
+		name: "VolumeClaimTemplates has 1 PVC",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakVolumeClaimTemplates(validVolumeClaimTemplates),
 		),
 	},
 	}
@@ -407,6 +616,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy("")),
 		errs: field.ErrorList{
 			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.Required(field.NewPath("spec", "template", "spec", "restartPolicy"), ""),
 		},
 	}, {
 		name: "invalid update strategy",
@@ -465,6 +675,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		set:  mkStatefulSet(&invalidPodTemplate2, tweakReplicas(3)),
 		errs: field.ErrorList{
 			field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), ""),
+			field.Required(field.NewPath("spec", "template", "spec", "containers"), ""),
 		},
 	}, {
 		name: "empty PersistentVolumeClaimRetentionPolicy",
@@ -534,6 +745,65 @@ func TestValidateStatefulSet(t *testing.T) {
 		errs: field.ErrorList{
 			field.Invalid(field.NewPath("spec", "serviceName"), "Invalid.Name", ""),
 		},
+	}, {
+		name: "missing volume in pod volumeMounts",
+		set:  mkStatefulSet(&podTemplateWithVolumeMounts),
+		errs: field.ErrorList{
+			field.NotFound(field.NewPath("spec", "template", "spec", "containers[0].volumeMounts[0].name"), "test"),
+		},
+	}, {
+		name: "want test volumeMount but have test1 volumeTemplate",
+		set: mkStatefulSet(&podTemplateWithVolumeMounts,
+			tweakPVCTemplate(api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+				Spec: api.PersistentVolumeClaimSpec{
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Resources: api.VolumeResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			})),
+		errs: field.ErrorList{
+			field.NotFound(field.NewPath("spec", "template", "spec", "containers[0].volumeMounts[0].name"), "test"),
+		},
+	}, {
+		name: "duplicate volumes",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakVolumes([]api.Volume{
+				{
+					Name: "test1",
+					VolumeSource: api.VolumeSource{
+						EmptyDir: &api.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "test1",
+					VolumeSource: api.VolumeSource{
+						EmptyDir: &api.EmptyDirVolumeSource{},
+					},
+				},
+			}...)),
+		errs: field.ErrorList{
+			field.Duplicate(field.NewPath("spec", "template", "spec", "volumes[1]", "name"), "test1"),
+		},
+	}, {
+		name: "invalid volumeClaimTemplates with no accessModes",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakVolumeClaimTemplates(invalidVolumeClaimTemplates),
+		),
+		errs: field.ErrorList{
+			field.Required(field.NewPath("spec", "volumeClaimTemplates").Index(0).Child("spec.accessModes"), ""),
+		},
+	}, {
+		name: "invalid volumeClaimTemplates with invalid VolumeAttributesClassName",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakVolumeClaimTemplates(invalidVolumeClaimTemplates2),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates").Index(0).Child("spec", "volumeAttributesClassName"), invalidName, ""),
+		},
 	},
 	}
 
@@ -566,9 +836,10 @@ func generateStatefulSetSpec(minSeconds int32) *apps.StatefulSetSpec {
 				Labels: labels,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				Containers:                    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
 			},
 		},
 	}
@@ -758,9 +1029,10 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				Containers:                    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
 			},
 		},
 	}
@@ -770,9 +1042,41 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				Labels: validLabels2,
 			},
 			Spec: api.PodSpec{
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				Containers:                    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
+			},
+		},
+	}
+	validPodTemplateWithVolumeMounts := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers: []api.Container{{
+					Name:                     "abc",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
+					VolumeMounts: []api.VolumeMount{{
+						Name:      "pvc-abc",
+						MountPath: "/test",
+					}},
+				}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
+			},
+		},
+	}
+	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	invalidPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(podtest.SetContainers()),
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: invalidLabels,
 			},
 		},
 	}
@@ -780,11 +1084,25 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 	storageClass := "storage-class1"
 	storageClass2 := "storage-class2"
 
+	invalidPVCTemplate := api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pvc-without-access-modes",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+			Resources: api.VolumeResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
 	validPVCTemplate := api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pvc-abc",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 			StorageClassName: &storageClass,
 			Resources: api.VolumeResourceRequirements{
 				Requests: api.ResourceList{
@@ -804,6 +1122,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			Name: "pvc-abc2",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 			StorageClassName: &storageClass2,
 			Resources: api.VolumeResourceRequirements{
 				Requests: api.ResourceList{
@@ -815,7 +1134,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 
 	addContainersValidTemplate := validPodTemplate.DeepCopy()
 	addContainersValidTemplate.Template.Spec.Containers = append(addContainersValidTemplate.Template.Spec.Containers,
-		api.Container{Name: "def", Image: "image2", ImagePullPolicy: "IfNotPresent"})
+		api.Container{Name: "def", Image: "image2", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile})
 	if len(addContainersValidTemplate.Template.Spec.Containers) != len(validPodTemplate.Template.Spec.Containers)+1 {
 		t.Errorf("failure during test setup: template %v should have more containers than template %v", addContainersValidTemplate, validPodTemplate)
 	}
@@ -882,6 +1201,42 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		name:   "update with invalid .spec.serviceName",
 		old:    mkStatefulSet(&validPodTemplate, tweakServiceName("Invalid.Name")),
 		update: mkStatefulSet(&validPodTemplate, tweakServiceName("Invalid.Name"), tweakReplicas(3)),
+	}, {
+		name:   "invalid old spec (missing volume template) should skip validation",
+		old:    mkStatefulSet(&validPodTemplateWithVolumeMounts),
+		update: mkStatefulSet(&validPodTemplateWithVolumeMounts, tweakReplicas(3)),
+	}, {
+		name:   "volume mount ",
+		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
+		update: mkStatefulSet(&validPodTemplateWithVolumeMounts, tweakPVCTemplate(validPVCTemplate), tweakReplicas(3)),
+	}, {
+		name: "valid old spec, invalid subdomain in new spec",
+		old:  mkStatefulSet(&validPodTemplate),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakSubdomain("NoUppercaseOrSpecialCharsLike=Equals"),
+		),
+	}, {
+		name: "valid old spec, invalid hostname in new spec",
+		old:  mkStatefulSet(&validPodTemplate),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakHostname("NoUppercaseOrSpecialCharsLike=Equals"),
+		),
+	}, {
+		name: "both invalid subdomain",
+		old:  mkStatefulSet(&validPodTemplate, tweakSubdomain("NoUppercaseOrSpecialCharsLike=Equals")),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakSubdomain("NoUppercaseOrSpecialCharsLike=Equals"),
+		),
+	}, {
+		name: "both invalid hostname",
+		old:  mkStatefulSet(&validPodTemplate, tweakHostname("NoUppercaseOrSpecialCharsLike=Equals")),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakHostname("NoUppercaseOrSpecialCharsLike=Equals"),
+		),
+	}, {
+		name:   "invalid old spec (missing volume accessModes) should skip validation",
+		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(invalidPVCTemplate)),
+		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(invalidPVCTemplate), tweakReplicas(3)),
 	},
 	}
 
@@ -949,6 +1304,19 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate, validPVCTemplate2)),
 		errs: field.ErrorList{
 			field.Forbidden(field.NewPath("spec"), ""),
+		},
+	}, {
+		name:   "valid old spec but invalid new spec",
+		old:    mkStatefulSet(&validPodTemplate),
+		update: mkStatefulSet(&invalidPodTemplate),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "template", "labels"),
+				"NoUppercaseOrSpecialCharsLike=Equals", ""),
+			field.Invalid(field.NewPath("spec", "template", "labels"),
+				"map[string]string{\\\"NoUppercaseOrSpecialCharsLike=Equals\\\":\\\"b\\\"}", ""),
+			field.Invalid(field.NewPath("spec", "template", "metadata", "labels"),
+				"map[string]string{\\\"NoUppercaseOrSpecialCharsLike=Equals\\\":\\\"b\\\"}", ""),
+			field.Required(field.NewPath("spec", "template", "spec", "containers"), ""),
 		},
 	},
 	}

@@ -80,12 +80,12 @@ func TestTLSConnection(t *testing.T) {
 		},
 		Codec: codec,
 	}
-	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil, nil, "")
+	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil, nil, "/pods")
 	defer destroyFunc()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = storage.Create(context.TODO(), "/abc", &example.Pod{}, nil, 0)
+	err = storage.Create(context.TODO(), "/pods/abc", &example.Pod{}, nil, 0)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}

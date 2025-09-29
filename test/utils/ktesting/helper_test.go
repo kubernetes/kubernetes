@@ -29,18 +29,23 @@ import (
 // testcase wraps a callback which is called with a TContext that intercepts
 // errors and log output. Those get compared.
 type testcase struct {
-	cb             func(TContext)
-	expectNoFail   bool
-	expectError    string
-	expectDuration time.Duration
-	expectLog      string
+	cb                             func(TContext)
+	expectNoFail                   bool
+	expectError                    string
+	expectDuration                 time.Duration
+	expectLog                      string
+	suppressUnexpectedErrorLogging bool
 }
 
 func (tc testcase) run(t *testing.T) {
 	bufferT := &logBufferT{T: t}
 	tCtx := Init(bufferT)
 	var err error
-	tCtx, finalize := WithError(tCtx, &err)
+	we := WithError
+	if !tc.suppressUnexpectedErrorLogging {
+		we = WithErrorLogging
+	}
+	tCtx, finalize := we(tCtx, &err)
 	start := time.Now()
 	func() {
 		defer finalize()

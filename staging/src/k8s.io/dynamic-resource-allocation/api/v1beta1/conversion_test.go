@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	resourceapi "k8s.io/api/resource/v1"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
-	resourceapi "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -215,7 +215,7 @@ func TestConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "v1beta1 to latest with alternatives",
+			name: "latest to v1beta1 with alternatives",
 			in: &resourceapi.ResourceClaim{
 				Spec: resourceapi.ResourceClaimSpec{
 					Devices: resourceapi.DeviceClaim{

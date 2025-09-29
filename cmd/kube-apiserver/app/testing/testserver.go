@@ -204,6 +204,12 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	}
 
 	s := options.NewServerRunOptions()
+	if !effectiveVersion.BinaryVersion().EqualTo(effectiveVersion.EmulationVersion()) {
+		// Allow new APIs because features might be enabled explicitly which depend
+		// some API which gets disabled when emulating versions.
+		s.GenericServerRunOptions.RuntimeConfigEmulationForwardCompatible = true
+	}
+
 	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
 	s.Options.GenericServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
 	if instanceOptions.RequestTimeout > 0 {

@@ -20,9 +20,16 @@ package v1
 
 // ContainerStateApplyConfiguration represents a declarative configuration of the ContainerState type for use
 // with apply.
+//
+// ContainerState holds a possible state of container.
+// Only one of its members may be specified.
+// If none of them is specified, the default one is ContainerStateWaiting.
 type ContainerStateApplyConfiguration struct {
-	Waiting    *ContainerStateWaitingApplyConfiguration    `json:"waiting,omitempty"`
-	Running    *ContainerStateRunningApplyConfiguration    `json:"running,omitempty"`
+	// Details about a waiting container
+	Waiting *ContainerStateWaitingApplyConfiguration `json:"waiting,omitempty"`
+	// Details about a running container
+	Running *ContainerStateRunningApplyConfiguration `json:"running,omitempty"`
+	// Details about a terminated container
 	Terminated *ContainerStateTerminatedApplyConfiguration `json:"terminated,omitempty"`
 }
 
@@ -31,7 +38,6 @@ type ContainerStateApplyConfiguration struct {
 func ContainerState() *ContainerStateApplyConfiguration {
 	return &ContainerStateApplyConfiguration{}
 }
-func (b ContainerStateApplyConfiguration) IsApplyConfiguration() {}
 
 // WithWaiting sets the Waiting field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -27,7 +27,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,8 +48,8 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/pkg/util/async"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -63,14 +62,14 @@ const (
 	kubeProxyTable = "kube-proxy"
 
 	// base chains
-	filterPreroutingChain     = "filter-prerouting"
-	filterInputChain          = "filter-input"
-	filterForwardChain        = "filter-forward"
-	filterOutputChain         = "filter-output"
-	filterOutputPostDNATChain = "filter-output-post-dnat"
-	natPreroutingChain        = "nat-prerouting"
-	natOutputChain            = "nat-output"
-	natPostroutingChain       = "nat-postrouting"
+	filterPreroutingPreDNATChain = "filter-prerouting-pre-dnat"
+	filterOutputPreDNATChain     = "filter-output-pre-dnat"
+	filterInputChain             = "filter-input"
+	filterForwardChain           = "filter-forward"
+	filterOutputChain            = "filter-output"
+	natPreroutingChain           = "nat-prerouting"
+	natOutputChain               = "nat-output"
+	natPostroutingChain          = "nat-postrouting"
 
 	// service dispatch
 	servicesChain       = "services"
@@ -151,10 +150,10 @@ type Proxier struct {
 	endpointsChanges *proxy.EndpointsChangeTracker
 	serviceChanges   *proxy.ServiceChangeTracker
 
-	mu           sync.Mutex // protects the following fields
-	svcPortMap   proxy.ServicePortMap
-	endpointsMap proxy.EndpointsMap
-	nodeLabels   map[string]string
+	mu             sync.Mutex // protects the following fields
+	svcPortMap     proxy.ServicePortMap
+	endpointsMap   proxy.EndpointsMap
+	topologyLabels map[string]string
 	// endpointSlicesSynced, and servicesSynced are set to true
 	// when corresponding objects are synced after startup. This is used to avoid
 	// updating nftables with some partial data after kube-proxy restart.
@@ -164,7 +163,7 @@ type Proxier struct {
 	lastFullSync         time.Time
 	needFullSync         bool
 	initialized          int32
-	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
+	syncRunner           *runner.BoundedFrequencyRunner // governs calls to syncProxyRules
 	syncPeriod           time.Duration
 	flushed              bool
 
@@ -273,10 +272,9 @@ func NewProxier(ctx context.Context,
 		serviceNodePorts:    newNFTElementStorage("map", serviceNodePortsMap),
 	}
 
-	burstSyncs := 2
-	logger.V(2).Info("NFTables sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
+	logger.V(2).Info("NFTables sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "maxSyncPeriod", proxyutil.FullSyncPeriod)
 	// We need to pass *some* maxInterval to NewBoundedFrequencyRunner. time.Hour is arbitrary.
-	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, proxyutil.FullSyncPeriod, burstSyncs)
+	proxier.syncRunner = runner.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, proxyutil.FullSyncPeriod)
 
 	return proxier, nil
 }
@@ -391,13 +389,16 @@ type nftablesBaseChain struct {
 }
 
 var nftablesBaseChains = []nftablesBaseChain{
-	// We want our filtering rules to operate on pre-DNAT dest IPs, so our filter
-	// chains have to run before DNAT.
-	{filterPreroutingChain, knftables.FilterType, knftables.PreroutingHook, knftables.DNATPriority + "-10"},
-	{filterInputChain, knftables.FilterType, knftables.InputHook, knftables.DNATPriority + "-10"},
-	{filterForwardChain, knftables.FilterType, knftables.ForwardHook, knftables.DNATPriority + "-10"},
-	{filterOutputChain, knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "-10"},
-	{filterOutputPostDNATChain, knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "+10"},
+	// filter base chains (pre-dnat priority) to operate on pre-DNAT dest IPs and Port for filtering load-balancer source ranges.
+	{filterPreroutingPreDNATChain, knftables.FilterType, knftables.PreroutingHook, knftables.DNATPriority + "-10"},
+	{filterOutputPreDNATChain, knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "-10"},
+
+	// filter base chains (filter priority)
+	{filterInputChain, knftables.FilterType, knftables.InputHook, knftables.FilterPriority},
+	{filterForwardChain, knftables.FilterType, knftables.ForwardHook, knftables.FilterPriority},
+	{filterOutputChain, knftables.FilterType, knftables.OutputHook, knftables.FilterPriority},
+
+	// nat base chains (dnat priority)
 	{natPreroutingChain, knftables.NATType, knftables.PreroutingHook, knftables.DNATPriority},
 	{natOutputChain, knftables.NATType, knftables.OutputHook, knftables.DNATPriority},
 	{natPostroutingChain, knftables.NATType, knftables.PostroutingHook, knftables.SNATPriority},
@@ -413,7 +414,7 @@ type nftablesJumpChain struct {
 }
 
 var nftablesJumpChains = []nftablesJumpChain{
-	// We can't jump to endpointsCheckChain from filter-prerouting like
+	// We can't jump to endpointsCheckChain from filter-prerouting-pre-dnat like
 	// firewallCheckChain because reject action is only valid in chains using the
 	// input, forward or output hooks with kernels before 5.9.
 	{nodePortEndpointsCheckChain, filterInputChain, "ct state new"},
@@ -421,15 +422,15 @@ var nftablesJumpChains = []nftablesJumpChain{
 	{serviceEndpointsCheckChain, filterForwardChain, "ct state new"},
 	{serviceEndpointsCheckChain, filterOutputChain, "ct state new"},
 
-	{firewallCheckChain, filterPreroutingChain, "ct state new"},
-	{firewallCheckChain, filterOutputChain, "ct state new"},
+	{firewallCheckChain, filterPreroutingPreDNATChain, "ct state new"},
+	{firewallCheckChain, filterOutputPreDNATChain, "ct state new"},
 
 	{servicesChain, natOutputChain, ""},
 	{servicesChain, natPreroutingChain, ""},
 	{masqueradingChain, natPostroutingChain, ""},
 
 	{clusterIPsCheckChain, filterForwardChain, "ct state new"},
-	{clusterIPsCheckChain, filterOutputPostDNATChain, "ct state new"},
+	{clusterIPsCheckChain, filterOutputChain, "ct state new"},
 }
 
 // ensureChain adds commands to tx to ensure that chain exists and doesn't contain
@@ -839,76 +840,14 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	proxier.syncProxyRules()
 }
 
-// OnNodeAdd is called whenever creation of new node object
-// is observed.
-func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
-	if node.Name != proxier.nodeName {
-		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.nodeName)
-		return
-	}
-
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return
-	}
-
+// OnTopologyChange is called whenever this node's proxy relevant topology-related labels change.
+func (proxier *Proxier) OnTopologyChange(topologyLabels map[string]string) {
 	proxier.mu.Lock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
+	proxier.topologyLabels = topologyLabels
 	proxier.needFullSync = true
 	proxier.mu.Unlock()
-	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
-
+	proxier.logger.V(4).Info("Updated proxier node topology labels", "labels", topologyLabels)
 	proxier.Sync()
-}
-
-// OnNodeUpdate is called whenever modification of an existing
-// node object is observed.
-func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
-	if node.Name != proxier.nodeName {
-		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.nodeName)
-		return
-	}
-
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return
-	}
-
-	proxier.mu.Lock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
-	proxier.needFullSync = true
-	proxier.mu.Unlock()
-	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
-
-	proxier.Sync()
-}
-
-// OnNodeDelete is called whenever deletion of an existing node
-// object is observed.
-func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
-	if node.Name != proxier.nodeName {
-		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.nodeName)
-		return
-	}
-
-	proxier.mu.Lock()
-	proxier.nodeLabels = nil
-	proxier.needFullSync = true
-	proxier.mu.Unlock()
-
-	proxier.Sync()
-}
-
-// OnNodeSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnNodeSynced() {
 }
 
 // OnServiceCIDRsChanged is called whenever a change is observed
@@ -1163,7 +1102,7 @@ func (proxier *Proxier) logFailure(tx *knftables.Transaction) {
 
 // This is where all of the nftables calls happen.
 // This assumes proxier.mu is NOT held
-func (proxier *Proxier) syncProxyRules() {
+func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
@@ -1202,7 +1141,7 @@ func (proxier *Proxier) syncProxyRules() {
 	defer func() {
 		if !success {
 			proxier.logger.Info("Sync failed", "retryingTime", proxier.syncPeriod)
-			proxier.syncRunner.RetryAfter(proxier.syncPeriod)
+			retryError = fmt.Errorf("Sync failed")
 			// proxier.serviceChanges and proxier.endpointChanges have already
 			// been flushed, so we've lost the state needed to be able to do
 			// a partial sync.
@@ -1310,7 +1249,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// from this node, given the service's traffic policies. hasEndpoints is true
 		// if the service has any usable endpoints on any node, not just this one.
 		allEndpoints := proxier.endpointsMap[svcName]
-		clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, hasEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeName, proxier.nodeLabels)
+		clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, hasEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeName, proxier.topologyLabels)
 
 		// skipServiceUpdate is used for all service-related chains and their elements.
 		// If no changes were done to the service or its endpoints, these objects may be skipped.
@@ -1888,6 +1827,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Finish housekeeping, clear stale conntrack entries for UDP Services
 		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap)
 	}
+	return
 }
 
 // epChainSkipUpdate returns true if the EP chain doesn't need to be updated.

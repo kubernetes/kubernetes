@@ -27,9 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/feature"
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
@@ -156,6 +158,9 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 		"NodeResourcesFitArgs":            ValidateNodeResourcesFitArgs,
 		"PodTopologySpread":               ValidatePodTopologySpreadArgs,
 		"VolumeBinding":                   ValidateVolumeBindingArgs,
+		"DynamicResources": func(path *field.Path, args *config.DynamicResourcesArgs) error {
+			return ValidateDynamicResourcesArgs(path, args, schedfeature.NewSchedulerFeaturesFromGates(feature.DefaultFeatureGate))
+		},
 	}
 
 	if profile.Plugins != nil {
@@ -237,7 +242,7 @@ func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerPr
 			curr = profiles[i].Plugins.QueueSort
 		}
 		if !apiequality.Semantic.DeepEqual(canon, curr) {
-			errs = append(errs, field.Invalid(path.Index(i).Child("plugins", "queueSort"), curr, "queueSort must be the same for all profiles"))
+			errs = append(errs, field.Invalid(path.Index(i).Child("plugins", "queueSort"), curr, "must be the same for all profiles"))
 		}
 		for _, cfg := range profiles[i].PluginConfig {
 			if cfg.Name == queueSortName && !apiequality.Semantic.DeepEqual(queueSortArgs, cfg.Args) {

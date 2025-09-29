@@ -27,7 +27,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/pmezard/go-difflib/difflib"
 
@@ -43,7 +42,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
 const (
@@ -52,11 +50,6 @@ const (
 
 	// kubeSchedulerBindAddressArg represents the bind-address argument of the kube-scheduler configuration.
 	kubeSchedulerBindAddressArg = "bind-address"
-)
-
-var (
-	usersAndGroups     *users.UsersAndGroups
-	usersAndGroupsOnce sync.Once
 )
 
 // ComponentPod returns a Pod object from the container, volume and annotations specifications
@@ -253,20 +246,20 @@ func ReadMultipleStaticPodsFromDisk(manifestDir string, components ...string) (m
 }
 
 // LivenessProbe creates a Probe object with a HTTPGet handler
-func LivenessProbe(host, path string, port int32, scheme v1.URIScheme) *v1.Probe {
+func LivenessProbe(host, path, port string, scheme v1.URIScheme) *v1.Probe {
 	// sets initialDelaySeconds same as periodSeconds to skip one period before running a check
 	return createHTTPProbe(host, path, port, scheme, 10, 15, 8, 10)
 }
 
 // ReadinessProbe creates a Probe object with a HTTPGet handler
-func ReadinessProbe(host, path string, port int32, scheme v1.URIScheme) *v1.Probe {
+func ReadinessProbe(host, path, port string, scheme v1.URIScheme) *v1.Probe {
 	// sets initialDelaySeconds as '0' because we don't want to delay user infrastructure checks
 	// looking for "ready" status on kubeadm static Pods
 	return createHTTPProbe(host, path, port, scheme, 0, 15, 3, 1)
 }
 
 // StartupProbe creates a Probe object with a HTTPGet handler
-func StartupProbe(host, path string, port int32, scheme v1.URIScheme, timeoutForControlPlane *metav1.Duration) *v1.Probe {
+func StartupProbe(host, path, port string, scheme v1.URIScheme, timeoutForControlPlane *metav1.Duration) *v1.Probe {
 	periodSeconds, timeoutForControlPlaneSeconds := int32(10), kubeadmconstants.ControlPlaneComponentHealthCheckTimeout.Seconds()
 	if timeoutForControlPlane != nil {
 		timeoutForControlPlaneSeconds = timeoutForControlPlane.Seconds()
@@ -278,13 +271,13 @@ func StartupProbe(host, path string, port int32, scheme v1.URIScheme, timeoutFor
 	return createHTTPProbe(host, path, port, scheme, periodSeconds, 15, failureThreshold, periodSeconds)
 }
 
-func createHTTPProbe(host, path string, port int32, scheme v1.URIScheme, initialDelaySeconds, timeoutSeconds, failureThreshold, periodSeconds int32) *v1.Probe {
+func createHTTPProbe(host, path, port string, scheme v1.URIScheme, initialDelaySeconds, timeoutSeconds, failureThreshold, periodSeconds int32) *v1.Probe {
 	return &v1.Probe{
 		ProbeHandler: v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Host:   host,
 				Path:   path,
-				Port:   intstr.FromInt32(port),
+				Port:   intstr.FromString(port),
 				Scheme: scheme,
 			},
 		},
@@ -416,16 +409,6 @@ func getProbeAddress(addr string) string {
 		return ""
 	}
 	return addr
-}
-
-// GetUsersAndGroups returns the local usersAndGroups, but first creates it
-// in a thread safe way once.
-func GetUsersAndGroups() (*users.UsersAndGroups, error) {
-	var err error
-	usersAndGroupsOnce.Do(func() {
-		usersAndGroups, err = users.AddUsersAndGroups()
-	})
-	return usersAndGroups, err
 }
 
 // DeepHashObject writes specified object to hash using the spew library

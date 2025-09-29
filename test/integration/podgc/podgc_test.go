@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -48,10 +49,11 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 			phase:     v1.PodPending,
 			wantPhase: v1.PodFailed,
 			wantDisruptionTarget: &v1.PodCondition{
-				Type:    v1.DisruptionTarget,
-				Status:  v1.ConditionTrue,
-				Reason:  "DeletionByPodGC",
-				Message: "PodGC: node no longer exists",
+				Type:               v1.DisruptionTarget,
+				Status:             v1.ConditionTrue,
+				ObservedGeneration: 1,
+				Reason:             "DeletionByPodGC",
+				Message:            "PodGC: node no longer exists",
 			},
 		},
 		"succeeded pod": {
@@ -160,6 +162,10 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			if !test.enableJobPodReplacementPolicy {
+				// TODO: this will be removed in 1.37.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.33"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)
 			testCtx := setup(t, "podgc-out-of-service")
 			cs := testCtx.ClientSet
@@ -297,10 +303,11 @@ func TestPodGcForPodsWithDuplicatedFieldKeys(t *testing.T) {
 				},
 			},
 			wantDisruptionTarget: &v1.PodCondition{
-				Type:    v1.DisruptionTarget,
-				Status:  v1.ConditionTrue,
-				Reason:  "DeletionByPodGC",
-				Message: "PodGC: node no longer exists",
+				Type:               v1.DisruptionTarget,
+				Status:             v1.ConditionTrue,
+				ObservedGeneration: 1,
+				Reason:             "DeletionByPodGC",
+				Message:            "PodGC: node no longer exists",
 			},
 		},
 		"Orphan pod with duplicated ports; scenario from https://issues.k8s.io/113482": {
@@ -330,10 +337,11 @@ func TestPodGcForPodsWithDuplicatedFieldKeys(t *testing.T) {
 				},
 			},
 			wantDisruptionTarget: &v1.PodCondition{
-				Type:    v1.DisruptionTarget,
-				Status:  v1.ConditionTrue,
-				Reason:  "DeletionByPodGC",
-				Message: "PodGC: node no longer exists",
+				Type:               v1.DisruptionTarget,
+				Status:             v1.ConditionTrue,
+				ObservedGeneration: 1,
+				Reason:             "DeletionByPodGC",
+				Message:            "PodGC: node no longer exists",
 			},
 		},
 	}

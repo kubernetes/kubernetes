@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
@@ -33,13 +32,13 @@ const Name = names.DefaultBinder
 
 // DefaultBinder binds pods to nodes using a k8s client.
 type DefaultBinder struct {
-	handle framework.Handle
+	handle fwk.Handle
 }
 
-var _ framework.BindPlugin = &DefaultBinder{}
+var _ fwk.BindPlugin = &DefaultBinder{}
 
 // New creates a DefaultBinder.
-func New(_ context.Context, _ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 	return &DefaultBinder{handle: handle}, nil
 }
 
@@ -49,16 +48,28 @@ func (b DefaultBinder) Name() string {
 }
 
 // Bind binds pods to nodes using the k8s client.
-func (b DefaultBinder) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+func (b DefaultBinder) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
 	logger := klog.FromContext(ctx)
-	logger.V(3).Info("Attempting to bind pod to node", "pod", klog.KObj(p), "node", klog.KRef("", nodeName))
 	binding := &v1.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.Name, UID: p.UID},
 		Target:     v1.ObjectReference{Kind: "Node", Name: nodeName},
 	}
+	if b.handle.APICacher() != nil {
+		// When API cacher is available, use it to bind the pod.
+		onFinish, err := b.handle.APICacher().BindPod(binding)
+		if err != nil {
+			return fwk.AsStatus(err)
+		}
+		err = b.handle.APICacher().WaitOnFinish(ctx, onFinish)
+		if err != nil {
+			return fwk.AsStatus(err)
+		}
+		return nil
+	}
+	logger.V(3).Info("Attempting to bind pod to node", "pod", klog.KObj(p), "node", klog.KRef("", nodeName))
 	err := b.handle.ClientSet().CoreV1().Pods(binding.Namespace).Bind(ctx, binding, metav1.CreateOptions{})
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	return nil
 }

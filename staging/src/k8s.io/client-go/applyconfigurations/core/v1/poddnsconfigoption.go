@@ -20,8 +20,13 @@ package v1
 
 // PodDNSConfigOptionApplyConfiguration represents a declarative configuration of the PodDNSConfigOption type for use
 // with apply.
+//
+// PodDNSConfigOption defines DNS resolver options of a pod.
 type PodDNSConfigOptionApplyConfiguration struct {
-	Name  *string `json:"name,omitempty"`
+	// Name is this DNS resolver option's name.
+	// Required.
+	Name *string `json:"name,omitempty"`
+	// Value is this DNS resolver option's value.
 	Value *string `json:"value,omitempty"`
 }
 
@@ -30,7 +35,6 @@ type PodDNSConfigOptionApplyConfiguration struct {
 func PodDNSConfigOption() *PodDNSConfigOptionApplyConfiguration {
 	return &PodDNSConfigOptionApplyConfiguration{}
 }
-func (b PodDNSConfigOptionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

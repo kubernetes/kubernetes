@@ -529,8 +529,10 @@ kube::golang::internal::verify_go_version() {
     export GOTOOLCHAIN='local'
     if [[ ! -f "${KUBE_ROOT}/.gimme/envs/gomaster.env" && ! -f "${HOME}/.gimme/envs/gomaster.env" ]]; then
       # gimme tries to write to $HOME directory, in CI environments this may not be writable.
-      # shellcheck disable=SC2155
-      [ -w "${HOME:?Variable HOME is not set}" ] || export HOME="$(mktemp -d)"
+      if [ ! -w "${HOME:?Variable HOME is not set}" ]; then
+        tmp_home="$(mktemp -d)"
+        export HOME="${tmp_home}"
+      fi
       GOROOT_BOOTSTRAP="${GOROOT_BOOTSTRAP:-/usr/local/go}" "${KUBE_ROOT}/third_party/gimme/gimme" "master" >/dev/null 2>&1
     fi
 
@@ -566,7 +568,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.24
+  minimum_go_version=go1.25
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -634,21 +636,6 @@ kube::golang::hack_tools_gotoolchain() {
      hack_tools_gotoolchain="${KUBE_HACK_TOOLS_GOTOOLCHAIN}";
   fi
   echo -n "${hack_tools_gotoolchain}"
-}
-
-kube::golang::setup_gomaxprocs() {
-  # GOMAXPROCS by default does not reflect the number of cpu(s) available
-  # when running in a container, please see https://github.com/golang/go/issues/33803
-  if [[ -z "${GOMAXPROCS:-}" ]]; then
-    if ! command -v ncpu >/dev/null 2>&1; then
-      GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install ./ncpu || echo "Will not automatically set GOMAXPROCS"
-    fi
-    if command -v ncpu >/dev/null 2>&1; then
-      GOMAXPROCS=$(ncpu)
-      export GOMAXPROCS
-      kube::log::status "Set GOMAXPROCS automatically to ${GOMAXPROCS}"
-    fi
-  fi
 }
 
 # This will take binaries from $GOPATH/bin and copy them to the appropriate
@@ -834,7 +821,7 @@ kube::golang::build_binaries_for_platform() {
       kube::log::info "    ${binary} (static)"
     else
       nonstatics+=("${binary}")
-      kube::log::info "    ${binary} (non-static)"
+      kube::log::info "    ${binary} (non-static${KUBE_RACE:+, race detection})"
     fi
    done
 
@@ -860,6 +847,9 @@ kube::golang::build_binaries_for_platform() {
       -ldflags="${goldflags}"
       -tags="${gotags:-}"
     )
+    if [[ -n "${KUBE_RACE:-}" ]]; then
+        build_args+=("${KUBE_RACE}")
+    fi
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
 

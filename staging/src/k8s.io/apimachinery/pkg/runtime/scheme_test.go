@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
-	runtimetestingv1 "k8s.io/apimachinery/pkg/runtime/testing/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -1125,12 +1124,6 @@ func TestToOpenAPIDefinitionName(t *testing.T) {
 		out         string
 		wantErr     error
 	}{
-		{
-			name:        "built-registerObj type",
-			registerObj: &runtimetestingv1.ExternalSimple{},
-			gvk:         schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Simple"},
-			out:         "io.k8s.apimachinery.pkg.runtime.testing.v1.ExternalSimple",
-		},
 		{
 			name:        "unstructured type",
 			registerObj: &unstructured.Unstructured{},

@@ -601,6 +601,13 @@
     MUST now include the new Label.
   release: v1.18
   file: test/e2e/apimachinery/namespace.go
+- testname: Ordered Namespace Deletion
+  codename: '[sig-api-machinery] OrderedNamespaceDeletion namespace deletion should
+    delete pod first [Conformance]'
+  description: Pods must be deleted before other objects when deleting a namespace.
+    See https://kep.k8s.io/5080
+  release: v1.34
+  file: test/e2e/apimachinery/namespace.go
 - testname: ResourceQuota, apply changes to a ResourceQuota status
   codename: '[sig-api-machinery] ResourceQuota should apply changes to a resourcequota
     status [Conformance]'
@@ -1489,9 +1496,9 @@
 - testname: Kubectl, diff Deployment
   codename: '[sig-cli] Kubectl client Kubectl diff should check if kubectl diff finds
     a difference for Deployments [Conformance]'
-  description: Create a Deployment with httpd image. Declare the same Deployment with
-    a different image, busybox. Diff of live Deployment with declared Deployment MUST
-    include the difference between live and declared image.
+  description: Create a Deployment with agnhost image. Declare the same Deployment
+    with a different image, busybox. Diff of live Deployment with declared Deployment
+    MUST include the difference between live and declared image.
   release: v1.19
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, create service, replication controller
@@ -1727,6 +1734,22 @@
     MUST have Endpoints and EndpointSlices pointing to each API server instance.
   release: v1.21
   file: test/e2e/network/endpointslice.go
+- testname: EndpointSlice, multiple IPs, multiple ports
+  codename: '[sig-network] EndpointSlice should support a Service with multiple endpoint
+    IPs specified in multiple EndpointSlices [Conformance]'
+  description: Given a selector-less Service with multiple manually-created EndpointSlices
+    (and no Endpoints) where the endpoints have different IPs and different Ports,
+    the service proxy MUST allow connections to both ports.
+  release: v1.34
+  file: test/e2e/network/endpointslice.go
+- testname: EndpointSlice, single IP, multiple ports
+  codename: '[sig-network] EndpointSlice should support a Service with multiple ports
+    specified in multiple EndpointSlices [Conformance]'
+  description: Given a selector-less Service with multiple manually-created EndpointSlices
+    (and no Endpoints) where the endpoints have the same IP but different Ports, the
+    service proxy MUST allow connections to both ports.
+  release: v1.34
+  file: test/e2e/network/endpointslice.go
 - testname: EndpointSlice API
   codename: '[sig-network] EndpointSlice should support creating EndpointSlice API
     operations [Conformance]'
@@ -1844,11 +1867,10 @@
     MUST be returned for each endpoint.
   release: v1.21
   file: test/e2e/network/proxy.go
-- testname: Proxy, logs service endpoint
+- testname: Proxy through apiserver to a Service
   codename: '[sig-network] Proxy version v1 should proxy through a service and a pod
     [Conformance]'
-  description: Select any node in the cluster to invoke  /logs endpoint  using the
-    /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
+  description: The apiserver will proxy a connection to a Service.
   release: v1.9
   file: test/e2e/network/proxy.go
 - testname: Service endpoint latency, thresholds
@@ -2066,6 +2088,16 @@
     watch event.
   release: v1.19
   file: test/e2e/network/service.go
+- testname: ConfigMap, from environment field with various prefixes
+  codename: '[sig-node] ConfigMap should be consumable as environment variable names
+    with various prefixes [Conformance]'
+  description: Create a Pod with environment variable values set using values from
+    ConfigMap. Allows users to use envFrom to set prefixes with various printable
+    ASCII characters excluding '=' as environment variable names. This test verifies
+    that different prefixes including digits, special characters, and letters can
+    be correctly used.
+  release: v1.34
+  file: test/e2e/common/node/configmap.go
 - testname: ConfigMap, from environment field
   codename: '[sig-node] ConfigMap should be consumable via environment variable [NodeConformance]
     [Conformance]'
@@ -2093,6 +2125,12 @@
     selector it MUST find the ConfigMap by it's static label and updated value. The
     ConfigMap must be deleted by Collection.
   release: v1.19
+  file: test/e2e/common/node/configmap.go
+- testname: ConfigMap Update
+  codename: '[sig-node] ConfigMap should update ConfigMap successfully [NodeConformance]
+    [Conformance]'
+  description: Ensure that a ConfigMap object can be created and then updated successfully.
+  release: v1.32
   file: test/e2e/common/node/configmap.go
 - testname: Pod Lifecycle, post start exec hook
   codename: '[sig-node] Container Lifecycle Hook when create a pod with lifecycle
@@ -2638,6 +2676,16 @@
     patch, delete, and deletecollection.'
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
+- testname: Secrets, pod environment from source
+  codename: '[sig-node] Secrets should be consumable as environment variable names
+    variable names with various prefixes [Conformance]'
+  description: Create a Pod with environment variable values set using values from
+    Secret. Allows users to use envFrom to set prefixes with various printable ASCII
+    characters excluding '=' as environment variable names. This test verifies that
+    different prefixes including digits, special characters, and letters can be correctly
+    used.
+  release: v1.34
+  file: test/e2e/common/node/secrets.go
 - testname: Secrets, pod environment field
   codename: '[sig-node] Secrets should be consumable from pods in env vars [NodeConformance]
     [Conformance]'
@@ -3746,4 +3794,15 @@
     via deleteCollection MUST succeed and it MUST be confirmed.
   release: v1.30
   file: test/e2e/storage/volume_attachment.go
+- testname: VolumeAttributesClass, lifecycle
+  codename: '[sig-storage] VolumeAttributesClass [FeatureGate:VolumeAttributesClass]
+    should run through the lifecycle of a VolumeAttributesClass [Conformance]'
+  description: Creating a VolumeAttributesClass MUST succeed. Reading the VolumeAttributesClass
+    MUST succeed. Patching the VolumeAttributesClass MUST succeed with its new label
+    found. Deleting the VolumeAttributesClass MUST succeed and it MUST be confirmed.
+    Replacement VolumeAttributesClass MUST be created. Updating the VolumeAttributesClass
+    MUST succeed with its new label found. Deleting the VolumeAttributesClass via
+    deleteCollection MUST succeed and it MUST be confirmed.
+  release: v1.35
+  file: test/e2e/storage/volumeattributesclass.go
 

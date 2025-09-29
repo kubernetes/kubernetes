@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"sync"
 
 	_ "crypto/sha1"
@@ -24,69 +25,258 @@ const (
 	serviceSSH      = "ssh-connection"
 )
 
-// supportedCiphers lists ciphers we support but might not recommend.
-var supportedCiphers = []string{
-	"aes128-ctr", "aes192-ctr", "aes256-ctr",
-	"aes128-gcm@openssh.com", gcm256CipherID,
-	chacha20Poly1305ID,
-	"arcfour256", "arcfour128", "arcfour",
-	aes128cbcID,
-	tripledescbcID,
+// The ciphers currently or previously implemented by this library, to use in
+// [Config.Ciphers]. For a list, see the [Algorithms.Ciphers] returned by
+// [SupportedAlgorithms] or [InsecureAlgorithms].
+const (
+	CipherAES128GCM            = "aes128-gcm@openssh.com"
+	CipherAES256GCM            = "aes256-gcm@openssh.com"
+	CipherChaCha20Poly1305     = "chacha20-poly1305@openssh.com"
+	CipherAES128CTR            = "aes128-ctr"
+	CipherAES192CTR            = "aes192-ctr"
+	CipherAES256CTR            = "aes256-ctr"
+	InsecureCipherAES128CBC    = "aes128-cbc"
+	InsecureCipherTripleDESCBC = "3des-cbc"
+	InsecureCipherRC4          = "arcfour"
+	InsecureCipherRC4128       = "arcfour128"
+	InsecureCipherRC4256       = "arcfour256"
+)
+
+// The key exchanges currently or previously implemented by this library, to use
+// in [Config.KeyExchanges]. For a list, see the
+// [Algorithms.KeyExchanges] returned by [SupportedAlgorithms] or
+// [InsecureAlgorithms].
+const (
+	InsecureKeyExchangeDH1SHA1   = "diffie-hellman-group1-sha1"
+	InsecureKeyExchangeDH14SHA1  = "diffie-hellman-group14-sha1"
+	KeyExchangeDH14SHA256        = "diffie-hellman-group14-sha256"
+	KeyExchangeDH16SHA512        = "diffie-hellman-group16-sha512"
+	KeyExchangeECDHP256          = "ecdh-sha2-nistp256"
+	KeyExchangeECDHP384          = "ecdh-sha2-nistp384"
+	KeyExchangeECDHP521          = "ecdh-sha2-nistp521"
+	KeyExchangeCurve25519        = "curve25519-sha256"
+	InsecureKeyExchangeDHGEXSHA1 = "diffie-hellman-group-exchange-sha1"
+	KeyExchangeDHGEXSHA256       = "diffie-hellman-group-exchange-sha256"
+	// KeyExchangeMLKEM768X25519 is supported from Go 1.24.
+	KeyExchangeMLKEM768X25519 = "mlkem768x25519-sha256"
+
+	// An alias for KeyExchangeCurve25519SHA256. This kex ID will be added if
+	// KeyExchangeCurve25519SHA256 is requested for backward compatibility with
+	// OpenSSH versions up to 7.2.
+	keyExchangeCurve25519LibSSH = "curve25519-sha256@libssh.org"
+)
+
+// The message authentication code (MAC) currently or previously implemented by
+// this library, to use in [Config.MACs]. For a list, see the
+// [Algorithms.MACs] returned by [SupportedAlgorithms] or
+// [InsecureAlgorithms].
+const (
+	HMACSHA256ETM      = "hmac-sha2-256-etm@openssh.com"
+	HMACSHA512ETM      = "hmac-sha2-512-etm@openssh.com"
+	HMACSHA256         = "hmac-sha2-256"
+	HMACSHA512         = "hmac-sha2-512"
+	HMACSHA1           = "hmac-sha1"
+	InsecureHMACSHA196 = "hmac-sha1-96"
+)
+
+var (
+	// supportedKexAlgos specifies key-exchange algorithms implemented by this
+	// package in preference order, excluding those with security issues.
+	supportedKexAlgos = []string{
+		KeyExchangeCurve25519,
+		KeyExchangeECDHP256,
+		KeyExchangeECDHP384,
+		KeyExchangeECDHP521,
+		KeyExchangeDH14SHA256,
+		KeyExchangeDH16SHA512,
+		KeyExchangeDHGEXSHA256,
+	}
+	// defaultKexAlgos specifies the default preference for key-exchange
+	// algorithms in preference order.
+	defaultKexAlgos = []string{
+		KeyExchangeCurve25519,
+		KeyExchangeECDHP256,
+		KeyExchangeECDHP384,
+		KeyExchangeECDHP521,
+		KeyExchangeDH14SHA256,
+		InsecureKeyExchangeDH14SHA1,
+	}
+	// insecureKexAlgos specifies key-exchange algorithms implemented by this
+	// package and which have security issues.
+	insecureKexAlgos = []string{
+		InsecureKeyExchangeDH14SHA1,
+		InsecureKeyExchangeDH1SHA1,
+		InsecureKeyExchangeDHGEXSHA1,
+	}
+	// supportedCiphers specifies cipher algorithms implemented by this package
+	// in preference order, excluding those with security issues.
+	supportedCiphers = []string{
+		CipherAES128GCM,
+		CipherAES256GCM,
+		CipherChaCha20Poly1305,
+		CipherAES128CTR,
+		CipherAES192CTR,
+		CipherAES256CTR,
+	}
+	// defaultCiphers specifies the default preference for ciphers algorithms
+	// in preference order.
+	defaultCiphers = supportedCiphers
+	// insecureCiphers specifies cipher algorithms implemented by this
+	// package and which have security issues.
+	insecureCiphers = []string{
+		InsecureCipherAES128CBC,
+		InsecureCipherTripleDESCBC,
+		InsecureCipherRC4256,
+		InsecureCipherRC4128,
+		InsecureCipherRC4,
+	}
+	// supportedMACs specifies MAC algorithms implemented by this package in
+	// preference order, excluding those with security issues.
+	supportedMACs = []string{
+		HMACSHA256ETM,
+		HMACSHA512ETM,
+		HMACSHA256,
+		HMACSHA512,
+		HMACSHA1,
+	}
+	// defaultMACs specifies the default preference for MAC algorithms in
+	// preference order.
+	defaultMACs = []string{
+		HMACSHA256ETM,
+		HMACSHA512ETM,
+		HMACSHA256,
+		HMACSHA512,
+		HMACSHA1,
+		InsecureHMACSHA196,
+	}
+	// insecureMACs specifies MAC algorithms implemented by this
+	// package and which have security issues.
+	insecureMACs = []string{
+		InsecureHMACSHA196,
+	}
+	// supportedHostKeyAlgos specifies the supported host-key algorithms (i.e.
+	// methods of authenticating servers) implemented by this package in
+	// preference order, excluding those with security issues.
+	supportedHostKeyAlgos = []string{
+		CertAlgoRSASHA256v01,
+		CertAlgoRSASHA512v01,
+		CertAlgoECDSA256v01,
+		CertAlgoECDSA384v01,
+		CertAlgoECDSA521v01,
+		CertAlgoED25519v01,
+		KeyAlgoRSASHA256,
+		KeyAlgoRSASHA512,
+		KeyAlgoECDSA256,
+		KeyAlgoECDSA384,
+		KeyAlgoECDSA521,
+		KeyAlgoED25519,
+	}
+	// defaultHostKeyAlgos specifies the default preference for host-key
+	// algorithms in preference order.
+	defaultHostKeyAlgos = []string{
+		CertAlgoRSASHA256v01,
+		CertAlgoRSASHA512v01,
+		CertAlgoRSAv01,
+		InsecureCertAlgoDSAv01,
+		CertAlgoECDSA256v01,
+		CertAlgoECDSA384v01,
+		CertAlgoECDSA521v01,
+		CertAlgoED25519v01,
+		KeyAlgoECDSA256,
+		KeyAlgoECDSA384,
+		KeyAlgoECDSA521,
+		KeyAlgoRSASHA256,
+		KeyAlgoRSASHA512,
+		KeyAlgoRSA,
+		InsecureKeyAlgoDSA,
+		KeyAlgoED25519,
+	}
+	// insecureHostKeyAlgos specifies host-key algorithms implemented by this
+	// package and which have security issues.
+	insecureHostKeyAlgos = []string{
+		KeyAlgoRSA,
+		InsecureKeyAlgoDSA,
+		CertAlgoRSAv01,
+		InsecureCertAlgoDSAv01,
+	}
+	// supportedPubKeyAuthAlgos specifies the supported client public key
+	// authentication algorithms. Note that this doesn't include certificate
+	// types since those use the underlying algorithm. Order is irrelevant.
+	supportedPubKeyAuthAlgos = []string{
+		KeyAlgoED25519,
+		KeyAlgoSKED25519,
+		KeyAlgoSKECDSA256,
+		KeyAlgoECDSA256,
+		KeyAlgoECDSA384,
+		KeyAlgoECDSA521,
+		KeyAlgoRSASHA256,
+		KeyAlgoRSASHA512,
+	}
+
+	// defaultPubKeyAuthAlgos specifies the preferred client public key
+	// authentication algorithms. This list is sent to the client if it supports
+	// the server-sig-algs extension. Order is irrelevant.
+	defaultPubKeyAuthAlgos = []string{
+		KeyAlgoED25519,
+		KeyAlgoSKED25519,
+		KeyAlgoSKECDSA256,
+		KeyAlgoECDSA256,
+		KeyAlgoECDSA384,
+		KeyAlgoECDSA521,
+		KeyAlgoRSASHA256,
+		KeyAlgoRSASHA512,
+		KeyAlgoRSA,
+		InsecureKeyAlgoDSA,
+	}
+	// insecurePubKeyAuthAlgos specifies client public key authentication
+	// algorithms implemented by this package and which have security issues.
+	insecurePubKeyAuthAlgos = []string{
+		KeyAlgoRSA,
+		InsecureKeyAlgoDSA,
+	}
+)
+
+// NegotiatedAlgorithms defines algorithms negotiated between client and server.
+type NegotiatedAlgorithms struct {
+	KeyExchange string
+	HostKey     string
+	Read        DirectionAlgorithms
+	Write       DirectionAlgorithms
 }
 
-// preferredCiphers specifies the default preference for ciphers.
-var preferredCiphers = []string{
-	"aes128-gcm@openssh.com", gcm256CipherID,
-	chacha20Poly1305ID,
-	"aes128-ctr", "aes192-ctr", "aes256-ctr",
+// Algorithms defines a set of algorithms that can be configured in the client
+// or server config for negotiation during a handshake.
+type Algorithms struct {
+	KeyExchanges   []string
+	Ciphers        []string
+	MACs           []string
+	HostKeys       []string
+	PublicKeyAuths []string
 }
 
-// supportedKexAlgos specifies the supported key-exchange algorithms in
-// preference order.
-var supportedKexAlgos = []string{
-	kexAlgoCurve25519SHA256, kexAlgoCurve25519SHA256LibSSH,
-	// P384 and P521 are not constant-time yet, but since we don't
-	// reuse ephemeral keys, using them for ECDH should be OK.
-	kexAlgoECDH256, kexAlgoECDH384, kexAlgoECDH521,
-	kexAlgoDH14SHA256, kexAlgoDH16SHA512, kexAlgoDH14SHA1,
-	kexAlgoDH1SHA1,
+// SupportedAlgorithms returns algorithms currently implemented by this package,
+// excluding those with security issues, which are returned by
+// InsecureAlgorithms. The algorithms listed here are in preference order.
+func SupportedAlgorithms() Algorithms {
+	return Algorithms{
+		Ciphers:        slices.Clone(supportedCiphers),
+		MACs:           slices.Clone(supportedMACs),
+		KeyExchanges:   slices.Clone(supportedKexAlgos),
+		HostKeys:       slices.Clone(supportedHostKeyAlgos),
+		PublicKeyAuths: slices.Clone(supportedPubKeyAuthAlgos),
+	}
 }
 
-// serverForbiddenKexAlgos contains key exchange algorithms, that are forbidden
-// for the server half.
-var serverForbiddenKexAlgos = map[string]struct{}{
-	kexAlgoDHGEXSHA1:   {}, // server half implementation is only minimal to satisfy the automated tests
-	kexAlgoDHGEXSHA256: {}, // server half implementation is only minimal to satisfy the automated tests
-}
-
-// preferredKexAlgos specifies the default preference for key-exchange
-// algorithms in preference order. The diffie-hellman-group16-sha512 algorithm
-// is disabled by default because it is a bit slower than the others.
-var preferredKexAlgos = []string{
-	kexAlgoCurve25519SHA256, kexAlgoCurve25519SHA256LibSSH,
-	kexAlgoECDH256, kexAlgoECDH384, kexAlgoECDH521,
-	kexAlgoDH14SHA256, kexAlgoDH14SHA1,
-}
-
-// supportedHostKeyAlgos specifies the supported host-key algorithms (i.e. methods
-// of authenticating servers) in preference order.
-var supportedHostKeyAlgos = []string{
-	CertAlgoRSASHA256v01, CertAlgoRSASHA512v01,
-	CertAlgoRSAv01, CertAlgoDSAv01, CertAlgoECDSA256v01,
-	CertAlgoECDSA384v01, CertAlgoECDSA521v01, CertAlgoED25519v01,
-
-	KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521,
-	KeyAlgoRSASHA256, KeyAlgoRSASHA512,
-	KeyAlgoRSA, KeyAlgoDSA,
-
-	KeyAlgoED25519,
-}
-
-// supportedMACs specifies a default set of MAC algorithms in preference order.
-// This is based on RFC 4253, section 6.4, but with hmac-md5 variants removed
-// because they have reached the end of their useful life.
-var supportedMACs = []string{
-	"hmac-sha2-256-etm@openssh.com", "hmac-sha2-512-etm@openssh.com", "hmac-sha2-256", "hmac-sha2-512", "hmac-sha1", "hmac-sha1-96",
+// InsecureAlgorithms returns algorithms currently implemented by this package
+// and which have security issues.
+func InsecureAlgorithms() Algorithms {
+	return Algorithms{
+		KeyExchanges:   slices.Clone(insecureKexAlgos),
+		Ciphers:        slices.Clone(insecureCiphers),
+		MACs:           slices.Clone(insecureMACs),
+		HostKeys:       slices.Clone(insecureHostKeyAlgos),
+		PublicKeyAuths: slices.Clone(insecurePubKeyAuthAlgos),
+	}
 }
 
 var supportedCompressions = []string{compressionNone}
@@ -94,13 +284,13 @@ var supportedCompressions = []string{compressionNone}
 // hashFuncs keeps the mapping of supported signature algorithms to their
 // respective hashes needed for signing and verification.
 var hashFuncs = map[string]crypto.Hash{
-	KeyAlgoRSA:       crypto.SHA1,
-	KeyAlgoRSASHA256: crypto.SHA256,
-	KeyAlgoRSASHA512: crypto.SHA512,
-	KeyAlgoDSA:       crypto.SHA1,
-	KeyAlgoECDSA256:  crypto.SHA256,
-	KeyAlgoECDSA384:  crypto.SHA384,
-	KeyAlgoECDSA521:  crypto.SHA512,
+	KeyAlgoRSA:         crypto.SHA1,
+	KeyAlgoRSASHA256:   crypto.SHA256,
+	KeyAlgoRSASHA512:   crypto.SHA512,
+	InsecureKeyAlgoDSA: crypto.SHA1,
+	KeyAlgoECDSA256:    crypto.SHA256,
+	KeyAlgoECDSA384:    crypto.SHA384,
+	KeyAlgoECDSA521:    crypto.SHA512,
 	// KeyAlgoED25519 doesn't pre-hash.
 	KeyAlgoSKECDSA256: crypto.SHA256,
 	KeyAlgoSKED25519:  crypto.SHA256,
@@ -135,18 +325,6 @@ func isRSACert(algo string) bool {
 	return isRSA(algo)
 }
 
-// supportedPubKeyAuthAlgos specifies the supported client public key
-// authentication algorithms. Note that this doesn't include certificate types
-// since those use the underlying algorithm. This list is sent to the client if
-// it supports the server-sig-algs extension. Order is irrelevant.
-var supportedPubKeyAuthAlgos = []string{
-	KeyAlgoED25519,
-	KeyAlgoSKED25519, KeyAlgoSKECDSA256,
-	KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521,
-	KeyAlgoRSASHA256, KeyAlgoRSASHA512, KeyAlgoRSA,
-	KeyAlgoDSA,
-}
-
 // unexpectedMessageError results when the SSH message that we received didn't
 // match what we wanted.
 func unexpectedMessageError(expected, got uint8) error {
@@ -158,7 +336,7 @@ func parseError(tag uint8) error {
 	return fmt.Errorf("ssh: parse error in message type %d", tag)
 }
 
-func findCommon(what string, client []string, server []string) (common string, err error) {
+func findCommon(what string, client []string, server []string, isClient bool) (string, error) {
 	for _, c := range client {
 		for _, s := range server {
 			if c == s {
@@ -166,23 +344,49 @@ func findCommon(what string, client []string, server []string) (common string, e
 			}
 		}
 	}
-	return "", fmt.Errorf("ssh: no common algorithm for %s; client offered: %v, server offered: %v", what, client, server)
+	err := &AlgorithmNegotiationError{
+		What: what,
+	}
+	if isClient {
+		err.SupportedAlgorithms = client
+		err.RequestedAlgorithms = server
+	} else {
+		err.SupportedAlgorithms = server
+		err.RequestedAlgorithms = client
+	}
+	return "", err
 }
 
-// directionAlgorithms records algorithm choices in one direction (either read or write)
-type directionAlgorithms struct {
+// AlgorithmNegotiationError defines the error returned if the client and the
+// server cannot agree on an algorithm for key exchange, host key, cipher, MAC.
+type AlgorithmNegotiationError struct {
+	What string
+	// RequestedAlgorithms lists the algorithms supported by the peer.
+	RequestedAlgorithms []string
+	// SupportedAlgorithms lists the algorithms supported on our side.
+	SupportedAlgorithms []string
+}
+
+func (a *AlgorithmNegotiationError) Error() string {
+	return fmt.Sprintf("ssh: no common algorithm for %s; we offered: %v, peer offered: %v",
+		a.What, a.SupportedAlgorithms, a.RequestedAlgorithms)
+}
+
+// DirectionAlgorithms defines the algorithms negotiated in one direction
+// (either read or write).
+type DirectionAlgorithms struct {
 	Cipher      string
 	MAC         string
-	Compression string
+	compression string
 }
 
 // rekeyBytes returns a rekeying intervals in bytes.
-func (a *directionAlgorithms) rekeyBytes() int64 {
+func (a *DirectionAlgorithms) rekeyBytes() int64 {
 	// According to RFC 4344 block ciphers should rekey after
 	// 2^(BLOCKSIZE/4) blocks. For all AES flavors BLOCKSIZE is
 	// 128.
 	switch a.Cipher {
-	case "aes128-ctr", "aes192-ctr", "aes256-ctr", gcm128CipherID, gcm256CipherID, aes128cbcID:
+	case CipherAES128CTR, CipherAES192CTR, CipherAES256CTR, CipherAES128GCM, CipherAES256GCM, InsecureCipherAES128CBC:
 		return 16 * (1 << 32)
 
 	}
@@ -192,66 +396,59 @@ func (a *directionAlgorithms) rekeyBytes() int64 {
 }
 
 var aeadCiphers = map[string]bool{
-	gcm128CipherID:     true,
-	gcm256CipherID:     true,
-	chacha20Poly1305ID: true,
+	CipherAES128GCM:        true,
+	CipherAES256GCM:        true,
+	CipherChaCha20Poly1305: true,
 }
 
-type algorithms struct {
-	kex     string
-	hostKey string
-	w       directionAlgorithms
-	r       directionAlgorithms
-}
+func findAgreedAlgorithms(isClient bool, clientKexInit, serverKexInit *kexInitMsg) (algs *NegotiatedAlgorithms, err error) {
+	result := &NegotiatedAlgorithms{}
 
-func findAgreedAlgorithms(isClient bool, clientKexInit, serverKexInit *kexInitMsg) (algs *algorithms, err error) {
-	result := &algorithms{}
-
-	result.kex, err = findCommon("key exchange", clientKexInit.KexAlgos, serverKexInit.KexAlgos)
+	result.KeyExchange, err = findCommon("key exchange", clientKexInit.KexAlgos, serverKexInit.KexAlgos, isClient)
 	if err != nil {
 		return
 	}
 
-	result.hostKey, err = findCommon("host key", clientKexInit.ServerHostKeyAlgos, serverKexInit.ServerHostKeyAlgos)
+	result.HostKey, err = findCommon("host key", clientKexInit.ServerHostKeyAlgos, serverKexInit.ServerHostKeyAlgos, isClient)
 	if err != nil {
 		return
 	}
 
-	stoc, ctos := &result.w, &result.r
+	stoc, ctos := &result.Write, &result.Read
 	if isClient {
 		ctos, stoc = stoc, ctos
 	}
 
-	ctos.Cipher, err = findCommon("client to server cipher", clientKexInit.CiphersClientServer, serverKexInit.CiphersClientServer)
+	ctos.Cipher, err = findCommon("client to server cipher", clientKexInit.CiphersClientServer, serverKexInit.CiphersClientServer, isClient)
 	if err != nil {
 		return
 	}
 
-	stoc.Cipher, err = findCommon("server to client cipher", clientKexInit.CiphersServerClient, serverKexInit.CiphersServerClient)
+	stoc.Cipher, err = findCommon("server to client cipher", clientKexInit.CiphersServerClient, serverKexInit.CiphersServerClient, isClient)
 	if err != nil {
 		return
 	}
 
 	if !aeadCiphers[ctos.Cipher] {
-		ctos.MAC, err = findCommon("client to server MAC", clientKexInit.MACsClientServer, serverKexInit.MACsClientServer)
+		ctos.MAC, err = findCommon("client to server MAC", clientKexInit.MACsClientServer, serverKexInit.MACsClientServer, isClient)
 		if err != nil {
 			return
 		}
 	}
 
 	if !aeadCiphers[stoc.Cipher] {
-		stoc.MAC, err = findCommon("server to client MAC", clientKexInit.MACsServerClient, serverKexInit.MACsServerClient)
+		stoc.MAC, err = findCommon("server to client MAC", clientKexInit.MACsServerClient, serverKexInit.MACsServerClient, isClient)
 		if err != nil {
 			return
 		}
 	}
 
-	ctos.Compression, err = findCommon("client to server compression", clientKexInit.CompressionClientServer, serverKexInit.CompressionClientServer)
+	ctos.compression, err = findCommon("client to server compression", clientKexInit.CompressionClientServer, serverKexInit.CompressionClientServer, isClient)
 	if err != nil {
 		return
 	}
 
-	stoc.Compression, err = findCommon("server to client compression", clientKexInit.CompressionServerClient, serverKexInit.CompressionServerClient)
+	stoc.compression, err = findCommon("server to client compression", clientKexInit.CompressionServerClient, serverKexInit.CompressionServerClient, isClient)
 	if err != nil {
 		return
 	}
@@ -297,7 +494,7 @@ func (c *Config) SetDefaults() {
 		c.Rand = rand.Reader
 	}
 	if c.Ciphers == nil {
-		c.Ciphers = preferredCiphers
+		c.Ciphers = defaultCiphers
 	}
 	var ciphers []string
 	for _, c := range c.Ciphers {
@@ -309,19 +506,22 @@ func (c *Config) SetDefaults() {
 	c.Ciphers = ciphers
 
 	if c.KeyExchanges == nil {
-		c.KeyExchanges = preferredKexAlgos
+		c.KeyExchanges = defaultKexAlgos
 	}
 	var kexs []string
 	for _, k := range c.KeyExchanges {
 		if kexAlgoMap[k] != nil {
 			// Ignore the KEX if we have no kexAlgoMap definition.
 			kexs = append(kexs, k)
+			if k == KeyExchangeCurve25519 && !contains(c.KeyExchanges, keyExchangeCurve25519LibSSH) {
+				kexs = append(kexs, keyExchangeCurve25519LibSSH)
+			}
 		}
 	}
 	c.KeyExchanges = kexs
 
 	if c.MACs == nil {
-		c.MACs = supportedMACs
+		c.MACs = defaultMACs
 	}
 	var macs []string
 	for _, m := range c.MACs {

@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 
 	"github.com/google/gnostic-models/compiler"
 )
@@ -60,7 +60,7 @@ func NewAdditionalPropertiesItem(in *yaml.Node, context *compiler.Context) (*Add
 		// since the oneof matched one of its possibilities, discard any matching errors
 		errors = make([]error, 0)
 	} else {
-		message := fmt.Sprintf("contains an invalid AdditionalPropertiesItem")
+		message := "contains an invalid AdditionalPropertiesItem"
 		err := compiler.NewError(context, message)
 		errors = []error{err}
 	}
@@ -113,7 +113,7 @@ func NewAnyOrExpression(in *yaml.Node, context *compiler.Context) (*AnyOrExpress
 		// since the oneof matched one of its possibilities, discard any matching errors
 		errors = make([]error, 0)
 	} else {
-		message := fmt.Sprintf("contains an invalid AnyOrExpression")
+		message := "contains an invalid AnyOrExpression"
 		err := compiler.NewError(context, message)
 		errors = []error{err}
 	}
@@ -227,7 +227,7 @@ func NewCallbackOrReference(in *yaml.Node, context *compiler.Context) (*Callback
 		// since the oneof matched one of its possibilities, discard any matching errors
 		errors = make([]error, 0)
 	} else {
-		message := fmt.Sprintf("contains an invalid CallbackOrReference")
+		message := "contains an invalid CallbackOrReference"
 		err := compiler.NewError(context, message)
 		errors = []error{err}
 	}
@@ -979,7 +979,7 @@ func NewExampleOrReference(in *yaml.Node, context *compiler.Context) (*ExampleOr
 		// since the oneof matched one of its possibilities, discard any matching errors
 		errors = make([]error, 0)
 	} else {
-		message := fmt.Sprintf("contains an invalid ExampleOrReference")
+		message := "contains an invalid ExampleOrReference"
 		err := compiler.NewError(context, message)
 		errors = []error{err}
 	}
@@ -1320,7 +1320,7 @@ func NewHeaderOrReference(in *yaml.Node, context *compiler.Context) (*HeaderOrRe
 		// since the oneof matched one of its possibilities, discard any matching errors
 		errors = make([]error, 0)
 	} else {
-		message := fmt.Sprintf("contains an invalid HeaderOrReference")
+		message := "contains an invalid HeaderOrReference"
 		err := compiler.NewError(context, message)
 		errors = []error{err}
 	}
@@ -1713,7 +1713,7 @@ func NewLinkOrReference(in *yaml.Node, context *compiler.Context) (*LinkOrRefere
 		// since the oneof matched one of its possibilities, discard any matching errors
 		errors = make([]error, 0)
 	} else {
-		message := fmt.Sprintf("contains an invalid LinkOrReference")
+		message := "contains an invalid LinkOrReference"
 		err := compiler.NewError(context, message)
 		errors = []error{err}
 	}
@@ -3090,7 +3090,7 @@ func NewParameterOrReference(in *yaml.Node, context *compiler.Context) (*Paramet
 		// since the oneof matched one of its possibilities, discard any matching errors
 		errors = make([]error, 0)
 	} else {
-		message := fmt.Sprintf("contains an invalid ParameterOrReference")
+		message := "contains an invalid ParameterOrReference"
 		err := compiler.NewError(context, message)
 		errors = []error{err}
 	}
@@ -3606,7 +3606,7 @@ func NewRequestBodyOrReference(in *yaml.Node, context *compiler.Context) (*Reque
 		// since the oneof matched one of its possibilities, discard any matching errors
 		errors = make([]error, 0)
 	} else {
-		message := fmt.Sprintf("contains an invalid RequestBodyOrReference")
+		message := "contains an invalid RequestBodyOrReference"
 		err := compiler.NewError(context, message)
 		errors = []error{err}
 	}
@@ -3743,7 +3743,7 @@ func NewResponseOrReference(in *yaml.Node, context *compiler.Context) (*Response
 		// since the oneof matched one of its possibilities, discard any matching errors
 		errors = make([]error, 0)
 	} else {
-		message := fmt.Sprintf("contains an invalid ResponseOrReference")
+		message := "contains an invalid ResponseOrReference"
 		err := compiler.NewError(context, message)
 		errors = []error{err}
 	}
@@ -4310,7 +4310,7 @@ func NewSchemaOrReference(in *yaml.Node, context *compiler.Context) (*SchemaOrRe
 		// since the oneof matched one of its possibilities, discard any matching errors
 		errors = make([]error, 0)
 	} else {
-		message := fmt.Sprintf("contains an invalid SchemaOrReference")
+		message := "contains an invalid SchemaOrReference"
 		err := compiler.NewError(context, message)
 		errors = []error{err}
 	}
@@ -4543,7 +4543,7 @@ func NewSecuritySchemeOrReference(in *yaml.Node, context *compiler.Context) (*Se
 		// since the oneof matched one of its possibilities, discard any matching errors
 		errors = make([]error, 0)
 	} else {
-		message := fmt.Sprintf("contains an invalid SecuritySchemeOrReference")
+		message := "contains an invalid SecuritySchemeOrReference"
 		err := compiler.NewError(context, message)
 		errors = []error{err}
 	}

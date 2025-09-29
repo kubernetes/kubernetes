@@ -24,6 +24,8 @@ import (
 
 // ExampleStatusApplyConfiguration represents a declarative configuration of the ExampleStatus type for use
 // with apply.
+//
+// ExampleStatus is the status for an Example resource
 type ExampleStatusApplyConfiguration struct {
 	State   *crv1.ExampleState `json:"state,omitempty"`
 	Message *string            `json:"message,omitempty"`
@@ -34,7 +36,6 @@ type ExampleStatusApplyConfiguration struct {
 func ExampleStatus() *ExampleStatusApplyConfiguration {
 	return &ExampleStatusApplyConfiguration{}
 }
-func (b ExampleStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithState sets the State field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -173,6 +173,21 @@ func TestValidateClass(t *testing.T) {
 				return class
 			}(),
 		},
+		"good-extended-resource-name": {
+			class: func() *resource.DeviceClass {
+				class := testClass(goodName)
+				class.Spec.ExtendedResourceName = ptr.To(string("example.com/gpu"))
+				return class
+			}(),
+		},
+		"bad-extended-resource-name": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com", "must be a valid extended resource name")},
+			class: func() *resource.DeviceClass {
+				class := testClass(goodName)
+				class.Spec.ExtendedResourceName = ptr.To(string("example.com"))
+				return class
+			}(),
+		},
 		"selectors": {
 			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("spec", "selectors").Index(1).Child("cel"), ""),
@@ -225,7 +240,7 @@ func TestValidateClass(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "config").Index(1).Child("opaque", "driver"), "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 				field.Required(field.NewPath("spec", "config").Index(1).Child("opaque", "parameters"), ""),
 				field.Invalid(field.NewPath("spec", "config").Index(2).Child("opaque", "parameters"), "<value omitted>", "error parsing data as JSON: invalid character 'x' looking for beginning of value"),
-				field.Invalid(field.NewPath("spec", "config").Index(3).Child("opaque", "parameters"), "<value omitted>", "parameters must be a valid JSON object"),
+				field.Invalid(field.NewPath("spec", "config").Index(3).Child("opaque", "parameters"), "<value omitted>", "must be a valid JSON object"),
 				field.Required(field.NewPath("spec", "config").Index(4).Child("opaque", "parameters"), ""),
 				field.Required(field.NewPath("spec", "config").Index(5).Child("opaque"), ""),
 				field.TooLong(field.NewPath("spec", "config").Index(7).Child("opaque", "parameters"), "" /* unused */, resource.OpaqueParametersMaxLength),

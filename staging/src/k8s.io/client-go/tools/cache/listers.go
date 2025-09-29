@@ -32,6 +32,10 @@ type AppendFunc func(interface{})
 
 // ListAll lists items in the store matching the given selector, calling appendFn on each one.
 func ListAll(store Store, selector labels.Selector, appendFn AppendFunc) error {
+	if labels.MatchesNothing(selector) {
+		return nil
+	}
+
 	selectAll := selector.Empty()
 	for _, m := range store.List() {
 		if selectAll {
@@ -55,6 +59,10 @@ func ListAll(store Store, selector labels.Selector, appendFn AppendFunc) error {
 // calling appendFn on each one.
 // If a blank namespace (NamespaceAll) is specified, this delegates to ListAll().
 func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selector, appendFn AppendFunc) error {
+	if labels.MatchesNothing(selector) {
+		return nil
+	}
+
 	if namespace == metav1.NamespaceAll {
 		return ListAll(indexer, selector, appendFn)
 	}

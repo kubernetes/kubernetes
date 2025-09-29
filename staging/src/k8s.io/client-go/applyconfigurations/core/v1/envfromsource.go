@@ -20,10 +20,16 @@ package v1
 
 // EnvFromSourceApplyConfiguration represents a declarative configuration of the EnvFromSource type for use
 // with apply.
+//
+// EnvFromSource represents the source of a set of ConfigMaps or Secrets
 type EnvFromSourceApplyConfiguration struct {
-	Prefix       *string                               `json:"prefix,omitempty"`
+	// Optional text to prepend to the name of each environment variable.
+	// May consist of any printable ASCII characters except '='.
+	Prefix *string `json:"prefix,omitempty"`
+	// The ConfigMap to select from
 	ConfigMapRef *ConfigMapEnvSourceApplyConfiguration `json:"configMapRef,omitempty"`
-	SecretRef    *SecretEnvSourceApplyConfiguration    `json:"secretRef,omitempty"`
+	// The Secret to select from
+	SecretRef *SecretEnvSourceApplyConfiguration `json:"secretRef,omitempty"`
 }
 
 // EnvFromSourceApplyConfiguration constructs a declarative configuration of the EnvFromSource type for use with
@@ -31,7 +37,6 @@ type EnvFromSourceApplyConfiguration struct {
 func EnvFromSource() *EnvFromSourceApplyConfiguration {
 	return &EnvFromSourceApplyConfiguration{}
 }
-func (b EnvFromSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPrefix sets the Prefix field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

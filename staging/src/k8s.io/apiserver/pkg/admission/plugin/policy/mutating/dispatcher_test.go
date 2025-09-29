@@ -23,7 +23,7 @@ import (
 	"time"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -77,14 +77,14 @@ func TestDispatcher(t *testing.T) {
 				}},
 			policyHooks: []generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]{
 				{
-					Policy: mutations(matchConstraints(policy("policy1"), &v1alpha1.MatchResources{
-						MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+					Policy: mutations(matchConstraints(policy("policy1"), &v1beta1.MatchResources{
+						MatchPolicy:       ptr.To(v1beta1.Equivalent),
 						NamespaceSelector: &metav1.LabelSelector{},
 						ObjectSelector:    &metav1.LabelSelector{},
-						ResourceRules: []v1alpha1.NamedRuleWithOperations{
+						ResourceRules: []v1beta1.NamedRuleWithOperations{
 							{
-								RuleWithOperations: v1alpha1.RuleWithOperations{
-									Rule: v1alpha1.Rule{
+								RuleWithOperations: v1beta1.RuleWithOperations{
+									Rule: v1beta1.Rule{
 										APIGroups:   []string{"apps"},
 										APIVersions: []string{"v1"},
 										Resources:   []string{"deployments"},
@@ -93,9 +93,9 @@ func TestDispatcher(t *testing.T) {
 								},
 							},
 						},
-					}), v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+					}), v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `Object{
 									spec: Object.spec{
 										replicas: object.spec.replicas + 100
@@ -104,7 +104,7 @@ func TestDispatcher(t *testing.T) {
 						}}),
 					Bindings: []*PolicyBinding{{
 						ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-						Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+						Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 							PolicyName: "policy1",
 						},
 					}},
@@ -168,14 +168,14 @@ func TestDispatcher(t *testing.T) {
 			},
 			policyHooks: []generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]{
 				{
-					Policy: paramKind(mutations(matchConstraints(policy("policy1"), &v1alpha1.MatchResources{
-						MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+					Policy: paramKind(mutations(matchConstraints(policy("policy1"), &v1beta1.MatchResources{
+						MatchPolicy:       ptr.To(v1beta1.Equivalent),
 						NamespaceSelector: &metav1.LabelSelector{},
 						ObjectSelector:    &metav1.LabelSelector{},
-						ResourceRules: []v1alpha1.NamedRuleWithOperations{
+						ResourceRules: []v1beta1.NamedRuleWithOperations{
 							{
-								RuleWithOperations: v1alpha1.RuleWithOperations{
-									Rule: v1alpha1.Rule{
+								RuleWithOperations: v1beta1.RuleWithOperations{
+									Rule: v1beta1.Rule{
 										APIGroups:   []string{"apps"},
 										APIVersions: []string{"v1"},
 										Resources:   []string{"deployments"},
@@ -184,24 +184,24 @@ func TestDispatcher(t *testing.T) {
 								},
 							},
 						}}),
-						v1alpha1.Mutation{
-							PatchType: v1alpha1.PatchTypeApplyConfiguration,
-							ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						v1beta1.Mutation{
+							PatchType: v1beta1.PatchTypeApplyConfiguration,
+							ApplyConfiguration: &v1beta1.ApplyConfiguration{
 								Expression: `Object{
 									spec: Object.spec{
 										replicas: object.spec.replicas + int(params.data['key'])
 									}
 								}`,
 							}}),
-						&v1alpha1.ParamKind{
+						&v1beta1.ParamKind{
 							APIVersion: "v1",
 							Kind:       "ConfigMap",
 						}),
 					Bindings: []*PolicyBinding{{
 						ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-						Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+						Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 							PolicyName: "policy1",
-							ParamRef:   &v1alpha1.ParamRef{Name: "cm1", Namespace: "default"},
+							ParamRef:   &v1beta1.ParamRef{Name: "cm1", Namespace: "default"},
 						},
 					}},
 				},
@@ -248,14 +248,14 @@ func TestDispatcher(t *testing.T) {
 				}},
 			policyHooks: []generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]{
 				{
-					Policy: mutations(matchConstraints(policy("policy1"), &v1alpha1.MatchResources{
-						MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+					Policy: mutations(matchConstraints(policy("policy1"), &v1beta1.MatchResources{
+						MatchPolicy:       ptr.To(v1beta1.Equivalent),
 						NamespaceSelector: &metav1.LabelSelector{},
 						ObjectSelector:    &metav1.LabelSelector{},
-						ResourceRules: []v1alpha1.NamedRuleWithOperations{
+						ResourceRules: []v1beta1.NamedRuleWithOperations{
 							{
-								RuleWithOperations: v1alpha1.RuleWithOperations{
-									Rule: v1alpha1.Rule{
+								RuleWithOperations: v1beta1.RuleWithOperations{
+									Rule: v1beta1.Rule{
 										APIGroups:   []string{"apps"},
 										APIVersions: []string{"v1"},
 										Resources:   []string{"deployments"},
@@ -264,9 +264,9 @@ func TestDispatcher(t *testing.T) {
 								},
 							},
 						},
-					}), v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+					}), v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `Object{
 									metadata: Object.metadata{
 										labels: {"policy1": string(int(object.?metadata.labels["count"].orValue("1")) + 1)}
@@ -275,20 +275,20 @@ func TestDispatcher(t *testing.T) {
 						}}),
 					Bindings: []*PolicyBinding{{
 						ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-						Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+						Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 							PolicyName: "policy1",
 						},
 					}},
 				},
 				{
-					Policy: mutations(matchConstraints(policy("policy2"), &v1alpha1.MatchResources{
-						MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+					Policy: mutations(matchConstraints(policy("policy2"), &v1beta1.MatchResources{
+						MatchPolicy:       ptr.To(v1beta1.Equivalent),
 						NamespaceSelector: &metav1.LabelSelector{},
 						ObjectSelector:    &metav1.LabelSelector{},
-						ResourceRules: []v1alpha1.NamedRuleWithOperations{
+						ResourceRules: []v1beta1.NamedRuleWithOperations{
 							{
-								RuleWithOperations: v1alpha1.RuleWithOperations{
-									Rule: v1alpha1.Rule{
+								RuleWithOperations: v1beta1.RuleWithOperations{
+									Rule: v1beta1.Rule{
 										APIGroups:   []string{"apps"},
 										APIVersions: []string{"v1"},
 										Resources:   []string{"deployments"},
@@ -297,9 +297,9 @@ func TestDispatcher(t *testing.T) {
 								},
 							},
 						},
-					}), v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+					}), v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `Object{
 									metadata: Object.metadata{
 										labels: {"policy2": string(int(object.?metadata.labels["count"].orValue("1")) + 1)}
@@ -308,7 +308,7 @@ func TestDispatcher(t *testing.T) {
 						}}),
 					Bindings: []*PolicyBinding{{
 						ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-						Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+						Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 							PolicyName: "policy2",
 						},
 					}},
@@ -359,19 +359,19 @@ func TestDispatcher(t *testing.T) {
 				}},
 			policyHooks: []generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]{
 				{
-					Policy: &v1alpha1.MutatingAdmissionPolicy{
+					Policy: &v1beta1.MutatingAdmissionPolicy{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "policy1",
 						},
-						Spec: v1alpha1.MutatingAdmissionPolicySpec{
-							MatchConstraints: &v1alpha1.MatchResources{
-								MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+						Spec: v1beta1.MutatingAdmissionPolicySpec{
+							MatchConstraints: &v1beta1.MatchResources{
+								MatchPolicy:       ptr.To(v1beta1.Equivalent),
 								NamespaceSelector: &metav1.LabelSelector{},
 								ObjectSelector:    &metav1.LabelSelector{},
-								ResourceRules: []v1alpha1.NamedRuleWithOperations{
+								ResourceRules: []v1beta1.NamedRuleWithOperations{
 									{
-										RuleWithOperations: v1alpha1.RuleWithOperations{
-											Rule: v1alpha1.Rule{
+										RuleWithOperations: v1beta1.RuleWithOperations{
+											Rule: v1beta1.Rule{
 												APIGroups:   []string{"apps"},
 												APIVersions: []string{"v1"},
 												Resources:   []string{"deployments"},
@@ -381,9 +381,9 @@ func TestDispatcher(t *testing.T) {
 									},
 								},
 							},
-							Mutations: []v1alpha1.Mutation{{
-								PatchType: v1alpha1.PatchTypeApplyConfiguration,
-								ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Mutations: []v1beta1.Mutation{{
+								PatchType: v1beta1.PatchTypeApplyConfiguration,
+								ApplyConfiguration: &v1beta1.ApplyConfiguration{
 									Expression: `Object{
 									metadata: Object.metadata{
 										labels: {"environment": "production"}
@@ -394,25 +394,25 @@ func TestDispatcher(t *testing.T) {
 					},
 					Bindings: []*PolicyBinding{{
 						ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-						Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+						Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 							PolicyName: "policy1",
 						},
 					}},
 				},
 				{
-					Policy: &v1alpha1.MutatingAdmissionPolicy{
+					Policy: &v1beta1.MutatingAdmissionPolicy{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "policy2",
 						},
-						Spec: v1alpha1.MutatingAdmissionPolicySpec{
-							MatchConstraints: &v1alpha1.MatchResources{
-								MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+						Spec: v1beta1.MutatingAdmissionPolicySpec{
+							MatchConstraints: &v1beta1.MatchResources{
+								MatchPolicy:       ptr.To(v1beta1.Equivalent),
 								NamespaceSelector: &metav1.LabelSelector{},
 								ObjectSelector:    &metav1.LabelSelector{},
-								ResourceRules: []v1alpha1.NamedRuleWithOperations{
+								ResourceRules: []v1beta1.NamedRuleWithOperations{
 									{
-										RuleWithOperations: v1alpha1.RuleWithOperations{
-											Rule: v1alpha1.Rule{
+										RuleWithOperations: v1beta1.RuleWithOperations{
+											Rule: v1beta1.Rule{
 												APIGroups:   []string{"apps"},
 												APIVersions: []string{"v1"},
 												Resources:   []string{"deployments"},
@@ -422,15 +422,15 @@ func TestDispatcher(t *testing.T) {
 									},
 								},
 							},
-							MatchConditions: []v1alpha1.MatchCondition{
+							MatchConditions: []v1beta1.MatchCondition{
 								{
 									Name:       "prodonly",
 									Expression: `object.?metadata.labels["environment"].orValue("") == "production"`,
 								},
 							},
-							Mutations: []v1alpha1.Mutation{{
-								PatchType: v1alpha1.PatchTypeApplyConfiguration,
-								ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Mutations: []v1beta1.Mutation{{
+								PatchType: v1beta1.PatchTypeApplyConfiguration,
+								ApplyConfiguration: &v1beta1.ApplyConfiguration{
 									Expression: `Object{
 									metadata: Object.metadata{
 										labels: {"policy1invoked": "true"}
@@ -441,7 +441,7 @@ func TestDispatcher(t *testing.T) {
 					},
 					Bindings: []*PolicyBinding{{
 						ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-						Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+						Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 							PolicyName: "policy2",
 						},
 					}},
@@ -493,19 +493,19 @@ func TestDispatcher(t *testing.T) {
 				}},
 			policyHooks: []generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]{
 				{
-					Policy: &v1alpha1.MutatingAdmissionPolicy{
+					Policy: &v1beta1.MutatingAdmissionPolicy{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "policy1",
 						},
-						Spec: v1alpha1.MutatingAdmissionPolicySpec{
-							MatchConstraints: &v1alpha1.MatchResources{
-								MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+						Spec: v1beta1.MutatingAdmissionPolicySpec{
+							MatchConstraints: &v1beta1.MatchResources{
+								MatchPolicy:       ptr.To(v1beta1.Equivalent),
 								NamespaceSelector: &metav1.LabelSelector{},
 								ObjectSelector:    &metav1.LabelSelector{},
-								ResourceRules: []v1alpha1.NamedRuleWithOperations{
+								ResourceRules: []v1beta1.NamedRuleWithOperations{
 									{
-										RuleWithOperations: v1alpha1.RuleWithOperations{
-											Rule: v1alpha1.Rule{
+										RuleWithOperations: v1beta1.RuleWithOperations{
+											Rule: v1beta1.Rule{
 												APIGroups:   []string{"apps"},
 												APIVersions: []string{"v1"},
 												Resources:   []string{"deployments"},
@@ -515,15 +515,15 @@ func TestDispatcher(t *testing.T) {
 									},
 								},
 							},
-							MatchConditions: []v1alpha1.MatchCondition{
+							MatchConditions: []v1beta1.MatchCondition{
 								{
 									Name:       "prodonly",
 									Expression: `object.?metadata.labels["environment"].orValue("") == "production"`,
 								},
 							},
-							Mutations: []v1alpha1.Mutation{{
-								PatchType: v1alpha1.PatchTypeApplyConfiguration,
-								ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Mutations: []v1beta1.Mutation{{
+								PatchType: v1beta1.PatchTypeApplyConfiguration,
+								ApplyConfiguration: &v1beta1.ApplyConfiguration{
 									Expression: `Object{
 									metadata: Object.metadata{
 										labels: {"policy1invoked": "true"}
@@ -534,25 +534,25 @@ func TestDispatcher(t *testing.T) {
 					},
 					Bindings: []*PolicyBinding{{
 						ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-						Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+						Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 							PolicyName: "policy1",
 						},
 					}},
 				},
 				{
-					Policy: &v1alpha1.MutatingAdmissionPolicy{
+					Policy: &v1beta1.MutatingAdmissionPolicy{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "policy2",
 						},
-						Spec: v1alpha1.MutatingAdmissionPolicySpec{
-							MatchConstraints: &v1alpha1.MatchResources{
-								MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+						Spec: v1beta1.MutatingAdmissionPolicySpec{
+							MatchConstraints: &v1beta1.MatchResources{
+								MatchPolicy:       ptr.To(v1beta1.Equivalent),
 								NamespaceSelector: &metav1.LabelSelector{},
 								ObjectSelector:    &metav1.LabelSelector{},
-								ResourceRules: []v1alpha1.NamedRuleWithOperations{
+								ResourceRules: []v1beta1.NamedRuleWithOperations{
 									{
-										RuleWithOperations: v1alpha1.RuleWithOperations{
-											Rule: v1alpha1.Rule{
+										RuleWithOperations: v1beta1.RuleWithOperations{
+											Rule: v1beta1.Rule{
 												APIGroups:   []string{"apps"},
 												APIVersions: []string{"v1"},
 												Resources:   []string{"deployments"},
@@ -562,9 +562,9 @@ func TestDispatcher(t *testing.T) {
 									},
 								},
 							},
-							Mutations: []v1alpha1.Mutation{{
-								PatchType: v1alpha1.PatchTypeApplyConfiguration,
-								ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+							Mutations: []v1beta1.Mutation{{
+								PatchType: v1beta1.PatchTypeApplyConfiguration,
+								ApplyConfiguration: &v1beta1.ApplyConfiguration{
 									Expression: `Object{
 									metadata: Object.metadata{
 										labels: {"environment": "production"}
@@ -575,7 +575,7 @@ func TestDispatcher(t *testing.T) {
 					},
 					Bindings: []*PolicyBinding{{
 						ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-						Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+						Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 							PolicyName: "policy2",
 						},
 					}},

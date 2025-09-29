@@ -24,7 +24,11 @@ import (
 
 // NamespaceSpecApplyConfiguration represents a declarative configuration of the NamespaceSpec type for use
 // with apply.
+//
+// NamespaceSpec describes the attributes on a Namespace.
 type NamespaceSpecApplyConfiguration struct {
+	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
+	// More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
 	Finalizers []corev1.FinalizerName `json:"finalizers,omitempty"`
 }
 
@@ -33,7 +37,6 @@ type NamespaceSpecApplyConfiguration struct {
 func NamespaceSpec() *NamespaceSpecApplyConfiguration {
 	return &NamespaceSpecApplyConfiguration{}
 }
-func (b NamespaceSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

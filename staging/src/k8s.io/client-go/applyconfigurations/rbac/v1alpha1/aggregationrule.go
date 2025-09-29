@@ -24,7 +24,11 @@ import (
 
 // AggregationRuleApplyConfiguration represents a declarative configuration of the AggregationRule type for use
 // with apply.
+//
+// AggregationRule describes how to locate ClusterRoles to aggregate into the ClusterRole
 type AggregationRuleApplyConfiguration struct {
+	// ClusterRoleSelectors holds a list of selectors which will be used to find ClusterRoles and create the rules.
+	// If any of the selectors match, then the ClusterRole's permissions will be added
 	ClusterRoleSelectors []v1.LabelSelectorApplyConfiguration `json:"clusterRoleSelectors,omitempty"`
 }
 
@@ -33,7 +37,6 @@ type AggregationRuleApplyConfiguration struct {
 func AggregationRule() *AggregationRuleApplyConfiguration {
 	return &AggregationRuleApplyConfiguration{}
 }
-func (b AggregationRuleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithClusterRoleSelectors adds the given value to the ClusterRoleSelectors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

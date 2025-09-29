@@ -20,10 +20,15 @@ package v1
 
 // ConfigMapKeySelectorApplyConfiguration represents a declarative configuration of the ConfigMapKeySelector type for use
 // with apply.
+//
+// Selects a key from a ConfigMap.
 type ConfigMapKeySelectorApplyConfiguration struct {
+	// The ConfigMap to select from.
 	LocalObjectReferenceApplyConfiguration `json:",inline"`
-	Key                                    *string `json:"key,omitempty"`
-	Optional                               *bool   `json:"optional,omitempty"`
+	// The key to select.
+	Key *string `json:"key,omitempty"`
+	// Specify whether the ConfigMap or its key must be defined
+	Optional *bool `json:"optional,omitempty"`
 }
 
 // ConfigMapKeySelectorApplyConfiguration constructs a declarative configuration of the ConfigMapKeySelector type for use with
@@ -31,7 +36,6 @@ type ConfigMapKeySelectorApplyConfiguration struct {
 func ConfigMapKeySelector() *ConfigMapKeySelectorApplyConfiguration {
 	return &ConfigMapKeySelectorApplyConfiguration{}
 }
-func (b ConfigMapKeySelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -93,8 +93,7 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	opts := validation.ClusterRoleValidationOptions{
 		AllowInvalidLabelValueInSelector: hasInvalidLabelValueInLabelSelector(oldObj),
 	}
-	errorList := validation.ValidateClusterRole(newObj, opts)
-	return append(errorList, validation.ValidateClusterRoleUpdate(newObj, old.(*rbac.ClusterRole), opts)...)
+	return validation.ValidateClusterRoleUpdate(newObj, old.(*rbac.ClusterRole), opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

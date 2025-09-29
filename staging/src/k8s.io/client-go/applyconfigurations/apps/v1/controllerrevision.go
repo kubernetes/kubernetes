@@ -30,11 +30,25 @@ import (
 
 // ControllerRevisionApplyConfiguration represents a declarative configuration of the ControllerRevision type for use
 // with apply.
+//
+// ControllerRevision implements an immutable snapshot of state data. Clients
+// are responsible for serializing and deserializing the objects that contain
+// their internal state.
+// Once a ControllerRevision has been successfully created, it can not be updated.
+// The API Server will fail validation of all requests that attempt to mutate
+// the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both
+// the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However,
+// it may be subject to name and representation changes in future releases, and clients should not
+// depend on its stability. It is primarily for internal use by controllers.
 type ControllerRevisionApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Data                                 *runtime.RawExtension `json:"data,omitempty"`
-	Revision                             *int64                `json:"revision,omitempty"`
+	// Data is the serialized representation of the state.
+	Data *runtime.RawExtension `json:"data,omitempty"`
+	// Revision indicates the revision of the state represented by Data.
+	Revision *int64 `json:"revision,omitempty"`
 }
 
 // ControllerRevision constructs a declarative configuration of the ControllerRevision type for use with
@@ -48,29 +62,14 @@ func ControllerRevision(name, namespace string) *ControllerRevisionApplyConfigur
 	return b
 }
 
-// ExtractControllerRevision extracts the applied configuration owned by fieldManager from
-// controllerRevision. If no managedFields are found in controllerRevision for fieldManager, a
-// ControllerRevisionApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractControllerRevisionFrom extracts the applied configuration owned by fieldManager from
+// controllerRevision for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // controllerRevision must be a unmodified ControllerRevision API object that was retrieved from the Kubernetes API.
-// ExtractControllerRevision provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractControllerRevisionFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractControllerRevision(controllerRevision *appsv1.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
-	return extractControllerRevision(controllerRevision, fieldManager, "")
-}
-
-// ExtractControllerRevisionStatus is the same as ExtractControllerRevision except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractControllerRevisionStatus(controllerRevision *appsv1.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
-	return extractControllerRevision(controllerRevision, fieldManager, "status")
-}
-
-func extractControllerRevision(controllerRevision *appsv1.ControllerRevision, fieldManager string, subresource string) (*ControllerRevisionApplyConfiguration, error) {
+func ExtractControllerRevisionFrom(controllerRevision *appsv1.ControllerRevision, fieldManager string, subresource string) (*ControllerRevisionApplyConfiguration, error) {
 	b := &ControllerRevisionApplyConfiguration{}
 	err := managedfields.ExtractInto(controllerRevision, internal.Parser().Type("io.k8s.api.apps.v1.ControllerRevision"), fieldManager, b, subresource)
 	if err != nil {
@@ -83,6 +82,21 @@ func extractControllerRevision(controllerRevision *appsv1.ControllerRevision, fi
 	b.WithAPIVersion("apps/v1")
 	return b, nil
 }
+
+// ExtractControllerRevision extracts the applied configuration owned by fieldManager from
+// controllerRevision. If no managedFields are found in controllerRevision for fieldManager, a
+// ControllerRevisionApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// controllerRevision must be a unmodified ControllerRevision API object that was retrieved from the Kubernetes API.
+// ExtractControllerRevision provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractControllerRevision(controllerRevision *appsv1.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
+	return ExtractControllerRevisionFrom(controllerRevision, fieldManager, "")
+}
+
 func (b ControllerRevisionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

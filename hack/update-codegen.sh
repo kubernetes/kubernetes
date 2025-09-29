@@ -694,6 +694,8 @@ function codegen::openapi() {
     # The result file, in each pkg, of open-api generation.
     local output_file="${GENERATED_FILE_PREFIX}openapi.go"
 
+    local output_model_name_file="${GENERATED_FILE_PREFIX}model_name.go"
+
     local output_dir="pkg/generated/openapi"
     local output_pkg="k8s.io/kubernetes/${output_dir}"
     local known_violations_file="${API_KNOWN_VIOLATIONS_DIR}/violation_exceptions.list"
@@ -718,7 +720,7 @@ function codegen::openapi() {
 
     local tag_dirs=()
     kube::util::read-array tag_dirs < <(
-        grep -l --null '+k8s:openapi-gen=' "${tag_files[@]}" \
+        grep -l --null '+k8s:openapi' "${tag_files[@]}" \
             | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
 
@@ -740,6 +742,7 @@ function codegen::openapi() {
     fi
 
     git_find -z ':(glob)pkg/generated/**'/"${output_file}" | xargs -0 rm -f
+    git_find -z ':(glob)pkg/generated/**'/"${output_model_name_file}" | xargs -0 rm -f
 
     openapi-gen \
         -v "${KUBE_VERBOSE}" \
@@ -748,6 +751,7 @@ function codegen::openapi() {
         --output-dir "${output_dir}" \
         --output-pkg "${output_pkg}" \
         --report-filename "${report_file}" \
+        --output-model-name-file "${output_model_name_file}" \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -1021,21 +1025,16 @@ function codegen::protobindings() {
     # Each element of this array is a directory containing subdirectories which
     # eventually contain a file named "api.proto".
     local apis=(
-        "staging/src/k8s.io/cri-api/pkg/apis/runtime"
-
-        "staging/src/k8s.io/kubelet/pkg/apis/podresources"
-
+        "staging/src/k8s.io/kubelet/pkg/apis/dra"
         "staging/src/k8s.io/kubelet/pkg/apis/deviceplugin"
-
+        "staging/src/k8s.io/kubelet/pkg/apis/podresources"
         "staging/src/k8s.io/kms/apis"
         "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
-
-        "staging/src/k8s.io/kubelet/pkg/apis/dra"
-
         "staging/src/k8s.io/kubelet/pkg/apis/pluginregistration"
         "pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis"
-
+        "staging/src/k8s.io/cri-api/pkg/apis/runtime"
         "staging/src/k8s.io/externaljwt/apis"
+        "staging/src/k8s.io/kubelet/pkg/apis/dra-health"
     )
 
     kube::log::status "protobuf bindings: ${#apis[@]} targets"
@@ -1047,7 +1046,7 @@ function codegen::protobindings() {
     fi
 
     for api in "${apis[@]}"; do
-        git_find -z ":(glob)${api}"/'**/api.pb.go' \
+        git_find -z ":(glob)${api}"/'**/api*.pb.go' \
             | xargs -0 rm -f
     done
 

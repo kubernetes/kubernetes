@@ -91,6 +91,8 @@ type RemoteRuntime struct {
 	injectors      []func(string) error
 	runtimeService internalapi.RuntimeService
 	imageService   internalapi.ImageManagerService
+	runtimeapi.UnsafeImageServiceServer
+	runtimeapi.UnsafeRuntimeServiceServer
 }
 
 // NewRemoteRuntimeProxy creates a new RemoteRuntime.

@@ -20,9 +20,17 @@ package v1
 
 // ConfigMapEnvSourceApplyConfiguration represents a declarative configuration of the ConfigMapEnvSource type for use
 // with apply.
+//
+// ConfigMapEnvSource selects a ConfigMap to populate the environment
+// variables with.
+//
+// The contents of the target ConfigMap's Data field will represent the
+// key-value pairs as environment variables.
 type ConfigMapEnvSourceApplyConfiguration struct {
+	// The ConfigMap to select from.
 	LocalObjectReferenceApplyConfiguration `json:",inline"`
-	Optional                               *bool `json:"optional,omitempty"`
+	// Specify whether the ConfigMap must be defined
+	Optional *bool `json:"optional,omitempty"`
 }
 
 // ConfigMapEnvSourceApplyConfiguration constructs a declarative configuration of the ConfigMapEnvSource type for use with
@@ -30,7 +38,6 @@ type ConfigMapEnvSourceApplyConfiguration struct {
 func ConfigMapEnvSource() *ConfigMapEnvSourceApplyConfiguration {
 	return &ConfigMapEnvSourceApplyConfiguration{}
 }
-func (b ConfigMapEnvSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

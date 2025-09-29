@@ -97,8 +97,8 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.7.6
-readonly __default_go_runner_version=v2.4.0-go1.24.4-bookworm.0
+readonly __default_distroless_iptables_version=v0.8.2
+readonly __default_go_runner_version=v2.4.0-go1.25.1-bookworm.0
 readonly __default_setcap_version=bookworm-v1.0.4
 
 # These are the base images for the Docker-wrapped binaries.
@@ -540,6 +540,7 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_BUILD_PLATFORMS=${KUBE_BUILD_PLATFORMS:-}"
     --env "KUBE_CGO_OVERRIDES=' ${KUBE_CGO_OVERRIDES[*]:-} '"
     --env "KUBE_STATIC_OVERRIDES=' ${KUBE_STATIC_OVERRIDES[*]:-} '"
+    --env "KUBE_RACE=${KUBE_RACE:-}"
     --env "FORCE_HOST_GO=${FORCE_HOST_GO:-}"
     --env "GO_VERSION=${GO_VERSION:-}"
     --env "GOTOOLCHAIN=${GOTOOLCHAIN:-}"
@@ -677,6 +678,8 @@ function kube::build::sync_to_container() {
   # are hidden from rsync so they will be deleted in the target container if
   # they exist. This will allow them to be re-created in the container if
   # necessary.
+  # PLEASE DO NOT ADD TO THIS
+  # https://github.com/kubernetes/kubernetes/issues/112862
   kube::build::rsync \
     --delete \
     --filter='- /_tmp/' \
@@ -701,13 +704,13 @@ function kube::build::copy_output() {
   #
   # We are looking to copy out all of the built binaries along with various
   # generated files.
+  # PLEASE DO NOT ADD TO THIS
+  # https://github.com/kubernetes/kubernetes/issues/112862
   kube::build::rsync \
     --prune-empty-dirs \
     --filter='- /_temp/' \
     --filter='+ /vendor/' \
-    --filter='+ /staging/***/Godeps/**' \
     --filter='+ /_output/dockerized/bin/**' \
-    --filter='- /_output/dockerized/go/**' \
     --filter='+ zz_generated.*' \
     --filter='+ generated.proto' \
     --filter='+ *.pb.go' \

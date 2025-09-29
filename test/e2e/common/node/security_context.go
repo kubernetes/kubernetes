@@ -33,14 +33,15 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
@@ -388,6 +389,38 @@ var _ = SIGDescribe("Security Context", func() {
 				strings.Repeat(fmt.Sprintf("=%v\n", fsGroup), len(configMap.Data)),
 			})
 		})
+		f.It("metrics should report count of started and failed user namespaced pods [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+			targetNode, err := findLinuxNode(ctx, f)
+			framework.ExpectNoError(err, "Error finding Linux node")
+			framework.Logf("Using node: %v", targetNode.Name)
+
+			ginkgo.By("Getting initial kubelet metrics values")
+			beforeMetrics, err := getCurrentUserNamespacedPodsMetrics(ctx, f, targetNode.Name)
+			framework.ExpectNoError(err, "Error getting initial kubelet metrics for node")
+			framework.Logf("Initial UserNamespaced pods metrics -- StartedPods: %v, StartedPodsErrors: %v", beforeMetrics.StartedPods, beforeMetrics.StartedPodsErrors)
+
+			ginkgo.By("Scheduling a pod with a UserNamespace that will fail")
+
+			createdPod := makePod(false)
+			createdPod.Spec.NodeName = targetNode.Name
+			createdPod.Spec.Containers[0].Command = []string{"bogus"}
+
+			createdPod = e2epod.NewPodClient(f).Create(ctx, createdPod)
+			ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, createdPod)
+			framework.ExpectNoError(err)
+			gomega.Expect(ev).NotTo(gomega.BeNil())
+			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
+
+			ginkgo.By("Getting subsequent kubelet metrics values")
+
+			afterMetrics, err := getCurrentUserNamespacedPodsMetrics(ctx, f, targetNode.Name)
+			framework.ExpectNoError(err, "Error getting subsequent kubelet metrics for node")
+			framework.Logf("Subsequent UserNamespaced pods metrics -- StartedPods: %v, StartedPodsErrors: %v", afterMetrics.StartedPods, afterMetrics.StartedPodsErrors)
+
+			ginkgo.By("Ensuring metrics were updated")
+			gomega.Expect(beforeMetrics.StartedPods).To(gomega.BeNumerically("<", afterMetrics.StartedPods), "Count of started UserNamespaced pods should increase")
+			gomega.Expect(beforeMetrics.StartedPodsErrors).To(gomega.BeNumerically("<", afterMetrics.StartedPodsErrors), "Count of started UserNamespaced pods errors should increase")
+		})
 	})
 
 	ginkgo.Context("When creating a container with runAsUser", func() {
@@ -460,7 +493,7 @@ var _ = SIGDescribe("Security Context", func() {
 							Name:    podName,
 							Command: []string{"id", "-u"}, // Print UID and exit
 							SecurityContext: &v1.SecurityContext{
-								RunAsNonRoot: pointer.BoolPtr(true),
+								RunAsNonRoot: ptr.To(true),
 								RunAsUser:    userid,
 							},
 						},
@@ -473,7 +506,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-nonroot-uid"
-			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(nonRootTestUserID))
+			pod := makeNonRootPod(name, rootImage, ptr.To[int64](nonRootTestUserID))
 			podClient.Create(ctx, pod)
 
 			podClient.WaitForSuccess(ctx, name, framework.PodStartTimeout)
@@ -483,7 +516,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-root-uid"
-			pod := makeNonRootPod(name, nonRootImage, pointer.Int64Ptr(0))
+			pod := makeNonRootPod(name, nonRootImage, ptr.To[int64](0))
 			pod = podClient.Create(ctx, pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
@@ -1065,4 +1098,32 @@ func kubeletUsernsMappings(subuidBinary string) (uint32, uint32, error) {
 	}
 
 	return parseGetSubIdsOutput(string(outUids))
+}
+
+// getCurrentUserNamespacedPodsMetrics returns a UserNamespacedPodsMetrics object. Any metrics that do not have any
+// values reported will be set to 0.
+func getCurrentUserNamespacedPodsMetrics(ctx context.Context, f *framework.Framework, nodeName string) (UserNamespacedPodsMetrics, error) {
+	var result UserNamespacedPodsMetrics
+
+	m, err := e2emetrics.GetKubeletMetrics(ctx, f.ClientSet, nodeName)
+	if err != nil {
+		return result, err
+	}
+
+	samples := m[metrics.StartedUserNamespacedPodsTotalKey]
+	for _, v := range samples {
+		result.StartedPods += int(v.Value)
+	}
+
+	samples = m[metrics.StartedUserNamespacedPodsErrorsTotalKey]
+	for _, v := range samples {
+		result.StartedPodsErrors += int(v.Value)
+	}
+
+	return result, nil
+}
+
+type UserNamespacedPodsMetrics struct {
+	StartedPods       int
+	StartedPodsErrors int
 }

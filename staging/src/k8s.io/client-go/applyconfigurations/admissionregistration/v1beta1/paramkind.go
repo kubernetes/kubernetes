@@ -20,9 +20,16 @@ package v1beta1
 
 // ParamKindApplyConfiguration represents a declarative configuration of the ParamKind type for use
 // with apply.
+//
+// ParamKind is a tuple of Group Kind and Version.
 type ParamKindApplyConfiguration struct {
+	// APIVersion is the API group version the resources belong to.
+	// In format of "group/version".
+	// Required.
 	APIVersion *string `json:"apiVersion,omitempty"`
-	Kind       *string `json:"kind,omitempty"`
+	// Kind is the API kind the resources belong to.
+	// Required.
+	Kind *string `json:"kind,omitempty"`
 }
 
 // ParamKindApplyConfiguration constructs a declarative configuration of the ParamKind type for use with
@@ -30,7 +37,6 @@ type ParamKindApplyConfiguration struct {
 func ParamKind() *ParamKindApplyConfiguration {
 	return &ParamKindApplyConfiguration{}
 }
-func (b ParamKindApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAPIVersion sets the APIVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

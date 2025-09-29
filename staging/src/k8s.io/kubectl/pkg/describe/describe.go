@@ -35,6 +35,8 @@ import (
 	"unicode"
 
 	"github.com/fatih/camelcase"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -53,7 +55,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -231,7 +232,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: certificatesv1beta1.GroupName, Kind: "CertificateSigningRequest"}: &CertificateSigningRequestDescriber{c},
 		{Group: storagev1.GroupName, Kind: "StorageClass"}:                        &StorageClassDescriber{c},
 		{Group: storagev1.GroupName, Kind: "CSINode"}:                             &CSINodeDescriber{c},
-		{Group: storagev1beta1.GroupName, Kind: "VolumeAttributesClass"}:          &VolumeAttributesClassDescriber{c},
+		{Group: storagev1.GroupName, Kind: "VolumeAttributesClass"}:               &VolumeAttributesClassDescriber{c},
 		{Group: policyv1beta1.GroupName, Kind: "PodDisruptionBudget"}:             &PodDisruptionBudgetDescriber{c},
 		{Group: policyv1.GroupName, Kind: "PodDisruptionBudget"}:                  &PodDisruptionBudgetDescriber{c},
 		{Group: rbacv1.GroupName, Kind: "Role"}:                                   &RoleDescriber{c},
@@ -372,7 +373,7 @@ func smartLabelFor(field string) string {
 		if slice.Contains[string](commonAcronyms, strings.ToUpper(part), nil) {
 			part = strings.ToUpper(part)
 		} else {
-			part = strings.Title(part)
+			part = cases.Title(language.English).String(part)
 		}
 		result = append(result, part)
 	}
@@ -1865,7 +1866,11 @@ func describeContainerBasicInfo(container corev1.Container, status corev1.Contai
 func describeContainerPorts(cPorts []corev1.ContainerPort) string {
 	ports := make([]string, 0, len(cPorts))
 	for _, cPort := range cPorts {
-		ports = append(ports, fmt.Sprintf("%d/%s", cPort.ContainerPort, cPort.Protocol))
+		portStr := fmt.Sprintf("%d/%s", cPort.ContainerPort, cPort.Protocol)
+		if cPort.Name != "" {
+			portStr = fmt.Sprintf("%s (%s)", portStr, cPort.Name)
+		}
+		ports = append(ports, portStr)
 	}
 	return strings.Join(ports, ", ")
 }
@@ -1873,7 +1878,11 @@ func describeContainerPorts(cPorts []corev1.ContainerPort) string {
 func describeContainerHostPorts(cPorts []corev1.ContainerPort) string {
 	ports := make([]string, 0, len(cPorts))
 	for _, cPort := range cPorts {
-		ports = append(ports, fmt.Sprintf("%d/%s", cPort.HostPort, cPort.Protocol))
+		portStr := fmt.Sprintf("%d/%s", cPort.HostPort, cPort.Protocol)
+		if cPort.Name != "" {
+			portStr = fmt.Sprintf("%s (%s)", portStr, cPort.Name)
+		}
+		ports = append(ports, portStr)
 	}
 	return strings.Join(ports, ", ")
 }
@@ -3438,61 +3447,15 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 		return "", err
 	}
 
-	tokens := []corev1.Secret{}
-
-	// missingSecrets is the set of all secrets present in the
-	// serviceAccount but not present in the set of existing secrets.
-	missingSecrets := sets.New[string]()
-	secrets := corev1.SecretList{}
-	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
-		func(options metav1.ListOptions) (runtime.Object, error) {
-			newList, err := d.CoreV1().Secrets(namespace).List(context.TODO(), options)
-			if err != nil {
-				return nil, runtimeresource.EnhanceListError(err, options, corev1.ResourceSecrets.String())
-			}
-			secrets.Items = append(secrets.Items, newList.Items...)
-			return newList, nil
-		})
-
-	// errors are tolerated here in order to describe the serviceAccount with all
-	// of the secrets that it references, even if those secrets cannot be fetched.
-	if err == nil {
-		// existingSecrets is the set of all secrets remaining on a
-		// service account that are not present in the "tokens" slice.
-		existingSecrets := sets.New[string]()
-
-		for _, s := range secrets.Items {
-			if s.Type == corev1.SecretTypeServiceAccountToken {
-				name := s.Annotations[corev1.ServiceAccountNameKey]
-				uid := s.Annotations[corev1.ServiceAccountUIDKey]
-				if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
-					tokens = append(tokens, s)
-				}
-			}
-			existingSecrets.Insert(s.Name)
-		}
-
-		for _, s := range serviceAccount.Secrets {
-			if !existingSecrets.Has(s.Name) {
-				missingSecrets.Insert(s.Name)
-			}
-		}
-		for _, s := range serviceAccount.ImagePullSecrets {
-			if !existingSecrets.Has(s.Name) {
-				missingSecrets.Insert(s.Name)
-			}
-		}
-	}
-
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = searchEvents(d.CoreV1(), serviceAccount, describerSettings.ChunkSize)
 	}
 
-	return describeServiceAccount(serviceAccount, tokens, missingSecrets, events)
+	return describeServiceAccount(serviceAccount, events)
 }
 
-func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []corev1.Secret, missingSecrets sets.Set[string], events *corev1.EventList) (string, error) {
+func describeServiceAccount(serviceAccount *corev1.ServiceAccount, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
@@ -3503,28 +3466,16 @@ func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []core
 		var (
 			emptyHeader = "                   "
 			pullHeader  = "Image pull secrets:"
-			mountHeader = "Mountable secrets: "
-			tokenHeader = "Tokens:            "
 
-			pullSecretNames  = []string{}
-			mountSecretNames = []string{}
-			tokenSecretNames = []string{}
+			pullSecretNames = []string{}
 		)
 
 		for _, s := range serviceAccount.ImagePullSecrets {
 			pullSecretNames = append(pullSecretNames, s.Name)
 		}
-		for _, s := range serviceAccount.Secrets {
-			mountSecretNames = append(mountSecretNames, s.Name)
-		}
-		for _, s := range tokens {
-			tokenSecretNames = append(tokenSecretNames, s.Name)
-		}
 
 		types := map[string][]string{
-			pullHeader:  pullSecretNames,
-			mountHeader: mountSecretNames,
-			tokenHeader: tokenSecretNames,
+			pullHeader: pullSecretNames,
 		}
 		for _, header := range sets.List(sets.KeySet(types)) {
 			names := types[header]
@@ -3533,11 +3484,7 @@ func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []core
 			} else {
 				prefix := header
 				for _, name := range names {
-					if missingSecrets.Has(name) {
-						w.Write(LEVEL_0, "%s\t%s (not found)\n", prefix, name)
-					} else {
-						w.Write(LEVEL_0, "%s\t%s\n", prefix, name)
-					}
+					w.Write(LEVEL_0, "%s\t%s\n", prefix, name)
 					prefix = emptyHeader
 				}
 			}
@@ -4414,12 +4361,16 @@ func DescribeEvents(el *corev1.EventList, w PrefixWriter) {
 		if source == "" {
 			source = e.ReportingController
 		}
+		message := strings.TrimSpace(e.Message)
+		if len(e.InvolvedObject.FieldPath) > 0 {
+			message = fmt.Sprintf("%s: %s", e.InvolvedObject.FieldPath, message)
+		}
 		w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
 			e.Type,
 			e.Reason,
 			interval,
 			source,
-			strings.TrimSpace(e.Message),
+			message,
 		)
 	}
 }
@@ -4816,7 +4767,7 @@ type VolumeAttributesClassDescriber struct {
 }
 
 func (d *VolumeAttributesClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	vac, err := d.StorageV1beta1().VolumeAttributesClasses().Get(context.TODO(), name, metav1.GetOptions{})
+	vac, err := d.StorageV1().VolumeAttributesClasses().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -4829,7 +4780,7 @@ func (d *VolumeAttributesClassDescriber) Describe(namespace, name string, descri
 	return describeVolumeAttributesClass(vac, events)
 }
 
-func describeVolumeAttributesClass(vac *storagev1beta1.VolumeAttributesClass, events *corev1.EventList) (string, error) {
+func describeVolumeAttributesClass(vac *storagev1.VolumeAttributesClass, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", vac.Name)

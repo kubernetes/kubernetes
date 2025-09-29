@@ -32,11 +32,25 @@ type statuszRegistry interface {
 	goVersion() string
 	binaryVersion() *version.Version
 	emulationVersion() *version.Version
+	paths() []string
 }
 
 type registry struct {
 	// componentGlobalsRegistry compatibility.ComponentGlobalsRegistry
 	effectiveVersion compatibility.EffectiveVersion
+	// listedPaths is an alphabetically sorted list of paths to be reported at /.
+	listedPaths []string
+}
+
+// Option is a function to configure registry.
+type Option func(reg *registry)
+
+// WithListedPaths returns an Option to configure the ListedPaths.
+func WithListedPaths(listedPaths []string) Option {
+	cpyListedPaths := make([]string, len(listedPaths))
+	copy(cpyListedPaths, listedPaths)
+
+	return func(reg *registry) { reg.listedPaths = cpyListedPaths }
 }
 
 func (*registry) processStartTime() time.Time {
@@ -62,6 +76,14 @@ func (r *registry) binaryVersion() *version.Version {
 func (r *registry) emulationVersion() *version.Version {
 	if r.effectiveVersion != nil {
 		return r.effectiveVersion.EmulationVersion()
+	}
+
+	return nil
+}
+
+func (r *registry) paths() []string {
+	if r.listedPaths != nil {
+		return r.listedPaths
 	}
 
 	return nil

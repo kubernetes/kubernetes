@@ -20,7 +20,11 @@ package v1
 
 // ScopeSelectorApplyConfiguration represents a declarative configuration of the ScopeSelector type for use
 // with apply.
+//
+// A scope selector represents the AND of the selectors represented
+// by the scoped-resource selector requirements.
 type ScopeSelectorApplyConfiguration struct {
+	// A list of scope selector requirements by scope of the resources.
 	MatchExpressions []ScopedResourceSelectorRequirementApplyConfiguration `json:"matchExpressions,omitempty"`
 }
 
@@ -29,7 +33,6 @@ type ScopeSelectorApplyConfiguration struct {
 func ScopeSelector() *ScopeSelectorApplyConfiguration {
 	return &ScopeSelectorApplyConfiguration{}
 }
-func (b ScopeSelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithMatchExpressions adds the given value to the MatchExpressions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

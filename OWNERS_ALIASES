@@ -179,6 +179,7 @@ aliases:
     - dom4ha
     - macsko
     - sanposhiho
+    - utam0k
     - kerthcet
   # emeritus:
   # - adtac
@@ -215,10 +216,13 @@ aliases:
     - seans3
     - soltysh
   sig-testing-reviewers:
+    - aojea
     - bentheelder
     - cblecker
-    - spiffxp
     - dims
+    - pohly
+  # emeritus:
+  # - spiffxp
   sig-node-approvers:
     - Random-Liu
     - dchen1107
@@ -246,6 +250,7 @@ aliases:
     - dims
     - endocrimes
     - feiskyer
+    - HirazawaUi
     - mtaufen
     - sjenning
     - wzshiming
@@ -266,6 +271,7 @@ aliases:
     - kannon92
     - ffromani
     - tallclair
+    - natasha41575
   sig-network-approvers:
     - aojea
     - bowei
@@ -553,5 +559,6 @@ aliases:
   conformance-behavior-approvers:
     - smarterclayton
     - johnbelamaric
-    - spiffxp
     - dims
+  # emeritus:
+  # - spiffpx

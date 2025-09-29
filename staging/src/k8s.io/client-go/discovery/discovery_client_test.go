@@ -25,13 +25,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	openapi_v3 "github.com/google/gnostic-models/openapiv3"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	golangproto "google.golang.org/protobuf/proto"
+
 	apidiscovery "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -533,7 +533,7 @@ func openapiSchemaFakeServer(t *testing.T) (*httptest.Server, error) {
 			return
 		}
 
-		output, err := proto.Marshal(returnedOpenAPI())
+		output, err := golangproto.Marshal(returnedOpenAPI())
 		if err != nil {
 			errMsg := fmt.Sprintf("Unexpected marshal error: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)

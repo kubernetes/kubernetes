@@ -20,8 +20,14 @@ package v1beta1
 
 // DeviceApplyConfiguration represents a declarative configuration of the Device type for use
 // with apply.
+//
+// Device represents one individual hardware instance that can be selected based
+// on its attributes. Besides the name, exactly one field must be set.
 type DeviceApplyConfiguration struct {
-	Name  *string                        `json:"name,omitempty"`
+	// Name is unique identifier among all devices managed by
+	// the driver in the pool. It must be a DNS label.
+	Name *string `json:"name,omitempty"`
+	// Basic defines one device instance.
 	Basic *BasicDeviceApplyConfiguration `json:"basic,omitempty"`
 }
 
@@ -30,7 +36,6 @@ type DeviceApplyConfiguration struct {
 func Device() *DeviceApplyConfiguration {
 	return &DeviceApplyConfiguration{}
 }
-func (b DeviceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

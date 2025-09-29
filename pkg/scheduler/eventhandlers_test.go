@@ -28,29 +28,30 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	resourceapi "k8s.io/api/resource/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	dyfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
@@ -77,15 +78,15 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 	unschedulablePods := []*v1.Pod{highPriorityPod, medNominatedPriorityPod, medPriorityPod, lowPriorityPod}
 
 	// Make pods schedulable on Delete event when QHints are enabled, but not when nominated node appears.
-	queueHintForPodDelete := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	queueHintForPodDelete := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 		oldPod, _, err := util.As[*v1.Pod](oldObj, newObj)
 		if err != nil {
 			t.Errorf("Failed to convert objects to pods: %v", err)
 		}
 		if oldPod.Status.NominatedNodeName == "" {
-			return framework.QueueSkip, nil
+			return fwk.QueueSkip, nil
 		}
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 	queueingHintMap := internalqueue.QueueingHintMapPerProfile{
 		testSchedulerName: {
@@ -161,16 +162,22 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				client := fake.NewClientset(objs...)
 				informerFactory := informers.NewSharedInformerFactory(client, 0)
 
+				// apiDispatcher is unused in the test, but intializing it anyway.
+				apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
+				apiDispatcher.Run(logger)
+				defer apiDispatcher.Close()
+
 				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
 				queue := internalqueue.NewPriorityQueue(
 					newDefaultQueueSort(),
 					informerFactory,
-					internalqueue.WithMetricsRecorder(*recorder),
+					internalqueue.WithMetricsRecorder(recorder),
 					internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+					internalqueue.WithAPIDispatcher(apiDispatcher),
 					// disable backoff queue
 					internalqueue.WithPodInitialBackoffDuration(0),
 					internalqueue.WithPodMaxBackoffDuration(0))
-				schedulerCache := internalcache.New(ctx, 30*time.Second)
+				schedulerCache := internalcache.New(ctx, 30*time.Second, nil)
 
 				// Put test pods into unschedulable queue
 				for _, pod := range unschedulablePods {
@@ -185,7 +192,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 					}
 				}
 
-				s, _, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
+				s, _, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
 				if err != nil {
 					t.Fatalf("Failed to initialize test scheduler: %v", err)
 				}
@@ -210,7 +217,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 	}
 }
 
-func newDefaultQueueSort() framework.LessFunc {
+func newDefaultQueueSort() fwk.LessFunc {
 	sort := &queuesort.PrioritySort{}
 	return sort.Less
 }
@@ -241,7 +248,7 @@ func TestUpdatePodInCache(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, ttl),
+				Cache:           internalcache.New(ctx, ttl, nil),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
@@ -425,7 +432,7 @@ func TestPreCheckForNode(t *testing.T) {
 func TestAddAllEventHandlers(t *testing.T) {
 	tests := []struct {
 		name                   string
-		gvkMap                 map[framework.EventResource]framework.ActionType
+		gvkMap                 map[fwk.EventResource]fwk.ActionType
 		enableDRA              bool
 		enableDRADeviceTaints  bool
 		expectStaticInformers  map[reflect.Type]bool
@@ -433,7 +440,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 	}{
 		{
 			name:   "default handlers in framework",
-			gvkMap: map[framework.EventResource]framework.ActionType{},
+			gvkMap: map[fwk.EventResource]fwk.ActionType{},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
 				reflect.TypeOf(&v1.Node{}):      true,
@@ -443,10 +450,10 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "DRA events disabled",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				framework.ResourceClaim: framework.Add,
-				framework.ResourceSlice: framework.Add,
-				framework.DeviceClass:   framework.Add,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				fwk.ResourceClaim: fwk.Add,
+				fwk.ResourceSlice: fwk.Add,
+				fwk.DeviceClass:   fwk.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
@@ -457,10 +464,10 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "core DRA events enabled",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				framework.ResourceClaim: framework.Add,
-				framework.ResourceSlice: framework.Add,
-				framework.DeviceClass:   framework.Add,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				fwk.ResourceClaim: fwk.Add,
+				fwk.ResourceSlice: fwk.Add,
+				fwk.DeviceClass:   fwk.Add,
 			},
 			enableDRA: true,
 			expectStaticInformers: map[reflect.Type]bool{
@@ -475,10 +482,10 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "all DRA events enabled",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				framework.ResourceClaim: framework.Add,
-				framework.ResourceSlice: framework.Add,
-				framework.DeviceClass:   framework.Add,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				fwk.ResourceClaim: fwk.Add,
+				fwk.ResourceSlice: fwk.Add,
+				fwk.DeviceClass:   fwk.Add,
 			},
 			enableDRA:             true,
 			enableDRADeviceTaints: true,
@@ -495,10 +502,10 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "add GVKs handlers defined in framework dynamically",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				"Pod":                               framework.Add | framework.Delete,
-				"PersistentVolume":                  framework.Delete,
-				"storage.k8s.io/CSIStorageCapacity": framework.Update,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				"Pod":                               fwk.Add | fwk.Delete,
+				"PersistentVolume":                  fwk.Delete,
+				"storage.k8s.io/CSIStorageCapacity": fwk.Update,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):                       true,
@@ -511,9 +518,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "add GVKs handlers defined in plugins dynamically",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				"daemonsets.v1.apps": framework.Add | framework.Delete,
-				"cronjobs.v1.batch":  framework.Delete,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				"daemonsets.v1.apps": fwk.Add | fwk.Delete,
+				"cronjobs.v1.batch":  fwk.Delete,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
@@ -527,9 +534,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "add GVKs handlers defined in plugins dynamically, with one illegal GVK form",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				"daemonsets.v1.apps":    framework.Add | framework.Delete,
-				"custommetrics.v1beta1": framework.Update,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				"daemonsets.v1.apps":    fwk.Add | fwk.Delete,
+				"custommetrics.v1beta1": fwk.Update,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
@@ -571,16 +578,16 @@ func TestAddAllEventHandlers(t *testing.T) {
 			var resourceClaimCache *assumecache.AssumeCache
 			var resourceSliceTracker *resourceslicetracker.Tracker
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
+				resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 				var err error
 				opts := resourceslicetracker.Options{
 					EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
-					SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+					SliceInformer:      informerFactory.Resource().V1().ResourceSlices(),
 				}
 				if opts.EnableDeviceTaints {
 					opts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
-					opts.ClassInformer = informerFactory.Resource().V1beta1().DeviceClasses()
+					opts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 
 				}
 				resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, opts)

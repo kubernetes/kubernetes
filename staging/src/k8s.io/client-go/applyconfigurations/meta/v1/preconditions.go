@@ -24,9 +24,13 @@ import (
 
 // PreconditionsApplyConfiguration represents a declarative configuration of the Preconditions type for use
 // with apply.
+//
+// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 type PreconditionsApplyConfiguration struct {
-	UID             *types.UID `json:"uid,omitempty"`
-	ResourceVersion *string    `json:"resourceVersion,omitempty"`
+	// Specifies the target UID.
+	UID *types.UID `json:"uid,omitempty"`
+	// Specifies the target ResourceVersion
+	ResourceVersion *string `json:"resourceVersion,omitempty"`
 }
 
 // PreconditionsApplyConfiguration constructs a declarative configuration of the Preconditions type for use with
@@ -34,7 +38,6 @@ type PreconditionsApplyConfiguration struct {
 func Preconditions() *PreconditionsApplyConfiguration {
 	return &PreconditionsApplyConfiguration{}
 }
-func (b PreconditionsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithUID sets the UID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

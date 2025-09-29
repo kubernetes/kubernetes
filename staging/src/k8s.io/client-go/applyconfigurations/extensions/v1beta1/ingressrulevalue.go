@@ -20,7 +20,18 @@ package v1beta1
 
 // IngressRuleValueApplyConfiguration represents a declarative configuration of the IngressRuleValue type for use
 // with apply.
+//
+// IngressRuleValue represents a rule to apply against incoming requests. If the
+// rule is satisfied, the request is routed to the specified backend. Currently
+// mixing different types of rules in a single Ingress is disallowed, so exactly
+// one of the following must be set.
 type IngressRuleValueApplyConfiguration struct {
+	// http is a list of http selectors pointing to backends.
+	// A path is matched against the path of an incoming request. Currently it can
+	// contain characters disallowed from the conventional "path" part of a URL
+	// as defined by RFC 3986. Paths must begin with a '/'.
+	// A backend defines the referenced service endpoint to which the traffic
+	// will be forwarded to.
 	HTTP *HTTPIngressRuleValueApplyConfiguration `json:"http,omitempty"`
 }
 
@@ -29,7 +40,6 @@ type IngressRuleValueApplyConfiguration struct {
 func IngressRuleValue() *IngressRuleValueApplyConfiguration {
 	return &IngressRuleValueApplyConfiguration{}
 }
-func (b IngressRuleValueApplyConfiguration) IsApplyConfiguration() {}
 
 // WithHTTP sets the HTTP field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -24,8 +24,17 @@ import (
 
 // HostPathVolumeSourceApplyConfiguration represents a declarative configuration of the HostPathVolumeSource type for use
 // with apply.
+//
+// Represents a host path mapped into a pod.
+// Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSourceApplyConfiguration struct {
-	Path *string              `json:"path,omitempty"`
+	// path of the directory on the host.
+	// If the path is a symlink, it will follow the link to the real path.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+	Path *string `json:"path,omitempty"`
+	// type for HostPath Volume
+	// Defaults to ""
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
 	Type *corev1.HostPathType `json:"type,omitempty"`
 }
 
@@ -34,7 +43,6 @@ type HostPathVolumeSourceApplyConfiguration struct {
 func HostPathVolumeSource() *HostPathVolumeSourceApplyConfiguration {
 	return &HostPathVolumeSourceApplyConfiguration{}
 }
-func (b HostPathVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPath sets the Path field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

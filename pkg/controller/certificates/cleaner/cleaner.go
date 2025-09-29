@@ -107,7 +107,12 @@ func (ccc *CSRCleanerController) worker(ctx context.Context) {
 
 func (ccc *CSRCleanerController) handle(ctx context.Context, csr *capi.CertificateSigningRequest) error {
 	logger := klog.FromContext(ctx)
-	if isIssuedPastDeadline(logger, csr) || isDeniedPastDeadline(logger, csr) || isFailedPastDeadline(logger, csr) || isPendingPastDeadline(logger, csr) || isIssuedExpired(logger, csr) {
+	if isIssuedPastDeadline(logger, csr) ||
+		isDeniedPastDeadline(logger, csr) ||
+		isFailedPastDeadline(logger, csr) ||
+		isPendingPastDeadline(logger, csr) ||
+		isIssuedExpired(logger, csr) ||
+		isApprovedUnissuedPastDeadline(logger, csr) {
 		if err := ccc.csrClient.Delete(ctx, csr.Name, metav1.DeleteOptions{}); err != nil {
 			return fmt.Errorf("unable to delete CSR %q: %v", csr.Name, err)
 		}
@@ -170,8 +175,11 @@ func isFailedPastDeadline(logger klog.Logger, csr *capi.CertificateSigningReques
 // creation time of the CSR is passed the deadline that issued requests are
 // maintained for.
 func isIssuedPastDeadline(logger klog.Logger, csr *capi.CertificateSigningRequest) bool {
+	if !isIssued(csr) {
+		return false
+	}
 	for _, c := range csr.Status.Conditions {
-		if c.Type == capi.CertificateApproved && isIssued(csr) && isOlderThan(c.LastUpdateTime, approvedExpiration) {
+		if c.Type == capi.CertificateApproved && isOlderThan(c.LastUpdateTime, approvedExpiration) {
 			logger.Info("Cleaning CSR as it is more than approvedExpiration duration old and approved.", "csr", csr.Name, "approvedExpiration", approvedExpiration)
 			return true
 		}
@@ -179,9 +187,25 @@ func isIssuedPastDeadline(logger klog.Logger, csr *capi.CertificateSigningReques
 	return false
 }
 
-// isOlderThan checks that t is a non-zero time after time.Now() + d.
+// isApprovedUnissuedPastDeadline checks if the certificate has an Approved status but
+// no certificate has been issued, and the approval time has passed the deadline
+// that pending requests are maintained for.
+func isApprovedUnissuedPastDeadline(logger klog.Logger, csr *capi.CertificateSigningRequest) bool {
+	if isIssued(csr) {
+		return false
+	}
+	for _, c := range csr.Status.Conditions {
+		if c.Type == capi.CertificateApproved && isOlderThan(c.LastUpdateTime, pendingExpiration) {
+			logger.Info("Cleaning CSR as it is approved but unissued for more than pendingExpiration duration.", "csr", csr.Name, "pendingExpiration", pendingExpiration)
+			return true
+		}
+	}
+	return false
+}
+
+// isOlderThan checks that t is a non-zero and older than d from time.Now().
 func isOlderThan(t metav1.Time, d time.Duration) bool {
-	return !t.IsZero() && t.Sub(time.Now()) < -1*d
+	return !t.IsZero() && time.Since(t.Time) > d
 }
 
 // isIssued checks if the CSR has `Issued` status. There is no explicit

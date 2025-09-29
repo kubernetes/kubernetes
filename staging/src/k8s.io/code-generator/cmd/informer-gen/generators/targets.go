@@ -144,15 +144,23 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		// If there's a comment of the form "// +groupName=somegroup" or
 		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 		// group when generating.
-		if override := gengo.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
-			gv.Group = clientgentypes.Group(override[0])
+		override, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupName"}, p.Comments)
+		if err != nil {
+			klog.Fatalf("error extracting groupName tags: %v", err)
+		}
+		if override["groupName"] != nil {
+			gv.Group = clientgentypes.Group(override["groupName"][0])
 		}
 
 		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
 		// the Go group identifier in CamelCase. It defaults
 		groupGoNames[groupPackageName] = namer.IC(strings.Split(gv.Group.NonEmpty(), ".")[0])
-		if override := gengo.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
-			groupGoNames[groupPackageName] = namer.IC(override[0])
+		override, err = genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupGoName"}, p.Comments)
+		if err != nil {
+			klog.Fatalf("error extracting groupGoName tags: %v", err)
+		}
+		if override["groupGoName"] != nil {
+			groupGoNames[groupPackageName] = namer.IC(override["groupGoName"][0])
 		}
 
 		var typesToGenerate []*types.Type

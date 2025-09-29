@@ -529,3 +529,110 @@ func TestFilterPods(t *testing.T) {
 		})
 	}
 }
+
+func TestEvictDuringNamespaceTerminating(t *testing.T) {
+	testPodUID := types.UID("test-uid")
+	testPodName := "test-pod"
+	testNamespace := "default"
+
+	retryDelay := 5 * time.Millisecond
+	globalTimeout := 2 * retryDelay
+
+	tests := []struct {
+		description string
+		refresh     bool
+		err         error
+	}{
+		{
+			description: "Pod refreshed after NamespaceTerminating error",
+			refresh:     true,
+			err:         nil,
+		},
+		{
+			description: "Pod not refreshed after NamespaceTerminating error",
+			refresh:     false,
+			err:         fmt.Errorf("error when evicting pods/%q -n %q: global timeout reached: %v", testPodName, testNamespace, globalTimeout),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			var retry bool
+
+			initialPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					UID:       testPodUID,
+				},
+			}
+
+			// pod with DeletionTimestamp, indicating deletion in progress
+			deletedPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              testPodName,
+					Namespace:         testNamespace,
+					UID:               testPodUID,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+				},
+			}
+
+			evictPods := []corev1.Pod{*initialPod}
+
+			k := fake.NewClientset(initialPod)
+			addEvictionSupport(t, k, "v1")
+
+			// mock eviction to return NamespaceTerminating error
+			k.PrependReactor("create", "pods", func(action ktest.Action) (bool, runtime.Object, error) {
+				if action.GetSubresource() != "eviction" {
+					return false, nil, nil
+				}
+
+				err := apierrors.NewForbidden(
+					schema.GroupResource{Resource: "pods"},
+					testPodName,
+					errors.New("namespace is terminating"),
+				)
+
+				err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{
+					Type: corev1.NamespaceTerminatingCause,
+				})
+
+				return true, nil, err
+			})
+
+			k.PrependReactor("get", "pods", func(action ktest.Action) (bool, runtime.Object, error) {
+				if !test.refresh {
+					// for non-refresh test, always return the initial pod
+					return true, initialPod, nil
+				}
+
+				if retry {
+					// second call, pod is deleted
+					return true, nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, testPodName)
+				}
+
+				// first call, pod is being deleted
+				retry = true
+
+				return true, deletedPod, nil
+			})
+
+			h := &Helper{
+				Client:               k,
+				DisableEviction:      false,
+				Out:                  os.Stdout,
+				ErrOut:               os.Stderr,
+				Timeout:              globalTimeout,
+				EvictErrorRetryDelay: retryDelay,
+			}
+
+			err := h.DeleteOrEvictPods(evictPods)
+			if test.err == nil && err != nil {
+				t.Errorf("expected no error, got: %v", err)
+			} else if test.err != nil && (err == nil || err.Error() != test.err.Error()) {
+				t.Errorf("%s: unexpected eviction; actual %v; expected %v", test.description, err, test.err)
+			}
+		})
+	}
+}

@@ -63,7 +63,7 @@ const (
 	TimeoutOnSetupVolumeName = "timeout-setup-volume"
 	// FailOnSetupVolumeName will cause setup call to fail
 	FailOnSetupVolumeName = "fail-setup-volume"
-	//TimeoutAndFailOnSetupVolumeName will first timeout and then fail the setup
+	// TimeoutAndFailOnSetupVolumeName will first timeout and then fail the setup
 	TimeoutAndFailOnSetupVolumeName = "timeout-and-fail-setup-volume"
 	// SuccessAndTimeoutSetupVolumeName will cause first mount operation to succeed but subsequent attempts to timeout
 	SuccessAndTimeoutSetupVolumeName = "success-and-timeout-setup-volume-name"
@@ -191,6 +191,7 @@ type FakeVolumePlugin struct {
 	SupportsSELinux        bool
 	DisableNodeExpansion   bool
 	CanSupportFn           func(*volume.Spec) bool
+	VerifyExhaustedEnabled bool
 
 	// default to false which means it is attachable by default
 	NonAttachable bool
@@ -437,7 +438,9 @@ func (plugin *FakeVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
 	return !plugin.NonAttachable, nil
 }
 
-func (plugin *FakeVolumePlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {}
+func (plugin *FakeVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+	return plugin.VerifyExhaustedEnabled
+}
 
 func (plugin *FakeVolumePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
 	return true, nil
@@ -619,7 +622,8 @@ func (f *FakeAttachableVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) 
 	return true, nil
 }
 
-func (f *FakeAttachableVolumePlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {
+func (f *FakeAttachableVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+	return false
 }
 
 var _ volume.VolumePlugin = &FakeAttachableVolumePlugin{}

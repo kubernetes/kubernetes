@@ -310,7 +310,7 @@ func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting daemon sets controller")
 	defer logger.Info("Shutting down daemon sets controller")
 
-	if !cache.WaitForNamedCacheSync("daemon sets", ctx.Done(), dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
 		return
 	}
 
@@ -689,30 +689,6 @@ func (dsc *DaemonSetsController) updateNode(logger klog.Logger, old, cur interfa
 	dsc.nodeUpdateQueue.Add(curNode.Name)
 }
 
-// getPodsFromCache returns the Pods that a given DS should manage.
-func (dsc *DaemonSetsController) getDaemonPodsFromCache(ds *apps.DaemonSet) ([]*v1.Pod, error) {
-	// Iterate over two keys:
-	//  The UID of the Daemonset, which identifies Pods that are controlled by the Daemonset.
-	//  The OrphanPodIndexKey, which helps identify orphaned Pods that are not currently managed by any controller,
-	//   but may be adopted later on if they have matching labels with the Daemonset.
-	podsForDS := []*v1.Pod{}
-	for _, key := range []string{string(ds.UID), controller.OrphanPodIndexKey} {
-		podObjs, err := dsc.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
-		if err != nil {
-			return nil, err
-		}
-		for _, obj := range podObjs {
-			pod, ok := obj.(*v1.Pod)
-			if !ok {
-				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
-				continue
-			}
-			podsForDS = append(podsForDS, pod)
-		}
-	}
-	return podsForDS, nil
-}
-
 // getDaemonPods returns daemon pods owned by the given ds.
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned Pods are pointers to objects in the cache.
@@ -723,7 +699,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ctx context.Context, ds *apps.Dae
 		return nil, err
 	}
 	// List all pods indexed to DS UID and Orphan pods
-	pods, err := dsc.getDaemonPodsFromCache(ds)
+	pods, err := controller.FilterPodsByOwner(dsc.podIndexer, &ds.ObjectMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -1469,7 +1445,15 @@ func (dsc *DaemonSetsController) syncNodeUpdate(ctx context.Context, nodeName st
 		daemonPods := podsByDS[dsKey]
 		scheduled := len(daemonPods) > 0
 
-		if (shouldRun && !scheduled) || (!shouldContinueRunning && scheduled) {
+		// Enqueue DaemonSet for sync in the following scenarios:
+		// 1. (shouldRun && !scheduled): Node now meets scheduling requirements but no pod exists
+		//    - Need to create a new pod on this node
+		// 2. (!shouldContinueRunning && scheduled): Node no longer meets requirements but pod exists
+		//    - Need to delete the existing pod from this node
+		// 3. (scheduled && ds.Status.NumberMisscheduled > 0): DaemonSet pod exists and misscheduled count is nonzero.
+		//    - For example: a pod was scheduled before the node became unready and tainted; after the node becomes ready and taints are removed, the pod may now be valid again.
+		//    - Need to recalculate NumberMisscheduled to ensure the DaemonSet status accurately reflects the current scheduling state.
+		if (shouldRun && !scheduled) || (!shouldContinueRunning && scheduled) || (scheduled && ds.Status.NumberMisscheduled > 0) {
 			dsc.enqueueDaemonSet(ds)
 		}
 	}

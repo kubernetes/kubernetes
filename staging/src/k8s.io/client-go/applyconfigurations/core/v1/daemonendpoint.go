@@ -20,7 +20,10 @@ package v1
 
 // DaemonEndpointApplyConfiguration represents a declarative configuration of the DaemonEndpoint type for use
 // with apply.
+//
+// DaemonEndpoint contains information about a single Daemon endpoint.
 type DaemonEndpointApplyConfiguration struct {
+	// Port number of the given endpoint.
 	Port *int32 `json:"Port,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type DaemonEndpointApplyConfiguration struct {
 func DaemonEndpoint() *DaemonEndpointApplyConfiguration {
 	return &DaemonEndpointApplyConfiguration{}
 }
-func (b DaemonEndpointApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPort sets the Port field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

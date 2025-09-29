@@ -243,7 +243,7 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting controller", "name", controllerName)
 	defer logger.Info("Shutting down controller", "name", controllerName)
 
-	if !cache.WaitForNamedCacheSync(rsc.Kind, ctx.Done(), rsc.podListerSynced, rsc.rsListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, rsc.podListerSynced, rsc.rsListerSynced) {
 		return
 	}
 
@@ -497,13 +497,14 @@ func (rsc *ReplicaSetController) updatePod(logger klog.Logger, old, cur interfac
 		// having its status updated with the newly available replica. For now, we can fake the
 		// update by resyncing the controller MinReadySeconds after the it is requeued because
 		// a Pod transitioned to Ready.
+		// If there are multiple pods with varying readiness times, we cannot correctly track it
+		// with the current queue. Further resyncs are attempted at the end of the syncReplicaSet
+		// function.
 		// Note that this still suffers from #29229, we are just moving the problem one level
 		// "closer" to kubelet (from the deployment to the replica set controller).
 		if !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
 			logger.V(2).Info("pod will be enqueued after a while for availability check", "duration", rs.Spec.MinReadySeconds, "kind", rsc.Kind, "pod", klog.KObj(oldPod))
-			// Add a second to avoid milliseconds skew in AddAfter.
-			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
-			rsc.enqueueRSAfter(rs, (time.Duration(rs.Spec.MinReadySeconds)*time.Second)+time.Second)
+			rsc.enqueueRSAfter(rs, time.Duration(rs.Spec.MinReadySeconds)*time.Second)
 		}
 		return
 	}
@@ -695,36 +696,6 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 	return nil
 }
 
-// getRSPods returns the Pods that a given RS should manage.
-func (rsc *ReplicaSetController) getRSPods(rs *apps.ReplicaSet, orphanedPods bool) ([]*v1.Pod, error) {
-	// Iterate over two keys:
-	//  The UID of the RS, which identifies Pods that are controlled by the RS.
-	//  The OrphanPodIndexKey, which helps identify orphaned Pods that are not currently managed by any controller,
-	//   but may be adopted later on if they have matching labels with the ReplicaSet.
-	podsForRS := []*v1.Pod{}
-
-	uidKeys := []string{string(rs.UID)}
-	if orphanedPods {
-		uidKeys = append(uidKeys, controller.OrphanPodIndexKey)
-	}
-
-	for _, key := range uidKeys {
-		podObjs, err := rsc.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
-		if err != nil {
-			return nil, err
-		}
-		for _, obj := range podObjs {
-			pod, ok := obj.(*v1.Pod)
-			if !ok {
-				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
-				continue
-			}
-			podsForRS = append(podsForRS, pod)
-		}
-	}
-	return podsForRS, nil
-}
-
 // syncReplicaSet will sync the ReplicaSet with the given key if it has had its expectations fulfilled,
 // meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
 // invoked concurrently with the same key.
@@ -757,7 +728,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 
 	// List all pods indexed to RS UID and Orphan pods
-	allRSPods, err := rsc.getRSPods(rs, true)
+	allRSPods, err := controller.FilterPodsByOwner(rsc.podIndexer, &rs.ObjectMeta)
 	if err != nil {
 		return err
 	}
@@ -777,12 +748,14 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 
 	var manageReplicasErr error
-	var nextSyncInSeconds *int
+	var nextSyncDuration *time.Duration
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
 		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
 	}
 	rs = rs.DeepCopy()
-	newStatus := calculateStatus(rs, activePods, terminatingPods, manageReplicasErr, rsc.controllerFeatures, rsc.clock)
+	// Use the same time for calculating status and nextSyncDuration.
+	now := rsc.clock.Now()
+	newStatus := calculateStatus(rs, activePods, terminatingPods, manageReplicasErr, rsc.controllerFeatures, now)
 
 	// Always updates status as pods come up or die.
 	updatedRS, err := updateReplicaSetStatus(logger, rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus, rsc.controllerFeatures)
@@ -794,14 +767,19 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	if manageReplicasErr != nil {
 		return manageReplicasErr
 	}
-	// Resync the ReplicaSet after MinReadySeconds as a last line of defense to guard against clock-skew.
+	// Plan the next availability check as a last line of defense against queue preemption (we have one queue key for checking availability of all the pods)
+	// or early sync (see https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info).
 	if updatedRS.Spec.MinReadySeconds > 0 &&
-		updatedRS.Status.ReadyReplicas == *(updatedRS.Spec.Replicas) &&
-		updatedRS.Status.AvailableReplicas != *(updatedRS.Spec.Replicas) {
-		nextSyncInSeconds = ptr.To(int(updatedRS.Spec.MinReadySeconds))
+		updatedRS.Status.ReadyReplicas != updatedRS.Status.AvailableReplicas {
+		// Safeguard fallback to the .spec.minReadySeconds to ensure that we always end up with .status.availableReplicas updated.
+		nextSyncDuration = ptr.To(time.Duration(updatedRS.Spec.MinReadySeconds) * time.Second)
+		// Use the same point in time (now) for calculating status and nextSyncDuration to get matching availability for the pods.
+		if nextCheck := controller.FindMinNextPodAvailabilityCheck(activePods, updatedRS.Spec.MinReadySeconds, now, rsc.clock); nextCheck != nil {
+			nextSyncDuration = nextCheck
+		}
 	}
-	if nextSyncInSeconds != nil {
-		rsc.queue.AddAfter(key, time.Duration(*nextSyncInSeconds)*time.Second)
+	if nextSyncDuration != nil {
+		rsc.queue.AddAfter(key, *nextSyncDuration)
 	}
 	return nil
 }

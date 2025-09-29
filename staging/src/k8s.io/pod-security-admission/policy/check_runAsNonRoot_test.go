@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestRunAsNonRoot(t *testing.T) {
@@ -45,7 +45,7 @@ func TestRunAsNonRoot(t *testing.T) {
 		{
 			name: "pod runAsNonRoot=false",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
-				SecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: utilpointer.Bool(false)},
+				SecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: ptr.To(false)},
 				Containers: []corev1.Container{
 					{Name: "a", SecurityContext: nil},
 				},
@@ -56,14 +56,14 @@ func TestRunAsNonRoot(t *testing.T) {
 		{
 			name: "containers runAsNonRoot=false",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
-				SecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: utilpointer.Bool(true)},
+				SecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: ptr.To(true)},
 				Containers: []corev1.Container{
 					{Name: "a", SecurityContext: nil},
 					{Name: "b", SecurityContext: &corev1.SecurityContext{}},
-					{Name: "c", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: utilpointer.Bool(false)}},
-					{Name: "d", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: utilpointer.Bool(false)}},
-					{Name: "e", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: utilpointer.Bool(true)}},
-					{Name: "f", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: utilpointer.Bool(true)}},
+					{Name: "c", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: ptr.To(false)}},
+					{Name: "d", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: ptr.To(false)}},
+					{Name: "e", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: ptr.To(true)}},
+					{Name: "f", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: ptr.To(true)}},
 				},
 			}},
 			expectReason: `runAsNonRoot != true`,
@@ -75,8 +75,8 @@ func TestRunAsNonRoot(t *testing.T) {
 				Containers: []corev1.Container{
 					{Name: "a", SecurityContext: nil},
 					{Name: "b", SecurityContext: &corev1.SecurityContext{}},
-					{Name: "d", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: utilpointer.Bool(true)}},
-					{Name: "e", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: utilpointer.Bool(true)}},
+					{Name: "d", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: ptr.To(true)}},
+					{Name: "e", SecurityContext: &corev1.SecurityContext{RunAsNonRoot: ptr.To(true)}},
 				},
 			}},
 			expectReason: `runAsNonRoot != true`,
@@ -85,7 +85,7 @@ func TestRunAsNonRoot(t *testing.T) {
 		{
 			name: "UserNamespacesPodSecurityStandards enabled without HostUsers",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
-				HostUsers: utilpointer.Bool(false),
+				HostUsers: ptr.To(false),
 			}},
 			expectAllowed:  true,
 			relaxForUserNS: true,
@@ -96,7 +96,7 @@ func TestRunAsNonRoot(t *testing.T) {
 				Containers: []corev1.Container{
 					{Name: "a"},
 				},
-				HostUsers: utilpointer.Bool(true),
+				HostUsers: ptr.To(true),
 			}},
 			expectReason:   `runAsNonRoot != true`,
 			expectDetail:   `pod or container "a" must set securityContext.runAsNonRoot=true`,

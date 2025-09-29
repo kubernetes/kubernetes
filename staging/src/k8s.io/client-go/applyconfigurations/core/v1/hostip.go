@@ -20,7 +20,10 @@ package v1
 
 // HostIPApplyConfiguration represents a declarative configuration of the HostIP type for use
 // with apply.
+//
+// HostIP represents a single IP address allocated to the host.
 type HostIPApplyConfiguration struct {
+	// IP is the IP address assigned to the host
 	IP *string `json:"ip,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type HostIPApplyConfiguration struct {
 func HostIP() *HostIPApplyConfiguration {
 	return &HostIPApplyConfiguration{}
 }
-func (b HostIPApplyConfiguration) IsApplyConfiguration() {}
 
 // WithIP sets the IP field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -28,10 +28,13 @@ import (
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega/gcustom"
+	gomegatypes "github.com/onsi/gomega/types"
 	"google.golang.org/grpc/codes"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -95,19 +98,18 @@ type testParameters struct {
 	enableResizing      bool   // enable resizing for both CSI mock driver and storageClass.
 	enableNodeExpansion bool   // enable node expansion for CSI mock driver
 	// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
-	disableResizingOnDriver       bool
-	disableControllerExpansion    bool
-	enableSnapshot                bool
-	enableVolumeMountGroup        bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
-	enableNodeVolumeCondition     bool
-	hooks                         *drivers.Hooks
-	tokenRequests                 []storagev1.TokenRequest
-	requiresRepublish             *bool
-	fsGroupPolicy                 *storagev1.FSGroupPolicy
-	enableSELinuxMount            *bool
-	enableRecoverExpansionFailure bool
-	enableCSINodeExpandSecret     bool
-	reclaimPolicy                 *v1.PersistentVolumeReclaimPolicy
+	disableResizingOnDriver    bool
+	disableControllerExpansion bool
+	enableSnapshot             bool
+	enableVolumeMountGroup     bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
+	enableNodeVolumeCondition  bool
+	hooks                      *drivers.Hooks
+	tokenRequests              []storagev1.TokenRequest
+	requiresRepublish          *bool
+	fsGroupPolicy              *storagev1.FSGroupPolicy
+	enableSELinuxMount         *bool
+	enableCSINodeExpandSecret  bool
+	reclaimPolicy              *v1.PersistentVolumeReclaimPolicy
 }
 
 type mockDriverSetup struct {
@@ -116,6 +118,7 @@ type mockDriverSetup struct {
 	pods        []*v1.Pod
 	pvcs        []*v1.PersistentVolumeClaim
 	pvs         []*v1.PersistentVolume
+	quotas      []*v1.ResourceQuota
 	sc          map[string]*storagev1.StorageClass
 	vsc         map[string]*unstructured.Unstructured
 	driver      drivers.MockCSITestDriver
@@ -163,23 +166,22 @@ func (m *mockDriverSetup) init(ctx context.Context, tp testParameters) {
 
 	var err error
 	driverOpts := drivers.CSIMockDriverOpts{
-		RegisterDriver:                tp.registerDriver,
-		PodInfo:                       tp.podInfo,
-		StorageCapacity:               tp.storageCapacity,
-		EnableTopology:                tp.enableTopology,
-		AttachLimit:                   tp.attachLimit,
-		DisableAttach:                 tp.disableAttach,
-		EnableResizing:                tp.enableResizing,
-		EnableNodeExpansion:           tp.enableNodeExpansion,
-		EnableNodeVolumeCondition:     tp.enableNodeVolumeCondition,
-		DisableControllerExpansion:    tp.disableControllerExpansion,
-		EnableSnapshot:                tp.enableSnapshot,
-		EnableVolumeMountGroup:        tp.enableVolumeMountGroup,
-		TokenRequests:                 tp.tokenRequests,
-		RequiresRepublish:             tp.requiresRepublish,
-		FSGroupPolicy:                 tp.fsGroupPolicy,
-		EnableSELinuxMount:            tp.enableSELinuxMount,
-		EnableRecoverExpansionFailure: tp.enableRecoverExpansionFailure,
+		RegisterDriver:             tp.registerDriver,
+		PodInfo:                    tp.podInfo,
+		StorageCapacity:            tp.storageCapacity,
+		EnableTopology:             tp.enableTopology,
+		AttachLimit:                tp.attachLimit,
+		DisableAttach:              tp.disableAttach,
+		EnableResizing:             tp.enableResizing,
+		EnableNodeExpansion:        tp.enableNodeExpansion,
+		EnableNodeVolumeCondition:  tp.enableNodeVolumeCondition,
+		DisableControllerExpansion: tp.disableControllerExpansion,
+		EnableSnapshot:             tp.enableSnapshot,
+		EnableVolumeMountGroup:     tp.enableVolumeMountGroup,
+		TokenRequests:              tp.tokenRequests,
+		RequiresRepublish:          tp.requiresRepublish,
+		FSGroupPolicy:              tp.fsGroupPolicy,
+		EnableSELinuxMount:         tp.enableSELinuxMount,
 	}
 
 	// At the moment, only tests which need hooks are
@@ -257,6 +259,15 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 	for _, vsc := range m.vsc {
 		ginkgo.By(fmt.Sprintf("Deleting volumesnapshotclass %s", vsc.GetName()))
 		m.config.Framework.DynamicClient.Resource(utils.SnapshotClassGVR).Delete(context.TODO(), vsc.GetName(), metav1.DeleteOptions{})
+	}
+
+	for _, quota := range m.quotas {
+		ginkgo.By(fmt.Sprintf("Deleting quota %s", quota.Name))
+		if err := cs.CoreV1().ResourceQuotas(quota.Namespace).Delete(ctx, quota.Name, metav1.DeleteOptions{}); err != nil {
+			if !apierrors.IsNotFound(err) {
+				errs = append(errs, err)
+			}
+		}
 	}
 
 	err := utilerrors.NewAggregate(errs)
@@ -463,7 +474,7 @@ func (m *mockDriverSetup) createPodWithFSGroup(ctx context.Context, fsGroup *int
 	return class, claim, pod
 }
 
-func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes []v1.PersistentVolumeAccessMode, mountOptions []string, seLinuxOpts *v1.SELinuxOptions, policy *v1.PodSELinuxChangePolicy) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes []v1.PersistentVolumeAccessMode, mountOptions []string, seLinuxOpts *v1.SELinuxOptions, policy *v1.PodSELinuxChangePolicy, privileged bool) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	ginkgo.By("Creating pod with SELinux context")
 	f := m.f
 	nodeSelection := m.config.ClientNodeSelection
@@ -480,7 +491,7 @@ func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes 
 		ReclaimPolicy:        m.tp.reclaimPolicy,
 	}
 	class, claim := createClaim(ctx, f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, accessModes)
-	pod, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, seLinuxOpts, policy)
+	pod, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, seLinuxOpts, policy, privileged)
 	framework.ExpectNoError(err, "Failed to create pause pod with SELinux context %s: %v", seLinuxOpts, err)
 
 	if class != nil {
@@ -495,6 +506,59 @@ func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes 
 	}
 
 	return class, claim, pod
+}
+
+func (m *mockDriverSetup) createResourceQuota(ctx context.Context, quota *v1.ResourceQuota) *v1.ResourceQuota {
+	ginkgo.By("Creating Resource Quota")
+	f := m.f
+
+	quota.ObjectMeta = metav1.ObjectMeta{
+		Name:      f.UniqueName + "-quota",
+		Namespace: f.Namespace.Name,
+	}
+	var err error
+
+	quota, err = f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, quota, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "Failed to create resourceQuota")
+	m.quotas = append(m.quotas, quota)
+	usedResources := v1.ResourceList{}
+	usedResources[pvcSizeQuotaKey] = resource.MustParse("0")
+	usedResources[pvcCountQuotaKey] = resource.MustParse("0")
+	err = m.waitForResourceQuota(ctx, f.Namespace.Name, quota.Name, usedResources)
+	framework.ExpectNoError(err, "Failed to wait for resourcequota creation")
+	return quota
+}
+
+func (m *mockDriverSetup) waitForResourceQuota(ctx context.Context, ns, quotaName string, used v1.ResourceList) error {
+	var lastResourceQuota *v1.ResourceQuota
+	f := m.f
+	err := framework.Gomega().Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().ResourceQuotas(ns).Get, quotaName, metav1.GetOptions{})).Should(haveUsedResources(used, &lastResourceQuota))
+	if lastResourceQuota != nil && err == nil {
+		framework.Logf("Got expected ResourceQuota:\n%s", format.Object(lastResourceQuota, 1))
+	}
+	return err
+}
+
+func haveUsedResources(used v1.ResourceList, lastResourceQuota **v1.ResourceQuota) gomegatypes.GomegaMatcher {
+	// The template emits the actual ResourceQuota object as YAML.
+	// In particular the ManagedFields are interesting because both
+	// kube-apiserver and kube-controller-manager set the status.
+	return gcustom.MakeMatcher(func(resourceQuota *v1.ResourceQuota) (bool, error) {
+		if lastResourceQuota != nil {
+			*lastResourceQuota = resourceQuota
+		}
+		// used may not yet be calculated
+		if resourceQuota.Status.Used == nil {
+			return false, nil
+		}
+		// verify that the quota shows the expected used resource values
+		for k, v := range used {
+			if actualValue, found := resourceQuota.Status.Used[k]; !found || (actualValue.Cmp(v) != 0) {
+				return false, nil
+			}
+		}
+		return true, nil
+	}).WithTemplate("Expected:\n{{.FormattedActual}}\n{{.To}} have the following .status.used entries:\n{{range $key, $value := .Data}}    {{$key}}: \"{{$value.ToUnstructured}}\"\n{{end}}").WithTemplateData(used /* Formatting of the map is done inside the template. */)
 }
 
 func waitForCSIDriver(cs clientset.Interface, driverName string) error {
@@ -802,7 +866,7 @@ func startBusyBoxPodWithVolumeSource(cs clientset.Interface, volumeSource v1.Vol
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
-func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection, ns string, seLinuxOpts *v1.SELinuxOptions, policy *v1.PodSELinuxChangePolicy) (*v1.Pod, error) {
+func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection, ns string, seLinuxOpts *v1.SELinuxOptions, policy *v1.PodSELinuxChangePolicy, privileged bool) (*v1.Pod, error) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-volume-tester-",
@@ -816,6 +880,9 @@ func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentV
 				{
 					Name:  "volume-tester",
 					Image: imageutils.GetE2EImage(imageutils.Pause),
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &privileged,
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",

@@ -20,8 +20,13 @@ package v1
 
 // SecretReferenceApplyConfiguration represents a declarative configuration of the SecretReference type for use
 // with apply.
+//
+// SecretReference represents a Secret Reference. It has enough information to retrieve secret
+// in any namespace
 type SecretReferenceApplyConfiguration struct {
-	Name      *string `json:"name,omitempty"`
+	// name is unique within a namespace to reference a secret resource.
+	Name *string `json:"name,omitempty"`
+	// namespace defines the space within which the secret name must be unique.
 	Namespace *string `json:"namespace,omitempty"`
 }
 
@@ -30,7 +35,6 @@ type SecretReferenceApplyConfiguration struct {
 func SecretReference() *SecretReferenceApplyConfiguration {
 	return &SecretReferenceApplyConfiguration{}
 }
-func (b SecretReferenceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

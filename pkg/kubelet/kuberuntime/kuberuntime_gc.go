@@ -127,6 +127,7 @@ func (cgc *containerGC) enforceMaxContainersPerEvictUnit(ctx context.Context, ev
 
 // removeOldestN removes the oldest toRemove containers and returns the resulting slice.
 func (cgc *containerGC) removeOldestN(ctx context.Context, containers []containerGCInfo, toRemove int) []containerGCInfo {
+	logger := klog.FromContext(ctx)
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	if numToKeep > 0 {
@@ -142,12 +143,12 @@ func (cgc *containerGC) removeOldestN(ctx context.Context, containers []containe
 			}
 			message := "Container is in unknown state, try killing it before removal"
 			if err := cgc.manager.killContainer(ctx, nil, id, containers[i].name, message, reasonUnknown, nil, nil); err != nil {
-				klog.ErrorS(err, "Failed to stop container", "containerID", containers[i].id)
+				logger.Error(err, "Failed to stop container", "containerID", containers[i].id)
 				continue
 			}
 		}
 		if err := cgc.manager.removeContainer(ctx, containers[i].id); err != nil {
-			klog.ErrorS(err, "Failed to remove container", "containerID", containers[i].id)
+			logger.Error(err, "Failed to remove container", "containerID", containers[i].id)
 		}
 	}
 
@@ -172,16 +173,17 @@ func (cgc *containerGC) removeOldestNSandboxes(ctx context.Context, sandboxes []
 
 // removeSandbox removes the sandbox by sandboxID.
 func (cgc *containerGC) removeSandbox(ctx context.Context, sandboxID string) {
-	klog.V(4).InfoS("Removing sandbox", "sandboxID", sandboxID)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Removing sandbox", "sandboxID", sandboxID)
 	// In normal cases, kubelet should've already called StopPodSandbox before
 	// GC kicks in. To guard against the rare cases where this is not true, try
 	// stopping the sandbox before removing it.
 	if err := cgc.client.StopPodSandbox(ctx, sandboxID); err != nil {
-		klog.ErrorS(err, "Failed to stop sandbox before removing", "sandboxID", sandboxID)
+		logger.Error(err, "Failed to stop sandbox before removing", "sandboxID", sandboxID)
 		return
 	}
 	if err := cgc.client.RemovePodSandbox(ctx, sandboxID); err != nil {
-		klog.ErrorS(err, "Failed to remove sandbox", "sandboxID", sandboxID)
+		logger.Error(err, "Failed to remove sandbox", "sandboxID", sandboxID)
 	}
 }
 
@@ -206,7 +208,7 @@ func (cgc *containerGC) evictableContainers(ctx context.Context, minAge time.Dur
 			continue
 		}
 
-		labeledInfo := getContainerInfoFromLabels(container.Labels)
+		labeledInfo := getContainerInfoFromLabels(ctx, container.Labels)
 		containerInfo := containerGCInfo{
 			id:         container.Id,
 			name:       container.Metadata.Name,
@@ -326,6 +328,7 @@ func (cgc *containerGC) evictSandboxes(ctx context.Context, evictNonDeletedPods 
 // evictPodLogsDirectories evicts all evictable pod logs directories. Pod logs directories
 // are evictable if there are no corresponding pods.
 func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesReady bool) error {
+	logger := klog.FromContext(ctx)
 	osInterface := cgc.manager.osInterface
 	podLogsDirectory := cgc.manager.podLogsDirectory
 	if allSourcesReady {
@@ -340,10 +343,10 @@ func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesR
 			if !cgc.podStateProvider.ShouldPodContentBeRemoved(podUID) {
 				continue
 			}
-			klog.V(4).InfoS("Removing pod logs", "podUID", podUID)
+			logger.V(4).Info("Removing pod logs", "podUID", podUID)
 			err := osInterface.RemoveAll(filepath.Join(podLogsDirectory, name))
 			if err != nil {
-				klog.ErrorS(err, "Failed to remove pod logs directory", "path", name)
+				logger.Error(err, "Failed to remove pod logs directory", "path", name)
 			}
 		}
 	}
@@ -358,11 +361,11 @@ func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesR
 				if err != nil {
 					// TODO: we should handle container not found (i.e. container was deleted) case differently
 					// once https://github.com/kubernetes/kubernetes/issues/63336 is resolved
-					klog.InfoS("Error getting ContainerStatus for containerID", "containerID", containerID, "err", err)
+					logger.Info("Error getting ContainerStatus for containerID", "containerID", containerID, "err", err)
 				} else {
 					status := resp.GetStatus()
 					if status == nil {
-						klog.V(4).InfoS("Container status is nil")
+						logger.V(4).Info("Container status is nil")
 						continue
 					}
 					if status.State != runtimeapi.ContainerState_CONTAINER_EXITED {
@@ -377,18 +380,18 @@ func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesR
 						// See https://github.com/kubernetes/kubernetes/issues/52172
 						//
 						// We only remove unhealthy symlink for dead containers
-						klog.V(5).InfoS("Container is still running, not removing symlink", "containerID", containerID, "path", logSymlink)
+						logger.V(5).Info("Container is still running, not removing symlink", "containerID", containerID, "path", logSymlink)
 						continue
 					}
 				}
 			} else {
-				klog.V(4).InfoS("Unable to obtain container ID", "err", err)
+				logger.V(4).Info("Unable to obtain container ID", "err", err)
 			}
 			err := osInterface.Remove(logSymlink)
 			if err != nil {
-				klog.ErrorS(err, "Failed to remove container log dead symlink", "path", logSymlink)
+				logger.Error(err, "Failed to remove container log dead symlink", "path", logSymlink)
 			} else {
-				klog.V(4).InfoS("Removed symlink", "path", logSymlink)
+				logger.V(4).Info("Removed symlink", "path", logSymlink)
 			}
 		}
 	}

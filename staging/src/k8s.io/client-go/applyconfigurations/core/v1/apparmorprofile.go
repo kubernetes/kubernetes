@@ -24,9 +24,20 @@ import (
 
 // AppArmorProfileApplyConfiguration represents a declarative configuration of the AppArmorProfile type for use
 // with apply.
+//
+// AppArmorProfile defines a pod or container's AppArmor settings.
 type AppArmorProfileApplyConfiguration struct {
-	Type             *corev1.AppArmorProfileType `json:"type,omitempty"`
-	LocalhostProfile *string                     `json:"localhostProfile,omitempty"`
+	// type indicates which kind of AppArmor profile will be applied.
+	// Valid options are:
+	// Localhost - a profile pre-loaded on the node.
+	// RuntimeDefault - the container runtime's default profile.
+	// Unconfined - no AppArmor enforcement.
+	Type *corev1.AppArmorProfileType `json:"type,omitempty"`
+	// localhostProfile indicates a profile loaded on the node that should be used.
+	// The profile must be preconfigured on the node to work.
+	// Must match the loaded name of the profile.
+	// Must be set if and only if type is "Localhost".
+	LocalhostProfile *string `json:"localhostProfile,omitempty"`
 }
 
 // AppArmorProfileApplyConfiguration constructs a declarative configuration of the AppArmorProfile type for use with
@@ -34,7 +45,6 @@ type AppArmorProfileApplyConfiguration struct {
 func AppArmorProfile() *AppArmorProfileApplyConfiguration {
 	return &AppArmorProfileApplyConfiguration{}
 }
-func (b AppArmorProfileApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

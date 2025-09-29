@@ -21,10 +21,9 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
-
-	"k8s.io/code-generator/cmd/validation-gen/util"
 )
 
 const (
@@ -43,9 +42,7 @@ func (minimumTagValidator) TagName() string {
 	return minimumTagName
 }
 
-var minimumTagValidScopes = sets.New(
-	ScopeAny,
-)
+var minimumTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 
 func (minimumTagValidator) ValidScopes() sets.Set[Scope] {
 	return minimumTagValidScopes

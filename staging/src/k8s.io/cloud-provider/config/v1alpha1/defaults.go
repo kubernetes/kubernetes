@@ -24,7 +24,7 @@ import (
 	nodeconfigv1alpha1 "k8s.io/cloud-provider/controllers/node/config/v1alpha1"
 	serviceconfigv1alpha1 "k8s.io/cloud-provider/controllers/service/config/v1alpha1"
 	cmconfigv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -63,7 +63,7 @@ func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration)
 		obj.ClusterName = "kubernetes"
 	}
 	if obj.ConfigureCloudRoutes == nil {
-		obj.ConfigureCloudRoutes = utilpointer.BoolPtr(true)
+		obj.ConfigureCloudRoutes = ptr.To(true)
 	}
 	if obj.RouteReconciliationPeriod == zero {
 		obj.RouteReconciliationPeriod = metav1.Duration{Duration: 10 * time.Second}

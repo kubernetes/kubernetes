@@ -20,6 +20,8 @@ package v1beta2
 
 // DeviceClassConfigurationApplyConfiguration represents a declarative configuration of the DeviceClassConfiguration type for use
 // with apply.
+//
+// DeviceClassConfiguration is used in DeviceClass.
 type DeviceClassConfigurationApplyConfiguration struct {
 	DeviceConfigurationApplyConfiguration `json:",inline"`
 }
@@ -29,7 +31,6 @@ type DeviceClassConfigurationApplyConfiguration struct {
 func DeviceClassConfiguration() *DeviceClassConfigurationApplyConfiguration {
 	return &DeviceClassConfigurationApplyConfiguration{}
 }
-func (b DeviceClassConfigurationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithOpaque sets the Opaque field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

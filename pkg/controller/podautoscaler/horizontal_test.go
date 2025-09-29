@@ -93,7 +93,7 @@ func statusOkWithOverrides(overrides ...autoscalingv2.HorizontalPodAutoscalerCon
 	resv1 := make([]autoscalingv2.HorizontalPodAutoscalerCondition, len(resv2))
 	for i, cond := range resv2 {
 		resv1[i] = autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.HorizontalPodAutoscalerConditionType(cond.Type),
+			Type:   cond.Type,
 			Status: cond.Status,
 			Reason: cond.Reason,
 		}
@@ -861,6 +861,7 @@ type mockMonitor struct {
 
 	metricComputationActionLabels map[autoscalingv2.MetricSourceType][]monitor.ActionLabel
 	metricComputationErrorLabels  map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel
+	metricObjectsCount            int
 }
 
 func newMockMonitor() *mockMonitor {
@@ -897,6 +898,24 @@ func (m *mockMonitor) waitUntilRecorded(ctx context.Context, t *testing.T) {
 	}); err != nil {
 		t.Fatalf("no reconciliation is recorded in the monitor, len(monitor.reconciliationActionLabels)=%v len(monitor.reconciliationErrorLabels)=%v ", len(m.reconciliationActionLabels), len(m.reconciliationErrorLabels))
 	}
+}
+
+func (m *mockMonitor) ObserveHPAAddition() {
+	m.Lock()
+	defer m.Unlock()
+	m.metricObjectsCount++
+}
+
+func (m *mockMonitor) ObserveHPADeletion() {
+	m.Lock()
+	defer m.Unlock()
+	m.metricObjectsCount--
+}
+
+func (m *mockMonitor) GetObjectsCount() int {
+	m.RLock()
+	defer m.RUnlock()
+	return m.metricObjectsCount
 }
 
 func TestScaleUp(t *testing.T) {
@@ -4003,7 +4022,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {
 	policy := autoscalingv2.MaxChangePolicySelect
 	directionBehavior := autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: ptr.To(int32(stabilizationWindow)),
+		StabilizationWindowSeconds: ptr.To(stabilizationWindow),
 		SelectPolicy:               &policy,
 	}
 	if pods != 0 {
@@ -5150,6 +5169,11 @@ func TestMultipleHPAs(t *testing.T) {
 	testClient := &fake.Clientset{}
 	testScaleClient := &scalefake.FakeScaleClient{}
 	testMetricsClient := &metricsfake.Clientset{}
+	hpaWatcher := watch.NewFake()
+	podWatcher := watch.NewFake()
+
+	testClient.AddWatchReactor("horizontalpodautoscalers", core.DefaultWatchReactor(hpaWatcher, nil))
+	testClient.AddWatchReactor("pods", core.DefaultWatchReactor(podWatcher, nil))
 
 	hpaList := [hpaCount]autoscalingv2.HorizontalPodAutoscaler{}
 	scaleUpEventsMap := map[string][]timestampedScaleEvent{}
@@ -5369,6 +5393,13 @@ func TestMultipleHPAs(t *testing.T) {
 		return handled, obj, err
 	})
 
+	testClient.AddReactor("delete", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		deleteAction := action.(core.DeleteAction)
+		hpaName := deleteAction.GetName()
+		processed <- hpaName
+		return true, nil, nil
+	})
+
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 
 	tCtx := ktesting.Init(t)
@@ -5389,6 +5420,7 @@ func TestMultipleHPAs(t *testing.T) {
 	)
 	hpaController.scaleUpEvents = scaleUpEventsMap
 	hpaController.scaleDownEvents = scaleDownEventsMap
+	hpaController.monitor = newMockMonitor()
 
 	informerFactory.Start(tCtx.Done())
 	go hpaController.Run(tCtx, 5)
@@ -5406,6 +5438,32 @@ func TestMultipleHPAs(t *testing.T) {
 	}
 
 	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
+	assert.Equal(t, hpaCount, hpaController.monitor.(*mockMonitor).GetObjectsCount(), "Expected objects count to match number of HPAs")
+
+	// Test HPA deletion
+	hpaName := "dummy-hpa-0"
+
+	// Delete the HPA through the API
+	err := testClient.AutoscalingV2().HorizontalPodAutoscalers(testNamespace).Delete(tCtx, hpaName, metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("Failed to delete HPA: %v", err)
+	}
+
+	// Simulate the watch event for deletion
+	hpaWatcher.Delete(&hpaList[0])
+
+	// Wait for deletion to be processed
+	select {
+	case deletedHPAName := <-processed:
+		assert.Equal(t, hpaName, deletedHPAName, "Expected the deleted HPA name to match")
+	case <-time.After(5 * time.Second):
+		t.Fatalf("Timeout waiting for HPA deletion to be processed")
+	}
+
+	// Give the controller time to process the deletion and update the monitor
+	assert.Eventually(t, func() bool {
+		return hpaController.monitor.(*mockMonitor).GetObjectsCount() == hpaCount-1
+	}, 5*time.Second, 100*time.Millisecond, "Expected objects count to be hpaCount-1 after an HPA was deleted")
 }
 
 func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
@@ -5450,4 +5508,67 @@ func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
 	})
 
 	tc.runTest(t)
+}
+
+func TestBuildQuantity(t *testing.T) {
+	tests := []struct {
+		name         string
+		resourceName v1.ResourceName
+		rawProposal  int64
+		expected     resource.Quantity
+	}{
+		{
+			name:         "Memory - 1000 bytes → 1Ki",
+			resourceName: v1.ResourceMemory,
+			rawProposal:  1000,
+			expected:     *resource.NewQuantity(1, resource.BinarySI), // 1Ki
+		},
+		{
+			name:         "Memory - 1000000 bytes → 1000Ki",
+			resourceName: v1.ResourceMemory,
+			rawProposal:  1000000,
+			expected:     *resource.NewQuantity(1000, resource.BinarySI), // 1000Ki
+		},
+		{
+			name:         "CPU - 100 milli-cores",
+			resourceName: v1.ResourceCPU,
+			rawProposal:  100,
+			expected:     *resource.NewMilliQuantity(100, resource.DecimalSI),
+		},
+		{
+			name:         "CPU - 500 milli-cores",
+			resourceName: v1.ResourceCPU,
+			rawProposal:  500,
+			expected:     *resource.NewMilliQuantity(500, resource.DecimalSI),
+		},
+		{
+			name:         "CPU - 1 milli-core",
+			resourceName: v1.ResourceCPU,
+			rawProposal:  1,
+			expected:     *resource.NewMilliQuantity(1, resource.DecimalSI),
+		},
+		{
+			name:         "CustomResource - 200 milli-units",
+			resourceName: v1.ResourceName("custom-resource"),
+			rawProposal:  200,
+			expected:     *resource.NewMilliQuantity(200, resource.DecimalSI),
+		},
+		{
+			name:         "CustomResource - 300 milli-units",
+			resourceName: v1.ResourceName("custom-resource"),
+			rawProposal:  300,
+			expected:     *resource.NewMilliQuantity(300, resource.DecimalSI),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q := buildQuantity(tt.resourceName, tt.rawProposal)
+			if !q.Equal(tt.expected) || (q.Format != tt.expected.Format) {
+				t.Errorf("expected quantity %v (Format: %v), got %v (Format: %v)",
+					tt.expected.String(), tt.expected.Format,
+					q.String(), q.Format)
+			}
+		})
+	}
 }

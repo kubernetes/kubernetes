@@ -45,3 +45,48 @@ type TestTypeList struct {
 type TestTypeStatus struct {
 	Blah string `json:"blah"`
 }
+
+type Conversion struct {
+	Identical MemoryIdentical `json:"identical"`
+	Different MemoryDifferent `json:"different"`
+}
+type MemoryIdentical struct {
+	Items *MemoryIdentical `json:"items,omitempty"`
+
+	Properties map[string]MemoryIdentical `json:"properties,omitempty"`
+
+	// +listType=atomic
+	AllOf []MemoryIdentical `json:"allOf,omitempty"`
+
+	Bool bool `json:"bool"`
+}
+type MemoryDifferent struct {
+	Items *MemoryDifferent `json:"items,omitempty"`
+
+	Properties map[string]MemoryDifferent `json:"properties,omitempty"`
+
+	// +listType=atomic
+	AllOf []MemoryDifferent `json:"allOf,omitempty"`
+
+	Bool *bool `json:"bool"` // differs from internal representation
+}
+
+type ConversionPrivate struct {
+	PublicField  string `json:"publicField"`
+	privateField string `json:"privateField"`
+}
+
+type ConversionCustomContainer struct {
+	// +listType=atomic
+	Slice []ConversionCustom `json:"slice"`
+	// +listType=atomic
+	SliceP  []*ConversionCustom          `json:"sliceP"`
+	Map     map[string]ConversionCustom  `json:"map"`
+	MapP    map[string]*ConversionCustom `json:"mapP"`
+	Struct  ConversionCustom             `json:"struct"`
+	StructP *ConversionCustom            `json:"structP"`
+}
+type ConversionCustom struct {
+	PublicField  string `json:"publicField"`
+	privateField string `json:"privateField"`
+}

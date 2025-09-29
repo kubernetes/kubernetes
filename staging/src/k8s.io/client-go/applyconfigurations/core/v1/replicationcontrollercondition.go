@@ -25,12 +25,19 @@ import (
 
 // ReplicationControllerConditionApplyConfiguration represents a declarative configuration of the ReplicationControllerCondition type for use
 // with apply.
+//
+// ReplicationControllerCondition describes the state of a replication controller at a certain point.
 type ReplicationControllerConditionApplyConfiguration struct {
-	Type               *corev1.ReplicationControllerConditionType `json:"type,omitempty"`
-	Status             *corev1.ConditionStatus                    `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                               `json:"lastTransitionTime,omitempty"`
-	Reason             *string                                    `json:"reason,omitempty"`
-	Message            *string                                    `json:"message,omitempty"`
+	// Type of replication controller condition.
+	Type *corev1.ReplicationControllerConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// The last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // ReplicationControllerConditionApplyConfiguration constructs a declarative configuration of the ReplicationControllerCondition type for use with
@@ -38,7 +45,6 @@ type ReplicationControllerConditionApplyConfiguration struct {
 func ReplicationControllerCondition() *ReplicationControllerConditionApplyConfiguration {
 	return &ReplicationControllerConditionApplyConfiguration{}
 }
-func (b ReplicationControllerConditionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

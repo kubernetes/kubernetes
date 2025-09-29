@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"fmt"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -26,6 +27,11 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
 )
+
+type dockerConfigProviderWithCoordinates interface {
+	// provideWithCoordinates returns the DockerConfig and service account coordinates for the given image.
+	provideWithCoordinates(image string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates)
+}
 
 type provider struct {
 	name string
@@ -41,16 +47,16 @@ func registerCredentialProviderPlugin(name string, p *pluginProvider) {
 	defer providersMutex.Unlock()
 
 	if seenProviderNames.Has(name) {
-		klog.Fatalf("Credential provider %q was registered twice", name)
+		panic(fmt.Sprintf("Credential provider %q was registered twice", name))
 	}
 	seenProviderNames.Insert(name)
 
 	providers = append(providers, provider{name, p})
-	klog.V(4).Infof("Registered credential provider %q", name)
+	klog.V(4).InfoS("Registered credential provider", "provider", name)
 }
 
 type externalCredentialProviderKeyring struct {
-	providers []credentialprovider.DockerConfigProvider
+	providers []dockerConfigProviderWithCoordinates
 }
 
 func NewExternalCredentialProviderDockerKeyring(podNamespace, podName, podUID, serviceAccountName string) credentialprovider.DockerKeyring {
@@ -58,16 +64,11 @@ func NewExternalCredentialProviderDockerKeyring(podNamespace, podName, podUID, s
 	defer providersMutex.RUnlock()
 
 	keyring := &externalCredentialProviderKeyring{
-		providers: make([]credentialprovider.DockerConfigProvider, 0, len(providers)),
+		providers: make([]dockerConfigProviderWithCoordinates, 0, len(providers)),
 	}
 
 	for _, p := range providers {
-		if !p.impl.Enabled() {
-			continue
-		}
-
 		pp := &perPodPluginProvider{
-			name:     p.name,
 			provider: p.impl,
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {
@@ -91,8 +92,12 @@ func (k *externalCredentialProviderKeyring) Lookup(image string) ([]credentialpr
 	keyring := &credentialprovider.BasicDockerKeyring{}
 
 	for _, p := range k.providers {
-		// TODO: modify the credentialprovider.CredentialSource to contain the SA/pod information
-		keyring.Add(nil, p.Provide(image))
+		dockerConfig, saCoords := p.provideWithCoordinates(image)
+		if saCoords != nil {
+			keyring.Add(&credentialprovider.CredentialSource{ServiceAccount: saCoords}, dockerConfig)
+		} else {
+			keyring.Add(nil, dockerConfig)
+		}
 	}
 
 	return keyring.Lookup(image)

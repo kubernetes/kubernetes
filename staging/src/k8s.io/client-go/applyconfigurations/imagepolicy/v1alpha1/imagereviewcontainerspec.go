@@ -20,7 +20,10 @@ package v1alpha1
 
 // ImageReviewContainerSpecApplyConfiguration represents a declarative configuration of the ImageReviewContainerSpec type for use
 // with apply.
+//
+// ImageReviewContainerSpec is a description of a container within the pod creation request.
 type ImageReviewContainerSpecApplyConfiguration struct {
+	// This can be in the form image:tag or image@SHA:012345679abcdef.
 	Image *string `json:"image,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type ImageReviewContainerSpecApplyConfiguration struct {
 func ImageReviewContainerSpec() *ImageReviewContainerSpecApplyConfiguration {
 	return &ImageReviewContainerSpecApplyConfiguration{}
 }
-func (b ImageReviewContainerSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithImage sets the Image field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

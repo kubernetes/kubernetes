@@ -26,12 +26,19 @@ import (
 
 // ReplicaSetConditionApplyConfiguration represents a declarative configuration of the ReplicaSetCondition type for use
 // with apply.
+//
+// ReplicaSetCondition describes the state of a replica set at a certain point.
 type ReplicaSetConditionApplyConfiguration struct {
-	Type               *appsv1.ReplicaSetConditionType `json:"type,omitempty"`
-	Status             *corev1.ConditionStatus         `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                    `json:"lastTransitionTime,omitempty"`
-	Reason             *string                         `json:"reason,omitempty"`
-	Message            *string                         `json:"message,omitempty"`
+	// Type of replica set condition.
+	Type *appsv1.ReplicaSetConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// The last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // ReplicaSetConditionApplyConfiguration constructs a declarative configuration of the ReplicaSetCondition type for use with
@@ -39,7 +46,6 @@ type ReplicaSetConditionApplyConfiguration struct {
 func ReplicaSetCondition() *ReplicaSetConditionApplyConfiguration {
 	return &ReplicaSetConditionApplyConfiguration{}
 }
-func (b ReplicaSetConditionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

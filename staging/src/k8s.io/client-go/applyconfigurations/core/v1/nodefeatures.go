@@ -20,7 +20,12 @@ package v1
 
 // NodeFeaturesApplyConfiguration represents a declarative configuration of the NodeFeatures type for use
 // with apply.
+//
+// NodeFeatures describes the set of features implemented by the CRI implementation.
+// The features contained in the NodeFeatures should depend only on the cri implementation
+// independent of runtime handlers.
 type NodeFeaturesApplyConfiguration struct {
+	// SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
 	SupplementalGroupsPolicy *bool `json:"supplementalGroupsPolicy,omitempty"`
 }
 
@@ -29,7 +34,6 @@ type NodeFeaturesApplyConfiguration struct {
 func NodeFeatures() *NodeFeaturesApplyConfiguration {
 	return &NodeFeaturesApplyConfiguration{}
 }
-func (b NodeFeaturesApplyConfiguration) IsApplyConfiguration() {}
 
 // WithSupplementalGroupsPolicy sets the SupplementalGroupsPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

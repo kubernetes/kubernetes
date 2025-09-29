@@ -20,10 +20,19 @@ package v1
 
 // GlusterfsVolumeSourceApplyConfiguration represents a declarative configuration of the GlusterfsVolumeSource type for use
 // with apply.
+//
+// Represents a Glusterfs mount that lasts the lifetime of a pod.
+// Glusterfs volumes do not support ownership management or SELinux relabeling.
 type GlusterfsVolumeSourceApplyConfiguration struct {
+	// endpoints is the endpoint name that details Glusterfs topology.
 	EndpointsName *string `json:"endpoints,omitempty"`
-	Path          *string `json:"path,omitempty"`
-	ReadOnly      *bool   `json:"readOnly,omitempty"`
+	// path is the Glusterfs volume path.
+	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
+	Path *string `json:"path,omitempty"`
+	// readOnly here will force the Glusterfs volume to be mounted with read-only permissions.
+	// Defaults to false.
+	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // GlusterfsVolumeSourceApplyConfiguration constructs a declarative configuration of the GlusterfsVolumeSource type for use with
@@ -31,7 +40,6 @@ type GlusterfsVolumeSourceApplyConfiguration struct {
 func GlusterfsVolumeSource() *GlusterfsVolumeSourceApplyConfiguration {
 	return &GlusterfsVolumeSourceApplyConfiguration{}
 }
-func (b GlusterfsVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithEndpointsName sets the EndpointsName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

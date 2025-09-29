@@ -82,13 +82,13 @@ func GenReSTCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string, str
 	buf.WriteString("\n" + long + "\n\n")
 
 	if cmd.Runnable() {
-		buf.WriteString(fmt.Sprintf("::\n\n  %s\n\n", cmd.UseLine()))
+		fmt.Fprintf(buf, "::\n\n  %s\n\n", cmd.UseLine())
 	}
 
 	if len(cmd.Example) > 0 {
 		buf.WriteString("Examples\n")
 		buf.WriteString("~~~~~~~~\n\n")
-		buf.WriteString(fmt.Sprintf("::\n\n%s\n\n", indentString(cmd.Example, "  ")))
+		fmt.Fprintf(buf, "::\n\n%s\n\n", indentString(cmd.Example, "  "))
 	}
 
 	if err := printOptionsReST(buf, cmd, name); err != nil {
@@ -101,7 +101,7 @@ func GenReSTCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string, str
 			parent := cmd.Parent()
 			pname := parent.CommandPath()
 			ref = strings.ReplaceAll(pname, " ", "_")
-			buf.WriteString(fmt.Sprintf("* %s \t - %s\n", linkHandler(pname, ref), parent.Short))
+			fmt.Fprintf(buf, "* %s \t - %s\n", linkHandler(pname, ref), parent.Short)
 			cmd.VisitParents(func(c *cobra.Command) {
 				if c.DisableAutoGenTag {
 					cmd.DisableAutoGenTag = c.DisableAutoGenTag
@@ -118,7 +118,7 @@ func GenReSTCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string, str
 			}
 			cname := name + " " + child.Name()
 			ref = strings.ReplaceAll(cname, " ", "_")
-			buf.WriteString(fmt.Sprintf("* %s \t - %s\n", linkHandler(cname, ref), child.Short))
+			fmt.Fprintf(buf, "* %s \t - %s\n", linkHandler(cname, ref), child.Short)
 		}
 		buf.WriteString("\n")
 	}

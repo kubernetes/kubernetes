@@ -58,7 +58,10 @@ func newTypeModels(openAPISchemaFilePath string, pkgTypes map[string]*types.Pack
 	gvkToOpenAPIType := map[clientgentypes.GroupVersionKind]string{}
 	rootDefs := map[string]spec.Schema{}
 	for _, p := range pkgTypes {
-		gv := groupVersion(p)
+		gv, err := groupVersion(p)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse comments of package %s: %w", p.Name, err)
+		}
 		for _, t := range p.Types {
 			tags := genclientTags(t)
 			hasApply := tags.HasVerb("apply") || tags.HasVerb("applyStatus")

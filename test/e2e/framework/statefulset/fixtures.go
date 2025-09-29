@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // NewStatefulSet creates a new Webserver StatefulSet for testing. The StatefulSet is named name, is in namespace ns,
@@ -71,7 +71,7 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
-			Replicas: pointer.Int32(replicas),
+			Replicas: ptr.To[int32](replicas),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
@@ -81,8 +81,9 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 					Containers: []v1.Container{
 						{
 							Name:         "webserver",
-							Image:        imageutils.GetE2EImage(imageutils.Httpd),
+							Image:        imageutils.GetE2EImage(imageutils.AgnhostPrev),
 							VolumeMounts: mounts,
+							Args:         []string{"test-webserver"},
 						},
 					},
 					Volumes: vols,

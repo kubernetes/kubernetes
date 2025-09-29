@@ -20,10 +20,16 @@ package v1
 
 // VolumeAttachmentSpecApplyConfiguration represents a declarative configuration of the VolumeAttachmentSpec type for use
 // with apply.
+//
+// VolumeAttachmentSpec is the specification of a VolumeAttachment request.
 type VolumeAttachmentSpecApplyConfiguration struct {
-	Attacher *string                                   `json:"attacher,omitempty"`
-	Source   *VolumeAttachmentSourceApplyConfiguration `json:"source,omitempty"`
-	NodeName *string                                   `json:"nodeName,omitempty"`
+	// attacher indicates the name of the volume driver that MUST handle this
+	// request. This is the name returned by GetPluginName().
+	Attacher *string `json:"attacher,omitempty"`
+	// source represents the volume that should be attached.
+	Source *VolumeAttachmentSourceApplyConfiguration `json:"source,omitempty"`
+	// nodeName represents the node that the volume should be attached to.
+	NodeName *string `json:"nodeName,omitempty"`
 }
 
 // VolumeAttachmentSpecApplyConfiguration constructs a declarative configuration of the VolumeAttachmentSpec type for use with
@@ -31,7 +37,6 @@ type VolumeAttachmentSpecApplyConfiguration struct {
 func VolumeAttachmentSpec() *VolumeAttachmentSpecApplyConfiguration {
 	return &VolumeAttachmentSpecApplyConfiguration{}
 }
-func (b VolumeAttachmentSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAttacher sets the Attacher field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

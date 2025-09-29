@@ -167,16 +167,10 @@ message ResourceAttributes {
   optional string name = 7;
 
   // fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.
-  //
-  // This field  is alpha-level. To use this field, you must enable the
-  // `AuthorizeWithSelectors` feature gate (disabled by default).
   // +optional
   optional FieldSelectorAttributes fieldSelector = 8;
 
   // labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.
-  //
-  // This field  is alpha-level. To use this field, you must enable the
-  // `AuthorizeWithSelectors` feature gate (disabled by default).
   // +optional
   optional LabelSelectorAttributes labelSelector = 9;
 }

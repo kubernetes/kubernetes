@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestDefaultAdmissionWebhook(t *testing.T) {
@@ -114,7 +114,7 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 				Webhooks: []v1beta1.MutatingWebhook{{
 					ClientConfig: v1beta1.WebhookClientConfig{
 						Service: &v1beta1.ServiceReference{
-							Port: utilpointer.Int32(443), // defaulted
+							Port: ptr.To[int32](443), // defaulted
 						},
 					},
 					FailurePolicy:           &ignore,
@@ -144,6 +144,7 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 
 func TestDefaultAdmissionPolicy(t *testing.T) {
 	fail := v1beta1.Fail
+	never := v1beta1.NeverReinvocationPolicy
 	equivalent := v1beta1.Equivalent
 	allScopes := v1beta1.AllScopes
 
@@ -213,6 +214,42 @@ func TestDefaultAdmissionPolicy(t *testing.T) {
 						},
 					},
 					FailurePolicy: &fail,
+				},
+			},
+		},
+		{
+			name: "MutatingAdmissionPolicy",
+			original: &v1beta1.MutatingAdmissionPolicy{
+				Spec: v1beta1.MutatingAdmissionPolicySpec{
+					MatchConstraints:   &v1beta1.MatchResources{},
+					ReinvocationPolicy: never,
+					Mutations: []v1beta1.Mutation{
+						{
+							PatchType: v1beta1.PatchTypeApplyConfiguration,
+							ApplyConfiguration: &v1beta1.ApplyConfiguration{
+								Expression: "fake string",
+							},
+						},
+					},
+				},
+			},
+			expected: &v1beta1.MutatingAdmissionPolicy{
+				Spec: v1beta1.MutatingAdmissionPolicySpec{
+					MatchConstraints: &v1beta1.MatchResources{
+						MatchPolicy:       &equivalent,
+						NamespaceSelector: &metav1.LabelSelector{},
+						ObjectSelector:    &metav1.LabelSelector{},
+					},
+					FailurePolicy:      &fail,
+					ReinvocationPolicy: never,
+					Mutations: []v1beta1.Mutation{
+						{
+							PatchType: v1beta1.PatchTypeApplyConfiguration,
+							ApplyConfiguration: &v1beta1.ApplyConfiguration{
+								Expression: "fake string",
+							},
+						},
+					},
 				},
 			},
 		},

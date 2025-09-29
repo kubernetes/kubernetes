@@ -20,7 +20,10 @@ package v1
 
 // IngressLoadBalancerStatusApplyConfiguration represents a declarative configuration of the IngressLoadBalancerStatus type for use
 // with apply.
+//
+// IngressLoadBalancerStatus represents the status of a load-balancer.
 type IngressLoadBalancerStatusApplyConfiguration struct {
+	// ingress is a list containing ingress points for the load-balancer.
 	Ingress []IngressLoadBalancerIngressApplyConfiguration `json:"ingress,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type IngressLoadBalancerStatusApplyConfiguration struct {
 func IngressLoadBalancerStatus() *IngressLoadBalancerStatusApplyConfiguration {
 	return &IngressLoadBalancerStatusApplyConfiguration{}
 }
-func (b IngressLoadBalancerStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithIngress adds the given value to the Ingress field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

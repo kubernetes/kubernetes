@@ -24,8 +24,16 @@ import (
 
 // VolumeResourceRequirementsApplyConfiguration represents a declarative configuration of the VolumeResourceRequirements type for use
 // with apply.
+//
+// VolumeResourceRequirements describes the storage resource requirements for a volume.
 type VolumeResourceRequirementsApplyConfiguration struct {
-	Limits   *corev1.ResourceList `json:"limits,omitempty"`
+	// Limits describes the maximum amount of compute resources allowed.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	Limits *corev1.ResourceList `json:"limits,omitempty"`
+	// Requests describes the minimum amount of compute resources required.
+	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value. Requests cannot exceed Limits.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Requests *corev1.ResourceList `json:"requests,omitempty"`
 }
 
@@ -34,7 +42,6 @@ type VolumeResourceRequirementsApplyConfiguration struct {
 func VolumeResourceRequirements() *VolumeResourceRequirementsApplyConfiguration {
 	return &VolumeResourceRequirementsApplyConfiguration{}
 }
-func (b VolumeResourceRequirementsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithLimits sets the Limits field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

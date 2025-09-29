@@ -20,6 +20,8 @@ package v1
 
 // ExampleSpecApplyConfiguration represents a declarative configuration of the ExampleSpec type for use
 // with apply.
+//
+// ExampleSpec is the spec for an Example resource
 type ExampleSpecApplyConfiguration struct {
 	Foo *string `json:"foo,omitempty"`
 	Bar *bool   `json:"bar,omitempty"`
@@ -30,7 +32,6 @@ type ExampleSpecApplyConfiguration struct {
 func ExampleSpec() *ExampleSpecApplyConfiguration {
 	return &ExampleSpecApplyConfiguration{}
 }
-func (b ExampleSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithFoo sets the Foo field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

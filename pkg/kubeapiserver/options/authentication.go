@@ -61,7 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -524,7 +524,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 			},
 			ClaimMappings: apiserver.ClaimMappings{
 				Username: apiserver.PrefixedClaimOrExpression{
-					Prefix: pointer.String(usernamePrefix),
+					Prefix: ptr.To(usernamePrefix),
 					Claim:  o.OIDC.UsernameClaim,
 				},
 			},
@@ -532,7 +532,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 
 		if len(o.OIDC.GroupsClaim) > 0 {
 			jwtAuthenticator.ClaimMappings.Groups = apiserver.PrefixedClaimOrExpression{
-				Prefix: pointer.String(o.OIDC.GroupsPrefix),
+				Prefix: ptr.To(o.OIDC.GroupsPrefix),
 				Claim:  o.OIDC.GroupsClaim,
 			}
 		}
@@ -715,6 +715,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 			return err
 		}
 		authenticatorConfig.CustomDial = egressDialer
+		authenticatorConfig.EgressLookup = egressSelector.Lookup
 	}
 
 	// var openAPIV3SecuritySchemes spec3.SecuritySchemes
@@ -726,6 +727,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 
 	if len(o.AuthenticationConfigFile) > 0 {
 		authenticationconfigmetrics.RegisterMetrics()
+		authenticationconfigmetrics.RecordAuthenticationConfigLastConfigInfo(apiServerID, authenticatorConfig.AuthenticationConfigData)
 		trackedAuthenticationConfigData := authenticatorConfig.AuthenticationConfigData
 		var mu sync.Mutex
 
@@ -788,7 +790,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 
 				trackedAuthenticationConfigData = authConfigData
 				klog.InfoS("reloaded authentication config")
-				authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadSuccess(apiServerID)
+				authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadSuccess(apiServerID, authConfigData)
 			},
 			func(err error) { klog.ErrorS(err, "watching authentication config file") },
 		)

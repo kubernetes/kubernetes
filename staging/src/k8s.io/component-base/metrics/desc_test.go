@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 
@@ -73,7 +72,7 @@ func TestDescCreate(t *testing.T) {
 			fqName:                "hidden_stable_descriptor",
 			help:                  "this is a hidden descriptor",
 			stabilityLevel:        STABLE,
-			deprecatedVersion:     "1.16.0",
+			deprecatedVersion:     "1.14.0",
 			shouldCreate:          false,
 			expectedAnnotatedHelp: "this is a hidden descriptor", // hidden descriptor shall not be annotated.
 		},
@@ -150,15 +149,13 @@ func TestDescClearState(t *testing.T) {
 		tc := test
 		t.Run(tc.name, func(t *testing.T) {
 			descA := NewDesc(tc.fqName, tc.help, nil, nil, tc.stabilityLevel, tc.deprecatedVersion)
-			descB := NewDesc(tc.fqName, tc.help, nil, nil, tc.stabilityLevel, tc.deprecatedVersion)
-
 			descA.create(&currentVersion)
+
 			descA.ClearState()
 
-			// create
-			//nolint:govet // it's okay to compare sync.RWMutex, it's empty
-			if !reflect.DeepEqual(*descA, *descB) {
-				t.Fatal("descriptor state hasn't be cleaned up")
+			if descA.IsCreated() || descA.IsDeprecated() || descA.IsHidden() {
+				t.Fatalf("descriptor state hasn't be cleaned up; is created: %v, is deprecated: %v, is hidden: %v", descA.IsCreated(), descA.IsDeprecated(), descA.IsHidden())
+
 			}
 		})
 	}

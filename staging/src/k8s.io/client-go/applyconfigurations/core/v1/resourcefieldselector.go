@@ -24,10 +24,15 @@ import (
 
 // ResourceFieldSelectorApplyConfiguration represents a declarative configuration of the ResourceFieldSelector type for use
 // with apply.
+//
+// ResourceFieldSelector represents container resources (cpu, memory) and their output format
 type ResourceFieldSelectorApplyConfiguration struct {
-	ContainerName *string            `json:"containerName,omitempty"`
-	Resource      *string            `json:"resource,omitempty"`
-	Divisor       *resource.Quantity `json:"divisor,omitempty"`
+	// Container name: required for volumes, optional for env vars
+	ContainerName *string `json:"containerName,omitempty"`
+	// Required: resource to select
+	Resource *string `json:"resource,omitempty"`
+	// Specifies the output format of the exposed resources, defaults to "1"
+	Divisor *resource.Quantity `json:"divisor,omitempty"`
 }
 
 // ResourceFieldSelectorApplyConfiguration constructs a declarative configuration of the ResourceFieldSelector type for use with
@@ -35,7 +40,6 @@ type ResourceFieldSelectorApplyConfiguration struct {
 func ResourceFieldSelector() *ResourceFieldSelectorApplyConfiguration {
 	return &ResourceFieldSelectorApplyConfiguration{}
 }
-func (b ResourceFieldSelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithContainerName sets the ContainerName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

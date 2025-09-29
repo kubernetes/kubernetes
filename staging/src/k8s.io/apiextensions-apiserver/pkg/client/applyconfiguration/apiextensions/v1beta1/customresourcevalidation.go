@@ -20,7 +20,10 @@ package v1beta1
 
 // CustomResourceValidationApplyConfiguration represents a declarative configuration of the CustomResourceValidation type for use
 // with apply.
+//
+// CustomResourceValidation is a list of validation methods for CustomResources.
 type CustomResourceValidationApplyConfiguration struct {
+	// openAPIV3Schema is the OpenAPI v3 schema to use for validation and pruning.
 	OpenAPIV3Schema *JSONSchemaPropsApplyConfiguration `json:"openAPIV3Schema,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type CustomResourceValidationApplyConfiguration struct {
 func CustomResourceValidation() *CustomResourceValidationApplyConfiguration {
 	return &CustomResourceValidationApplyConfiguration{}
 }
-func (b CustomResourceValidationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithOpenAPIV3Schema sets the OpenAPIV3Schema field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

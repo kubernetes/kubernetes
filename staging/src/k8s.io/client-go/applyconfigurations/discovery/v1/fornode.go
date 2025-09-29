@@ -20,7 +20,10 @@ package v1
 
 // ForNodeApplyConfiguration represents a declarative configuration of the ForNode type for use
 // with apply.
+//
+// ForNode provides information about which nodes should consume this endpoint.
 type ForNodeApplyConfiguration struct {
+	// name represents the name of the node.
 	Name *string `json:"name,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type ForNodeApplyConfiguration struct {
 func ForNode() *ForNodeApplyConfiguration {
 	return &ForNodeApplyConfiguration{}
 }
-func (b ForNodeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -20,9 +20,20 @@ package v1beta1
 
 // IngressTLSApplyConfiguration represents a declarative configuration of the IngressTLS type for use
 // with apply.
+//
+// IngressTLS describes the transport layer security associated with an Ingress.
 type IngressTLSApplyConfiguration struct {
-	Hosts      []string `json:"hosts,omitempty"`
-	SecretName *string  `json:"secretName,omitempty"`
+	// Hosts are a list of hosts included in the TLS certificate. The values in
+	// this list must match the name/s used in the tlsSecret. Defaults to the
+	// wildcard host setting for the loadbalancer controller fulfilling this
+	// Ingress, if left unspecified.
+	Hosts []string `json:"hosts,omitempty"`
+	// SecretName is the name of the secret used to terminate SSL traffic on 443.
+	// Field is left optional to allow SSL routing based on SNI hostname alone.
+	// If the SNI host in a listener conflicts with the "Host" header field used
+	// by an IngressRule, the SNI host is used for termination and value of the
+	// Host header is used for routing.
+	SecretName *string `json:"secretName,omitempty"`
 }
 
 // IngressTLSApplyConfiguration constructs a declarative configuration of the IngressTLS type for use with
@@ -30,7 +41,6 @@ type IngressTLSApplyConfiguration struct {
 func IngressTLS() *IngressTLSApplyConfiguration {
 	return &IngressTLSApplyConfiguration{}
 }
-func (b IngressTLSApplyConfiguration) IsApplyConfiguration() {}
 
 // WithHosts adds the given value to the Hosts field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

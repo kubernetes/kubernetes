@@ -1009,7 +1009,7 @@ func validateVariable(compiler plugincel.Compiler, v *admissionregistration.Vari
 		allErrors = append(allErrors, field.Required(fldPath.Child("name"), "name is not specified"))
 	} else {
 		if !isCELIdentifier(v.Name) {
-			allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), v.Name, "name is not a valid CEL identifier"))
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), v.Name, "must be a valid CEL identifier"))
 		}
 	}
 	if len(v.Expression) == 0 || strings.TrimSpace(v.Expression) == "" {
@@ -1057,9 +1057,9 @@ func validateValidation(compiler plugincel.Compiler, v *admissionregistration.Va
 		allErrors = append(allErrors, validateMessageExpression(compiler, v.MessageExpression, opts, fldPath.Child("messageExpression"))...)
 	}
 	if len(v.Message) > 0 && len(trimmedMsg) == 0 {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("message"), v.Message, "message must be non-empty if specified"))
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("message"), v.Message, "must be non-empty if specified"))
 	} else if hasNewlines(trimmedMsg) {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("message"), v.Message, "message must not contain line breaks"))
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("message"), v.Message, "must not contain line breaks"))
 	} else if hasNewlines(trimmedMsg) && trimmedMsg == "" {
 		allErrors = append(allErrors, field.Required(fldPath.Child("message"), "message must be specified if expression contains line breaks"))
 	}

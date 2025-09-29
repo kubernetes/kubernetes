@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // rsStrategy implements verification logic for ReplicaSets.
@@ -142,9 +142,7 @@ func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	oldReplicaSet := old.(*apps.ReplicaSet)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template)
-	allErrs := appsvalidation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, opts)
-
-	return allErrs
+	return appsvalidation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

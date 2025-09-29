@@ -20,7 +20,11 @@ package v1beta3
 
 // UserSubjectApplyConfiguration represents a declarative configuration of the UserSubject type for use
 // with apply.
+//
+// UserSubject holds detailed information for user-kind subject.
 type UserSubjectApplyConfiguration struct {
+	// `name` is the username that matches, or "*" to match all usernames.
+	// Required.
 	Name *string `json:"name,omitempty"`
 }
 
@@ -29,7 +33,6 @@ type UserSubjectApplyConfiguration struct {
 func UserSubject() *UserSubjectApplyConfiguration {
 	return &UserSubjectApplyConfiguration{}
 }
-func (b UserSubjectApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

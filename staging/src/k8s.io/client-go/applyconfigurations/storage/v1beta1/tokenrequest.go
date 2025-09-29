@@ -20,9 +20,15 @@ package v1beta1
 
 // TokenRequestApplyConfiguration represents a declarative configuration of the TokenRequest type for use
 // with apply.
+//
+// TokenRequest contains parameters of a service account token.
 type TokenRequestApplyConfiguration struct {
-	Audience          *string `json:"audience,omitempty"`
-	ExpirationSeconds *int64  `json:"expirationSeconds,omitempty"`
+	// audience is the intended audience of the token in "TokenRequestSpec".
+	// It will default to the audiences of kube apiserver.
+	Audience *string `json:"audience,omitempty"`
+	// expirationSeconds is the duration of validity of the token in "TokenRequestSpec".
+	// It has the same default value of "ExpirationSeconds" in "TokenRequestSpec"
+	ExpirationSeconds *int64 `json:"expirationSeconds,omitempty"`
 }
 
 // TokenRequestApplyConfiguration constructs a declarative configuration of the TokenRequest type for use with
@@ -30,7 +36,6 @@ type TokenRequestApplyConfiguration struct {
 func TokenRequest() *TokenRequestApplyConfiguration {
 	return &TokenRequestApplyConfiguration{}
 }
-func (b TokenRequestApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAudience sets the Audience field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

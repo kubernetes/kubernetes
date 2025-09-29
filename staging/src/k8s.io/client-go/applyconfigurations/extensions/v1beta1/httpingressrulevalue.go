@@ -20,7 +20,14 @@ package v1beta1
 
 // HTTPIngressRuleValueApplyConfiguration represents a declarative configuration of the HTTPIngressRuleValue type for use
 // with apply.
+//
+// HTTPIngressRuleValue is a list of http selectors pointing to backends.
+// In the example: http://<host>/<path>?<searchpart> -> backend where
+// where parts of the url correspond to RFC 3986, this resource will be used
+// to match against everything after the last '/' and before the first '?'
+// or '#'.
 type HTTPIngressRuleValueApplyConfiguration struct {
+	// A collection of paths that map requests to backends.
 	Paths []HTTPIngressPathApplyConfiguration `json:"paths,omitempty"`
 }
 
@@ -29,7 +36,6 @@ type HTTPIngressRuleValueApplyConfiguration struct {
 func HTTPIngressRuleValue() *HTTPIngressRuleValueApplyConfiguration {
 	return &HTTPIngressRuleValueApplyConfiguration{}
 }
-func (b HTTPIngressRuleValueApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPaths adds the given value to the Paths field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

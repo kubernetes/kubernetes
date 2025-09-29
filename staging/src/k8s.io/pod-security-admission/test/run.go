@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	newestMinorVersionToTest            = 32
+	newestMinorVersionToTest            = 34
 	podOSBasedRestrictionEnabledVersion = 29
 )
 
@@ -52,6 +52,10 @@ type Options struct {
 	// This is used to skip failure cases for negative tests of data in alpha/beta fields.
 	// If unset, all testcases are run.
 	Features featuregate.FeatureGate
+
+	// EmulationVersion optionally indicates a different minor version is being emulated.
+	// This can lower the effective "latest" version.
+	EmulationVersion *api.Version
 
 	// CreateNamespace is an optional stub for creating a namespace with the given name and labels.
 	// Returning an error fails the test.
@@ -194,7 +198,7 @@ func Run(t *testing.T, opts Options) {
 	if len(opts.Checks) == 0 {
 		opts.Checks = policy.DefaultChecks()
 	}
-	_, err = policy.NewEvaluator(opts.Checks)
+	_, err = policy.NewEvaluator(opts.Checks, opts.EmulationVersion)
 	if err != nil {
 		t.Fatalf("invalid checks: %v", err)
 	}

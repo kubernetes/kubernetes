@@ -27,9 +27,15 @@ import (
 
 // JobTemplateSpecApplyConfiguration represents a declarative configuration of the JobTemplateSpec type for use
 // with apply.
+//
+// JobTemplateSpec describes the data a Job should have when created from a template
 type JobTemplateSpecApplyConfiguration struct {
+	// Standard object's metadata of the jobs created from this template.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *batchv1.JobSpecApplyConfiguration `json:"spec,omitempty"`
+	// Specification of the desired behavior of the job.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *batchv1.JobSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // JobTemplateSpecApplyConfiguration constructs a declarative configuration of the JobTemplateSpec type for use with
@@ -37,7 +43,6 @@ type JobTemplateSpecApplyConfiguration struct {
 func JobTemplateSpec() *JobTemplateSpecApplyConfiguration {
 	return &JobTemplateSpecApplyConfiguration{}
 }
-func (b JobTemplateSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -25,11 +25,25 @@ import (
 
 // DeviceTaintApplyConfiguration represents a declarative configuration of the DeviceTaint type for use
 // with apply.
+//
+// The device this taint is attached to has the "effect" on
+// any claim which does not tolerate the taint and, through the claim,
+// to pods using the claim.
 type DeviceTaintApplyConfiguration struct {
-	Key       *string                             `json:"key,omitempty"`
-	Value     *string                             `json:"value,omitempty"`
-	Effect    *resourcev1alpha3.DeviceTaintEffect `json:"effect,omitempty"`
-	TimeAdded *v1.Time                            `json:"timeAdded,omitempty"`
+	// The taint key to be applied to a device.
+	// Must be a label name.
+	Key *string `json:"key,omitempty"`
+	// The taint value corresponding to the taint key.
+	// Must be a label value.
+	Value *string `json:"value,omitempty"`
+	// The effect of the taint on claims that do not tolerate the taint
+	// and through such claims on the pods using them.
+	// Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
+	// nodes is not valid here.
+	Effect *resourcev1alpha3.DeviceTaintEffect `json:"effect,omitempty"`
+	// TimeAdded represents the time at which the taint was added.
+	// Added automatically during create or update if not set.
+	TimeAdded *v1.Time `json:"timeAdded,omitempty"`
 }
 
 // DeviceTaintApplyConfiguration constructs a declarative configuration of the DeviceTaint type for use with
@@ -37,7 +51,6 @@ type DeviceTaintApplyConfiguration struct {
 func DeviceTaint() *DeviceTaintApplyConfiguration {
 	return &DeviceTaintApplyConfiguration{}
 }
-func (b DeviceTaintApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKey sets the Key field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

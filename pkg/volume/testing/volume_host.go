@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -177,11 +176,6 @@ func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID t
 // Returns the hostname of the host kubelet is running on
 func (f *fakeVolumeHost) GetHostName() string {
 	return "fakeHostName"
-}
-
-// Returns host IP or nil in the case of error.
-func (f *fakeVolumeHost) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP() not implemented")
 }
 
 func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
@@ -437,4 +431,8 @@ func (f *fakeKubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, label
 	}
 
 	return fullSet.Bytes(), nil
+}
+
+func (f *fakeKubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error) {
+	return []byte("key\n"), []byte("cert\n"), nil
 }

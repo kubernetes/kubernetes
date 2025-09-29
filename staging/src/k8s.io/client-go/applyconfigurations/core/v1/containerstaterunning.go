@@ -24,7 +24,10 @@ import (
 
 // ContainerStateRunningApplyConfiguration represents a declarative configuration of the ContainerStateRunning type for use
 // with apply.
+//
+// ContainerStateRunning is a running state of a container.
 type ContainerStateRunningApplyConfiguration struct {
+	// Time at which the container was last (re-)started
 	StartedAt *metav1.Time `json:"startedAt,omitempty"`
 }
 
@@ -33,7 +36,6 @@ type ContainerStateRunningApplyConfiguration struct {
 func ContainerStateRunning() *ContainerStateRunningApplyConfiguration {
 	return &ContainerStateRunningApplyConfiguration{}
 }
-func (b ContainerStateRunningApplyConfiguration) IsApplyConfiguration() {}
 
 // WithStartedAt sets the StartedAt field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

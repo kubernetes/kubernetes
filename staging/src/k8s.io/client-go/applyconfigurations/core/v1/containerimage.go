@@ -20,9 +20,14 @@ package v1
 
 // ContainerImageApplyConfiguration represents a declarative configuration of the ContainerImage type for use
 // with apply.
+//
+// Describe a container image
 type ContainerImageApplyConfiguration struct {
-	Names     []string `json:"names,omitempty"`
-	SizeBytes *int64   `json:"sizeBytes,omitempty"`
+	// Names by which this image is known.
+	// e.g. ["kubernetes.example/hyperkube:v1.0.7", "cloud-vendor.registry.example/cloud-vendor/hyperkube:v1.0.7"]
+	Names []string `json:"names,omitempty"`
+	// The size of the image in bytes.
+	SizeBytes *int64 `json:"sizeBytes,omitempty"`
 }
 
 // ContainerImageApplyConfiguration constructs a declarative configuration of the ContainerImage type for use with
@@ -30,7 +35,6 @@ type ContainerImageApplyConfiguration struct {
 func ContainerImage() *ContainerImageApplyConfiguration {
 	return &ContainerImageApplyConfiguration{}
 }
-func (b ContainerImageApplyConfiguration) IsApplyConfiguration() {}
 
 // WithNames adds the given value to the Names field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

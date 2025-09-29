@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/naming"
@@ -42,18 +43,15 @@ import (
 	"k8s.io/client-go/tools/pager"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 	"k8s.io/utils/trace"
 )
 
 const defaultExpectedTypeName = "<unspecified>"
 
-var (
-	// We try to spread the load on apiserver by setting timeouts for
-	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
-	defaultMinWatchTimeout = 5 * time.Minute
-)
+// We try to spread the load on apiserver by setting timeouts for
+// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
+var defaultMinWatchTimeout = 5 * time.Minute
 
 // ReflectorStore is the subset of cache.Store that the reflector uses
 type ReflectorStore interface {
@@ -75,6 +73,13 @@ type ReflectorStore interface {
 	// meaning in some implementations that have non-trivial
 	// additional behavior (e.g., DeltaFIFO).
 	Resync() error
+}
+
+// TransformingStore is an optional interface that can be implemented by the provided store.
+// If implemented on the provided store reflector will use the same transformer in its internal stores.
+type TransformingStore interface {
+	Store
+	Transformer() TransformFunc
 }
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
@@ -130,7 +135,7 @@ type Reflector struct {
 	ShouldResync func() bool
 	// MaxInternalErrorRetryDuration defines how long we should retry internal errors returned by watch.
 	MaxInternalErrorRetryDuration time.Duration
-	// UseWatchList if turned on instructs the reflector to open a stream to bring data from the API server.
+	// useWatchList if turned on instructs the reflector to open a stream to bring data from the API server.
 	// Streaming has the primary advantage of using fewer server's resources to fetch data.
 	//
 	// The old behaviour establishes a LIST request which gets data in chunks.
@@ -138,9 +143,7 @@ type Reflector struct {
 	// might result in an increased memory consumption of the APIServer.
 	//
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
-	//
-	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
-	UseWatchList *bool
+	useWatchList bool
 }
 
 func (r *Reflector) Name() string {
@@ -293,11 +296,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 		r.expectedGVK = getExpectedGVKFromObject(expectedType)
 	}
 
-	// don't overwrite UseWatchList if already set
-	// because the higher layers (e.g. storage/cacher) disabled it on purpose
-	if r.UseWatchList == nil {
-		r.UseWatchList = ptr.To(clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient))
-	}
+	r.useWatchList = clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient)
 
 	return r
 }
@@ -364,9 +363,6 @@ func (r *Reflector) RunWithContext(ctx context.Context) {
 }
 
 var (
-	// nothing will ever be sent down this channel
-	neverExitWatch <-chan time.Time = make(chan time.Time)
-
 	// Used to indicate that watching stopped because of a signal from the stop
 	// channel passed in from a client of the reflector.
 	errorStopRequested = errors.New("stop requested")
@@ -376,7 +372,8 @@ var (
 // required, and a cleanup function.
 func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 	if r.resyncPeriod == 0 {
-		return neverExitWatch, func() bool { return false }
+		// nothing will ever be sent down this channel
+		return nil, func() bool { return false }
 	}
 	// The cleanup function is required: imagine the scenario where watches
 	// always fail so we end up listing frequently. Then, if we don't
@@ -403,8 +400,7 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 	logger.V(3).Info("Listing and watching", "type", r.typeDescription, "reflector", r.name)
 	var err error
 	var w watch.Interface
-	useWatchList := ptr.Deref(r.UseWatchList, false)
-	fallbackToList := !useWatchList
+	fallbackToList := !r.useWatchList
 
 	defer func() {
 		if w != nil {
@@ -412,7 +408,7 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 		}
 	}()
 
-	if useWatchList {
+	if r.useWatchList {
 		w, err = r.watchList(ctx)
 		if w == nil && err == nil {
 			// stopCh was closed
@@ -726,6 +722,11 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 		return false
 	}
 
+	storeOpts := []StoreOption{}
+	if tr, ok := r.store.(TransformingStore); ok && tr.Transformer() != nil {
+		storeOpts = append(storeOpts, WithTransformer(tr.Transformer()))
+	}
+
 	initTrace := trace.New("Reflector WatchList", trace.Field{Key: "name", Value: r.name})
 	defer initTrace.LogIfLong(10 * time.Second)
 	for {
@@ -737,7 +738,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 
 		resourceVersion = ""
 		lastKnownRV := r.rewatchResourceVersion()
-		temporaryStore = NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		temporaryStore = NewStore(DeletionHandlingMetaNamespaceKeyFunc, storeOpts...)
 		// TODO(#115478): large "list", slow clients, slow network, p&f
 		//  might slow down streaming and eventually fail.
 		//  maybe in such a case we should retry with an increased timeout?
@@ -745,7 +746,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 		options := metav1.ListOptions{
 			ResourceVersion:      lastKnownRV,
 			AllowWatchBookmarks:  true,
-			SendInitialEvents:    pointer.Bool(true),
+			SendInitialEvents:    ptr.To(true),
 			ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 			TimeoutSeconds:       &timeoutSeconds,
 		}
@@ -905,6 +906,15 @@ loop:
 			if expectedGVK != nil {
 				if e, a := *expectedGVK, event.Object.GetObjectKind().GroupVersionKind(); e != a {
 					utilruntime.HandleErrorWithContext(ctx, nil, "Unexpected watch event object gvk", "reflector", name, "expectedGVK", e, "actualGVK", a)
+					continue
+				}
+			}
+			// For now, let’s block unsupported Table
+			// resources for watchlist only
+			// see #132926 for more info
+			if exitOnWatchListBookmarkReceived {
+				if unsupportedGVK := isUnsupportedTableObject(event.Object); unsupportedGVK {
+					utilruntime.HandleErrorWithContext(ctx, nil, "Unsupported watch event object gvk", "reflector", name, "actualGVK", event.Object.GetObjectKind().GroupVersionKind())
 					continue
 				}
 			}
@@ -1174,4 +1184,23 @@ type VeryShortWatchError struct {
 func (e *VeryShortWatchError) Error() string {
 	return fmt.Sprintf("very short watch: %s: Unexpected watch close - "+
 		"watch lasted less than a second and no items received", e.Name)
+}
+
+var unsupportedTableGVK = map[schema.GroupVersionKind]bool{
+	metav1beta1.SchemeGroupVersion.WithKind("Table"): true,
+	metav1.SchemeGroupVersion.WithKind("Table"):      true,
+}
+
+// isUnsupportedTableObject checks whether the given runtime.Object
+// is a "Table" object that belongs to a set of well-known unsupported GroupVersionKinds.
+func isUnsupportedTableObject(rawObject runtime.Object) bool {
+	unstructuredObj, ok := rawObject.(*unstructured.Unstructured)
+	if !ok {
+		return false
+	}
+	if unstructuredObj.GetKind() != "Table" {
+		return false
+	}
+
+	return unsupportedTableGVK[rawObject.GetObjectKind().GroupVersionKind()]
 }

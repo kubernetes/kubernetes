@@ -24,10 +24,19 @@ import (
 
 // VolumeErrorApplyConfiguration represents a declarative configuration of the VolumeError type for use
 // with apply.
+//
+// VolumeError captures an error encountered during a volume operation.
 type VolumeErrorApplyConfiguration struct {
-	Time      *metav1.Time `json:"time,omitempty"`
-	Message   *string      `json:"message,omitempty"`
-	ErrorCode *int32       `json:"errorCode,omitempty"`
+	// time represents the time the error was encountered.
+	Time *metav1.Time `json:"time,omitempty"`
+	// message represents the error encountered during Attach or Detach operation.
+	// This string may be logged, so it should not contain sensitive
+	// information.
+	Message *string `json:"message,omitempty"`
+	// errorCode is a numeric gRPC code representing the error encountered during Attach or Detach operations.
+	//
+	// This is an optional, beta field that requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
+	ErrorCode *int32 `json:"errorCode,omitempty"`
 }
 
 // VolumeErrorApplyConfiguration constructs a declarative configuration of the VolumeError type for use with
@@ -35,7 +44,6 @@ type VolumeErrorApplyConfiguration struct {
 func VolumeError() *VolumeErrorApplyConfiguration {
 	return &VolumeErrorApplyConfiguration{}
 }
-func (b VolumeErrorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithTime sets the Time field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

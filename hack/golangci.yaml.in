@@ -102,6 +102,12 @@ linters:
           - revive
         text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
 
+      # The generated swagger docs also don't follow the naming convention.
+      - linters:
+          - staticcheck
+        text: "ST1003: should not use underscores in Go names"
+        path: types_swagger_doc_generated.go$
+
       {{- if .Hints}}
 
       - path: (.+)\.go$
@@ -165,6 +171,7 @@ linters:
     - kubeapilinter
     - logcheck
     - revive
+    - sorted
     - staticcheck
     - testifylint
     - unused
@@ -182,6 +189,13 @@ linters:
         settings:
           config: |
             {{include "hack/logcheck.conf" | indent 12 | trim}}
+      sorted:
+        # Installed there by hack/verify-golangci-lint.sh.
+        path: _output/local/bin/sorted.so
+        description: check if feature gates are sorted
+        original-url: k8s.io/kubernetes/hack/tools/golangci-lint/sorted
+        settings:
+          {{include "hack/tools/golangci-lint/sorted/config.yaml" | indent 10 | trim}}
       kubeapilinter:
         path: _output/local/bin/kube-api-linter.so
         description: kube-api-linter and lints Kube like APIs based on API conventions and best practices.
@@ -223,10 +237,11 @@ linters:
           msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"        
       {{- end}}
       {{- if .Base }}
-    gocritic:	
-      enabled-checks:	
-        - equalFold	
-        - boolExprSimplify	
+    gocritic:
+      enabled-checks:
+        - equalFold
+        - boolExprSimplify
+        - deprecatedComment
     {{- end}}
     revive:
       # Only these rules are enabled.
@@ -237,6 +252,7 @@ linters:
     staticcheck:
       checks:
         - "all"
+        - "-QF1008"  # Omit embedded fields from selector expression
         {{- if .Base }}
         - "-QF1001"  # Apply De Morgan’s law
         - "-QF1002"  # Convert untagged switch to tagged switch

@@ -57,7 +57,7 @@ func RunBenchmarkStoreListCreate(ctx context.Context, b *testing.B, store storag
 			panic(fmt.Sprintf("Unexpected error %s", err))
 		}
 		listOut := &example.PodList{}
-		err = store.GetList(ctx, "/pods", storage.ListOptions{
+		err = store.GetList(ctx, "/pods/", storage.ListOptions{
 			Recursive:            true,
 			ResourceVersion:      podOut.ResourceVersion,
 			ResourceVersionMatch: match,
@@ -219,4 +219,14 @@ type BenchmarkData struct {
 	Pods           []*example.Pod
 	NamespaceNames []string
 	NodeNames      []string
+}
+
+func RunBenchmarkStoreStats(ctx context.Context, b *testing.B, store storage.Interface) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := store.Stats(ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
 }

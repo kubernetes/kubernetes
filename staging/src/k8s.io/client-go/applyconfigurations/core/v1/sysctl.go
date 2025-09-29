@@ -20,8 +20,12 @@ package v1
 
 // SysctlApplyConfiguration represents a declarative configuration of the Sysctl type for use
 // with apply.
+//
+// Sysctl defines a kernel parameter to be set
 type SysctlApplyConfiguration struct {
-	Name  *string `json:"name,omitempty"`
+	// Name of a property to set
+	Name *string `json:"name,omitempty"`
+	// Value of a property to set
 	Value *string `json:"value,omitempty"`
 }
 
@@ -30,7 +34,6 @@ type SysctlApplyConfiguration struct {
 func Sysctl() *SysctlApplyConfiguration {
 	return &SysctlApplyConfiguration{}
 }
-func (b SysctlApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

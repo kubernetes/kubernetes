@@ -45,7 +45,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // ControllerStorage includes dummy storage for Replication Controllers and for Scale subresource.
@@ -321,12 +321,13 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
+		const validationIdentifier = "rc_scale"
 		// Run declarative validation with panic recovery
 		declarativeErrs := rest.ValidateUpdateDeclaratively(
-			ctx, legacyscheme.Scheme, scale, oldScale, rest.WithTakeover(takeover), rest.WithSubresourceMapper(i.scaleGVKMapper))
+			ctx, legacyscheme.Scheme, scale, oldScale, rest.WithTakeover(takeover), rest.WithSubresourceMapper(i.scaleGVKMapper), rest.WithValidationIdentifier(validationIdentifier))
 
 		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier)
 
 		// Only apply declarative errors if takeover is enabled
 		if takeover {

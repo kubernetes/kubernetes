@@ -24,7 +24,12 @@ import (
 
 // FlowDistinguisherMethodApplyConfiguration represents a declarative configuration of the FlowDistinguisherMethod type for use
 // with apply.
+//
+// FlowDistinguisherMethod specifies the method of a flow distinguisher.
 type FlowDistinguisherMethodApplyConfiguration struct {
+	// `type` is the type of flow distinguisher method
+	// The supported types are "ByUser" and "ByNamespace".
+	// Required.
 	Type *flowcontrolv1beta1.FlowDistinguisherMethodType `json:"type,omitempty"`
 }
 
@@ -33,7 +38,6 @@ type FlowDistinguisherMethodApplyConfiguration struct {
 func FlowDistinguisherMethod() *FlowDistinguisherMethodApplyConfiguration {
 	return &FlowDistinguisherMethodApplyConfiguration{}
 }
-func (b FlowDistinguisherMethodApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	goruntime "runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -51,7 +52,7 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestAuthenticationValidate(t *testing.T) {
@@ -345,7 +346,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "sub",
-							Prefix: pointer.String("https://testIssuerURL#"),
+							Prefix: ptr.To("https://testIssuerURL#"),
 						},
 					},
 				},
@@ -731,7 +732,7 @@ jwt:
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 						},
@@ -823,7 +824,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -859,7 +860,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String("https://testIssuerURL#"),
+									Prefix: ptr.To("https://testIssuerURL#"),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -895,7 +896,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "email",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -932,7 +933,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String("k8s-"),
+									Prefix: ptr.To("k8s-"),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -971,11 +972,11 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 								Groups: apiserver.PrefixedClaimOrExpression{
 									Claim:  "groups",
-									Prefix: pointer.String("oidc:"),
+									Prefix: ptr.To("oidc:"),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1018,7 +1019,7 @@ jwt:
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 						},
@@ -1044,7 +1045,7 @@ jwt:
 			args: []string{
 				"--authentication-config=nonexistent-file",
 			},
-			expectErr:    `failed to load authentication configuration from file "nonexistent-file": open nonexistent-file: no such file or directory`,
+			expectErr:    fmt.Sprintf(`failed to load authentication configuration from file "nonexistent-file": open nonexistent-file: %s`, getFileNotFoundForOS()),
 			expectConfig: kubeauthenticator.Config{},
 		},
 		{
@@ -1398,7 +1399,7 @@ jwt:
 						ClaimMappings: apiserver.ClaimMappings{
 							Username: apiserver.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String(""),
+								Prefix: ptr.To(""),
 							},
 						},
 					},
@@ -1474,7 +1475,7 @@ jwt:
 						ClaimMappings: apiserver.ClaimMappings{
 							Username: apiserver.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String(""),
+								Prefix: ptr.To(""),
 							},
 						},
 					},
@@ -1550,7 +1551,7 @@ jwt:
 						ClaimMappings: apiserver.ClaimMappings{
 							Username: apiserver.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String(""),
+								Prefix: ptr.To(""),
 							},
 						},
 					},
@@ -1792,4 +1793,15 @@ func (d *dummyPublicKeyGetter) GetCacheAgeMaxSeconds() int {
 
 func (d *dummyPublicKeyGetter) GetPublicKeys(ctx context.Context, keyIDHint string) []serviceaccount.PublicKey {
 	return []serviceaccount.PublicKey{}
+}
+
+// getFileNotFoundForOS returns the expected error message for a file not found error on the current OS
+// - on Windows, the error message is "The system cannot find the file specified"
+// - on other, the error message is "no such file or directory"
+func getFileNotFoundForOS() string {
+	if goruntime.GOOS == "windows" {
+		return "The system cannot find the file specified"
+	} else {
+		return "no such file or directory"
+	}
 }

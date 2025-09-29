@@ -27,9 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	resourcehelpers "k8s.io/component-helpers/resource"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -94,7 +97,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 		return 0, 0, 0, time.Time{}, fmt.Errorf("did not receive metrics for targeted pods (pods might be unready)")
 	}
 
-	requests, err := calculatePodRequests(podList, container, resource)
+	requests, err := calculateRequests(podList, container, resource)
 	if err != nil {
 		return 0, 0, 0, time.Time{}, err
 	}
@@ -182,7 +185,7 @@ func (c *ReplicaCalculator) GetMetricReplicas(currentReplicas int32, targetUsage
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v", metricName, err)
 	}
 
-	replicaCount, usage, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUsage, tolerances, namespace, selector, v1.ResourceName(""))
+	replicaCount, usage, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUsage, tolerances, namespace, selector, "")
 	return replicaCount, usage, timestamp, err
 }
 
@@ -287,7 +290,14 @@ func (c *ReplicaCalculator) getUsageRatioReplicaCount(currentReplicas int32, usa
 		if err != nil {
 			return 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err)
 		}
-		replicaCount = int32(math.Ceil(usageRatio * float64(readyPodCount)))
+		// Calculate replicaCount as float64 first
+		replicaCountFloat := usageRatio * float64(readyPodCount)
+		// Check if replicaCount exceeds max int32
+		if replicaCountFloat > math.MaxInt32 {
+			replicaCount = math.MaxInt32
+		} else {
+			replicaCount = int32(math.Ceil(replicaCountFloat))
+		}
 	} else {
 		// Scale to zero or n pods depending on usageRatio
 		replicaCount = int32(math.Ceil(usageRatio))
@@ -350,8 +360,14 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, tar
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, metricSelector, err)
 	}
+
 	usage = 0
 	for _, val := range metrics {
+		// Cap at MaxInt64 for positive overflow
+		if val > 0 && usage > math.MaxInt64-val {
+			usage = math.MaxInt64
+			break
+		}
 		usage = usage + val
 	}
 
@@ -449,29 +465,83 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 	return
 }
 
-func calculatePodRequests(pods []*v1.Pod, container string, resource v1.ResourceName) (map[string]int64, error) {
+// calculateRequests computes the request value for each pod for the specified
+// resource.
+// If container is non-empty, it uses the request of that specific container.
+// If container is empty, it uses pod-level requests if pod-level requests are
+// set on the pod. Otherwise, it sums the requests of all containers in the pod
+// (including restartable init containers).
+// It returns a map of pod names to their calculated request values.
+func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceName) (map[string]int64, error) {
+	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResources)
 	requests := make(map[string]int64, len(pods))
 	for _, pod := range pods {
-		podSum := int64(0)
-		// Calculate all regular containers and restartable init containers requests.
-		containers := append([]v1.Container{}, pod.Spec.Containers...)
-		for _, c := range pod.Spec.InitContainers {
-			if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
-				containers = append(containers, c)
-			}
+		var request int64
+		var err error
+		// Determine if we should use pod-level requests: see KEP-2837
+		// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md
+		usePodLevelRequests := podLevelResourcesEnabled &&
+			resourcehelpers.IsPodLevelRequestsSet(pod) &&
+			// If a container name is specified in the HPA, it takes precedence over
+			// the pod-level requests.
+			container == ""
+
+		if usePodLevelRequests {
+			request, err = calculatePodLevelRequests(pod, resource)
+		} else {
+			request, err = calculatePodRequestsFromContainers(pod, container, resource)
 		}
-		for _, c := range containers {
-			if container == "" || container == c.Name {
-				if containerRequest, ok := c.Resources.Requests[resource]; ok {
-					podSum += containerRequest.MilliValue()
-				} else {
-					return nil, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.ObjectMeta.Name)
-				}
-			}
+		if err != nil {
+			return nil, err
 		}
-		requests[pod.Name] = podSum
+		requests[pod.Name] = request
 	}
 	return requests, nil
+}
+
+// calculatePodLevelRequests computes the requests for the specific resource at
+// the pod level.
+func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
+	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{})
+	podRequest, ok := podLevelRequests[resource]
+	if !ok {
+		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
+	}
+	return podRequest.MilliValue(), nil
+}
+
+// calculatePodRequestsFromContainers computes the requests for the specified
+// resource by summing requests from all containers in the pod.
+// If a container name is specified, it uses only that container.
+func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource v1.ResourceName) (int64, error) {
+	containers := append([]v1.Container{}, pod.Spec.Containers...)
+	for _, c := range pod.Spec.InitContainers {
+		if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
+			containers = append(containers, c)
+		}
+	}
+
+	request := int64(0)
+	for _, c := range containers {
+		if container == "" || container == c.Name {
+			containerRequest, ok := c.Resources.Requests[resource]
+			if !ok {
+				return 0, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.Name)
+			}
+			request += containerRequest.MilliValue()
+		}
+		// container names are unique inside the pod
+		if container == c.Name {
+			return request, nil
+		}
+	}
+
+	// If we're looking for a specific container and didn't find it
+	if container != "" {
+		return 0, fmt.Errorf("container %s not found in Pod %s", container, pod.Name)
+	}
+
+	return request, nil
 }
 
 func removeMetricsForPods(metrics metricsclient.PodMetricsInfo, pods sets.Set[string]) {

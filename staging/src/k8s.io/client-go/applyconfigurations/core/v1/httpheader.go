@@ -20,8 +20,13 @@ package v1
 
 // HTTPHeaderApplyConfiguration represents a declarative configuration of the HTTPHeader type for use
 // with apply.
+//
+// HTTPHeader describes a custom header to be used in HTTP probes
 type HTTPHeaderApplyConfiguration struct {
-	Name  *string `json:"name,omitempty"`
+	// The header field name.
+	// This will be canonicalized upon output, so case-variant names will be understood as the same header.
+	Name *string `json:"name,omitempty"`
+	// The header field value
 	Value *string `json:"value,omitempty"`
 }
 
@@ -30,7 +35,6 @@ type HTTPHeaderApplyConfiguration struct {
 func HTTPHeader() *HTTPHeaderApplyConfiguration {
 	return &HTTPHeaderApplyConfiguration{}
 }
-func (b HTTPHeaderApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

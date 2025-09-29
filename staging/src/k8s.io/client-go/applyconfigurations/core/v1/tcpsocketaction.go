@@ -24,9 +24,15 @@ import (
 
 // TCPSocketActionApplyConfiguration represents a declarative configuration of the TCPSocketAction type for use
 // with apply.
+//
+// TCPSocketAction describes an action based on opening a socket
 type TCPSocketActionApplyConfiguration struct {
+	// Number or name of the port to access on the container.
+	// Number must be in the range 1 to 65535.
+	// Name must be an IANA_SVC_NAME.
 	Port *intstr.IntOrString `json:"port,omitempty"`
-	Host *string             `json:"host,omitempty"`
+	// Optional: Host name to connect to, defaults to the pod IP.
+	Host *string `json:"host,omitempty"`
 }
 
 // TCPSocketActionApplyConfiguration constructs a declarative configuration of the TCPSocketAction type for use with
@@ -34,7 +40,6 @@ type TCPSocketActionApplyConfiguration struct {
 func TCPSocketAction() *TCPSocketActionApplyConfiguration {
 	return &TCPSocketActionApplyConfiguration{}
 }
-func (b TCPSocketActionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPort sets the Port field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

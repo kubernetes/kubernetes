@@ -27,27 +27,40 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
-	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 )
 
+type Options struct {
+	EnableHealthService bool
+}
+
+type DeviceHealthUpdate struct {
+	PoolName   string
+	DeviceName string
+	Health     string
+}
+
 type ExamplePlugin struct {
+	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
 	stopCh         <-chan struct{}
 	logger         klog.Logger
-	resourceClient cgoresource.ResourceV1beta2Interface
+	resourceClient cgoresource.ResourceV1Interface
 	d              *kubeletplugin.Helper
 	fileOps        FileOperations
 
@@ -62,6 +75,10 @@ type ExamplePlugin struct {
 	prepared  map[ClaimID][]kubeletplugin.Device // prepared claims -> result of nodePrepareResource
 	gRPCCalls []GRPCCall
 
+	healthMutex       sync.Mutex
+	deviceHealth      map[string]string
+	HealthControlChan chan DeviceHealthUpdate
+
 	blockPrepareResourcesMutex   sync.Mutex
 	blockUnprepareResourcesMutex sync.Mutex
 
@@ -70,7 +87,17 @@ type ExamplePlugin struct {
 
 	unprepareResourcesFailure   error
 	failUnprepareResourcesMutex sync.Mutex
+
+	// cancelMainContext is used to cancel an upper-level context.
+	// It's called from HandleError if set.
+	cancelMainContext context.CancelCauseFunc
 }
+
+var _ kubeletplugin.DRAPlugin = &ExamplePlugin{}
+var _ drahealthv1alpha1.DRAResourceHealthServer = &ExamplePlugin{}
+
+//nolint:unused
+func (ex *ExamplePlugin) mustEmbedUnimplementedDRAResourceHealthServer() {}
 
 type GRPCCall struct {
 	// FullMethod is the fully qualified, e.g. /package.service/method.
@@ -119,15 +146,16 @@ type FileOperations struct {
 	// file does not exist.
 	Remove func(name string) error
 
-	// ErrorHandler is an optional callback for ResourceSlice publishing problems.
-	ErrorHandler func(ctx context.Context, err error, msg string)
+	// HandleError is an optional callback for ResourceSlice publishing problems.
+	HandleError func(ctx context.Context, err error, msg string)
+
 	// DriverResources provides the information that the driver will use to
 	// construct the ResourceSlices that it will publish.
 	DriverResources *resourceslice.DriverResources
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
-func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...any) (*ExamplePlugin, error) {
 	logger := klog.FromContext(ctx)
 
 	if fileOps.Create == nil {
@@ -143,25 +171,49 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 			return nil
 		}
 	}
-	ex := &ExamplePlugin{
-		stopCh:         ctx.Done(),
-		logger:         logger,
-		resourceClient: draclient.New(kubeClient),
-		fileOps:        fileOps,
-		cdiDir:         cdiDir,
-		driverName:     driverName,
-		nodeName:       nodeName,
-		prepared:       make(map[ClaimID][]kubeletplugin.Device),
-	}
 
-	opts = append(opts,
+	publicOpts := []kubeletplugin.Option{
 		kubeletplugin.DriverName(driverName),
 		kubeletplugin.NodeName(nodeName),
 		kubeletplugin.KubeClient(kubeClient),
+	}
+
+	testOpts := &options{}
+	pluginOpts := &Options{}
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case Options:
+			*pluginOpts = typedOpt
+		case TestOption:
+			if err := typedOpt(testOpts); err != nil {
+				return nil, fmt.Errorf("apply test option: %w", err)
+			}
+		case kubeletplugin.Option:
+			publicOpts = append(publicOpts, typedOpt)
+		default:
+			return nil, fmt.Errorf("unexpected option type %T", opt)
+		}
+	}
+
+	ex := &ExamplePlugin{
+		stopCh:            ctx.Done(),
+		logger:            logger,
+		resourceClient:    draclient.New(kubeClient),
+		fileOps:           fileOps,
+		cdiDir:            cdiDir,
+		driverName:        driverName,
+		nodeName:          nodeName,
+		prepared:          make(map[ClaimID][]kubeletplugin.Device),
+		cancelMainContext: testOpts.cancelMainContext,
+		deviceHealth:      make(map[string]string),
+		HealthControlChan: make(chan DeviceHealthUpdate, 10),
+	}
+
+	publicOpts = append(publicOpts,
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
 	)
-	d, err := kubeletplugin.Start(ctx, ex, opts...)
+	d, err := kubeletplugin.Start(ctx, ex, publicOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %w", err)
 	}
@@ -189,12 +241,15 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 	return status.PluginRegistered
 }
 
-func (ex *ExamplePlugin) ErrorHandler(ctx context.Context, err error, msg string) {
-	if ex.fileOps.ErrorHandler != nil {
-		ex.fileOps.ErrorHandler(ctx, err, msg)
+func (ex *ExamplePlugin) HandleError(ctx context.Context, err error, msg string) {
+	if ex.fileOps.HandleError != nil {
+		ex.fileOps.HandleError(ctx, err, msg)
 		return
 	}
 	utilruntime.HandleErrorWithContext(ctx, err, msg)
+	if ex.cancelMainContext != nil {
+		ex.cancelMainContext(err)
+	}
 }
 
 // BlockNodePrepareResources locks blockPrepareResourcesMutex and returns unlocking function for it
@@ -473,23 +528,24 @@ func (ex *ExamplePlugin) recordGRPCCall(ctx context.Context, req interface{}, in
 	return call.Response, call.Err
 }
 
-func (ex *ExamplePlugin) recordGRPCStream(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	call := GRPCCall{
-		FullMethod: info.FullMethod,
-	}
+func (ex *ExamplePlugin) recordGRPCStream(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 	ex.mutex.Lock()
-	ex.gRPCCalls = append(ex.gRPCCalls, call)
-	index := len(ex.gRPCCalls) - 1
+	// Append a new empty GRPCCall struct to get its index.
+	ex.gRPCCalls = append(ex.gRPCCalls, GRPCCall{})
+
+	pCall := &ex.gRPCCalls[len(ex.gRPCCalls)-1]
+
+	pCall.FullMethod = info.FullMethod
 	ex.mutex.Unlock()
 
-	// We don't hold the mutex here to allow concurrent calls.
-	call.Err = handler(srv, stream)
+	defer func() {
+		ex.mutex.Lock()
+		defer ex.mutex.Unlock()
+		pCall.Err = err
+	}()
 
-	ex.mutex.Lock()
-	ex.gRPCCalls[index] = call
-	ex.mutex.Unlock()
-
-	return call.Err
+	err = handler(srv, stream)
+	return err
 }
 
 func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {
@@ -536,4 +592,95 @@ func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resour
 // To restore normal GetInfo behavior, call SetGetInfoError(nil).
 func (ex *ExamplePlugin) SetGetInfoError(err error) {
 	ex.d.SetGetInfoError(err)
+}
+
+func (ex *ExamplePlugin) NodeWatchResources(req *drahealthv1alpha1.NodeWatchResourcesRequest, srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
+	logger := klog.FromContext(srv.Context())
+	logger.V(3).Info("Starting dynamic NodeWatchResources stream")
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	// Send an initial update immediately to report on pre-configured devices.
+	if err := ex.sendHealthUpdate(srv); err != nil {
+		logger.Error(err, "Failed to send initial health update")
+	}
+
+	for {
+		select {
+		case <-srv.Context().Done():
+			logger.V(3).Info("NodeWatchResources stream canceled by kubelet")
+			return nil
+		case update, ok := <-ex.HealthControlChan:
+			if !ok {
+				logger.V(3).Info("HealthControlChan closed, exiting NodeWatchResources stream.")
+				return nil
+			}
+			logger.V(3).Info("Received health update from control channel", "update", update)
+			ex.healthMutex.Lock()
+			key := update.PoolName + "/" + update.DeviceName
+			ex.deviceHealth[key] = update.Health
+			ex.healthMutex.Unlock()
+
+			if err := ex.sendHealthUpdate(srv); err != nil {
+				logger.Error(err, "Failed to send health update after control message")
+			}
+		case <-ticker.C:
+			if err := ex.sendHealthUpdate(srv); err != nil {
+				if srv.Context().Err() != nil {
+					logger.V(3).Info("NodeWatchResources stream closed during periodic update, exiting.")
+					return nil
+				}
+				logger.Error(err, "Failed to send periodic health update")
+			}
+		}
+	}
+}
+
+// sendHealthUpdate dynamically builds the health report from the current state of the deviceHealth map.
+func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
+	logger := klog.FromContext(srv.Context())
+	healthUpdates := []*drahealthv1alpha1.DeviceHealth{}
+
+	ex.healthMutex.Lock()
+	for key, health := range ex.deviceHealth {
+		parts := strings.SplitN(key, "/", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		poolName := parts[0]
+		deviceName := parts[1]
+
+		var healthEnum drahealthv1alpha1.HealthStatus
+		switch health {
+		case "Healthy":
+			healthEnum = drahealthv1alpha1.HealthStatus_HEALTHY
+		case "Unhealthy":
+			healthEnum = drahealthv1alpha1.HealthStatus_UNHEALTHY
+		default:
+			healthEnum = drahealthv1alpha1.HealthStatus_UNKNOWN
+		}
+
+		healthUpdates = append(healthUpdates, &drahealthv1alpha1.DeviceHealth{
+			Device: &drahealthv1alpha1.DeviceIdentifier{
+				PoolName:   poolName,
+				DeviceName: deviceName,
+			},
+			Health:          healthEnum,
+			LastUpdatedTime: time.Now().Unix(),
+		})
+	}
+	ex.healthMutex.Unlock()
+
+	// Sorting slice to ensure consistent ordering in tests.
+	sort.Slice(healthUpdates, func(i, j int) bool {
+		if healthUpdates[i].GetDevice().GetPoolName() != healthUpdates[j].GetDevice().GetPoolName() {
+			return healthUpdates[i].GetDevice().GetPoolName() < healthUpdates[j].GetDevice().GetPoolName()
+		}
+		return healthUpdates[i].GetDevice().GetDeviceName() < healthUpdates[j].GetDevice().GetDeviceName()
+	})
+
+	resp := &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: healthUpdates}
+	logger.V(5).Info("Test driver sending health update", "response", resp)
+	return srv.Send(resp)
 }

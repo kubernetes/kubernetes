@@ -24,8 +24,13 @@ import (
 
 // EventSeriesApplyConfiguration represents a declarative configuration of the EventSeries type for use
 // with apply.
+//
+// EventSeries contain information on series of events, i.e. thing that was/is happening
+// continuously for some time.
 type EventSeriesApplyConfiguration struct {
-	Count            *int32            `json:"count,omitempty"`
+	// Number of occurrences in this series up to the last heartbeat time
+	Count *int32 `json:"count,omitempty"`
+	// Time of the last occurrence observed
 	LastObservedTime *metav1.MicroTime `json:"lastObservedTime,omitempty"`
 }
 
@@ -34,7 +39,6 @@ type EventSeriesApplyConfiguration struct {
 func EventSeries() *EventSeriesApplyConfiguration {
 	return &EventSeriesApplyConfiguration{}
 }
-func (b EventSeriesApplyConfiguration) IsApplyConfiguration() {}
 
 // WithCount sets the Count field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

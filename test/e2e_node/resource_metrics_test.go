@@ -61,7 +61,8 @@ var _ = SIGDescribe("ResourceMetricsAPI", feature.ResourceMetrics, func() {
 
 			keys := []string{
 				"resource_scrape_error", "node_cpu_usage_seconds_total", "node_memory_working_set_bytes",
-				"pod_cpu_usage_seconds_total", "pod_memory_working_set_bytes",
+				"pod_cpu_usage_seconds_total", "pod_memory_working_set_bytes", "node_swap_usage_bytes",
+				"container_swap_usage_bytes", "pod_swap_usage_bytes",
 			}
 
 			// NOTE: This check should be removed when ListMetricDescriptors is implemented
@@ -103,6 +104,11 @@ var _ = SIGDescribe("ResourceMetricsAPI", feature.ResourceMetrics, func() {
 				"container_swap_usage_bytes": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): zeroSampe,
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): zeroSampe,
+				}),
+
+				"container_swap_limit_bytes": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(0*e2evolume.Kb, 80*e2evolume.Mb),
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(0*e2evolume.Kb, 80*e2evolume.Mb),
 				}),
 
 				"pod_cpu_usage_seconds_total": gstruct.MatchElements(podID, gstruct.IgnoreExtras, gstruct.Elements{

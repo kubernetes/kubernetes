@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/volume"
@@ -93,6 +94,7 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 }
 
 func TestOperationGenerator_GenerateExpandAndRecoverVolumeFunc(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
 	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeInfeasible
 	var tests = []struct {
@@ -193,6 +195,7 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 		x := resource.MustParse(size)
 		return &x
 	}
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 
 	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeInfeasible
 	nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
@@ -321,6 +324,7 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 }
 
 func TestExpandDuringMount(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
 	var tests = []struct {
 		name string
@@ -403,6 +407,7 @@ func TestExpandDuringMount(t *testing.T) {
 	}
 }
 func TestCheckForRecoveryFromExpansion(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	tests := []struct {
 		name                  string
 		pvc                   *v1.PersistentVolumeClaim

@@ -20,7 +20,11 @@ package v1
 
 // PodSchedulingGateApplyConfiguration represents a declarative configuration of the PodSchedulingGate type for use
 // with apply.
+//
+// PodSchedulingGate is associated to a Pod to guard its scheduling.
 type PodSchedulingGateApplyConfiguration struct {
+	// Name of the scheduling gate.
+	// Each scheduling gate must have a unique name field.
 	Name *string `json:"name,omitempty"`
 }
 
@@ -29,7 +33,6 @@ type PodSchedulingGateApplyConfiguration struct {
 func PodSchedulingGate() *PodSchedulingGateApplyConfiguration {
 	return &PodSchedulingGateApplyConfiguration{}
 }
-func (b PodSchedulingGateApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

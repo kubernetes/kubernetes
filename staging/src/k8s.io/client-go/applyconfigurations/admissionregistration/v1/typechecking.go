@@ -20,7 +20,11 @@ package v1
 
 // TypeCheckingApplyConfiguration represents a declarative configuration of the TypeChecking type for use
 // with apply.
+//
+// TypeChecking contains results of type checking the expressions in the
+// ValidatingAdmissionPolicy
 type TypeCheckingApplyConfiguration struct {
+	// The type checking warnings for each expression.
 	ExpressionWarnings []ExpressionWarningApplyConfiguration `json:"expressionWarnings,omitempty"`
 }
 
@@ -29,7 +33,6 @@ type TypeCheckingApplyConfiguration struct {
 func TypeChecking() *TypeCheckingApplyConfiguration {
 	return &TypeCheckingApplyConfiguration{}
 }
-func (b TypeCheckingApplyConfiguration) IsApplyConfiguration() {}
 
 // WithExpressionWarnings adds the given value to the ExpressionWarnings field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

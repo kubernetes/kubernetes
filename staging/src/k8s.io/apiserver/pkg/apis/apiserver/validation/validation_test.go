@@ -32,19 +32,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	api "k8s.io/apiserver/pkg/apis/apiserver"
 	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/utils/pointer"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidateAuthenticationConfiguration(t *testing.T) {
 	testCases := []struct {
-		name              string
-		in                *api.AuthenticationConfiguration
-		disallowedIssuers []string
-		want              string
+		name                                         string
+		in                                           *api.AuthenticationConfiguration
+		disallowedIssuers                            []string
+		structuredAuthnFeatureOverride               *bool
+		structuredAuthnEgressSelectorFeatureOverride *bool
+		gaOnly                                       bool
+		want                                         string
 	}{
 		{
 			name: "jwt authenticator is empty",
@@ -69,7 +76,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -87,7 +94,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -114,7 +121,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -133,7 +140,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -153,7 +160,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "claim",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -183,7 +190,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "claim",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -208,7 +215,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						},
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -234,7 +241,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 						UserValidationRules: []api.UserValidationRule{
@@ -264,7 +271,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -272,6 +279,154 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 			},
 			disallowedIssuers: []string{"a", "b", "https://issuer-url", "c"},
 			want:              `jwt[0].issuer.url: Invalid value: "https://issuer-url": URL must not overlap with disallowed issuers: [a b c https://issuer-url]`,
+		},
+		{
+			name: "valid authentication configuration with invalid egress type",
+			in: &api.AuthenticationConfiguration{
+				JWT: []api.JWTAuthenticator{
+					{
+						Issuer: api.Issuer{
+							URL:                "https://issuer-url",
+							Audiences:          []string{"audience"},
+							EgressSelectorType: "panda",
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								Claim:         "foo",
+								RequiredValue: "bar",
+							},
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: ptr.To("prefix"),
+							},
+						},
+					},
+				},
+			},
+			disallowedIssuers: []string{"a", "b", "c"},
+			want:              `jwt[0].issuer.egressSelectorType: Invalid value: "panda": egress selector must be either controlplane or cluster`,
+		},
+		{
+			name: "valid authentication configuration with valid egress type with StructuredAuthenticationConfiguration feature disabled",
+			in: &api.AuthenticationConfiguration{
+				JWT: []api.JWTAuthenticator{
+					{
+						Issuer: api.Issuer{
+							URL:                "https://issuer-url",
+							Audiences:          []string{"audience"},
+							EgressSelectorType: "controlplane",
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								Claim:         "foo",
+								RequiredValue: "bar",
+							},
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: ptr.To("prefix"),
+							},
+						},
+					},
+				},
+			},
+			disallowedIssuers:              []string{"a", "b", "c"},
+			structuredAuthnFeatureOverride: ptr.To(false),
+			want: "[" +
+				`jwt[0].issuer.egressSelectorType: Invalid value: "controlplane": egress selector is not supported when StructuredAuthenticationConfiguration feature gate is disabled` +
+				", " +
+				// this feature did not exist in v1.33 so it is automatically disabled as well
+				`jwt[0].issuer.egressSelectorType: Invalid value: "controlplane": egress selector is not supported when StructuredAuthenticationConfigurationEgressSelector feature gate is disabled` +
+				"]",
+		},
+		{
+			name: "valid authentication configuration with valid egress type with StructuredAuthenticationConfigurationEgressSelector feature disabled",
+			in: &api.AuthenticationConfiguration{
+				JWT: []api.JWTAuthenticator{
+					{
+						Issuer: api.Issuer{
+							URL:                "https://issuer-url",
+							Audiences:          []string{"audience"},
+							EgressSelectorType: "controlplane",
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								Claim:         "foo",
+								RequiredValue: "bar",
+							},
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: ptr.To("prefix"),
+							},
+						},
+					},
+				},
+			},
+			disallowedIssuers: []string{"a", "b", "c"},
+			structuredAuthnEgressSelectorFeatureOverride: ptr.To(false),
+			want: `jwt[0].issuer.egressSelectorType: Invalid value: "controlplane": egress selector is not supported when StructuredAuthenticationConfigurationEgressSelector feature gate is disabled`,
+		},
+		{
+			name: "valid authentication configuration with valid egress type with GA features only",
+			in: &api.AuthenticationConfiguration{
+				JWT: []api.JWTAuthenticator{
+					{
+						Issuer: api.Issuer{
+							URL:                "https://issuer-url",
+							Audiences:          []string{"audience"},
+							EgressSelectorType: "controlplane",
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								Claim:         "foo",
+								RequiredValue: "bar",
+							},
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: ptr.To("prefix"),
+							},
+						},
+					},
+				},
+			},
+			disallowedIssuers: []string{"a", "b", "c"},
+			gaOnly:            true,
+			want:              `jwt[0].issuer.egressSelectorType: Invalid value: "controlplane": egress selector is not supported when StructuredAuthenticationConfigurationEgressSelector feature gate is disabled`,
+		},
+		{
+			name: "valid authentication configuration with valid egress type",
+			in: &api.AuthenticationConfiguration{
+				JWT: []api.JWTAuthenticator{
+					{
+						Issuer: api.Issuer{
+							URL:                "https://issuer-url",
+							Audiences:          []string{"audience"},
+							EgressSelectorType: "cluster",
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								Claim:         "foo",
+								RequiredValue: "bar",
+							},
+						},
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: ptr.To("prefix"),
+							},
+						},
+					},
+				},
+			},
+			disallowedIssuers: []string{"a", "b", "c"},
+			want:              "",
 		},
 		{
 			name: "valid authentication configuration that uses unverified email",
@@ -653,7 +808,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -665,6 +820,17 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.structuredAuthnFeatureOverride != nil {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33")) // go back to when the feature could be disabled
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, *tt.structuredAuthnFeatureOverride)
+			}
+			if tt.structuredAuthnEgressSelectorFeatureOverride != nil {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfigurationEgressSelector, *tt.structuredAuthnEgressSelectorFeatureOverride)
+			}
+			if tt.gaOnly {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", false)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", false)
+			}
 			got := ValidateAuthenticationConfiguration(authenticationcel.NewDefaultCompiler(), tt.in, tt.disallowedIssuers).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("AuthenticationConfiguration validation mismatch (-want +got):\n%s", d)
@@ -685,7 +851,7 @@ func TestValidateIssuerURL(t *testing.T) {
 		{
 			name: "url is empty",
 			in:   "",
-			want: "issuer.url: Required value: URL is required",
+			want: "issuer.url: Required value",
 		},
 		{
 			name: "url parse error",
@@ -857,7 +1023,7 @@ func TestValidateAudiences(t *testing.T) {
 		{
 			name: "audience is empty",
 			in:   []string{""},
-			want: "issuer.audiences[0]: Required value: audience can't be empty",
+			want: "issuer.audiences[0]: Required value",
 		},
 		{
 			name:        "invalid match policy with single audience",
@@ -900,7 +1066,7 @@ func TestValidateAudiences(t *testing.T) {
 			name:        "multiple audiences set when structured authn feature is disabled",
 			in:          []string{"audience1", "audience2"},
 			matchPolicy: "MatchAny",
-			want:        `issuer.audiences: Invalid value: []string{"audience1", "audience2"}: multiple audiences are not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
+			want:        `issuer.audiences: Invalid value: ["audience1","audience2"]: multiple audiences are not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
 		},
 	}
 
@@ -990,7 +1156,7 @@ func TestValidateClaimValidationRules(t *testing.T) {
 				{Claim: "claim", Message: "message"},
 			},
 			structuredAuthnFeatureEnabled: true,
-			want:                          `issuer.claimValidationRules[0].message: Invalid value: "message": message can't be set when claim is set`,
+			want:                          `issuer.claimValidationRules[0].message: Invalid value: "message": may not be specified when claim is set`,
 		},
 		{
 			name: "requiredValue set when expression is set",
@@ -998,7 +1164,7 @@ func TestValidateClaimValidationRules(t *testing.T) {
 				{Expression: "claims.foo == 'bar'", RequiredValue: "value"},
 			},
 			structuredAuthnFeatureEnabled: true,
-			want:                          `issuer.claimValidationRules[0].requiredValue: Invalid value: "value": requiredValue can't be set when expression is set`,
+			want:                          `issuer.claimValidationRules[0].requiredValue: Invalid value: "value": may not be specified when expression is set`,
 		},
 		{
 			name: "duplicate claim",
@@ -1024,7 +1190,7 @@ func TestValidateClaimValidationRules(t *testing.T) {
 				{Expression: "claims.foo == 'bar'"},
 			},
 			structuredAuthnFeatureEnabled: false,
-			want:                          `issuer.claimValidationRules[0].expression: Invalid value: "claims.foo == 'bar'": expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
+			want:                          `issuer.claimValidationRules[0].expression: Invalid value: "claims.foo == 'bar'": not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
 		},
 		{
 			name: "CEL expression compilation error",
@@ -1137,11 +1303,11 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Expression: "claims.username",
-					Prefix:     pointer.String("prefix"),
+					Prefix:     ptr.To("prefix"),
 				},
 			},
 			structuredAuthnFeatureEnabled: true,
-			want:                          `issuer.claimMappings.username.prefix: Invalid value: "prefix": prefix can't be set when expression is set`,
+			want:                          `issuer.claimMappings.username.prefix: Invalid value: "prefix": may not be specified when expression is set`,
 		},
 		{
 			name: "username prefix is nil when claim is set",
@@ -1170,7 +1336,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Groups: api.PrefixedClaimOrExpression{
 					Claim:      "claim",
@@ -1185,22 +1351,22 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Groups: api.PrefixedClaimOrExpression{
 					Expression: "claims.groups",
-					Prefix:     pointer.String("prefix"),
+					Prefix:     ptr.To("prefix"),
 				},
 			},
 			structuredAuthnFeatureEnabled: true,
-			want:                          `issuer.claimMappings.groups.prefix: Invalid value: "prefix": prefix can't be set when expression is set`,
+			want:                          `issuer.claimMappings.groups.prefix: Invalid value: "prefix": may not be specified when expression is set`,
 		},
 		{
 			name: "groups prefix is nil when claim is set",
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Groups: api.PrefixedClaimOrExpression{
 					Claim: "claim",
@@ -1214,7 +1380,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Groups: api.PrefixedClaimOrExpression{
 					Expression: "foo.bar",
@@ -1230,7 +1396,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				UID: api.ClaimOrExpression{
 					Claim:      "claim",
@@ -1245,7 +1411,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				UID: api.ClaimOrExpression{
 					Expression: "foo.bar",
@@ -1261,7 +1427,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Extra: []api.ExtraMapping{
 					{Key: "", ValueExpression: "claims.extra"},
@@ -1275,21 +1441,21 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Extra: []api.ExtraMapping{
 					{Key: "example.org/foo", ValueExpression: ""},
 				},
 			},
 			structuredAuthnFeatureEnabled: true,
-			want:                          `issuer.claimMappings.extra[0].valueExpression: Required value: valueExpression is required`,
+			want:                          `issuer.claimMappings.extra[0].valueExpression: Required value`,
 		},
 		{
 			name: "extra mapping value expression is invalid",
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Extra: []api.ExtraMapping{
 					{Key: "example.org/foo", ValueExpression: "foo.bar"},
@@ -1308,7 +1474,7 @@ func TestValidateClaimMappings(t *testing.T) {
 				},
 			},
 			structuredAuthnFeatureEnabled: false,
-			want: `[issuer.claimMappings.username.expression: Invalid value: "foo.bar": expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.username.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+			want: `[issuer.claimMappings.username.expression: Invalid value: "foo.bar": not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.username.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
  | foo.bar
  | ^]`,
 		},
@@ -1317,14 +1483,14 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Groups: api.PrefixedClaimOrExpression{
 					Expression: "foo.bar",
 				},
 			},
 			structuredAuthnFeatureEnabled: false,
-			want: `[issuer.claimMappings.groups.expression: Invalid value: "foo.bar": expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.groups.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+			want: `[issuer.claimMappings.groups.expression: Invalid value: "foo.bar": not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.groups.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
  | foo.bar
  | ^]`,
 		},
@@ -1333,14 +1499,14 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				UID: api.ClaimOrExpression{
 					Expression: "foo.bar",
 				},
 			},
 			structuredAuthnFeatureEnabled: false,
-			want: `[issuer.claimMappings.uid: Invalid value: "": uid claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.uid.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+			want: `[issuer.claimMappings.uid: Invalid value: "": claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.uid.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
  | foo.bar
  | ^]`,
 		},
@@ -1349,28 +1515,28 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				UID: api.ClaimOrExpression{
 					Claim: "claim",
 				},
 			},
 			structuredAuthnFeatureEnabled: false,
-			want:                          `issuer.claimMappings.uid: Invalid value: "": uid claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
+			want:                          `issuer.claimMappings.uid: Invalid value: "": claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
 		},
 		{
 			name: "extra mapping is invalid when structured authn feature is disabled",
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Extra: []api.ExtraMapping{
 					{Key: "example.org/foo", ValueExpression: "claims.extra"},
 				},
 			},
 			structuredAuthnFeatureEnabled: false,
-			want:                          `issuer.claimMappings.extra: Invalid value: "": extra claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
+			want:                          `issuer.claimMappings.extra: Invalid value: "": claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
 		},
 		{
 			name: "duplicate extra mapping key",
@@ -1407,7 +1573,7 @@ func TestValidateClaimMappings(t *testing.T) {
 				},
 			},
 			structuredAuthnFeatureEnabled: true,
-			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.org/Foo": key must be lowercase`,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.org/Foo": must be lowercase`,
 		},
 		{
 			name: "extra mapping key prefix is k8.io",
@@ -1655,7 +1821,7 @@ func TestValidateUserValidationRules(t *testing.T) {
 			name:                          "user info validation rule, expression is empty",
 			in:                            []api.UserValidationRule{{}},
 			structuredAuthnFeatureEnabled: true,
-			want:                          "issuer.userValidationRules[0].expression: Required value: expression is required",
+			want:                          "issuer.userValidationRules[0].expression: Required value",
 		},
 		{
 			name: "duplicate expression",

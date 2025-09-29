@@ -20,9 +20,18 @@ package v1
 
 // WebhookConversionApplyConfiguration represents a declarative configuration of the WebhookConversion type for use
 // with apply.
+//
+// WebhookConversion describes how to call a conversion webhook
 type WebhookConversionApplyConfiguration struct {
-	ClientConfig             *WebhookClientConfigApplyConfiguration `json:"clientConfig,omitempty"`
-	ConversionReviewVersions []string                               `json:"conversionReviewVersions,omitempty"`
+	// clientConfig is the instructions for how to call the webhook if strategy is `Webhook`.
+	ClientConfig *WebhookClientConfigApplyConfiguration `json:"clientConfig,omitempty"`
+	// conversionReviewVersions is an ordered list of preferred `ConversionReview`
+	// versions the Webhook expects. The API server will use the first version in
+	// the list which it supports. If none of the versions specified in this list
+	// are supported by API server, conversion will fail for the custom resource.
+	// If a persisted Webhook configuration specifies allowed versions and does not
+	// include any versions known to the API Server, calls to the webhook will fail.
+	ConversionReviewVersions []string `json:"conversionReviewVersions,omitempty"`
 }
 
 // WebhookConversionApplyConfiguration constructs a declarative configuration of the WebhookConversion type for use with
@@ -30,7 +39,6 @@ type WebhookConversionApplyConfiguration struct {
 func WebhookConversion() *WebhookConversionApplyConfiguration {
 	return &WebhookConversionApplyConfiguration{}
 }
-func (b WebhookConversionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithClientConfig sets the ClientConfig field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

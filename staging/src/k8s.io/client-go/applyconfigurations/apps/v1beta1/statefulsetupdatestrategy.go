@@ -24,8 +24,14 @@ import (
 
 // StatefulSetUpdateStrategyApplyConfiguration represents a declarative configuration of the StatefulSetUpdateStrategy type for use
 // with apply.
+//
+// StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
+// controller will use to perform updates. It includes any additional parameters
+// necessary to perform the update for the indicated strategy.
 type StatefulSetUpdateStrategyApplyConfiguration struct {
-	Type          *appsv1beta1.StatefulSetUpdateStrategyType          `json:"type,omitempty"`
+	// Type indicates the type of the StatefulSetUpdateStrategy.
+	Type *appsv1beta1.StatefulSetUpdateStrategyType `json:"type,omitempty"`
+	// RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
 	RollingUpdate *RollingUpdateStatefulSetStrategyApplyConfiguration `json:"rollingUpdate,omitempty"`
 }
 
@@ -34,7 +40,6 @@ type StatefulSetUpdateStrategyApplyConfiguration struct {
 func StatefulSetUpdateStrategy() *StatefulSetUpdateStrategyApplyConfiguration {
 	return &StatefulSetUpdateStrategyApplyConfiguration{}
 }
-func (b StatefulSetUpdateStrategyApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

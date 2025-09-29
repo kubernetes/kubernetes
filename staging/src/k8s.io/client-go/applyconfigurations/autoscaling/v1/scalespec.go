@@ -20,7 +20,10 @@ package v1
 
 // ScaleSpecApplyConfiguration represents a declarative configuration of the ScaleSpec type for use
 // with apply.
+//
+// ScaleSpec describes the attributes of a scale subresource.
 type ScaleSpecApplyConfiguration struct {
+	// replicas is the desired number of instances for the scaled object.
 	Replicas *int32 `json:"replicas,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type ScaleSpecApplyConfiguration struct {
 func ScaleSpec() *ScaleSpecApplyConfiguration {
 	return &ScaleSpecApplyConfiguration{}
 }
-func (b ScaleSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithReplicas sets the Replicas field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

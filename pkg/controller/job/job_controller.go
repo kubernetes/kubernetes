@@ -257,7 +257,7 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting job controller")
 	defer logger.Info("Shutting down job controller")
 
-	if !cache.WaitForNamedCacheSync("job", ctx.Done(), jm.podStoreSynced, jm.jobStoreSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, jm.podStoreSynced, jm.jobStoreSynced) {
 		return
 	}
 
@@ -769,7 +769,7 @@ func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job) ([]*v1.Po
 	}
 
 	// list all pods managed by this Job using the pod indexer
-	pods, err := jm.getJobPodsByIndexer(j)
+	pods, err := controller.FilterPodsByOwner(jm.podIndexer, &j.ObjectMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -806,27 +806,6 @@ func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job) ([]*v1.Po
 		}
 	}
 	return pods, err
-}
-
-// getJobPodsByIndexer returns the set of pods that this Job should manage.
-func (jm *Controller) getJobPodsByIndexer(j *batch.Job) ([]*v1.Pod, error) {
-	podsForJob := []*v1.Pod{}
-	for _, key := range []string{string(j.UID), controller.OrphanPodIndexKey} {
-		pods, err := jm.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, obj := range pods {
-			pod, ok := obj.(*v1.Pod)
-			if !ok {
-				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
-				continue
-			}
-			podsForJob = append(podsForJob, pod)
-		}
-	}
-	return podsForJob, nil
 }
 
 // syncJob will sync the job with the given key if it has had its expectations fulfilled, meaning
@@ -1803,10 +1782,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 					if completionIndex != unknownCompletionIndex {
 						template = podTemplate.DeepCopy()
 						addCompletionIndexAnnotation(template, completionIndex)
-
-						if feature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
-							addCompletionIndexLabel(template, completionIndex)
-						}
+						addCompletionIndexLabel(template, completionIndex)
 						template.Spec.Hostname = fmt.Sprintf("%s-%d", job.Name, completionIndex)
 						generateName = podGenerateNameWithIndex(job.Name, completionIndex)
 						if hasBackoffLimitPerIndex(job) {

@@ -24,9 +24,22 @@ import (
 
 // ModifyVolumeStatusApplyConfiguration represents a declarative configuration of the ModifyVolumeStatus type for use
 // with apply.
+//
+// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation
 type ModifyVolumeStatusApplyConfiguration struct {
-	TargetVolumeAttributesClassName *string                                         `json:"targetVolumeAttributesClassName,omitempty"`
-	Status                          *corev1.PersistentVolumeClaimModifyVolumeStatus `json:"status,omitempty"`
+	// targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled
+	TargetVolumeAttributesClassName *string `json:"targetVolumeAttributesClassName,omitempty"`
+	// status is the status of the ControllerModifyVolume operation. It can be in any of following states:
+	// - Pending
+	// Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as
+	// the specified VolumeAttributesClass not existing.
+	// - InProgress
+	// InProgress indicates that the volume is being modified.
+	// - Infeasible
+	// Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
+	// resolve the error, a valid VolumeAttributesClass needs to be specified.
+	// Note: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.
+	Status *corev1.PersistentVolumeClaimModifyVolumeStatus `json:"status,omitempty"`
 }
 
 // ModifyVolumeStatusApplyConfiguration constructs a declarative configuration of the ModifyVolumeStatus type for use with
@@ -34,7 +47,6 @@ type ModifyVolumeStatusApplyConfiguration struct {
 func ModifyVolumeStatus() *ModifyVolumeStatusApplyConfiguration {
 	return &ModifyVolumeStatusApplyConfiguration{}
 }
-func (b ModifyVolumeStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithTargetVolumeAttributesClassName sets the TargetVolumeAttributesClassName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

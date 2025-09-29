@@ -20,16 +20,6 @@ syntax = "proto3";
 package runtime.v1;
 option go_package = "k8s.io/cri-api/pkg/apis/runtime/v1";
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-
-option (gogoproto.goproto_stringer_all) = false;
-option (gogoproto.stringer_all) =  true;
-option (gogoproto.goproto_getters_all) = true;
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_unrecognized_all) = false;
-
 // Runtime service defines the public APIs for remote container runtimes
 service RuntimeService {
     // Version returns the runtime name, runtime version, and runtime API version.
@@ -1631,14 +1621,14 @@ message ImageStatusResponse {
 // AuthConfig contains authorization information for connecting to a registry.
 message AuthConfig {
     string username = 1;
-    string password = 2;
-    string auth = 3;
+    string password = 2 [debug_redact = true];
+    string auth = 3 [debug_redact = true];
     string server_address = 4;
     // IdentityToken is used to authenticate the user and get
     // an access token for the registry.
-    string identity_token = 5;
+    string identity_token = 5 [debug_redact = true];
     // RegistryToken is a bearer token to be sent to a registry
-    string registry_token = 6;
+    string registry_token = 6 [debug_redact = true];
 }
 
 message PullImageRequest {

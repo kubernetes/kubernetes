@@ -20,7 +20,10 @@ package v1beta2
 
 // ResourceClaimSpecApplyConfiguration represents a declarative configuration of the ResourceClaimSpec type for use
 // with apply.
+//
+// ResourceClaimSpec defines what is being requested in a ResourceClaim and how to configure it.
 type ResourceClaimSpecApplyConfiguration struct {
+	// Devices defines how to request devices.
 	Devices *DeviceClaimApplyConfiguration `json:"devices,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type ResourceClaimSpecApplyConfiguration struct {
 func ResourceClaimSpec() *ResourceClaimSpecApplyConfiguration {
 	return &ResourceClaimSpecApplyConfiguration{}
 }
-func (b ResourceClaimSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithDevices sets the Devices field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

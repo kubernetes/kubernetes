@@ -29,6 +29,7 @@ import (
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 // supportedScoringStrategyTypes has to be a set of strings for use with field.Unsupported
@@ -188,7 +189,7 @@ func validateFunctionShape(shape []config.UtilizationShapePoint, path *field.Pat
 
 	for i := 1; i < len(shape); i++ {
 		if shape[i-1].Utilization >= shape[i].Utilization {
-			allErrs = append(allErrs, field.Invalid(path.Index(i).Child("utilization"), shape[i].Utilization, "utilization values must be sorted in increasing order"))
+			allErrs = append(allErrs, field.Invalid(path.Index(i).Child("utilization"), shape[i].Utilization, "values must be sorted in increasing order"))
 			break
 		}
 	}
@@ -324,6 +325,23 @@ func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFi
 
 	if len(allErrs) == 0 {
 		return nil
+	}
+	return allErrs.ToAggregate()
+}
+
+// ValidateDynamicResourcesArgs validates that DynamicResourcesArgs are correct.
+// In contrast to the REST API, setting fields that have no effect because
+// the corresponding feature is disabled is considered an error.
+func ValidateDynamicResourcesArgs(path *field.Path, args *config.DynamicResourcesArgs, fts feature.Features) error {
+	var allErrs field.ErrorList
+	if fts.EnableDRASchedulerFilterTimeout {
+		if args.FilterTimeout != nil && args.FilterTimeout.Duration < 0 {
+			allErrs = append(allErrs, field.Invalid(path.Child("filterTimeout"), args.FilterTimeout, "must be zero or positive"))
+		}
+	} else {
+		if args.FilterTimeout != nil {
+			allErrs = append(allErrs, field.Forbidden(path.Child("filterTimeout"), "DRASchedulingFilterTimeout feature gate is disabled"))
+		}
 	}
 	return allErrs.ToAggregate()
 }

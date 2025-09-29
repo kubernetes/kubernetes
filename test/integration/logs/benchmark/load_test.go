@@ -19,6 +19,8 @@ package benchmark
 import (
 	"bytes"
 	"errors"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -31,11 +33,23 @@ import (
 )
 
 func TestData(t *testing.T) {
-	versionResponse := &runtimev1.VersionResponse{
-		Version:           "0.1.0",
-		RuntimeName:       "containerd",
-		RuntimeVersion:    "v1.6.18",
-		RuntimeApiVersion: "v1",
+	// proto objects mutate themselves when calling String(), build a fresh one every time
+	makeVersionResponse := func() *runtimev1.VersionResponse {
+		return &runtimev1.VersionResponse{
+			Version:           "0.1.0",
+			RuntimeName:       "containerd",
+			RuntimeVersion:    "v1.6.18",
+			RuntimeApiVersion: "v1",
+		}
+	}
+	// make the object to log and expect
+	versionResponse := makeVersionResponse()
+	// Compute the String() representation of this object for this invocation.
+	// Proto objects' String() output is non-deterministic, but stable within a given binary invocation.
+	// Sanity check the value isn't empty and reflects the data in the object
+	versionResponseString := makeVersionResponse().String()
+	if !regexp.MustCompile(`runtime_name:.*"containerd"`).MatchString(versionResponseString) {
+		t.Fatalf("expected versionResponseString to contain runtimeName.*containerd, got %q", versionResponseString)
 	}
 
 	testcases := map[string]struct {
@@ -152,12 +166,12 @@ func TestData(t *testing.T) {
 					},
 				},
 			},
-			printf:     `[RemoteRuntimeService] Version Response: [apiVersion &VersionResponse{Version:0.1.0,RuntimeName:containerd,RuntimeVersion:v1.6.18,RuntimeApiVersion:v1,}]`,
-			structured: `"[RemoteRuntimeService] Version Response" apiVersion="&VersionResponse{Version:0.1.0,RuntimeName:containerd,RuntimeVersion:v1.6.18,RuntimeApiVersion:v1,}"`,
+			printf:     `[RemoteRuntimeService] Version Response: [apiVersion ` + versionResponseString + `]`,
+			structured: `"[RemoteRuntimeService] Version Response" apiVersion=` + strconv.Quote(versionResponseString),
 			// Because of
 			// https://github.com/kubernetes/kubernetes/issues/106652
 			// we get the string instead of a JSON struct.
-			json: `"msg":"[RemoteRuntimeService] Version Response","v":0,"apiVersion":"&VersionResponse{Version:0.1.0,RuntimeName:containerd,RuntimeVersion:v1.6.18,RuntimeApiVersion:v1,}"`,
+			json: `"msg":"[RemoteRuntimeService] Version Response","v":0,"apiVersion":` + strconv.Quote(versionResponseString),
 			stats: logStats{
 				TotalLines: 1,
 				JsonLines:  1,

@@ -20,9 +20,14 @@ package v2
 
 // CrossVersionObjectReferenceApplyConfiguration represents a declarative configuration of the CrossVersionObjectReference type for use
 // with apply.
+//
+// CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReferenceApplyConfiguration struct {
-	Kind       *string `json:"kind,omitempty"`
-	Name       *string `json:"name,omitempty"`
+	// kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	Kind *string `json:"kind,omitempty"`
+	// name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	Name *string `json:"name,omitempty"`
+	// apiVersion is the API version of the referent
 	APIVersion *string `json:"apiVersion,omitempty"`
 }
 
@@ -31,7 +36,6 @@ type CrossVersionObjectReferenceApplyConfiguration struct {
 func CrossVersionObjectReference() *CrossVersionObjectReferenceApplyConfiguration {
 	return &CrossVersionObjectReferenceApplyConfiguration{}
 }
-func (b CrossVersionObjectReferenceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

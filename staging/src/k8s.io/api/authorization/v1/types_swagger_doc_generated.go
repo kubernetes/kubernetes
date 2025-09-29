@@ -87,8 +87,8 @@ var map_ResourceAttributes = map[string]string{
 	"resource":      "Resource is one of the existing resource types.  \"*\" means all.",
 	"subresource":   "Subresource is one of the existing resource types.  \"\" means none.",
 	"name":          "Name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all.",
-	"fieldSelector": "fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.\n\nThis field  is alpha-level. To use this field, you must enable the `AuthorizeWithSelectors` feature gate (disabled by default).",
-	"labelSelector": "labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.\n\nThis field  is alpha-level. To use this field, you must enable the `AuthorizeWithSelectors` feature gate (disabled by default).",
+	"fieldSelector": "fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.",
+	"labelSelector": "labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.",
 }
 
 func (ResourceAttributes) SwaggerDoc() map[string]string {

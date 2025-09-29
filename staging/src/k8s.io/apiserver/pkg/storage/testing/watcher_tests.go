@@ -44,7 +44,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func RunTestWatch(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -347,9 +347,6 @@ func RunTestDelayedWatchDelivery(ctx context.Context, t *testing.T, store storag
 		}
 	}
 
-	// Now stop the watcher and check if the consecutive events are being delivered.
-	watcher.Stop()
-
 	watched := 0
 	for {
 		event, ok := <-watcher.ResultChan()
@@ -364,11 +361,19 @@ func RunTestDelayedWatchDelivery(ctx context.Context, t *testing.T, store storag
 			t.Errorf("Unexpected object watched: %s, expected %s", a, e)
 		}
 		watched++
+		// Before stopping watcher wait for an event to arrive and give them some time to fill the queue.
+		if watched == 1 {
+			time.Sleep(time.Second)
+			// Stop the watcher to check if the consecutive events will be delivered.
+			watcher.Stop()
+		}
 	}
 	// We expect at least N events to be delivered, depending on the implementation.
 	// For now, this number is smallest for Cacher and it equals 10 (size of the out buffer).
-	if watched < 10 {
-		t.Errorf("Unexpected number of events: %v, expected: %v", watched, totalPods)
+	outBufferSize := 10
+	expectWatched := outBufferSize + 1 // initial event
+	if watched < expectWatched {
+		t.Errorf("Unexpected number of events: %v, expected at least: %v", watched, expectWatched)
 	}
 }
 
@@ -383,7 +388,7 @@ func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPre
 		Predicate:       storage.Everything,
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", storageOpts, list); err != nil {
+	if err := store.GetList(ctx, "/pods/", storageOpts, list); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -424,7 +429,7 @@ func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store Inter
 		Predicate:       storage.Everything,
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/pods", storageOpts, list); err != nil {
+	if err := store.GetList(ctx, "/pods/", storageOpts, list); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -493,7 +498,7 @@ func RunTestWatcherTimeout(ctx context.Context, t *testing.T, store storage.Inte
 		Predicate: storage.Everything,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/pods", options, &podList); err != nil {
+	if err := store.GetList(ctx, "/pods/", options, &podList); err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
 	initialRV := podList.ResourceVersion
@@ -585,7 +590,7 @@ func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store s
 // Given this feature is currently not explicitly used by higher layers of Kubernetes
 // (it rather is used by wrappers of storage.Interface to implement its functionalities)
 // this test is currently considered optional.
-func RunOptionalTestProgressNotify(ctx context.Context, t *testing.T, store storage.Interface) {
+func RunOptionalTestProgressNotify(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc) {
 	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns"}}
 	key := computePodKey(input)
 	out := &example.Pod{}
@@ -593,6 +598,15 @@ func RunOptionalTestProgressNotify(ctx context.Context, t *testing.T, store stor
 		t.Fatalf("Create failed: %v", err)
 	}
 	validateResourceVersion := resourceVersionNotOlderThan(out.ResourceVersion)
+	// Since etcd v3.6.2 we need to increase RV due to https://github.com/etcd-io/etcd/pull/20241.
+	// We must advance the resource version to ensure that etcd revision progresses past the watch we establish.
+	// As etcd does not send progress notifications for watches on future revisions.
+	//
+	// A Kubernetes watch is exclusive (first event received is after a given RV), which translates
+	// to an inclusive etcd watch at revision+1. Without this increment, if no other writes
+	// have occurred, the watch would be on a future revision, preventing progress
+	// notifications.
+	increaseRV(ctx, t)
 
 	opts := storage.ListOptions{
 		ResourceVersion: out.ResourceVersion,
@@ -725,9 +739,9 @@ func RunTestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.
 			ctx = genericapirequest.WithRequestInfo(ctx, requestInfo)
 			ctx = genericapirequest.WithNamespace(ctx, "")
 
-			watchKey := "/pods"
+			watchKey := "/pods/"
 			if tt.requestedName != "" {
-				watchKey += "/" + tt.requestedName
+				watchKey += tt.requestedName
 			}
 
 			predicate := CreatePodPredicate(tt.fieldSelector, false, tt.indexFields)
@@ -738,7 +752,7 @@ func RunTestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.
 				Predicate:       predicate,
 				Recursive:       true,
 			}
-			if err := store.GetList(ctx, "/pods", opts, list); err != nil {
+			if err := store.GetList(ctx, "/pods/", opts, list); err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
 
@@ -753,7 +767,7 @@ func RunTestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.
 			currentObjs := map[string]*example.Pod{}
 			for _, watchTest := range tt.watchTests {
 				out := &example.Pod{}
-				key := "pods/" + watchTest.obj.Name
+				key := "/pods/" + watchTest.obj.Name
 				err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 					func(runtime.Object) (runtime.Object, error) {
 						obj := watchTest.obj.DeepCopy()
@@ -1036,11 +1050,11 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 			ctx = genericapirequest.WithRequestInfo(ctx, requestInfo)
 			ctx = genericapirequest.WithNamespace(ctx, tt.requestedNamespace)
 
-			watchKey := "/pods"
+			watchKey := "/pods/"
 			if tt.requestedNamespace != "" {
-				watchKey += "/" + tt.requestedNamespace
+				watchKey += tt.requestedNamespace + "/"
 				if tt.requestedName != "" {
-					watchKey += "/" + tt.requestedName
+					watchKey += tt.requestedName
 				}
 			}
 
@@ -1052,7 +1066,7 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 				Predicate:       predicate,
 				Recursive:       true,
 			}
-			if err := store.GetList(ctx, "/pods", opts, list); err != nil {
+			if err := store.GetList(ctx, "/pods/", opts, list); err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
 
@@ -1067,7 +1081,7 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 			currentObjs := map[string]*example.Pod{}
 			for _, watchTest := range tt.watchTests {
 				out := &example.Pod{}
-				key := "pods/" + watchTest.obj.Namespace + "/" + watchTest.obj.Name
+				key := "/pods/" + watchTest.obj.Namespace + "/" + watchTest.obj.Name
 				err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 					func(runtime.Object) (runtime.Object, error) {
 						obj := watchTest.obj.DeepCopy()
@@ -1180,7 +1194,7 @@ func RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx context.Context
 		Predicate: storage.Everything,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/pods", storageOpts, list); err != nil {
+	if err := store.GetList(ctx, "/pods/", storageOpts, list); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	startRV := list.ResourceVersion
@@ -1273,8 +1287,8 @@ func RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx context.Context
 // In that case we expect a watch request to be established.
 func RunSendInitialEventsBackwardCompatibility(ctx context.Context, t *testing.T, store storage.Interface) {
 	opts := storage.ListOptions{Predicate: storage.Everything}
-	opts.SendInitialEvents = pointer.Bool(true)
-	w, err := store.Watch(ctx, "/pods", opts)
+	opts.SendInitialEvents = ptr.To(true)
+	w, err := store.Watch(ctx, "/pods/", opts)
 	require.NoError(t, err)
 	w.Stop()
 }
@@ -1688,7 +1702,7 @@ func RunWatchListMatchSingle(ctx context.Context, t *testing.T, store storage.In
 	opts.SendInitialEvents = &trueVal
 	opts.Predicate.AllowWatchBookmarks = true
 
-	w, err := store.Watch(context.Background(), "/pods", opts)
+	w, err := store.Watch(context.Background(), "/pods/", opts)
 	require.NoError(t, err, "failed to create watch: %v")
 	defer w.Stop()
 
@@ -1741,7 +1755,7 @@ func RunWatchErrorIsBlockingFurtherEvents(ctx context.Context, t *testing.T, sto
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			w, err := store.Watch(ctx, "/pods", opts)
+			w, err := store.Watch(ctx, "/pods/", opts)
 			if err != nil {
 				t.Errorf("failed to create watch: %v", err)
 				return

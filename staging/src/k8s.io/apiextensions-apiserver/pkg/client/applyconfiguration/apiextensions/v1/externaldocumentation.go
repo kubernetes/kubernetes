@@ -20,6 +20,8 @@ package v1
 
 // ExternalDocumentationApplyConfiguration represents a declarative configuration of the ExternalDocumentation type for use
 // with apply.
+//
+// ExternalDocumentation allows referencing an external resource for extended documentation.
 type ExternalDocumentationApplyConfiguration struct {
 	Description *string `json:"description,omitempty"`
 	URL         *string `json:"url,omitempty"`
@@ -30,7 +32,6 @@ type ExternalDocumentationApplyConfiguration struct {
 func ExternalDocumentation() *ExternalDocumentationApplyConfiguration {
 	return &ExternalDocumentationApplyConfiguration{}
 }
-func (b ExternalDocumentationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithDescription sets the Description field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -35,6 +35,8 @@ type RemoteRuntime struct {
 	RuntimeService *apitest.FakeRuntimeService
 	// Fake image service.
 	ImageService *apitest.FakeImageService
+	kubeapi.UnsafeImageServiceServer
+	kubeapi.UnsafeRuntimeServiceServer
 }
 
 // NewFakeRemoteRuntime creates a new RemoteRuntime.
@@ -370,4 +372,9 @@ func (f *RemoteRuntime) RuntimeConfig(ctx context.Context, req *kubeapi.RuntimeC
 // UpdatePodSandboxResources synchronously updates the PodSandboxConfig.
 func (f *RemoteRuntime) UpdatePodSandboxResources(ctx context.Context, req *kubeapi.UpdatePodSandboxResourcesRequest) (*kubeapi.UpdatePodSandboxResourcesResponse, error) {
 	return f.RuntimeService.UpdatePodSandboxResources(ctx, req)
+}
+
+// Close will shutdown the internal gRPC client connection.
+func (f *RemoteRuntime) Close() error {
+	return f.RuntimeService.Close()
 }

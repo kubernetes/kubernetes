@@ -51,7 +51,6 @@ import (
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/ptr"
 )
 
 var (
@@ -339,6 +338,7 @@ type Cacher struct {
 	bookmarkWatchers *watcherBookmarkTimeBuckets
 	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
 	expiredBookmarkWatchers []*cacheWatcher
+	compactor               *compactor
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -374,8 +374,18 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		config.Clock = clock.RealClock{}
 	}
 	objType := reflect.TypeOf(obj)
+	resourcePrefix := config.ResourcePrefix
+	if resourcePrefix == "" {
+		return nil, fmt.Errorf("resourcePrefix cannot be empty")
+	}
+	if resourcePrefix == "/" {
+		return nil, fmt.Errorf("resourcePrefix cannot be /")
+	}
+	if !strings.HasPrefix(resourcePrefix, "/") {
+		return nil, fmt.Errorf("resourcePrefix needs to start from /")
+	}
 	cacher := &Cacher{
-		resourcePrefix: config.ResourcePrefix,
+		resourcePrefix: resourcePrefix,
 		ready:          newReady(config.Clock),
 		storage:        config.Storage,
 		objectType:     objType,
@@ -425,9 +435,9 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	progressRequester := progress.NewConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers,
-		config.Clock, eventFreshDuration, config.GroupResource, progressRequester)
-	listerWatcher := NewListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc, contextMetadata)
-	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
+		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion)
+	listerWatcher := NewListerWatcher(config.Storage, resourcePrefix, config.NewListFunc, contextMetadata)
+	reflectorName := "storage/cacher.go:" + resourcePrefix
 
 	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0)
 	// Configure reflector's pager to for an appropriate pagination chunk size for fetching data from
@@ -437,12 +447,21 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	// We don't want to terminate all watchers as recreating all watchers puts high load on api-server.
 	// In most of the cases, leader is reelected within few cycles.
 	reflector.MaxInternalErrorRetryDuration = time.Second * 30
-	// since the watch-list is provided by the watch cache instruct
-	// the reflector to issue a regular LIST against the store
-	reflector.UseWatchList = ptr.To(false)
 
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+		err := config.Storage.EnableResourceSizeEstimation(cacher.getKeys)
+		if err != nil {
+			return nil, fmt.Errorf("failed to enable resource size estimation: %w", err)
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+		cacher.compactor = newCompactor(config.Storage, watchCache, config.Clock)
+		go cacher.compactor.Run(stopCh)
+	}
 
 	go cacher.dispatchEvents()
 	go progressRequester.Run(stopCh)
@@ -459,7 +478,6 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 			}, time.Second, stopCh,
 		)
 	}()
-
 	return cacher, nil
 }
 
@@ -487,6 +505,10 @@ type namespacedName struct {
 }
 
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	key, err := c.prepareKey(key, opts.Recursive)
+	if err != nil {
+		return nil, err
+	}
 	pred := opts.Predicate
 	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
@@ -654,6 +676,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 }
 
 func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	key, err := c.prepareKey(key, false)
+	if err != nil {
+		return err
+	}
 	getRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return err
@@ -698,20 +724,6 @@ func computeListLimit(opts storage.ListOptions) int64 {
 	return opts.Predicate.Limit
 }
 
-func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, opts storage.ListOptions) (listResp, string, error) {
-	if !opts.Recursive {
-		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, listRV, key)
-		if err != nil {
-			return listResp{}, "", err
-		}
-		if exists {
-			return listResp{Items: []interface{}{obj}, ResourceVersion: readResourceVersion}, "", nil
-		}
-		return listResp{ResourceVersion: readResourceVersion}, "", nil
-	}
-	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, opts)
-}
-
 type listResp struct {
 	Items           []interface{}
 	ResourceVersion uint64
@@ -719,15 +731,11 @@ type listResp struct {
 
 // GetList implements storage.Interface
 func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	// For recursive lists, we need to make sure the key ended with "/" so that we only
-	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
-	// with prefix "/a" will return all three, while with prefix "/a/" will return only
-	// "/a/b" which is the correct answer.
-	preparedKey := key
-	if opts.Recursive && !strings.HasSuffix(key, "/") {
-		preparedKey += "/"
+	preparedKey, err := c.prepareKey(key, opts.Recursive)
+	if err != nil {
+		return err
 	}
-	listRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
+	_, err = c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return err
 	}
@@ -763,7 +771,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 
-	resp, indexUsed, err := c.listItems(ctx, listRV, preparedKey, opts)
+	resp, indexUsed, err := c.watchCache.WaitUntilFreshAndGetList(ctx, preparedKey, opts)
 	if err != nil {
 		return err
 	}
@@ -1143,6 +1151,19 @@ func (c *Cacher) isStopped() bool {
 	return c.stopped
 }
 
+func (c *Cacher) Compact(resourceVersion string) error {
+	rv, err := c.versioner.ParseResourceVersion(resourceVersion)
+	if err != nil {
+		return err
+	}
+	c.watchCache.Compact(rv)
+	return nil
+}
+
+func (c *Cacher) MarkConsistent(consistent bool) {
+	c.watchCache.MarkConsistent(consistent)
+}
+
 // Stop implements the graceful termination.
 func (c *Cacher) Stop() {
 	c.stopLock.Lock()
@@ -1156,6 +1177,10 @@ func (c *Cacher) Stop() {
 	c.stopLock.Unlock()
 	close(c.stopCh)
 	c.stopWg.Wait()
+}
+
+func (c *Cacher) prepareKey(key string, recursive bool) (string, error) {
+	return storage.PrepareKey(c.resourcePrefix, key, recursive)
 }
 
 func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, triggerValue string, triggerSupported bool) func(bool) {
@@ -1287,6 +1312,14 @@ func (c *Cacher) setInitialEventsEndBookmarkIfRequested(cacheInterval *watchCach
 
 		cacheInterval.initialEventsEndBookmark = initialEventsEndBookmark
 	}
+}
+
+func (c *Cacher) getKeys(ctx context.Context) ([]string, error) {
+	rev, err := c.storage.GetCurrentResourceVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return c.watchCache.WaitUntilFreshAndGetKeys(ctx, rev)
 }
 
 func (c *Cacher) Ready() bool {

@@ -24,10 +24,16 @@ import (
 
 // ValidatingAdmissionPolicyStatusApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicyStatus type for use
 // with apply.
+//
+// ValidatingAdmissionPolicyStatus represents the status of a ValidatingAdmissionPolicy.
 type ValidatingAdmissionPolicyStatusApplyConfiguration struct {
-	ObservedGeneration *int64                           `json:"observedGeneration,omitempty"`
-	TypeChecking       *TypeCheckingApplyConfiguration  `json:"typeChecking,omitempty"`
-	Conditions         []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	// The generation observed by the controller.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// The results of type checking for each expression.
+	// Presence of this field indicates the completion of the type checking.
+	TypeChecking *TypeCheckingApplyConfiguration `json:"typeChecking,omitempty"`
+	// The conditions represent the latest available observations of a policy's current state.
+	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // ValidatingAdmissionPolicyStatusApplyConfiguration constructs a declarative configuration of the ValidatingAdmissionPolicyStatus type for use with
@@ -35,7 +41,6 @@ type ValidatingAdmissionPolicyStatusApplyConfiguration struct {
 func ValidatingAdmissionPolicyStatus() *ValidatingAdmissionPolicyStatusApplyConfiguration {
 	return &ValidatingAdmissionPolicyStatusApplyConfiguration{}
 }
-func (b ValidatingAdmissionPolicyStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

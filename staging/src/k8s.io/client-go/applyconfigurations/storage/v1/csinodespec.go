@@ -20,7 +20,11 @@ package v1
 
 // CSINodeSpecApplyConfiguration represents a declarative configuration of the CSINodeSpec type for use
 // with apply.
+//
+// CSINodeSpec holds information about the specification of all CSI drivers installed on a node
 type CSINodeSpecApplyConfiguration struct {
+	// drivers is a list of information of all CSI Drivers existing on a node.
+	// If all drivers in the list are uninstalled, this can become empty.
 	Drivers []CSINodeDriverApplyConfiguration `json:"drivers,omitempty"`
 }
 
@@ -29,7 +33,6 @@ type CSINodeSpecApplyConfiguration struct {
 func CSINodeSpec() *CSINodeSpecApplyConfiguration {
 	return &CSINodeSpecApplyConfiguration{}
 }
-func (b CSINodeSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithDrivers adds the given value to the Drivers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

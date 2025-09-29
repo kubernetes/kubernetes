@@ -27,11 +27,13 @@ import (
 // registrationServer implements the kubelet plugin registration gRPC interface.
 type registrationServer struct {
 	driverName        string
-	endpoint          string
+	draEndpointPath   string
 	supportedVersions []string
 	status            *registerapi.RegistrationStatus
 
 	getInfoError atomic.Pointer[error]
+
+	registerapi.UnsafeRegistrationServer
 }
 
 var _ registerapi.RegistrationServer = &registrationServer{}
@@ -44,7 +46,7 @@ func (e *registrationServer) GetInfo(ctx context.Context, req *registerapi.InfoR
 	return &registerapi.PluginInfo{
 		Type:              registerapi.DRAPlugin,
 		Name:              e.driverName,
-		Endpoint:          e.endpoint,
+		Endpoint:          e.draEndpointPath,
 		SupportedVersions: e.supportedVersions,
 	}, nil
 }

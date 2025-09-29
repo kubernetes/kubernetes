@@ -20,9 +20,15 @@ package v1beta2
 
 // ServiceAccountSubjectApplyConfiguration represents a declarative configuration of the ServiceAccountSubject type for use
 // with apply.
+//
+// ServiceAccountSubject holds detailed information for service-account-kind subject.
 type ServiceAccountSubjectApplyConfiguration struct {
+	// `namespace` is the namespace of matching ServiceAccount objects.
+	// Required.
 	Namespace *string `json:"namespace,omitempty"`
-	Name      *string `json:"name,omitempty"`
+	// `name` is the name of matching ServiceAccount objects, or "*" to match regardless of name.
+	// Required.
+	Name *string `json:"name,omitempty"`
 }
 
 // ServiceAccountSubjectApplyConfiguration constructs a declarative configuration of the ServiceAccountSubject type for use with
@@ -30,7 +36,6 @@ type ServiceAccountSubjectApplyConfiguration struct {
 func ServiceAccountSubject() *ServiceAccountSubjectApplyConfiguration {
 	return &ServiceAccountSubjectApplyConfiguration{}
 }
-func (b ServiceAccountSubjectApplyConfiguration) IsApplyConfiguration() {}
 
 // WithNamespace sets the Namespace field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

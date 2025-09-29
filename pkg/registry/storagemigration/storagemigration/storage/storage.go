@@ -24,7 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/registry/storagemigration/storagemigration"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"

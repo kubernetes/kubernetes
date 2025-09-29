@@ -437,12 +437,6 @@ const (
 	// Separate kubectl user preferences.
 	KubeRC FeatureGate = "KUBECTL_KUBERC"
 
-	// owner: @soltysh
-	// kep: https://kep.k8s.io/3515
-	//
-	// Improved kubectl apply --prune behavior.
-	OpenAPIV3Patch FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
-
 	// owner: @justinb
 	// kep: https://kep.k8s.io/3659
 	//
@@ -455,6 +449,12 @@ const (
 	// Transition to WebSockets.
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
+
+	// owner: @thockin
+	// kep: https://kep.k8s.io/5296
+	//
+	// Support KYAML output.
+	KYAMLOutput FeatureGate = "KUBECTL_KYAML"
 )
 
 // IsEnabled returns true iff environment variable is set to true.

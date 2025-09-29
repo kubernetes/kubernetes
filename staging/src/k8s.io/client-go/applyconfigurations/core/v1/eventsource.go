@@ -20,9 +20,13 @@ package v1
 
 // EventSourceApplyConfiguration represents a declarative configuration of the EventSource type for use
 // with apply.
+//
+// EventSource contains information for an event.
 type EventSourceApplyConfiguration struct {
+	// Component from which the event is generated.
 	Component *string `json:"component,omitempty"`
-	Host      *string `json:"host,omitempty"`
+	// Node name on which the event is generated.
+	Host *string `json:"host,omitempty"`
 }
 
 // EventSourceApplyConfiguration constructs a declarative configuration of the EventSource type for use with
@@ -30,7 +34,6 @@ type EventSourceApplyConfiguration struct {
 func EventSource() *EventSourceApplyConfiguration {
 	return &EventSourceApplyConfiguration{}
 }
-func (b EventSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithComponent sets the Component field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

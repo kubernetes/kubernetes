@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -792,9 +793,10 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
 		e2epod.NewPodClient(f).CreateSync(ctx, serverPod1)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend1)
+		framework.ExpectNoError(err)
 
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.
@@ -821,7 +823,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		e2epod.NewPodClient(f).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend2)
+		framework.ExpectNoError(err)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -924,9 +927,10 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
 		e2epod.NewPodClient(f).CreateSync(ctx, serverPod1)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend1)
+		framework.ExpectNoError(err)
 
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.
@@ -953,7 +957,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		e2epod.NewPodClient(f).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend2)
+		framework.ExpectNoError(err)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -1103,7 +1108,20 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 			framework.Failf("Service HealthCheck NodePort was not allocated")
 		}
 
-		ips := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
+		// Collect InternalIP addresses for each node.
+		nodeInternalIPs := make(map[string]sets.Set[string], len(nodes.Items))
+		for i := range nodes.Items {
+			node := &nodes.Items[i]
+			internalIPs := sets.New[string]()
+			for _, addr := range node.Status.Addresses {
+				if addr.Type == v1.NodeInternalIP && addr.Address != "" {
+					internalIPs.Insert(addr.Address)
+				}
+			}
+			if internalIPs.Len() > 0 {
+				nodeInternalIPs[node.Name] = internalIPs
+			}
+		}
 
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		svcTCPPort := int(svc.Spec.Ports[0].Port)
@@ -1128,22 +1146,24 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 
 			// HealthCheck should pass only on the node where num(endpoints) > 0
 			// All other nodes should fail the healthcheck on the service healthCheckNodePort
-			for n, internalIP := range ips {
-				// Make sure the loadbalancer picked up the health check change.
-				// Confirm traffic can reach backend through LB before checking healthcheck nodeport.
-				e2eservice.TestReachableHTTP(ctx, ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout)
-				expectedSuccess := nodes.Items[n].Name == endpointNodeName
-				port := strconv.Itoa(healthCheckNodePort)
-				ipPort := net.JoinHostPort(internalIP, port)
-				framework.Logf("Health checking %s, http://%s/healthz, expectedSuccess %v", nodes.Items[n].Name, ipPort, expectedSuccess)
-				err := testHTTPHealthCheckNodePortFromTestContainer(ctx,
-					config,
-					internalIP,
-					healthCheckNodePort,
-					e2eservice.KubeProxyEndpointLagTimeout,
-					expectedSuccess,
-					threshold)
-				framework.ExpectNoError(err)
+			for n, internalIPs := range nodeInternalIPs {
+				for ip := range internalIPs {
+					// Make sure the loadbalancer picked up the health check change.
+					// Confirm traffic can reach backend through LB before checking healthcheck nodeport.
+					e2eservice.TestReachableHTTP(ctx, ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout)
+					expectedSuccess := n == endpointNodeName
+					port := strconv.Itoa(healthCheckNodePort)
+					ipPort := net.JoinHostPort(ip, port)
+					framework.Logf("Health checking %s, http://%s/healthz, expectedSuccess %v", n, ipPort, expectedSuccess)
+					err := testHTTPHealthCheckNodePortFromTestContainer(ctx,
+						config,
+						ip,
+						healthCheckNodePort,
+						e2eservice.KubeProxyEndpointLagTimeout,
+						expectedSuccess,
+						threshold)
+					framework.ExpectNoError(err)
+				}
 			}
 
 			err = f.ClientSet.AppsV1().Deployments(namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})

@@ -20,7 +20,10 @@ package v1
 
 // SleepActionApplyConfiguration represents a declarative configuration of the SleepAction type for use
 // with apply.
+//
+// SleepAction describes a "sleep" action.
 type SleepActionApplyConfiguration struct {
+	// Seconds is the number of seconds to sleep.
 	Seconds *int64 `json:"seconds,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type SleepActionApplyConfiguration struct {
 func SleepAction() *SleepActionApplyConfiguration {
 	return &SleepActionApplyConfiguration{}
 }
-func (b SleepActionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithSeconds sets the Seconds field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

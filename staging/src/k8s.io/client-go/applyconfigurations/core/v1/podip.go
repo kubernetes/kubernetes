@@ -20,7 +20,10 @@ package v1
 
 // PodIPApplyConfiguration represents a declarative configuration of the PodIP type for use
 // with apply.
+//
+// PodIP represents a single IP address allocated to the pod.
 type PodIPApplyConfiguration struct {
+	// IP is the IP address assigned to the pod
 	IP *string `json:"ip,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type PodIPApplyConfiguration struct {
 func PodIP() *PodIPApplyConfiguration {
 	return &PodIPApplyConfiguration{}
 }
-func (b PodIPApplyConfiguration) IsApplyConfiguration() {}
 
 // WithIP sets the IP field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

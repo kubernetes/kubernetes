@@ -20,7 +20,10 @@ package v1
 
 // NodeSwapStatusApplyConfiguration represents a declarative configuration of the NodeSwapStatus type for use
 // with apply.
+//
+// NodeSwapStatus represents swap memory information.
 type NodeSwapStatusApplyConfiguration struct {
+	// Total amount of swap memory in bytes.
 	Capacity *int64 `json:"capacity,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type NodeSwapStatusApplyConfiguration struct {
 func NodeSwapStatus() *NodeSwapStatusApplyConfiguration {
 	return &NodeSwapStatusApplyConfiguration{}
 }
-func (b NodeSwapStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithCapacity sets the Capacity field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

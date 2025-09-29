@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -243,8 +244,8 @@ type Interface interface {
 		ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
-	// Count returns number of different entries under the key (generally being path prefix).
-	Count(ctx context.Context, key string) (int64, error)
+	// Stats returns storage stats.
+	Stats(ctx context.Context) (Stats, error)
 
 	// ReadinessCheck checks if the storage is ready for accepting requests.
 	ReadinessCheck() error
@@ -267,7 +268,18 @@ type Interface interface {
 	// GetCurrentResourceVersion gets the current resource version from etcd.
 	// This method issues an empty list request and reads only the ResourceVersion from the object metadata
 	GetCurrentResourceVersion(ctx context.Context) (uint64, error)
+
+	// EnableResourceSizeEstimation enables estimating resource size by providing function get keys from storage.
+	EnableResourceSizeEstimation(KeysFunc) error
+
+	// CompactRevision returns latest observed revision that was compacted.
+	// Without ListFromCacheSnapshot enabled only locally executed compaction will be observed.
+	// Returns 0 if no compaction was yet observed.
+	CompactRevision() int64
 }
+
+// KeysFunc is a function prototype to fetch keys from storage.
+type KeysFunc func(context.Context) ([]string, error)
 
 // GetOptions provides the options that may be provided for storage get operations.
 type GetOptions struct {
@@ -369,4 +381,42 @@ func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions
 		return withRev, "", fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
 	}
 	return withRev, "", nil
+}
+
+// Stats provides statistics information about storage.
+type Stats struct {
+	// ObjectCount informs about number of objects stored in the storage.
+	ObjectCount int64
+	// EstimatedAverageObjectSizeBytes informs about size of objects stored in the storage, based on size of serialized values.
+	// Value is an estimate, meaning it doesn't need to provide accurate nor consistent.
+	EstimatedAverageObjectSizeBytes int64
+}
+
+func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
+	if key == ".." ||
+		strings.HasPrefix(key, "../") ||
+		strings.HasSuffix(key, "/..") ||
+		strings.Contains(key, "/../") {
+		return "", fmt.Errorf("invalid key: %q", key)
+	}
+	if key == "." ||
+		strings.HasPrefix(key, "./") ||
+		strings.HasSuffix(key, "/.") ||
+		strings.Contains(key, "/./") {
+		return "", fmt.Errorf("invalid key: %q", key)
+	}
+	if key == "" || key == "/" {
+		return "", fmt.Errorf("empty key: %q", key)
+	}
+	// For recursive requests, we need to make sure the key ended with "/" so that we only
+	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
+	// with prefix "/a" will return all three, while with prefix "/a/" will return only
+	// "/a/b" which is the correct answer.
+	if recursive && !strings.HasSuffix(key, "/") {
+		key += "/"
+	}
+	if !strings.HasPrefix(key, resourcePrefix) {
+		return "", fmt.Errorf("invalid key: %q lacks resource prefix: %q", key, resourcePrefix)
+	}
+	return key, nil
 }

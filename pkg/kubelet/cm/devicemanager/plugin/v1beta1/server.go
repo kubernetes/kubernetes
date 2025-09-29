@@ -33,7 +33,7 @@ import (
 	"k8s.io/klog/v2"
 	api "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
@@ -59,6 +59,8 @@ type server struct {
 
 	// isStarted indicates whether the service has started successfully.
 	isStarted bool
+
+	api.UnsafeRegistrationServer
 }
 
 // NewServer returns an initialized device plugin registration server.
@@ -90,7 +92,7 @@ func (s *server) Start() error {
 	}
 
 	if selinux.GetEnabled() {
-		if err := selinux.SetFileLabel(s.socketDir, config.KubeletPluginsDirSELinuxLabel); err != nil {
+		if err := selinux.SetFileLabel(s.socketDir, kubeletconfig.KubeletPluginsDirSELinuxLabel); err != nil {
 			klog.ErrorS(err, "Unprivileged containerized plugins might not work. Could not set selinux context on socket dir", "path", s.socketDir)
 		}
 	}

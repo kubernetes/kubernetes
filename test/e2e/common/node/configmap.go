@@ -140,8 +140,12 @@ var _ = SIGDescribe("ConfigMap", func() {
 		configMap, err := newConfigMapWithEmptyKey(ctx, f)
 		gomega.Expect(err).To(gomega.HaveOccurred(), "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
 	})
-
-	ginkgo.It("should update ConfigMap successfully", func(ctx context.Context) {
+	/*
+		Release : v1.32
+		Testname: ConfigMap Update
+		Description: Ensure that a ConfigMap object can be created and then updated successfully.
+	*/
+	framework.ConformanceIt("should update ConfigMap successfully", f.WithNodeConformance(), func(ctx context.Context) {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
@@ -250,7 +254,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Allows users to use envFrom to set prefixes with various printable ASCII characters excluding '=' as environment variable names.
 		This test verifies that different prefixes including digits, special characters, and letters can be correctly used.
 	*/
-	framework.It("should be consumable as environment variable names with various prefixes", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable as environment variable names with various prefixes", func(ctx context.Context) {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))

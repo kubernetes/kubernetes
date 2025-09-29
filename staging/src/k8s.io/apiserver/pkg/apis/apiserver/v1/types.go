@@ -19,6 +19,7 @@ package v1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -185,6 +186,18 @@ type Issuer struct {
 	//   example: claimValidationRule[].expression: 'sets.equivalent(claims.aud, ["bar", "foo", "baz"])' to require an exact match.
 	// +optional
 	AudienceMatchPolicy AudienceMatchPolicyType `json:"audienceMatchPolicy,omitempty"`
+
+	// egressSelectorType is an indicator of which egress selection should be used for sending all traffic related
+	// to this issuer (discovery, JWKS, distributed claims, etc).  If unspecified, no custom dialer is used.
+	// When specified, the valid choices are "controlplane" and "cluster".  These correspond to the associated
+	// values in the --egress-selector-config-file.
+	//
+	// - controlplane: for traffic intended to go to the control plane.
+	//
+	// - cluster: for traffic intended to go to the system being managed by Kubernetes.
+	//
+	// +optional
+	EgressSelectorType EgressSelectorType `json:"egressSelectorType,omitempty"`
 }
 
 // AudienceMatchPolicyType is a set of valid values for issuer.audienceMatchPolicy
@@ -194,6 +207,17 @@ type AudienceMatchPolicyType string
 const (
 	// MatchAny means the "aud" claim in the presented JWT must match at least one of the entries in the "audiences" field.
 	AudienceMatchPolicyMatchAny AudienceMatchPolicyType = "MatchAny"
+)
+
+// EgressSelectorType is an indicator of which egress selection should be used for sending traffic.
+type EgressSelectorType string
+
+const (
+	// EgressSelectorControlPlane is the EgressSelectorType for traffic intended to go to the control plane.
+	EgressSelectorControlPlane EgressSelectorType = "controlplane"
+
+	// EgressSelectorCluster is the EgressSelectorType for traffic intended to go to the system being managed by Kubernetes.
+	EgressSelectorCluster EgressSelectorType = "cluster"
 )
 
 // ClaimValidationRule provides the configuration for a single claim validation rule.
@@ -528,4 +552,14 @@ type WebhookMatchCondition struct {
 	//
 	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
 	Expression string `json:"expression"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// TracingConfiguration provides versioned configuration for tracing clients.
+type TracingConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Embed the component config tracing configuration struct
+	tracingapi.TracingConfiguration `json:",inline"`
 }

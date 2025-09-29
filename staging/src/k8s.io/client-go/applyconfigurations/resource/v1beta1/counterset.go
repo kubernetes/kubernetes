@@ -20,8 +20,23 @@ package v1beta1
 
 // CounterSetApplyConfiguration represents a declarative configuration of the CounterSet type for use
 // with apply.
+//
+// CounterSet defines a named set of counters
+// that are available to be used by devices defined in the
+// ResourceSlice.
+//
+// The counters are not allocatable by themselves, but
+// can be referenced by devices. When a device is allocated,
+// the portion of counters it uses will no longer be available for use
+// by other devices.
 type CounterSetApplyConfiguration struct {
-	Name     *string                              `json:"name,omitempty"`
+	// Name defines the name of the counter set.
+	// It must be a DNS label.
+	Name *string `json:"name,omitempty"`
+	// Counters defines the set of counters for this CounterSet
+	// The name of each counter must be unique in that set and must be a DNS label.
+	//
+	// The maximum number of counters is 32.
 	Counters map[string]CounterApplyConfiguration `json:"counters,omitempty"`
 }
 
@@ -30,7 +45,6 @@ type CounterSetApplyConfiguration struct {
 func CounterSet() *CounterSetApplyConfiguration {
 	return &CounterSetApplyConfiguration{}
 }
-func (b CounterSetApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

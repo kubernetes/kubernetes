@@ -25,10 +25,15 @@ import (
 
 // CronJobStatusApplyConfiguration represents a declarative configuration of the CronJobStatus type for use
 // with apply.
+//
+// CronJobStatus represents the current state of a cron job.
 type CronJobStatusApplyConfiguration struct {
-	Active             []corev1.ObjectReferenceApplyConfiguration `json:"active,omitempty"`
-	LastScheduleTime   *metav1.Time                               `json:"lastScheduleTime,omitempty"`
-	LastSuccessfulTime *metav1.Time                               `json:"lastSuccessfulTime,omitempty"`
+	// A list of pointers to currently running jobs.
+	Active []corev1.ObjectReferenceApplyConfiguration `json:"active,omitempty"`
+	// Information when was the last time the job was successfully scheduled.
+	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
+	// Information when was the last time the job successfully completed.
+	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 }
 
 // CronJobStatusApplyConfiguration constructs a declarative configuration of the CronJobStatus type for use with
@@ -36,7 +41,6 @@ type CronJobStatusApplyConfiguration struct {
 func CronJobStatus() *CronJobStatusApplyConfiguration {
 	return &CronJobStatusApplyConfiguration{}
 }
-func (b CronJobStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithActive adds the given value to the Active field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

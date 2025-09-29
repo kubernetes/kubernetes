@@ -20,6 +20,7 @@
       "github.com/bketelsen/crypt": "unused, crypto",
       "github.com/containerd/cgroups": "standardize on single cgroups library from runc, refer #128157",
       "github.com/davecgh/go-spew": "refer to #103942",
+      "github.com/evanphx/json-patch/v5": "refer to https://github.com/kubernetes/kubernetes/pull/91622#issuecomment-637087847",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
       "github.com/getsentry/raven-go": "unmaintained, archive mode",
       "github.com/go-bindata/go-bindata": "refer to #99829",
@@ -84,6 +85,7 @@
       "google.golang.org/appengine": "cloud dependency",
       "google.golang.org/genproto": "refer to #113366",
       "gopkg.in/square/go-jose.v2": "obsolete, use gopkg.in/go-jose/go-jose.v2",
+      "gopkg.in/evanphx/json-patch.v5": "refer to https://github.com/kubernetes/kubernetes/pull/91622#issuecomment-637087847",
       "gopkg.in/fsnotify.v1": "obsolete, use github.com/fsnotify/fsnotify",
       "gopkg.in/yaml.v2": "prefer sigs.k8s.io/yaml",
       "gopkg.in/yaml.v3": "prefer sigs.k8s.io/yaml/goyaml.v3",
@@ -149,14 +151,8 @@
         "k8s.io/apiextensions-apiserver",
         "k8s.io/apimachinery",
         "k8s.io/apiserver",
-        "k8s.io/client-go",
         "k8s.io/code-generator",
-        "k8s.io/cri-api",
-        "k8s.io/externaljwt",
-        "k8s.io/kms",
         "k8s.io/kube-aggregator",
-        "k8s.io/kubelet",
-        "k8s.io/kubernetes",
         "k8s.io/metrics"
       ],
       "github.com/golang/groupcache": [
@@ -178,10 +174,6 @@
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go"
       ],
-      "github.com/google/shlex": [
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5"
-      ],
       "github.com/gregjones/httpcache": [
         "k8s.io/client-go"
       ],
@@ -192,7 +184,7 @@
         "github.com/prometheus/client_golang",
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
-        "sigs.k8s.io/structured-merge-diff/v4"
+        "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/klauspost/compress": [
         "github.com/prometheus/client_golang",
@@ -212,13 +204,14 @@
         "github.com/prometheus/client_golang",
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
-        "sigs.k8s.io/structured-merge-diff/v4"
+        "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/modern-go/reflect2": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
-        "k8s.io/kube-openapi"
+        "k8s.io/kube-openapi",
+        "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/pkg/errors": [
         "github.com/Microsoft/hnslib",
@@ -234,11 +227,8 @@
         "github.com/google/cel-go",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2"
       ],
-      "gopkg.in/yaml.v2": [
-        "github.com/prometheus/client_golang",
-        "github.com/prometheus/common"
-      ],
       "gopkg.in/yaml.v3": [
+        "github.com/containerd/containerd/api",
         "github.com/coreos/go-semver",
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
@@ -247,7 +237,6 @@
         "github.com/go-task/slim-sprig/v3",
         "github.com/google/cadvisor",
         "github.com/google/cel-go",
-        "github.com/google/gnostic-models",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "github.com/grpc-ecosystem/grpc-gateway/v2",
@@ -287,7 +276,6 @@
       "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
-      "github.com/google/shlex",
       "github.com/gregjones/httpcache",
       "github.com/grpc-ecosystem/go-grpc-prometheus",
       "github.com/json-iterator/go",

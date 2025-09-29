@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
@@ -47,9 +48,9 @@ import (
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/keyutil"
+	basecompatibility "k8s.io/component-base/compatibility"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
-
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
@@ -102,6 +103,11 @@ type Extra struct {
 	SystemNamespaces []string
 
 	VersionedInformers clientgoinformers.SharedInformerFactory
+
+	// Coordinated Leader Election timers
+	CoordinatedLeadershipLeaseDuration time.Duration
+	CoordinatedLeadershipRenewDeadline time.Duration
+	CoordinatedLeadershipRetryPeriod   time.Duration
 }
 
 // BuildGenericConfig takes the generic controlplane apiserver options and produces
@@ -302,6 +308,10 @@ func CreateConfig(
 			ExtendExpiration:                    opts.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
+
+			CoordinatedLeadershipLeaseDuration: opts.CoordinatedLeadershipLeaseDuration,
+			CoordinatedLeadershipRenewDeadline: opts.CoordinatedLeadershipRenewDeadline,
+			CoordinatedLeadershipRetryPeriod:   opts.CoordinatedLeadershipRetryPeriod,
 		},
 	}
 
@@ -370,6 +380,7 @@ func CreateConfig(
 		clientgoExternalClient,
 		dynamicExternalClient,
 		utilfeature.DefaultFeatureGate,
+		compatibility.DefaultComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent),
 		append(genericInitializers, additionalInitializers...)...,
 	)
 	if err != nil {

@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -79,10 +80,6 @@ var (
 type Waiter interface {
 	// WaitForControlPlaneComponents waits for all control plane components to be ready.
 	WaitForControlPlaneComponents(podMap map[string]*v1.Pod, apiServerAddress string) error
-	// WaitForAPI waits for the API Server's /healthz endpoint to become "ok"
-	// TODO: remove WaitForAPI once WaitForAllControlPlaneComponents goes GA:
-	// https://github.com/kubernetes/kubeadm/issues/2907
-	WaitForAPI() error
 	// WaitForPodsWithLabel waits for Pods in the kube-system namespace to become Ready
 	WaitForPodsWithLabel(kvLabel string) error
 	// WaitForStaticPodSingleHash fetches sha256 hash for the control plane static pod
@@ -322,32 +319,6 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 	return utilerrors.NewAggregate(errs)
 }
 
-// WaitForAPI waits for the API Server's /healthz endpoint to report "ok"
-func (w *KubeWaiter) WaitForAPI() error {
-	_, _ = fmt.Fprintf(w.writer, "[api-check] Waiting for a healthy API server. This can take up to %v\n", w.timeout)
-
-	start := time.Now()
-	err := wait.PollUntilContextTimeout(
-		context.Background(),
-		constants.KubernetesAPICallRetryInterval,
-		w.timeout,
-		true, func(ctx context.Context) (bool, error) {
-			healthStatus := 0
-			w.client.Discovery().RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&healthStatus)
-			if healthStatus != http.StatusOK {
-				return false, nil
-			}
-			return true, nil
-		})
-	if err != nil {
-		_, _ = fmt.Fprintf(w.writer, "[api-check] The API server is not healthy after %v\n", time.Since(start))
-		return err
-	}
-
-	_, _ = fmt.Fprintf(w.writer, "[api-check] The API server is healthy after %v\n", time.Since(start))
-	return nil
-}
-
 // WaitForPodsWithLabel will lookup pods with the given label and wait until they are all
 // reporting status as running.
 func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
@@ -357,7 +328,7 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 		constants.KubernetesAPICallRetryInterval, w.timeout,
 		true, func(_ context.Context) (bool, error) {
 			listOpts := metav1.ListOptions{LabelSelector: kvLabel}
-			pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
+			pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(context.Background(), listOpts)
 			if err != nil {
 				_, _ = fmt.Fprintf(w.writer, "[apiclient] Error getting Pods with label selector %q [%v]\n", kvLabel, err)
 				return false, nil
@@ -387,7 +358,8 @@ func (w *KubeWaiter) WaitForKubelet(healthzAddress string, healthzPort int32) er
 	var (
 		lastError       error
 		start           = time.Now()
-		healthzEndpoint = fmt.Sprintf("http://%s:%d/healthz", healthzAddress, healthzPort)
+		addrPort        = net.JoinHostPort(healthzAddress, strconv.Itoa(int(healthzPort)))
+		healthzEndpoint = fmt.Sprintf("http://%s/healthz", addrPort)
 	)
 
 	if healthzPort == 0 {
@@ -523,7 +495,7 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 func getStaticPodSingleHash(client clientset.Interface, nodeName string, component string) (string, error) {
 
 	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
-	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), staticPodName, metav1.GetOptions{})
+	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.Background(), staticPodName, metav1.GetOptions{})
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to obtain static Pod hash for component %s on Node %s", component, nodeName)
 	}

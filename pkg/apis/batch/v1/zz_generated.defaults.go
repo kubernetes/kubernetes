@@ -154,6 +154,12 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -222,6 +228,12 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -289,6 +301,12 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
 				}
 			}
 		}
@@ -472,6 +490,12 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -540,6 +564,12 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
 			}
 		}
 		apiscorev1.SetDefaults_ResourceList(&a.Resources.Limits)
@@ -607,6 +637,12 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
 					apiscorev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+				if b.ValueFrom.FileKeyRef != nil {
+					if b.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						b.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
 				}
 			}
 		}

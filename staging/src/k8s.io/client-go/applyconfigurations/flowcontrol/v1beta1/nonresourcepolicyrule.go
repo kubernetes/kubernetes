@@ -20,8 +20,24 @@ package v1beta1
 
 // NonResourcePolicyRuleApplyConfiguration represents a declarative configuration of the NonResourcePolicyRule type for use
 // with apply.
+//
+// NonResourcePolicyRule is a predicate that matches non-resource requests according to their verb and the
+// target non-resource URL. A NonResourcePolicyRule matches a request if and only if both (a) at least one member
+// of verbs matches the request and (b) at least one member of nonResourceURLs matches the request.
 type NonResourcePolicyRuleApplyConfiguration struct {
-	Verbs           []string `json:"verbs,omitempty"`
+	// `verbs` is a list of matching verbs and may not be empty.
+	// "*" matches all verbs. If it is present, it must be the only entry.
+	// Required.
+	Verbs []string `json:"verbs,omitempty"`
+	// `nonResourceURLs` is a set of url prefixes that a user should have access to and may not be empty.
+	// For example:
+	// - "/healthz" is legal
+	// - "/hea*" is illegal
+	// - "/hea" is legal but matches nothing
+	// - "/hea/*" also matches nothing
+	// - "/healthz/*" matches all per-component health checks.
+	// "*" matches all non-resource urls. if it is present, it must be the only entry.
+	// Required.
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty"`
 }
 
@@ -30,7 +46,6 @@ type NonResourcePolicyRuleApplyConfiguration struct {
 func NonResourcePolicyRule() *NonResourcePolicyRuleApplyConfiguration {
 	return &NonResourcePolicyRuleApplyConfiguration{}
 }
-func (b NonResourcePolicyRuleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithVerbs adds the given value to the Verbs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

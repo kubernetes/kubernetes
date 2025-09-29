@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 
@@ -57,15 +58,15 @@ func noObjectTTL() (time.Duration, bool) {
 	return time.Duration(0), false
 }
 
-func getSecret(fakeClient clientset.Interface) GetObjectFunc {
+func getSecret(ctx context.Context, fakeClient clientset.Interface) GetObjectFunc {
 	return func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-		return fakeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, opts)
+		return fakeClient.CoreV1().Secrets(namespace).Get(ctx, name, opts)
 	}
 }
 
-func newSecretStore(fakeClient clientset.Interface, clock clock.Clock, getTTL GetObjectTTLFunc, ttl time.Duration) *objectStore {
+func newSecretStore(ctx context.Context, fakeClient clientset.Interface, clock clock.Clock, getTTL GetObjectTTLFunc, ttl time.Duration) *objectStore {
 	return &objectStore{
-		getObject:  getSecret(fakeClient),
+		getObject:  getSecret(ctx, fakeClient),
 		clock:      clock,
 		items:      make(map[objectKey]*objectStoreItem),
 		defaultTTL: ttl,
@@ -87,8 +88,9 @@ func newCacheBasedSecretManager(store Store) Manager {
 }
 
 func TestSecretStore(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
-	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
+	store := newSecretStore(tCtx, fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	store.AddReference("ns1", "name1", "pod1")
 	store.AddReference("ns2", "name2", "pod2")
 	store.AddReference("ns1", "name1", "pod3")
@@ -121,8 +123,9 @@ func TestSecretStore(t *testing.T) {
 }
 
 func TestSecretStoreDeletingSecret(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
-	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
+	store := newSecretStore(tCtx, fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	store.AddReference("ns", "name", "pod")
 
 	result := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "name", ResourceVersion: "10"}}
@@ -150,9 +153,10 @@ func TestSecretStoreDeletingSecret(t *testing.T) {
 }
 
 func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, 0)
+	store := newSecretStore(tCtx, fakeClient, fakeClock, noObjectTTL, 0)
 
 	for i := 0; i < 10; i++ {
 		store.AddReference(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i), types.UID(fmt.Sprintf("pod-%d", i)))
@@ -177,9 +181,10 @@ func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 }
 
 func TestSecretStoreGetNeverRefresh(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
+	store := newSecretStore(tCtx, fakeClient, fakeClock, noObjectTTL, time.Minute)
 
 	for i := 0; i < 10; i++ {
 		store.AddReference(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i), types.UID(fmt.Sprintf("pod-%d", i)))
@@ -207,9 +212,10 @@ func TestCustomTTL(t *testing.T) {
 		return ttl, ttlExists
 	}
 
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
 	fakeClock := testingclock.NewFakeClock(time.Time{})
-	store := newSecretStore(fakeClient, fakeClock, customTTL, time.Minute)
+	store := newSecretStore(tCtx, fakeClient, fakeClock, customTTL, time.Minute)
 
 	store.AddReference("ns", "name", "pod")
 	store.Get("ns", "name")
@@ -383,9 +389,10 @@ func podWithSecretsAndUID(ns, podName, podUID string, toAttach secretsToAttach) 
 }
 
 func TestCacheInvalidation(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
+	store := newSecretStore(tCtx, fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := newCacheBasedSecretManager(store)
 
 	// Create a pod with some secrets.
@@ -438,9 +445,10 @@ func TestCacheInvalidation(t *testing.T) {
 }
 
 func TestResourceContentExpired(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
+	store := newSecretStore(tCtx, fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := newCacheBasedSecretManager(store)
 
 	// Create a pod with some secrets.
@@ -463,9 +471,10 @@ func TestResourceContentExpired(t *testing.T) {
 }
 
 func TestRegisterIdempotence(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
+	store := newSecretStore(tCtx, fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := newCacheBasedSecretManager(store)
 
 	s1 := secretsToAttach{
@@ -498,9 +507,10 @@ func TestRegisterIdempotence(t *testing.T) {
 }
 
 func TestCacheRefcounts(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
+	store := newSecretStore(tCtx, fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := newCacheBasedSecretManager(store)
 
 	s1 := secretsToAttach{
@@ -619,8 +629,9 @@ func TestCacheRefcounts(t *testing.T) {
 }
 
 func TestCacheBasedSecretManager(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
-	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
+	store := newSecretStore(tCtx, fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	manager := newCacheBasedSecretManager(store)
 
 	// Create a pod with some secrets.

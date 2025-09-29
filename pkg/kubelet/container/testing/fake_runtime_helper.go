@@ -24,6 +24,7 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -38,6 +39,7 @@ type FakeRuntimeHelper struct {
 	PodContainerDir string
 	RuntimeHandlers map[string]kubecontainer.RuntimeHandler
 	Err             error
+	PodStats        map[kubetypes.UID]*statsapi.PodStats
 }
 
 func (f *FakeRuntimeHelper) GenerateRunContainerOptions(_ context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
@@ -117,4 +119,11 @@ func (f *FakeRuntimeHelper) UnprepareDynamicResources(ctx context.Context, pod *
 
 func (f *FakeRuntimeHelper) SetPodWatchCondition(_ kubetypes.UID, _ string, _ func(*kubecontainer.PodStatus) bool) {
 	// Not implemented.
+}
+
+func (f *FakeRuntimeHelper) PodCPUAndMemoryStats(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	if stats, ok := f.PodStats[pod.UID]; ok {
+		return stats, nil
+	}
+	return nil, fmt.Errorf("stats for pod %q not found", pod.UID)
 }

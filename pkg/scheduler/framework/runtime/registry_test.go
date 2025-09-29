@@ -24,7 +24,7 @@ import (
 	"github.com/google/uuid"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
 func TestDecodeInto(t *testing.T) {
@@ -110,7 +110,7 @@ func (p *mockNoopPlugin) Name() string {
 
 func NewMockNoopPluginFactory() PluginFactory {
 	uuid := uuid.New().String()
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &mockNoopPlugin{uuid}, nil
 	}
 }

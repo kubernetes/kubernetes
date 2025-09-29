@@ -20,8 +20,16 @@ package v1
 
 // EndpointHintsApplyConfiguration represents a declarative configuration of the EndpointHints type for use
 // with apply.
+//
+// EndpointHints provides hints describing how an endpoint should be consumed.
 type EndpointHintsApplyConfiguration struct {
+	// forZones indicates the zone(s) this endpoint should be consumed by when
+	// using topology aware routing. May contain a maximum of 8 entries.
 	ForZones []ForZoneApplyConfiguration `json:"forZones,omitempty"`
+	// forNodes indicates the node(s) this endpoint should be consumed by when
+	// using topology aware routing. May contain a maximum of 8 entries.
+	// This is an Alpha feature and is only used when the PreferSameTrafficDistribution
+	// feature gate is enabled.
 	ForNodes []ForNodeApplyConfiguration `json:"forNodes,omitempty"`
 }
 
@@ -30,7 +38,6 @@ type EndpointHintsApplyConfiguration struct {
 func EndpointHints() *EndpointHintsApplyConfiguration {
 	return &EndpointHintsApplyConfiguration{}
 }
-func (b EndpointHintsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithForZones adds the given value to the ForZones field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

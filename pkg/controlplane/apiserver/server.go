@@ -38,7 +38,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/component-base/zpages/flagz"
-	"k8s.io/component-base/zpages/statusz"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -162,10 +161,6 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(s.GenericAPIServer.Handler.NonGoRestfulMux, name, statusz.NewRegistry(c.Generic.EffectiveVersion))
-	}
-
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.CoordinatedLeaderElection) {
 		leaseInformer := s.VersionedInformers.Coordination().V1().Leases()
 		lcInformer := s.VersionedInformers.Coordination().V1beta1().LeaseCandidates()
@@ -190,6 +185,10 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 					go controller.Run(ctx, workers)
 					go gccontroller.Run(ctx)
 				}, err
+			}, leaderelection.LeaderElectionTimers{
+				LeaseDuration: c.CoordinatedLeadershipLeaseDuration,
+				RenewDeadline: c.CoordinatedLeadershipRenewDeadline,
+				RetryPeriod:   c.CoordinatedLeadershipRetryPeriod,
 			})
 			return nil
 		})

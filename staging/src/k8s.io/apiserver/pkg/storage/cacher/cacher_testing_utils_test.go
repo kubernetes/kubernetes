@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
@@ -37,6 +38,7 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
+	"k8s.io/utils/clock"
 )
 
 var (
@@ -59,18 +61,25 @@ func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServ
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	versioner := storage.APIObjectVersioner{}
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	storage := etcd3.New(
+	compactor := etcd3.NewCompactor(server.V3Client.Client, 0, clock.RealClock{}, nil)
+	t.Cleanup(compactor.Stop)
+	storage, err := etcd3.New(
 		server.V3Client,
+		compactor,
 		codec,
 		newPod,
 		newPodList,
 		prefix,
-		"/pods",
+		"/pods/",
 		schema.GroupResource{Resource: "pods"},
 		identity.NewEncryptCheckTransformer(),
 		etcd3.NewDefaultLeaseManagerConfig(),
 		etcd3.NewDefaultDecoder(codec, versioner),
 		versioner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(storage.Close)
 	return server, storage
 }
 
@@ -78,7 +87,7 @@ func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
-func compactWatchCache(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
+func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
@@ -123,10 +132,45 @@ func compactWatchCache(c *CacheDelegator, client *clientv3.Client) storagetestin
 	}
 }
 
-func increaseRV(client *clientv3.Client) storagetesting.IncreaseRVFunc {
-	return func(ctx context.Context, t *testing.T) {
-		if _, err := client.KV.Put(ctx, "increaseRV", "ok"); err != nil {
+func compactStore(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
+	return func(ctx context.Context, t *testing.T, resourceVersion string) {
+		versioner := storage.APIObjectVersioner{}
+		rv, err := versioner.ParseResourceVersion(resourceVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var currentVersion int64
+		currentVersion, _, _, err = etcd3.Compact(ctx, client, currentVersion, int64(rv))
+		if err != nil {
+			_, _, _, err = etcd3.Compact(ctx, client, currentVersion, int64(rv))
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Wait for compaction to be observed.
+		if c.cacher.compactor != nil {
+			for {
+				select {
+				case <-ctx.Done():
+					t.Fatal(ctx.Err())
+				case <-time.After(100 * time.Millisecond):
+				}
+				compactedRev := c.storage.CompactRevision()
+				if compactedRev == int64(rv) {
+					break
+				}
+			}
+			c.cacher.compactor.compactIfNeeded()
+		}
+	}
+}
+
+func increaseRVFunc(client *clientv3.Client) storagetesting.IncreaseRVFunc {
+	return func(ctx context.Context, t *testing.T) int64 {
+		resp, err := client.KV.Put(ctx, "increaseRV", "ok")
+		if err != nil {
 			t.Fatalf("Could not update increaseRV: %v", err)
 		}
+		return resp.Header.Revision
 	}
 }

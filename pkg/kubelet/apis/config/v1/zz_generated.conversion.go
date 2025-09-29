@@ -157,6 +157,7 @@ func Convert_config_ExecEnvVar_To_v1_ExecEnvVar(in *config.ExecEnvVar, out *conf
 
 func autoConvert_v1_ServiceAccountTokenAttributes_To_config_ServiceAccountTokenAttributes(in *configv1.ServiceAccountTokenAttributes, out *config.ServiceAccountTokenAttributes, s conversion.Scope) error {
 	out.ServiceAccountTokenAudience = in.ServiceAccountTokenAudience
+	out.CacheType = config.ServiceAccountTokenCacheType(in.CacheType)
 	out.RequireServiceAccount = (*bool)(unsafe.Pointer(in.RequireServiceAccount))
 	out.RequiredServiceAccountAnnotationKeys = *(*[]string)(unsafe.Pointer(&in.RequiredServiceAccountAnnotationKeys))
 	out.OptionalServiceAccountAnnotationKeys = *(*[]string)(unsafe.Pointer(&in.OptionalServiceAccountAnnotationKeys))
@@ -170,6 +171,7 @@ func Convert_v1_ServiceAccountTokenAttributes_To_config_ServiceAccountTokenAttri
 
 func autoConvert_config_ServiceAccountTokenAttributes_To_v1_ServiceAccountTokenAttributes(in *config.ServiceAccountTokenAttributes, out *configv1.ServiceAccountTokenAttributes, s conversion.Scope) error {
 	out.ServiceAccountTokenAudience = in.ServiceAccountTokenAudience
+	out.CacheType = configv1.ServiceAccountTokenCacheType(in.CacheType)
 	out.RequireServiceAccount = (*bool)(unsafe.Pointer(in.RequireServiceAccount))
 	out.RequiredServiceAccountAnnotationKeys = *(*[]string)(unsafe.Pointer(&in.RequiredServiceAccountAnnotationKeys))
 	out.OptionalServiceAccountAnnotationKeys = *(*[]string)(unsafe.Pointer(&in.OptionalServiceAccountAnnotationKeys))

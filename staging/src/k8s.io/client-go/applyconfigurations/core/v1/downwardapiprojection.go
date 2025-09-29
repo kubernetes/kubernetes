@@ -20,7 +20,12 @@ package v1
 
 // DownwardAPIProjectionApplyConfiguration represents a declarative configuration of the DownwardAPIProjection type for use
 // with apply.
+//
+// Represents downward API info for projecting into a projected volume.
+// Note that this is identical to a downwardAPI volume source without the default
+// mode.
 type DownwardAPIProjectionApplyConfiguration struct {
+	// Items is a list of DownwardAPIVolume file
 	Items []DownwardAPIVolumeFileApplyConfiguration `json:"items,omitempty"`
 }
 
@@ -29,7 +34,6 @@ type DownwardAPIProjectionApplyConfiguration struct {
 func DownwardAPIProjection() *DownwardAPIProjectionApplyConfiguration {
 	return &DownwardAPIProjectionApplyConfiguration{}
 }
-func (b DownwardAPIProjectionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithItems adds the given value to the Items field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

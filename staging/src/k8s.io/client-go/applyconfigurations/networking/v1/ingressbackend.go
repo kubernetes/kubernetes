@@ -24,8 +24,16 @@ import (
 
 // IngressBackendApplyConfiguration represents a declarative configuration of the IngressBackend type for use
 // with apply.
+//
+// IngressBackend describes all endpoints for a given service and port.
 type IngressBackendApplyConfiguration struct {
-	Service  *IngressServiceBackendApplyConfiguration            `json:"service,omitempty"`
+	// service references a service as a backend.
+	// This is a mutually exclusive setting with "Resource".
+	Service *IngressServiceBackendApplyConfiguration `json:"service,omitempty"`
+	// resource is an ObjectRef to another Kubernetes resource in the namespace
+	// of the Ingress object. If resource is specified, a service.Name and
+	// service.Port must not be specified.
+	// This is a mutually exclusive setting with "Service".
 	Resource *corev1.TypedLocalObjectReferenceApplyConfiguration `json:"resource,omitempty"`
 }
 
@@ -34,7 +42,6 @@ type IngressBackendApplyConfiguration struct {
 func IngressBackend() *IngressBackendApplyConfiguration {
 	return &IngressBackendApplyConfiguration{}
 }
-func (b IngressBackendApplyConfiguration) IsApplyConfiguration() {}
 
 // WithService sets the Service field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

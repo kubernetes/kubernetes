@@ -22,18 +22,17 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
-
-	"k8s.io/code-generator/cmd/validation-gen/util"
 )
 
 const (
 	requiredTagName  = "k8s:required"
 	optionalTagName  = "k8s:optional"
 	forbiddenTagName = "k8s:forbidden"
-	defaultTagName   = "default" // TODO: this should evenually be +k8s:default
+	defaultTagName   = "default" // TODO: this should eventually be +k8s:default
 )
 
 func init() {

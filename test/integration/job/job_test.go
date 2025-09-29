@@ -1588,6 +1588,9 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 			if !test.enableJobSuccessPolicy {
 				// TODO: this will be removed in 1.36.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			} else if !test.enableJobPodReplacementPolicy {
+				// TODO: this will be removed in 1.37.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, test.enableJobManagedBy)
@@ -3196,6 +3199,10 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 	for name, tc := range cases {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
+			if !tc.podReplacementPolicyEnabled {
+				// TODO: this will be removed in 1.37.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.podReplacementPolicyEnabled)
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -3262,6 +3269,8 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 // Enabling will then match the original failed case.
 func TestJobPodReplacementPolicyFeatureToggling(t *testing.T) {
 	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
+	// TODO: this will be removed in 1.37.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 	const podCount int32 = 2
 	jobSpec := batchv1.JobSpec{
 		Parallelism:          ptr.To(podCount),
@@ -4079,6 +4088,29 @@ func TestSuspendJob(t *testing.T) {
 			}
 			validate("update", tc.update.wantActive, tc.update.wantStatus, tc.update.wantReason)
 		})
+	}
+}
+
+// TestSuspendJobWithZeroCompletions verifies the suspended Job with
+// completions=0 is marked as Complete.
+func TestSuspendJobWithZeroCompletions(t *testing.T) {
+	closeFn, restConfig, clientSet, ns := setup(t, "suspended-with-zero-completions")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(func() {
+		cancel()
+	})
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Completions: ptr.To[int32](0),
+			Suspend:     ptr.To(true),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+	for _, condition := range []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete} {
+		validateJobCondition(ctx, t, clientSet, jobObj, condition)
 	}
 }
 

@@ -27,11 +27,14 @@ import (
 	"testing"
 	"time"
 
+	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -61,9 +64,10 @@ func TestNodeAuthorizer(t *testing.T) {
 		uniqueResourceClaimTemplatesPerPod: 1,
 		uniqueResourceClaimTemplatesWithClaimPerPod: 1,
 		nodeResourceSlicesPerNode:                   2,
+		podCertificateRequestsPerPod:                2,
 	}
-	nodes, pods, pvs, attachments, slices := generate(opts)
-	populate(g, nodes, pods, pvs, attachments, slices)
+	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
+	populate(g, nodes, pods, pvs, attachments, slices, pcrs)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
 	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
@@ -72,23 +76,41 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	nodeunregistered := &user.DefaultInfo{Name: "system:node:nodeunregistered", Groups: []string{"system:nodes"}}
 
-	selectorAuthzDisabled := utilfeature.DefaultFeatureGate.DeepCopy()
-	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzDisabled, genericfeatures.AuthorizeWithSelectors, false)
-	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzDisabled, features.AuthorizeNodeWithSelectors, false)
+	selectorAuthzDisabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, f, version.MustParse("1.33"))
+		featuregatetesting.SetFeatureGateDuringTest(t, f, genericfeatures.AuthorizeWithSelectors, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.AuthorizeNodeWithSelectors, false)
+		return f
+	}
 
-	selectorAuthzEnabled := utilfeature.DefaultFeatureGate.DeepCopy()
-	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzEnabled, genericfeatures.AuthorizeWithSelectors, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzEnabled, features.AuthorizeNodeWithSelectors, true)
+	selectorAuthzEnabled := func(t testing.TB) featuregate.FeatureGate {
+		return utilfeature.DefaultFeatureGate
+	}
 
-	serviceAccountTokenForCredentialProvidersDisabled := utilfeature.DefaultFeatureGate.DeepCopy()
-	featuregatetesting.SetFeatureGateDuringTest(t, serviceAccountTokenForCredentialProvidersDisabled, features.KubeletServiceAccountTokenForCredentialProviders, false)
+	serviceAccountTokenForCredentialProvidersDisabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.KubeletServiceAccountTokenForCredentialProviders, false)
+		return f
+	}
 
-	serviceAccountTokenForCredentialProvidersEnabled := utilfeature.DefaultFeatureGate.DeepCopy()
-	featuregatetesting.SetFeatureGateDuringTest(t, serviceAccountTokenForCredentialProvidersEnabled, features.KubeletServiceAccountTokenForCredentialProviders, true)
+	serviceAccountTokenForCredentialProvidersEnabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.KubeletServiceAccountTokenForCredentialProviders, true)
+		return f
+	}
+
+	podCertificateProjectionEnabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateDuringTest(t, f, genericfeatures.AuthorizeWithSelectors, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.AuthorizeNodeWithSelectors, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.PodCertificateRequest, true)
+		return f
+	}
 
 	featureVariants := []struct {
 		suffix   string
-		features featuregate.FeatureGate
+		features func(t testing.TB) featuregate.FeatureGate
 	}{
 		{suffix: "selector_disabled", features: selectorAuthzDisabled},
 		{suffix: "selector_enabled", features: selectorAuthzEnabled},
@@ -99,7 +121,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		attrs        authorizer.AttributesRecord
 		expect       authorizer.Decision
 		expectReason string
-		features     featuregate.FeatureGate
+		features     func(t testing.TB) featuregate.FeatureGate
 	}{
 		{
 			name:   "allowed configmap",
@@ -255,6 +277,90 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect:       authorizer.DecisionNoOpinion,
 			features:     serviceAccountTokenForCredentialProvidersDisabled,
 			expectReason: "can only create tokens for individual service accounts",
+		},
+		{
+			name:     "allowed svcacct token create when PodCertificateProjection is enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
+			expect:   authorizer.DecisionAllow,
+			features: podCertificateProjectionEnabled,
+		},
+		{
+			name:     "allowed svcacct get when PodCertificateProjection is enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
+			expect:   authorizer.DecisionAllow,
+			features: podCertificateProjectionEnabled,
+		},
+		{
+			name:   "disallowed pcr create when PodCertificateProjection is disabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:     "allowed pcr create when PodCertificateProjection is enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
+			expect:   authorizer.DecisionAllow,
+			features: podCertificateProjectionEnabled,
+		},
+		{
+			name:   "disallowed pcr get when PodCertificateProjection is disabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:     "allowed pcr get when PodCertificateProjection is enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
+			expect:   authorizer.DecisionAllow,
+			features: podCertificateProjectionEnabled,
+		},
+		{
+			name:   "disallowed pcr list when PodCertificateProjection is disabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:         "disallowed pcr list (un-filtered) when PodCertificateProjection is enabled",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
+			expect:       authorizer.DecisionNoOpinion,
+			expectReason: "can only list/watch podcertificaterequests with nodeName field selector",
+			features:     podCertificateProjectionEnabled,
+		},
+		{
+			name:         "disallowed pcr list (filtered to other node) when PodCertificateProjection is enabled",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0", FieldSelectorRequirements: fields.Requirements{{Field: "spec.nodeName", Operator: "=", Value: "othernode"}}},
+			expect:       authorizer.DecisionNoOpinion,
+			expectReason: "can only list/watch podcertificaterequests with nodeName field selector",
+			features:     podCertificateProjectionEnabled,
+		},
+		{
+			name:     "allowed pcr list (filtered to correct node) when PodCertificateProjection is enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0", FieldSelectorRequirements: fields.Requirements{{Field: "spec.nodeName", Operator: "=", Value: "node0"}}},
+			expect:   authorizer.DecisionAllow,
+			features: podCertificateProjectionEnabled,
+		},
+		{
+			name:   "disallowed pcr watch when PodCertificateProjection is disabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:         "disallowed pcr watch (un-filtered) when PodCertificateProjection is enabled",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
+			expect:       authorizer.DecisionNoOpinion,
+			expectReason: "can only list/watch podcertificaterequests with nodeName field selector",
+			features:     podCertificateProjectionEnabled,
+		},
+		{
+			name:         "disallowed pcr watch (filtered to other node) when PodCertificateProjection is enabled",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0", FieldSelectorRequirements: fields.Requirements{{Field: "spec.nodeName", Operator: "=", Value: "othernode"}}},
+			expect:       authorizer.DecisionNoOpinion,
+			expectReason: "can only list/watch podcertificaterequests with nodeName field selector",
+			features:     podCertificateProjectionEnabled,
+		},
+		{
+			name:     "allowed pcr watch (filtered to correct node) when PodCertificateProjection is enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0", FieldSelectorRequirements: fields.Requirements{{Field: "spec.nodeName", Operator: "=", Value: "node0"}}},
+			expect:   authorizer.DecisionAllow,
+			features: podCertificateProjectionEnabled,
 		},
 		{
 			name:   "disallowed get lease in namespace other than kube-node-lease - feature enabled",
@@ -770,7 +876,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		if tc.features == nil {
 			for _, variant := range featureVariants {
 				t.Run(tc.name+"_"+variant.suffix, func(t *testing.T) {
-					authz.features = variant.features
+					authz.features = variant.features(t)
 					decision, reason, _ := authz.Authorize(context.Background(), tc.attrs)
 					if decision != tc.expect {
 						t.Errorf("expected %v, got %v (%s)", tc.expect, decision, reason)
@@ -779,8 +885,12 @@ func TestNodeAuthorizer(t *testing.T) {
 			}
 		} else {
 			t.Run(tc.name, func(t *testing.T) {
-				authz.features = tc.features
-				decision, reason, _ := authz.Authorize(context.Background(), tc.attrs)
+				authz.features = tc.features(t)
+				decision, reason, err := authz.Authorize(context.Background(), tc.attrs)
+				if err != nil {
+					t.Fatalf("Unexpected error calling Authorize: %v", err)
+				}
+
 				if decision != tc.expect {
 					t.Errorf("expected %v, got %v (%s)", tc.expect, decision, reason)
 				}
@@ -1050,6 +1160,8 @@ type sampleDataOpts struct {
 	uniqueResourceClaimTemplatesWithClaimPerPod int
 
 	nodeResourceSlicesPerNode int
+
+	podCertificateRequestsPerPod int
 }
 
 func mustParseFields(s string) fields.Requirements {
@@ -1074,12 +1186,12 @@ func BenchmarkPopulationAllocation(b *testing.B) {
 		uniquePVCsPerPod:       1,
 	}
 
-	nodes, pods, pvs, attachments, slices := generate(opts)
+	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		g := NewGraph()
-		populate(g, nodes, pods, pvs, attachments, slices)
+		populate(g, nodes, pods, pvs, attachments, slices, pcrs)
 	}
 }
 
@@ -1105,14 +1217,14 @@ func BenchmarkPopulationRetention(b *testing.B) {
 		uniquePVCsPerPod:       1,
 	}
 
-	nodes, pods, pvs, attachments, slices := generate(opts)
+	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
 	// Garbage collect before the first iteration
 	runtime.GC()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		g := NewGraph()
-		populate(g, nodes, pods, pvs, attachments, slices)
+		populate(g, nodes, pods, pvs, attachments, slices, pcrs)
 
 		if i == 0 {
 			f, _ := os.Create("BenchmarkPopulationRetention.profile")
@@ -1143,9 +1255,9 @@ func BenchmarkWriteIndexMaintenance(b *testing.B) {
 		sharedPVCsPerPod:       0,
 		uniquePVCsPerPod:       1,
 	}
-	nodes, pods, pvs, attachments, slices := generate(opts)
+	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
 	g := NewGraph()
-	populate(g, nodes, pods, pvs, attachments, slices)
+	populate(g, nodes, pods, pvs, attachments, slices, pcrs)
 	// Garbage collect before the first iteration
 	runtime.GC()
 	b.ResetTimer()
@@ -1169,7 +1281,7 @@ func BenchmarkUnauthorizedRequests(b *testing.B) {
 		podsPerNode:            1,
 		sharedConfigMapsPerPod: 1,
 	}
-	nodes, pods, pvs, attachments, slices := generate(opts)
+	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
 
 	// Create an additional Node that doesn't have access to a shared ConfigMap
 	// that all the other Nodes are authorized to read.
@@ -1184,7 +1296,7 @@ func BenchmarkUnauthorizedRequests(b *testing.B) {
 	pods = append(pods, pod)
 
 	g := NewGraph()
-	populate(g, nodes, pods, pvs, attachments, slices)
+	populate(g, nodes, pods, pvs, attachments, slices, pcrs)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
 	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
@@ -1221,8 +1333,8 @@ func BenchmarkAuthorization(b *testing.B) {
 		sharedPVCsPerPod:       0,
 		uniquePVCsPerPod:       1,
 	}
-	nodes, pods, pvs, attachments, slices := generate(opts)
-	populate(g, nodes, pods, pvs, attachments, slices)
+	nodes, pods, pvs, attachments, slices, pcrs := generate(opts)
+	populate(g, nodes, pods, pvs, attachments, slices, pcrs)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
 	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
@@ -1287,7 +1399,7 @@ func BenchmarkAuthorization(b *testing.B) {
 		},
 	}
 
-	podToAdd, _ := generatePod("testwrite", "ns0", "node0", "default", opts, rand.Perm)
+	podToAdd, _, _ := generatePod("testwrite", "ns0", "node0", "default", opts, rand.Perm)
 
 	b.ResetTimer()
 	for _, testWriteContention := range []bool{false, true} {
@@ -1371,7 +1483,7 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 }
 
-func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourceapi.ResourceSlice) {
+func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourceapi.ResourceSlice, pcrs []*certsv1alpha1.PodCertificateRequest) {
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, pod := range pods {
@@ -1386,6 +1498,9 @@ func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*cor
 	for _, slice := range slices {
 		p.addResourceSlice(slice)
 	}
+	for _, pcr := range pcrs {
+		p.addPCR(pcr)
+	}
 }
 
 func randomSubset(a, b int, randPerm func(int) []int) []int {
@@ -1399,12 +1514,13 @@ func randomSubset(a, b int, randPerm func(int) []int) []int {
 // the secret/configmap/pvc/node references in the pod and pv objects are named to indicate the connections between the objects.
 // for example, secret0-pod0-node0 is a secret referenced by pod0 which is bound to node0.
 // when populated into the graph, the node authorizer should allow node0 to access that secret, but not node1.
-func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1.VolumeAttachment, []*resourceapi.ResourceSlice) {
+func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1.VolumeAttachment, []*resourceapi.ResourceSlice, []*certsv1alpha1.PodCertificateRequest) {
 	nodes := make([]*corev1.Node, 0, opts.nodes)
 	pods := make([]*corev1.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*corev1.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
 	attachments := make([]*storagev1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
 	slices := make([]*resourceapi.ResourceSlice, 0, opts.nodes*opts.nodeResourceSlicesPerNode)
+	pcrs := make([]*certsv1alpha1.PodCertificateRequest, 0, opts.nodes*opts.podsPerNode*opts.podCertificateRequestsPerPod)
 
 	r := rand.New(rand.NewSource(12345))
 
@@ -1415,9 +1531,10 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 			namespace := fmt.Sprintf("ns%d", p%opts.namespaces)
 			svcAccountName := fmt.Sprintf("svcacct%d-%s", p, nodeName)
 
-			pod, podPVs := generatePod(name, namespace, nodeName, svcAccountName, opts, r.Perm)
+			pod, podPVs, podPCRs := generatePod(name, namespace, nodeName, svcAccountName, opts, r.Perm)
 			pods = append(pods, pod)
 			pvs = append(pvs, podPVs...)
+			pcrs = append(pcrs, podPCRs...)
 		}
 		for a := 0; a < opts.attachmentsPerNode; a++ {
 			attachment := &storagev1.VolumeAttachment{}
@@ -1436,17 +1553,18 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 			slice := &resourceapi.ResourceSlice{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Spec: resourceapi.ResourceSliceSpec{
-					NodeName: nodeName,
+					NodeName: &nodeName,
 				},
 			}
 			slices = append(slices, slice)
 		}
 	}
-	return nodes, pods, pvs, attachments, slices
+	return nodes, pods, pvs, attachments, slices, pcrs
 }
 
-func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleDataOpts, randPerm func(int) []int) (*corev1.Pod, []*corev1.PersistentVolume) {
+func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleDataOpts, randPerm func(int) []int) (*corev1.Pod, []*corev1.PersistentVolume, []*certsv1alpha1.PodCertificateRequest) {
 	pvs := make([]*corev1.PersistentVolume, 0, opts.uniquePVCsPerPod+opts.sharedPVCsPerPod)
+	pcrs := make([]*certsv1alpha1.PodCertificateRequest, 0, opts.podCertificateRequestsPerPod)
 
 	pod := &corev1.Pod{}
 	pod.Name = name
@@ -1533,5 +1651,21 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 		}})
 	}
 
-	return pod, pvs
+	for i := 0; i < opts.podCertificateRequestsPerPod; i++ {
+		pcr := &certsv1alpha1.PodCertificateRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: pod.ObjectMeta.Namespace,
+				Name:      fmt.Sprintf("pcr%d-%s", i, pod.ObjectMeta.Name),
+			},
+			Spec: certsv1alpha1.PodCertificateRequestSpec{
+				PodName:            pod.ObjectMeta.Name,
+				PodUID:             pod.ObjectMeta.UID,
+				ServiceAccountName: pod.Spec.ServiceAccountName,
+				NodeName:           types.NodeName(pod.Spec.NodeName),
+			},
+		}
+		pcrs = append(pcrs, pcr)
+	}
+
+	return pod, pvs, pcrs
 }

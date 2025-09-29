@@ -20,7 +20,10 @@ package v1
 
 // NodeDaemonEndpointsApplyConfiguration represents a declarative configuration of the NodeDaemonEndpoints type for use
 // with apply.
+//
+// NodeDaemonEndpoints lists ports opened by daemons running on the Node.
 type NodeDaemonEndpointsApplyConfiguration struct {
+	// Endpoint on which Kubelet is listening.
 	KubeletEndpoint *DaemonEndpointApplyConfiguration `json:"kubeletEndpoint,omitempty"`
 }
 
@@ -29,7 +32,6 @@ type NodeDaemonEndpointsApplyConfiguration struct {
 func NodeDaemonEndpoints() *NodeDaemonEndpointsApplyConfiguration {
 	return &NodeDaemonEndpointsApplyConfiguration{}
 }
-func (b NodeDaemonEndpointsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKubeletEndpoint sets the KubeletEndpoint field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

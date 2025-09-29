@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -33,7 +34,7 @@ func TestNodeName(t *testing.T) {
 		pod        *v1.Pod
 		node       *v1.Node
 		name       string
-		wantStatus *framework.Status
+		wantStatus *fwk.Status
 	}{
 		{
 			pod:  &v1.Pod{},
@@ -49,7 +50,7 @@ func TestNodeName(t *testing.T) {
 			pod:        st.MakePod().Node("bar").Obj(),
 			node:       st.MakeNode().Name("foo").Obj(),
 			name:       "host doesn't match",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReason),
 		},
 	}
 
@@ -62,7 +63,7 @@ func TestNodeName(t *testing.T) {
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
-			gotStatus := p.(framework.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
+			gotStatus := p.(fwk.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
 			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 				t.Errorf("status does not match (-want,+got):\n%s", diff)
 			}

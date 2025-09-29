@@ -21,7 +21,9 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -99,13 +101,13 @@ type backoffQueue struct {
 	podMaxBackoff     time.Duration
 	// activeQLessFn is used as an eventual less function if two backoff times are equal,
 	// when the SchedulerPopFromBackoffQ feature is enabled.
-	activeQLessFn framework.LessFunc
+	activeQLessFn fwk.LessFunc
 
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
 	isPopFromBackoffQEnabled bool
 }
 
-func newBackoffQueue(clock clock.WithTicker, podInitialBackoffDuration time.Duration, podMaxBackoffDuration time.Duration, activeQLessFn framework.LessFunc, popFromBackoffQEnabled bool) *backoffQueue {
+func newBackoffQueue(clock clock.WithTicker, podInitialBackoffDuration time.Duration, podMaxBackoffDuration time.Duration, activeQLessFn fwk.LessFunc, popFromBackoffQEnabled bool) *backoffQueue {
 	bq := &backoffQueue{
 		clock:                    clock,
 		podInitialBackoff:        podInitialBackoffDuration,
@@ -270,7 +272,7 @@ func (bq *backoffQueue) popAllBackoffCompletedWithQueue(logger klog.Logger, queu
 		}
 		_, err := queue.Pop()
 		if err != nil {
-			logger.Error(err, "Unable to pop pod from backoff queue despite backoff completion", "pod", klog.KObj(pod))
+			utilruntime.HandleErrorWithLogger(logger, err, "Unable to pop pod from backoff queue despite backoff completion", "pod", klog.KObj(pod))
 			break
 		}
 		poppedPods = append(poppedPods, pInfo)
@@ -305,6 +307,7 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 			return
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
+		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQ)
 		return
 	}
 	bq.podBackoffQ.AddOrUpdate(pInfo)
@@ -315,6 +318,7 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 		return
 	}
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
+	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQ)
 }
 
 // update updates the pod in backoffQueue if oldPodInfo is already in the queue.

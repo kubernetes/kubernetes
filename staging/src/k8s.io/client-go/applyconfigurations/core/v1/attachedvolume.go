@@ -24,9 +24,13 @@ import (
 
 // AttachedVolumeApplyConfiguration represents a declarative configuration of the AttachedVolume type for use
 // with apply.
+//
+// AttachedVolume describes a volume attached to a node
 type AttachedVolumeApplyConfiguration struct {
-	Name       *corev1.UniqueVolumeName `json:"name,omitempty"`
-	DevicePath *string                  `json:"devicePath,omitempty"`
+	// Name of the attached volume
+	Name *corev1.UniqueVolumeName `json:"name,omitempty"`
+	// DevicePath represents the device path where the volume should be available
+	DevicePath *string `json:"devicePath,omitempty"`
 }
 
 // AttachedVolumeApplyConfiguration constructs a declarative configuration of the AttachedVolume type for use with
@@ -34,7 +38,6 @@ type AttachedVolumeApplyConfiguration struct {
 func AttachedVolume() *AttachedVolumeApplyConfiguration {
 	return &AttachedVolumeApplyConfiguration{}
 }
-func (b AttachedVolumeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

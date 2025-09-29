@@ -24,7 +24,10 @@ import (
 
 // CounterApplyConfiguration represents a declarative configuration of the Counter type for use
 // with apply.
+//
+// Counter describes a quantity associated with a device.
 type CounterApplyConfiguration struct {
+	// Value defines how much of a certain device counter is available.
 	Value *resource.Quantity `json:"value,omitempty"`
 }
 
@@ -33,7 +36,6 @@ type CounterApplyConfiguration struct {
 func Counter() *CounterApplyConfiguration {
 	return &CounterApplyConfiguration{}
 }
-func (b CounterApplyConfiguration) IsApplyConfiguration() {}
 
 // WithValue sets the Value field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

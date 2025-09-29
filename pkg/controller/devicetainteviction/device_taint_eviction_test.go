@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,9 +35,10 @@ import (
 	gomegatypes "github.com/onsi/gomega/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/watch"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -62,10 +64,10 @@ func setup(tb testing.TB) *testContext {
 	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
 	controller := New(fakeClientset,
 		informerFactory.Core().V1().Pods(),
-		informerFactory.Resource().V1beta1().ResourceClaims(),
-		informerFactory.Resource().V1beta1().ResourceSlices(),
+		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1().ResourceSlices(),
 		informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-		informerFactory.Resource().V1beta1().DeviceClasses(),
+		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
 	)
 	tContext := &testContext{
@@ -223,16 +225,16 @@ var (
 		slice.Spec.Pool.Generation++
 		return slice
 	}()
-	sliceUnknownDevices = func() *resourceapi.ResourceSlice {
+	sliceOtherDevices = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
 		for i := range slice.Spec.Devices {
-			slice.Spec.Devices[i].Basic = nil
+			slice.Spec.Devices[i].Name += "-other"
 		}
 		return slice
 	}()
 	sliceTainted = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
-		slice.Spec.Devices[0].Basic.Taints = []resourceapi.DeviceTaint{{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, Value: taintValue, TimeAdded: &taintTime}}
+		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, Value: taintValue, TimeAdded: &taintTime}}
 		return slice
 	}()
 	sliceTaintedExtended = func() *resourceapi.ResourceSlice {
@@ -244,8 +246,8 @@ var (
 	sliceTaintedNoSchedule = func() *resourceapi.ResourceSlice {
 		slice := sliceTainted.DeepCopy()
 		for i := range slice.Spec.Devices {
-			for j := range slice.Spec.Devices[i].Basic.Taints {
-				slice.Spec.Devices[i].Basic.Taints[j].Effect = resourceapi.DeviceTaintEffectNoSchedule
+			for j := range slice.Spec.Devices[i].Taints {
+				slice.Spec.Devices[i].Taints[j].Effect = resourceapi.DeviceTaintEffectNoSchedule
 			}
 		}
 		return slice
@@ -253,15 +255,15 @@ var (
 	sliceTaintedValueOther = func() *resourceapi.ResourceSlice {
 		slice := sliceTainted.DeepCopy()
 		for i := range slice.Spec.Devices {
-			for j := range slice.Spec.Devices[i].Basic.Taints {
-				slice.Spec.Devices[i].Basic.Taints[j].Value += "-other"
+			for j := range slice.Spec.Devices[i].Taints {
+				slice.Spec.Devices[i].Taints[j].Value += "-other"
 			}
 		}
 		return slice
 	}()
 	sliceTaintedTwice = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
-		slice.Spec.Devices[0].Basic.Taints = []resourceapi.DeviceTaint{
+		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{
 			{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: &taintTime},
 			{Key: taintKey + "-other", Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: &taintTime},
 		}
@@ -269,14 +271,14 @@ var (
 	}()
 	sliceUntainted = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
-		slice.Spec.Devices[1].Basic.Taints = nil
-		slice.Spec.Devices[2].Basic.Taints = nil
+		slice.Spec.Devices[1].Taints = nil
+		slice.Spec.Devices[2].Taints = nil
 		return slice
 	}()
 	slice2 = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
 		slice.Name += "-2"
-		slice.Spec.NodeName = nodeName2
+		slice.Spec.NodeName = &nodeName2
 		slice.Spec.Pool.Name = nodeName2
 		slice.Spec.Pool.Generation++
 		return slice
@@ -858,15 +860,15 @@ func TestHandlers(t *testing.T) {
 				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
 			},
 		},
-		"no-evict-unknown-device": {
+		"no-evict-other-device": {
 			events: []any{
-				add(sliceUnknownDevices),
+				add(sliceOtherDevices),
 				add(slice2),
 				add(inUseClaim),
 				add(podWithClaimTemplateInStatus),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceUnknownDevices, slice2},
+				slices:          []*resourceapi.ResourceSlice{sliceOtherDevices, slice2},
 				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
 			},
 		},
@@ -1190,20 +1192,58 @@ func applyEventPair(tContext *testContext, event any) {
 	}
 }
 
-func startTestController(tCtx ktesting.TContext, informerFactory informers.SharedInformerFactory) *Controller {
+func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Controller {
+	// fake.Clientset suffers from a race condition related to informers:
+	// it does not implement resource version support in its Watch
+	// implementation and instead assumes that watches are set up
+	// before further changes are made.
+	//
+	// If a test waits for caches to be synced and then immediately
+	// adds an object, that new object will never be seen by event handlers
+	// if the race goes wrong and the Watch call hadn't completed yet
+	// (can be triggered by adding a sleep before https://github.com/kubernetes/kubernetes/blob/b53b9fb5573323484af9a19cf3f5bfe80760abba/staging/src/k8s.io/client-go/tools/cache/reflector.go#L431).
+	//
+	// To work around this, we count all watches and only proceed when
+	// all of them are in place. This replaces the normal watch reactor
+	// (https://github.com/kubernetes/kubernetes/blob/b53b9fb5573323484af9a19cf3f5bfe80760abba/staging/src/k8s.io/client-go/kubernetes/fake/clientset_generated.go#L161-L173).
+	var numWatches atomic.Int32
+	clientSet.PrependWatchReactor("*", func(action core.Action) (handled bool, ret watch.Interface, err error) {
+		var opts metav1.ListOptions
+		if watchActcion, ok := action.(core.WatchActionImpl); ok {
+			opts = watchActcion.ListOptions
+		}
+		gvr := action.GetResource()
+		ns := action.GetNamespace()
+		watch, err := clientSet.Tracker().Watch(gvr, ns, opts)
+		if err != nil {
+			return false, nil, err
+		}
+		numWatches.Add(1)
+		return true, watch, nil
+	})
+
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+
 	controller := New(tCtx.Client(),
 		informerFactory.Core().V1().Pods(),
-		informerFactory.Resource().V1beta1().ResourceClaims(),
-		informerFactory.Resource().V1beta1().ResourceSlices(),
+		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1().ResourceSlices(),
 		informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-		informerFactory.Resource().V1beta1().DeviceClasses(),
+		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
 	)
 	controller.metrics = metrics.New(300 /* one large initial bucket for testing */)
 	// Always log, not matter what the -v value is.
 	logger := klog.FromContext(tCtx)
 	controller.eventLogger = &logger
+
 	informerFactory.Start(tCtx.Done())
+	tCtx.Cleanup(informerFactory.Shutdown)
+
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int32 {
+		return numWatches.Load()
+	}).WithTimeout(5*time.Second).Should(gomega.Equal(int32(5)), "All watches should be registered.")
+
 	return controller
 }
 
@@ -1248,6 +1288,12 @@ func TestEviction(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	tCtx.Parallel()
 
+	do := func(tCtx ktesting.TContext, what string, action func(tCtx ktesting.TContext) error) {
+		tCtx.Log(what)
+		err := action(tCtx)
+		require.NoError(tCtx, err, what)
+	}
+
 	pod := podWithClaimName.DeepCopy()
 	for name, tt := range map[string]struct {
 		initialObjects []runtime.Object
@@ -1262,13 +1308,18 @@ func TestEviction(t *testing.T) {
 		},
 		"add": {
 			afterSync: func(tCtx ktesting.TContext) {
-				var err error
-				_, err = tCtx.Client().CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create pod")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceSlices().Create(tCtx, sliceTainted, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create slice")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create claim")
+				do(tCtx, "create pod", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{})
+					return err
+				})
+				do(tCtx, "create slice", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, sliceTainted, metav1.CreateOptions{})
+					return err
+				})
+				do(tCtx, "create claim", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
+					return err
+				})
 			},
 		},
 		"update": {
@@ -1282,13 +1333,18 @@ func TestEviction(t *testing.T) {
 				}(),
 			},
 			afterSync: func(tCtx ktesting.TContext) {
-				var err error
-				_, err = tCtx.Client().CoreV1().Pods(pod.Namespace).Update(tCtx, pod, metav1.UpdateOptions{})
-				require.NoError(tCtx, err, "update pod")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceSlices().Update(tCtx, sliceTainted, metav1.UpdateOptions{})
-				require.NoError(tCtx, err, "update slice")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).UpdateStatus(tCtx, inUseClaim, metav1.UpdateOptions{})
-				require.NoError(tCtx, err, "update claim")
+				do(tCtx, "update pod", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().CoreV1().Pods(pod.Namespace).Update(tCtx, pod, metav1.UpdateOptions{})
+					return err
+				})
+				do(tCtx, "update slice", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1().ResourceSlices().Update(tCtx, sliceTainted, metav1.UpdateOptions{})
+					return err
+				})
+				do(tCtx, "update claim", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1().ResourceClaims(inUseClaim.Namespace).UpdateStatus(tCtx, inUseClaim, metav1.UpdateOptions{})
+					return err
+				})
 			},
 		},
 		"delete": {
@@ -1305,16 +1361,18 @@ func TestEviction(t *testing.T) {
 				pod,
 			},
 			afterSync: func(tCtx ktesting.TContext) {
-				var err error
-
-				err = tCtx.Client().ResourceV1beta1().ResourceSlices().Delete(tCtx, slice.Name+"-other", metav1.DeleteOptions{})
-				require.NoError(tCtx, err, "delete slice")
-				err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Delete(tCtx, inUseClaim.Name, metav1.DeleteOptions{})
-				require.NoError(tCtx, err, "delete claim")
+				do(tCtx, "delete slice", func(tCtx ktesting.TContext) error {
+					return tCtx.Client().ResourceV1().ResourceSlices().Delete(tCtx, slice.Name+"-other", metav1.DeleteOptions{})
+				})
+				do(tCtx, "delete claim", func(tCtx ktesting.TContext) error {
+					return tCtx.Client().ResourceV1().ResourceClaims(inUseClaim.Namespace).Delete(tCtx, inUseClaim.Name, metav1.DeleteOptions{})
+				})
 
 				// Re-create after deletion to enabled the normal flow.
-				_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create claim")
+				do(tCtx, "create claim", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
+					return err
+				})
 			},
 		},
 	} {
@@ -1347,9 +1405,7 @@ func TestEviction(t *testing.T) {
 				updatedPod = obj.(*v1.Pod)
 				return false, nil, nil
 			})
-			informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-			controller := startTestController(tCtx, informerFactory)
-			defer informerFactory.Shutdown()
+			controller := newTestController(tCtx, fakeClientset)
 
 			var wg sync.WaitGroup
 			defer func() {
@@ -1427,7 +1483,7 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	// do something which cancels eviction.
 	pod := podWithClaimName.DeepCopy()
 	slice := sliceTainted.DeepCopy()
-	slice.Spec.Devices[0].Basic.Taints[0].TimeAdded = &metav1.Time{Time: time.Now()}
+	slice.Spec.Devices[0].Taints[0].TimeAdded = &metav1.Time{Time: time.Now()}
 	claim := inUseClaim.DeepCopy()
 	claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 		Operator:          resourceapi.DeviceTolerationOpExists,
@@ -1445,9 +1501,7 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	require.NoError(tCtx, err, "get pod before eviction")
 	assert.Equal(tCtx, podWithClaimName, pod, "test pod")
 
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var mutex sync.Mutex
 	podEvicting := false
@@ -1488,7 +1542,7 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	if deletePod {
 		tCtx.ExpectNoError(fakeClientset.CoreV1().Pods(pod.Namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{}))
 	} else {
-		tCtx.ExpectNoError(fakeClientset.ResourceV1beta1().ResourceSlices().Delete(tCtx, slice.Name, metav1.DeleteOptions{}))
+		tCtx.ExpectNoError(fakeClientset.ResourceV1().ResourceSlices().Delete(tCtx, slice.Name, metav1.DeleteOptions{}))
 	}
 
 	// Shortly after deletion we should also see the cancellation.
@@ -1499,6 +1553,10 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	}).WithTimeout(30 * time.Second).Should(gomega.BeFalseBecause("pod no longer pending eviction"))
 
 	// Whether we get an event depends on whether the pod still exists.
+	// If we expect an event, we need to wait for it.
+	if !deletePod {
+		ktesting.Eventually(tCtx, listEvents).WithTimeout(30 * time.Second).Should(matchCancellationEvent())
+	}
 	ktesting.Consistently(tCtx, func(tCtx ktesting.TContext) error {
 		matchEvents := matchCancellationEvent()
 		if deletePod {
@@ -1554,9 +1612,7 @@ func TestParallelPodDeletion(t *testing.T) {
 		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
 		return false, nil, nil
 	})
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var wg sync.WaitGroup
 	defer func() {
@@ -1633,9 +1689,7 @@ func TestRetry(t *testing.T) {
 		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
 		return false, nil, nil
 	})
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var wg sync.WaitGroup
 	defer func() {
@@ -1706,9 +1760,7 @@ func TestEvictionFailure(t *testing.T) {
 		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
 		return true, nil, apierrors.NewInternalError(errors.New("fake error"))
 	})
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var wg sync.WaitGroup
 	defer func() {

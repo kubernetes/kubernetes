@@ -20,8 +20,13 @@ package v1
 
 // HostAliasApplyConfiguration represents a declarative configuration of the HostAlias type for use
 // with apply.
+//
+// HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
+// pod's hosts file.
 type HostAliasApplyConfiguration struct {
-	IP        *string  `json:"ip,omitempty"`
+	// IP address of the host file entry.
+	IP *string `json:"ip,omitempty"`
+	// Hostnames for the above IP address.
 	Hostnames []string `json:"hostnames,omitempty"`
 }
 
@@ -30,7 +35,6 @@ type HostAliasApplyConfiguration struct {
 func HostAlias() *HostAliasApplyConfiguration {
 	return &HostAliasApplyConfiguration{}
 }
-func (b HostAliasApplyConfiguration) IsApplyConfiguration() {}
 
 // WithIP sets the IP field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -204,13 +204,15 @@ func (c *controller) LastSyncResourceVersion() string {
 // concurrently.
 func (c *controller) processLoop(ctx context.Context) {
 	for {
-		// TODO: Plumb through the ctx so that this can
-		// actually exit when the controller is stopped. Or just give up on this stuff
-		// ever being stoppable.
-		_, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
-		if err != nil {
-			if err == ErrFIFOClosed {
-				return
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			_, err := c.config.Pop(PopProcessFunc(c.config.Process))
+			if err != nil {
+				if errors.Is(err, ErrFIFOClosed) {
+					return
+				}
 			}
 		}
 	}
