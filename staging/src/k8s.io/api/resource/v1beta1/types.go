@@ -1389,11 +1389,13 @@ type ResourceClaimStatus struct {
 	// the future, but not reduced.
 	//
 	// +optional
-	// +k8s:optional
 	// +listType=map
 	// +listMapKey=uid
 	// +patchStrategy=merge
 	// +patchMergeKey=uid
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=uid
 	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,2,opt,name=reservedFor" patchStrategy:"merge" patchMergeKey:"uid"`
 
 	// DeallocationRequested is tombstoned since Kubernetes 1.32 where

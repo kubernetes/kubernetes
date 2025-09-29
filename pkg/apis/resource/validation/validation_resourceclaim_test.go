@@ -414,7 +414,7 @@ func TestValidateClaim(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(2).Child("exactly", "count"), int64(-1), "must be greater than zero"),
 				field.NotSupported(field.NewPath("spec", "devices", "requests").Index(3).Child("exactly", "allocationMode"), resource.DeviceAllocationMode("other"), []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}),
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(4).Child("exactly", "count"), int64(2), "must not be specified when allocationMode is 'All'"),
-				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(5).Child("name"), "foo"),
+				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(5), "foo"),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
@@ -648,7 +648,7 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"prioritized-list-nested-requests-same-name": {
 			wantFailures: field.ErrorList{
-				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(1).Child("name"), "foo"),
+				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(1), "foo"),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
@@ -1074,7 +1074,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-reserved-for-duplicate": {
-			wantFailures: field.ErrorList{field.Duplicate(field.NewPath("status", "reservedFor").Index(1).Child("uid"), types.UID("1"))},
+			wantFailures: field.ErrorList{field.Duplicate(field.NewPath("status", "reservedFor").Index(1), types.UID("1")).MarkCoveredByDeclarative()},
 			oldClaim:     validAllocatedClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				for i := 0; i < 2; i++ {
@@ -1340,7 +1340,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		"invalid-device-status-duplicate": {
 			wantFailures: field.ErrorList{
 				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "2001:db8::1/64"),
-				field.Duplicate(field.NewPath("status", "devices").Index(1).Child("deviceID"), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)),
+				field.Duplicate(field.NewPath("status", "devices").Index(1), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1368,7 +1368,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-device-status-duplicate-with-share-id": {
 			wantFailures: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "devices").Index(1).Child("deviceID"),
+				field.Duplicate(field.NewPath("status", "devices").Index(1),
 					structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), ptr.To(goodShareID))),
 			},
 			oldClaim: func() *resource.ResourceClaim {
@@ -1503,7 +1503,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		"invalid-device-status-duplicate-disabled-feature-gate": {
 			wantFailures: field.ErrorList{
 				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "2001:db8::1/64"),
-				field.Duplicate(field.NewPath("status", "devices").Index(1).Child("deviceID"), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)),
+				field.Duplicate(field.NewPath("status", "devices").Index(1), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1531,7 +1531,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-device-status-duplicate-with-share-id-disabled-feature-gate": {
 			wantFailures: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "devices").Index(1).Child("deviceID"),
+				field.Duplicate(field.NewPath("status", "devices").Index(1),
 					structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), ptr.To(goodShareID))),
 			},
 			oldClaim: func() *resource.ResourceClaim {

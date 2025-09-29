@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +34,11 @@ import (
 )
 
 var apiVersions = []string{"v1beta1", "v1beta2", "v1"} // "v1alpha3" is excluded because it doesn't have ResourceClaim
+
+const (
+	validUUID  = "550e8400-e29b-41d4-a716-446655440000"
+	validUUID1 = "550e8400-e29b-41d4-a716-446655440001"
+)
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -383,7 +389,7 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 		// .Status.Allocation.Devices.Results[%d].ShareID
 		"valid status.Allocation.Devices.Results[].ShareID": {
 			old:    mkValidResourceClaim(),
-			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultShareID("123e4567-e89b-12d3-a456-426614174000")),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultShareID(validUUID)),
 		},
 		"invalid status.Allocation.Devices.Results[].ShareID": {
 			old:    mkValidResourceClaim(),
@@ -404,8 +410,8 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 			old: mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(
 				tweakStatusDevices(standardAllocatedDeviceStatus()),
-				tweakStatusDeviceRequestAllocationResultShareID("123e4567-e89b-12d3-a456-426614174000"),
-				tweakStatusAllocatedDeviceStatusShareID("123e4567-e89b-12d3-a456-426614174000"),
+				tweakStatusDeviceRequestAllocationResultShareID(validUUID),
+				tweakStatusAllocatedDeviceStatusShareID(validUUID),
 			),
 		},
 		"invalid status.Devices[].ShareID": {
@@ -430,6 +436,34 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
 				field.Invalid(field.NewPath("status", "devices").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+			},
+		},
+		// UID in status.ReservedFor
+		"duplicate uid in status.ReservedFor": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusReservedFor(
+					resourceClaimReference(validUUID),
+					resourceClaimReference(uuid.New().String()),
+					resourceClaimReference(validUUID),
+				)),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "reservedFor").Index(2), ""),
+			},
+		},
+		"multiple- duplicate uid in status.ReservedFor": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusReservedFor(
+				resourceClaimReference(validUUID),
+				resourceClaimReference(uuid.New().String()),
+				resourceClaimReference(validUUID),
+				resourceClaimReference(validUUID1),
+				resourceClaimReference(validUUID1),
+				resourceClaimReference(uuid.New().String()),
+			)),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "reservedFor").Index(2), ""),
+				field.Duplicate(field.NewPath("status", "reservedFor").Index(4), ""),
 			},
 		},
 	}
@@ -544,5 +578,19 @@ func standardAllocatedDeviceStatus() resource.AllocatedDeviceStatus {
 		Driver: "dra.example.com",
 		Pool:   "pool-0",
 		Device: "device-0",
+	}
+}
+
+func resourceClaimReference(uid string) resource.ResourceClaimConsumerReference {
+	return resource.ResourceClaimConsumerReference{
+		UID:      types.UID(uid),
+		Resource: "Pod",
+		Name:     "pod-name",
+	}
+}
+
+func tweakStatusReservedFor(refs ...resource.ResourceClaimConsumerReference) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Status.ReservedFor = refs
 	}
 }
