@@ -297,6 +297,118 @@ func TestDoProbeWithContainerRestartRules(t *testing.T) {
 	}
 }
 
+func TestDoProbeWithContainerRestartAllContainers(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, true)
+	TestDoProbe(t)
+	TestDoProbeWithContainerRestartRules(t)
+
+	var (
+		restartPolicyNever = v1.ContainerRestartPolicyNever
+	)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	for _, probeType := range [...]probeType{liveness, readiness, startup} {
+		testcases := []struct {
+			name           string
+			pod            func() v1.Pod
+			podStatus      func() v1.PodStatus
+			expectContinue bool
+		}{
+			{
+				name: "container terminated with matching restartAllContainers",
+				pod: func() v1.Pod {
+					pod := getTestPod()
+					setTestProbe(pod, probeType, v1.Probe{})
+					c := pod.Spec.Containers[0]
+					c.RestartPolicy = &restartPolicyNever
+					c.RestartPolicyRules = []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestartAllContainers,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{1},
+						},
+					}}
+					pod.Spec.Containers[0] = c
+					return *pod
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer,
+				expectContinue: true,
+			},
+			{
+				name: "container terminated by restartAllContainers",
+				pod: func() v1.Pod {
+					pod := getTestPod()
+					setTestProbe(pod, probeType, v1.Probe{})
+					triggerContainer := v1.Container{
+						Name:          "trigger",
+						RestartPolicy: &restartPolicyNever,
+						RestartPolicyRules: []v1.ContainerRestartRule{{
+							Action: v1.ContainerRestartRuleActionRestartAllContainers,
+							ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+								Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+								Values:   []int32{1},
+							},
+						}},
+					}
+					pod.Spec.Containers = append(pod.Spec.Containers, triggerContainer)
+					return *pod
+				},
+				podStatus: func() v1.PodStatus {
+					status := getTestRunningStatusWithFailedContainer()
+					// Mark the trigger container as terminated.
+					status.ContainerStatuses = append(status.ContainerStatuses, v1.ContainerStatus{
+						Name: "trigger",
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode: 1,
+							},
+						},
+					})
+					return status
+				},
+				expectContinue: true,
+			},
+			{
+				name: "container cleaned up by restartAllContainers",
+				pod: func() v1.Pod {
+					pod := getTestPod()
+					setTestProbe(pod, probeType, v1.Probe{})
+					triggerContainer := v1.Container{
+						Name:          "trigger",
+						RestartPolicy: &restartPolicyNever,
+						RestartPolicyRules: []v1.ContainerRestartRule{{
+							Action: v1.ContainerRestartRuleActionRestartAllContainers,
+							ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+								Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+								Values:   []int32{1},
+							},
+						}},
+					}
+					pod.Spec.Containers = append(pod.Spec.Containers, triggerContainer)
+					return *pod
+				},
+				// After cleanup, the container will be in Waiting state, and pod in Pending state
+				podStatus:      getTestPendingStatus,
+				expectContinue: true,
+			},
+		}
+
+		for _, tc := range testcases {
+			pod := tc.pod()
+			podStatus := tc.podStatus()
+			w := newWorker(m, probeType, &pod, pod.Spec.Containers[0])
+
+			m.statusManager.SetPodStatus(logger, w.pod, podStatus)
+
+			if c := w.doProbe(ctx); c != tc.expectContinue {
+				t.Errorf("[%s: %s] Expected continue to be %v but got %v", probeType, tc.name, tc.expectContinue, c)
+			}
+		}
+	}
+}
+
 func TestInitialDelay(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()

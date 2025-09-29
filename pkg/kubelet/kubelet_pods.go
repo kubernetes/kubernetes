@@ -1969,6 +1969,9 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, v1.PodScheduled),
 		Status:             v1.ConditionTrue,
 	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
+		s.Conditions = append(s.Conditions, status.GenerateAllContainersRestartingCondition(pod, podStatus, &oldPodStatus, s.Phase))
+	}
 	// set HostIP/HostIPs and initialize PodIP/PodIPs for host network pods
 	if kl.kubeClient != nil {
 		hostIPs, err := kl.getHostIPsAnyWay()
@@ -2066,12 +2069,18 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 	// set status for Pods created on versions of kube older than 1.6
 	apiPodStatus.QOSClass = v1qos.GetPodQOS(pod)
 
+	podRestarting := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
+		podRestarting = kubecontainer.ShouldAllContainersRestart(pod, podStatus, &oldPodStatus)
+	}
+
 	apiPodStatus.ContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,
 		oldPodStatus.ContainerStatuses,
 		pod.Spec.Containers,
 		len(pod.Spec.InitContainers) > 0,
 		false,
+		podRestarting,
 	)
 	apiPodStatus.InitContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,
@@ -2079,6 +2088,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		pod.Spec.InitContainers,
 		len(pod.Spec.InitContainers) > 0,
 		true,
+		podRestarting,
 	)
 	var ecSpecs []v1.Container
 	for i := range pod.Spec.EphemeralContainers {
@@ -2093,6 +2103,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		ecSpecs,
 		len(pod.Spec.InitContainers) > 0,
 		false,
+		podRestarting,
 	)
 
 	return &apiPodStatus
@@ -2100,7 +2111,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 
 // convertToAPIContainerStatuses converts the given internal container
 // statuses into API container statuses.
-func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, hasInitContainers, isInitContainer bool) []v1.ContainerStatus {
+func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, hasInitContainers, isInitContainer, podRestarting bool) []v1.ContainerStatus {
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
 	logger := klog.TODO()
@@ -2118,10 +2129,22 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 		if oldStatus != nil {
 			status.VolumeMounts = oldStatus.VolumeMounts // immutable
+			if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
+				if oldStatus.RestartCount > status.RestartCount {
+					status.RestartCount = oldStatus.RestartCount
+				}
+			}
 		}
 		switch {
 		case cs.State == kubecontainer.ContainerStateRunning:
 			status.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(cs.StartedAt)}
+			if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
+				if oldStatus != nil &&
+					oldStatus.State.Terminated != nil &&
+					oldStatus.RestartCount >= int32(cs.RestartCount) {
+					status.RestartCount = oldStatus.RestartCount + 1
+				}
+			}
 		case cs.State == kubecontainer.ContainerStateCreated:
 			// containers that are created but not running are "waiting to be running"
 			status.State.Waiting = &v1.ContainerStateWaiting{}
@@ -2138,20 +2161,29 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		case cs.State == kubecontainer.ContainerStateUnknown &&
 			oldStatus != nil && // we have an old status
 			oldStatus.State.Running != nil: // our previous status was running
-			// if this happens, then we know that this container was previously running and isn't anymore (assuming the CRI isn't failing to return running containers).
-			// you can imagine this happening in cases where a container failed and the kubelet didn't ask about it in time to see the result.
-			// in this case, the container should not to into waiting state immediately because that can make cases like runonce pods actually run
-			// twice. "container never ran" is different than "container ran and failed".  This is handled differently in the kubelet
-			// and it is handled differently in higher order logic like crashloop detection and handling
-			status.State.Terminated = &v1.ContainerStateTerminated{
-				Reason:   kubecontainer.ContainerReasonStatusUnknown,
-				Message:  "The container could not be located when the pod was terminated",
-				ExitCode: 137, // this code indicates an error
+			// If the pod is restarting, consider the container as pending
+			if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) && podRestarting {
+				status.State.Terminated = nil
+				status.State.Waiting = &v1.ContainerStateWaiting{
+					Reason:  kubecontainer.ContainerReasonStatusUnknown,
+					Message: "container removed during pod restart",
+				}
+				status.RestartCount = oldStatus.RestartCount + 1
+			} else {
+				// if this happens, then we know that this container was previously running and isn't anymore (assuming the CRI isn't failing to return running containers).
+				// you can imagine this happening in cases where a container failed and the kubelet didn't ask about it in time to see the result.
+				// in this case, the container should not to into waiting state immediately because that can make cases like runonce pods actually run
+				// twice. "container never ran" is different than "container ran and failed".  This is handled differently in the kubelet
+				// and it is handled differently in higher order logic like crashloop detection and handling
+				status.State.Terminated = &v1.ContainerStateTerminated{
+					Reason:   kubecontainer.ContainerReasonStatusUnknown,
+					Message:  "The container could not be located when the pod was terminated",
+					ExitCode: 137, // this code indicates an error
+				}
+				// the restart count normally comes from the CRI (see near the top of this method), but since this is being added explicitly
+				// for the case where the CRI did not return a status, we need to manually increment the restart count to be accurate.
+				status.RestartCount = oldStatus.RestartCount + 1
 			}
-			// the restart count normally comes from the CRI (see near the top of this method), but since this is being added explicitly
-			// for the case where the CRI did not return a status, we need to manually increment the restart count to be accurate.
-			status.RestartCount = oldStatus.RestartCount + 1
-
 		default:
 			// this collapses any unknown state to container waiting.  If any container is waiting, then the pod status moves to pending even if it is running.
 			// if I'm reading this correctly, then any failure to read status on any container results in the entire pod going pending even if the containers
@@ -2331,6 +2363,23 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		if !ok {
 			continue
 		}
+
+		// If the container is missing, RestartAllContainers in place, and previous status is not waiting, then the container
+		// is removed from runtime. It should be considered Waiting, with no LastTerminationState, to avoid confusions
+		// after pod restart.
+		if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) && podRestarting && oldStatus.State.Waiting == nil {
+			status := statuses[container.Name]
+			status.State.Waiting = &v1.ContainerStateWaiting{
+				Reason:  kubecontainer.ContainerReasonStatusUnknown,
+				Message: "The container is removed because RestartAllContainers in place",
+			}
+			status.State.Terminated = nil
+			status.State.Running = nil
+			status.RestartCount = oldStatus.RestartCount + 1
+			statuses[container.Name] = status
+			continue
+		}
+
 		if oldStatus.State.Terminated != nil {
 			// if the old container status was terminated, the lasttermination status is correct
 			continue
@@ -2419,6 +2468,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
 			status.StopSignal = cStatus.StopSignal
 		}
+
 		if containerSeen[cName] == 0 {
 			statuses[cName] = status
 		} else {

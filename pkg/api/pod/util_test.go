@@ -6313,3 +6313,62 @@ func TestDisabledWorkload(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateContainerRestartRulesOnSidecarOption(t *testing.T) {
+	policyAlways := api.ContainerRestartPolicyAlways
+	testCases := []struct {
+		name           string
+		oldPodSpec     *api.PodSpec
+		featureEnabled bool
+		want           bool
+	}{
+		{
+			name:           "feature enabled",
+			featureEnabled: true,
+			want:           true,
+		},
+		{
+			name:           "feature disabled",
+			featureEnabled: false,
+			want:           false,
+		},
+		{
+			name: "old pod spec has sidecar container without rules",
+			oldPodSpec: &api.PodSpec{
+				InitContainers: []api.Container{{
+					RestartPolicy: &policyAlways,
+				}},
+			},
+			featureEnabled: false,
+			want:           false,
+		},
+		{
+			name: "old pod spec has sidecar containers with rules",
+			oldPodSpec: &api.PodSpec{
+				InitContainers: []api.Container{{
+					RestartPolicy: &policyAlways,
+					RestartPolicyRules: []api.ContainerRestartRule{{
+						Action: api.ContainerRestartRuleActionRestartAllContainers,
+						ExitCodes: &api.ContainerRestartRuleOnExitCodes{
+							Operator: api.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{42},
+						},
+					}},
+				}},
+			},
+			featureEnabled: false,
+			want:           true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, tc.featureEnabled)
+			// The new pod doesn't impact the outcome.
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, tc.oldPodSpec, nil, nil)
+			if tc.want != gotOptions.AllowContainerRestartPolicyRulesOnSidecars {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, gotOptions.AllowInvalidPodDeletionCost)
+			}
+		})
+	}
+}

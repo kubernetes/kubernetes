@@ -508,10 +508,11 @@ func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*k
 type containerKillReason string
 
 const (
-	reasonStartupProbe        containerKillReason = "StartupProbe"
-	reasonLivenessProbe       containerKillReason = "LivenessProbe"
-	reasonFailedPostStartHook containerKillReason = "FailedPostStartHook"
-	reasonUnknown             containerKillReason = "Unknown"
+	reasonStartupProbe         containerKillReason = "StartupProbe"
+	reasonLivenessProbe        containerKillReason = "LivenessProbe"
+	reasonFailedPostStartHook  containerKillReason = "FailedPostStartHook"
+	reasonRestartAllContainers containerKillReason = "RestartAllContainers"
+	reasonUnknown              containerKillReason = "Unknown"
 )
 
 // containerToKillInfo contains necessary information to kill a container.
@@ -547,6 +548,18 @@ type containerToUpdateInfo struct {
 	currentContainerResources *containerResources
 }
 
+// containerToRemoveInfo contains necessary information to update a container's resources.
+type containerToRemoveInfo struct {
+	// The ID of the container.
+	containerID kubecontainer.ContainerID
+	// The name of the container
+	name string
+	// The spec of the container.
+	container *v1.Container
+	// Whether to kill the container before removal.
+	kill bool
+}
+
 // podActions keeps information what to do for a pod.
 type podActions struct {
 	// Stop all running (regular, init and ephemeral) containers and the sandbox for the pod.
@@ -579,11 +592,13 @@ type podActions struct {
 	ContainersToUpdate map[v1.ResourceName][]containerToUpdateInfo
 	// UpdatePodResources is true if container(s) need resource update with restart
 	UpdatePodResources bool
+	// ContainersToRemove is a list of containers to be removed for RestartAllContainers.
+	ContainersToRemove []containerToRemoveInfo
 }
 
 func (p podActions) String() string {
-	return fmt.Sprintf("KillPod: %t, CreateSandbox: %t, UpdatePodResources: %t, Attempt: %d, InitContainersToStart: %v, ContainersToStart: %v, EphemeralContainersToStart: %v,ContainersToUpdate: %v, ContainersToKill: %v",
-		p.KillPod, p.CreateSandbox, p.UpdatePodResources, p.Attempt, p.InitContainersToStart, p.ContainersToStart, p.EphemeralContainersToStart, p.ContainersToUpdate, p.ContainersToKill)
+	return fmt.Sprintf("KillPod: %t, CreateSandbox: %t, UpdatePodResources: %t, Attempt: %d, InitContainersToStart: %v, ContainersToStart: %v, EphemeralContainersToStart: %v,ContainersToUpdate: %v, ContainersToKill: %v, ContainersToRemove: %v",
+		p.KillPod, p.CreateSandbox, p.UpdatePodResources, p.Attempt, p.InitContainersToStart, p.ContainersToStart, p.EphemeralContainersToStart, p.ContainersToUpdate, p.ContainersToKill, p.ContainersToRemove)
 }
 
 // containerChanged will determine whether the container has changed based on the fields that will affect the running of the container.
@@ -1005,7 +1020,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
-func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
+func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, apiPodStatus *v1.PodStatus) podActions {
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Syncing Pod", "pod", klog.KObj(pod))
 
@@ -1017,6 +1032,33 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		Attempt:           attempt,
 		ContainersToStart: []int{},
 		ContainersToKill:  make(map[kubecontainer.ContainerID]containerToKillInfo),
+	}
+
+	// Needs to create a new sandbox when the pod is marked for RestartAllContainers
+	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
+		allContainersRestarting := false
+		if apiPodStatus != nil {
+			for _, cond := range apiPodStatus.Conditions {
+				if cond.Type == v1.AllContainersRestarting && cond.Status == v1.ConditionTrue {
+					allContainersRestarting = true
+					break
+				}
+			}
+		}
+		if allContainersRestarting {
+			logger.V(3).Info("Pod marked for RestartAllContainers", "pod", klog.KObj(pod))
+			changes.KillPod = false
+			changes.CreateSandbox = false
+			// Kill and remove containers in reverse order. Source containers (which exited and triggered
+			// RestartAllContainers) are removed last.
+			sourceInitContainers, targetInitContainers := m.getContainersToRemove(ctx, pod.Spec.InitContainers, podStatus)
+			sourceContainers, targetContainers := m.getContainersToRemove(ctx, pod.Spec.Containers, podStatus)
+			changes.ContainersToRemove = append(changes.ContainersToRemove, targetContainers...)
+			changes.ContainersToRemove = append(changes.ContainersToRemove, targetInitContainers...)
+			changes.ContainersToRemove = append(changes.ContainersToRemove, sourceContainers...)
+			changes.ContainersToRemove = append(changes.ContainersToRemove, sourceInitContainers...)
+			return changes
+		}
 	}
 
 	// If we need to (re-)create the pod sandbox, everything will need to be
@@ -1203,6 +1245,33 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	return changes
 }
 
+func (m *kubeGenericRuntimeManager) getContainersToRemove(ctx context.Context, containers []v1.Container, podStatus *kubecontainer.PodStatus) (sources []containerToRemoveInfo, targets []containerToRemoveInfo) {
+	for idx := len(containers) - 1; idx >= 0; idx-- {
+		c := containers[idx]
+		containerStatus := podStatus.FindContainerStatusByName(c.Name)
+		if containerStatus != nil {
+			info := containerToRemoveInfo{
+				containerID: containerStatus.ID,
+				name:        containerStatus.Name,
+				container:   &containers[idx],
+			}
+			if containerStatus.State == kubecontainer.ContainerStateExited {
+				exitCode := containerStatus.ExitCode
+				rule, ok := podutil.FindMatchingContainerRestartRule(c, int32(exitCode))
+				if ok && rule.Action == v1.ContainerRestartRuleActionRestartAllContainers {
+					sources = append(sources, info)
+				} else {
+					targets = append(targets, info)
+				}
+			} else {
+				info.kill = true
+				targets = append(targets, info)
+			}
+		}
+	}
+	return
+}
+
 // SyncPod syncs the running pod into the desired pod by executing following steps:
 //
 //  1. Compute sandbox and container changes.
@@ -1213,10 +1282,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 //  6. Create init containers.
 //  7. Resize running containers (if InPlacePodVerticalScaling==true)
 //  8. Create normal containers.
-func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, apiPodStatus *v1.PodStatus) (result kubecontainer.PodSyncResult) {
 	logger := klog.FromContext(ctx)
 	// Step 1: Compute sandbox and container changes.
-	podContainerChanges := m.computePodActions(ctx, pod, podStatus)
+	podContainerChanges := m.computePodActions(ctx, pod, podStatus, apiPodStatus)
 	logger.V(3).Info("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)
@@ -1258,6 +1327,30 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 				logger.Error(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
 				return
+			}
+		}
+
+		// Removes the containers if they are marked for removal (for in-place restart)
+		if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
+			for _, containerInfo := range podContainerChanges.ContainersToRemove {
+				logger.V(3).Info("Removing container before pod restarts", "containerName", containerInfo.name, "containerID", containerInfo.containerID, "pod", klog.KObj(pod))
+				removeContainerResult := kubecontainer.NewSyncResult(kubecontainer.RemoveContainer, containerInfo.name)
+				result.AddSyncResult(removeContainerResult)
+				if containerInfo.kill {
+					logger.V(3).Info("Killing container before removal", "containerName", containerInfo.name, "containerID", containerInfo.containerID, "pod", klog.KObj(pod))
+					// Killing containers without grace period.
+					var gracePeriod int64 = 0
+					if err := m.killContainer(ctx, pod, containerInfo.containerID, containerInfo.name, "killing", reasonRestartAllContainers, &gracePeriod, nil); err != nil {
+						removeContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
+						logger.Error(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerInfo.containerID, "pod", klog.KObj(pod))
+						return
+					}
+				}
+				if err := m.removeContainer(ctx, containerInfo.containerID.ID); err != nil {
+					removeContainerResult.Fail(kubecontainer.ErrRemoveContainer, err.Error())
+					logger.Error(err, "removeContainer for pod failed", "containerName", containerInfo.name, "containerID", containerInfo.containerID, "pod", klog.KObj(pod))
+					return
+				}
 			}
 		}
 	}

@@ -872,6 +872,213 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 	})
 })
 
+var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithFeatureGate(features.ContainerRestartRules), framework.WithFeatureGate(features.RestartAllContainersOnContainerExits), func() {
+	f := framework.NewDefaultFramework("pods")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+	ginkgo.Describe("RestartAllContainers", func() {
+		var (
+			containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
+			containerRestartPolicyNever  = v1.ContainerRestartPolicyNever
+		)
+
+		restartAllContainersRules := []v1.ContainerRestartRule{
+			{
+				Action: v1.ContainerRestartRuleActionRestartAllContainers,
+				ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+					Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+					Values:   []int32{42},
+				},
+			},
+		}
+
+		ginkgo.It("should restart all containers on regular container exit", func(ctx context.Context) {
+			podName := "restart-rules-exit-code-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					InitContainers: []v1.Container{
+						{
+							Name:    "init",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "exit 0"},
+						},
+						{
+							Name:          "sidecar",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "sleep 10000"},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:               "source-container",
+							Image:              imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:            []string{"/bin/sh", "-c", "sleep 60; exit 42"},
+							RestartPolicy:      &containerRestartPolicyNever,
+							RestartPolicyRules: restartAllContainersRules,
+						},
+						{
+							Name:    "regular",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "sleep 10000"},
+						},
+					},
+				},
+			}
+
+			// All containers should be restarted once
+			podClient := e2epod.NewPodClient(f)
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+			validateAllContainersRestarted(ctx, f, pod, []string{"init", "sidecar", "source-container", "regular"})
+		})
+
+		ginkgo.It("should restart all containers on sidecar container exit", func(ctx context.Context) {
+			podName := "restart-rules-exit-code-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					InitContainers: []v1.Container{
+						{
+							Name:    "init",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "exit 0"},
+						},
+						{
+							Name:          "sidecar",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "sleep 10000"},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+						{
+							Name:               "source-sidecar",
+							Image:              imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:            []string{"/bin/sh", "-c", "sleep 60; exit 42"},
+							RestartPolicy:      &containerRestartPolicyAlways,
+							RestartPolicyRules: restartAllContainersRules,
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:    "regular",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "sleep 10000"},
+						},
+					},
+				},
+			}
+
+			// All containers should be restarted once
+			podClient := e2epod.NewPodClient(f)
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+			validateAllContainersRestarted(ctx, f, pod, []string{"init", "sidecar", "source-sidecar", "regular"})
+		})
+
+		ginkgo.It("should restart init and sidecar containers on init container exit", func(ctx context.Context) {
+			podName := "restart-rules-exit-code-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					InitContainers: []v1.Container{
+						{
+							Name:          "sidecar",
+							Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:       []string{"/bin/sh", "-c", "sleep 10000"},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+						{
+							Name:    "init",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "exit 0"},
+						},
+						{
+							Name:               "source-init",
+							Image:              imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:            []string{"/bin/sh", "-c", "if [ -f /mnt/init-complete ]; then exit 0; else touch /mnt/init-complete; exit 42; fi"},
+							RestartPolicy:      &containerRestartPolicyNever,
+							RestartPolicyRules: restartAllContainersRules,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:    "regular",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "sleep 10000"},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "workdir",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+
+			// All containers should be restarted once
+			podClient := e2epod.NewPodClient(f)
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+			validateAllContainersRestarted(ctx, f, pod, []string{"init", "sidecar", "source-init"})
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+		})
+	})
+})
+
+func validateAllContainersRestarted(ctx context.Context, f *framework.Framework, pod *v1.Pod, containers []string) {
+	ginkgo.By("Waiting for all containers to restart")
+	err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "all containers restarted", 3*time.Minute, func(pod *v1.Pod) (bool, error) {
+		restartedCount := 0
+		for _, cName := range containers {
+			restarted := false
+			for _, status := range pod.Status.ContainerStatuses {
+				if status.Name == cName && status.RestartCount > 0 {
+					restarted = true
+				}
+			}
+			for _, status := range pod.Status.InitContainerStatuses {
+				if status.Name == cName && status.RestartCount > 0 {
+					restarted = true
+				}
+			}
+			if restarted {
+				restartedCount++
+			}
+		}
+		ginkgo.By(fmt.Sprintf("%d out of %d containers restarted", restartedCount, len(containers)))
+		return restartedCount == len(containers), nil
+	})
+	framework.ExpectNoError(err, "failed to see all containers restart")
+}
+
 func createAndValidateRestartableContainer(ctx context.Context, f *framework.Framework, pod *v1.Pod, podName, containerName string) {
 	ginkgo.By("Creating the pod")
 	e2epod.NewPodClient(f).Create(ctx, pod)

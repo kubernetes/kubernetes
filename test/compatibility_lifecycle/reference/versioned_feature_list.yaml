@@ -1495,6 +1495,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+- name: RestartAllContainersOnContainerExits
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: RetryGenerateName
   versionedSpecs:
   - default: false
