@@ -149,7 +149,7 @@ func Unique[T any](_ context.Context, _ operation.Operation, fldPath *field.Path
 		// specify that just the keys should be rendered in the error.
 		errs = append(errs, field.Duplicate(fldPath.Index(i), val))
 	}
-	return errs
+	return errs.WithOrigin("unique")
 }
 
 // SemanticDeepEqual is a MatchFunc that uses equality.Semantic.DeepEqual to
