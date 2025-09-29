@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -308,12 +309,56 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 
 	require.Error(t, err, "Expected an error but got none")
 
-	var attachErr *VolumeAttachLimitExceededError
-	require.ErrorAs(t, err, &attachErr, "Error should be of type VolumeAttachLimitExceededError")
-	require.Equal(t, []string{"vol1"}, attachErr.UnmountedVolumes, "UnmountedVolumes mismatch")
-	require.Equal(t, []string{"vol1"}, attachErr.UnattachedVolumes, "UnattachedVolumes mismatch")
-	require.Empty(t, attachErr.VolumesNotInDSW, "VolumesNotInDSW should be empty")
-	require.ErrorIs(t, attachErr.OriginalError, context.DeadlineExceeded, "OriginalError should be context.DeadlineExceeded")
+	var rejectingErr *RejectingPodError
+	require.ErrorAs(t, err, &rejectingErr)
+	assert.Equal(t, VolumeAttachmentLimitExceededReason, rejectingErr.Reason)
+	assert.Equal(t, "Node has reached its volume attachment limit", rejectingErr.Desc)
+}
+
+func TestNodeAffitifyMismatch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePVNodeAffinity, true)
+
+	tmpDir := t.TempDir()
+	podManager := kubepod.NewBasicPodManager()
+
+	node, pod, pv, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
+	node.Status.VolumesAttached = []v1.AttachedVolume{} // volume should be not attached to trigger the error
+
+	// Set PV's NodeAffinity to not match the scheduled node
+	pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
+		Required: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      "kubernetes.io/hostname",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"some-other-node"},
+						},
+					},
+				},
+			},
+		},
+	}
+	kubeClient := fake.NewClientset(node, pod, pv, claim)
+	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
+
+	tCtx := ktesting.Init(t)
+	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+	go manager.Run(tCtx, sourcesReady)
+	podManager.SetPods([]*v1.Pod{pod})
+
+	go simulateVolumeInUseUpdate(
+		v1.UniqueVolumeName("fake/fake-device"),
+		tCtx.Done(),
+		manager)
+
+	err := manager.WaitForAttachAndMount(tCtx, pod)
+
+	var rejectingErr *RejectingPodError
+	require.ErrorAs(t, err, &rejectingErr)
+	assert.Equal(t, VolumeNodeAffinityReason, rejectingErr.Reason)
+	assert.Equal(t, "node affinity mismatch", rejectingErr.Desc)
 }
 
 func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
