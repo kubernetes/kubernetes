@@ -185,6 +185,9 @@ type imageRecord struct {
 
 	// Pinned status of the image
 	pinned bool
+
+	// Reserved for restart indicates if this image is reserved for containers that will be restarted
+	reservedForRestart bool
 }
 
 // NewImageGCManager instantiates a new ImageGCManager object.
@@ -261,6 +264,60 @@ func isContainerActuallyUsingImage(c *container.Container) bool {
 	}
 }
 
+// willContainerRestart determines if a container in its current state will be restarted.
+// This is used to decide whether to reserve the container's image from garbage collection.
+func willContainerRestart(c *container.Container) bool {
+	switch c.State {
+	case container.ContainerStateUnknown:
+		// Unknown state containers are always restarted according to ShouldContainerBeRestarted logic
+		return true
+	case container.ContainerStateCreated:
+		// Created containers are always restarted according to ShouldContainerBeRestarted logic
+		return true
+	case container.ContainerStateExited:
+		// Exited containers may be restarted depending on restart policy
+		// We use a conservative approach and assume they will be restarted
+		// This prevents GC of images for containers that might restart
+		return true
+	case container.ContainerStateRunning:
+		// Running containers don't need restart
+		return false
+	default:
+		// For any other state, be conservative and assume they will be restarted
+		return true
+	}
+}
+
+// reserveImageForRestart marks an image as reserved for container restart to prevent garbage collection.
+func (im *realImageGCManager) reserveImageForRestart(imageID, runtimeHandler string, isRuntimeClassInImageCriAPIEnabled bool) {
+	im.imageRecordsLock.Lock()
+	defer im.imageRecordsLock.Unlock()
+
+	imageKey := imageID
+	if isRuntimeClassInImageCriAPIEnabled {
+		imageKey = getImageTuple(imageID, runtimeHandler)
+	}
+
+	if record, exists := im.imageRecords[imageKey]; exists {
+		record.reservedForRestart = true
+		record.lastUsed = time.Now() // Update last used time to prevent immediate GC
+	}
+}
+
+// clearReservationsForImagesInUse clears reservations for images that are now actively in use.
+func (im *realImageGCManager) clearReservationsForImagesInUse(imagesInUse sets.Set[string]) {
+	im.imageRecordsLock.Lock()
+	defer im.imageRecordsLock.Unlock()
+
+	for imageKey := range im.imageRecords {
+		if isImageUsed(imageKey, imagesInUse) {
+			if record, exists := im.imageRecords[imageKey]; exists && record.reservedForRestart {
+				record.reservedForRestart = false
+			}
+		}
+	}
+}
+
 func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.Time) (sets.Set[string], error) {
 	logger := klog.FromContext(ctx)
 	isRuntimeClassInImageCriAPIEnabled := utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI)
@@ -275,33 +332,51 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 		return imagesInUse, err
 	}
 
-	// Make a set of images in use by containers.
+	// Make a set of images in use by containers and track reservations for restarting containers.
 	for _, pod := range pods {
 		for _, container := range pod.Containers {
-			// Skip containers that are not actually using the image
-			// This includes containers in error states like CreateContainerConfigError
-			if !isContainerActuallyUsingImage(container) {
-				klog.V(5).InfoS("Skipping container for image usage, container not actually using image",
+			// Check if container is actually using the image
+			containerUsingImage := isContainerActuallyUsingImage(container)
+
+			// Check if container will be restarted (needs image reservation)
+			containerWillRestart := willContainerRestart(container)
+
+			if containerUsingImage {
+				// Container is actively using the image - mark as in use
+				if err := im.handleImageVolumes(ctx, imagesInUse, container, pod, images); err != nil {
+					return imagesInUse, err
+				}
+
+				if !isRuntimeClassInImageCriAPIEnabled {
+					logger.V(5).Info("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef)
+					imagesInUse.Insert(container.ImageID)
+				} else {
+					imageKey := getImageTuple(container.ImageID, container.ImageRuntimeHandler)
+					logger.V(5).Info("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef, "imageKey", imageKey)
+					imagesInUse.Insert(imageKey)
+				}
+			} else if containerWillRestart {
+				// Container is not using the image but will be restarted - reserve the image
+				logger.V(5).Info("Reserving image for container restart",
+					"pod", klog.KRef(pod.Namespace, pod.Name),
+					"containerName", container.Name,
+					"containerState", container.State,
+					"imageID", container.ImageID)
+
+				// Mark image as reserved for restart
+				im.reserveImageForRestart(container.ImageID, container.ImageRuntimeHandler, isRuntimeClassInImageCriAPIEnabled)
+			} else {
+				// Container is not using the image and won't be restarted - safe to skip
+				logger.V(5).Info("Skipping container for image usage, container not using image and won't restart",
 					"pod", klog.KRef(pod.Namespace, pod.Name),
 					"containerName", container.Name,
 					"containerState", container.State)
-				continue
-			}
-
-			if err := im.handleImageVolumes(ctx, imagesInUse, container, pod, images); err != nil {
-				return imagesInUse, err
-			}
-
-			if !isRuntimeClassInImageCriAPIEnabled {
-				logger.V(5).Info("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef)
-				imagesInUse.Insert(container.ImageID)
-			} else {
-				imageKey := getImageTuple(container.ImageID, container.ImageRuntimeHandler)
-				logger.V(5).Info("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef, "imageKey", imageKey)
-				imagesInUse.Insert(imageKey)
 			}
 		}
 	}
+
+	// Clear reservations for images that are now actively in use
+	im.clearReservationsForImagesInUse(imagesInUse)
 
 	// Add new images and record those being used.
 	now := time.Now()
@@ -598,7 +673,11 @@ func (im *realImageGCManager) imagesInEvictionOrder(ctx context.Context, freeTim
 		if record.pinned {
 			logger.V(5).Info("Image is pinned, skipping garbage collection", "imageID", image)
 			continue
-
+		}
+		// Check if image is reserved for container restart, prevent garbage collection
+		if record.reservedForRestart {
+			logger.V(5).Info("Image is reserved for container restart, skipping garbage collection", "imageID", image)
+			continue
 		}
 		if !isRuntimeClassInImageCriAPIEnabled {
 			images = append(images, evictionInfo{
