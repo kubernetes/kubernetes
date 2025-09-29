@@ -52,6 +52,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&LeaseList{},
 		&LeaseCandidate{},
 		&LeaseCandidateList{},
+		&EvictionRequest{},
+		&EvictionRequestList{},
 	)
 	return nil
 }

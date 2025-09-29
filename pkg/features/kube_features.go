@@ -330,6 +330,11 @@ const (
 	// If enabled, it allows passing --service-account-signing-endpoint flag to configure external signer.
 	ExternalServiceAccountTokenSigner featuregate.Feature = "ExternalServiceAccountTokenSigner"
 
+	// owner: @uMetalooper
+	//
+	// Enables the EvictionRequest API for coordinated pod eviction.
+	EvictionRequestAPI featuregate.Feature = "EvictionRequestAPI"
+
 	// owner: @vinayakankugoyal @thockin
 	//
 	// Controls if the gitRepo volume plugin is supported or not.
@@ -1246,6 +1251,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	ExternalServiceAccountTokenSigner: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	EvictionRequestAPI: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	GitRepoVolumeDriver: {
