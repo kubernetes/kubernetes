@@ -23,7 +23,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
-
 )
 
 var apiVersions = []string{"v1", "v1alpha1", "v1beta1"}
@@ -47,7 +46,7 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input,Strategy.Validate, tc.expectedErrs )
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
 		})
 	}
 }

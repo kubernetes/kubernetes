@@ -126,7 +126,7 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, newObj, rest.WithTakeover(takeover))
 
 		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover,"ClusterRoleUpdate")
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, "ClusterRoleUpdate")
 
 		// Only apply declarative errors if takeover is enabled
 		if takeover {
