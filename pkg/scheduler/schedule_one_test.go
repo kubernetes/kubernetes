@@ -1175,6 +1175,236 @@ func TestSchedulerScheduleOne(t *testing.T) {
 	}
 }
 
+type constSigPluginConfig struct {
+	name       string
+	signature  []fwk.SignFragment
+	status     *fwk.Status
+	pluginType string
+}
+
+type constantSigPlugin struct {
+	config *constSigPluginConfig
+}
+
+var _ fwk.FilterPlugin = &constantSigPlugin{}
+var _ fwk.PreFilterPlugin = &constantSigPlugin{}
+var _ fwk.ScorePlugin = &constantSigPlugin{}
+var _ fwk.PreScorePlugin = &constantSigPlugin{}
+
+func (pl *constantSigPlugin) Name() string {
+	return pl.config.name
+}
+
+func (pl *constantSigPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
+	return fwk.NewStatus(fwk.Success)
+}
+
+func (pl *constantSigPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	return nil, fwk.NewStatus(fwk.Success)
+}
+
+func (pl *constantSigPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
+	return nil
+}
+
+func (pl *constantSigPlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
+	return fwk.NewStatus(fwk.Success)
+}
+
+func (pl *constantSigPlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
+	return 1, fwk.NewStatus(fwk.Success)
+}
+
+func (pl *constantSigPlugin) ScoreExtensions() fwk.ScoreExtensions {
+	return nil
+}
+
+func (pl *constantSigPlugin) SignPod(_ context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return pl.config.signature, pl.config.status
+}
+
+func newConstSigFactory(config *constSigPluginConfig) frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+		return &constantSigPlugin{config: config}, nil
+	}
+}
+
+func TestSignatures(t *testing.T) {
+	table := []struct {
+		name                 string
+		plugins              []*constSigPluginConfig
+		expectedSignature    string
+		expectUnscheduleable bool
+	}{
+		{
+			name:              "no plugins",
+			expectedSignature: `{"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+		},
+		{
+			name: "single filter",
+			plugins: []*constSigPluginConfig{
+				{
+					name:       "ConstSig",
+					signature:  []fwk.SignFragment{{Key: "test", Value: 16}},
+					status:     fwk.NewStatus(fwk.Success),
+					pluginType: "filter",
+				},
+			},
+			expectedSignature: `{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+		},
+		{
+			name: "single prefilter",
+			plugins: []*constSigPluginConfig{
+				{
+					name:       "ConstSig",
+					signature:  []fwk.SignFragment{{Key: "test", Value: 16}},
+					status:     fwk.NewStatus(fwk.Success),
+					pluginType: "prefilter",
+				},
+			},
+			expectedSignature: `{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+		},
+		{
+			name: "single score",
+			plugins: []*constSigPluginConfig{
+				{
+					name:       "ConstSig",
+					signature:  []fwk.SignFragment{{Key: "test", Value: 16}},
+					status:     fwk.NewStatus(fwk.Success),
+					pluginType: "score",
+				},
+			},
+			expectedSignature: `{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+		},
+		{
+			name: "single prescore",
+			plugins: []*constSigPluginConfig{
+				{
+					name:       "ConstSig",
+					signature:  []fwk.SignFragment{{Key: "test", Value: 16}},
+					status:     fwk.NewStatus(fwk.Success),
+					pluginType: "prescore",
+				},
+			},
+			expectedSignature: `{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+		},
+		{
+			name: "two plugins",
+			plugins: []*constSigPluginConfig{
+				{
+					name:       "ConstSig",
+					signature:  []fwk.SignFragment{{Key: "test", Value: 16}},
+					status:     fwk.NewStatus(fwk.Success),
+					pluginType: "filter",
+				},
+				{
+					name:       "ConstSig2",
+					signature:  []fwk.SignFragment{{Key: "test2", Value: 17}},
+					status:     fwk.NewStatus(fwk.Success),
+					pluginType: "score",
+				},
+			},
+			expectedSignature: `{"test":16,"test2":17,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+		},
+		{
+			name: "plugin with multiple fragments",
+			plugins: []*constSigPluginConfig{
+				{
+					name:       "ConstSig",
+					signature:  []fwk.SignFragment{{Key: "test", Value: 16}, {Key: "test2", Value: 17}},
+					status:     fwk.NewStatus(fwk.Success),
+					pluginType: "filter",
+				},
+			},
+			expectedSignature: `{"test":16,"test2":17,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+		},
+		{
+			name: "overlapping fragments",
+			plugins: []*constSigPluginConfig{
+				{
+					name:       "ConstSig",
+					signature:  []fwk.SignFragment{{Key: "test", Value: 16}},
+					status:     fwk.NewStatus(fwk.Success),
+					pluginType: "filter",
+				},
+				{
+					name:       "ConstSig2",
+					signature:  []fwk.SignFragment{{Key: "test", Value: 16}},
+					status:     fwk.NewStatus(fwk.Success),
+					pluginType: "score",
+				},
+			},
+			expectedSignature: `{"test":16,"v1.Pod.Spec.SchedulerName":"test-scheduler"}`,
+		},
+		{
+			name: "unsignable plugin",
+			plugins: []*constSigPluginConfig{
+				{
+					name:       "ConstSig",
+					status:     fwk.NewStatus(fwk.Unschedulable),
+					pluginType: "filter",
+				},
+			},
+			expectUnscheduleable: true,
+		},
+		{
+			name: "error plugin",
+			plugins: []*constSigPluginConfig{
+				{
+					name:       "ConstSig",
+					status:     fwk.NewStatus(fwk.Error),
+					pluginType: "filter",
+				},
+			},
+			expectUnscheduleable: true,
+		},
+	}
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			snapshot := internalcache.NewSnapshot([]*v1.Pod{}, []*v1.Node{})
+			informerFactory := informers.NewSharedInformerFactory(nil, 0)
+
+			plugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+
+			for _, pl := range item.plugins {
+				switch pl.pluginType {
+				case "filter":
+					plugins = append(plugins, tf.RegisterFilterPlugin(pl.name, newConstSigFactory(pl)))
+				case "prefilter":
+					plugins = append(plugins, tf.RegisterPreFilterPlugin(pl.name, newConstSigFactory(pl)))
+				case "score":
+					plugins = append(plugins, tf.RegisterScorePlugin(pl.name, newConstSigFactory(pl), 1))
+				case "prescore":
+					plugins = append(plugins, tf.RegisterPreScorePlugin(pl.name, newConstSigFactory(pl)))
+				}
+			}
+
+			schedFramework, err := tf.NewFramework(ctx,
+				plugins,
+				testSchedulerName,
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			signature, status := schedFramework.SignPod(ctx, podWithID("foo", ""))
+			if !status.IsSuccess() {
+				if !item.expectUnscheduleable || status.Code() != fwk.Unschedulable {
+					t.Fatalf("Unexpected status %v on %s", status, item.name)
+				}
+			}
+			if signature != item.expectedSignature {
+				t.Fatal(fmt.Errorf("Test %s got signature %s, expected %s", item.name, signature, item.expectedSignature))
+			}
+		})
+	}
+}
+
 // Tests the logic removing pods from inFlightPods after Permit (needed to fix issue https://github.com/kubernetes/kubernetes/issues/129967).
 // This needs to be a separate test case, because it mocks the waitOnPermit and runPrebindPlugins functions.
 func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
@@ -4388,6 +4618,20 @@ func podWithResources(id, desiredHost string, limits v1.ResourceList, requests v
 	pod := podWithID(id, desiredHost)
 	pod.Spec.Containers = []v1.Container{
 		{Name: "ctr", Resources: v1.ResourceRequirements{Limits: limits, Requests: requests}},
+	}
+	return pod
+}
+
+func podWithAffinity(id, desiredHost, label string) *v1.Pod {
+	pod := podWithID(id, desiredHost)
+	pod.Spec.Affinity = &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					TopologyKey: label,
+				},
+			},
+		},
 	}
 	return pod
 }

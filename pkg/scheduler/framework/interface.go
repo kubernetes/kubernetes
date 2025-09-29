@@ -173,6 +173,13 @@ type Framework interface {
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() fwk.LessFunc
 
+	// Create a scheduling signature for a given pod, if possible. Two pods with the same signature
+	// should get the same feasibility and scores for any given set of nodes even after one of them gets assigned. If some plugins
+	// are unable to create a signature, the pod may be "unsignable" which disables results caching
+	// and gang scheduling optimizations.
+	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/5598-opportunistic-batching
+	SignPod(ctx context.Context, pod *v1.Pod) (string, *fwk.Status)
+
 	// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If a non-success status is returned, then the scheduling

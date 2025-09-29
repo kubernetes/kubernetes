@@ -46,6 +46,7 @@ var _ fwk.FilterPlugin = &Fit{}
 var _ fwk.EnqueueExtensions = &Fit{}
 var _ fwk.PreScorePlugin = &Fit{}
 var _ fwk.ScorePlugin = &Fit{}
+var _ fwk.SignPlugin = &Fit{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -166,6 +167,29 @@ func getPreScoreState(cycleState fwk.CycleState) (*preScoreState, error) {
 // Name returns name of the plugin. It is used in logs, etc.
 func (f *Fit) Name() string {
 	return Name
+}
+
+func getResources(containers []v1.Container) any {
+	ret := []any{}
+	for _, c := range containers {
+		ret = append(ret, c.Resources)
+	}
+	return ret
+}
+
+func resourcesSigner(pod *v1.Pod) any {
+	return map[string]any{
+		"containers":     getResources(pod.Spec.Containers),
+		"initContainers": getResources(pod.Spec.InitContainers),
+		"overhead":       pod.Spec.Overhead,
+	}
+}
+
+// Filtering and scoring based on the container resources and overheads.
+func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return []fwk.SignFragment{
+		{Key: fwk.ResourcesSignerName, Value: resourcesSigner(pod)},
+	}, fwk.NewStatus(fwk.Success)
 }
 
 // NewFit initializes a new plugin and returns it.
