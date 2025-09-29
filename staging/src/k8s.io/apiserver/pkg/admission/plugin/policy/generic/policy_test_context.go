@@ -166,6 +166,7 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return policiesAndBindingsTracker.Watch(fakePolicyGVR, "")
 			},
+			UnsupportedWatchListSemantics: true,
 		},
 		Pexample,
 		30*time.Second,
@@ -179,6 +180,7 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return policiesAndBindingsTracker.Watch(fakeBindingGVR, "")
 			},
+			UnsupportedWatchListSemantics: true,
 		},
 		Bexample,
 		30*time.Second,
