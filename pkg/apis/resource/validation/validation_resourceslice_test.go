@@ -694,7 +694,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"duplicate-shared-counters": {
 			wantFailures: field.ErrorList{
-				field.Duplicate(field.NewPath("spec", "sharedCounters").Index(1).Child("name"), goodName),
+				field.Duplicate(field.NewPath("spec", "sharedCounters").Index(1), goodName),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)

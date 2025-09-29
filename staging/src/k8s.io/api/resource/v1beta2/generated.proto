@@ -1379,11 +1379,13 @@ message ResourceClaimStatus {
   // the future, but not reduced.
   //
   // +optional
-  // +k8s:optional
   // +listType=map
   // +listMapKey=uid
   // +patchStrategy=merge
   // +patchMergeKey=uid
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=uid
   repeated ResourceClaimConsumerReference reservedFor = 2;
 
   // Devices contains the status of each device allocated for this
