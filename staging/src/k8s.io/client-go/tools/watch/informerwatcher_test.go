@@ -413,6 +413,7 @@ func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 			watchCalls++
 			return w, nil
 		},
+		UnsupportedWatchListSemantics: true,
 	}
 	//nolint:logcheck // Intentionally uses the older API.
 	_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
