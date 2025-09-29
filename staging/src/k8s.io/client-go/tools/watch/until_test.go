@@ -204,6 +204,7 @@ func TestUntilWithSync(t *testing.T) {
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					select {}
 				},
+				UnsupportedWatchListSemantics: true,
 			},
 			preconditionFunc: nil,
 			conditionFunc: func(e watch.Event) (bool, error) {
@@ -221,6 +222,7 @@ func TestUntilWithSync(t *testing.T) {
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					select {}
 				},
+				UnsupportedWatchListSemantics: true,
 			},
 			preconditionFunc: func(store cache.Store) (bool, error) {
 				return true, nil
@@ -243,6 +245,7 @@ func TestUntilWithSync(t *testing.T) {
 					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 						return fakeclient.CoreV1().Secrets("").Watch(context.TODO(), options)
 					},
+					UnsupportedWatchListSemantics: true,
 				}
 			}(),
 			preconditionFunc: func(store cache.Store) (bool, error) {
@@ -273,6 +276,7 @@ func TestUntilWithSync(t *testing.T) {
 					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 						return fakeclient.CoreV1().Secrets("").Watch(context.TODO(), options)
 					},
+					UnsupportedWatchListSemantics: true,
 				}
 			}(),
 			preconditionFunc: func(store cache.Store) (bool, error) {
