@@ -29,7 +29,7 @@ package v1beta1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AllocatedDeviceStatus = map[string]string{
 	"":            "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.\n\nThe combination of Driver, Pool, Device, and ShareID must match the corresponding key in Status.Allocation.Devices.",
-	"driver":      "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+	"driver":      "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. It should use only lower case characters.",
 	"pool":        "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
 	"device":      "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
 	"shareID":     "ShareID uniquely identifies an individual allocation share of the device.",
@@ -292,7 +292,7 @@ func (DeviceRequest) SwaggerDoc() map[string]string {
 var map_DeviceRequestAllocationResult = map[string]string{
 	"":                         "DeviceRequestAllocationResult contains the allocation result for one request.",
 	"request":                  "Request is the name of the request in the claim which caused this device to be allocated. If it references a subrequest in the firstAvailable list on a DeviceRequest, this field must include both the name of the main request and the subrequest using the format <main request>/<subrequest>.\n\nMultiple devices may have been allocated per request.",
-	"driver":                   "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+	"driver":                   "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. It should use only lower case characters.",
 	"pool":                     "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
 	"device":                   "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
 	"adminAccess":              "AdminAccess indicates that this device was allocated for administrative access. See the corresponding request field for a definition of mode.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
@@ -369,7 +369,7 @@ func (NetworkDeviceData) SwaggerDoc() map[string]string {
 
 var map_OpaqueDeviceConfiguration = map[string]string{
 	"":           "OpaqueDeviceConfiguration contains configuration parameters for a driver in a format defined by the driver vendor.",
-	"driver":     "Driver is used to determine which kubelet plugin needs to be passed these configuration parameters.\n\nAn admission policy provided by the driver developer could use this to decide whether it needs to validate them.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+	"driver":     "Driver is used to determine which kubelet plugin needs to be passed these configuration parameters.\n\nAn admission policy provided by the driver developer could use this to decide whether it needs to validate them.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. It should use only lower case characters.",
 	"parameters": "Parameters can contain arbitrary data. It is the responsibility of the driver developer to handle validation and versioning. Typically this includes self-identification and a version (\"kind\" + \"apiVersion\" for Kubernetes types), with conversion between different versions.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
 }
 
@@ -493,7 +493,7 @@ func (ResourceSliceList) SwaggerDoc() map[string]string {
 
 var map_ResourceSliceSpec = map[string]string{
 	"":                       "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
-	"driver":                 "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. This field is immutable.",
+	"driver":                 "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. It should use only lower case characters. This field is immutable.",
 	"pool":                   "Pool describes the pool that this ResourceSlice belongs to.",
 	"nodeName":               "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set. This field is immutable.",
 	"nodeSelector":           "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
