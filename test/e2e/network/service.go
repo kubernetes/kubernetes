@@ -3821,10 +3821,11 @@ var _ = common.SIGDescribe("Services", func() {
 			framework.Failf("failed to get Service %q: %v", serviceName, err)
 		}
 		service.Spec.Ports = []v1.ServicePort{svcTCPport}
-		_, err = cs.CoreV1().Services(ns).Update(ctx, service, metav1.UpdateOptions{})
+		updatedSVC, err := cs.CoreV1().Services(ns).Update(ctx, service, metav1.UpdateOptions{})
 		if err != nil {
 			framework.Failf("failed to get Service %q: %v", serviceName, err)
 		}
+		gomega.Expect(resourceversion.CompareResourceVersion(service.ResourceVersion, updatedSVC.ResourceVersion)).To(gomega.BeNumerically("==", -1), "updated object should have a larger resource version")
 
 		ginkgo.By("Checking if the Service forwards traffic to TCP only")
 		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolTCP, execPod, 30*time.Second)

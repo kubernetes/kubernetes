@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
@@ -529,6 +530,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
 	gomega.Expect(jr.Status.Conditions[0].Message).To(gomega.Equal("all checks passed"), "The Message returned was %v", jr.Status.Conditions[0].Message)
 
+	oldRV := jr.ResourceVersion
 	ginkgo.By("kubectl patch apiservice " + apiServiceName + " -p '{\"spec\":{\"versionPriority\": 400}}'")
 	patchContent, err := restClient.Patch(types.MergePatchType).
 		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/"+apiServiceName).
@@ -539,6 +541,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	err = json.Unmarshal([]byte(patchContent), &jr)
 	framework.ExpectNoError(err, "Failed to process patchContent: %v | err: %v ", string(patchContent), err)
 	gomega.Expect(jr.Spec.VersionPriority).To(gomega.Equal(int32(400)), "The VersionPriority returned was %d", jr.Spec.VersionPriority)
+	gomega.Expect(resourceversion.CompareResourceVersion(oldRV, jr.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 	ginkgo.By("List APIServices")
 	listApiservices, err := restClient.Get().
