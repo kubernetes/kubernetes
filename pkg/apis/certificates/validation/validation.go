@@ -38,9 +38,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilcert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 )
 
@@ -353,7 +355,7 @@ func getValidationOptions(newCSR, oldCSR *certificates.CertificateSigningRequest
 		allowResettingCertificate:    false,
 		allowBothApprovedAndDenied:   allowBothApprovedAndDenied(oldCSR),
 		allowLegacySignerName:        allowLegacySignerName(oldCSR),
-		allowDuplicateConditionTypes: allowDuplicateConditionTypes(oldCSR),
+		allowDuplicateConditionTypes: allowDuplicateConditionTypes(newCSR, oldCSR),
 		allowEmptyConditionType:      allowEmptyConditionType(oldCSR),
 		allowArbitraryCertificate:    allowArbitraryCertificate(newCSR, oldCSR),
 		allowDuplicateUsages:         allowDuplicateUsages(oldCSR),
@@ -387,13 +389,24 @@ func allowLegacySignerName(oldCSR *certificates.CertificateSigningRequest) bool 
 	}
 }
 
-func allowDuplicateConditionTypes(oldCSR *certificates.CertificateSigningRequest) bool {
-	switch {
-	case oldCSR != nil && hasDuplicateConditionTypes(oldCSR):
-		return true // compatibility with existing data
-	default:
+func allowDuplicateConditionTypes(newCSR, oldCSR *certificates.CertificateSigningRequest) bool {
+	// old logic for backward compatibility
+	if !utilfeature.DefaultMutableFeatureGate.Enabled(features.CSRStrictConditionUniquenessOnUpdate) {
+		switch {
+		case oldCSR != nil && hasDuplicateConditionTypes(oldCSR):
+			return true // compatibility with existing data
+		default:
+			return false
+		}
+	}
+
+	// new logic
+	if oldCSR == nil || !hasDuplicateConditionTypes(oldCSR) {
 		return false
 	}
+	// oldCSR has duplicate condition types.
+	// Allow duplicates only if the conditions list is unchanged.
+	return apiequality.Semantic.DeepEqual(newCSR.Status.Conditions, oldCSR.Status.Conditions)
 }
 func hasDuplicateConditionTypes(csr *certificates.CertificateSigningRequest) bool {
 	seen := map[certificates.RequestConditionType]bool{}
