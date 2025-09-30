@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -297,7 +298,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			Resource: crd.Spec.Names.Plural,
 		}
 		crClient := dynamicClient.Resource(gvr)
-		_, err = crClient.Create(ctx, &unstructured.Unstructured{Object: map[string]interface{}{
+		u1, err := crClient.Create(ctx, &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": gvr.Group + "/" + gvr.Version,
 			"kind":       crd.Spec.Names.Kind,
 			"metadata": map[string]interface{}{
@@ -313,7 +314,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		framework.ExpectNoError(err, "setting default for a to \"A\" in schema")
 
 		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-			u1, err := crClient.Get(ctx, name1, metav1.GetOptions{})
+			u1, err = crClient.Get(ctx, name1, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -382,6 +383,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			return true, nil
 		})
 		framework.ExpectNoError(err, "waiting for CR to be defaulted on read for b and a staying the same")
+		gomega.Expect(resourceversion.CompareResourceVersion(u1.GetResourceVersion(), u2.GetResourceVersion())).To(gomega.BeNumerically("==", -1), "second created object should have a larger resource version")
 	})
 
 })
