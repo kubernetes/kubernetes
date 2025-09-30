@@ -1992,8 +1992,21 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 }
 
+// defaultKubernetesFeatureGateDependencies enumerates the dependencies of any feature gate that
+// depends on another. Dependencies ensure that a dependent feature gate can only be enabled if all
+// of its dependencies are also enabled, and ensures a feature at a higher stability level cannot
+// depend on a less stable feature.
+//
+// Entries are alphabetized.
+var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]featuregate.Feature{
+	InPlacePodVerticalScalingAllocatedStatus: {InPlacePodVerticalScaling},
+	InPlacePodVerticalScalingExclusiveCPUs:   {InPlacePodVerticalScaling},
+	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling, MemoryManager},
+}
+
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddDependencies(defaultKubernetesFeatureGateDependencies))
 	runtime.Must(zpagesfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 
 	// Register all client-go features with kube's feature gate instance and make all client-go
