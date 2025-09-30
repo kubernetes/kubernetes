@@ -214,6 +214,12 @@ type featureGate struct {
 	// It is reset when SetEmulationVersion is called.
 	queriedFeatures  atomic.Value
 	emulationVersion atomic.Pointer[version.Version]
+	// freezeOnRead indicates whether this feature gate should automatically
+	// transition into "frozen mode" after the first read (via Enabled).
+	frozen atomic.Bool
+	// frozen is atomically set to true when the first read (Enabled call) occurs
+	// if freezeOnRead is true. Once frozen, the gate becomes immutable.
+	freezeOnRead bool
 }
 
 func setUnsetAlphaGates(known map[Feature]VersionedSpecs, enabled map[Feature]bool, val bool, cVer *version.Version) {
@@ -277,9 +283,22 @@ func NewFeatureGate() *featureGate {
 	return NewVersionedFeatureGate(binaryVersison)
 }
 
+// NewFeatureGateWithFrozen creates a feature gate that enters "frozen mode"
+// after the first call to Enabled(). Once frozen, all mutation methods will
+// reject further writes. This enforces a strict "configuration phase"
+// (before the first read) followed by a "runtime phase" (after first read).
+func NewFeatureGateWithFreeze() *featureGate {
+	fg := NewFeatureGate()
+	fg.freezeOnRead = true
+	return fg
+}
+
 // Set parses a string of the form "key1=value1,key2=value2,..." into a
 // map[string]bool of known keys or returns an error.
 func (f *featureGate) Set(value string) error {
+	if f.freezeOnRead && f.frozen.Load() {
+		return fmt.Errorf("cannot mutate feature gates after they are frozen")
+	}
 	m := make(map[string]bool)
 	for _, s := range strings.Split(value, ",") {
 		if len(s) == 0 {
@@ -314,6 +333,9 @@ func (f *featureGate) Validate() []error {
 
 // unsafeSetFromMap stores flag gates for known features from a map[string]bool into an enabled map.
 func (f *featureGate) unsafeSetFromMap(enabled map[Feature]bool, m map[string]bool, emulationVersion *version.Version) []error {
+	if f.freezeOnRead && f.frozen.Load() {
+		panic("cannot mutate feature gates after they are frozen")
+	}
 	var errs []error
 	// Copy existing state
 	known := map[Feature]VersionedSpecs{}
@@ -357,6 +379,9 @@ func (f *featureGate) unsafeSetFromMap(enabled map[Feature]bool, m map[string]bo
 
 // SetFromMap stores flag gates for known features from a map[string]bool or returns an error
 func (f *featureGate) SetFromMap(m map[string]bool) error {
+	if f.freezeOnRead && f.frozen.Load() {
+		return fmt.Errorf("cannot mutate feature gates after they are frozen")
+	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -403,6 +428,9 @@ func (f *featureGate) Type() string {
 
 // Add adds features to the featureGate.
 func (f *featureGate) Add(features map[Feature]FeatureSpec) error {
+	if f.freezeOnRead && f.frozen.Load() {
+		return fmt.Errorf("cannot mutate feature gates after they are frozen")
+	}
 	vs := map[Feature]VersionedSpecs{}
 	for name, spec := range features {
 		// if no version is provided for the FeatureSpec, it is defaulted to version 0.0 so that it can be enabled/disabled regardless of emulation version.
@@ -414,6 +442,10 @@ func (f *featureGate) Add(features map[Feature]FeatureSpec) error {
 
 // AddVersioned adds versioned feature specs to the featureGate.
 func (f *featureGate) AddVersioned(features map[Feature]VersionedSpecs) error {
+	if f.freezeOnRead && f.frozen.Load() {
+		return fmt.Errorf("cannot mutate feature gates after they are frozen")
+	}
+
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -480,6 +512,9 @@ func (f *featureGate) OverrideDefault(name Feature, override bool) error {
 }
 
 func (f *featureGate) OverrideDefaultAtVersion(name Feature, override bool, ver *version.Version) error {
+	if f.freezeOnRead && f.frozen.Load() {
+		return fmt.Errorf("cannot mutate feature gates after they are frozen")
+	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -543,6 +578,9 @@ func (f *featureGate) GetAllVersioned() map[Feature]VersionedSpecs {
 }
 
 func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) error {
+	if f.freezeOnRead && f.frozen.Load() {
+		return fmt.Errorf("cannot mutate feature gates after they are frozen")
+	}
 	if emulationVersion.EqualTo(f.EmulationVersion()) {
 		return nil
 	}
@@ -617,6 +655,9 @@ func featureEnabled(key Feature, enabled map[Feature]bool, known map[Feature]Ver
 
 // Enabled returns true if the key is enabled.  If the key is not known, this call will panic.
 func (f *featureGate) Enabled(key Feature) bool {
+	if f.freezeOnRead {
+		f.frozen.Store(true)
+	}
 	// TODO: ideally we should lock the feature gate in this call to be safe, need to evaluate how much performance impact locking would have.
 	v := featureEnabled(key, f.enabled.Load().(map[Feature]bool), f.known.Load().(map[Feature]VersionedSpecs), f.EmulationVersion())
 	f.unsafeRecordQueried(key)
@@ -733,6 +774,9 @@ func (f *featureGate) DeepCopy() MutableVersionedFeatureGate {
 // ExplicitlySet returns true if the feature value is explicitly set instead of
 // being derived from the default values or special features.
 func (f *featureGate) ExplicitlySet(name Feature) bool {
+	if f.freezeOnRead && f.frozen.Load() {
+		return false
+	}
 	enabledRaw := f.enabledRaw.Load().(map[string]bool)
 	_, ok := enabledRaw[string(name)]
 	return ok
@@ -740,6 +784,9 @@ func (f *featureGate) ExplicitlySet(name Feature) bool {
 
 // ResetFeatureValueToDefault resets the value of the feature back to the default value.
 func (f *featureGate) ResetFeatureValueToDefault(name Feature) error {
+	if f.freezeOnRead && f.frozen.Load() {
+		return fmt.Errorf("cannot mutate feature gates after they are frozen")
+	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	enabled := map[Feature]bool{}
