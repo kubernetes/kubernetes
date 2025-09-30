@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -38,12 +39,14 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
+	"k8s.io/dynamic-resource-allocation/structured"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -2934,6 +2937,54 @@ func Test_createRequestMappings(t *testing.T) {
 				if r.ResourceName != gotReqMappings[i].ResourceName {
 					t.Fatalf("different resource name, want %#v, got %#v", r, gotReqMappings[i])
 				}
+			}
+		})
+	}
+}
+
+// TestAllocatorSelection covers the selection of a structured allocation implementation
+// based on actual Kubernetes feature gates. This test lives here instead of
+// k8s.io/dynamic-resource-allocation/structured because that code has no access
+// to feature gate definitions.
+func TestAllocatorSelection(t *testing.T) {
+	for name, tc := range map[string]struct {
+		features             string
+		expectImplementation string
+	}{
+		// The most conservative implementation: only used when explicitly asking
+		// for the most stable Kubernetes (no alpha or beta features).
+		"only-GA": {
+			features:             "AllAlpha=false,AllBeta=false",
+			expectImplementation: "stable",
+		},
+
+		// By default, some beta features are on and the incubating implementation
+		// is used.
+		"default": {
+			features:             "",
+			expectImplementation: "incubating",
+		},
+
+		// Alpha features need the experimental implementation.
+		"alpha": {
+			features:             "AllAlpha=true,AllBeta=true",
+			expectImplementation: "experimental",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+			tCtx.ExpectNoError(featureGate.Set(tc.features), "set features")
+			fts := feature.NewSchedulerFeaturesFromGates(featureGate)
+			features := allocatorFeatures(fts)
+
+			// Slightly hacky: most arguments are not valid and the constructor
+			// is expected to not use them yet.
+			allocator, err := structured.NewAllocator(tCtx, features, structured.AllocatedState{}, nil, nil, nil)
+			tCtx.ExpectNoError(err, "create allocator")
+			allocatorType := fmt.Sprintf("%T", allocator)
+			if !strings.Contains(allocatorType, tc.expectImplementation) {
+				tCtx.Fatalf("Expected allocator implementation %q, got %s", tc.expectImplementation, allocatorType)
 			}
 		})
 	}
