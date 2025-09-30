@@ -17,24 +17,12 @@ limitations under the License.
 package storageversionmigrator
 
 import (
-	"fmt"
-	"strconv"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	corev1 "k8s.io/api/core/v1"
 	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-func convertResourceVersionToInt(rv string) (int64, error) {
-	resourceVersion, err := strconv.ParseInt(rv, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse resource version %q: %w", rv, err)
-	}
-
-	return resourceVersion, nil
-}
 
 func getGVRFromResource(svm *svmv1alpha1.StorageVersionMigration) schema.GroupVersionResource {
 	return schema.GroupVersionResource{
