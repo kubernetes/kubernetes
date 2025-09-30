@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/watchlist"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
@@ -194,6 +195,7 @@ func WaitForCertificate(ctx context.Context, client clientset.Interface, reqName
 					options.FieldSelector = fieldSelector
 					return client.CertificatesV1().CertificateSigningRequests().Watch(ctx, options)
 				},
+				UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
 			}
 			break
 		} else {
@@ -218,6 +220,7 @@ func WaitForCertificate(ctx context.Context, client clientset.Interface, reqName
 					options.FieldSelector = fieldSelector
 					return client.CertificatesV1beta1().CertificateSigningRequests().Watch(ctx, options)
 				},
+				UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
 			}
 			break
 		} else {
