@@ -569,7 +569,6 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		// It will be retried.
 		return true
 	}
-
 	c.queue.Forget(poolName)
 	return true
 }
@@ -596,6 +595,12 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	c.mutex.RLock()
 	resources = c.resources
 	c.mutex.RUnlock()
+	if err := validateDriverResources(resources); err != nil {
+		c.errorHandler(ctx, err, "pool validation failed")
+		// We only report the error through the error handler to prevent
+		// the controller from retrying.
+		return nil
+	}
 
 	pool, ok := resources.Pools[poolName]
 	if !ok {
