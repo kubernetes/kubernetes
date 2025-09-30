@@ -53,6 +53,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/daemon"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -391,6 +392,7 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		ds.Spec.UpdateStrategy = appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType}
 		ds, err := c.AppsV1().DaemonSets(ns).Create(ctx, ds, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
+		gomega.Expect(ds).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkRunningOnAllNodes(f, ds))

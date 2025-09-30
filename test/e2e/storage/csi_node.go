@@ -28,6 +28,7 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
@@ -65,6 +66,7 @@ var _ = utils.SIGDescribe("CSINodes", func() {
 			ginkgo.By(fmt.Sprintf("Creating initial csiNode %q", initialCSINode.Name))
 			csiNode, err := csiNodeClient.Create(ctx, &initialCSINode, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create csiNode %q", initialCSINode.Name)
+			gomega.Expect(csiNode).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By(fmt.Sprintf("Getting initial csiNode %q", initialCSINode.Name))
 			retrievedCSINode, err := csiNodeClient.Get(ctx, initialCSINode.Name, metav1.GetOptions{})

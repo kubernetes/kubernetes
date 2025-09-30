@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -961,6 +962,7 @@ var _ = SIGDescribe("Pods", func() {
 		p, err := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(ctx, testPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get Pod %v in namespace %v", testPodName, testNamespaceName)
 		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodRunning), "failed to see Pod %v in namespace %v running", p.ObjectMeta.Name, testNamespaceName)
+		gomega.Expect(p).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("patching the Pod with a new Label and updated data")
 		prePatchResourceVersion := p.ResourceVersion

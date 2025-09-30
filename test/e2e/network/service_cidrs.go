@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -248,6 +249,7 @@ var _ = common.SIGDescribe("ServiceCIDR and IPAddress API", func() {
 		if err != nil {
 			framework.Failf("unexpected error getting IPAddress: %v", err)
 		}
+		gomega.Expect(createdIP).To(apimachineryutils.HaveValidResourceVersion())
 		_, err = f.ClientSet.NetworkingV1().IPAddresses().Create(ctx, ipv6, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("unexpected error getting IPAddress: %v", err)

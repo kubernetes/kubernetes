@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -194,8 +195,10 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		ginkgo.By("Creating two CSIDrivers")
 		createdDriver1, err := client.Create(ctx, driver1, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create first CSIDriver")
+		gomega.Expect(createdDriver1).To(apimachineryutils.HaveValidResourceVersion())
 		createdDriver2, err := client.Create(ctx, driver2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create second CSIDriver")
+		gomega.Expect(createdDriver2).To(apimachineryutils.HaveValidResourceVersion())
 		_, err = client.Create(ctx, driver1, metav1.CreateOptions{})
 		if !apierrors.IsAlreadyExists(err) {
 			framework.Failf("expected 409, got %#v", err)

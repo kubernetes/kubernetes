@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
@@ -413,6 +414,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			},
 		})
 		framework.ExpectNoError(err, "Creating validating webhook configuration")
+		gomega.Expect(hook).To(apimachineryutils.HaveValidResourceVersion())
 		defer func() {
 			err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, hook.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Deleting validating webhook configuration")
@@ -507,6 +509,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			},
 		})
 		framework.ExpectNoError(err, "Creating mutating webhook configuration")
+		gomega.Expect(hook).To(apimachineryutils.HaveValidResourceVersion())
 		defer func() {
 			err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(ctx, hook.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Deleting mutating webhook configuration")

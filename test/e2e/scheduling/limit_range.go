@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -294,6 +295,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		ginkgo.By(fmt.Sprintf("Creating LimitRange %q in namespace %q", lrName, f.Namespace.Name))
 		limitRange, err := lrClient.Create(ctx, limitRange, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create limitRange %q", lrName)
+		gomega.Expect(limitRange).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("Creating another limitRange in another namespace")
 		lrNamespace, err := f.CreateNamespace(ctx, lrName, nil)

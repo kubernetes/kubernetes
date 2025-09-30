@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -172,6 +173,7 @@ var _ = SIGDescribe("Secrets", func() {
 			Type: "Opaque",
 		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create secret")
+		gomega.Expect(createdSecret).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing secrets in all namespaces to ensure that there are more than zero")
 		// list all secrets in all namespaces to ensure endpoint coverage
