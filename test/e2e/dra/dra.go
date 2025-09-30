@@ -1981,13 +1981,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		}))
 		b := drautils.NewBuilder(f, driver)
 
-		f.It("DeviceTaint keeps pod pending", func(ctx context.Context) {
+		f.It("NoSchedule keeps pod pending", func(ctx context.Context) {
 			pod, template := b.PodInline()
 			b.Create(ctx, pod, template)
 			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
 		})
 
-		f.It("DeviceToleration enables pod scheduling", func(ctx context.Context) {
+		f.It("NoSchedule can be tolerated", func(ctx context.Context) {
 			pod, template := b.PodInline()
 			template.Spec.Spec.Devices.Requests[0].Exactly.Tolerations = []resourceapi.DeviceToleration{{
 				Effect:   resourceapi.DeviceTaintEffectNoSchedule,
@@ -2057,6 +2057,36 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				"Reason":  gomega.Equal("DeletionByDeviceTaintManager"),
 				"Message": gomega.Equal("Device Taint manager: deleting due to NoExecute taint"),
 			}))))
+		})
+	})
+
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRADeviceTaints), func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false), drautils.TaintAllDevices(resourceapi.DeviceTaint{
+			Key:    "example.com/taint",
+			Value:  "tainted",
+			Effect: resourceapi.DeviceTaintEffectNoExecute,
+		}))
+		b := drautils.NewBuilder(f, driver)
+
+		f.It("NoExecute keeps pod pending", func(ctx context.Context) {
+			pod, template := b.PodInline()
+			b.Create(ctx, pod, template)
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		})
+
+		f.It("NoExecute can be tolerated", func(ctx context.Context) {
+			pod, template := b.PodInline()
+			template.Spec.Spec.Devices.Requests[0].Exactly.Tolerations = []resourceapi.DeviceToleration{{
+				Effect:   resourceapi.DeviceTaintEffectNoExecute,
+				Operator: resourceapi.DeviceTolerationOpExists,
+				// No key: tolerate *all* taints with this effect.
+			}}
+			b.Create(ctx, pod, template)
+			b.TestPod(ctx, f, pod)
+
+			// Testing the pod is slow enough that the test fails when the pod gets evicted unexpectedly,
+			// We don't need to a "Consistently" here.
 		})
 	})
 

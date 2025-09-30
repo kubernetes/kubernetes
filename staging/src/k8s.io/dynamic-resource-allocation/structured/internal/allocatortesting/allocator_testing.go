@@ -246,14 +246,26 @@ func allDeviceRequest(name, class string) wrapDeviceRequest {
 	}
 }
 
-func subRequest(name, class string, count int64, selectors ...resourceapi.DeviceSelector) resourceapi.DeviceSubRequest {
-	return resourceapi.DeviceSubRequest{
+func subRequest(name, class string, count int64, fields ...any) resourceapi.DeviceSubRequest {
+	subRequest := resourceapi.DeviceSubRequest{
 		Name:            name,
 		Count:           count,
 		AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
 		DeviceClassName: class,
-		Selectors:       selectors,
 	}
+
+	for _, field := range fields {
+		switch typedField := field.(type) {
+		case resourceapi.DeviceSelector:
+			subRequest.Selectors = append(subRequest.Selectors, typedField)
+		case resourceapi.DeviceToleration:
+			subRequest.Tolerations = append(subRequest.Tolerations, typedField)
+		default:
+			panic(fmt.Sprintf("unsupported field for DeviceSubRequest: %T", field))
+		}
+	}
+
+	return subRequest
 }
 
 type wrapDeviceRequest struct{ resourceapi.DeviceRequest }
@@ -566,12 +578,13 @@ func (in wrapResourceSlice) withCounterSet(counterSets ...resourceapi.CounterSet
 	return wrapResourceSlice{ResourceSlice: inResourceSlice}
 }
 
-func deviceAllocationResult(request, driver, pool, device string, adminAccess bool) resourceapi.DeviceRequestAllocationResult {
+func deviceAllocationResult(request, driver, pool, device string, adminAccess bool, tolerations ...resourceapi.DeviceToleration) resourceapi.DeviceRequestAllocationResult {
 	r := resourceapi.DeviceRequestAllocationResult{
-		Request: request,
-		Driver:  driver,
-		Pool:    pool,
-		Device:  device,
+		Request:     request,
+		Driver:      driver,
+		Pool:        pool,
+		Device:      device,
+		Tolerations: tolerations,
 	}
 	if adminAccess {
 		r.AdminAccess = &adminAccess
@@ -791,7 +804,7 @@ func toCounters(counters map[string]resource.Quantity) map[string]resourceapi.Co
 // deviceRequestAllocationResultWithBindingConditions returns an DeviceRequestAllocationResult object for testing purposes,
 // specifying the driver, pool, device, usage restriction, binding conditions,
 // binding failure conditions, and binding timeout.
-func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, device string, bindingConditions, bindingFailureConditions []string) resourceapi.DeviceRequestAllocationResult {
+func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, device string, bindingConditions, bindingFailureConditions []string, tolerations ...resourceapi.DeviceToleration) resourceapi.DeviceRequestAllocationResult {
 	return resourceapi.DeviceRequestAllocationResult{
 		Request:                  request,
 		Driver:                   driver,
@@ -799,6 +812,7 @@ func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, d
 		Device:                   device,
 		BindingConditions:        bindingConditions,
 		BindingFailureConditions: bindingFailureConditions,
+		Tolerations:              tolerations,
 	}
 }
 
@@ -842,6 +856,11 @@ func TestAllocator(t *testing.T,
 		Key:      taintKey,
 		Value:    taintValue2,
 		Effect:   resourceapi.DeviceTaintEffectNoExecute,
+	}
+	tolerationNoScheduleKey1 := resourceapi.DeviceToleration{
+		Operator: resourceapi.DeviceTolerationOpExists,
+		Key:      "key1",
+		Effect:   resourceapi.DeviceTaintEffectNoSchedule,
 	}
 
 	testcases := map[string]struct {
@@ -3448,7 +3467,27 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device2, false), // Only second device's taints are tolerated.
+				deviceAllocationResult(req0, driverA, pool1, device2, false, tolerationNoExecute), // Only second device's taints are tolerated.
+			)},
+		},
+		"tainted-two-devices-prioritized-list-tolerated": {
+			features: Features{
+				DeviceTaints:    true,
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
+				subRequest(subReq0, classA, 1),
+				subRequest(subReq1, classA, 1, tolerationNoExecute),
+			))),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule),
+				device(device2, nil, nil).withTaints(taintNoExecute),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, device2, false, tolerationNoExecute), // Only second device's taints are tolerated.
 			)},
 		},
 		"tainted-one-device-two-taints-both-tolerated": {
@@ -3463,7 +3502,7 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device1, false, tolerationNoSchedule, tolerationNoExecute),
 			)},
 		},
 		"tainted-disabled": {
@@ -4106,11 +4145,7 @@ func TestAllocator(t *testing.T,
 				DeviceTaints:           true,
 			},
 			claimsToAllocate: objects(
-				claimWithRequests(claim0, nil, request(req0, classA, 2)).withTolerations(resourceapi.DeviceToleration{
-					Operator: resourceapi.DeviceTolerationOpExists,
-					Key:      "key1",
-					Effect:   resourceapi.DeviceTaintEffectNoSchedule,
-				}),
+				claimWithRequests(claim0, nil, request(req0, classA, 2)).withTolerations(tolerationNoScheduleKey1),
 			),
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(
@@ -4144,8 +4179,8 @@ func TestAllocator(t *testing.T,
 				resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
 						Results: []resourceapi.DeviceRequestAllocationResult{
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}),
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, tolerationNoScheduleKey1),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil, tolerationNoScheduleKey1),
 						},
 					},
 					NodeSelector: localNodeSelector(node1),

@@ -367,6 +367,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				Pool:             internal.id.Pool.String(),
 				Device:           internal.id.Device.String(),
 				AdminAccess:      internal.adminAccess,
+				Tolerations:      internal.lookupRequest(claim).tolerations(),
 				ShareID:          internal.shareID,
 				ConsumedCapacity: consumedCapacity,
 			}
@@ -666,11 +667,36 @@ type internalDeviceResult struct {
 	adminAccess      *bool
 }
 
-func (i internalDeviceResult) requestName() string {
-	if i.parentRequest == "" {
-		return i.request
+func (idr internalDeviceResult) requestName() string {
+	if idr.parentRequest == "" {
+		return idr.request
 	}
-	return fmt.Sprintf("%s/%s", i.parentRequest, i.request)
+	return fmt.Sprintf("%s/%s", idr.parentRequest, idr.request)
+}
+
+func (idr internalDeviceResult) lookupRequest(claim *resourceapi.ResourceClaim) requestAccessor {
+	requestName := idr.request
+	if idr.parentRequest != "" {
+		requestName = idr.parentRequest
+	}
+	for i := range claim.Spec.Devices.Requests {
+		request := &claim.Spec.Devices.Requests[i]
+		if request.Name != requestName {
+			continue
+		}
+		if idr.parentRequest == "" {
+			// No need to check sub-requests.
+			return &exactDeviceRequestAccessor{request}
+		}
+		for j := range request.FirstAvailable {
+			subRequest := &request.FirstAvailable[j]
+			if subRequest.Name != idr.request {
+				continue
+			}
+			return &deviceSubRequestAccessor{subRequest}
+		}
+	}
+	return nil
 }
 
 type constraint interface {
