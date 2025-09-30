@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
@@ -212,10 +213,18 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 		return rv.failMigration(ctx, toBeProcessedSVM, err.Error())
 	}
 
-	toBeProcessedSVM.Status.ResourceVersion, err = rv.getLatestResourceVersion(gvr, ctx)
+	latestRV, err := rv.getLatestResourceVersion(gvr, ctx)
 	if err != nil {
 		return err
 	}
+
+	// Compare the resource version against itself, if it fails then it is not a
+	// well formed RV and we should fail migration.
+	if _, err := resourceversion.CompareResourceVersion(latestRV, latestRV); err != nil {
+		err := fmt.Errorf("latest resourceVersion for %s is empty", gvr.String())
+		return rv.failMigration(ctx, toBeProcessedSVM, err.Error())
+	}
+	toBeProcessedSVM.Status.ResourceVersion = latestRV
 
 	_, err = rv.kubeClient.StoragemigrationV1alpha1().
 		StorageVersionMigrations().
