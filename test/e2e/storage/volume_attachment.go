@@ -31,6 +31,7 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
@@ -66,6 +67,7 @@ var _ = utils.SIGDescribe("VolumeAttachment", func() {
 			retrievedVA, err := vaClient.Get(ctx, firstVA, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to get VolumeAttachment %q", firstVA)
 			gomega.Expect(retrievedVA.Name).To(gomega.Equal(firstVA), "Checking that retrieved VolumeAttachment has the correct name")
+			gomega.Expect(retrievedVA).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By(fmt.Sprintf("Patch VolumeAttachment %q on node %q", firstVA, vaNodeName))
 			payload := "{\"metadata\":{\"labels\":{\"" + retrievedVA.Name + "\":\"patched\"}}}"

@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -438,6 +439,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		queriedEPS, err := epsClient.Get(ctx, createdEPS.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(queriedEPS.UID).To(gomega.Equal(createdEPS.UID))
+		gomega.Expect(queriedEPS).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		epsList, err := epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})

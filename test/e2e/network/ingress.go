@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -177,6 +178,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		gottenIngress, err := ingClient.Get(ctx, createdIngress.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(gottenIngress.UID).To(gomega.Equal(createdIngress.UID))
+		gomega.Expect(gottenIngress).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		ings, err := ingClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})

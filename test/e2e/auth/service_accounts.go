@@ -39,6 +39,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -690,6 +691,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 		createdServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Create(ctx, &testServiceAccount, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create a ServiceAccount")
+		gomega.Expect(createdServiceAccount).To(apimachineryutils.HaveValidResourceVersion())
 
 		getServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Get(ctx, testServiceAccountName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch the created ServiceAccount")

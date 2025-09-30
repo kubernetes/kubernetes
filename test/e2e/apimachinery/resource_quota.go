@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -1033,6 +1034,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 		gomega.Expect(resourceQuotaResult.Spec.Hard[v1.ResourceCPU]).To(gomega.Equal(resource.MustParse("1")))
 		gomega.Expect(resourceQuotaResult.Spec.Hard[v1.ResourceMemory]).To(gomega.Equal(resource.MustParse("500Mi")))
+		gomega.Expect(resourceQuotaResult).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("Listing all ResourceQuotas with LabelSelector")
 		rq, err := client.CoreV1().ResourceQuotas("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})

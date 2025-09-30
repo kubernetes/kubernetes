@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -306,7 +307,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			},
 		}}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating CR")
-
+		gomega.Expect(u1).To(apimachineryutils.HaveValidResourceVersion())
 		// Setting default for a to "A" and waiting for the CR to get defaulted on read
 		crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(ctx, crd.Name, types.JSONPatchType, []byte(`[
 			{"op":"add","path":"/spec/versions/0/schema/openAPIV3Schema/properties/a/default", "value": "A"}

@@ -42,6 +42,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/openapi3"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -520,6 +521,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		vapRead, err := client.Get(ctx, vapCreated.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(vapRead.UID).To(gomega.Equal(vapCreated.UID))
+		gomega.Expect(vapRead).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
@@ -766,6 +768,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		vapbRead, err := client.Get(ctx, vapbCreated.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(vapbRead.UID).To(gomega.Equal(vapbCreated.UID))
+		gomega.Expect(vapbRead).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})

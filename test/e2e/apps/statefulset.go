@@ -51,6 +51,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/features"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -1059,6 +1060,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			setHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
+			gomega.Expect(ss).To(apimachineryutils.HaveValidResourceVersion())
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			waitForStatus(ctx, c, ss)
 

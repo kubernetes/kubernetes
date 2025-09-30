@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -155,6 +156,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		gottenCSC, err := cscClient.Get(ctx, csc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(gottenCSC.UID).To(gomega.Equal(createdCSC.UID))
+		gomega.Expect(gottenCSC).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing in namespace")
 		cscs, err := cscClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
