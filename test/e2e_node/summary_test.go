@@ -426,10 +426,10 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			}
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("250M"),
+					v1.ResourceMemory: resource.MustParse("260M"),
 				},
 				Requests: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("200M"),
+					v1.ResourceMemory: resource.MustParse("100M"),
 				},
 			}
 			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
