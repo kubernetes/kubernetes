@@ -103,6 +103,13 @@ func (in *Slice) DeepCopyInto(out *Slice) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Taints != nil {
+		in, out := &in.Taints, &out.Taints
+		*out = make([]resourcev1.SliceDeviceTaint, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.SharedCounters != nil {
 		in, out := &in.SharedCounters, &out.SharedCounters
 		*out = make([]resourcev1.CounterSet, len(*in))

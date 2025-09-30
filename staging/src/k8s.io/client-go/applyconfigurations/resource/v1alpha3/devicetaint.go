@@ -21,6 +21,7 @@ package v1alpha3
 import (
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // DeviceTaintApplyConfiguration represents a declarative configuration of the DeviceTaint type for use
@@ -38,12 +39,27 @@ type DeviceTaintApplyConfiguration struct {
 	Value *string `json:"value,omitempty"`
 	// The effect of the taint on claims that do not tolerate the taint
 	// and through such claims on the pods using them.
-	// Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
+	// Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
 	// nodes is not valid here.
 	Effect *resourcev1alpha3.DeviceTaintEffect `json:"effect,omitempty"`
 	// TimeAdded represents the time at which the taint was added.
 	// Added automatically during create or update if not set.
 	TimeAdded *v1.Time `json:"timeAdded,omitempty"`
+	// Description is a human-readable explanation for the taint.
+	//
+	// The length must be smaller or equal to 1024.
+	Description *string `json:"description,omitempty"`
+	// Data contains arbitrary data specific to the taint key.
+	//
+	// The length of the raw data must be smaller or equal to 10 Ki.
+	Data *runtime.RawExtension `json:"data,omitempty"`
+	// EvictionsPerSecond controls how quickly Pods get evicted if that is
+	// the effect of the taint. If multiple taints cause eviction
+	// of the same set of Pods, then the lowest rate defined in
+	// any of those taints applies.
+	//
+	// The default is 100 Pods/s.
+	EvictionsPerSecond *int64 `json:"evictionsPerSecond,omitempty"`
 }
 
 // DeviceTaintApplyConfiguration constructs a declarative configuration of the DeviceTaint type for use with
@@ -81,5 +97,29 @@ func (b *DeviceTaintApplyConfiguration) WithEffect(value resourcev1alpha3.Device
 // If called multiple times, the TimeAdded field is set to the value of the last call.
 func (b *DeviceTaintApplyConfiguration) WithTimeAdded(value v1.Time) *DeviceTaintApplyConfiguration {
 	b.TimeAdded = &value
+	return b
+}
+
+// WithDescription sets the Description field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Description field is set to the value of the last call.
+func (b *DeviceTaintApplyConfiguration) WithDescription(value string) *DeviceTaintApplyConfiguration {
+	b.Description = &value
+	return b
+}
+
+// WithData sets the Data field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Data field is set to the value of the last call.
+func (b *DeviceTaintApplyConfiguration) WithData(value runtime.RawExtension) *DeviceTaintApplyConfiguration {
+	b.Data = &value
+	return b
+}
+
+// WithEvictionsPerSecond sets the EvictionsPerSecond field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the EvictionsPerSecond field is set to the value of the last call.
+func (b *DeviceTaintApplyConfiguration) WithEvictionsPerSecond(value int64) *DeviceTaintApplyConfiguration {
+	b.EvictionsPerSecond = &value
 	return b
 }

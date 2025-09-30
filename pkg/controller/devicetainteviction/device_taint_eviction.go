@@ -27,6 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -46,6 +48,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
@@ -54,12 +57,17 @@ import (
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	"k8s.io/kubernetes/pkg/features"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
+	"k8s.io/utils/ptr"
 )
 
 const (
 	// retries is the number of times that the controller tries to delete a pod
 	// that needs to be evicted.
 	retries = 5
+
+	// evictionBurst is the number of pods which get evicted immediately
+	// before the rate limit kicks in. This number is fairly arbitrary.
+	evictionBurst = 10
 )
 
 // Controller listens to Taint changes of DRA devices and Toleration changes of ResourceClaims,
@@ -89,10 +97,11 @@ type Controller struct {
 	podInformer   coreinformers.PodInformer
 	podLister     corelisters.PodLister
 	claimInformer resourceinformers.ResourceClaimInformer
-	sliceInformer resourceinformers.ResourceSliceInformer
+	sliceInformer draapi.ResourceSliceInformer
 	taintInformer resourcealphainformers.DeviceTaintRuleInformer
 	classInformer resourceinformers.DeviceClassInformer
 	haveSynced    []cache.InformerSynced
+	hasSynced     atomic.Int32
 	metrics       metrics.Metrics
 
 	// evictPod ensures that the pod gets evicted at the specified time.
@@ -103,13 +112,17 @@ type Controller struct {
 	// Idempotent, returns false if there was nothing to cancel.
 	cancelEvict func(pod tainteviction.NamespacedObject) bool
 
+	// mutex protects the following shared data structures.
+	mutex sync.Mutex
+
 	// allocatedClaims holds all currently known allocated claims.
 	allocatedClaims map[types.NamespacedName]allocatedClaim // A value is slightly more efficient in BenchmarkTaintUntaint (less allocations!).
 
 	// pools indexes all slices by driver and pool name.
 	pools map[poolID]pool
 
-	hasSynced atomic.Int32
+	// evictions tracks all active (= at least one pod pending eviction) device taints.
+	evictions map[draapi.DeviceTaintID]*deviceTaint
 }
 
 type poolID struct {
@@ -117,17 +130,31 @@ type poolID struct {
 }
 
 type pool struct {
-	slices        sets.Set[*resourceapi.ResourceSlice]
+	slices        sets.Set[*draapi.ResourceSlice]
 	maxGeneration int64
 }
 
+type deviceTaint struct {
+	taint *draapi.TrackedDeviceTaint
+
+	// The rate limiter gets instantiated when needed. If the configured
+	// eviction rate changes, it gets recreated.
+	limiter *rate.Limiter
+
+	// pendingPods contains all known pods which need to be evicted because of this taint.
+	pendingPods sets.Set[types.UID]
+
+	// numEvictedPods counts the number of pods evicted because of this taint.
+	numEvictedPods int64
+}
+
 // addSlice adds one slice to the pool.
-func (p *pool) addSlice(slice *resourceapi.ResourceSlice) {
+func (p *pool) addSlice(slice *draapi.ResourceSlice) {
 	if slice == nil {
 		return
 	}
 	if p.slices == nil {
-		p.slices = sets.New[*resourceapi.ResourceSlice]()
+		p.slices = sets.New[*draapi.ResourceSlice]()
 		p.maxGeneration = math.MinInt64
 	}
 	p.slices.Insert(slice)
@@ -139,7 +166,7 @@ func (p *pool) addSlice(slice *resourceapi.ResourceSlice) {
 }
 
 // removeSlice removes a slice. It must have been added before.
-func (p *pool) removeSlice(slice *resourceapi.ResourceSlice) {
+func (p *pool) removeSlice(slice *draapi.ResourceSlice) {
 	if slice == nil {
 		return
 	}
@@ -167,11 +194,12 @@ func (p pool) getTaintedDevices() []taintedDevice {
 			continue
 		}
 		for _, device := range slice.Spec.Devices {
-			for _, taint := range device.Taints {
+			for i := range device.Taints {
+				taint := &device.Taints[i]
 				if taint.Effect != resourceapi.DeviceTaintEffectNoExecute {
 					continue
 				}
-				buffer = append(buffer, taintedDevice{deviceName: device.Name, taint: taint})
+				buffer = append(buffer, taintedDevice{deviceName: device.Name.String(), taint: taint})
 			}
 		}
 	}
@@ -184,13 +212,13 @@ func (p pool) getTaintedDevices() []taintedDevice {
 }
 
 // getDevice looks up one device by name. Out-dated slices are ignored.
-func (p pool) getDevice(deviceName string) *resourceapi.Device {
+func (p pool) getDevice(deviceName string) *draapi.SliceDevice {
 	for slice := range p.slices {
 		if slice.Spec.Pool.Generation != p.maxGeneration {
 			continue
 		}
 		for i := range slice.Spec.Devices {
-			if slice.Spec.Devices[i].Name == deviceName {
+			if slice.Spec.Devices[i].Name.String() == deviceName {
 				return &slice.Spec.Devices[i]
 			}
 		}
@@ -201,7 +229,7 @@ func (p pool) getDevice(deviceName string) *resourceapi.Device {
 
 type taintedDevice struct {
 	deviceName string
-	taint      resourceapi.DeviceTaint
+	taint      *draapi.TrackedDeviceTaint
 }
 
 // allocatedClaim is a ResourceClaim which has an allocation result. It
@@ -214,29 +242,126 @@ type allocatedClaim struct {
 	// For each device, the value is calculated as `<time of setting the taint> +
 	// <toleration seconds, 0 if not set>`.
 	evictionTime *metav1.Time
+
+	// taints contains pointers to the taints in the pool which cause eviction.
+	// Non-empty if and only if evictionTime is set.
+	taints []*draapi.TrackedDeviceTaint
 }
 
-func (tc *Controller) deletePodHandler(c clientset.Interface, emitEventFunc func(tainteviction.NamespacedObject)) func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
+func (tc *Controller) createDeletePodHandler(c clientset.Interface, emitEventFunc func(tainteviction.NamespacedObject)) func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
 	return func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
-		klog.FromContext(ctx).Info("Deleting pod", "pod", args.Object)
-		var err error
-		for i := 0; i < retries; i++ {
-			err = addConditionAndDeletePod(ctx, c, args.Object, &emitEventFunc)
-			if apierrors.IsNotFound(err) {
-				// Not a problem, the work is done.
-				// But we didn't do it, so don't
-				// bump the metric.
-				return nil
-			}
-			if err == nil {
-				tc.metrics.PodDeletionsTotal.Inc()
-				tc.metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt).Seconds()))
-				return nil
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-		return err
+		return tc.deletePod(ctx, c, emitEventFunc, fireAt, args)
 	}
+}
+
+// deletePod gets called by the worker queue when it is time to evict a pod.
+// It checks for rate limiting and depending on that either puts back the pod
+// for future processing or proceeds with the eviction.
+func (tc *Controller) deletePod(ctx context.Context, c clientset.Interface, emitEventFunc func(tainteviction.NamespacedObject), fireAt time.Time, args *tainteviction.WorkArgs) (finalErr error) {
+	logger := klog.FromContext(ctx)
+	if loggerV := logger.V(5); loggerV.Enabled() {
+		loggerV.Info("Starting attempt to evict pod", "pod", args.Object)
+		defer func() {
+			loggerV.Info("Done with eviction attempt", "pod", args.Object, "err", finalErr)
+		}()
+	}
+
+	// Figure out all on-going evictions which affect the pod and reserve a token
+	// from their rate limiter (creating one if needed). At the end, update
+	// those evictions.
+	//
+	// Both must be protected by the mutex, but let's not hold that mutex
+	// while doing API calls.
+	preallocate := 10
+	evictionsForPod := make([]*deviceTaint, 0, preallocate)
+	evicted := false
+	defer func() {
+		if evicted {
+			tc.mutex.Lock()
+			defer tc.mutex.Unlock()
+
+			for _, eviction := range evictionsForPod {
+				eviction.numEvictedPods++
+				if eviction.taint.Rule != nil {
+					// TODO: schedule status update
+				}
+			}
+		}
+	}()
+
+	reservations := make([]*rate.Reservation, 0, preallocate)
+	func() {
+		tc.mutex.Lock()
+		defer tc.mutex.Unlock()
+
+		for _, eviction := range tc.evictions {
+			if !eviction.pendingPods.Has(args.Object.UID) {
+				continue
+			}
+			evictionsForPod = append(evictionsForPod, eviction)
+
+			if eviction.limiter == nil {
+				// Eviction starts in a burst, then continues with a configurable rate.
+				limit := ptr.Deref(eviction.taint.EvictionsPerSecond, resourceapi.DefaultEvictionsPerSecond)
+				eviction.limiter = rate.NewLimiter(rate.Limit(limit), evictionBurst)
+				logger.V(5).Info("Created new rate limiter", "rate", limit, "burst", evictionBurst, "taint", eviction.taint.ID)
+			}
+			reservation := eviction.limiter.Reserve()
+			reservations = append(reservations, reservation)
+		}
+	}()
+
+	var maxDelay time.Duration
+	now := time.Now()
+	for _, reservation := range reservations {
+		delay := reservation.DelayFrom(now)
+		if delay == rate.InfDuration {
+			// This rate limiter can never grant any token?!
+			// Shouldn't happen, log it and try again anyway
+			// after one minute (chosen so that if this happens
+			// we aren't busy looping).
+			logger.Error(nil, "Internal error: rate limiter refuses to grant tokens")
+			delay = time.Minute
+		}
+		if delay > maxDelay {
+			maxDelay = delay
+		}
+	}
+
+	if maxDelay > 0 {
+		// Each eviction attempt runs in its own goroutine. Therefore it is okay to delay here.
+		// Theoretically, releasing the reserved tokens could unblock some other pod eviction
+		// if pods are tainted through some shared taints without sharing all of them.
+		// In practice this seems unusual and isn't worth making the code more complex for.
+		logger.V(5).Info("Pod eviction delayed by rate limit delay", "pod", args.Object, "delay", maxDelay)
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for rate limit delay: %w", context.Cause(ctx))
+		case <-time.After(maxDelay):
+		}
+
+	}
+
+	logger.Info("Deleting pod", "pod", args.Object)
+	var err error
+	for i := 0; i < retries; i++ {
+		err = addConditionAndDeletePod(ctx, c, args.Object, &emitEventFunc)
+		if apierrors.IsNotFound(err) {
+			// Not a problem, the work is done.
+			// But we didn't do it, so don't
+			// bump the metric.
+			return nil
+		}
+		if err == nil {
+			evicted = true
+			tc.metrics.PodDeletionsTotal.Inc()
+			tc.metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt).Seconds()))
+			return nil
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	// TODO: we could ask for a retry now that ErrAgain is implemented. Should we?
+	return err
 }
 
 func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, podRef tainteviction.NamespacedObject, emitEventFunc *func(tainteviction.NamespacedObject)) (err error) {
@@ -283,7 +408,7 @@ func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, podRef
 
 // New creates a new Controller that will use passed clientset to communicate with the API server.
 // Spawns no goroutines. That happens in Run.
-func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, taintInformer resourcealphainformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string) *Controller {
+func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer draapi.ResourceSliceInformer, taintInformer resourcealphainformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string) *Controller {
 	metrics.Register() // It would be nicer to pass the controller name here, but that probably would break generating https://kubernetes.io/docs/reference/instrumentation/metrics.
 
 	tc := &Controller{
@@ -306,7 +431,8 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 			taintInformer.Informer().HasSynced,
 			classInformer.Informer().HasSynced,
 		},
-		metrics: metrics.Global,
+		metrics:   metrics.Global,
+		evictions: make(map[draapi.DeviceTaintID]*deviceTaint),
 	}
 
 	return tc
@@ -334,9 +460,10 @@ func (tc *Controller) Run(ctx context.Context) error {
 	tc.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: tc.name}).WithLogger(logger)
 	defer eventBroadcaster.Shutdown()
 
-	taintEvictionQueue := tainteviction.CreateWorkerQueue(tc.deletePodHandler(tc.client, tc.emitPodDeletionEvent))
+	taintEvictionQueue := tainteviction.CreateWorkerQueue(tc.createDeletePodHandler(tc.client, tc.emitPodDeletionEvent))
 	evictPod := tc.evictPod
 	tc.evictPod = func(podRef tainteviction.NamespacedObject, fireAt time.Time) {
+		logger.V(3).Info("Scheduling pod for eviction", "pod", podRef, "at", fireAt)
 		// Only relevant for testing.
 		if evictPod != nil {
 			evictPod(podRef, fireAt)
@@ -345,6 +472,7 @@ func (tc *Controller) Run(ctx context.Context) error {
 	}
 	cancelEvict := tc.cancelEvict
 	tc.cancelEvict = func(podRef tainteviction.NamespacedObject) bool {
+		logger.V(3).Info("Canceling pod eviction", "pod", podRef)
 		if cancelEvict != nil {
 			cancelEvict(podRef)
 		}
@@ -362,9 +490,6 @@ func (tc *Controller) Run(ctx context.Context) error {
 	}
 	defer eventBroadcaster.Shutdown()
 
-	// mutex serializes event processing.
-	var mutex sync.Mutex
-
 	claimHandler, err := tc.claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			claim, ok := obj.(*resourceapi.ResourceClaim)
@@ -372,8 +497,8 @@ func (tc *Controller) Run(ctx context.Context) error {
 				logger.Error(nil, "Expected ResourceClaim", "actual", fmt.Sprintf("%T", obj))
 				return
 			}
-			mutex.Lock()
-			defer mutex.Unlock()
+			tc.mutex.Lock()
+			defer tc.mutex.Unlock()
 			tc.handleClaimChange(nil, claim)
 		},
 		UpdateFunc: func(oldObj, newObj any) {
@@ -386,8 +511,8 @@ func (tc *Controller) Run(ctx context.Context) error {
 			if !ok {
 				logger.Error(nil, "Expected ResourceClaim", "actual", fmt.Sprintf("%T", newObj))
 			}
-			mutex.Lock()
-			defer mutex.Unlock()
+			tc.mutex.Lock()
+			defer tc.mutex.Unlock()
 			tc.handleClaimChange(oldClaim, newClaim)
 		},
 		DeleteFunc: func(obj any) {
@@ -399,8 +524,8 @@ func (tc *Controller) Run(ctx context.Context) error {
 				logger.Error(nil, "Expected ResourceClaim", "actual", fmt.Sprintf("%T", obj))
 				return
 			}
-			mutex.Lock()
-			defer mutex.Unlock()
+			tc.mutex.Lock()
+			defer tc.mutex.Unlock()
 			tc.handleClaimChange(claim, nil)
 		},
 	})
@@ -419,8 +544,8 @@ func (tc *Controller) Run(ctx context.Context) error {
 				logger.Error(nil, "Expected ResourcePod", "actual", fmt.Sprintf("%T", obj))
 				return
 			}
-			mutex.Lock()
-			defer mutex.Unlock()
+			tc.mutex.Lock()
+			defer tc.mutex.Unlock()
 			tc.handlePodChange(nil, pod)
 		},
 		UpdateFunc: func(oldObj, newObj any) {
@@ -433,8 +558,8 @@ func (tc *Controller) Run(ctx context.Context) error {
 			if !ok {
 				logger.Error(nil, "Expected Pod", "actual", fmt.Sprintf("%T", newObj))
 			}
-			mutex.Lock()
-			defer mutex.Unlock()
+			tc.mutex.Lock()
+			defer tc.mutex.Unlock()
 			tc.handlePodChange(oldPod, newPod)
 		},
 		DeleteFunc: func(obj any) {
@@ -446,8 +571,8 @@ func (tc *Controller) Run(ctx context.Context) error {
 				logger.Error(nil, "Expected Pod", "actual", fmt.Sprintf("%T", obj))
 				return
 			}
-			mutex.Lock()
-			defer mutex.Unlock()
+			tc.mutex.Lock()
+			defer tc.mutex.Unlock()
 			tc.handlePodChange(pod, nil)
 		},
 	})
@@ -485,38 +610,38 @@ func (tc *Controller) Run(ctx context.Context) error {
 
 	_, err = sliceTracker.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
-			slice, ok := obj.(*resourceapi.ResourceSlice)
+			slice, ok := obj.(*draapi.ResourceSlice)
 			if !ok {
 				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", obj))
 				return
 			}
-			mutex.Lock()
-			defer mutex.Unlock()
+			tc.mutex.Lock()
+			defer tc.mutex.Unlock()
 			tc.handleSliceChange(nil, slice)
 		},
 		UpdateFunc: func(oldObj, newObj any) {
-			oldSlice, ok := oldObj.(*resourceapi.ResourceSlice)
+			oldSlice, ok := oldObj.(*draapi.ResourceSlice)
 			if !ok {
 				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", oldObj))
 				return
 			}
-			newSlice, ok := newObj.(*resourceapi.ResourceSlice)
+			newSlice, ok := newObj.(*draapi.ResourceSlice)
 			if !ok {
 				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", newObj))
 			}
-			mutex.Lock()
-			defer mutex.Unlock()
+			tc.mutex.Lock()
+			defer tc.mutex.Unlock()
 			tc.handleSliceChange(oldSlice, newSlice)
 		},
 		DeleteFunc: func(obj any) {
 			// No need to check for DeletedFinalStateUnknown here, the resourceslicetracker doesn't use that.
-			slice, ok := obj.(*resourceapi.ResourceSlice)
+			slice, ok := obj.(*draapi.ResourceSlice)
 			if !ok {
 				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", obj))
 				return
 			}
-			mutex.Lock()
-			defer mutex.Unlock()
+			tc.mutex.Lock()
+			defer tc.mutex.Unlock()
 			tc.handleSliceChange(slice, nil)
 		},
 	})
@@ -555,10 +680,11 @@ func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.Resource
 		if claim.Status.Allocation == nil {
 			return
 		}
-		tc.allocatedClaims[name] = allocatedClaim{
+		ac := allocatedClaim{
 			ResourceClaim: claim,
-			evictionTime:  tc.evictionTime(claim.Status.Allocation),
 		}
+		ac.evictionTime, ac.taints = tc.evictionTime(claim.Status.Allocation)
+		tc.allocatedClaims[name] = ac
 		tc.handlePods(claim)
 		return
 	}
@@ -584,10 +710,11 @@ func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.Resource
 
 	// Allocation added?
 	if oldClaim.Status.Allocation == nil && newClaim.Status.Allocation != nil {
-		tc.allocatedClaims[name] = allocatedClaim{
+		ac := allocatedClaim{
 			ResourceClaim: claim,
-			evictionTime:  tc.evictionTime(claim.Status.Allocation),
 		}
+		ac.evictionTime, ac.taints = tc.evictionTime(claim.Status.Allocation)
+		tc.allocatedClaims[name] = ac
 		syncBothClaims()
 		return
 	}
@@ -606,6 +733,7 @@ func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.Resource
 		tc.allocatedClaims[name] = allocatedClaim{
 			ResourceClaim: claim,
 			evictionTime:  tc.allocatedClaims[name].evictionTime,
+			taints:        tc.allocatedClaims[name].taints,
 		}
 		syncBothClaims()
 		return
@@ -615,9 +743,11 @@ func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.Resource
 }
 
 // evictionTime returns the earliest TimeAdded of any NoExecute taint in any allocated device
-// unless that taint is tolerated, nil if none.
-func (tc *Controller) evictionTime(allocation *resourceapi.AllocationResult) *metav1.Time {
+// unless that taint is tolerated, nil if none. It also returns pointers to the taints in
+// the pool which cause eviction.
+func (tc *Controller) evictionTime(allocation *resourceapi.AllocationResult) (*metav1.Time, []*draapi.TrackedDeviceTaint) {
 	var evictionTime *metav1.Time
+	var taints []*draapi.TrackedDeviceTaint
 
 	for _, allocatedDevice := range allocation.Devices.Results {
 		device := tc.pools[poolID{driverName: allocatedDevice.Driver, poolName: allocatedDevice.Pool}].getDevice(allocatedDevice.Device)
@@ -627,7 +757,8 @@ func (tc *Controller) evictionTime(allocation *resourceapi.AllocationResult) *me
 		}
 
 	nextTaint:
-		for _, taint := range device.Taints {
+		for i := range device.Taints {
+			taint := &device.Taints[i]
 			if taint.Effect != resourceapi.DeviceTaintEffectNoExecute {
 				continue
 			}
@@ -637,7 +768,7 @@ func (tc *Controller) evictionTime(allocation *resourceapi.AllocationResult) *me
 			tolerationSeconds := int64(math.MaxInt64)
 			for _, toleration := range allocatedDevice.Tolerations {
 				if toleration.Effect == resourceapi.DeviceTaintEffectNoExecute &&
-					resourceclaim.ToleratesTaint(toleration, taint) {
+					resourceclaim.ToleratesTaint(toleration, taint.DeviceTaint) {
 					if toleration.TolerationSeconds == nil {
 						// Tolerate forever -> ignore taint.
 						continue nextTaint
@@ -656,6 +787,7 @@ func (tc *Controller) evictionTime(allocation *resourceapi.AllocationResult) *me
 				newEvictionTime = &metav1.Time{Time: newEvictionTime.Add(time.Duration(tolerationSeconds) * time.Second)}
 			}
 
+			taints = append(taints, taint)
 			if evictionTime == nil {
 				evictionTime = newEvictionTime
 				continue
@@ -666,29 +798,56 @@ func (tc *Controller) evictionTime(allocation *resourceapi.AllocationResult) *me
 		}
 	}
 
-	return evictionTime
+	return evictionTime, taints
 }
 
-func (tc *Controller) handleSliceChange(oldSlice, newSlice *resourceapi.ResourceSlice) {
+func (tc *Controller) handleSliceChange(oldSlice, newSlice *draapi.ResourceSlice) {
 	slice := newSlice
 	if slice == nil {
 		slice = oldSlice
 	}
 	poolID := poolID{
-		driverName: slice.Spec.Driver,
-		poolName:   slice.Spec.Pool.Name,
+		driverName: slice.Spec.Driver.String(),
+		poolName:   slice.Spec.Pool.Name.String(),
 	}
 	if tc.eventLogger != nil {
 		// This is intentionally very verbose for debugging.
 		tc.eventLogger.Info("ResourceSlice changed", "pool", poolID, "oldSlice", klog.Format(oldSlice), "newSlice", klog.Format(newSlice), "diff", diff.Diff(oldSlice, newSlice))
 	}
 
+	// Keep existing evictions up-to-date when slices change.
+	newTaintIDs := allTaintIDs(newSlice)
+	if oldSlice != nil {
+		// Remove obsolete taints.
+		for _, device := range oldSlice.Spec.Devices {
+			for _, taint := range device.Taints {
+				if !newTaintIDs.Has(taint.ID) {
+					delete(tc.evictions, taint.ID)
+				}
+			}
+		}
+	}
+	if newSlice != nil {
+		for _, device := range newSlice.Spec.Devices {
+			for i := range device.Taints {
+				taint := &device.Taints[i]
+				oldTaint := tc.evictions[taint.ID]
+				if oldTaint != nil {
+					// Update existing entry.
+					if oldTaint.limiter != nil &&
+						oldTaint.limiter.Limit() != rate.Limit(ptr.Deref(taint.EvictionsPerSecond, resourceapi.DefaultEvictionsPerSecond)) {
+						// Will get recreated if needed.
+						oldTaint.limiter = nil
+					}
+					oldTaint.taint = taint
+				}
+			}
+		}
+	}
+
 	// Determine old and new device taints. Only devices
 	// where something changes trigger additional checks for claims
 	// using them.
-	//
-	// The pre-allocated slices are small enough to be allocated on
-	// the stack (https://stackoverflow.com/a/69187698/222305).
 	p := tc.pools[poolID]
 	oldDeviceTaints := p.getTaintedDevices()
 	p.removeSlice(oldSlice)
@@ -745,12 +904,14 @@ func (tc *Controller) handleSliceChange(oldSlice, newSlice *resourceapi.Resource
 		if !usesDevice(claim.Status.Allocation, poolID, modifiedDevices) {
 			continue
 		}
-		newEvictionTime := tc.evictionTime(claim.ResourceClaim.Status.Allocation)
-		if newEvictionTime.Equal(claim.evictionTime) {
+		newEvictionTime, newTaints := tc.evictionTime(claim.ResourceClaim.Status.Allocation)
+		if newEvictionTime.Equal(claim.evictionTime) &&
+			slices.Equal(claim.taints, newTaints) {
 			// No change.
 			continue
 		}
 		claim.evictionTime = newEvictionTime
+		claim.taints = newTaints
 		tc.allocatedClaims[name] = claim
 		// We could collect pods which depend on claims with changes.
 		// In practice, most pods probably depend on one claim, so
@@ -758,6 +919,24 @@ func (tc *Controller) handleSliceChange(oldSlice, newSlice *resourceapi.Resource
 		// to make the common case simple.
 		tc.handlePods(claim.ResourceClaim)
 	}
+}
+
+// allTaintIDs collects all IDs of any taint in the slice. Returns nil
+// (= empty set) if the slice is nil or has no taints.
+func allTaintIDs(slice *draapi.ResourceSlice) sets.Set[draapi.DeviceTaintID] {
+	if slice == nil {
+		return nil
+	}
+	var taintIDs sets.Set[draapi.DeviceTaintID]
+	for _, device := range slice.Spec.Devices {
+		for _, taint := range device.Taints {
+			if taintIDs == nil {
+				taintIDs = sets.New[draapi.DeviceTaintID]()
+			}
+			taintIDs.Insert(taint.ID)
+		}
+	}
+	return taintIDs
 }
 
 func usesDevice(allocation *resourceapi.AllocationResult, pool poolID, modifiedDevices sets.Set[string]) bool {
@@ -782,6 +961,15 @@ func (tc *Controller) handlePodChange(oldPod, newPod *v1.Pod) {
 	}
 	if newPod == nil {
 		// Nothing left to do for it. No need to emit an event here, it's gone.
+		for taintID, eviction := range tc.evictions {
+			eviction.pendingPods.Delete(oldPod.UID)
+			if len(eviction.pendingPods) == 0 {
+				delete(tc.evictions, taintID)
+				tc.logger.V(3).Info("Completed eviction", "taint", taintID, "deviceTaintRule", klog.KObj(eviction.taint.Rule), "pod", klog.KObj(oldPod))
+			} else {
+				tc.logger.V(5).Info("Removed deleted pod from eviction", "taint", taintID, "deviceTaintRule", klog.KObj(eviction.taint.Rule), "pod", klog.KObj(oldPod), "pendingPods", eviction.pendingPods.Len())
+			}
+		}
 		tc.cancelEvict(newObject(oldPod))
 		return
 	}
@@ -832,6 +1020,7 @@ func (tc *Controller) handlePod(pod *v1.Pod) {
 	// If any claim in use by the pod is tainted such that the taint is not tolerated,
 	// the pod needs to be evicted.
 	var evictionTime *metav1.Time
+	var taints sets.Set[*draapi.TrackedDeviceTaint]
 	for i := range pod.Spec.ResourceClaims {
 		claimName, mustCheckOwner, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
 		if err != nil {
@@ -863,12 +1052,43 @@ func (tc *Controller) handlePod(pod *v1.Pod) {
 		if evictionTime == nil || allocatedClaim.evictionTime.Before(evictionTime) {
 			evictionTime = allocatedClaim.evictionTime
 		}
+		if taints == nil {
+			taints = sets.New[*draapi.TrackedDeviceTaint]()
+		}
+		taints.Insert(allocatedClaim.taints...)
 	}
 
 	podRef := newObject(pod)
 	if evictionTime != nil {
+		for taint := range taints {
+			eviction := tc.evictions[taint.ID]
+			if eviction == nil {
+				// First pod being evicted because of the taint.
+				// We have to start tracking the eviction.
+				eviction = &deviceTaint{
+					taint:       taint,
+					pendingPods: sets.New(pod.UID),
+				}
+				tc.evictions[taint.ID] = eviction
+				if eviction.taint.Rule != nil {
+					// TODO: start updating the rule status.
+				}
+				tc.logger.V(3).Info("Started new eviction", "taint", taint.ID, "deviceTaintRule", klog.KObj(taint.Rule), "pod", klog.KObj(pod))
+			} else {
+				// Just add the pod, if not there yet.
+				eviction.pendingPods.Insert(pod.UID)
+				tc.logger.V(3).Info("Extended existing eviction", "taint", taint.ID, "deviceTaintRule", klog.KObj(taint.Rule), "pod", klog.KObj(pod), "pendingPods", eviction.pendingPods.Len())
+			}
+		}
 		tc.evictPod(podRef, evictionTime.Time)
 	} else {
+		for _, eviction := range tc.evictions {
+			// Done with the pod. Maybe even the whole eviction is done now.
+			eviction.pendingPods.Delete(pod.UID)
+			if len(eviction.pendingPods) == 0 {
+				delete(eviction.pendingPods, pod.UID)
+			}
+		}
 		tc.cancelWorkWithEvent(podRef)
 	}
 }

@@ -20,6 +20,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/structured"
 )
 
@@ -56,7 +57,7 @@ type ResourceSliceLister interface {
 	// k8s.io/dynamic-resource-allocation/resourceslice/tracker provides an implementation
 	// of the necessary logic. That tracker can be instantiated as a replacement for
 	// a normal ResourceSlice informer and provides a ListPatchedResourceSlices method.
-	ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error)
+	ListWithDeviceTaintRules() ([]*draapi.ResourceSlice, error)
 }
 
 // DeviceClassLister can be used to obtain DeviceClasses.

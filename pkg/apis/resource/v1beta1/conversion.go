@@ -207,15 +207,6 @@ func Convert_v1beta1_Device_To_resource_Device(in *resourcev1beta1.Device, out *
 		out.NodeName = basic.NodeName
 		out.NodeSelector = (*core.NodeSelector)(unsafe.Pointer(basic.NodeSelector))
 		out.AllNodes = basic.AllNodes
-		var taints []resource.DeviceTaint
-		for _, e := range basic.Taints {
-			var taint resource.DeviceTaint
-			if err := Convert_v1beta1_DeviceTaint_To_resource_DeviceTaint(&e, &taint, s); err != nil {
-				return err
-			}
-			taints = append(taints, taint)
-		}
-		out.Taints = taints
 		out.BindsToNode = basic.BindsToNode
 		out.BindingConditions = basic.BindingConditions
 		out.BindingFailureConditions = basic.BindingFailureConditions
@@ -256,15 +247,6 @@ func Convert_resource_Device_To_v1beta1_Device(in *resource.Device, out *resourc
 	out.Basic.NodeName = in.NodeName
 	out.Basic.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.Basic.AllNodes = in.AllNodes
-	var taints []resourcev1beta1.DeviceTaint
-	for _, e := range in.Taints {
-		var taint resourcev1beta1.DeviceTaint
-		if err := Convert_resource_DeviceTaint_To_v1beta1_DeviceTaint(&e, &taint, s); err != nil {
-			return err
-		}
-		taints = append(taints, taint)
-	}
-	out.Basic.Taints = taints
 	out.Basic.BindsToNode = in.BindsToNode
 	out.Basic.BindingConditions = in.BindingConditions
 	out.Basic.BindingFailureConditions = in.BindingFailureConditions

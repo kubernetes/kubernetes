@@ -121,7 +121,6 @@ var map_Device = map[string]string{
 	"nodeName":                 "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
 	"nodeSelector":             "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
 	"allNodes":                 "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
-	"taints":                   "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 	"bindsToNode":              "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 	"bindingConditions":        "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 	"bindingFailureConditions": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is set to \"True\", a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
@@ -317,11 +316,14 @@ func (DeviceSubRequest) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceTaint = map[string]string{
-	"":          "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
-	"key":       "The taint key to be applied to a device. Must be a label name.",
-	"value":     "The taint value corresponding to the taint key. Must be a label value.",
-	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
-	"timeAdded": "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
+	"":                   "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
+	"key":                "The taint key to be applied to a device. Must be a label name.",
+	"value":              "The taint value corresponding to the taint key. Must be a label value.",
+	"effect":             "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+	"timeAdded":          "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
+	"description":        "Description is a human-readable explanation for the taint.\n\nThe length must be smaller or equal to 1024.",
+	"data":               "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+	"evictionsPerSecond": "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint. If multiple taints cause eviction of the same set of Pods, then the lowest rate defined in any of those taints applies.\n\nThe default is 100 Pods/s.",
 }
 
 func (DeviceTaint) SwaggerDoc() map[string]string {
@@ -499,12 +501,22 @@ var map_ResourceSliceSpec = map[string]string{
 	"nodeSelector":           "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
 	"allNodes":               "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
 	"devices":                "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+	"taints":                 "If specified, these are driver-defined taints.\n\nThe maximum number of taints is 32. Either Devices or Taints may be set, but not both.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 	"perDeviceNodeSelection": "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
 	"sharedCounters":         "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of counters in all sets is 32.",
 }
 
 func (ResourceSliceSpec) SwaggerDoc() map[string]string {
 	return map_ResourceSliceSpec
+}
+
+var map_SliceDeviceTaint = map[string]string{
+	"":       "SliceDeviceTaint defines one taint within a ResourceSlice.",
+	"device": "Device is the name of the device in the pool that the ResourceSlice belongs to which is affected by the taint. Multiple taints may affect the same device.",
+}
+
+func (SliceDeviceTaint) SwaggerDoc() map[string]string {
+	return map_SliceDeviceTaint
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

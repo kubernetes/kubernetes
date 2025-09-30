@@ -19,6 +19,7 @@ package api
 import (
 	"unique"
 
+	v1 "k8s.io/api/resource/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -44,4 +45,13 @@ func Convert_string_To_api_UniqueString(in *string, out *UniqueString, s convers
 	}
 	*out = UniqueString(unique.Make(*in))
 	return nil
+}
+
+func Convert_api_SliceDevice_To_v1_Device(in *SliceDevice, out *v1.Device, s conversion.Scope) error {
+	// Lossy conversion: all additional fields are only used internally and not converted.
+	return Convert_api_Device_To_v1_Device(&in.Device, out, s)
+}
+
+func Convert_v1_Device_To_api_SliceDevice(in *v1.Device, out *SliceDevice, s conversion.Scope) error {
+	return Convert_v1_Device_To_api_Device(in, &out.Device, s)
 }

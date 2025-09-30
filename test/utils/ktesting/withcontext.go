@@ -107,7 +107,11 @@ func (wCtx withContext) ExpectNoError(err error, explain ...interface{}) {
 }
 
 func (cCtx withContext) Run(name string, cb func(tCtx TContext)) bool {
-	return run(cCtx, name, cb)
+	return run(cCtx, name, false, cb)
+}
+
+func (cCtx withContext) SyncTest(name string, cb func(tCtx TContext)) bool {
+	return run(cCtx, name, true, cb)
 }
 
 func (wCtx withContext) Logger() klog.Logger {

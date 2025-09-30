@@ -156,8 +156,8 @@ type Pool struct {
 
 // Slice is turned into one ResourceSlice by the controller.
 type Slice struct {
-	// Devices lists all devices which are part of the slice.
 	Devices                []resourceapi.Device
+	Taints                 []resourceapi.SliceDeviceTaint
 	SharedCounters         []resourceapi.CounterSet
 	PerDeviceNodeSelection *bool
 }
@@ -273,12 +273,8 @@ func (err *DroppedFieldsError) Error() string {
 func (err *DroppedFieldsError) DisabledFeatures() []string {
 	var disabled []string
 
-	// Both slices should have the same number of devices, but better check it.
-	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
-		if len(err.DesiredSlice.Spec.Devices[i].Taints) > len(err.ActualSlice.Spec.Devices[i].Taints) {
-			disabled = append(disabled, "DRADeviceTaints")
-			break
-		}
+	if len(err.DesiredSlice.Spec.Taints) > len(err.ActualSlice.Spec.Taints) {
+		disabled = append(disabled, "DRADeviceTaints")
 	}
 
 	// Dropped fields for partitionable devices can be detected without looking at the devices themselves.
@@ -354,11 +350,9 @@ func (c *Controller) Update(resources *DriverResources) {
 func roundTaintTimeAdded(resources *DriverResources) {
 	for _, pool := range resources.Pools {
 		for _, slice := range pool.Slices {
-			for _, device := range slice.Devices {
-				for _, taint := range device.Taints {
-					if taint.TimeAdded != nil {
-						taint.TimeAdded.Time = taint.TimeAdded.Time.Round(time.Second)
-					}
+			for _, taint := range slice.Taints {
+				if taint.Taint.TimeAdded != nil {
+					taint.Taint.TimeAdded.Time = taint.Taint.TimeAdded.Time.Round(time.Second)
 				}
 			}
 		}
@@ -719,7 +713,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		if !apiequality.Semantic.DeepEqual(&currentSlice.Spec.Pool, &desiredPool) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.NodeSelector, pool.NodeSelector) ||
 			ptr.Deref(currentSlice.Spec.AllNodes, false) != desiredAllNodes ||
-			!DevicesDeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
+			!TaintsDeepEqual(currentSlice.Spec.Taints, pool.Slices[i].Taints) ||
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharedCounters, pool.Slices[i].SharedCounters) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) {
 			changedDesiredSlices.Insert(i)
@@ -771,8 +766,9 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		slice.Spec.AllNodes = refIfNotZero(desiredAllNodes)
 		slice.Spec.SharedCounters = pool.Slices[i].SharedCounters
 		slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
+		slice.Spec.Devices = pool.Slices[i].Devices
 		// Preserve TimeAdded from existing device, if there is a matching device and taint.
-		slice.Spec.Devices = copyTaintTimeAdded(slice.Spec.Devices, pool.Slices[i].Devices)
+		slice.Spec.Taints = copyTaintTimeAdded(slice.Spec.Taints, pool.Slices[i].Taints)
 
 		actualSlice, err := c.resourceClient.ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
 		if err != nil {
@@ -817,6 +813,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 				NodeName:               refIfNotZero(nodeName),
 				NodeSelector:           pool.NodeSelector,
 				AllNodes:               refIfNotZero(desiredAllNodes),
+				Taints:                 pool.Slices[i].Taints,
 				Devices:                pool.Slices[i].Devices,
 				SharedCounters:         pool.Slices[i].SharedCounters,
 				PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
@@ -912,7 +909,7 @@ func (c *Controller) sliceStored(ctx context.Context, msg string, poolName strin
 	// One difference is normal: the apiserver may have added TimeAdded to taints.
 	// This mutates desiredSlice for the DeepEqual below.
 	if copyServerDefaults(desiredSlice, actualSlice) {
-		pool.Slices[sliceIndex].Devices = actualSlice.Spec.Devices
+		pool.Slices[sliceIndex].Taints = actualSlice.Spec.Taints
 	}
 
 	// Some fields may have been dropped. When we receive
@@ -923,9 +920,11 @@ func (c *Controller) sliceStored(ctx context.Context, msg string, poolName strin
 	// we can store.
 	if !apiequality.Semantic.DeepEqual(desiredSlice.Spec.PerDeviceNodeSelection, actualSlice.Spec.PerDeviceNodeSelection) ||
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.SharedCounters, actualSlice.Spec.SharedCounters) ||
+		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.Taints, actualSlice.Spec.Taints) ||
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.Devices, actualSlice.Spec.Devices) {
 		pool.Slices[sliceIndex].PerDeviceNodeSelection = actualSlice.Spec.PerDeviceNodeSelection
 		pool.Slices[sliceIndex].SharedCounters = actualSlice.Spec.SharedCounters
+		pool.Slices[sliceIndex].Taints = actualSlice.Spec.Taints
 		pool.Slices[sliceIndex].Devices = actualSlice.Spec.Devices
 
 		err := &DroppedFieldsError{
@@ -942,15 +941,13 @@ func copyServerDefaults(desiredSlice, actualSlice *resourceapi.ResourceSlice) bo
 	copied := false
 
 	// Should have the same length and entries in the same order.
-	for i := 0; i < len(desiredSlice.Spec.Devices) && i < len(actualSlice.Spec.Devices); i++ {
-		for e := 0; e < len(desiredSlice.Spec.Devices[i].Taints) && e < len(actualSlice.Spec.Devices[i].Taints); e++ {
-			if desiredSlice.Spec.Devices[i].Taints[e].TimeAdded == nil && actualSlice.Spec.Devices[i].Taints[e].TimeAdded != nil {
-				if !copied {
-					desiredSlice.Spec = *desiredSlice.Spec.DeepCopy()
-					copied = true
-				}
-				desiredSlice.Spec.Devices[i].Taints[e].TimeAdded = actualSlice.Spec.Devices[i].Taints[e].TimeAdded
+	for i := 0; i < len(desiredSlice.Spec.Taints) && i < len(actualSlice.Spec.Taints); i++ {
+		if desiredSlice.Spec.Taints[i].Taint.TimeAdded == nil && actualSlice.Spec.Taints[i].Taint.TimeAdded != nil {
+			if !copied {
+				desiredSlice.Spec = *desiredSlice.Spec.DeepCopy()
+				copied = true
 			}
+			desiredSlice.Spec.Taints[i].Taint.TimeAdded = actualSlice.Spec.Taints[i].Taint.TimeAdded
 		}
 	}
 	return copied
@@ -978,52 +975,34 @@ func sameSlice(existingSlice *resourceapi.ResourceSlice, desiredSlice *Slice) bo
 // copyTaintTimeAdded copies existing TimeAdded values from one slice into
 // the other if the other one doesn't have it for a taint. Both input
 // slices are read-only.
-func copyTaintTimeAdded(from, to []resourceapi.Device) []resourceapi.Device {
+func copyTaintTimeAdded(from, to []resourceapi.SliceDeviceTaint) []resourceapi.SliceDeviceTaint {
 	to = slices.Clone(to)
-	for i, toDevice := range to {
-		index := slices.IndexFunc(from, func(fromDevice resourceapi.Device) bool {
-			return fromDevice.Name == toDevice.Name
+	for i, toTaint := range to {
+		index := slices.IndexFunc(from, func(fromTaint resourceapi.SliceDeviceTaint) bool {
+			return toTaint.Device == fromTaint.Device &&
+				toTaint.Taint.Key == fromTaint.Taint.Key &&
+				toTaint.Taint.Value == fromTaint.Taint.Value &&
+				toTaint.Taint.Effect == fromTaint.Taint.Effect
 		})
 		if index < 0 {
-			// No matching device.
+			// No matching old taint.
 			continue
 		}
-		fromDevice := from[index]
-		for j, toTaint := range toDevice.Taints {
-			if toTaint.TimeAdded != nil {
-				// Already set.
-				continue
-			}
-			// Preserve the old TimeAdded if all other fields are the same.
-			index := slices.IndexFunc(fromDevice.Taints, func(fromTaint resourceapi.DeviceTaint) bool {
-				return toTaint.Key == fromTaint.Key &&
-					toTaint.Value == fromTaint.Value &&
-					toTaint.Effect == fromTaint.Effect
-			})
-			if index < 0 {
-				// No matching old taint.
-				continue
-			}
-			// In practice, devices are unlikely to have many
-			// taints.  Just clone the entire device before we
-			// motify it, it's unlikely that we do this more than once.
-			to[i] = *toDevice.DeepCopy()
-			to[i].Taints[j].TimeAdded = fromDevice.Taints[index].TimeAdded
-		}
+		to[i].Taint.TimeAdded = from[index].Taint.TimeAdded
 	}
 	return to
 }
 
-// DevicesDeepEqual compares two slices of Devices. It behaves like
+// TaintsDeepEqual compares two slices of SliceDeviceTaints. It behaves like
 // apiequality.Semantic.DeepEqual, with one small difference:
 // a nil DeviceTaint.TimeAdded is equal to a non-nil time.
 // Also, rounding to full seconds (caused by round-tripping) is
 // tolerated.
-func DevicesDeepEqual(a, b []resourceapi.Device) bool {
-	return devicesSemantic.DeepEqual(a, b)
+func TaintsDeepEqual(a, b []resourceapi.SliceDeviceTaint) bool {
+	return taintsSemantic.DeepEqual(a, b)
 }
 
-var devicesSemantic = func() conversion.Equalities {
+var taintsSemantic = func() conversion.Equalities {
 	semantic := apiequality.Semantic.Copy()
 	if err := semantic.AddFunc(deviceTaintEqual); err != nil {
 		panic(err)

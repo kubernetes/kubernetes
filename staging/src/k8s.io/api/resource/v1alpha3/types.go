@@ -18,6 +18,7 @@ package v1alpha3
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // DeviceSelector must have exactly one field set.
@@ -134,7 +135,7 @@ type DeviceTaint struct {
 
 	// The effect of the taint on claims that do not tolerate the taint
 	// and through such claims on the pods using them.
-	// Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
+	// Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
 	// nodes is not valid here.
 	//
 	// +required
@@ -156,12 +157,51 @@ type DeviceTaint struct {
 	// This field was defined as "It is only written for NoExecute taints." for node taints.
 	// But in practice, Kubernetes never did anything with it (no validation, no defaulting,
 	// ignored during pod eviction in pkg/controller/tainteviction).
+
+	// Description is a human-readable explanation for the taint.
+	//
+	// The length must be smaller or equal to 1024.
+	//
+	// +optional
+	Description *string `json:"description,omitempty" protobuf:"bytes,5,opt,name=description"`
+
+	// Data contains arbitrary data specific to the taint key.
+	//
+	// The length of the raw data must be smaller or equal to 10 Ki.
+	//
+	// +optional
+	Data *runtime.RawExtension `json:"data,omitempty" protobuf:"bytes,6,opt,name=data"`
+
+	// EvictionsPerSecond controls how quickly Pods get evicted if that is
+	// the effect of the taint. If multiple taints cause eviction
+	// of the same set of Pods, then the lowest rate defined in
+	// any of those taints applies.
+	//
+	// The default is 100 Pods/s.
+	//
+	// +optional
+	EvictionsPerSecond *int64 `json:"evictionsPerSecond,omitempty" protobuf:"varint,7,opt,name=evictionsPerSecond"`
 }
+
+const (
+	// DefaultEvictionsPerSecond is the default for [DeviceTaint.EvictionsPerSecond]
+	// if none is specified explicitly.
+	DefaultEvictionsPerSecond = 100
+
+	// TaintDescriptionMaxLength is the maximum size of [DeviceTaint.Description].
+	TaintDescriptionMaxLength = 1024
+
+	// TaintDataMaxLength is the maximum size of [DeviceTaint.Data].
+	TaintDataMaxLength = 10 * 1024
+)
 
 // +enum
 type DeviceTaintEffect string
 
 const (
+	// No effect, the taint is purely informational.
+	DeviceTaintEffectNone DeviceTaintEffect = "None"
+
 	// Do not allow new pods to schedule which use a tainted device unless they tolerate the taint,
 	// but allow all pods submitted to Kubelet without going through the scheduler
 	// to start, and allow all already-running pods to continue running.
@@ -190,12 +230,8 @@ type DeviceTaintRule struct {
 	// Changing the spec automatically increments the metadata.generation number.
 	Spec DeviceTaintRuleSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
-	// ^^^
-	// A spec gets added because adding a status seems likely.
-	// Such a status could provide feedback on applying the
-	// eviction and/or statistics (number of matching devices,
-	// affected allocated claims, pods remaining to be evicted,
-	// etc.).
+	// Status provides information about an on-going pod eviction.
+	Status DeviceTaintRuleStatus `json:"status" protobuf:"bytes,3,name=status"`
 }
 
 // DeviceTaintRuleSpec specifies the selector and one taint.
@@ -259,6 +295,28 @@ type DeviceTaintSelector struct {
 	// +optional
 	// +listType=atomic
 	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
+}
+
+// DeviceTaintRuleStatus provides information about an on-going pod eviction.
+type DeviceTaintRuleStatus struct {
+	// PodsPendingEviction counts the number of Pods which still need to be evicted.
+	// Because taints with the NoExecute effect also prevent scheduling new pods,
+	// this number should eventually reach zero.
+	//
+	// The count gets updated periodically, so it is not guaranteed to be 100%
+	// accurate.
+	//
+	// +optional
+	PodsPendingEviction *int64 `json:"podsPendingEviction,omitempty" protobuf:"varint,1,opt,name=podsPendingEviction"`
+
+	// PodsEvicted counts the number of Pods which were evicted because of the taint.
+	//
+	// This gets updated periodically, so it is not guaranteed to be 100%
+	// accurate. The actual count may be higher if the controller evicted
+	// some Pods and then gets restarted before updating this field.
+	//
+	// +optional
+	PodsEvicted *int64 `json:"podsEvicted,omitempty" protobuf:"varint,2,opt,name=podsEvicted"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

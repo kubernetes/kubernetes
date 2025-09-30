@@ -64,6 +64,13 @@ type ResourceSliceSpecApplyConfiguration struct {
 	//
 	// Must not have more than 128 entries.
 	Devices []DeviceApplyConfiguration `json:"devices,omitempty"`
+	// If specified, these are driver-defined taints.
+	//
+	// The maximum number of taints is 32. Either Devices or Taints may be set, but not both.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	Taints []SliceDeviceTaintApplyConfiguration `json:"taints,omitempty"`
 	// PerDeviceNodeSelection defines whether the access from nodes to
 	// resources in the pool is set on the ResourceSlice level or on each
 	// device. If it is set to true, every device defined the ResourceSlice
@@ -135,6 +142,19 @@ func (b *ResourceSliceSpecApplyConfiguration) WithDevices(values ...*DeviceApply
 			panic("nil value passed to WithDevices")
 		}
 		b.Devices = append(b.Devices, *values[i])
+	}
+	return b
+}
+
+// WithTaints adds the given value to the Taints field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Taints field.
+func (b *ResourceSliceSpecApplyConfiguration) WithTaints(values ...*SliceDeviceTaintApplyConfiguration) *ResourceSliceSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithTaints")
+		}
+		b.Taints = append(b.Taints, *values[i])
 	}
 	return b
 }

@@ -12954,12 +12954,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
-    - name: taints
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.resource.v1.DeviceTaint
-          elementRelationship: atomic
 - name: io.k8s.api.resource.v1.DeviceAllocationConfiguration
   map:
     fields:
@@ -13221,10 +13215,19 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1.DeviceTaint
   map:
     fields:
+    - name: data
+      type:
+        namedType: __untyped_atomic_
+    - name: description
+      type:
+        scalar: string
     - name: effect
       type:
         scalar: string
       default: ""
+    - name: evictionsPerSecond
+      type:
+        scalar: numeric
     - name: key
       type:
         scalar: string
@@ -13476,6 +13479,23 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.CounterSet
           elementRelationship: atomic
+    - name: taints
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.SliceDeviceTaint
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.SliceDeviceTaint
+  map:
+    fields:
+    - name: device
+      type:
+        scalar: string
+      default: ""
+    - name: taint
+      type:
+        namedType: io.k8s.api.resource.v1.DeviceTaint
+      default: {}
 - name: io.k8s.api.resource.v1alpha3.CELDeviceSelector
   map:
     fields:
@@ -13492,10 +13512,19 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.DeviceTaint
   map:
     fields:
+    - name: data
+      type:
+        namedType: __untyped_atomic_
+    - name: description
+      type:
+        scalar: string
     - name: effect
       type:
         scalar: string
       default: ""
+    - name: evictionsPerSecond
+      type:
+        scalar: numeric
     - name: key
       type:
         scalar: string
@@ -13523,6 +13552,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1alpha3.DeviceTaintRuleSpec
       default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.DeviceTaintRuleStatus
+      default: {}
 - name: io.k8s.api.resource.v1alpha3.DeviceTaintRuleSpec
   map:
     fields:
@@ -13533,6 +13566,15 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1alpha3.DeviceTaint
       default: {}
+- name: io.k8s.api.resource.v1alpha3.DeviceTaintRuleStatus
+  map:
+    fields:
+    - name: podsEvicted
+      type:
+        scalar: numeric
+    - name: podsPendingEviction
+      type:
+        scalar: numeric
 - name: io.k8s.api.resource.v1alpha3.DeviceTaintSelector
   map:
     fields:
@@ -13645,12 +13687,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
-    - name: taints
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.resource.v1beta1.DeviceTaint
-          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.CELDeviceSelector
   map:
     fields:
@@ -14007,10 +14043,19 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta1.DeviceTaint
   map:
     fields:
+    - name: data
+      type:
+        namedType: __untyped_atomic_
+    - name: description
+      type:
+        scalar: string
     - name: effect
       type:
         scalar: string
       default: ""
+    - name: evictionsPerSecond
+      type:
+        scalar: numeric
     - name: key
       type:
         scalar: string
@@ -14231,6 +14276,23 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.CounterSet
           elementRelationship: atomic
+    - name: taints
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.SliceDeviceTaint
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta1.SliceDeviceTaint
+  map:
+    fields:
+    - name: device
+      type:
+        scalar: string
+      default: ""
+    - name: taint
+      type:
+        namedType: io.k8s.api.resource.v1beta1.DeviceTaint
+      default: {}
 - name: io.k8s.api.resource.v1beta2.AllocatedDeviceStatus
   map:
     fields:
@@ -14386,12 +14448,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
-    - name: taints
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.resource.v1beta2.DeviceTaint
-          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta2.DeviceAllocationConfiguration
   map:
     fields:
@@ -14653,10 +14709,19 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta2.DeviceTaint
   map:
     fields:
+    - name: data
+      type:
+        namedType: __untyped_atomic_
+    - name: description
+      type:
+        scalar: string
     - name: effect
       type:
         scalar: string
       default: ""
+    - name: evictionsPerSecond
+      type:
+        scalar: numeric
     - name: key
       type:
         scalar: string
@@ -14908,6 +14973,23 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.CounterSet
           elementRelationship: atomic
+    - name: taints
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.SliceDeviceTaint
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.SliceDeviceTaint
+  map:
+    fields:
+    - name: device
+      type:
+        scalar: string
+      default: ""
+    - name: taint
+      type:
+        namedType: io.k8s.api.resource.v1beta2.DeviceTaint
+      default: {}
 - name: io.k8s.api.scheduling.v1.PriorityClass
   map:
     fields:

@@ -172,15 +172,6 @@ func Convert_v1beta1_Device_To_v1_Device(in *resourcev1beta1.Device, out *resour
 		out.NodeName = basic.NodeName
 		out.NodeSelector = basic.NodeSelector
 		out.AllNodes = basic.AllNodes
-		var taints []resourceapi.DeviceTaint
-		for _, e := range basic.Taints {
-			var taint resourceapi.DeviceTaint
-			if err := Convert_v1beta1_DeviceTaint_To_v1_DeviceTaint(&e, &taint, s); err != nil {
-				return err
-			}
-			taints = append(taints, taint)
-		}
-		out.Taints = taints
 	}
 	return nil
 }
@@ -217,15 +208,6 @@ func Convert_v1_Device_To_v1beta1_Device(in *resourceapi.Device, out *resourcev1
 	out.Basic.NodeName = in.NodeName
 	out.Basic.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.Basic.AllNodes = in.AllNodes
-	var taints []resourcev1beta1.DeviceTaint
-	for _, e := range in.Taints {
-		var taint resourcev1beta1.DeviceTaint
-		if err := Convert_v1_DeviceTaint_To_v1beta1_DeviceTaint(&e, &taint, s); err != nil {
-			return err
-		}
-		taints = append(taints, taint)
-	}
-	out.Basic.Taints = taints
 	return nil
 }
 
