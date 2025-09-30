@@ -1326,7 +1326,7 @@ type DeviceToleration struct {
 	// Effect indicates the taint effect to match. Empty means match all taint effects.
 	// When specified, allowed values are NoSchedule and NoExecute.
 	//
-	// +optional
+	// +required
 	Effect DeviceTaintEffect `json:"effect,omitempty" protobuf:"bytes,4,opt,name=effect,casttype=DeviceTaintEffect"`
 
 	// TolerationSeconds represents the period of time the toleration (which must be

@@ -1088,7 +1088,7 @@ message DeviceToleration {
   // Effect indicates the taint effect to match. Empty means match all taint effects.
   // When specified, allowed values are NoSchedule and NoExecute.
   //
-  // +optional
+  // +required
   optional string effect = 4;
 
   // TolerationSeconds represents the period of time the toleration (which must be

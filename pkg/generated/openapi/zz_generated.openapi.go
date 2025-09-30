@@ -49407,6 +49407,7 @@ func schema_k8sio_api_resource_v1_DeviceToleration(ref common.ReferenceCallback)
 						},
 					},
 				},
+				Required: []string{"effect"},
 			},
 		},
 	}
@@ -51961,6 +51962,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceToleration(ref common.ReferenceCall
 						},
 					},
 				},
+				Required: []string{"effect"},
 			},
 		},
 	}
@@ -54063,6 +54065,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceToleration(ref common.ReferenceCall
 						},
 					},
 				},
+				Required: []string{"effect"},
 			},
 		},
 	}

@@ -1091,6 +1091,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "effect"
+        ],
         "type": "object"
       },
       "io.k8s.api.resource.v1beta1.NetworkDeviceData": {
