@@ -572,3 +572,58 @@ func TestResourcePoolName(t *testing.T) {
 		})
 	}
 }
+
+func TestExtendedResourceName(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{
+		{
+			name:     "valid",
+			input:    "example-kub.io/foo",
+			wantErrs: nil,
+		},
+		{
+			name:  "invalid: no domain",
+			input: "foo",
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, "foo", "a qualified name must be a domain-prefixed path, such as 'example.com/my-prop'").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+		{
+			name:  "invalid: kubernetes.io domain",
+			input: "kubernetes.io/foo",
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, "kubernetes.io/foo", "must not have 'kubernetes.io' domain").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+		{
+			name:  "invalid: requests prefix",
+			input: "requests.example.com/foo",
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, "requests.example.com/foo", "must not have 'requests.' prefix").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+		{
+			name:  "invalid: name too long",
+			input: "example.com/" + strings.Repeat("a", 64),
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath, "example.com/"+strings.Repeat("a", 64), "name part must be no more than 63 bytes").WithOrigin("format=k8s-extended-resource-name"),
+			},
+		},
+	}
+
+	exactMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := &tc.input
+			gotErrs := ExtendedResourceName(ctx, operation.Operation{}, fldPath, value, nil)
+			exactMatcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
