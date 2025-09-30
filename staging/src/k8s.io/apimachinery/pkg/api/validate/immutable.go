@@ -35,6 +35,6 @@ func Immutable[T any](_ context.Context, op operation.Operation, fldPath *field.
 		return nil
 	}
 	return field.ErrorList{
-		field.Forbidden(fldPath, "field is immutable").WithOrigin("immutable"),
+		field.Invalid(fldPath, nil, "field is immutable").WithOrigin("immutable"),
 	}
 }

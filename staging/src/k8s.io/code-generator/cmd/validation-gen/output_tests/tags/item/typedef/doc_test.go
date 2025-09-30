@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+     http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -53,7 +53,7 @@ func Test(t *testing.T) {
 		},
 	}
 	st.Value(newStruct).OldValue(oldStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Forbidden(field.NewPath("typedefItems").Index(0), "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefItems").Index(0), nil, "immutable").WithOrigin("immutable"),
 	})
 
 	// Test nested typedef (typedef of typedef).

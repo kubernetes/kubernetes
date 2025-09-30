@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+     http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,13 +42,13 @@ func Test(t *testing.T) {
 	}
 
 	st.Value(new).OldValue(old).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Forbidden(field.NewPath("listField").Index(0), "immutable").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("listField").Index(1).Child("stringField"), "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(1).Child("stringField"), nil, "immutable").WithOrigin("immutable"),
 	})
 
 	st.Value(new).OldValue(&Struct{ListField: []Item{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Forbidden(field.NewPath("listField").Index(0), "immutable").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("listField").Index(1).Child("stringField"), "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(1).Child("stringField"), nil, "immutable").WithOrigin("immutable"),
 	})
 
 	// Test that "c" can change independently

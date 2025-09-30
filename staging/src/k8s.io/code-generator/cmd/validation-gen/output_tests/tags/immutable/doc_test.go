@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+     http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -65,15 +65,15 @@ func Test(t *testing.T) {
 	st.Value(&structA2).OldValue(&structA).ExpectValid()
 
 	st.Value(&structA).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Forbidden(field.NewPath("stringField"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("stringPtrField"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("structField"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("structPtrField"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("noncomparableStructField"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("noncomparableStructPtrField"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("sliceField"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("mapField"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("immutableField"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("immutablePtrField"), "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("stringField"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("stringPtrField"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("structField"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("structPtrField"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("noncomparableStructField"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("noncomparableStructPtrField"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("sliceField"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("mapField"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("immutableField"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("immutablePtrField"), nil, "").WithOrigin("immutable"),
 	})
 }

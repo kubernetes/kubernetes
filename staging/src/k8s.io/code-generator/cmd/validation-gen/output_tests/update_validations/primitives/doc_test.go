@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+     http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,9 +43,9 @@ func Test(t *testing.T) {
 	st.Value(&structA).OldValue(&structA).ExpectValid()
 
 	st.Value(&structA).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin().ByDeclarativeOnly(), field.ErrorList{
-		field.Forbidden(field.NewPath("s"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("i"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("b"), "").WithOrigin("immutable"),
-		field.Forbidden(field.NewPath("f"), "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("s"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("i"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("b"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("f"), nil, "").WithOrigin("immutable"),
 	})
 }
