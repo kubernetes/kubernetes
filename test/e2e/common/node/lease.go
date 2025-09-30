@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
@@ -90,6 +91,7 @@ var _ = SIGDescribe("Lease", func() {
 
 		createdLease, err := leaseClient.Create(ctx, lease, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating Lease failed")
+		gomega.Expect(createdLease).To(apimachineryutils.HaveValidResourceVersion())
 
 		readLease, err := leaseClient.Get(ctx, name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")

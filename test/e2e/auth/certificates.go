@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate/csr"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -307,6 +308,7 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err)
 		gomega.Expect(gottenCSR.UID).To(gomega.Equal(createdCSR.UID))
 		gomega.Expect(gottenCSR.Spec.ExpirationSeconds).To(gomega.Equal(csr.DurationToExpirationSeconds(time.Hour)))
+		gomega.Expect(gottenCSR).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		csrs, err := csrClient.List(ctx, metav1.ListOptions{FieldSelector: "spec.signerName=" + signerName})

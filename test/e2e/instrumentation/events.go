@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	typedeventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -102,6 +103,7 @@ var _ = common.SIGDescribe("Events API", func() {
 		ginkgo.By("creating a test event")
 		createdEvent, err := client.Create(ctx, newTestEvent(f.Namespace.Name, eventName, "testevent-constant"), metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create test event")
+		gomega.Expect(createdEvent).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing events in all namespaces")
 		foundCreatedEvent := eventExistsInList(ctx, clientAllNamespaces, f.Namespace.Name, eventName)

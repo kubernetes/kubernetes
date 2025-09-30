@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -339,6 +340,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		framework.ExpectNoError(err)
 		gomega.Expect(gottenIC.UID).To(gomega.Equal(ingressClass1.UID))
 		gomega.Expect(gottenIC.UID).To(gomega.Equal(ingressClass1.UID))
+		gomega.Expect(gottenIC).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		ics, err := icClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=generic"})

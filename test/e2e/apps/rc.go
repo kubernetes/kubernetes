@@ -40,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/controller/replication"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -155,6 +156,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			// Create a ReplicationController
 			testRcCreated, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Create(ctx, &rcTest, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Failed to create ReplicationController")
+			gomega.Expect(testRcCreated).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By("waiting for RC to be added")
 			eventFound := false

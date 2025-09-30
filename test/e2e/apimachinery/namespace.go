@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -278,6 +279,7 @@ var _ = SIGDescribe("Namespaces", framework.WithSerial(), func() {
 		ns, err := f.CreateNamespace(ctx, namespaceName, nil)
 		framework.ExpectNoError(err, "failed creating Namespace")
 		namespaceName = ns.ObjectMeta.Name
+		gomega.Expect(ns).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("patching the Namespace")
 		nspatch, err := json.Marshal(map[string]interface{}{

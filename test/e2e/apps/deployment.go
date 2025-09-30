@@ -52,6 +52,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -216,6 +217,7 @@ var _ = SIGDescribe("Deployment", func() {
 
 		createdDeployment, err := f.ClientSet.AppsV1().Deployments(testNamespaceName).Create(ctx, testDeployment, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Deployment %v in namespace %v", testDeploymentName, testNamespaceName)
+		gomega.Expect(createdDeployment).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("waiting for Deployment to be created")
 		ctxUntil, cancel := context.WithTimeout(ctx, 30*time.Second)

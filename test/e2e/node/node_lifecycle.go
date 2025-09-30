@@ -29,6 +29,7 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -81,6 +82,7 @@ var _ = SIGDescribe("Node Lifecycle", func() {
 		createdNode, err := nodeClient.Create(ctx, &fakeNode, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create node %q", fakeNode.Name)
 		gomega.Expect(createdNode.Name).To(gomega.Equal(fakeNode.Name), "Checking that the node has been created")
+		gomega.Expect(createdNode).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By(fmt.Sprintf("Getting %q", fakeNode.Name))
 		retrievedNode, err := nodeClient.Get(ctx, fakeNode.Name, metav1.GetOptions{})

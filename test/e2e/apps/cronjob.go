@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -381,6 +382,7 @@ var _ = SIGDescribe("CronJob", func() {
 		ginkgo.By("creating")
 		createdCronJob, err := cjClient.Create(ctx, cjTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
+		gomega.Expect(createdCronJob).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("getting")
 		gottenCronJob, err := cjClient.Get(ctx, createdCronJob.Name, metav1.GetOptions{})

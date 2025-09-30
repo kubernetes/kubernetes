@@ -38,6 +38,7 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -165,6 +166,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 			framework.ExpectNoError(err, "failed to lookup ControllerRevision: %v", err)
 			gomega.Expect(initialRevision).NotTo(gomega.BeNil(), "failed to lookup ControllerRevision: %v", initialRevision)
 		}
+		gomega.Expect(rev).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By(fmt.Sprintf("Patching ControllerRevision %q", initialRevision.Name))
 		payload := "{\"metadata\":{\"labels\":{\"" + initialRevision.Name + "\":\"patched\"}}}"

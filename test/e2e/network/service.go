@@ -57,6 +57,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
@@ -3284,6 +3285,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("creating an Endpoint")
 		createdEP, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Create(ctx, &testEndpoints, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Endpoint")
+		gomega.Expect(createdEP).To(apimachineryutils.HaveValidResourceVersion())
 		ginkgo.By("waiting for available Endpoint")
 		ctxUntil, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
@@ -3820,6 +3822,7 @@ var _ = common.SIGDescribe("Services", func() {
 		if err != nil {
 			framework.Failf("failed to get Service %q: %v", serviceName, err)
 		}
+		gomega.Expect(service).To(apimachineryutils.HaveValidResourceVersion())
 		service.Spec.Ports = []v1.ServicePort{svcTCPport}
 		updatedSVC, err := cs.CoreV1().Services(ns).Update(ctx, service, metav1.UpdateOptions{})
 		if err != nil {
