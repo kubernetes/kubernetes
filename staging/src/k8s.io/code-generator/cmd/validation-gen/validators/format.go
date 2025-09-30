@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-20.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,6 +52,7 @@ var (
 	// TODO: uncomment the following when we've done the homework
 	// to be sure it works the current state of IP manual-ratcheting
 	// ipSloppyValidator         = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
+	extendedResourceNameValidator = types.Name{Package: libValidationPkg, Name: "ExtendedResourceName"}
 	labelKeyValidator         = types.Name{Package: libValidationPkg, Name: "LabelKey"}
 	labelValueValidator       = types.Name{Package: libValidationPkg, Name: "LabelValue"}
 	longNameCaselessValidator = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
@@ -85,6 +86,8 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 
 	switch format {
 	// Keep this sequence alphabetized.
+	case "k8s-extended-resource-name":
+		return Function(formatTagName, DefaultFlags, extendedResourceNameValidator), nil
 	// TODO: uncomment the following when we've done the homework
 	// to be sure it works the current state of IP manual-ratcheting
 	/*
@@ -118,6 +121,9 @@ func (ftv formatTagValidator) Docs() TagDoc {
 		Scopes:         ftv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that a string field has a particular format.",
 		Payloads: []TagPayloadDoc{{ // Keep this list alphabetized.
+			Description: "k8s-extended-resource-name",
+			Docs:        "This field holds a Kubernetes extended resource name, which is a domain-prefixed name that does not use the 'kubernetes.io' or 'requests.' prefixes.",
+		}, {
 			Description: "k8s-ip",
 			Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
 		}, {
