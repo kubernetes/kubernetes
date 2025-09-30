@@ -17,9 +17,7 @@ FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-# WARNING: Please note that the script below removes the security packages from arm64 and ppc64el images
-# as they do not exist anymore in the debian repositories for jessie. So we do not recommend using this
-# image for any production use and limit use of this image to just test scenarios.
+# NOTE: This image has been updated from jessie to bookworm for better security and support.
 
 COPY fixup-apt-list.sh /
 RUN ["/fixup-apt-list.sh"]
