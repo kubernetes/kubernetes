@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	applyadmissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
@@ -535,6 +536,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		framework.ExpectNoError(err)
 		gomega.Expect(vapPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(vapPatched.Spec.FailurePolicy).To(gomega.HaveValue(gomega.Equal(admissionregistrationv1.Ignore)), "patched object should have the applied spec")
+		gomega.Expect(resourceversion.CompareResourceVersion(vapRead.ResourceVersion, vapPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		var vapUpdated *admissionregistrationv1.ValidatingAdmissionPolicy
@@ -780,6 +782,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		framework.ExpectNoError(err)
 		gomega.Expect(vapbPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(vapbPatched.Spec.ValidationActions).To(gomega.Equal([]admissionregistrationv1.ValidationAction{admissionregistrationv1.Warn}), "patched object should have the applied spec")
+		gomega.Expect(resourceversion.CompareResourceVersion(vapbRead.ResourceVersion, vapbPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("updating")
 		var vapbUpdated *admissionregistrationv1.ValidatingAdmissionPolicyBinding

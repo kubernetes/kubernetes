@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -39,6 +40,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	k8sclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -461,10 +463,12 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 		crd.Crd.Spec.Versions[1].Served = false
+		oldRV := crd.Crd.ResourceVersion
 		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd.Crd, metav1.UpdateOptions{})
 		if err != nil {
 			framework.Failf("%v", err)
 		}
+		gomega.Expect(resourceversion.CompareResourceVersion(oldRV, crd.Crd.ResourceVersion)).To(gomega.BeNumerically("==", -1), "updated object should have a larger resource version")
 
 		ginkgo.By("check the unserved version gets removed")
 		if err := waitForDefinitionCleanup(f.ClientSet, definitionName(crd, "v6alpha1")); err != nil {

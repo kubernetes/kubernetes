@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -975,6 +976,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				framework.ExpectNoError(err)
 				gomega.Expect(livePC.Value).To(gomega.Equal(pc.Value))
 				gomega.Expect(livePC.Description).To(gomega.Equal(newDesc))
+				gomega.Expect(resourceversion.CompareResourceVersion(pc.ResourceVersion, livePC.ResourceVersion)).To(gomega.BeNumerically("==", -1), "changed object should have a larger resource version")
 			}
 		})
 	})
