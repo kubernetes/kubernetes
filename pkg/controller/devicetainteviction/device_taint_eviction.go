@@ -557,7 +557,7 @@ func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.Resource
 		}
 		tc.allocatedClaims[name] = allocatedClaim{
 			ResourceClaim: claim,
-			evictionTime:  tc.evictionTime(claim.Status.Allocation),
+			evictionTime:  tc.evictionTime(claim),
 		}
 		tc.handlePods(claim)
 		return
@@ -586,7 +586,7 @@ func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.Resource
 	if oldClaim.Status.Allocation == nil && newClaim.Status.Allocation != nil {
 		tc.allocatedClaims[name] = allocatedClaim{
 			ResourceClaim: claim,
-			evictionTime:  tc.evictionTime(claim.Status.Allocation),
+			evictionTime:  tc.evictionTime(claim),
 		}
 		syncBothClaims()
 		return
@@ -615,12 +615,14 @@ func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.Resource
 }
 
 // evictionTime returns the earliest TimeAdded of any NoExecute taint in any allocated device
-// unless that taint is tolerated, nil if none.
-func (tc *Controller) evictionTime(allocation *resourceapi.AllocationResult) *metav1.Time {
+// unless that taint is tolerated, nil if none. May only be called for allocated claims.
+func (tc *Controller) evictionTime(claim *resourceapi.ResourceClaim) *metav1.Time {
 	var evictionTime *metav1.Time
 
+	allocation := claim.Status.Allocation
 	for _, allocatedDevice := range allocation.Devices.Results {
-		device := tc.pools[poolID{driverName: allocatedDevice.Driver, poolName: allocatedDevice.Pool}].getDevice(allocatedDevice.Device)
+		id := poolID{driverName: allocatedDevice.Driver, poolName: allocatedDevice.Pool}
+		device := tc.pools[id].getDevice(allocatedDevice.Device)
 		if device == nil {
 			// Unknown device? Can't be tainted...
 			continue
@@ -658,10 +660,12 @@ func (tc *Controller) evictionTime(allocation *resourceapi.AllocationResult) *me
 
 			if evictionTime == nil {
 				evictionTime = newEvictionTime
+				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", evictionTime)
 				continue
 			}
 			if newEvictionTime != nil && newEvictionTime.Before(evictionTime) {
 				evictionTime = newEvictionTime
+				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", evictionTime)
 			}
 		}
 	}
@@ -745,7 +749,7 @@ func (tc *Controller) handleSliceChange(oldSlice, newSlice *resourceapi.Resource
 		if !usesDevice(claim.Status.Allocation, poolID, modifiedDevices) {
 			continue
 		}
-		newEvictionTime := tc.evictionTime(claim.ResourceClaim.Status.Allocation)
+		newEvictionTime := tc.evictionTime(claim.ResourceClaim)
 		if newEvictionTime.Equal(claim.evictionTime) {
 			// No change.
 			continue
@@ -863,6 +867,7 @@ func (tc *Controller) handlePod(pod *v1.Pod) {
 		if evictionTime == nil || allocatedClaim.evictionTime.Before(evictionTime) {
 			evictionTime = allocatedClaim.evictionTime
 		}
+		tc.logger.V(3).Info("Going to evict pod", "evictionTime", *evictionTime, "claim", klog.KObj(allocatedClaim))
 	}
 
 	podRef := newObject(pod)
