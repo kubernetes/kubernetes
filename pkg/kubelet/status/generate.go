@@ -305,7 +305,7 @@ func generatePodReadyConditionForTerminalPhase(pod *v1.Pod, oldPodStatus *v1.Pod
 	return condition
 }
 
-func GeneratePodRestartCondition(pod *v1.Pod, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
+func GeneratePodRestartCondition(pod *v1.Pod, podStatus *kubecontainer.PodStatus, podPhase v1.PodPhase) v1.PodCondition {
 	if podPhase == v1.PodSucceeded {
 		return v1.PodCondition{
 			Type:   v1.PodRestartInPlace,
@@ -321,15 +321,22 @@ func GeneratePodRestartCondition(pod *v1.Pod, containerStatuses []v1.ContainerSt
 		}
 	}
 
-	// If all containers have stopped, removes the condition.
-	allNotRunning := true
-	for _, containerStatus := range containerStatuses {
-		if containerStatus.State.Running != nil {
-			allNotRunning = false
+	// If all init and regular containers have been removed, remove the condition.
+	allRemoved := true
+	for _, initC := range pod.Spec.InitContainers {
+		if podStatus.FindContainerStatusByName(initC.Name) != nil {
+			allRemoved = false
+			break
 		}
 	}
-	if allNotRunning {
-		klog.V(3).InfoS("all containers terminated, removing PodRestartInPlace condition", "podName", pod.Name, "containerStatuses", len(containerStatuses))
+	for _, c := range pod.Spec.Containers {
+		if podStatus.FindContainerStatusByName(c.Name) != nil {
+			allRemoved = false
+			break
+		}
+	}
+	if allRemoved {
+		klog.V(3).InfoS("all containers removed, removing PodRestartInPlace condition", "podName", pod.Name)
 		return v1.PodCondition{
 			Type:   v1.PodRestartInPlace,
 			Status: v1.ConditionFalse,
@@ -338,13 +345,13 @@ func GeneratePodRestartCondition(pod *v1.Pod, containerStatuses []v1.ContainerSt
 	}
 
 	for _, initContainer := range pod.Spec.InitContainers {
-		status, ok := podutil.GetContainerStatus(containerStatuses, initContainer.Name)
-		if !ok || status.State.Terminated == nil {
+		status := podStatus.FindContainerStatusByName(initContainer.Name)
+		if status == nil || status.State != kubecontainer.ContainerStateExited {
 			continue
 		}
-		exitCode := status.State.Terminated.ExitCode
+		exitCode := int32(status.ExitCode)
 		rule, ok := podutil.FindMatchingContainerRestartRule(initContainer, exitCode)
-		if rule.Action == v1.ContainerRestartRuleActionRestartPod {
+		if ok && rule.Action == v1.ContainerRestartRuleActionRestartPod {
 			klog.V(3).InfoS("initContainer exited with RestartPod action", "podName", pod.Name, "containerName", initContainer.Name, "exitCode", exitCode)
 			return v1.PodCondition{
 				Type:    v1.PodRestartInPlace,
@@ -355,13 +362,13 @@ func GeneratePodRestartCondition(pod *v1.Pod, containerStatuses []v1.ContainerSt
 		}
 	}
 	for _, container := range pod.Spec.Containers {
-		status, ok := podutil.GetContainerStatus(containerStatuses, container.Name)
-		if !ok || status.State.Terminated == nil {
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status == nil || status.State != kubecontainer.ContainerStateExited {
 			continue
 		}
-		exitCode := status.State.Terminated.ExitCode
+		exitCode := int32(status.ExitCode)
 		rule, ok := podutil.FindMatchingContainerRestartRule(container, exitCode)
-		if rule.Action == v1.ContainerRestartRuleActionRestartPod {
+		if ok && rule.Action == v1.ContainerRestartRuleActionRestartPod {
 			klog.V(3).InfoS("container exited with RestartPod action", "podName", pod.Name, "containerName", container.Name)
 			return v1.PodCondition{
 				Type:    v1.PodRestartInPlace,

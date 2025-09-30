@@ -1977,7 +1977,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		Status:             v1.ConditionTrue,
 	})
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
-		s.Conditions = append(s.Conditions, status.GeneratePodRestartCondition(pod, allContainerStatuses, s.Phase))
+		s.Conditions = append(s.Conditions, status.GeneratePodRestartCondition(pod, podStatus, s.Phase))
 	}
 	// set HostIP/HostIPs and initialize PodIP/PodIPs for host network pods
 	if kl.kubeClient != nil {
@@ -2129,7 +2129,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		if oldStatus != nil {
 			status.VolumeMounts = oldStatus.VolumeMounts // immutable
 			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
-				status.RestartCount = oldStatus.RestartCount
+				if oldStatus.RestartCount > status.RestartCount {
+					status.RestartCount = oldStatus.RestartCount
+				}
 			}
 		}
 		switch {

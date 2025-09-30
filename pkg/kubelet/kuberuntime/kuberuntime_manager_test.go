@@ -659,7 +659,7 @@ func TestSyncPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, nil)
 	assert.NoError(t, result.Error())
 	assert.Len(t, fakeRuntime.Containers, 2)
 	assert.Len(t, fakeImage.Images, 2)
@@ -720,7 +720,7 @@ func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, nil)
 	assert.NoError(t, result.Error())
 	assert.Equal(t, exceptSysctls, pod.Spec.SecurityContext.Sysctls)
 	for _, sandbox := range fakeRuntime.Sandboxes {
@@ -810,7 +810,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 1. should only create the init container.
 	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, nil)
 	assert.NoError(t, result.Error())
 	expected := []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
@@ -820,7 +820,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 2. should not create app container because init container is still running.
 	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, nil)
 	assert.NoError(t, result.Error())
 	verifyContainerStatuses(t, fakeRuntime, expected, "init container still running; do nothing")
 
@@ -836,7 +836,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// Sync again.
 	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, nil)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
@@ -852,7 +852,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// Sync again.
 	podStatus, err = m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, nil)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		// The first init container instance is purged and no longer visible.
@@ -1229,12 +1229,135 @@ func TestComputePodActions(t *testing.T) {
 			test.mutateStatusFn(status)
 		}
 		tCtx := ktesting.Init(t)
-		actions := m.computePodActions(tCtx, pod, status)
+		actions := m.computePodActions(tCtx, pod, status, nil)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
 		}
 	}
+}
+
+func TestComputePodActionsForRestartPod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletRestartPodInPlace, true)
+	TestComputePodActions(t)
+	TestComputePodActionsWithInitContainers(t)
+
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	apiPodStatusPodRestartTrue := &v1.PodStatus{
+		Conditions: []v1.PodCondition{
+			{
+				Type:   v1.PodRestartInPlace,
+				Status: v1.ConditionTrue,
+			},
+		},
+	}
+	for desc, test := range map[string]struct {
+		podFunc            func() *v1.Pod
+		podStatusFunc      func() *kubecontainer.PodStatus
+		apiPodStatus       *v1.PodStatus
+		containersToKill   []string
+		containersToRemove []string
+	}{
+		"pod marked for in place restart": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatus()
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatus()
+				return status
+			},
+			apiPodStatus:       apiPodStatusPodRestartTrue,
+			containersToKill:   []string{"foo1", "foo2", "foo3"},
+			containersToRemove: []string{"foo1", "foo2", "foo3"},
+		},
+		"pod marked for in place restart with init containers": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatusWithInitContainers()
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatusWithInitContainers()
+				return status
+			},
+			apiPodStatus:       apiPodStatusPodRestartTrue,
+			containersToKill:   []string{},
+			containersToRemove: []string{"init1", "init2", "init3"},
+		},
+		"pod marked for in place restart with restartable init containers": {
+			podFunc: func() *v1.Pod {
+				pod, _ := makeBasePodAndStatusWithRestartableInitContainers()
+				return pod
+			},
+			podStatusFunc: func() *kubecontainer.PodStatus {
+				_, status := makeBasePodAndStatusWithRestartableInitContainers()
+				return status
+			},
+			apiPodStatus:       apiPodStatusPodRestartTrue,
+			containersToKill:   []string{"restartable-init-1", "restartable-init-2", "restartable-init-3"},
+			containersToRemove: []string{"restartable-init-1", "restartable-init-2", "restartable-init-3"},
+		},
+	} {
+		pod := test.podFunc()
+		status := test.podStatusFunc()
+		tCtx := ktesting.Init(t)
+		actions := m.computePodActions(tCtx, pod, status, test.apiPodStatus)
+
+		statusByName := map[string]*kubecontainer.Status{}
+		for idx, c := range status.ContainerStatuses {
+			statusByName[c.Name] = status.ContainerStatuses[idx]
+		}
+		containerByName := map[string]*v1.Container{}
+		for idx, c := range pod.Spec.Containers {
+			containerByName[c.Name] = &pod.Spec.Containers[idx]
+		}
+		for idx, c := range pod.Spec.InitContainers {
+			containerByName[c.Name] = &pod.Spec.InitContainers[idx]
+		}
+
+		expected := &podActions{
+			CreateSandbox:      false,
+			KillPod:            false,
+			SandboxID:          status.SandboxStatuses[0].Id,
+			ContainersToStart:  []int{},
+			ContainersToKill:   map[kubecontainer.ContainerID]containerToKillInfo{},
+			ContainersToRemove: map[kubecontainer.ContainerID]containerToRemoveInfo{},
+		}
+		for _, name := range test.containersToKill {
+			cStatus, ok := statusByName[name]
+			if !ok {
+				t.Error("not found status: ", name)
+			}
+			c, ok := containerByName[name]
+			if !ok {
+				t.Error("not found container: ", name)
+			}
+			expected.ContainersToKill[cStatus.ID] = containerToKillInfo{
+				container: c,
+				name:      name,
+			}
+		}
+		for _, name := range test.containersToRemove {
+			cStatus, ok := statusByName[name]
+			if !ok {
+				t.Error("not found status: ", name)
+			}
+			c, ok := containerByName[name]
+			if !ok {
+				t.Error("not found container: ", name)
+			}
+			expected.ContainersToRemove[cStatus.ID] = containerToRemoveInfo{
+				container: c,
+				name:      name,
+			}
+		}
+		verifyActions(t, expected, &actions, desc)
+	}
+
 }
 
 func getKillMap(pod *v1.Pod, status *kubecontainer.PodStatus, cIndexes []int) map[kubecontainer.ContainerID]containerToKillInfo {
@@ -1284,6 +1407,9 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 	if expected.ContainersToUpdate == nil && actual.ContainersToUpdate != nil {
 		// No need to distinguish empty and nil maps for the test.
 		expected.ContainersToUpdate = map[v1.ResourceName][]containerToUpdateInfo{}
+	}
+	if expected.ContainersToRemove == nil && actual.ContainersToRemove != nil {
+		expected.ContainersToRemove = map[kubecontainer.ContainerID]containerToRemoveInfo{}
 	}
 	assert.Equal(t, expected, actual, desc)
 }
@@ -1501,7 +1627,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				test.mutateStatusFn(status)
 			}
 			tCtx := ktesting.Init(t)
-			actions := m.computePodActions(tCtx, pod, status)
+			actions := m.computePodActions(tCtx, pod, status, nil)
 			verifyActions(t, &test.actions, &actions, desc)
 		})
 	}
@@ -1908,7 +2034,7 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 			test.mutateStatusFn(pod, status)
 		}
 		tCtx := ktesting.Init(t)
-		actions := m.computePodActions(tCtx, pod, status)
+		actions := m.computePodActions(tCtx, pod, status, nil)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
@@ -2103,7 +2229,7 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 				test.mutateStatusFn(status)
 			}
 			tCtx := ktesting.Init(t)
-			actions := m.computePodActions(tCtx, pod, status)
+			actions := m.computePodActions(tCtx, pod, status, nil)
 			verifyActions(t, &test.actions, &actions, desc)
 		})
 	}
@@ -2244,7 +2370,7 @@ func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
 			test.mutateStatusFn(status)
 		}
 		ctx := context.Background()
-		actions := m.computePodActions(ctx, pod, status)
+		actions := m.computePodActions(ctx, pod, status, nil)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
@@ -2284,7 +2410,7 @@ func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	// the fakePodProvider so they are 'deleted'.
 	podStatus, err := m.GetPodStatus(tCtx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, nil)
 	// This will return an error if the pod has _not_ been deleted.
 	assert.NoError(t, result.Error())
 }
@@ -2765,7 +2891,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 
 			tCtx := ktesting.Init(t)
 			expectedActions := test.getExpectedPodActionsFn(pod, status)
-			actions := m.computePodActions(tCtx, pod, status)
+			actions := m.computePodActions(tCtx, pod, status, nil)
 			verifyActions(t, expectedActions, &actions, desc)
 		})
 	}
