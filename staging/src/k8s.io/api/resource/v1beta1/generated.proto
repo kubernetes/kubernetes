@@ -689,6 +689,7 @@ message DeviceClassSpec {
   // This is an alpha field.
   // +optional
   // +featureGate=DRAExtendedResource
+  // +k8s:format=k8s-extended-resource-name
   optional string extendedResourceName = 4;
 }
 
