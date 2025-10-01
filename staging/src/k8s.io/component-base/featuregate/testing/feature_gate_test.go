@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"maps"
 	gotest "testing"
 
 	"github.com/stretchr/testify/assert"
@@ -157,6 +158,134 @@ func TestSetFeatureGateInTest(t *gotest.T) {
 		assert.False(t, gate.Enabled("feature"))
 	})
 	assert.True(t, gate.Enabled("feature"))
+}
+
+func TestSetFeatureGatesInTestWithDependencies(t *gotest.T) {
+	const (
+		alphaFeature      = "AlphaFeature"
+		alphaFeatureDep   = "AlphaFeatureDep"
+		betaOffFeature    = "BetaOffFeature"
+		betaOffFeatureDep = "BetaOffFeatureDep"
+		betaOnFeature     = "BetaOnFeature"
+		betaOnFeatureDep  = "BetaOnFeatureDep"
+		gaFeature         = "GAFeature"
+	)
+	gate := featuregate.NewFeatureGate()
+	require.NoError(t, gate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
+		alphaFeature:      {PreRelease: featuregate.Alpha, Default: false},
+		alphaFeatureDep:   {PreRelease: featuregate.Alpha, Default: false},
+		betaOffFeature:    {PreRelease: featuregate.Beta, Default: false},
+		betaOffFeatureDep: {PreRelease: featuregate.Beta, Default: false},
+		betaOnFeature:     {PreRelease: featuregate.Beta, Default: true},
+		betaOnFeatureDep:  {PreRelease: featuregate.Beta, Default: true},
+		gaFeature:         {PreRelease: featuregate.GA, Default: true},
+	}))
+	require.NoError(t, gate.AddDependencies(map[featuregate.Feature][]featuregate.Feature{
+		alphaFeature:   {betaOnFeatureDep, betaOffFeatureDep, alphaFeatureDep},
+		betaOffFeature: {betaOnFeatureDep, betaOffFeatureDep},
+		betaOnFeature:  {betaOnFeatureDep},
+		gaFeature:      {},
+	}))
+
+	initialState := map[featuregate.Feature]bool{
+		"AllAlpha": false,
+		"AllBeta":  false,
+
+		alphaFeature:      false,
+		alphaFeatureDep:   false,
+		betaOffFeature:    false,
+		betaOffFeatureDep: false,
+		betaOnFeature:     true,
+		betaOnFeatureDep:  true,
+		gaFeature:         true,
+	}
+	expect(t, gate, initialState)
+
+	tests := []struct {
+		name              string
+		overrides         FeatureOverrides
+		expectedOverrides FeatureOverrides
+		expectError       bool
+	}{{
+		name:      "AllBeta",
+		overrides: FeatureOverrides{"AllBeta": true},
+		expectedOverrides: FeatureOverrides{
+			"AllBeta":         true,
+			betaOffFeature:    true,
+			betaOffFeatureDep: true,
+		},
+	}, {
+		name:      "AllBeta=false",
+		overrides: FeatureOverrides{"AllBeta": false},
+		expectedOverrides: FeatureOverrides{
+			"AllBeta":        false,
+			betaOnFeature:    false,
+			betaOnFeatureDep: false,
+		},
+	}, {
+		name:      "AllBeta+AllAlpha",
+		overrides: FeatureOverrides{"AllBeta": true, "AllAlpha": true},
+		expectedOverrides: FeatureOverrides{
+			"AllAlpha":        true,
+			"AllBeta":         true,
+			alphaFeature:      true,
+			alphaFeatureDep:   true,
+			betaOffFeature:    true,
+			betaOffFeatureDep: true,
+		},
+	}, {
+		name:        "AllAlpha",
+		overrides:   FeatureOverrides{"AllAlpha": true},
+		expectError: true,
+	}, {
+		name:      "Automatically disable deps",
+		overrides: FeatureOverrides{betaOnFeatureDep: false},
+		expectedOverrides: FeatureOverrides{
+			betaOnFeature:    false,
+			betaOnFeatureDep: false,
+		},
+	}, {
+		name:      "Don't automatically enable deps",
+		overrides: FeatureOverrides{betaOffFeatureDep: true},
+		expectedOverrides: FeatureOverrides{
+			betaOffFeatureDep: true,
+			betaOffFeature:    false,
+		},
+	}, {
+		name: "Error when disabling dependency",
+		overrides: FeatureOverrides{
+			betaOnFeature:    true, // Explicitly enabled so it's not automatically disabled.
+			betaOnFeatureDep: false,
+		},
+		expectError: true,
+	}, {
+		name: "Error when enabling dependent",
+		overrides: FeatureOverrides{
+			betaOffFeature: true,
+		},
+		expectError: true,
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *gotest.T) {
+			// Separate inner test so we can verify cleanup in the outer test.
+			t.Run("Set", func(t *gotest.T) {
+				if test.expectError {
+					fakeT := &ignoreErrorT{ignoreFatalT: &ignoreFatalT{T: t}}
+					SetFeatureGatesDuringTest(fakeT, gate, test.overrides)
+					require.True(t, fakeT.errorRecorded, "should capture error")
+					expect(t, gate, initialState)
+				} else {
+					SetFeatureGatesDuringTest(t, gate, test.overrides)
+					expectedState := maps.Clone(initialState)
+					maps.Copy(expectedState, test.expectedOverrides)
+					expect(t, gate, expectedState)
+				}
+			})
+			// Verify revert in cleanup.
+			expect(t, gate, initialState)
+		})
+	}
 }
 
 func TestSpecialGatesVersioned(t *gotest.T) {
@@ -435,7 +564,7 @@ type ignoreFatalT struct {
 func (f *ignoreFatalT) Fatal(args ...any) {
 	f.T.Helper()
 	f.fatalRecorded = true
-	newArgs := []any{"[IGNORED]"}
+	newArgs := []any{"[IGNORED Fatal]"}
 	newArgs = append(newArgs, args...)
 	f.T.Log(newArgs...)
 }
@@ -443,7 +572,26 @@ func (f *ignoreFatalT) Fatal(args ...any) {
 func (f *ignoreFatalT) Fatalf(format string, args ...any) {
 	f.T.Helper()
 	f.fatalRecorded = true
-	f.T.Logf("[IGNORED] "+format, args...)
+	f.T.Logf("[IGNORED Fatalf] "+format, args...)
+}
+
+type ignoreErrorT struct {
+	*ignoreFatalT
+	errorRecorded bool
+}
+
+func (f *ignoreErrorT) Error(args ...any) {
+	f.T.Helper()
+	f.errorRecorded = true
+	newArgs := []any{"[IGNORED Error]"}
+	newArgs = append(newArgs, args...)
+	f.T.Log(newArgs...)
+}
+
+func (f *ignoreErrorT) Errorf(format string, args ...any) {
+	f.T.Helper()
+	f.errorRecorded = true
+	f.T.Logf("[IGNORED Errorf] "+format, args...)
 }
 
 func cleanup() {
