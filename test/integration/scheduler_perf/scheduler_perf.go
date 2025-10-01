@@ -2018,6 +2018,7 @@ func getTestDataCollectors(podInformer coreinformers.PodInformer, name string, n
 		newThroughputCollector(podInformer, map[string]string{"Name": name}, labelSelector, namespaces, throughputErrorMargin),
 		newMetricsCollector(mcc, map[string]string{"Name": name}),
 		newMemoryCollector(map[string]string{"Name": name}, 500*time.Millisecond),
+		newSchedulingDurationCollector(map[string]string{"Name": name}),
 	}
 }
 
