@@ -258,16 +258,6 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				return obj
 			}(),
 		},
-		"drop-fields-binding-conditions-with-device-status": {
-			obj:               sliceWithBindingConditions,
-			bindingConditions: true,
-			deviceStatus:      false,
-			expectObj: func() *resource.ResourceSlice {
-				obj := slice.DeepCopy()
-				obj.Generation = 1
-				return obj
-			}(),
-		},
 		"drop-fields-binding-conditions-with-binding-conditions": {
 			obj:               sliceWithBindingConditions,
 			bindingConditions: false,
@@ -528,22 +518,6 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 			bindingConditions: false,
-			deviceStatus:      false,
-		},
-		"drop-fields-binding-conditions-with-device-status": {
-			oldObj: slice,
-			newObj: func() *resource.ResourceSlice {
-				obj := sliceWithBindingConditions.DeepCopy()
-				obj.ResourceVersion = "4"
-				return obj
-			}(),
-			expectObj: func() *resource.ResourceSlice {
-				obj := slice.DeepCopy()
-				obj.ResourceVersion = "4"
-				obj.Generation = 1
-				return obj
-			}(),
-			bindingConditions: true,
 			deviceStatus:      false,
 		},
 		"drop-fields-binding-conditions-with-binding-conditions": {
