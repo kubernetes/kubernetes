@@ -202,7 +202,7 @@ func ExtendedResourceName[T ~string](_ context.Context, op operation.Operation, 
 	val := (string)(*value)
 	allErrs := field.ErrorList{}
 	if !strings.Contains(val, "/") {
-		allErrs = append(allErrs, field.Invalid(fldPath, val, "a qualified name must be a domain-prefixed path, such as 'example.com/my-prop'"))
+		allErrs = append(allErrs, field.Invalid(fldPath, val, "a name must be a domain-prefixed path, such as 'example.com/my-prop'"))
 	} else if strings.Contains(val, resourceDefaultNamespacePrefix) {
 		allErrs = append(allErrs, field.Invalid(fldPath, val, fmt.Sprintf("must not have %q domain", resourceDefaultNamespacePrefix)))
 	}
