@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -5255,4 +5256,107 @@ func withNullablePtr(nullable bool, s schema.Structural) *schema.Structural {
 func nilInterfaceOfStringSlice() []interface{} {
 	var slice []interface{} = nil
 	return slice
+}
+
+func TestMergeAllOfConstraints(t *testing.T) {
+	tests := []struct {
+		name     string
+		target   *schema.Structural
+		allOf    *schema.Structural
+		expected *schema.Structural
+	}{
+		{
+			name: "string maxLength merged (min chosen)",
+			target: &schema.Structural{
+				Generic: schema.Generic{Type: "string"},
+				ValueValidation: &schema.ValueValidation{
+					MaxLength: ptr.To(int64(50)),
+				},
+			},
+			allOf: &schema.Structural{
+				Generic: schema.Generic{Type: "string"},
+				ValueValidation: &schema.ValueValidation{
+					MaxLength: ptr.To(int64(20)),
+				},
+			},
+			expected: &schema.Structural{
+				Generic: schema.Generic{Type: "string"},
+				ValueValidation: &schema.ValueValidation{
+					MaxLength: ptr.To(int64(20)),
+				},
+			},
+		},
+		{
+			name: "array maxItems merged (min chosen)",
+			target: &schema.Structural{
+				Generic: schema.Generic{Type: "array"},
+				ValueValidation: &schema.ValueValidation{
+					MaxItems: ptr.To(int64(10)),
+				},
+			},
+			allOf: &schema.Structural{
+				Generic: schema.Generic{Type: "array"},
+				ValueValidation: &schema.ValueValidation{
+					MaxItems: ptr.To(int64(5)),
+				},
+			},
+			expected: &schema.Structural{
+				Generic: schema.Generic{Type: "array"},
+				ValueValidation: &schema.ValueValidation{
+					MaxItems: ptr.To(int64(5)),
+				},
+			},
+		},
+		{
+			name: "object maxProperties merged (min chosen)",
+			target: &schema.Structural{
+				Generic: schema.Generic{Type: "object"},
+				ValueValidation: &schema.ValueValidation{
+					MaxProperties: ptr.To(int64(100)),
+				},
+			},
+			allOf: &schema.Structural{
+				Generic: schema.Generic{Type: "object"},
+				ValueValidation: &schema.ValueValidation{
+					MaxProperties: ptr.To(int64(30)),
+				},
+			},
+			expected: &schema.Structural{
+				Generic: schema.Generic{Type: "object"},
+				ValueValidation: &schema.ValueValidation{
+					MaxProperties: ptr.To(int64(30)),
+				},
+			},
+		},
+		{
+			name: "nested allOf handled recursively",
+			target: &schema.Structural{
+				Generic: schema.Generic{Type: "string"},
+			},
+			allOf: &schema.Structural{
+				Generic: schema.Generic{Type: "string"},
+				ValueValidation: &schema.ValueValidation{
+					AllOf: []schema.NestedValueValidation{
+						{ValueValidation: schema.ValueValidation{MaxLength: ptr.To(int64(40))}},
+						{ValueValidation: schema.ValueValidation{MaxLength: ptr.To(int64(25))}},
+					},
+				},
+			},
+			expected: &schema.Structural{
+				Generic: schema.Generic{Type: "string"},
+				ValueValidation: &schema.ValueValidation{
+					MaxLength: ptr.To(int64(25)), // min across allOf
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mergeAllOfConstraints(tt.target, tt.allOf)
+			if diff := cmp.Diff(tt.expected, tt.target); diff != "" {
+				t.Errorf("mergeAllOfConstraints mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
 }
