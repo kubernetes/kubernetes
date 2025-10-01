@@ -202,7 +202,7 @@ func mergeAllOfConstraints(target, allOf *schema.Structural) {
 		if target.ValueValidation == nil {
 			target.ValueValidation = &schema.ValueValidation{}
 		}
-		if target.ValueValidation.MaxLength == nil || *allOf.ValueValidation.MaxLength > *target.ValueValidation.MaxLength {
+		if target.ValueValidation.MaxLength == nil || *allOf.ValueValidation.MaxLength < *target.ValueValidation.MaxLength {
 			target.ValueValidation.MaxLength = allOf.ValueValidation.MaxLength
 		}
 	}
@@ -212,7 +212,7 @@ func mergeAllOfConstraints(target, allOf *schema.Structural) {
 		if target.ValueValidation == nil {
 			target.ValueValidation = &schema.ValueValidation{}
 		}
-		if target.ValueValidation.MaxItems == nil || *allOf.ValueValidation.MaxItems > *target.ValueValidation.MaxItems {
+		if target.ValueValidation.MaxItems == nil || *allOf.ValueValidation.MaxItems < *target.ValueValidation.MaxItems {
 			target.ValueValidation.MaxItems = allOf.ValueValidation.MaxItems
 		}
 	}
@@ -222,7 +222,7 @@ func mergeAllOfConstraints(target, allOf *schema.Structural) {
 		if target.ValueValidation == nil {
 			target.ValueValidation = &schema.ValueValidation{}
 		}
-		if target.ValueValidation.MaxProperties == nil || *allOf.ValueValidation.MaxProperties > *target.ValueValidation.MaxProperties {
+		if target.ValueValidation.MaxProperties == nil || *allOf.ValueValidation.MaxProperties < *target.ValueValidation.MaxProperties {
 			target.ValueValidation.MaxProperties = allOf.ValueValidation.MaxProperties
 		}
 	}
