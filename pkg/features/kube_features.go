@@ -2009,11 +2009,19 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	AnyVolumeDataSource: {},
 
-	apiextensionsfeatures.CRDValidationRatcheting: {},
-
-	apiextensionsfeatures.CustomResourceFieldSelectors: {},
-
 	AuthorizeNodeWithSelectors: {genericfeatures.AuthorizeWithSelectors},
+
+	CPUCFSQuotaPeriod: {},
+
+	CPUManagerPolicyAlphaOptions: {},
+
+	CPUManagerPolicyBetaOptions: {},
+
+	CPUManagerPolicyOptions: {},
+
+	CSIMigrationPortworx: {},
+
+	CSIVolumeHealth: {},
 
 	ClearingNominatedNodeNameAfterBinding: {},
 
@@ -2029,27 +2037,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	CoordinatedLeaderElection: {},
 
-	CPUCFSQuotaPeriod: {},
-
-	CPUManagerPolicyAlphaOptions: {},
-
-	CPUManagerPolicyBetaOptions: {},
-
-	CPUManagerPolicyOptions: {},
-
 	CrossNamespaceVolumeDataSource: {},
-
-	CSIMigrationPortworx: {},
-
-	CSIVolumeHealth: {},
-
-	DeploymentReplicaSetTerminatingReplicas: {},
-
-	DisableAllocatorDualWrite: {MultiCIDRServiceAllocator},
-
-	DisableCPUQuotaWithExclusiveCPUs: {},
-
-	DisableNodeKubeProxyVersion: {},
 
 	DRAAdminAccess: {DynamicResourceAllocation},
 
@@ -2069,6 +2057,14 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	DRASchedulerFilterTimeout: {DynamicResourceAllocation},
 
+	DeploymentReplicaSetTerminatingReplicas: {},
+
+	DisableAllocatorDualWrite: {MultiCIDRServiceAllocator},
+
+	DisableCPUQuotaWithExclusiveCPUs: {},
+
+	DisableNodeKubeProxyVersion: {},
+
 	DynamicResourceAllocation: {},
 
 	EnvFiles: {},
@@ -2085,13 +2081,13 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	GracefulNodeShutdownBasedOnPodPriority: {GracefulNodeShutdown},
 
-	HonorPVReclaimPolicy: {},
-
-	HostnameOverride: {},
-
 	HPAConfigurableTolerance: {},
 
 	HPAScaleToZero: {},
+
+	HonorPVReclaimPolicy: {},
+
+	HostnameOverride: {},
 
 	ImageMaximumGCAge: {},
 
@@ -2115,8 +2111,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	JobSuccessPolicy: {},
 
-	kcmfeatures.CloudControllerManagerWebhook: {},
-
 	KubeletCgroupDriverFromCRI: {},
 
 	KubeletCrashLoopBackOffMax: {},
@@ -2127,13 +2121,13 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	KubeletInUserNamespace: {},
 
+	KubeletPSI: {},
+
 	KubeletPodResourcesDynamicResources: {},
 
 	KubeletPodResourcesGet: {},
 
 	KubeletPodResourcesListUseActivePods: {},
-
-	KubeletPSI: {},
 
 	KubeletRegistrationGetOnExistsOnly: {},
 
@@ -2229,6 +2223,12 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	RuntimeClassInImageCriAPI: {},
 
+	SELinuxChangePolicy: {},
+
+	SELinuxMount: {},
+
+	SELinuxMountReadWriteOncePod: {},
+
 	SchedulerAsyncAPICalls: {},
 
 	SchedulerAsyncPreemption: {},
@@ -2236,12 +2236,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	SchedulerPopFromBackoffQ: {},
 
 	SchedulerQueueingHints: {},
-
-	SELinuxChangePolicy: {},
-
-	SELinuxMount: {},
-
-	SELinuxMountReadWriteOncePod: {},
 
 	SeparateTaintEvictionController: {},
 
@@ -2293,23 +2287,19 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	VolumeAttributesClass: {},
 
+	WinDSR: {},
+
+	WinOverlay: {},
+
 	WindowsCPUAndMemoryAffinity: {MemoryManager},
 
 	WindowsGracefulNodeShutdown: {GracefulNodeShutdown},
 
 	WindowsHostNetwork: {},
 
-	WinDSR: {},
+	apiextensionsfeatures.CRDValidationRatcheting: {},
 
-	WinOverlay: {},
-
-	genericfeatures.AggregatedDiscoveryRemoveBetaType: {},
-
-	genericfeatures.AllowParsingUserUIDFromCertAuth: {},
-
-	genericfeatures.AllowUnsafeMalformedObjectDeletion: {},
-
-	genericfeatures.AnonymousAuthConfigurableEndpoints: {},
+	apiextensionsfeatures.CustomResourceFieldSelectors: {},
 
 	genericfeatures.APIResponseCompression: {},
 
@@ -2318,6 +2308,14 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.APIServerTracing: {},
 
 	genericfeatures.APIServingWithRoutine: {},
+
+	genericfeatures.AggregatedDiscoveryRemoveBetaType: {},
+
+	genericfeatures.AllowParsingUserUIDFromCertAuth: {},
+
+	genericfeatures.AllowUnsafeMalformedObjectDeletion: {},
+
+	genericfeatures.AnonymousAuthConfigurableEndpoints: {},
 
 	genericfeatures.AuthorizeWithSelectors: {},
 
@@ -2376,6 +2374,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.WatchFromStorageWithoutResourceVersion: {},
 
 	genericfeatures.WatchList: {},
+
+	kcmfeatures.CloudControllerManagerWebhook: {},
 
 	zpagesfeatures.ComponentFlagz: {},
 
