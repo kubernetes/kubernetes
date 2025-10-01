@@ -361,7 +361,12 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "specify ShutdownGracePeriod without enabling GracefulNodeShutdown",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"GracefulNodeShutdown": false}
+			conf.FeatureGates = map[string]bool{
+				"GracefulNodeShutdown": false,
+				// Disable dependents.
+				"GracefulNodeShutdownBasedOnPodPriority": false,
+				"WindowsGracefulNodeShutdown":            false,
+			}
 			conf.ShutdownGracePeriod = metav1.Duration{Duration: 1 * time.Second}
 			return conf
 		},
@@ -369,7 +374,12 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "specify ShutdownGracePeriodCriticalPods without enabling GracefulNodeShutdown",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"GracefulNodeShutdown": false}
+			conf.FeatureGates = map[string]bool{
+				"GracefulNodeShutdown": false,
+				// Disable dependents.
+				"GracefulNodeShutdownBasedOnPodPriority": false,
+				"WindowsGracefulNodeShutdown":            false,
+			}
 			conf.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: 1 * time.Second}
 			return conf
 		},
