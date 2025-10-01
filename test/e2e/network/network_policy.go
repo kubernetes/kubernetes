@@ -1253,10 +1253,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			svc, err := jig.CreateOnlyLocalLoadBalancerService(ctx, timeout, true, nil)
 			framework.ExpectNoError(err)
 
-			// Grab subnetPrefix to detect SNAT'd requests
-			subnetPrefix, err := getSubnetPrefix(ctx, cs)
-			framework.ExpectNoError(err)
-
 			// FIXME: figure out the actual expected semantics for
 			// "ExternalTrafficPolicy: Local" + "IPMode: Proxy".
 			// https://issues.k8s.io/123714    ing := &svc.Status.LoadBalancer.Ingress[0]
@@ -1269,24 +1265,10 @@ var _ = common.SIGDescribe("Netpol", func() {
 			svcPort := int(svc.Spec.Ports[0].Port)
 
 			// Attempt HTTP request from the e2e “host” to LB_IP:svcPort
-			clientIPPort, err := GetHTTPContent(ingressIP, svcPort, e2eservice.KubeProxyLagTimeout, "/")
+			_, err = GetHTTPContent(ingressIP, svcPort, e2eservice.KubeProxyLagTimeout, "/clientip")
 
 			if err == nil {
-				host, _, splitErr := net.SplitHostPort(clientIPPort)
-				if splitErr != nil {
-					framework.Failf("unexpected clientIPPort format: %q", clientIPPort)
-				}
-
-				ip := utilnet.ParseIPSloppy(host)
-				if ip == nil {
-					framework.Failf("invalid client IP format: %q", host)
-				}
-
-				if subnetPrefix.Contains(ip) {
-					e2eskipper.Skipf("LoadBalancer request was SNAT'd")
-				}
-
-				framework.Failf("LoadBalancer traffic reached pod with preserved source IP %s, but default-deny NetworkPolicy should have blocked it", ip.String())
+				framework.Failf("LoadBalancer traffic reached pod, but default-deny NetworkPolicy should have blocked it")
 			}
 
 		})
