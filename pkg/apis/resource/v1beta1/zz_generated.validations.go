@@ -494,7 +494,18 @@ func Validate_DeviceClassSpec(ctx context.Context, op operation.Operation, fldPa
 			return oldObj.Config
 		}))...)
 
-	// field resourcev1beta1.DeviceClassSpec.ExtendedResourceName has no validation
+	// field resourcev1beta1.DeviceClassSpec.ExtendedResourceName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			errs = append(errs, validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("extendedResourceName"), obj.ExtendedResourceName, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClassSpec) *string { return oldObj.ExtendedResourceName }))...)
+
 	return errs
 }
 

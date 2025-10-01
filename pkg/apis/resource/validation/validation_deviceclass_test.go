@@ -181,7 +181,7 @@ func TestValidateClass(t *testing.T) {
 			}(),
 		},
 		"bad-extended-resource-name": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com", "must be a valid extended resource name")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com", "must be a valid extended resource name").MarkCoveredByDeclarative().WithOrigin("format=k8s-extended-resource-name")},
 			class: func() *resource.DeviceClass {
 				class := testClass(goodName)
 				class.Spec.ExtendedResourceName = ptr.To(string("example.com"))
