@@ -47,24 +47,35 @@ func init() {
 func SetFeatureGateDuringTest(tb TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) {
 	tb.Helper()
 	detectParallelOverrideCleanup := detectParallelOverride(tb, f)
-	originalValue := gate.Enabled(f)
 	originalEmuVer := gate.(featuregate.MutableVersionedFeatureGate).EmulationVersion()
-	originalExplicitlySet := gate.(featuregate.MutableVersionedFeatureGate).ExplicitlySet(f)
+	originalValues := map[string]bool{}
+	var originalUnset []featuregate.Feature
+	newValues := map[string]bool{}
 
 	// Specially handle AllAlpha and AllBeta
 	if f == "AllAlpha" || f == "AllBeta" {
 		// Iterate over individual gates so their individual values get restored
 		for k, v := range gate.(featuregate.MutableFeatureGate).GetAll() {
-			if k == "AllAlpha" || k == "AllBeta" {
-				continue
-			}
 			if (f == "AllAlpha" && v.PreRelease == featuregate.Alpha) || (f == "AllBeta" && v.PreRelease == featuregate.Beta) {
-				SetFeatureGateDuringTest(tb, gate, k, value)
+				originalValues[string(k)] = gate.Enabled(k)
+				if !gate.(featuregate.MutableVersionedFeatureGate).ExplicitlySet(k) {
+					originalUnset = append(originalUnset, k)
+				}
+				// Setting AllAlpha or AllBeta on their own only sets unset features, but for
+				// testing we want to override ALL alpha/beta features. So we explicitly set each
+				// alpha/beta feature in addition to AllAlpha/AllBeta
+				newValues[string(k)] = value
 			}
 		}
+	} else {
+		originalValues[string(f)] = gate.Enabled(f)
+		if !gate.(featuregate.MutableVersionedFeatureGate).ExplicitlySet(f) {
+			originalUnset = append(originalUnset, f)
+		}
+		newValues[string(f)] = value
 	}
 
-	if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, value)); err != nil {
+	if err := gate.(featuregate.MutableFeatureGate).SetFromMap(newValues); err != nil {
 		if s := suggestChangeEmulationVersion(tb, gate, f, value); s != "" {
 			tb.Errorf("error setting %s=%v: %v. %s", f, value, err, s)
 		} else {
@@ -80,13 +91,14 @@ func SetFeatureGateDuringTest(tb TB, gate featuregate.FeatureGate, f featuregate
 			tb.Fatalf("change of feature gate emulation version from %s to %s in the chain of SetFeatureGateDuringTest is not allowed\nuse SetFeatureGateEmulationVersionDuringTest to change emulation version in tests",
 				originalEmuVer.String(), emuVer.String())
 		}
-		if originalExplicitlySet {
-			if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
-				tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
-			}
-		} else {
+		// To avoid violating feature dependencies, first atomicaly restore all original values,
+		// then reset features that were unset (the value should be unchanged).
+		if err := gate.(featuregate.MutableVersionedFeatureGate).SetFromMap(originalValues); err != nil {
+			tb.Errorf("error restoring features %v: %v", originalValues, err)
+		}
+		for _, f := range originalUnset {
 			if err := gate.(featuregate.MutableVersionedFeatureGate).ResetFeatureValueToDefault(f); err != nil {
-				tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
+				tb.Errorf("error resetting %s: %v", f, err)
 			}
 		}
 	})
