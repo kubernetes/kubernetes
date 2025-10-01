@@ -1325,7 +1325,7 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 			sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
 			for _, arg := range v.Args {
 				sw.Do(", ", nil)
-				toGolangSourceDataLiteral(sw, emitterContext{Context: c}, arg)
+				toGolangSourceDataLiteral(sw, c, arg)
 			}
 			sw.Do(")", targs)
 		}
@@ -1406,7 +1406,7 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 			}
 
 			sw.Do("var $.varName|private$ = ", targs)
-			toGolangSourceDataLiteral(sw, emitterContext{Context: c}, variable.Initializer)
+			toGolangSourceDataLiteral(sw, c, variable.Initializer)
 			sw.Do("\n", nil)
 		}
 	}
@@ -1420,13 +1420,7 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 	}
 }
 
-type emitterContext struct {
-	*generator.Context
-	// True if the literal to be emitted is a slice or array element.
-	isElement bool
-}
-
-func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, value any) {
+func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context, value any) {
 	// For safety, be strict in what values we output to visited source, and ensure strings
 	// are quoted.
 
@@ -1470,9 +1464,9 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, va
 			// a "standard signature" validation function to wrap it.
 			targs := generator.Args{
 				"funcName":   c.Universe.Type(v.Function.Function),
-				"field":      mkSymbolArgs(c.Context, fieldPkgSymbols),
-				"operation":  mkSymbolArgs(c.Context, operationPkgSymbols),
-				"context":    mkSymbolArgs(c.Context, contextPkgSymbols),
+				"field":      mkSymbolArgs(c, fieldPkgSymbols),
+				"operation":  mkSymbolArgs(c, operationPkgSymbols),
+				"context":    mkSymbolArgs(c, contextPkgSymbols),
 				"objType":    v.ObjType,
 				"objTypePfx": "*",
 			}
@@ -1531,18 +1525,16 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, va
 		targs := generator.Args{
 			"type": c.Universe.Type(v.Type),
 		}
-		if !c.isElement { // To conform to gofmt, omit type names for array/slice elements.
-			sw.Do("$.type|raw$", targs)
-			if len(v.TypeArgs) > 0 {
-				sw.Do("[", nil)
-				for i, typeArg := range v.TypeArgs {
-					if i > 0 {
-						sw.Do(", ", nil)
-					}
-					sw.Do("$.|raw$", typeArg)
+		sw.Do("$.type|raw$", targs)
+		if len(v.TypeArgs) > 0 {
+			sw.Do("[", nil)
+			for i, typeArg := range v.TypeArgs {
+				if i > 0 {
+					sw.Do(", ", nil)
 				}
-				sw.Do("]", nil)
+				sw.Do("$.|raw$", typeArg)
 			}
+			sw.Do("]", nil)
 		}
 		sw.Do("{\n", nil)
 		for _, f := range v.Fields {
@@ -1570,7 +1562,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, va
 		}
 		sw.Do("{\n", nil)
 		for _, e := range v.Elements {
-			toGolangSourceDataLiteral(sw, emitterContext{Context: c.Context, isElement: true}, e)
+			toGolangSourceDataLiteral(sw, c, e)
 			sw.Do(",\n", nil)
 		}
 		sw.Do("}", nil)
@@ -1606,7 +1598,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c emitterContext, va
 	}
 }
 
-func emitFunctionCall(sw *generator.SnippetWriter, c emitterContext, v validators.FunctionGen, leadingArgs ...string) {
+func emitFunctionCall(sw *generator.SnippetWriter, c *generator.Context, v validators.FunctionGen, leadingArgs ...string) {
 	targs := generator.Args{
 		"funcName": c.Universe.Type(v.Function),
 	}
