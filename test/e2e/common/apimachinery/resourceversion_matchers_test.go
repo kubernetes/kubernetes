@@ -38,7 +38,8 @@ func TestHaveValidResourceVersionMatch(t *testing.T) {
 		{
 			name:            "zero resource version",
 			resourceVersion: "0",
-			expectedMatch:   true,
+			expectedMatch:   false,
+			expectedFailure: "Expected resource version to be a valid uint128, but got \"0\": the resource version is zero which is not valid",
 		},
 		{
 			name:            "negative resource version",
