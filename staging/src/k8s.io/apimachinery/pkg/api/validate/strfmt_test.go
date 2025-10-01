@@ -591,21 +591,21 @@ func TestExtendedResourceName(t *testing.T) {
 			name:  "invalid: no domain",
 			input: "foo",
 			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, "foo", "a qualified name must be a domain-prefixed path, such as 'example.com/my-prop'").WithOrigin("format=k8s-extended-resource-name"),
+				field.Invalid(fldPath, "foo", "a name must be a domain-prefixed path, such as 'example.com/my-prop'").WithOrigin("format=k8s-extended-resource-name"),
 			},
 		},
 		{
 			name:  "invalid: kubernetes.io domain",
 			input: "kubernetes.io/foo",
 			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, "kubernetes.io/foo", "must not have 'kubernetes.io' domain").WithOrigin("format=k8s-extended-resource-name"),
+				field.Invalid(fldPath, "kubernetes.io/foo", "must not have \"kubernetes.io/\" domain").WithOrigin("format=k8s-extended-resource-name"),
 			},
 		},
 		{
 			name:  "invalid: requests prefix",
 			input: "requests.example.com/foo",
 			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, "requests.example.com/foo", "must not have 'requests.' prefix").WithOrigin("format=k8s-extended-resource-name"),
+				field.Invalid(fldPath, "requests.example.com/foo", "must not have \"requests.\" prefix").WithOrigin("format=k8s-extended-resource-name"),
 			},
 		},
 		{
