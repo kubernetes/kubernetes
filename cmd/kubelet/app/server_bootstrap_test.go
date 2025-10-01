@@ -335,6 +335,13 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
 
+	case req.Method == "GET" && req.URL.Path == "/apis/certificates.k8s.io/v1/certificatesigningrequests" && req.URL.RawQuery == "fieldSelector=metadata.name%3Dtest-csr&resourceVersionMatch=NotOlderThan&sendInitialEvents=true&watch=true":
+		data := mustMarshal(&metav1.WatchEvent{
+			Type: "ERROR",
+		})
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
+
 	case req.Method == "GET" && req.URL.Path == "/apis/certificates.k8s.io/v1/certificatesigningrequests" && req.URL.RawQuery == "fieldSelector=metadata.name%3Dtest-csr&resourceVersion=2&watch=true":
 		if s.csr == nil {
 			t.Fatalf("no csr")
