@@ -485,7 +485,7 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateRequestNameRef(result.Request, fldPath.Child("request"), requestNames)...)
 	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"))...)
-	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool"))...)
+	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
 	allErrs = append(allErrs, validateDeviceBindingParameters(result.BindingConditions, result.BindingFailureConditions, fldPath)...)
 	if result.ShareID != nil {
@@ -1208,7 +1208,7 @@ func truncateIfTooLong(str string, maxLen int) string {
 func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.Path, allocatedDevices sets.Set[structured.SharedDeviceID]) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(device.Driver, fldPath.Child("driver"))...)
-	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool"))...)
 	allErrs = append(allErrs, validateDeviceName(device.Device, fldPath.Child("device"))...)
 	if device.ShareID != nil {
 		allErrs = append(allErrs, validateUID(*device.ShareID, fldPath.Child("shareID"))...)
