@@ -35,10 +35,34 @@ func TestCompareResourceVersion(t *testing.T) {
 			expected: -1,
 		},
 		{
+			name: "a is zero, invalid",
+			a:    "0",
+			b:    "1",
+			err:  true,
+		},
+		{
+			name: "both zero",
+			a:    "0",
+			b:    "0",
+			err:  true,
+		},
+		{
 			name:     "a greater than b",
 			a:        "200",
 			b:        "100",
 			expected: 1,
+		},
+		{
+			name: "b is 0, invalid",
+			a:    "1",
+			b:    "0",
+			err:  true,
+		},
+		{
+			name:     "a equal to b small",
+			a:        "1",
+			b:        "1",
+			expected: 0,
 		},
 		{
 			name:     "a equal to b",

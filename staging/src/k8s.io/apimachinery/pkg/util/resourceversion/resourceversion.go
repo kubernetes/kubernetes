@@ -40,6 +40,8 @@ func (i InvalidResourceVersion) Error() string {
 // The function will return an error if the resource version is not a properly
 // formatted positive integer, but has no restriction on length. A properly
 // formatted integer will not contain leading zeros or non integer characters.
+// Zero is also considered an invalid value as it is used as a special value in
+// list/watch events and will never be a live resource version.
 func CompareResourceVersion(a, b string) (int, error) {
 	if !isWellFormed(a) {
 		return 0, InvalidResourceVersion{rv: a}
