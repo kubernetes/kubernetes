@@ -1713,6 +1713,7 @@ type DeviceClassSpec struct {
 	// This is an alpha field.
 	// +optional
 	// +featureGate=DRAExtendedResource
+	// +k8s:format=k8s-extended-resource-name
 	ExtendedResourceName *string `json:"extendedResourceName,omitempty" protobuf:"bytes,4,opt,name=extendedResourceName"`
 }
 
