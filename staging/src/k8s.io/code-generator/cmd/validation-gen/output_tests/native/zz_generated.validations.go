@@ -186,10 +186,21 @@ func Validate_MyObject(ctx context.Context, op operation.Operation, fldPath *fie
 			if earlyReturn {
 				return // do not proceed
 			}
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 60)...)
 			return
 		}(fldPath.Child("fieldForLength"), &obj.FieldForLength, safe.Field(oldObj, func(oldObj *MyObject) *string { return &oldObj.FieldForLength }))...)
 
-	// field MyObject.FieldForLengthWithoutDV has no validation
+	// field MyObject.FieldForLengthWithoutDV
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 60)...)
+			return
+		}(fldPath.Child("fieldForLengthWithoutDV"), &obj.FieldForLengthWithoutDV, safe.Field(oldObj, func(oldObj *MyObject) *string { return &oldObj.FieldForLengthWithoutDV }))...)
 
 	// field MyObject.StableTypeField
 	errs = append(errs,
@@ -449,6 +460,7 @@ func Validate_StableType(ctx context.Context, op operation.Operation, fldPath *f
 			if earlyReturn {
 				return // do not proceed
 			}
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 10)...)
 			return
 		}(fldPath.Child("innerField"), &obj.InnerField, safe.Field(oldObj, func(oldObj *StableType) *string { return &oldObj.InnerField }))...)
 

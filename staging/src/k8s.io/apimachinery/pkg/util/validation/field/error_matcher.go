@@ -44,6 +44,7 @@ type ErrorMatcher struct {
 	matchOrigin              bool
 	matchDetail              func(want, got string) bool
 	requireOriginWhenInvalid bool
+	matchDeclarativeOnly     bool
 	// normalizationRules holds the pre-compiled regex patterns for path normalization.
 	normalizationRules []NormalizationRule
 }
@@ -168,7 +169,6 @@ func (m ErrorMatcher) ByType() ErrorMatcher {
 // see ByFieldNormalized.
 func (m ErrorMatcher) ByField() ErrorMatcher {
 	m.matchField = true
-	m.normalizationRules = rules
 	return m
 }
 
