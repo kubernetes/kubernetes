@@ -83,7 +83,10 @@ func Validate_ItemList(ctx context.Context, op operation.Operation, fldPath *fie
 	// lists with map semantics require unique keys
 	errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
 	func() { // cohort {"key": "immutable"}
-		errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "immutable" }, validate.DirectEqual, validate.ImmutableByCompare)...)
+		if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "immutable" }, validate.DirectEqual, validate.Immutable); len(e) != 0 {
+			errs = append(errs, e...)
+			return // do not proceed
+		}
 	}()
 	func() { // cohort {"key": "validated"}
 		errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "validated" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {

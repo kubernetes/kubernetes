@@ -107,24 +107,24 @@ func TestUpdateCorrelation(t *testing.T) {
 	st.Value(&structA2).OldValue(&structA1).ExpectValid()
 
 	st.Value(&structA1).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Forbidden(field.NewPath("listField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("listField").Index(1), "immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(1), "immutable"),
-		field.Forbidden(field.NewPath("typedefField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("typedefField").Index(1), "immutable"),
+		field.Invalid(field.NewPath("listField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
 	})
 
 	st.Value(&structB).OldValue(&structA1).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Forbidden(field.NewPath("listField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("listField").Index(1), "immutable"),
-		field.Forbidden(field.NewPath("listField").Index(2), "immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(1), "immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(2), "immutable"),
-		field.Forbidden(field.NewPath("typedefField").Index(0), "immutable"),
-		field.Forbidden(field.NewPath("typedefField").Index(1), "immutable"),
-		field.Forbidden(field.NewPath("typedefField").Index(2), "immutable"),
+		field.Invalid(field.NewPath("listField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(2), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(2), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(2), nil, "immutable").WithOrigin("immutable"),
 	})
 }
 
