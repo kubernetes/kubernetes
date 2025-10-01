@@ -83,10 +83,10 @@ func (mitv maxItemsTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:         mitv.TagName(),
 		Scopes:      mitv.ValidScopes().UnsortedList(),
-		Description: "Indicates that a list field has a limit on its size.",
+		Description: "Indicates that a list has a limit on its size.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<non-negative integer>",
-			Docs:        "This field must be no more than X items long.",
+			Docs:        "This list must be no more than X items long.",
 		}},
 		PayloadsType:     codetags.ValueTypeInt,
 		PayloadsRequired: true,

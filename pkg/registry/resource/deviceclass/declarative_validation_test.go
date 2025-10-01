@@ -49,17 +49,25 @@ func TestDeclarativeValidate(t *testing.T) {
 				"valid": {
 					input: mkDeviceClass(),
 				},
+				// spec.selectors.
+				"valid: at limit selectors": {
+					input: mkDeviceClass(tweakSelectors(32)),
+				},
 				"too many selectors": {
 					input: mkDeviceClass(tweakSelectors(33)),
 					expectedErrs: field.ErrorList{
 						field.TooMany(field.NewPath("spec", "selectors"), 33, 32).WithOrigin("maxItems"),
 					},
 				},
+				// spec.config
 				"too many configs": {
 					input: mkDeviceClass(tweakConfig(33)),
 					expectedErrs: field.ErrorList{
 						field.TooMany(field.NewPath("spec", "config"), 33, 32).WithOrigin("maxItems"),
 					},
+				},
+				"valid: at limit configs": {
+					input: mkDeviceClass(tweakConfig(32)),
 				},
 				// TODO: Add more test cases
 			}
@@ -93,6 +101,10 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(),
 				},
+				"valid update: at limit selectors": {
+					old:    mkDeviceClass(),
+					update: mkDeviceClass(tweakSelectors(32)),
+				},
 				"update with too many selectors": {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakSelectors(33)),
@@ -100,7 +112,10 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						field.TooMany(field.NewPath("spec", "selectors"), 33, 32).WithOrigin("maxItems"),
 					},
 				},
-
+				"valid update: at limit configs": {
+					old:    mkDeviceClass(),
+					update: mkDeviceClass(tweakConfig(32)),
+				},
 				"update with too many configs": {
 					old:    mkDeviceClass(),
 					update: mkDeviceClass(tweakConfig(33)),
@@ -130,7 +145,7 @@ func mkDeviceClass(mutators ...func(*resource.DeviceClass)) resource.DeviceClass
 		},
 		Spec: resource.DeviceClassSpec{
 			Selectors: []resource.DeviceSelector{
-				resource.DeviceSelector{
+				{
 					CEL: &resource.CELDeviceSelector{
 						Expression: "device.driver == \"test.driver.io\"",
 					},
@@ -158,6 +173,8 @@ func mkDeviceClass(mutators ...func(*resource.DeviceClass)) resource.DeviceClass
 
 func tweakSelectors(count int) func(*resource.DeviceClass) {
 	return func(dc *resource.DeviceClass) {
+		dc.Spec.Selectors = []resource.DeviceSelector{}
+
 		for i := 0; i < count; i++ {
 			dc.Spec.Selectors = append(dc.Spec.Selectors, resource.DeviceSelector{
 				CEL: &resource.CELDeviceSelector{
@@ -170,6 +187,7 @@ func tweakSelectors(count int) func(*resource.DeviceClass) {
 
 func tweakConfig(count int) func(*resource.DeviceClass) {
 	return func(dc *resource.DeviceClass) {
+		dc.Spec.Config = []resource.DeviceClassConfiguration{}
 		for i := 0; i < count; i++ {
 			dc.Spec.Config = append(dc.Spec.Config, resource.DeviceClassConfiguration{
 				DeviceConfiguration: resource.DeviceConfiguration{
