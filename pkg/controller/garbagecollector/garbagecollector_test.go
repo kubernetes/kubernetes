@@ -818,6 +818,14 @@ func TestGetDeletableResources(t *testing.T) {
 	}
 }
 
+type wrappedKubeClientWithUnsupportedWatchListSemantics struct {
+	kubernetes.Interface
+}
+
+func (c *wrappedKubeClientWithUnsupportedWatchListSemantics) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 // TestGarbageCollectorSync ensures that a discovery client error
 // or an informer sync error will not cause the garbage collector
 // to block infinitely.
@@ -889,10 +897,11 @@ func TestGarbageCollectorSync(t *testing.T) {
 	srv, clientConfig := testServerAndClientConfig(alternativeTestHandler)
 	defer srv.Close()
 	clientConfig.ContentConfig.NegotiatedSerializer = nil
-	client, err := kubernetes.NewForConfig(clientConfig)
+	kubeClient, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
+	client := &wrappedKubeClientWithUnsupportedWatchListSemantics{kubeClient}
 
 	tweakableRM := meta.NewDefaultRESTMapper(nil)
 	tweakableRM.AddSpecific(schema.GroupVersionKind{Version: "v1", Kind: "Pod"}, schema.GroupVersionResource{Version: "v1", Resource: "pods"}, schema.GroupVersionResource{Version: "v1", Resource: "pod"}, meta.RESTScopeNamespace)
@@ -1740,7 +1749,7 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(deployment1apps, virtual)}, // parent node switched to alternate identity, still virtual
+						makeNode(deployment1apps, virtual)},                                  // parent node switched to alternate identity, still virtual
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID}, // remember absence of bad parent coordinates
 					pendingAttemptToDelete: []*node{
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)), // child of bad parent coordinates enqueued for delete attempt
@@ -1885,7 +1894,7 @@ func TestConflictingData(t *testing.T) {
 				insertEvent(makeAddEvent(deployment1apps)),
 				assertState(state{
 					pendingGraphChanges: []*event{
-						makeAddEvent(deployment1apps),                                // good parent observation sneaked in
+						makeAddEvent(deployment1apps), // good parent observation sneaked in
 						makeVirtualDeleteEvent(badSecretReferenceWithDeploymentUID)}, // bad virtual parent not found, queued virtual delete event
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
@@ -1957,7 +1966,7 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)), // good child added
-						makeNode(deployment1apps, virtual)},                 // virtual parent added
+						makeNode(deployment1apps, virtual)}, // virtual parent added
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps, virtual), // virtual parent enqueued for delete attempt
 					},
@@ -2145,7 +2154,7 @@ func TestConflictingData(t *testing.T) {
 						makeNode(pod2ns1, withOwners(pod1ns1)),
 						makeNode(pod1nonamespace, virtual)},
 					pendingAttemptToDelete: []*node{
-						makeNode(pod1nonamespace, virtual),      // virtual parent queued for deletion
+						makeNode(pod1nonamespace, virtual), // virtual parent queued for deletion
 						makeNode(pod2ns1, withOwners(pod1ns1))}, // mismatched child queued for deletion
 				}),
 
@@ -2266,7 +2275,7 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1nonamespace, virtual)}, // missing virtual parent replaced with alternate coordinates, still virtual
+						makeNode(pod1nonamespace, virtual)},      // missing virtual parent replaced with alternate coordinates, still virtual
 					absentOwnerCache: []objectReference{pod1ns1}, // cached absence of missing parent
 					pendingAttemptToDelete: []*node{
 						makeNode(pod2ns1, withOwners(pod1ns1)), // good child of missing parent enqueued for deletion
