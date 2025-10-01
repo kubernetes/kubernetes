@@ -232,32 +232,54 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 	return result
 }
 
-// withDeviceClass adds resource to device class mapping to preFilterState.
-func withDeviceClass(result *preFilterState, draManager fwk.SharedDRAManager) *fwk.Status {
+// computePodResourceRequestWithCache is like computePodResourceRequest but also sets up device class mapping
+// using the provided DRA manager or global cache. This is used by event handlers that don't have access to CycleState.
+func computePodResourceRequestWithCache(pod *v1.Pod, opts ResourceRequestsOptions, draManager *fwk.SharedDRAManager) *preFilterState {
+	result := computePodResourceRequest(pod, opts)
+
+	if opts.EnableDRAExtendedResource {
+		var manager fwk.SharedDRAManager
+		if draManager != nil {
+			manager = *draManager
+		}
+		withDeviceClassFromCache(result, manager)
+	}
+
+	return result
+}
+
+// withDeviceClassFromCache adds resource to device class mapping to preFilterState using the global cache.
+// This version doesn't return an error to match the interface expected by event handlers.
+func withDeviceClassFromCache(result *preFilterState, draManager fwk.SharedDRAManager) {
 	hasExtendedResource := false
 	for rName, rQuant := range result.ScalarResources {
 		// Skip in case request quantity is zero
 		if rQuant == 0 {
 			continue
 		}
-
 		if schedutil.IsDRAExtendedResourceName(rName) {
 			hasExtendedResource = true
 			break
 		}
 	}
-	if hasExtendedResource {
-		resourceToDeviceClass, err := extended.DeviceClassMapping(draManager)
-		if err != nil {
-			return fwk.AsStatus(err)
+	if hasExtendedResource && draManager != nil {
+		// Use the global cache instead of calling DeviceClassMapping directly
+		cache := draManager.ExtendedResourceCache()
+		resourceToDeviceClass := cache.GetAllMappings()
+
+		// If cache is empty, fall back to direct API call for test compatibility
+		if len(resourceToDeviceClass) == 0 {
+			if mapping, err := extended.DeviceClassMapping(draManager); err == nil {
+				resourceToDeviceClass = mapping
+			}
 		}
+
 		result.resourceToDeviceClass = resourceToDeviceClass
 		if len(resourceToDeviceClass) == 0 {
 			// ensure it is empty map, not nil.
 			result.resourceToDeviceClass = make(map[v1.ResourceName]string, 0)
 		}
 	}
-	return nil
 }
 
 // PreFilter invoked at the prefilter extension point.
@@ -272,9 +294,7 @@ func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.
 	}
 	result := computePodResourceRequest(pod, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources})
 	if f.enableDRAExtendedResource {
-		if err := withDeviceClass(result, f.handle.SharedDRAManager()); err != nil {
-			return nil, err
-		}
+		withDeviceClassFromCache(result, f.handle.SharedDRAManager())
 	}
 
 	cycleState.Write(preFilterStateKey, result)
@@ -422,7 +442,12 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 		return fwk.Queue, err
 	}
 	// Leaving in the queue, since the pod won't fit into the modified node anyway.
-	if !isFit(pod, modifiedNode, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources, EnableDRAExtendedResource: f.enableDRAExtendedResource}) {
+	// Use the DRA manager's extended resource cache for event handlers
+	var draManager fwk.SharedDRAManager
+	if f.enableDRAExtendedResource {
+		draManager = f.handle.SharedDRAManager()
+	}
+	if !isFitWithDRAManager(pod, modifiedNode, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources, EnableDRAExtendedResource: f.enableDRAExtendedResource}, draManager) {
 		logger.V(5).Info("node was created or updated, but it doesn't have enough resource(s) to accommodate this pod", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return fwk.QueueSkip, nil
 	}
@@ -432,7 +457,7 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 		return fwk.Queue, nil
 	}
 	// The pod will fit, but since there was no increase in available resources, the change won't make the pod schedulable.
-	if !haveAnyRequestedResourcesIncreased(pod, originalNode, modifiedNode, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources, EnableDRAExtendedResource: f.enableDRAExtendedResource}) {
+	if !haveAnyRequestedResourcesIncreasedWithDRAManager(pod, originalNode, modifiedNode, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources, EnableDRAExtendedResource: f.enableDRAExtendedResource}, &draManager) {
 		logger.V(5).Info("node was updated, but haven't changed the pod's resource requestments fit assessment", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return fwk.QueueSkip, nil
 	}
@@ -443,7 +468,18 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 
 // haveAnyRequestedResourcesIncreased returns true if any of the resources requested by the pod have increased or if allowed pod number increased.
 func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode *v1.Node, opts ResourceRequestsOptions) bool {
-	podRequest := computePodResourceRequest(pod, opts)
+	return haveAnyRequestedResourcesIncreasedWithDRAManager(pod, originalNode, modifiedNode, opts, nil)
+}
+
+// haveAnyRequestedResourcesIncreasedWithDRAManager is like haveAnyRequestedResourcesIncreased but uses
+// the DRA manager's extended resource cache for device class mappings.
+func haveAnyRequestedResourcesIncreasedWithDRAManager(pod *v1.Pod, originalNode, modifiedNode *v1.Node, opts ResourceRequestsOptions, draManager *fwk.SharedDRAManager) bool {
+	var podRequest *preFilterState
+	if opts.EnableDRAExtendedResource {
+		podRequest = computePodResourceRequestWithCache(pod, opts, draManager)
+	} else {
+		podRequest = computePodResourceRequest(pod, opts)
+	}
 	originalNodeInfo := framework.NewNodeInfo()
 	originalNodeInfo.SetNode(originalNode)
 	modifiedNodeInfo := framework.NewNodeInfo()
@@ -480,9 +516,9 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 			_, okScalar := modifiedNodeInfo.GetAllocatable().GetScalarResources()[rName]
 			_, okDynamic := podRequest.resourceToDeviceClass[rName]
 
-			if (okDynamic || podRequest.resourceToDeviceClass == nil) && !okScalar {
+			if (okDynamic || podRequest.resourceToDeviceClass == nil || len(podRequest.resourceToDeviceClass) == 0) && !okScalar {
 				// The extended resource request matches a device class or no device class mapping
-				// provided and it is not in the node's Allocatable (i.e. it is not provided
+				// provided (nil or empty) and it is not in the node's Allocatable (i.e. it is not provided
 				// by the node's device plugin), then leave it to the dynamicresources
 				// plugin to evaluate whether it can be satisfy by DRA resources.
 				return true
@@ -495,11 +531,21 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 // isFit checks if the pod fits the node. If the node is nil, it returns false.
 // It constructs a fake NodeInfo object for the node and checks if the pod fits the node.
 func isFit(pod *v1.Pod, node *v1.Node, opts ResourceRequestsOptions) bool {
+	return isFitWithDRAManager(pod, node, opts, nil)
+}
+
+// isFitWithDRAManager is like isFit but uses the provided DRA manager for extended resource cache.
+// If draManager is nil, it falls back to the standard Fits function without extended resource mapping.
+func isFitWithDRAManager(pod *v1.Pod, node *v1.Node, opts ResourceRequestsOptions, draManager fwk.SharedDRAManager) bool {
 	if node == nil {
 		return false
 	}
 	nodeInfo := framework.NewNodeInfo()
 	nodeInfo.SetNode(node)
+
+	if opts.EnableDRAExtendedResource {
+		return len(FitsWithDRAManager(pod, nodeInfo, opts, draManager)) == 0
+	}
 	return len(Fits(pod, nodeInfo, opts)) == 0
 }
 
@@ -559,6 +605,12 @@ type InsufficientResource struct {
 // Fits checks if node have enough resources to host the pod.
 func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, opts ResourceRequestsOptions) []InsufficientResource {
 	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, opts)
+}
+
+// FitsWithDRAManager is like Fits but uses the DRA manager's global cache for extended resource mappings.
+// This version is intended for use by event handlers that don't have access to CycleState.
+func FitsWithDRAManager(pod *v1.Pod, nodeInfo fwk.NodeInfo, opts ResourceRequestsOptions, draManager fwk.SharedDRAManager) []InsufficientResource {
+	return fitsRequest(computePodResourceRequestWithCache(pod, opts, &draManager), nodeInfo, nil, nil, opts)
 }
 
 func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], opts ResourceRequestsOptions) []InsufficientResource {
@@ -636,11 +688,11 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 			_, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
 			_, okDynamic := podRequest.resourceToDeviceClass[rName]
 
-			if (okDynamic || podRequest.resourceToDeviceClass == nil) && !okScalar {
+			if (okDynamic || podRequest.resourceToDeviceClass == nil || len(podRequest.resourceToDeviceClass) == 0) && !okScalar {
 				// The extended resource request matches a device class or no device class mapping
-				// provided and it is not in the node's Allocatable (i.e. it is not provided
+				// provided (nil or empty) and it is not in the node's Allocatable (i.e. it is not provided
 				// by the node's device plugin), then leave it to the dynamicresources
-				// plugin to evaluate whether it can be satisfy by DRA resources.
+				// plugin to evaluate whether it can be satisfied by DRA resources.
 				continue
 			}
 		}

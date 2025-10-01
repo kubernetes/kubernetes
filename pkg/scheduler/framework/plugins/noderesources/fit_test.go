@@ -1961,8 +1961,8 @@ func TestWithDeviceClass(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			withDeviceClass(tc.state, draManager)
-			if diff := cmp.Diff(tc.state.resourceToDeviceClass, tc.expectedResourceToDeviceClass); diff != "" {
+			withDeviceClassFromCache(tc.state, draManager)
+			if diff := cmp.Diff(tc.expectedResourceToDeviceClass, tc.state.resourceToDeviceClass); diff != "" {
 				t.Error("resourceToDeviceClass doesn't match (-expected +actual):\n", diff)
 			}
 		})
