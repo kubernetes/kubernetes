@@ -30,7 +30,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
@@ -310,6 +312,19 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 		}
 	}
 
+	// Servers s1 and s2 share the same global feature gates, so in order to test each server
+	// executing under different feature gate values, we need to switch to the relevant server's
+	// feature setup before it does work. This is a horrible hack, and doesn't cover any background
+	// goroutines.
+	s1Features := func() {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, true)
+	}
+	s2Features := func() {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, false)
+	}
+
 	etcdOptions := framework.SharedEtcd()
 	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 	// s1 uses IPAddress allocator
@@ -318,7 +333,10 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount"},
 		etcdOptions)
-	defer s1.TearDownFn()
+	defer func() {
+		s1Features()
+		s1.TearDownFn()
+	}()
 
 	kubeclient1, err := clientset.NewForConfig(s1.ClientConfig)
 	if err != nil {
@@ -344,9 +362,12 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			"--emulated-version=1.33",
-			fmt.Sprintf("--feature-gates=%s=false,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
+			fmt.Sprintf("--feature-gates=%s=false,%s=false", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
 		etcdOptions)
-	defer s2.TearDownFn()
+	defer func() {
+		s2Features()
+		s2.TearDownFn()
+	}()
 
 	kubeclient2, err := clientset.NewForConfig(s2.ClientConfig)
 	if err != nil {
@@ -355,11 +376,13 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 
 	// create 5 random services and check that the Services have an IP associated
 	for i := 5; i < 10; i++ {
+		s2Features()
 		service, err := kubeclient2.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i), metav1.CreateOptions{})
 		if err != nil {
 			t.Error(err)
 		}
 
+		s1Features()
 		err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
 			// The repair loop must create the IP address associated
 			_, err = kubeclient1.NetworkingV1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
