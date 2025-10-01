@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -235,17 +236,15 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return errStatus
 	}
 
-	gcListResourceVersion, err := convertResourceVersionToInt(resourceMonitor.Controller.LastSyncResourceVersion())
-	if err != nil {
-		return err
-	}
-	listResourceVersion, err := convertResourceVersionToInt(toBeProcessedSVM.Status.ResourceVersion)
-	if err != nil {
-		return err
-	}
+	gcListResourceVersion := resourceMonitor.Controller.LastSyncResourceVersion()
+	listResourceVersion := toBeProcessedSVM.Status.ResourceVersion
 
-	if gcListResourceVersion < listResourceVersion {
-		return fmt.Errorf("GC cache is not up to date, requeuing to attempt again. gcListResourceVersion: %d, listResourceVersion: %d", gcListResourceVersion, listResourceVersion)
+	rvCmp, err := resourceversion.CompareResourceVersion(gcListResourceVersion, listResourceVersion)
+	if err != nil {
+		return fmt.Errorf("error comparing resource versions between GC and SVM resource: %w", err)
+	}
+	if rvCmp == -1 {
+		return fmt.Errorf("GC cache is not up to date, requeuing to attempt again. gcListResourceVersion: %s, listResourceVersion: %s", gcListResourceVersion, listResourceVersion)
 	}
 
 	toBeProcessedSVM, err = svmc.kubeClient.StoragemigrationV1alpha1().
@@ -270,6 +269,15 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
 			return err
+		}
+		rvCmp, err := resourceversion.CompareResourceVersion(accessor.GetResourceVersion(), listResourceVersion)
+		if err != nil {
+			logger.V(4).Error(err, "Unable to compare the resource version of the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "error", err.Error())
+			return err
+		}
+		if rvCmp == 1 {
+			logger.V(6).Info("Resource ignored due to resource version being greater than the SVM checkpoint", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String())
+			continue
 		}
 
 		typeMeta := typeMetaUIDRV{}
