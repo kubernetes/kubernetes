@@ -98,6 +98,7 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
 	effectiveVersion := utilcompatibility.DefaultKubeEffectiveVersionForTest()
 	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	effectiveVersion.SetMinCompatibilityVersion(featureGate.MinCompatibilityVersion())
 	componentGlobalsRegistry := compatibility.NewComponentGlobalsRegistry()
 	if err := componentGlobalsRegistry.Register(compatibility.DefaultKubeComponent, effectiveVersion, featureGate); err != nil {
 		return result, err
@@ -114,8 +115,8 @@ func StartTestServer(t *testing.T, ctx context.Context, customFlags []string) (r
 	}
 	// If the local ComponentGlobalsRegistry is changed by the flags,
 	// we need to copy the new feature values back to the DefaultFeatureGate because most feature checks still use the DefaultFeatureGate.
-	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) || !featureGate.MinCompatibilityVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.MinCompatibilityVersion()) {
+		featuregatetesting.SetFeatureGateVersionsDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion())
 	}
 	featureOverrides := map[featuregate.Feature]bool{}
 	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
