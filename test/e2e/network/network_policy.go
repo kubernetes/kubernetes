@@ -18,11 +18,13 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -1264,15 +1266,97 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ingressIP := e2eservice.GetIngressPoint(ingress)
 			svcPort := int(svc.Spec.Ports[0].Port)
 
-			// Attempt HTTP request from the e2e “host” to LB_IP:svcPort
-			_, err = GetHTTPContent(ingressIP, svcPort, e2eservice.KubeProxyLagTimeout, "/clientip")
+			// before poll, give kube-proxy time to converge
+			time.Sleep(e2eservice.KubeProxyLagTimeout)
 
+			// Attempt HTTP request from the e2e “host” to LB_IP:svcPort
+			shortTry := 2 * time.Second
+			err = wait.PollUntilContextTimeout(
+				ctx,
+				shortTry,   // interval
+				5*shortTry, // timeout window
+				true,       // check immediately
+				func(ctx context.Context) (bool, error) {
+					_, e := GetHTTPContent(ingressIP, svcPort, shortTry, "/clientip")
+					// Return true if it ever becomes reachable (failure for this test).
+					return e == nil, nil
+				},
+			)
 			if err == nil {
-				framework.Failf("LoadBalancer traffic reached pod, but default-deny NetworkPolicy should have blocked it")
+				framework.Failf("LoadBalancer traffic became reachable within the poll window, but default-deny NetworkPolicy should have blocked it")
+			} else if errors.Is(err, context.DeadlineExceeded) {
+				// Timed out without ever becoming reachable — this is the expected outcome.
+			} else {
+				framework.ExpectNoError(err)
 			}
 
-		})
+			// Verify there is at least one local endpoint and pick a node that hosts it
+			ep, err := cs.CoreV1().Endpoints(nsX).Get(ctx, svc.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			if ep == nil || len(ep.Subsets) == 0 {
+				e2eskipper.Skipf("Service has no endpoints")
+			}
 
+			var nodeName string
+			found := false
+			for _, subset := range ep.Subsets {
+				for _, addr := range subset.Addresses {
+					if addr.NodeName != nil && *addr.NodeName != "" {
+						nodeName = *addr.NodeName
+						found = true
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+			if !found {
+				e2eskipper.Skipf("Could not find an endpoint node for Service %q", svc.Name)
+			}
+
+			// Resolve a reachable node IP for that node
+			node, err := cs.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			var nodeIP string
+			for _, a := range node.Status.Addresses {
+				if a.Type == v1.NodeExternalIP && a.Address != "" {
+					nodeIP = a.Address
+					break
+				}
+			}
+			if nodeIP == "" {
+				for _, a := range node.Status.Addresses {
+					if a.Type == v1.NodeInternalIP && a.Address != "" {
+						nodeIP = a.Address
+						break
+					}
+				}
+			}
+			if nodeIP == "" {
+				e2eskipper.Skipf("No usable IP found for node %q", nodeName)
+			}
+
+			// Confirm the NodePort path (on a node with a local endpoint) remains unreachable.
+			nodePort := int(svc.Spec.Ports[0].NodePort)
+			err = wait.PollUntilContextTimeout(
+				ctx,
+				shortTry,
+				5*shortTry,
+				true,
+				func(ctx context.Context) (bool, error) {
+					_, e := GetHTTPContent(nodeIP, nodePort, shortTry, "/clientip")
+					return e == nil, nil
+				},
+			)
+			if err == nil {
+				framework.Failf("NodePort traffic on node %q became reachable within the poll window, but default-deny NetworkPolicy should have blocked it", nodeName)
+			} else if errors.Is(err, context.DeadlineExceeded) {
+				// Expected: stayed unreachable the whole time.
+			} else {
+				framework.ExpectNoError(err)
+			}
+		})
 	})
 })
 

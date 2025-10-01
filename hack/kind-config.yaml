@@ -1,0 +1,14 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  disableDefaultCNI: true
+kubeadmConfigPatches:
+- |
+  kind: KubeProxyConfiguration
+  apiVersion: kubeproxy.config.k8s.io/v1alpha1
+  mode: "iptables"
+  # make sure this matches your Pod CIDR (Calico default)
+  clusterCIDR: "10.244.0.0/16"
+nodes:
+- role: control-plane
+- role: worker
