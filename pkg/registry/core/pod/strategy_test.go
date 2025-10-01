@@ -2000,49 +2000,6 @@ func Test_mutateTopologySpreadConstraints(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:                               "matchLabelKeys are not merged into labelSelector when MatchLabelKeysInPodTopologySpread is false and MatchLabelKeysInPodTopologySpreadSelectorMerge is true",
-			matchLabelKeysEnabled:              false,
-			matchLabelKeysSelectorMergeEnabled: true,
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"country": "Japan",
-						"city":    "Tokyo",
-					},
-				},
-				Spec: api.PodSpec{
-					TopologySpreadConstraints: []api.TopologySpreadConstraint{
-						{
-							MaxSkew:           1,
-							TopologyKey:       "kubernetes.io/hostname",
-							WhenUnsatisfiable: api.DoNotSchedule,
-							LabelSelector:     &metav1.LabelSelector{},
-							MatchLabelKeys:    []string{"country", "city"},
-						},
-					},
-				},
-			},
-			wantPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"country": "Japan",
-						"city":    "Tokyo",
-					},
-				},
-				Spec: api.PodSpec{
-					TopologySpreadConstraints: []api.TopologySpreadConstraint{
-						{
-							MaxSkew:           1,
-							TopologyKey:       "kubernetes.io/hostname",
-							WhenUnsatisfiable: api.DoNotSchedule,
-							LabelSelector:     &metav1.LabelSelector{},
-							MatchLabelKeys:    []string{"country", "city"},
-						},
-					},
-				},
-			},
-		},
 	}
 
 	for _, tc := range tests {

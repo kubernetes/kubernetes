@@ -3337,6 +3337,8 @@ func TestDropSidecarContainers(t *testing.T) {
 }
 
 func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ClusterTrustBundle, true)
+
 	testCases := []struct {
 		description                         string
 		clusterTrustBundleProjectionEnabled bool

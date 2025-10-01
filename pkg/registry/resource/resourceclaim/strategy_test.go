@@ -1129,18 +1129,6 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			bindingConditions:       false,
 			deviceStatusFeatureGate: true,
 		},
-		"drop-fields-binding-conditions-disable-device-status-feature-gate": {
-			oldObj:    objWithStatus,
-			newObj:    objWithDeviceBindingConditions,
-			expectObj: objWithStatus,
-			verify: func(t *testing.T, as []testclient.Action) {
-				if len(as) != 0 {
-					t.Errorf("expected no action to be taken")
-				}
-			},
-			bindingConditions:       true,
-			deviceStatusFeatureGate: false,
-		},
 		"keep-fields-consumable-capacity-with-device-status": {
 			oldObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
