@@ -57,6 +57,10 @@ func (m *HaveValidResourceVersionMatcher) Match(actual interface{}) (success boo
 		m.failureReason = fmt.Sprintf("resource version requires %d bits (more than 128)", val.BitLen())
 		return false, nil
 	}
+	if val.Cmp(big.NewInt(0)) == 0 {
+		m.failureReason = "the resource version is zero which is not valid"
+		return false, nil
+	}
 
 	return true, nil
 }
