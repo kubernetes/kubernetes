@@ -257,7 +257,7 @@ func validateObjectMetaAccessorWithOptsCommon(meta metav1.Object, isNamespaced b
 		}
 	} else {
 		if len(meta.GetNamespace()) != 0 {
-			// TODO(thockin): change to "may not be specifed on this type" or something
+			// TODO(thockin): change to "may not be specified on this type" or something
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("namespace"), "not allowed on this type"))
 		}
 	}
