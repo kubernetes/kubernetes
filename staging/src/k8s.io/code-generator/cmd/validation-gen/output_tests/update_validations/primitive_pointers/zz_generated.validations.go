@@ -59,7 +59,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
 			return
 		}(fldPath.Child("sp"), obj.SP, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.SP }))...)
 
@@ -71,7 +74,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
 			return
 		}(fldPath.Child("ip"), obj.IP, safe.Field(oldObj, func(oldObj *Struct) *int { return oldObj.IP }))...)
 
@@ -83,7 +89,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
 			return
 		}(fldPath.Child("bp"), obj.BP, safe.Field(oldObj, func(oldObj *Struct) *bool { return oldObj.BP }))...)
 
@@ -95,7 +104,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
 			return
 		}(fldPath.Child("fp"), obj.FP, safe.Field(oldObj, func(oldObj *Struct) *float64 { return oldObj.FP }))...)
 
