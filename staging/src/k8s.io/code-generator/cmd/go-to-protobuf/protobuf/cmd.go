@@ -279,6 +279,7 @@ func Run(g *Generator) {
 
 		path := filepath.Join(g.OutputDir, p.ImportPath())
 		outputPath := filepath.Join(g.OutputDir, p.OutputPath())
+		protomessageOutputPath := filepath.Join(g.OutputDir, p.ProtomessageOutputPath())
 
 		// generate the gogoprotobuf protoc
 		cmd := exec.Command("protoc", append(args, path)...)
@@ -295,12 +296,17 @@ func Run(g *Generator) {
 
 		// alter the generated protobuf file to remove the generated types (but leave the serializers) and rewrite the
 		// package statement to match the desired package name
-		if err := RewriteGeneratedGogoProtobufFile(outputPath, p.ExtractGeneratedType, p.OptionalTypeName, buf.Bytes(), g.DropGogoGo); err != nil {
+		if err := RewriteGeneratedGogoProtobufFile(outputPath, protomessageOutputPath, p.ExtractGeneratedType, p.OptionalTypeName, buf.Bytes(), g.DropGogoGo); err != nil {
 			log.Fatalf("Unable to rewrite generated %s: %v", outputPath, err)
 		}
 
+		outputPaths := []string{outputPath}
+		if g.DropGogoGo {
+			outputPaths = append(outputPaths, protomessageOutputPath)
+		}
+
 		// sort imports
-		cmd = exec.Command("goimports", "-w", outputPath)
+		cmd = exec.Command("goimports", append([]string{"-w"}, outputPaths...)...)
 		out, err = cmd.CombinedOutput()
 		if len(out) > 0 {
 			log.Print(string(out))
@@ -311,7 +317,7 @@ func Run(g *Generator) {
 		}
 
 		// format and simplify the generated file
-		cmd = exec.Command("gofmt", "-s", "-w", outputPath)
+		cmd = exec.Command("gofmt", append([]string{"-s", "-w"}, outputPaths...)...)
 		out, err = cmd.CombinedOutput()
 		if len(out) > 0 {
 			log.Print(string(out))

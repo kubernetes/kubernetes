@@ -145,6 +145,7 @@ function codegen::protobuf() {
     git_find -z \
         ':(glob)**/generated.proto' \
         ':(glob)**/generated.pb.go' \
+        ':(glob)**/generated.protomessage.pb.go' \
         | xargs -0 rm -f
 
     if kube::protoc::check_protoc >/dev/null; then

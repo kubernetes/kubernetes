@@ -320,8 +320,6 @@ type unbufferedMarshaller interface {
 
 // unmarshaler is the subset of gogo Message and Unmarshaler used by unmarshal
 type unmarshaler interface {
-	// Marker method, currently defined on all protoc-generated messages
-	ProtoMessage()
 	// Reset() is called on the top-level message before unmarshaling,
 	// and clears all existing data from the message instance.
 	Reset()
