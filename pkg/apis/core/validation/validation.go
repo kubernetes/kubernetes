@@ -139,7 +139,7 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsDNS1123Label(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).WithOrigin("format=dns-label"))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).WithOrigin("format=k8s-short-name"))
 	}
 	return allErrs
 }
