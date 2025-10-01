@@ -32,7 +32,7 @@ type ErrorMatcher struct {
 	// "want" error has a nil field, don't match on field.
 	matchField bool
 	// TODO(thockin): consider whether value could be assumed - if the
-	// "want" error has a nil value, don't match on field.
+	// "want" error has a nil value, don't match on value.
 	matchValue               bool
 	matchOrigin              bool
 	matchDetail              func(want, got string) bool
@@ -138,6 +138,13 @@ func (m ErrorMatcher) ByValue() ErrorMatcher {
 }
 
 // ByOrigin returns a derived ErrorMatcher which also matches by the origin.
+// When this is used and an origin is set in the error, the matcher will
+// consider all expected errors with the same origin to be a match. The only
+// expception to this is when it finds two errors which are exactly identical,
+// which is too suspicious to ignore. This multi-matching allows tests to
+// express a single expectation ("I set the X field to an invalid value, and I
+// expect an error from origin Y") without having to know exactly how many
+// errors might be returned, or in what order, or with what wording.
 func (m ErrorMatcher) ByOrigin() ErrorMatcher {
 	m.matchOrigin = true
 	return m
@@ -184,40 +191,61 @@ func (m ErrorMatcher) ByDetailRegexp() ErrorMatcher {
 type TestIntf interface {
 	Helper()
 	Errorf(format string, args ...any)
-	Logf(format string, args ...any)
 }
 
 // Test compares two ErrorLists by the criteria configured in this matcher, and
-// fails the test if they don't match. If a given "want" error matches multiple
-// "got" errors, they will all be consumed. This might be OK (e.g. if there are
-// multiple errors on the same field from the same origin) or it might be an
-// insufficiently specific matcher, so these will be logged.
+// fails the test if they don't match. If matching by origin is enabled and the
+// error has a non-empty origin, a given "want" error can match multiple
+// "got" errors, and they will all be consumed. The only exception to this is
+// if the matcher got multiple identical (in every way, even those not being
+// matched on) errors, which is likely to indicate a bug.
 func (m ErrorMatcher) Test(tb TestIntf, want, got ErrorList) {
 	tb.Helper()
+
+	exactly := m.Exactly() // makes a copy
+
+	// If we ever find an EXACT duplicate error, it's almost certainly a bug
+	// worth reporting. If we ever find a use-case where this is not a bug, we
+	// can revisit this assumption.
+	seen := map[string]bool{}
+	for _, g := range got {
+		key := exactly.Render(g)
+		if seen[key] {
+			tb.Errorf("exact duplicate error:\n%s", key)
+		}
+		seen[key] = true
+	}
 
 	remaining := got
 	for _, w := range want {
 		tmp := make(ErrorList, 0, len(remaining))
-		n := 0
-		for _, g := range remaining {
+		matched := false
+		for i, g := range remaining {
 			if m.Matches(w, g) {
-				n++
+				matched = true
+				if m.matchOrigin && w.Origin != "" {
+					// When origin is included in the match, we allow multiple
+					// matches against the same wanted error, so that tests
+					// can be insulated from the exact number, order, and
+					// wording of cases that might return more than one error.
+					continue
+				} else {
+					// Single-match, save the rest of the "got" errors and move
+					// on to the next "want" error.
+					tmp = append(tmp, remaining[i+1:]...)
+					break
+				}
 			} else {
 				tmp = append(tmp, g)
 			}
 		}
-		if n == 0 {
+		if !matched {
 			tb.Errorf("expected an error matching:\n%s", m.Render(w))
-		} else if n > 1 {
-			// This is not necessarily and error, but it's worth logging in
-			// case it's not what the test author intended.
-			tb.Logf("multiple errors matched:\n%s", m.Render(w))
 		}
 		remaining = tmp
 	}
 	if len(remaining) > 0 {
 		for _, e := range remaining {
-			exactly := m.Exactly() // makes a copy
 			tb.Errorf("unmatched error:\n%s", exactly.Render(e))
 		}
 	}
