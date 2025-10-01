@@ -113,7 +113,7 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 				newFSGroupPolicy: storagev1.NoneFSGroupPolicy,
 			},
 			{
-				name:             "should update fsGroup if update from detault to File",
+				name:             "should update fsGroup if update from default to File",
 				oldFSGroupPolicy: storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy,
 				newFSGroupPolicy: storagev1.FileFSGroupPolicy,
 			},
