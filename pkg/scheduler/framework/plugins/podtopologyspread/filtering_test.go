@@ -2528,8 +2528,20 @@ func TestSingleConstraint(t *testing.T) {
 			},
 		},
 		{
-			// TODO(Huang-Wei): maybe document this to remind users that typos on node labels
-			// can cause unexpected behavior
+			// Edge case: Node label typos cause unexpected spreading behavior.
+			// In this test, node-b has a typo ("zon" instead of "zone"), which means:
+			// - node-b is treated as NOT having the "zone" label at all
+			// - PodTopologySpread constraint with topologyKey="zone" doesn't apply to node-b
+			// - node-b becomes UnschedulableAndUnresolvable because it lacks the required topology key
+			//
+			// User impact: A simple typo in node labels can silently break pod spreading.
+			// Pods may fail to schedule, or spread unevenly across nodes.
+			// Always verify node labels match exactly with topologyKey in your spread constraints.
+			//
+			// In this example:
+			// - Existing pods: 1 on node-a (zone1), 1 on node-b (no zone!), 1 on node-x (zone2), 1 on node-y (zone2)
+			// - From scheduler's view: zone1 has 1 pod, zone2 has 2 pods (node-b is invisible)
+			// - New pod can only go to zone1 (node-a) due to maxSkew=1
 			name: "pods spread across zones as 1/2 due to absence of label 'zone' on node-b",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
@@ -2620,10 +2632,32 @@ func TestSingleConstraint(t *testing.T) {
 			},
 		},
 		{
-			// not a desired case, but it can happen
-			// TODO(Huang-Wei): document this "pod-not-match-itself" case
-			// in this case, placement of the new pod doesn't change pod distribution of the cluster
-			// as the incoming pod doesn't have label "foo"
+			// Edge case: Pod doesn't match its own topology spread constraint selector.
+			// This is not a recommended configuration, but it can happen in practice and has subtle behavior.
+			//
+			// In this test, the incoming pod:
+			// - Has label "bar" (not "foo")
+			// - Has a spread constraint with labelSelector matching "foo"
+			// - Therefore, the pod does NOT match its own constraint's selector
+			//
+			// Behavior:
+			// - The scheduler counts existing pods with label "foo" for spreading
+			// - But the new pod (with label "bar") is NOT counted in the spread calculation
+			// - The pod's placement doesn't affect the distribution of "foo" pods
+			// - All nodes that satisfy the constraint for existing "foo" pods are valid
+			//
+			// User impact: This creates a "ghost pod" scenario where:
+			// - The pod uses a spread constraint but doesn't participate in the spreading
+			// - Multiple such pods can all schedule to the same node without violating the constraint
+			// - This defeats the purpose of topology spreading
+			//
+			// Recommendation: Ensure your pod's labels match the labelSelector in your spread constraints.
+			// Typically, a pod should match its own topology spread constraint selector.
+			//
+			// In this example:
+			// - Existing "foo" pods: 2 on node-a, 1 on node-b, 0 on node-x, 3 on node-y
+			// - New "bar" pod with maxSkew=1: can go to node-b or node-x (both satisfy constraint for "foo" pods)
+			// - The "bar" pod itself won't be counted if another "bar" pod with same constraint is scheduled later
 			name: "pods spread across nodes as 2/1/0/3, but pod doesn't match itself",
 			pod: st.MakePod().Name("p").Label("bar", "").
 				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
