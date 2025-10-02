@@ -39,25 +39,26 @@ import (
 )
 
 const (
-	flagClusterName        = "cluster"
-	flagAuthInfoName       = "user"
-	flagContext            = "context"
-	flagNamespace          = "namespace"
-	flagAPIServer          = "server"
-	flagTLSServerName      = "tls-server-name"
-	flagInsecure           = "insecure-skip-tls-verify"
-	flagCertFile           = "client-certificate"
-	flagKeyFile            = "client-key"
-	flagCAFile             = "certificate-authority"
-	flagBearerToken        = "token"
-	flagImpersonate        = "as"
-	flagImpersonateUID     = "as-uid"
-	flagImpersonateGroup   = "as-group"
-	flagUsername           = "username"
-	flagPassword           = "password"
-	flagTimeout            = "request-timeout"
-	flagCacheDir           = "cache-dir"
-	flagDisableCompression = "disable-compression"
+	flagClusterName          = "cluster"
+	flagAuthInfoName         = "user"
+	flagContext              = "context"
+	flagNamespace            = "namespace"
+	flagAPIServer            = "server"
+	flagTLSServerName        = "tls-server-name"
+	flagInsecure             = "insecure-skip-tls-verify"
+	flagCertFile             = "client-certificate"
+	flagKeyFile              = "client-key"
+	flagCAFile               = "certificate-authority"
+	flagBearerToken          = "token"
+	flagImpersonate          = "as"
+	flagImpersonateUserExtra = "as-user-extra"
+	flagImpersonateUID       = "as-uid"
+	flagImpersonateGroup     = "as-group"
+	flagUsername             = "username"
+	flagPassword             = "password"
+	flagTimeout              = "request-timeout"
+	flagCacheDir             = "cache-dir"
+	flagDisableCompression   = "disable-compression"
 )
 
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
@@ -83,24 +84,25 @@ type ConfigFlags struct {
 	KubeConfig *string
 
 	// config flags
-	ClusterName        *string
-	AuthInfoName       *string
-	Context            *string
-	Namespace          *string
-	APIServer          *string
-	TLSServerName      *string
-	Insecure           *bool
-	CertFile           *string
-	KeyFile            *string
-	CAFile             *string
-	BearerToken        *string
-	Impersonate        *string
-	ImpersonateUID     *string
-	ImpersonateGroup   *[]string
-	Username           *string
-	Password           *string
-	Timeout            *string
-	DisableCompression *bool
+	ClusterName          *string
+	AuthInfoName         *string
+	Context              *string
+	Namespace            *string
+	APIServer            *string
+	TLSServerName        *string
+	Insecure             *bool
+	CertFile             *string
+	KeyFile              *string
+	CAFile               *string
+	BearerToken          *string
+	Impersonate          *string
+	ImpersonateUserExtra *map[string]string
+	ImpersonateUID       *string
+	ImpersonateGroup     *[]string
+	Username             *string
+	Password             *string
+	Timeout              *string
+	DisableCompression   *bool
 	// If non-nil, wrap config function can transform the Config
 	// before it is returned in ToRESTConfig function.
 	WrapConfigFn func(*rest.Config) *rest.Config
@@ -182,6 +184,13 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	}
 	if f.Impersonate != nil {
 		overrides.AuthInfo.Impersonate = *f.Impersonate
+	}
+	if f.ImpersonateUserExtra != nil {
+		userExtras := make(map[string][]string)
+		for key, val := range *f.ImpersonateUserExtra {
+			userExtras[key] = strings.Split(val, ",")
+		}
+		overrides.AuthInfo.ImpersonateUserExtra = userExtras
 	}
 	if f.ImpersonateUID != nil {
 		overrides.AuthInfo.ImpersonateUID = *f.ImpersonateUID
@@ -370,6 +379,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.Impersonate != nil {
 		flags.StringVar(f.Impersonate, flagImpersonate, *f.Impersonate, "Username to impersonate for the operation. User could be a regular user or a service account in a namespace.")
 	}
+	if f.ImpersonateUserExtra != nil {
+		flags.StringToStringVar(f.ImpersonateUserExtra, flagImpersonateUserExtra, *f.ImpersonateUserExtra, "User extras to impersonate for the operation. This is --as-user-extra key1='val1,val2' format.")
+	}
 	if f.ImpersonateUID != nil {
 		flags.StringVar(f.ImpersonateUID, flagImpersonateUID, *f.ImpersonateUID, "UID to impersonate for the operation.")
 	}
@@ -449,6 +461,7 @@ func (f *ConfigFlags) WithWarningPrinter(ioStreams genericiooptions.IOStreams) *
 // NewConfigFlags returns ConfigFlags with default values set
 func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 	impersonateGroup := []string{}
+	impersonateUserExtra := make(map[string]string)
 	insecure := false
 	disableCompression := false
 
@@ -457,21 +470,22 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		Timeout:    ptr.To("0"),
 		KubeConfig: ptr.To(""),
 
-		CacheDir:           ptr.To(getDefaultCacheDir()),
-		ClusterName:        ptr.To(""),
-		AuthInfoName:       ptr.To(""),
-		Context:            ptr.To(""),
-		Namespace:          ptr.To(""),
-		APIServer:          ptr.To(""),
-		TLSServerName:      ptr.To(""),
-		CertFile:           ptr.To(""),
-		KeyFile:            ptr.To(""),
-		CAFile:             ptr.To(""),
-		BearerToken:        ptr.To(""),
-		Impersonate:        ptr.To(""),
-		ImpersonateUID:     ptr.To(""),
-		ImpersonateGroup:   &impersonateGroup,
-		DisableCompression: &disableCompression,
+		CacheDir:             ptr.To(getDefaultCacheDir()),
+		ClusterName:          ptr.To(""),
+		AuthInfoName:         ptr.To(""),
+		Context:              ptr.To(""),
+		Namespace:            ptr.To(""),
+		APIServer:            ptr.To(""),
+		TLSServerName:        ptr.To(""),
+		CertFile:             ptr.To(""),
+		KeyFile:              ptr.To(""),
+		CAFile:               ptr.To(""),
+		BearerToken:          ptr.To(""),
+		Impersonate:          ptr.To(""),
+		ImpersonateUserExtra: &impersonateUserExtra,
+		ImpersonateUID:       ptr.To(""),
+		ImpersonateGroup:     &impersonateGroup,
+		DisableCompression:   &disableCompression,
 
 		usePersistentConfig: usePersistentConfig,
 		// The more groups you have, the more discovery requests you need to make.
