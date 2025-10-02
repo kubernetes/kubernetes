@@ -25,7 +25,9 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -50,15 +52,20 @@ const (
 	migrationFailedStatusReason  = "StorageVersionMigrationFailed"
 )
 
+type graphBuilderInterface interface {
+	GetMonitor(ctx context.Context, gvr schema.GroupVersionResource) (*garbagecollector.Monitor, error)
+}
+
 type SVMController struct {
 	controllerName         string
 	kubeClient             kubernetes.Interface
-	dynamicClient          *dynamic.DynamicClient
+	dynamicClient          dynamic.Interface
 	svmListers             svmlisters.StorageVersionMigrationLister
 	svmSynced              cache.InformerSynced
 	queue                  workqueue.TypedRateLimitingInterface[string]
+	rateLimiter            workqueue.TypedRateLimiter[string]
 	restMapper             meta.RESTMapper
-	dependencyGraphBuilder *garbagecollector.GraphBuilder
+	dependencyGraphBuilder graphBuilderInterface
 }
 
 func NewSVMController(
@@ -71,6 +78,7 @@ func NewSVMController(
 	dependencyGraphBuilder *garbagecollector.GraphBuilder,
 ) *SVMController {
 	logger := klog.FromContext(ctx)
+	rateLimiter := workqueue.DefaultTypedControllerRateLimiter[string]()
 
 	svmController := &SVMController{
 		kubeClient:             kubeClient,
@@ -81,9 +89,10 @@ func NewSVMController(
 		restMapper:             mapper,
 		dependencyGraphBuilder: dependencyGraphBuilder,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
+			rateLimiter,
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: controllerName},
 		),
+		rateLimiter: rateLimiter,
 	}
 
 	_, _ = svmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -163,6 +172,10 @@ func (svmc *SVMController) processNext(ctx context.Context) bool {
 	}
 
 	klog.FromContext(ctx).V(2).Info("Error syncing SVM resource, retrying", "svm", key, "err", err)
+	if suggestDelay, ok := apierrors.SuggestsClientDelay(err); ok {
+		svmc.queue.AddAfter(key, max(time.Second*time.Duration(suggestDelay), svmc.rateLimiter.When(key)))
+		return true
+	}
 	svmc.queue.AddRateLimited(key)
 
 	return true
@@ -263,8 +276,6 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return err
 	}
 
-	// ToDo: implement a mechanism to resume migration from the last migrated resource in case of a failure
-	// process storage migration
 	for _, obj := range resourceMonitor.Store.List() {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
@@ -272,11 +283,11 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		}
 		rvCmp, err := resourceversion.CompareResourceVersion(accessor.GetResourceVersion(), listResourceVersion)
 		if err != nil {
-			logger.V(4).Error(err, "Unable to compare the resource version of the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "error", err.Error())
+			logger.V(4).Error(err, "Unable to compare the resource version of the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "accessorRV", accessor.GetResourceVersion(), "listResourceVersion", listResourceVersion, "error", err.Error())
 			return err
 		}
 		if rvCmp == 1 {
-			logger.V(6).Info("Resource ignored due to resource version being greater than the SVM checkpoint", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String())
+			logger.V(6).Info("Resource ignored due to resource version being greater than the SVM checkpoint", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "accessorRV", accessor.GetResourceVersion(), "listResourceVersion", listResourceVersion)
 			continue
 		}
 
@@ -345,20 +356,14 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 }
 
 func isRetriableError(k8sError error) bool {
-	switch {
-	case apierrors.IsServerTimeout(k8sError):
-		return true
-	case apierrors.IsTooManyRequests(k8sError):
-		return true
-	case apierrors.IsServiceUnavailable(k8sError):
-		return true
-	case apierrors.IsInternalError(k8sError):
-		return true
-	case apierrors.IsTimeout(k8sError):
-		return true
-	default:
-		return false
-	}
+	return utilnet.IsConnectionReset(k8sError) ||
+		utilnet.IsHTTP2ConnectionLost(k8sError) ||
+		utilnet.IsProbableEOF(k8sError) ||
+		apierrors.IsServerTimeout(k8sError) ||
+		apierrors.IsTooManyRequests(k8sError) ||
+		apierrors.IsServiceUnavailable(k8sError) ||
+		apierrors.IsInternalError(k8sError) ||
+		apierrors.IsTimeout(k8sError)
 }
 
 func (svmc *SVMController) failMigration(ctx context.Context, toBeProcessedSVM *svmv1alpha1.StorageVersionMigration, err error) error {
