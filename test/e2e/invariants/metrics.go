@@ -98,6 +98,20 @@ var apiServerMetricInvariants = []apiServerMetricInvariant{
 			return true
 		},
 	},
+	{
+		Metric: "apiserver_validation_declarative_validation_panic_total",
+		SIG:    "api-machinery",
+		Owners: []string{"aaron-prindle", "jpbetz", "thockin"},
+		IsValid: func(samples testutil.Samples) bool {
+			// declarative validation panics should never be non-zero
+			for _, sample := range samples {
+				if sample.Value != 0 {
+					return false
+				}
+			}
+			return true
+		},
+	},
 }
 
 func checkInvariantMetrics(ctx context.Context) {
