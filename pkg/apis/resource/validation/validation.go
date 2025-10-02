@@ -1129,7 +1129,7 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 		// just shows the number of entries.
 		err := field.TooMany(fldPath, len(slice), maxSize).WithOrigin("maxItems")
 		if slices.Contains(opts, sizeCovered) {
-			err = err.MarkCoveredByDeclarative().WithOrigin("maxItems")
+			err = err.MarkCoveredByDeclarative()
 		}
 		allErrs = append(allErrs, err)
 	}
