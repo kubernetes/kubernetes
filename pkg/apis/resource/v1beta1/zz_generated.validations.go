@@ -502,6 +502,9 @@ func Validate_DeviceClassSpec(ctx context.Context, op operation.Operation, fldPa
 				return nil
 			}
 			// call field-attached validations
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
 			errs = append(errs, validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("extendedResourceName"), obj.ExtendedResourceName, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClassSpec) *string { return oldObj.ExtendedResourceName }))...)
