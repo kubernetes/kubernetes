@@ -334,6 +334,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
 			},
 		},
+		"spec immutable: short-circuits other errors (e.g. TooMany)": {
+			update: mkValidResourceClaim(tweakDevicesRequests(33)),
+			old:    mkValidResourceClaim(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
+			},
+		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
