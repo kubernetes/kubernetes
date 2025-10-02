@@ -1589,6 +1589,8 @@ type DeviceRequestAllocationResult struct {
 	//
 	// +optional
 	// +featureGate=DRAConsumableCapacity
+	// +k8s:optional
+	// +k8s:format=k8s-uuid
 	ShareID *types.UID `json:"shareID,omitempty" protobuf:"bytes,9,opt,name=shareID"`
 
 	// ConsumedCapacity tracks the amount of capacity consumed per device as part of the claim request.
@@ -1844,6 +1846,8 @@ type AllocatedDeviceStatus struct {
 	//
 	// +optional
 	// +featureGate=DRAConsumableCapacity
+	// +k8s:optional
+	// +k8s:format=k8s-uuid
 	ShareID *string `json:"shareID,omitempty" protobuf:"bytes,7,opt,name=shareID"`
 
 	// Conditions contains the latest observation of the device's state.
