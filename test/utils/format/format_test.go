@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestGomegaFormatObject(t *testing.T) {
@@ -57,6 +58,13 @@ func TestGomegaFormatObject(t *testing.T) {
 		"podlist": {value: v1.PodList{}, expected: `<v1.PodList>: 
     items: null
     metadata: {}`},
+		"unstructured": {value: func() any {
+			var obj unstructured.Unstructured
+			obj.SetName("some-name")
+			return &obj
+		}(), expected: `<*unstructured.Unstructured | <hex>>: 
+    metadata:
+      name: some-name`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			actual := format.Object(test.value, test.indentation)
