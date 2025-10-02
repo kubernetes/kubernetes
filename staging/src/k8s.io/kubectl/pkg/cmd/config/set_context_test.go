@@ -37,48 +37,71 @@ type setContextTest struct {
 	expectedConfig clientcmdapi.Config //expect kubectl config
 }
 
-func TestCreateContext(t *testing.T) {
-	conf := clientcmdapi.Config{}
-	test := setContextTest{
-		testContext: "shaker-context",
-		description: "Testing for create a new context",
-		config:      conf,
-		args:        []string{"shaker-context"},
-		flags: []string{
-			"--cluster=cluster_nickname",
-			"--user=user_nickname",
-			"--namespace=namespace",
-		},
-		expected: `Context "shaker-context" created.` + "\n",
-		expectedConfig: clientcmdapi.Config{
-			Contexts: map[string]*clientcmdapi.Context{
-				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"}},
-		},
-	}
-	test.run(t)
+var namespaceFlagCases = []struct {
+	description   string
+	namespaceFlag string
+}{
+	{
+		description:   "long namespace flag",
+		namespaceFlag: "--namespace",
+	},
+	{
+		description:   "short namespace flag",
+		namespaceFlag: "-n",
+	},
 }
-func TestModifyContext(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Contexts: map[string]*clientcmdapi.Context{
-			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
-			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
-	test := setContextTest{
-		testContext: "shaker-context",
-		description: "Testing for modify a already exist context",
-		config:      conf,
-		args:        []string{"shaker-context"},
-		flags: []string{
-			"--cluster=cluster_nickname",
-			"--user=user_nickname",
-			"--namespace=namespace",
-		},
-		expected: `Context "shaker-context" modified.` + "\n",
-		expectedConfig: clientcmdapi.Config{
-			Contexts: map[string]*clientcmdapi.Context{
-				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"},
-				"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}},
+
+func TestCreateContext(t *testing.T) {
+	for _, tc := range namespaceFlagCases {
+		t.Run(tc.description, func(t *testing.T) {
+			conf := clientcmdapi.Config{}
+			test := setContextTest{
+				testContext: "shaker-context",
+				description: "Testing for create a new context",
+				config:      conf,
+				args:        []string{"shaker-context"},
+				flags: []string{
+					"--cluster=cluster_nickname",
+					"--user=user_nickname",
+					tc.namespaceFlag + "=namespace",
+				},
+				expected: `Context "shaker-context" created.` + "\n",
+				expectedConfig: clientcmdapi.Config{
+					Contexts: map[string]*clientcmdapi.Context{
+						"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"}},
+				},
+			}
+			test.run(t)
+		})
 	}
-	test.run(t)
+}
+
+func TestModifyContext(t *testing.T) {
+	for _, tc := range namespaceFlagCases {
+		t.Run(tc.description, func(t *testing.T) {
+			conf := clientcmdapi.Config{
+				Contexts: map[string]*clientcmdapi.Context{
+					"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+					"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
+			test := setContextTest{
+				testContext: "shaker-context",
+				description: "Testing for modify a already exist context",
+				config:      conf,
+				args:        []string{"shaker-context"},
+				flags: []string{
+					"--cluster=cluster_nickname",
+					"--user=user_nickname",
+					tc.namespaceFlag + "=namespace",
+				},
+				expected: `Context "shaker-context" modified.` + "\n",
+				expectedConfig: clientcmdapi.Config{
+					Contexts: map[string]*clientcmdapi.Context{
+						"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"},
+						"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}},
+			}
+			test.run(t)
+		})
+	}
 }
 
 func TestModifyCurrentContext(t *testing.T) {
