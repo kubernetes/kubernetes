@@ -31,6 +31,7 @@ import (
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	types "k8s.io/apimachinery/pkg/types"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -88,6 +89,34 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_AllocatedDeviceStatus validates an instance of AllocatedDeviceStatus according
+// to declarative validation rules in the API schema.
+func Validate_AllocatedDeviceStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1.AllocatedDeviceStatus) (errs field.ErrorList) {
+	// field resourcev1.AllocatedDeviceStatus.Driver has no validation
+	// field resourcev1.AllocatedDeviceStatus.Pool has no validation
+	// field resourcev1.AllocatedDeviceStatus.Device has no validation
+
+	// field resourcev1.AllocatedDeviceStatus.ShareID
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			errs = append(errs, validate.UUID(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("shareID"), obj.ShareID, safe.Field(oldObj, func(oldObj *resourcev1.AllocatedDeviceStatus) *string { return oldObj.ShareID }))...)
+
+	// field resourcev1.AllocatedDeviceStatus.Conditions has no validation
+	// field resourcev1.AllocatedDeviceStatus.Data has no validation
+	// field resourcev1.AllocatedDeviceStatus.NetworkData has no validation
+	return errs
 }
 
 // Validate_AllocationResult validates an instance of AllocationResult according
@@ -386,7 +415,22 @@ func Validate_DeviceRequestAllocationResult(ctx context.Context, op operation.Op
 	// field resourcev1.DeviceRequestAllocationResult.Tolerations has no validation
 	// field resourcev1.DeviceRequestAllocationResult.BindingConditions has no validation
 	// field resourcev1.DeviceRequestAllocationResult.BindingFailureConditions has no validation
-	// field resourcev1.DeviceRequestAllocationResult.ShareID has no validation
+
+	// field resourcev1.DeviceRequestAllocationResult.ShareID
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *types.UID) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			errs = append(errs, validate.UUID(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("shareID"), obj.ShareID, safe.Field(oldObj, func(oldObj *resourcev1.DeviceRequestAllocationResult) *types.UID { return oldObj.ShareID }))...)
+
 	// field resourcev1.DeviceRequestAllocationResult.ConsumedCapacity has no validation
 	return errs
 }
@@ -565,6 +609,8 @@ func Validate_ResourceClaimStatus(ctx context.Context, op operation.Operation, f
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_AllocatedDeviceStatus)...)
 			return
 		}(fldPath.Child("devices"), obj.Devices, safe.Field(oldObj, func(oldObj *resourcev1.ResourceClaimStatus) []resourcev1.AllocatedDeviceStatus { return oldObj.Devices }))...)
 

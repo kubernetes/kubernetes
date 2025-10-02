@@ -65,6 +65,8 @@ message AllocatedDeviceStatus {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
+  // +k8s:optional
+  // +k8s:format=k8s-uuid
   optional string shareID = 7;
 
   // Conditions contains the latest observation of the device's state.
@@ -901,6 +903,8 @@ message DeviceRequestAllocationResult {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
+  // +k8s:optional
+  // +k8s:format=k8s-uuid
   optional string shareID = 9;
 
   // ConsumedCapacity tracks the amount of capacity consumed per device as part of the claim request.
