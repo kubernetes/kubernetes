@@ -61,6 +61,9 @@ func Validate_MyType(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
 			errs = append(errs, validate.UUID(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("uuidField"), &obj.UUIDField, safe.Field(oldObj, func(oldObj *MyType) *string { return &oldObj.UUIDField }))...)
@@ -73,6 +76,9 @@ func Validate_MyType(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
 			errs = append(errs, validate.UUID(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("uuidPtrField"), obj.UUIDPtrField, safe.Field(oldObj, func(oldObj *MyType) *string { return oldObj.UUIDPtrField }))...)

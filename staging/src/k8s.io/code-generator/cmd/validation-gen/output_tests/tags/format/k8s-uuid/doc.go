@@ -28,10 +28,10 @@ var localSchemeBuilder = testscheme.New()
 // +k8s:validation:Required
 type MyType struct {
 	TypeMeta int
-	// +k8s:Optional
+	// +k8s:optional
 	// +k8s:format=k8s-uuid
 	UUIDField string `json:"uuidField"`
-	// +k8s:Optional
+	// +k8s:optional
 	// +k8s:format=k8s-uuid
 	UUIDPtrField *string `json:"uuidPtrField"`
 	// Note: no validation here

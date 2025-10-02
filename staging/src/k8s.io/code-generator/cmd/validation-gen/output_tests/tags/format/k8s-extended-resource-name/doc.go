@@ -28,10 +28,10 @@ var localSchemeBuilder = testscheme.New()
 // +k8s:validation:Required
 type MyType struct {
 	TypeMeta int
-	// +k8s:Optional
+	// +k8s:optional
 	// +k8s:format=k8s-extended-resource-name
 	NameField string `json:"nameField"`
-	// +k8s:Optional
+	// +k8s:optional
 	// +k8s:format=k8s-extended-resource-name
 	NamePtrField *string `json:"namePtrField"`
 	// Note: no validation here
