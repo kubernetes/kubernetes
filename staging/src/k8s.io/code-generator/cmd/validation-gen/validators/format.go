@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-20.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -53,13 +53,13 @@ var (
 	// to be sure it works the current state of IP manual-ratcheting
 	// ipSloppyValidator         = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
 	extendedResourceNameValidator = types.Name{Package: libValidationPkg, Name: "ExtendedResourceName"}
-	labelKeyValidator         = types.Name{Package: libValidationPkg, Name: "LabelKey"}
-	labelValueValidator       = types.Name{Package: libValidationPkg, Name: "LabelValue"}
-	longNameCaselessValidator = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
-	longNameValidator         = types.Name{Package: libValidationPkg, Name: "LongName"}
-	resourcePoolNameValidator = types.Name{Package: libValidationPkg, Name: "ResourcePoolName"}
-	shortNameValidator        = types.Name{Package: libValidationPkg, Name: "ShortName"}
-	uuidValidator             = types.Name{Package: libValidationPkg, Name: "UUID"}
+	labelKeyValidator             = types.Name{Package: libValidationPkg, Name: "LabelKey"}
+	labelValueValidator           = types.Name{Package: libValidationPkg, Name: "LabelValue"}
+	longNameCaselessValidator     = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
+	longNameValidator             = types.Name{Package: libValidationPkg, Name: "LongName"}
+	resourcePoolNameValidator     = types.Name{Package: libValidationPkg, Name: "ResourcePoolName"}
+	shortNameValidator            = types.Name{Package: libValidationPkg, Name: "ShortName"}
+	uuidValidator                 = types.Name{Package: libValidationPkg, Name: "UUID"}
 )
 
 func (formatTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
