@@ -84,7 +84,7 @@ func validateUID(uid string, fldPath *field.Path) field.ErrorList {
 	} else if len(uid) != 36 || uid != strings.ToLower(uid) {
 		allErrs = append(allErrs, field.Invalid(fldPath, uid, "uid must be in RFC 4122 normalized form, `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` with lowercase hexadecimal characters"))
 	}
-	return allErrs
+	return allErrs.WithOrigin("format=k8s-uuid")
 }
 
 // ValidateResourceClaim validates a ResourceClaim.
@@ -489,7 +489,7 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
 	allErrs = append(allErrs, validateDeviceBindingParameters(result.BindingConditions, result.BindingFailureConditions, fldPath)...)
 	if result.ShareID != nil {
-		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID"))...)
+		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
 	return allErrs
 }
@@ -1212,7 +1212,7 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool"))...)
 	allErrs = append(allErrs, validateDeviceName(device.Device, fldPath.Child("device"))...)
 	if device.ShareID != nil {
-		allErrs = append(allErrs, validateUID(*device.ShareID, fldPath.Child("shareID"))...)
+		allErrs = append(allErrs, validateUID(*device.ShareID, fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
 	deviceID := structured.MakeDeviceID(device.Driver, device.Pool, device.Device)
 	sharedDeviceID := structured.MakeSharedDeviceID(deviceID, (*types.UID)(device.ShareID))
