@@ -79,7 +79,7 @@ func NewCmdConfigSetContext(restClientGetter genericclioptions.RESTClientGetter,
 	cmd.Flags().BoolVar(&options.currContext, "current", options.currContext, "Modify the current context")
 	cmd.Flags().Var(&options.cluster, clientcmd.FlagClusterName, clientcmd.FlagClusterName+" for the context entry in kubeconfig")
 	cmd.Flags().Var(&options.authInfo, clientcmd.FlagAuthInfoName, clientcmd.FlagAuthInfoName+" for the context entry in kubeconfig")
-	cmd.Flags().Var(&options.namespace, clientcmd.FlagNamespace, clientcmd.FlagNamespace+" for the context entry in kubeconfig")
+	cmd.Flags().VarP(&options.namespace, clientcmd.FlagNamespace, "n", clientcmd.FlagNamespace+" for the context entry in kubeconfig")
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"namespace",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
