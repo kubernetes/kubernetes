@@ -302,7 +302,7 @@ type VolumeLogger interface {
 	GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error)
 }
 
-// Generates an error string with the format ": <err>" if err exists
+// errSuffix generates an error string with the format ": <err>" if err exists
 func errSuffix(err error) string {
 	errStr := ""
 	if err != nil {
@@ -311,12 +311,12 @@ func errSuffix(err error) string {
 	return errStr
 }
 
-// Generate a detailed error msg for logs
+// generateVolumeMsgDetailed generates a detailed error msg for logs
 func generateVolumeMsgDetailed(prefixMsg, suffixMsg, volumeName, details string) (detailedMsg string) {
 	return fmt.Sprintf("%v for volume %q %v %v", prefixMsg, volumeName, details, suffixMsg)
 }
 
-// Generate a simplified error msg for events and a detailed error msg for logs
+// generateVolumeMsg generates a simplified error msg for events and a detailed error msg for logs
 func generateVolumeMsg(prefixMsg, suffixMsg, volumeName, details string) (simpleMsg, detailedMsg string) {
 	simpleMsg = fmt.Sprintf("%v for volume %q %v", prefixMsg, volumeName, suffixMsg)
 	return simpleMsg, generateVolumeMsgDetailed(prefixMsg, suffixMsg, volumeName, details)
