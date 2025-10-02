@@ -306,6 +306,34 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			update: validClaim,
 			old:    validClaim,
 		},
+		"spec immutable: modify request class name": {
+			update: mkValidResourceClaim(tweakSpecChangeClassName("another-class")),
+			old:    validClaim,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
+			},
+		},
+		"spec immutable: add request": {
+			update: mkValidResourceClaim(tweakSpecAddRequest(mkDeviceRequest("req-1"))),
+			old:    validClaim,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
+			},
+		},
+		"spec immutable: remove request": {
+			update: mkValidResourceClaim(tweakSpecRemoveRequest(0)),
+			old:    validClaim,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
+			},
+		},
+		"spec immutable: add constraint": {
+			update: mkValidResourceClaim(tweakSpecAddConstraint(mkDeviceConstraint())),
+			old:    validClaim,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
+			},
+		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
@@ -565,10 +593,32 @@ func tweakStatusDeviceRequestAllocationResultShareID(shareID types.UID) func(rc 
 	}
 }
 
+func tweakSpecChangeClassName(deviceClassName string) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Requests) > 0 && rc.Spec.Devices.Requests[0].Exactly != nil {
+			rc.Spec.Devices.Requests[0].Exactly.DeviceClassName = deviceClassName
+		}
+	}
+}
+
 func tweakStatusAllocatedDeviceStatusShareID(shareID string) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		for i := range rc.Status.Devices {
 			rc.Status.Devices[i].ShareID = &shareID
+		}
+	}
+}
+
+func tweakSpecAddRequest(req resource.DeviceRequest) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests, req)
+	}
+}
+
+func tweakSpecRemoveRequest(index int) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if index >= 0 && index < len(rc.Spec.Devices.Requests) {
+			rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests[:index], rc.Spec.Devices.Requests[index+1:]...)
 		}
 	}
 }
@@ -592,5 +642,10 @@ func resourceClaimReference(uid string) resource.ResourceClaimConsumerReference 
 func tweakStatusReservedFor(refs ...resource.ResourceClaimConsumerReference) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		rc.Status.ReservedFor = refs
+	}
+}
+func tweakSpecAddConstraint(c resource.DeviceConstraint) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Spec.Devices.Constraints = append(rc.Spec.Devices.Constraints, c)
 	}
 }
