@@ -865,7 +865,7 @@ func TestValidateClaimUpdate(t *testing.T) {
 				spec := validClaim.Spec.DeepCopy()
 				spec.Devices.Requests[0].Exactly.DeviceClassName += "2"
 				return *spec
-			}(), "field is immutable")},
+			}(), "field is immutable")}.MarkCoveredByDeclarative(),
 			oldClaim: validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Spec.Devices.Requests[0].Exactly.DeviceClassName += "2"

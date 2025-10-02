@@ -101,7 +101,7 @@ func ValidateResourceClaimUpdate(resourceClaim, oldClaim *resource.ResourceClaim
 	// The spec is immutable. On update, we only check for immutability.
 	// Re-validating other fields is skipped because the user cannot change them;
 	// the only actionable error is for the immutability violation.
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceClaim.Spec, oldClaim.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceClaim.Spec, oldClaim.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 

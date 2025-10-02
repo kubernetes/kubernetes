@@ -520,6 +520,11 @@ func Validate_ResourceClaim(ctx context.Context, op operation.Operation, fldPath
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
+			// call field-attached validations
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ResourceClaimSpec(ctx, op, fldPath, obj, oldObj)...)
 			return

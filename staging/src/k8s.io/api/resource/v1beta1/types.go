@@ -701,6 +701,7 @@ type ResourceClaim struct {
 
 	// Spec describes what is being requested and how to configure it.
 	// The spec is immutable.
+	// +k8s:immutable
 	Spec ResourceClaimSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
 	// Status describes whether the claim is ready to use and what has been allocated.
