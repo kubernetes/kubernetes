@@ -413,3 +413,18 @@ func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	hasher.Reset()
 	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
 }
+
+// IsControlPlaneNode returns true if the kube-apiserver static pod manifest is present
+// on the host.
+func IsControlPlaneNode() bool {
+	isControlPlaneNode := true
+
+	filepath := kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer,
+		kubeadmconstants.GetStaticPodDirectory())
+
+	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		isControlPlaneNode = false
+	}
+
+	return isControlPlaneNode
+}
