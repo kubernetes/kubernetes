@@ -829,6 +829,81 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(ctx, f, pod, expectedEnv...)
 		})
 
+		ginkgo.It("retries pod scheduling after updating ResourceSlice", func(ctx context.Context) {
+			pod, template := b.PodInline()
+			template.Spec.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{{
+				CEL: &resourceapi.CELDeviceSelector{
+					// Not set yet, gets added below.
+					Expression: `has(device.attributes["dra.example.com"].updated)`,
+				},
+			}}
+			b.Create(ctx, template, pod)
+
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
+
+			// Matches initial setup of driver, except that we mutate the resources to add the attribute.
+			driver.SetResources(nodes, drautils.DriverResources(maxAllocations),
+				func(resources map[string]resourceslice.DriverResources) {
+					for _, dr := range resources {
+						for _, pool := range dr.Pools {
+							gomega.Expect(pool.Slices).To(gomega.HaveLen(1))
+							slice := pool.Slices[0]
+							for i := range slice.Devices {
+								device := &slice.Devices[i]
+								if device.Attributes == nil {
+									device.Attributes = make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
+								}
+								device.Attributes["dra.example.com/updated"] = resourceapi.DeviceAttribute{
+									BoolValue: ptr.To(true),
+								}
+							}
+						}
+					}
+				},
+			)
+
+			b.TestPod(ctx, f, pod, expectedEnv...)
+		})
+
+		ginkgo.It("retries pod scheduling after adding ResourceSlice", func(ctx context.Context) {
+			pod, template := b.PodInline()
+			template.Spec.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{{
+				CEL: &resourceapi.CELDeviceSelector{
+					// Not set yet, gets added below.
+					Expression: `has(device.attributes["dra.example.com"].updated)`,
+				},
+			}}
+			b.Create(ctx, template, pod)
+
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
+
+			// Matches initial setup of driver, except that we mutate the resources to add the attribute.
+			driver.SetResources(nodes, drautils.DriverResources(maxAllocations),
+				func(resources map[string]resourceslice.DriverResources) {
+					for _, dr := range resources {
+						for key, pool := range dr.Pools {
+							gomega.Expect(pool.Slices).To(gomega.HaveLen(1))
+							slice := pool.Slices[0].DeepCopy()
+							for j := range slice.Devices {
+								device := &slice.Devices[j]
+								device.Name += "-updated"
+								if device.Attributes == nil {
+									device.Attributes = make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
+								}
+								device.Attributes["dra.example.com/updated"] = resourceapi.DeviceAttribute{
+									BoolValue: ptr.To(true),
+								}
+							}
+							pool.Slices = append(pool.Slices, *slice)
+							dr.Pools[key] = pool
+						}
+					}
+				},
+			)
+
+			b.TestPod(ctx, f, pod, expectedEnv...)
+		})
+
 		ginkgo.It("runs a pod without a generated resource claim", func(ctx context.Context) {
 			pod, _ /* template */ := b.PodInline()
 			created := b.Create(ctx, pod)
