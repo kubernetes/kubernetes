@@ -57,6 +57,28 @@ func TestCreateContext(t *testing.T) {
 	}
 	test.run(t)
 }
+
+func TestCreateContext_ShorthandNamespace(t *testing.T) {
+	conf := clientcmdapi.Config{}
+	test := setContextTest{
+		testContext: "shaker-context",
+		description: "Testing for create a new context",
+		config:      conf,
+		args:        []string{"shaker-context"},
+		flags: []string{
+			"--cluster=cluster_nickname",
+			"--user=user_nickname",
+			"-n=namespace",
+		},
+		expected: `Context "shaker-context" created.` + "\n",
+		expectedConfig: clientcmdapi.Config{
+			Contexts: map[string]*clientcmdapi.Context{
+				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"}},
+		},
+	}
+	test.run(t)
+}
+
 func TestModifyContext(t *testing.T) {
 	conf := clientcmdapi.Config{
 		Contexts: map[string]*clientcmdapi.Context{
