@@ -1313,8 +1313,10 @@ func TestDropDisabledFields(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, tc.enableRatcheting)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, tc.enableSelectableFields)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				apiextensionsfeatures.CRDValidationRatcheting:      tc.enableRatcheting,
+				apiextensionsfeatures.CustomResourceFieldSelectors: tc.enableSelectableFields,
+			})
 			old := tc.oldCRD.DeepCopy()
 
 			dropDisabledFields(tc.crd, tc.oldCRD)

@@ -1006,8 +1006,10 @@ func Test_UnionedGVKs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pluginConfig := defaults.PluginConfigsV1
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tt.enableInPlacePodVerticalScaling)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tt.enableDynamicResourceAllocation)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.InPlacePodVerticalScaling: tt.enableInPlacePodVerticalScaling,
+				features.DynamicResourceAllocation: tt.enableDynamicResourceAllocation,
+			})
 			if !tt.enableSchedulerQueueingHints {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)

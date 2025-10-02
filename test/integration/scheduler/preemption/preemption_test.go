@@ -408,9 +408,11 @@ func TestPreemption(t *testing.T) {
 			for _, clearingNominatedNodeNameAfterBinding := range []bool{true, false} {
 				for _, test := range tests {
 					t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, Async API calls enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, asyncAPICallsEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ClearingNominatedNodeNameAfterBinding, clearingNominatedNodeNameAfterBinding)
+						featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+							features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+							features.SchedulerAsyncAPICalls:                asyncAPICallsEnabled,
+							features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
+						})
 
 						testCtx := testutils.InitTestSchedulerWithOptions(t,
 							testutils.InitTestAPIServer(t, "preemption", nil),

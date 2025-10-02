@@ -702,9 +702,7 @@ func TestSchedulerDefaults(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			for featureName, enabled := range tc.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, featureName, enabled)
-			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, tc.features)
 			SetDefaults_KubeSchedulerConfiguration(tc.config)
 			if diff := cmp.Diff(tc.expected, tc.config); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
@@ -899,9 +897,7 @@ func TestPluginArgsDefaults(t *testing.T) {
 		scheme := runtime.NewScheme()
 		utilruntime.Must(AddToScheme(scheme))
 		t.Run(tc.name, func(t *testing.T) {
-			for k, v := range tc.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
-			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, tc.features)
 			scheme.Default(tc.in)
 			if diff := cmp.Diff(tc.want, tc.in); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)

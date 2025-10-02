@@ -235,9 +235,11 @@ func TestNominatedNode(t *testing.T) {
 			for _, nominatedNodeNameForExpectationEnabled := range []bool{false} {
 				for _, tt := range tests {
 					t.Run(fmt.Sprintf("%s (Async preemption: %v, Async API calls: %v, NNN for expectation: %v)", tt.name, asyncPreemptionEnabled, asyncAPICallsEnabled, nominatedNodeNameForExpectationEnabled), func(t *testing.T) {
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, nominatedNodeNameForExpectationEnabled)
+						featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+							features.SchedulerAsyncPreemption:        asyncPreemptionEnabled,
+							features.SchedulerAsyncAPICalls:          asyncAPICallsEnabled,
+							features.NominatedNodeNameForExpectation: nominatedNodeNameForExpectationEnabled,
+						})
 
 						cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 							Profiles: []configv1.KubeSchedulerProfile{{
