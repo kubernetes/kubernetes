@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/dump"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -73,13 +74,13 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume, annotati
 			Containers:        []v1.Container{container},
 			Priority:          &priority,
 			PriorityClassName: "system-node-critical",
-			HostNetwork:       true,
 			Volumes:           VolumeMapToSlice(volumes),
 			SecurityContext: &v1.PodSecurityContext{
 				SeccompProfile: &v1.SeccompProfile{
 					Type: v1.SeccompProfileTypeRuntimeDefault,
 				},
 			},
+			HostUsers: ptr.To(false),
 		},
 	}
 }
