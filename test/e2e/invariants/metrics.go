@@ -85,6 +85,9 @@ type apiServerMetricInvariant struct {
 // All fields must be specified
 var apiServerMetricInvariants = []apiServerMetricInvariant{
 	{
+		// TODO: Migrate to apiserver_validation_declarative_validation_parity_discrepancies_total
+		// when it reaches beta / when this metric is deprecated.
+		// For now we uare using the previous beta metric.
 		Metric: "apiserver_validation_declarative_validation_mismatch_total",
 		SIG:    "api-machinery",
 		Owners: []string{"aaron-prindle", "jpbetz", "thockin"},
@@ -99,6 +102,9 @@ var apiServerMetricInvariants = []apiServerMetricInvariant{
 		},
 	},
 	{
+		// TODO: Migrate to apiserver_validation_declarative_validation_panics_total
+		// when it reaches beta / when this metric is deprecated.
+		// For now we uare using the previous beta metric.
 		Metric: "apiserver_validation_declarative_validation_panic_total",
 		SIG:    "api-machinery",
 		Owners: []string{"aaron-prindle", "jpbetz", "thockin"},
