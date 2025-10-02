@@ -754,7 +754,7 @@ func (qs *queueSet) canAccommodateSeatsLocked(seats int) bool {
 		// we have picked the queue with the minimum virtual finish time, but
 		// the number of seats this request asks for exceeds the concurrency limit.
 		// TODO: this is a quick fix for now, once we have borrowing in place we will not need it
-		if qs.totRequestsExecuting == 0 {
+		if qs.dCfg.ConcurrencyLimit > 0 && qs.totRequestsExecuting == 0 {
 			// TODO: apply additional lateny associated with this request, as described in the KEP
 			return true
 		}
