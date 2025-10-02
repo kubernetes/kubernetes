@@ -401,8 +401,10 @@ func TestPreemptionStarvation(t *testing.T) {
 		for _, clearingNominatedNodeNameAfterBinding := range []bool{true, false} {
 			for _, test := range tests {
 				t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ClearingNominatedNodeNameAfterBinding, clearingNominatedNodeNameAfterBinding)
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+						features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+						features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
+					})
 
 					pendingPods := make([]*v1.Pod, test.numExpectedPending)
 					numRunningPods := test.numExistingPod - test.numExpectedPending
@@ -513,8 +515,10 @@ func TestPreemptionRaces(t *testing.T) {
 		for _, clearingNominatedNodeNameAfterBinding := range []bool{true, false} {
 			for _, test := range tests {
 				t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ClearingNominatedNodeNameAfterBinding, clearingNominatedNodeNameAfterBinding)
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+						features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+						features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
+					})
 
 					if test.numRepetitions <= 0 {
 						test.numRepetitions = 1
@@ -799,8 +803,10 @@ func TestPDBInPreemption(t *testing.T) {
 		for _, clearingNominatedNodeNameAfterBinding := range []bool{true, false} {
 			for _, test := range tests {
 				t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ClearingNominatedNodeNameAfterBinding, clearingNominatedNodeNameAfterBinding)
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+						features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+						features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
+					})
 
 					for i := 1; i <= test.nodeCnt; i++ {
 						nodeName := fmt.Sprintf("node-%v", i)
@@ -1184,8 +1190,10 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 		for _, clearingNominatedNodeNameAfterBinding := range []bool{true, false} {
 			for _, test := range tests {
 				t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ClearingNominatedNodeNameAfterBinding, clearingNominatedNodeNameAfterBinding)
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+						features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+						features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
+					})
 
 					if err := test.init(); err != nil {
 						t.Fatalf("Error while initializing test: %v", err)

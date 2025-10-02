@@ -1058,8 +1058,10 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tc.enabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.extendedEnabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DynamicResourceAllocation: tc.enabled,
+				features.DRAExtendedResource:       tc.extendedEnabled,
+			})
 
 			oldPod := tc.oldPod.DeepCopy()
 			newPod := tc.newPod.DeepCopy()
@@ -2790,8 +2792,10 @@ func TestOldPodViolatesMatchLabelKeysValidationOption(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.MatchLabelKeysInPodTopologySpread:              tc.matchLabelKeysEnabled,
+				features.MatchLabelKeysInPodTopologySpreadSelectorMerge: tc.matchLabelKeysSelectorMergeEnabled,
+			})
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
 			if tc.wantOption != gotOptions.OldPodViolatesMatchLabelKeysValidation {
 				t.Errorf("Got OldPodViolatesMatchLabelKeysValidation=%t, want %t", gotOptions.OldPodViolatesMatchLabelKeysValidation, tc.wantOption)
@@ -2851,8 +2855,10 @@ func TestOldPodViolatesLegacyMatchLabelKeysValidationOption(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.MatchLabelKeysInPodTopologySpread:              tc.matchLabelKeysEnabled,
+				features.MatchLabelKeysInPodTopologySpreadSelectorMerge: tc.matchLabelKeysSelectorMergeEnabled,
+			})
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
 			if tc.wantOption != gotOptions.OldPodViolatesLegacyMatchLabelKeysValidation {
 				t.Errorf("Got OldPodViolatesLegacyMatchLabelKeysValidation=%t, want %t", gotOptions.OldPodViolatesLegacyMatchLabelKeysValidation, tc.wantOption)

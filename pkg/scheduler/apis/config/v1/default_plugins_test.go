@@ -101,9 +101,7 @@ func TestApplyFeatureGates(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			for k, v := range test.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
-			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, test.features)
 
 			gotConfig := getDefaultPlugins()
 			if diff := cmp.Diff(test.wantConfig, gotConfig); diff != "" {

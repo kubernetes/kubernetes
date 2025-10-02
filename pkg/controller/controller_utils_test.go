@@ -863,8 +863,10 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 
 	for i, test := range inequalityTests {
 		t.Run(fmt.Sprintf("Inequality tests %d", i), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, !test.disablePodDeletioncost)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.PodDeletionCost:      !test.disablePodDeletioncost,
+				features.LogarithmicScaleDown: !test.disableLogarithmicScaleDown,
+			})
 
 			podsWithRanks := ActivePodsWithRanks{
 				Pods: []*v1.Pod{test.lesser.pod, test.greater.pod},

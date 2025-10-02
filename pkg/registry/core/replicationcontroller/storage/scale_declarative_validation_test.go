@@ -77,8 +77,10 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 					// We only need to test both gate enabled and disabled together, because
 					// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
 					// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+						features.DeclarativeValidation:         gateVal,
+						features.DeclarativeValidationTakeover: gateVal,
+					})
 
 					_, _, err := storage.Scale.Update(ctx, tc.input.Name, rest.DefaultUpdatedObjectInfo(&tc.input), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 					errs := errorListFromStatusError(t, err)
