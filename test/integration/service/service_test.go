@@ -559,8 +559,10 @@ func Test_TransitionsForPreferSameTrafficDistribution(t *testing.T) {
 	// Setup components, like kube-apiserver and EndpointSlice controller.
 	////////////////////////////////////////////////////////////////////////////
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTrafficDistribution, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ServiceTrafficDistribution:    true,
+		features.PreferSameTrafficDistribution: true,
+	})
 
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
