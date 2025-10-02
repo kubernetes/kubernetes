@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/kubernetes/fake"
@@ -319,6 +320,7 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:    "resource.k8s.io",
 		APIVersion:  "v1",
+		Resource:    "resourceclaims",
 		Subresource: "status",
 	})
 	poolPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("pool")
@@ -327,6 +329,7 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 		update       resource.ResourceClaim
 		expectedErrs field.ErrorList
 	}{
+		// .Status.Allocation.Devices.Results[%d].Pool
 		"valid pool name": {
 			old:    mkValidResourceClaim(),
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultPool("dra.example.com/pool-a")),
@@ -375,6 +378,58 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultPool("a//b")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(poolPath, "", "").WithOrigin("format=k8s-resource-pool-name"),
+			},
+		},
+		// .Status.Allocation.Devices.Results[%d].ShareID
+		"valid status.Allocation.Devices.Results[].ShareID": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultShareID("123e4567-e89b-12d3-a456-426614174000")),
+		},
+		"invalid status.Allocation.Devices.Results[].ShareID": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultShareID("invalid-uid")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "").WithOrigin("format=k8s-uuid"),
+			},
+		},
+		"invalid uppercase status.Allocation.Devices.Results[].ShareID ": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultShareID("123e4567-E89b-12d3-A456-426614174000")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "").WithOrigin("format=k8s-uuid"),
+			},
+		},
+		// .Status.Devices[%d].ShareID
+		"valid status.Devices[].ShareID": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(standardAllocatedDeviceStatus()),
+				tweakStatusDeviceRequestAllocationResultShareID("123e4567-e89b-12d3-a456-426614174000"),
+				tweakStatusAllocatedDeviceStatusShareID("123e4567-e89b-12d3-a456-426614174000"),
+			),
+		},
+		"invalid status.Devices[].ShareID": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(standardAllocatedDeviceStatus()),
+				tweakStatusDeviceRequestAllocationResultShareID("invalid-uid"),
+				tweakStatusAllocatedDeviceStatusShareID("invalid-uid"),
+			),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+			},
+		},
+		"invalid upper case status.Devices[].ShareID": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(standardAllocatedDeviceStatus()),
+				tweakStatusDeviceRequestAllocationResultShareID("123e4567-E89b-12d3-A456-426614174000"),
+				tweakStatusAllocatedDeviceStatusShareID("123e4567-E89b-12d3-A456-426614174000"),
+			),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("shareID"), "invalid-uid", "must be a lowercase UUID in 8-4-4-4-12 format").WithOrigin("format=k8s-uuid"),
 			},
 		},
 	}
@@ -454,10 +509,40 @@ func mkResourceClaimWithStatus(tweaks ...func(rc *resource.ResourceClaim)) resou
 	return rc
 }
 
+func tweakStatusDevices(devices ...resource.AllocatedDeviceStatus) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Status.Devices = devices
+	}
+}
+
 func tweakStatusDeviceRequestAllocationResultPool(pool string) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		for i := range rc.Status.Allocation.Devices.Results {
 			rc.Status.Allocation.Devices.Results[i].Pool = pool
 		}
+	}
+}
+
+func tweakStatusDeviceRequestAllocationResultShareID(shareID types.UID) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		for i := range rc.Status.Allocation.Devices.Results {
+			rc.Status.Allocation.Devices.Results[i].ShareID = &shareID
+		}
+	}
+}
+
+func tweakStatusAllocatedDeviceStatusShareID(shareID string) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		for i := range rc.Status.Devices {
+			rc.Status.Devices[i].ShareID = &shareID
+		}
+	}
+}
+
+func standardAllocatedDeviceStatus() resource.AllocatedDeviceStatus {
+	return resource.AllocatedDeviceStatus{
+		Driver: "dra.example.com",
+		Pool:   "pool-0",
+		Device: "device-0",
 	}
 }
