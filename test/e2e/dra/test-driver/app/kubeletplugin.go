@@ -228,6 +228,10 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 	return ex, nil
 }
 
+func (ex *ExamplePlugin) PublishResources(ctx context.Context, resources resourceslice.DriverResources) error {
+	return ex.d.PublishResources(ctx, resources)
+}
+
 // Stop ensures that all servers are stopped and resources freed.
 func (ex *ExamplePlugin) Stop() {
 	ex.d.Stop()
