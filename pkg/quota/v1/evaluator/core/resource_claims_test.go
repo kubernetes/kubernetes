@@ -75,7 +75,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		},
 	})
 
-	evaluator := NewResourceClaimEvaluator(nil)
+	evaluator := NewResourceClaimEvaluator(nil, nil)
 	testCases := map[string]struct {
 		claim  *api.ResourceClaim
 		usage  corev1.ResourceList
@@ -237,7 +237,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 }
 
 func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
-	evaluator := NewResourceClaimEvaluator(nil)
+	evaluator := NewResourceClaimEvaluator(nil, nil)
 	testCases := map[string]struct {
 		items []corev1.ResourceName
 		want  []corev1.ResourceName
@@ -276,7 +276,7 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 }
 
 func TestResourceClaimEvaluatorHandles(t *testing.T) {
-	evaluator := NewResourceClaimEvaluator(nil)
+	evaluator := NewResourceClaimEvaluator(nil, nil)
 	testCases := []struct {
 		name  string
 		attrs admission.Attributes

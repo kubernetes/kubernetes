@@ -250,11 +250,6 @@ func (p *podEvaluator) UncoveredQuotaScopes(limitedScopes []corev1.ScopedResourc
 	return uncoveredScopes, nil
 }
 
-// UsageWithDeivceClass knows how to measure usage associated with pods
-func (p *podEvaluator) UsageWithDeviceClass(item runtime.Object, deviceClassToExtendedResourceMap map[string]string) (corev1.ResourceList, error) {
-	return p.Usage(item)
-}
-
 // Usage knows how to measure usage associated with pods
 func (p *podEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 	// delegate to normal usage
@@ -263,7 +258,7 @@ func (p *podEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 
 // UsageStats calculates aggregate usage for the object.
 func (p *podEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
-	return generic.CalculateUsageStats(options, p.listFuncByNamespace, podMatchesScopeFunc, p.UsageWithDeviceClass)
+	return generic.CalculateUsageStats(options, p.listFuncByNamespace, podMatchesScopeFunc, p.Usage)
 }
 
 // verifies we implement the required interface.

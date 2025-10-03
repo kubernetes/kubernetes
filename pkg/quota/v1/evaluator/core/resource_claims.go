@@ -29,10 +29,10 @@ import (
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/dynamic-resource-allocation/deviceclass/cache"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
 	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/quota/v1/evaluator/deviceclassmapping"
 )
 
 // The name used for object count quota. This evaluator takes over counting
@@ -56,12 +56,9 @@ func V1ImplicitExtendedResourceByDeviceClass(className string) corev1.ResourceNa
 }
 
 // NewResourceClaimEvaluator returns an evaluator that can evaluate resource claims
-func NewResourceClaimEvaluator(f quota.ListerForResourceFunc, m *deviceclassmapping.DeviceClassMapping) quota.Evaluator {
+func NewResourceClaimEvaluator(f quota.ListerForResourceFunc, m *cache.DeviceClassMapping) quota.Evaluator {
 	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, resourceapi.SchemeGroupVersion.WithResource("resourceclaims"))
-	claimEvaluator := &claimEvaluator{
-		listFuncByNamespace: listFuncByNamespace,
-		deviceClassMapping:  m,
-	}
+	claimEvaluator := &claimEvaluator{listFuncByNamespace: listFuncByNamespace, deviceClassMapping: m}
 	return claimEvaluator
 }
 
@@ -69,8 +66,8 @@ func NewResourceClaimEvaluator(f quota.ListerForResourceFunc, m *deviceclassmapp
 type claimEvaluator struct {
 	// listFuncByNamespace knows how to list resource claims
 	listFuncByNamespace generic.ListFuncByNamespace
-	// a global cache of extended resource to device class mapping
-	deviceClassMapping *deviceclassmapping.DeviceClassMapping
+	// a global cache of device class and extended resource mapping
+	deviceClassMapping *cache.DeviceClassMapping
 }
 
 // Constraints verifies that all required resources are present on the item.
@@ -127,11 +124,6 @@ func (p *claimEvaluator) MatchingResources(items []corev1.ResourceName) []corev1
 	return result
 }
 
-// Usage knows how to measure usage associated with item.
-func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
-	return p.UsageWithDeviceClass(item, nil)
-}
-
 func (p *claimEvaluator) extendedResourceQuota(dcName string) corev1.ResourceName {
 	resource := corev1.ResourceName("")
 	if name, ok := p.deviceClassMapping.Get(dcName); ok {
@@ -163,13 +155,14 @@ func (p *claimEvaluator) setResourceQuantity(resourceMap map[corev1.ResourceName
 	}
 }
 
-// UsageWithDeviceClass knows how to measure usage associated with item.
-func (p *claimEvaluator) UsageWithDeviceClass(item runtime.Object, deviceClassMap map[string]string) (corev1.ResourceList, error) {
+// Usage knows how to measure usage associated with item.
+func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 	result := corev1.ResourceList{}
 	claim, err := toExternalResourceClaimOrError(item)
 	if err != nil {
 		return result, err
 	}
+
 	isExtendedResourceClaim := claim.Annotations[resourceapi.ExtendedResourceClaimAnnotation] == "true"
 	// charge for claim
 	result[ClaimObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
@@ -194,7 +187,6 @@ func (p *claimEvaluator) UsageWithDeviceClass(item runtime.Object, deviceClassMa
 					// don't count towards the quota and users shouldn't
 					// expect that when downgrading.
 				}
-
 				q := resource.NewQuantity(numDevices, resource.DecimalSI)
 
 				if q.Cmp(maxQuantityByDeviceClassClaim[deviceClassClaim]) > 0 {
@@ -224,7 +216,6 @@ func (p *claimEvaluator) UsageWithDeviceClass(item runtime.Object, deviceClassMa
 			quantity := result[deviceClassClaim]
 			quantity.Add(*(resource.NewQuantity(numDevices, resource.DecimalSI)))
 			p.setResourceQuantity(result, quantity, request.Exactly.DeviceClassName, request.Name, isExtendedResourceClaim)
-
 		default:
 			// Some unknown, future request type. Cannot do quota for it.
 		}
@@ -235,7 +226,7 @@ func (p *claimEvaluator) UsageWithDeviceClass(item runtime.Object, deviceClassMa
 
 // UsageStats calculates aggregate usage for the object.
 func (p *claimEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
-	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.UsageWithDeviceClass)
+	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
 }
 
 // ensure we implement required interface
