@@ -21,10 +21,12 @@ limitations under the License.
 package contract
 
 import (
+	"testing"
+
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
@@ -96,11 +98,11 @@ func (r *resourceClaimTrackerContract) Get(_, _ string) (*resourceapi.ResourceCl
 	return nil, nil
 }
 
-func (r *resourceClaimTrackerContract) ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error) {
+func (r *resourceClaimTrackerContract) ListAllAllocatedDevices() (sets.Set[schedulerapi.DeviceID], error) {
 	return nil, nil
 }
 
-func (r *resourceClaimTrackerContract) GatherAllocatedState() (*structured.AllocatedState, error) {
+func (r *resourceClaimTrackerContract) GatherAllocatedState() (*schedulerapi.AllocatedState, error) {
 	return nil, nil
 }
 
@@ -135,4 +137,85 @@ func (s *sharedDRAManagerContract) ResourceSlices() fwk.ResourceSliceLister {
 
 func (s *sharedDRAManagerContract) DeviceClasses() fwk.DeviceClassLister {
 	return nil
+}
+
+// TestSchedulerAPIContract validates that the schedulerapi package types
+// used in the autoscaler contract are accessible and compatible.
+//
+// This test ensures that changes to the schedulerapi package are visible to
+// SIG Autoscaling during code review, as these types are part of the
+// autoscaler contract.
+func TestSchedulerAPIContract(t *testing.T) {
+	// Validate that the schedulerapi contract is valid
+	err := schedulerapi.ValidateSchedulerContract()
+	if err != nil {
+		t.Fatalf("SchedulerAPI contract validation failed: %v", err)
+	}
+
+	// Validate that all schedulerapi types used in the autoscaler contract
+	// are properly tracked
+	types := schedulerapi.SchedulerContractTypes()
+	expectedTypes := []string{
+		"DeviceID",
+		"AllocatedState",
+		"SharedDeviceID",
+		"DeviceConsumedCapacity",
+		"ConsumedCapacityCollection",
+		"ConsumedCapacity",
+		"MakeDeviceID",
+		"MakeSharedDeviceID",
+		"NewConsumedCapacityCollection",
+		"NewConsumedCapacity",
+		"NewDeviceConsumedCapacity",
+	}
+
+	if len(types) != len(expectedTypes) {
+		t.Errorf("Expected %d schedulerapi types, got %d", len(expectedTypes), len(types))
+	}
+
+	for _, expectedType := range expectedTypes {
+		found := false
+		for _, actualType := range types {
+			if actualType == expectedType {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Missing schedulerapi type in contract: %s", expectedType)
+		}
+	}
+}
+
+func TestResourceClaimTrackerSchedulerAPITypes(t *testing.T) {
+	// Create a contract instance to test the interface
+	tracker := &resourceClaimTrackerContract{}
+
+	// Test ListAllAllocatedDevices method with schedulerapi.DeviceID
+	devices, err := tracker.ListAllAllocatedDevices()
+	if err != nil {
+		t.Errorf("ListAllAllocatedDevices failed: %v", err)
+	}
+	if devices == nil {
+		// This is expected for the contract implementation, but ensures the method is accessible
+		devices = sets.New[schedulerapi.DeviceID]()
+	}
+
+	// Test GatherAllocatedState method with schedulerapi.AllocatedState
+	state, err := tracker.GatherAllocatedState()
+	if err != nil {
+		t.Errorf("GatherAllocatedState failed: %v", err)
+	}
+	if state == nil {
+		// This is expected for the contract implementation, but ensures the method is accessible
+		state = &schedulerapi.AllocatedState{
+			AllocatedDevices:         sets.New[schedulerapi.DeviceID](),
+			AllocatedSharedDeviceIDs: sets.New[schedulerapi.SharedDeviceID](),
+			AggregatedCapacity:       schedulerapi.NewConsumedCapacityCollection(),
+		}
+	}
+
+	// Validate that the schedulerapi package types are properly accessible
+	_ = devices
+	_ = state
 }
