@@ -532,7 +532,6 @@ aliases:
   feature-approvers:
     - adrianmoisey # Autoscaling
     - andrewsykim # Cloud Provider
-    - ahg-g # Scheduling
     - ardaguclu # CLI
     - aojea # Network, Testing
     - danwinship # Network
@@ -542,6 +541,7 @@ aliases:
     - derekwaynecarr # Node
     - dgrisonnet # Instrumentation
     - dims # Architecture
+    - dom4ha # Scheduling
     - eddiezane # CLI
     - enj # Auth
     - gjtempleton # Autoscaling
@@ -556,6 +556,7 @@ aliases:
     - liggitt # Auth
     - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
+    - macsko # Scheduling
     - marosset # Windows
     - mikezappa87 # Network
     - mrunalp # Node
@@ -563,6 +564,7 @@ aliases:
     - rexagod # Instrumentation
     - richabanker # Instrumentation
     - saad-ali # Storage
+    - sanposhiho # Scheduling
     - sergeykanzhelev # Node
     - shaneutt # Network
     - soltysh # Apps, CLI
