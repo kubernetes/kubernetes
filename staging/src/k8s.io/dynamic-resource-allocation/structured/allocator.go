@@ -31,6 +31,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured/internal/experimental"
 	"k8s.io/dynamic-resource-allocation/structured/internal/incubating"
 	"k8s.io/dynamic-resource-allocation/structured/internal/stable"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 )
 
 // To keep the code in different packages simple, type aliases are used everywhere.
@@ -40,30 +41,32 @@ import (
 
 type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
-type DeviceID = internal.DeviceID
+
+// Type aliases to schedulerapi package for types that are part of the
+// scheduler and autoscaler contract. This ensures that changes to these
+// types require autoscaler approval.
+type DeviceID = schedulerapi.DeviceID
+type AllocatedState = schedulerapi.AllocatedState
+type SharedDeviceID = schedulerapi.SharedDeviceID
+type DeviceConsumedCapacity = schedulerapi.DeviceConsumedCapacity
+type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
+type ConsumedCapacity = schedulerapi.ConsumedCapacity
 
 func MakeDeviceID(driver, pool, device string) DeviceID {
-	return internal.MakeDeviceID(driver, pool, device)
+	return schedulerapi.MakeDeviceID(driver, pool, device)
 }
 
-// types_experimental
-type AllocatedState = internal.AllocatedState
-type SharedDeviceID = internal.SharedDeviceID
-type DeviceConsumedCapacity = internal.DeviceConsumedCapacity
-type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
-type ConsumedCapacity = internal.ConsumedCapacity
-
 func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
-	return internal.MakeSharedDeviceID(deviceID, shareID)
+	return schedulerapi.MakeSharedDeviceID(deviceID, shareID)
 }
 
 func NewConsumedCapacityCollection() ConsumedCapacityCollection {
-	return internal.NewConsumedCapacityCollection()
+	return schedulerapi.NewConsumedCapacityCollection()
 }
 
 func NewDeviceConsumedCapacity(deviceID DeviceID,
 	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	return internal.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
+	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
 // Allocator calculates how to allocate a set of unallocated claims which use
