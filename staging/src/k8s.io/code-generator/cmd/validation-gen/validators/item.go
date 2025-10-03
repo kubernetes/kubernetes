@@ -100,7 +100,7 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	// Fields inherit list metadata from typedefs, but not vice-versa.
 	// If we find no listMetadata then something is wrong.
 	// The item tag requires map semantics, which can come from either listType=map or unique=map
-	if !ok || listMeta.semantic != semanticMap || len(listMeta.keyFields) == 0 {
+	if !ok || listMeta.semantic != semanticMap || len(listMeta.keyMembers) == 0 {
 		return Validations{}, fmt.Errorf("found items with no list metadata - item tags require listType=map or unique=map with listMapKey")
 	}
 
@@ -270,7 +270,7 @@ func (itv itemTagValidator) Docs() TagDoc {
 
 // validateTypeMatch ensures the provided value matches the field's type
 func validateTypeMatch(fieldType *types.Type, value any) error {
-	nativeType := util.NativeType(fieldType)
+	nativeType := util.NonPointer(util.NativeType(fieldType))
 
 	switch {
 	case nativeType == types.String:
@@ -304,7 +304,11 @@ func buildMatchConditions(elemT *types.Type, criteria []keyValuePair, itemRef st
 		if err != nil {
 			return "", err
 		}
-		conditions = append(conditions, fmt.Sprintf("%s.%s == %s", itemRef, member.Name, rhs))
+		if member.Type.Kind == types.Pointer {
+			conditions = append(conditions, fmt.Sprintf("%s.%s != nil && *%s.%s == %s", itemRef, member.Name, itemRef, member.Name, rhs))
+		} else {
+			conditions = append(conditions, fmt.Sprintf("%s.%s == %s", itemRef, member.Name, rhs))
+		}
 	}
 
 	return strings.Join(conditions, " && "), nil
@@ -324,7 +328,7 @@ func createMatchFn(elemT *types.Type, criteria []keyValuePair) (FunctionLiteral,
 }
 
 func generateComparisonRHS(member *types.Member, value any) (string, error) {
-	memberType := util.NativeType(member.Type)
+	memberType := util.NonPointer(util.NativeType(member.Type))
 	switch {
 	case memberType == types.String:
 		strVal, ok := value.(string)
