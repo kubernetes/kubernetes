@@ -76,62 +76,57 @@ func TestMaxLength(t *testing.T) {
 
 func TestMaxItems(t *testing.T) {
 	cases := []struct {
-		fn  func(op operation.Operation, fp *field.Path) field.ErrorList
-		err string // regex
+		name  string
+		items int
+		max   int
+		err   string // regex
 	}{{
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := make([]string, 0)
-			max := 0
-			return MaxItems(context.Background(), op, fp, value, nil, max)
-		},
+		name:  "0 items, max 0",
+		items: 0,
+		max:   0,
 	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := make([]string, 1)
-			max := 0
-			return MaxItems(context.Background(), op, fp, value, nil, max)
-		},
-		err: "fldpath: Too many.*must have at most",
+		name:  "1 item, max 0",
+		items: 1,
+		max:   0,
+		err:   "fldpath: Too many.*must have at most",
 	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := make([]int, 1)
-			max := 1
-			return MaxItems(context.Background(), op, fp, value, nil, max)
-		},
+		name:  "1 item, max 1",
+		items: 1,
+		max:   1,
 	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := make([]int, 2)
-			max := 1
-			return MaxItems(context.Background(), op, fp, value, nil, max)
-		},
-		err: "fldpath: Too many.*must have at most",
+		name:  "2 items, max 1",
+		items: 2,
+		max:   1,
+		err:   "fldpath: Too many.*must have at most",
 	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := make([]bool, 0)
-			max := -1
-			return MaxItems(context.Background(), op, fp, value, nil, max)
-		},
-		err: "fldpath: Too many.*too many items",
+		name:  "0 items, max -1",
+		items: 0,
+		max:   -1,
+		err:   "fldpath: Too many.*too many items",
 	}}
 
-	for i, tc := range cases {
-		result := tc.fn(operation.Operation{}, field.NewPath("fldpath"))
-		if len(result) > 0 && tc.err == "" {
-			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
-			continue
-		}
-		if len(result) == 0 && tc.err != "" {
-			t.Errorf("case %d: unexpected success: expected %q", i, tc.err)
-			continue
-		}
-		if len(result) > 0 {
-			if len(result) > 1 {
-				t.Errorf("case %d: unexepected multi-error: %v", i, fmtErrs(result))
-				continue
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := make([]bool, tc.items)
+			result := MaxItems(context.Background(), operation.Operation{}, field.NewPath("fldpath"), value, nil, tc.max)
+			if len(result) > 0 && tc.err == "" {
+				t.Errorf("unexpected failure: %v", fmtErrs(result))
+				return
 			}
-			if re := regexp.MustCompile(tc.err); !re.MatchString(result[0].Error()) {
-				t.Errorf("case %d: wrong error\nexpected: %q\n     got: %v", i, tc.err, fmtErrs(result))
+			if len(result) == 0 && tc.err != "" {
+				t.Errorf("unexpected success: expected %q", tc.err)
+				return
 			}
-		}
+			if len(result) > 0 {
+				if len(result) > 1 {
+					t.Errorf("unexepected multi-error: %v", fmtErrs(result))
+					return
+				}
+				if re := regexp.MustCompile(tc.err); !re.MatchString(result[0].Error()) {
+					t.Errorf("wrong error\nexpected: %q\n     got: %v", tc.err, fmtErrs(result))
+				}
+			}
+		})
 	}
 }
 

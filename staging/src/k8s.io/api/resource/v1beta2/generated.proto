@@ -642,6 +642,8 @@ message DeviceClassSpec {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:maxItems=32
   repeated DeviceSelector selectors = 1;
 
   // Config defines configuration parameters that apply to each device that is claimed via this class.
@@ -652,6 +654,8 @@ message DeviceClassSpec {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:maxItems=32
   repeated DeviceClassConfiguration config = 2;
 
   // ExtendedResourceName is the extended resource name for the devices of this class.

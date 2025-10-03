@@ -544,8 +544,9 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
 			return validateSelector(selector, fldPath, stored)
 		},
-		fldPath.Child("selectors"))...)
+		fldPath.Child("selectors"), sizeCovered)...)
 	// Same logic as above for configs.
+	stored = false
 	if oldSpec != nil {
 		stored = apiequality.Semantic.DeepEqual(spec.Config, oldSpec.Config)
 	}
@@ -553,7 +554,7 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 		func(config resource.DeviceClassConfiguration, fldPath *field.Path) field.ErrorList {
 			return validateDeviceClassConfiguration(config, fldPath, stored)
 		},
-		fldPath.Child("config"))...)
+		fldPath.Child("config"), sizeCovered)...)
 	if spec.ExtendedResourceName != nil && !v1helper.IsExtendedResourceName(corev1.ResourceName(*spec.ExtendedResourceName)) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("extendedResourceName"), *spec.ExtendedResourceName,
 			"must be a valid extended resource name"))
