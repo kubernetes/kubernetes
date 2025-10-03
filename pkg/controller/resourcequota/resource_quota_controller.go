@@ -34,19 +34,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	quota "k8s.io/apiserver/pkg/quota/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // NamespacedResourcesFunc knows how to discover namespaced resources.
@@ -62,8 +58,6 @@ type ControllerOptions struct {
 	QuotaClient corev1client.ResourceQuotasGetter
 	// Shared informer for resource quotas
 	ResourceQuotaInformer coreinformers.ResourceQuotaInformer
-	// Shared informer for device classes
-	DeviceClassInformer resourceinformers.DeviceClassInformer
 	// Controls full recalculation of quota usage
 	ResyncPeriod controller.ResyncPeriodFunc
 	// Maintains evaluators that know how to calculate usage for group resource
@@ -88,8 +82,6 @@ type Controller struct {
 	rqClient corev1client.ResourceQuotasGetter
 	// A lister/getter of resource quota objects
 	rqLister corelisters.ResourceQuotaLister
-	// A lister/getter of device class objects
-	dcLister resourcelisters.DeviceClassLister
 	// A list of functions that return true when their caches have synced
 	informerSyncedFuncs []cache.InformerSynced
 	// ResourceQuota objects that need to be synchronized
@@ -116,8 +108,7 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 	rq := &Controller{
 		rqClient:            options.QuotaClient,
 		rqLister:            options.ResourceQuotaInformer.Lister(),
-		dcLister:            options.DeviceClassInformer.Lister(),
-		informerSyncedFuncs: []cache.InformerSynced{options.ResourceQuotaInformer.Informer().HasSynced, options.DeviceClassInformer.Informer().HasSynced},
+		informerSyncedFuncs: []cache.InformerSynced{options.ResourceQuotaInformer.Informer().HasSynced},
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resourcequota_primary"},
@@ -374,26 +365,9 @@ func (rq *Controller) syncResourceQuota(ctx context.Context, resourceQuota *v1.R
 	}
 	hardLimits := quota.Add(v1.ResourceList{}, resourceQuota.Spec.Hard)
 
-	var deviceClassMap map[string]string
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-		dcs, err := rq.dcLister.List(labels.Everything())
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("resource quota controller cannot list resource device classes: %w", err))
-			return err
-		}
-		for i := range dcs {
-			if dcs[i].Spec.ExtendedResourceName != nil {
-				if deviceClassMap == nil {
-					deviceClassMap = make(map[string]string)
-				}
-				deviceClassMap[dcs[i].Name] = *dcs[i].Spec.ExtendedResourceName
-			}
-		}
-	}
-
 	var errs []error
-	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry, resourceQuota.Spec.ScopeSelector, deviceClassMap)
 
+	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry, resourceQuota.Spec.ScopeSelector)
 	if err != nil {
 		// if err is non-nil, remember it to return, but continue updating status with any resources in newUsage
 		errs = append(errs, err)

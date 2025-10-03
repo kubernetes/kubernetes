@@ -35,6 +35,9 @@ type DeviceClassMapping struct {
 
 // NewDeviceClassMapping creates a new DeviceClassMapping.
 func NewDeviceClassMapping(i informers.SharedInformerFactory) *DeviceClassMapping {
+	if i == nil {
+		return nil
+	}
 	cache := &DeviceClassMapping{
 		mapping:  make(map[string]string),
 		informer: i,

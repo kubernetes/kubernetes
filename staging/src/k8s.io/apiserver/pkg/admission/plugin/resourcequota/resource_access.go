@@ -28,7 +28,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
-	resourcev1listers "k8s.io/client-go/listers/resource/v1"
 	"k8s.io/utils/lru"
 )
 
@@ -41,9 +40,6 @@ type QuotaAccessor interface {
 
 	// GetQuotas gets all possible quotas for a given namespace
 	GetQuotas(namespace string) ([]corev1.ResourceQuota, error)
-
-	// GetDeviceClassMap gets the mapping of device class to extended resource name
-	GetDeviceClassMap() (map[string]string, error)
 }
 
 type quotaAccessor struct {
@@ -51,9 +47,6 @@ type quotaAccessor struct {
 
 	// lister can list/get quota objects from a shared informer's cache
 	lister corev1listers.ResourceQuotaLister
-
-	// deviceClassLister can list/get device class objects from a shared informer's cache
-	deviceClassLister resourcev1listers.DeviceClassLister
 
 	// hasSynced indicates whether the lister has completed its initial sync
 	hasSynced func() bool
@@ -112,27 +105,6 @@ func (e *quotaAccessor) checkCache(quota *corev1.ResourceQuota) *corev1.Resource
 		return quota
 	}
 	return cachedQuota
-}
-
-// GetDeviceClassMap gets the mapping of device class to extended resource name
-func (e *quotaAccessor) GetDeviceClassMap() (map[string]string, error) {
-	items, err := e.deviceClassLister.List(labels.Everything())
-	if err != nil {
-		return nil, fmt.Errorf("error resolving device class: %w", err)
-	}
-	if len(items) == 0 {
-		return nil, nil
-	}
-	var deviceClassMap map[string]string
-	for _, dc := range items {
-		if dc.Spec.ExtendedResourceName != nil {
-			if deviceClassMap == nil {
-				deviceClassMap = make(map[string]string)
-			}
-			deviceClassMap[dc.Name] = *dc.Spec.ExtendedResourceName
-		}
-	}
-	return deviceClassMap, nil
 }
 
 func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, error) {

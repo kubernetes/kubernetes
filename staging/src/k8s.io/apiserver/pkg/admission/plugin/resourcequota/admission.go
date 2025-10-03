@@ -115,10 +115,8 @@ func (a *QuotaAdmission) SetExternalKubeClientSet(client kubernetes.Interface) {
 // SetExternalKubeInformerFactory registers an informer factory into QuotaAdmission
 func (a *QuotaAdmission) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	quotas := f.Core().V1().ResourceQuotas()
-	deviceClasses := f.Resource().V1().DeviceClasses()
 	a.quotaAccessor.lister = quotas.Lister()
-	a.quotaAccessor.deviceClassLister = deviceClasses.Lister()
-	a.quotaAccessor.hasSynced = func() bool { return quotas.Informer().HasSynced() && deviceClasses.Informer().HasSynced() }
+	a.quotaAccessor.hasSynced = quotas.Informer().HasSynced
 }
 
 // SetQuotaConfiguration assigns and initializes configuration and evaluator for QuotaAdmission

@@ -112,11 +112,6 @@ func toExternalServiceOrError(obj runtime.Object) (*corev1.Service, error) {
 	return svc, nil
 }
 
-// UsageWithDeviceClass knows how to measure usage associated with services
-func (p *serviceEvaluator) UsageWithDeviceClass(item runtime.Object, deviceClassToExtendedResourceMap map[string]string) (corev1.ResourceList, error) {
-	return p.Usage(item)
-}
-
 // Usage knows how to measure usage associated with services
 func (p *serviceEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 	result := corev1.ResourceList{}
@@ -164,7 +159,7 @@ func portsWithNodePorts(svc *corev1.Service) *resource.Quantity {
 
 // UsageStats calculates aggregate usage for the object.
 func (p *serviceEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
-	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.UsageWithDeviceClass)
+	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
 }
 
 var _ quota.Evaluator = &serviceEvaluator{}
