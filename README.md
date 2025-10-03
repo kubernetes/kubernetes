@@ -2,13 +2,29 @@
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569) [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes/kubernetes)](https://goreportcard.com/report/github.com/kubernetes/kubernetes) ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kubernetes/kubernetes?sort=semver)
 
-<img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
-
-----
+<img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="200">
 
 Kubernetes, also known as K8s, is an open source system for managing [containerized applications]
 across multiple hosts. It provides basic mechanisms for the deployment, maintenance,
 and scaling of applications.
+
+---
+
+## 📌 Table of Contents 
+
+- [📖 About](#about)
+- [🚀 To start using K8s](#to-start-using-k8s)
+- [🛠️ To start developing K8s](#to-start-developing-k8s)
+- [💬 Support](#support)
+- [🔐 Security](#security)
+- [🗓️ Community Meetings](#community-meetings)
+- [👥 Adopters](#adopters)
+- [🏛️ Governance](#governance)
+- [🗺️ Roadmap](#roadmap)
+
+----
+
+## 📖 About 
 
 Kubernetes builds upon a decade and a half of experience at Google running
 production workloads at scale using a system called [Borg],
@@ -21,9 +37,8 @@ and microservices-oriented, consider joining the CNCF.
 For details about who's involved and how Kubernetes plays a role,
 read the CNCF [announcement].
 
-----
 
-## To start using K8s
+## 🚀 To start using K8s
 
 See our documentation on [kubernetes.io].
 
@@ -32,7 +47,7 @@ Take a free course on [Scalable Microservices with Kubernetes].
 To use Kubernetes code as a library in other applications, see the [list of published components](https://git.k8s.io/kubernetes/staging/README.md).
 Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries is not supported.
 
-## To start developing K8s
+## 🛠️ To start developing K8s
 
 The [community repository] hosts all information about
 building Kubernetes from source, how to contribute code
@@ -58,7 +73,7 @@ make quick-release
 
 For the full story, head over to the [developer's documentation].
 
-## Support
+## 💬 Support
 
 If you need support, start with the [troubleshooting guide],
 and work your way through the process that we've outlined.
@@ -79,15 +94,26 @@ That said, if you have questions, reach out to us
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
 [troubleshooting guide]: https://kubernetes.io/docs/tasks/debug/
 
-## Community Meetings 
+## 🔐 Security
+
+If you discover a security vulnerability in Kubernetes, please refer to our [Security Reporting Guidelines](https://kubernetes.io/security/) for instructions. 
+
+## 🗓️ Community Meetings 
 
 The [Calendar](https://www.kubernetes.dev/resources/calendar/) has the list of all the meetings in the Kubernetes community in a single location.
 
-## Adopters
+## 👥 Adopters
+Organizations across industries use Kubernetes in production. Some notable examples:
+
+- Google
+- Spotify
+- Airbnb
+- CERN
+- Adidas
 
 The [User Case Studies](https://kubernetes.io/case-studies/) website has real-world use cases of organizations across industries that are deploying/migrating to Kubernetes.
 
-## Governance 
+## 🏛️ Governance 
 
 Kubernetes project is governed by a framework of principles, values, policies and processes to help our community and constituents towards our shared goals.
 
@@ -95,6 +121,6 @@ The [Kubernetes Community](https://github.com/kubernetes/community/blob/master/g
 
 The [Kubernetes Steering community repo](https://github.com/kubernetes/steering) is used by the Kubernetes Steering Committee, which oversees governance of the Kubernetes project.
 
-## Roadmap 
+## 🗺️ Roadmap 
 
 The [Kubernetes Enhancements repo](https://github.com/kubernetes/enhancements) provides information about Kubernetes releases, as well as feature tracking and backlogs.
