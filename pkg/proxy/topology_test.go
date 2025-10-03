@@ -390,6 +390,13 @@ func TestCategorizeEndpoints(t *testing.T) {
 		clusterEndpoints: nil,
 		localEndpoints:   sets.New[string]("10.0.0.1:80"),
 		allEndpoints:     sets.New[string]("10.0.0.1:80"),
+	}, {
+		name:             "empty cluster endpoints when no service endpoints exist",
+		serviceInfo:      &BaseServicePortInfo{},
+		endpoints:        nil,
+		clusterEndpoints: sets.New[string](),
+		localEndpoints:   nil,
+		allEndpoints:     nil,
 	}}
 
 	for _, tc := range testCases {
