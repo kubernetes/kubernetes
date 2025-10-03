@@ -97,5 +97,49 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("outOfOrder"), obj.OutOfOrder, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.OutOfOrder }))...)
 
+	// field Struct.PtrItems
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []PtrItem) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a PtrItem, b PtrItem) bool {
+				return ((a.StringKey == nil && b.StringKey == nil) || (a.StringKey != nil && b.StringKey != nil && *a.StringKey == *b.StringKey)) && a.IntKey == b.IntKey && a.BoolKey == b.BoolKey
+			})...)
+			func() { // cohort {"stringKey": "target-ptr", "intKey": 42, "boolKey": true}
+				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *PtrItem) bool {
+					return item.StringKey != nil && *item.StringKey == "target-ptr" && item.IntKey == 42 && item.BoolKey == true
+				}, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrItem) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item PtrItems[stringKey=target-ptr,intKey=42,boolKey=true]")
+				})...)
+			}()
+			return
+		}(fldPath.Child("ptrItems"), obj.PtrItems, safe.Field(oldObj, func(oldObj *Struct) []PtrItem { return oldObj.PtrItems }))...)
+
+	// field Struct.MixedPtrItems
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []MixedPtrItem) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a MixedPtrItem, b MixedPtrItem) bool {
+				return ((a.StringPtrKey == nil && b.StringPtrKey == nil) || (a.StringPtrKey != nil && b.StringPtrKey != nil && *a.StringPtrKey == *b.StringPtrKey)) && a.StringKey == b.StringKey
+			})...)
+			func() { // cohort {"stringPtrKey": "target-ptr", "stringKey": "target"}
+				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *MixedPtrItem) bool {
+					return item.StringPtrKey != nil && *item.StringPtrKey == "target-ptr" && item.StringKey == "target"
+				}, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MixedPtrItem) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item MixedPtrItems")
+				})...)
+			}()
+			return
+		}(fldPath.Child("mixedPtrItems"), obj.MixedPtrItems, safe.Field(oldObj, func(oldObj *Struct) []MixedPtrItem { return oldObj.MixedPtrItems }))...)
+
 	return errs
 }
