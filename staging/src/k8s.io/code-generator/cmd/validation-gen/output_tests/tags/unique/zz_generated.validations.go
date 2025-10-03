@@ -120,5 +120,50 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("customUniqueListWithTypeMap"), obj.CustomUniqueListWithTypeMap, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.CustomUniqueListWithTypeMap }))...)
 
+	// field Struct.SliceMapFieldWithPtrKey
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []PtrKeyStruct) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a PtrKeyStruct, b PtrKeyStruct) bool {
+				return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
+			})...)
+			return
+		}(fldPath.Child("sliceMapFieldWithPtrKey"), obj.SliceMapFieldWithPtrKey, safe.Field(oldObj, func(oldObj *Struct) []PtrKeyStruct { return oldObj.SliceMapFieldWithPtrKey }))...)
+
+	// field Struct.SliceMapFieldWithMixedKeys
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []ItemWithMixedKeys) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a ItemWithMixedKeys, b ItemWithMixedKeys) bool {
+				return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && a.Key2 == b.Key2
+			})...)
+			return
+		}(fldPath.Child("sliceMapFieldWithMixedKeys"), obj.SliceMapFieldWithMixedKeys, safe.Field(oldObj, func(oldObj *Struct) []ItemWithMixedKeys { return oldObj.SliceMapFieldWithMixedKeys }))...)
+
+	// field Struct.SliceMapFieldWithMultiplePtrKeys
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []ItemWithMultiplePtrKeys) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a ItemWithMultiplePtrKeys, b ItemWithMultiplePtrKeys) bool {
+				return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && ((a.Key2 == nil && b.Key2 == nil) || (a.Key2 != nil && b.Key2 != nil && *a.Key2 == *b.Key2))
+			})...)
+			return
+		}(fldPath.Child("sliceMapFieldWithMultiplePtrKeys"), obj.SliceMapFieldWithMultiplePtrKeys, safe.Field(oldObj, func(oldObj *Struct) []ItemWithMultiplePtrKeys { return oldObj.SliceMapFieldWithMultiplePtrKeys }))...)
+
 	return errs
 }

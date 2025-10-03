@@ -18,6 +18,8 @@ package singlekey
 
 import (
 	"testing"
+
+	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -141,5 +143,25 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		AtomicUniqueMapItems: nil,
+	}).ExpectValid()
+
+	st.Value(&Struct{
+		PtrKeyItems: []PtrKeyItem{
+			{Key: ptr.To("a"), Data: "d1"},
+			{Key: ptr.To("target-ptr"), Data: "d2"},
+			{Key: nil, Data: "d3"},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		`ptrKeyItems[1]`: {
+			"item PtrKeyItems[key=target-ptr]",
+		},
+	})
+
+	st.Value(&Struct{
+		PtrKeyItems: []PtrKeyItem{
+			{Key: ptr.To("a"), Data: "d1"},
+			{Key: ptr.To("b"), Data: "d2"},
+			{Key: nil, Data: "d3"},
+		},
 	}).ExpectValid()
 }

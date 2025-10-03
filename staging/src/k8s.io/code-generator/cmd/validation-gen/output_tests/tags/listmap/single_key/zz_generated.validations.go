@@ -158,5 +158,20 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("listNonComparableField"), obj.ListNonComparableField, safe.Field(oldObj, func(oldObj *Struct) []NonComparableStruct { return oldObj.ListNonComparableField }))...)
 
+	// field Struct.ListPtrKeyField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []PtrKeyStruct) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a PtrKeyStruct, b PtrKeyStruct) bool {
+				return ((a.KeyField == nil && b.KeyField == nil) || (a.KeyField != nil && b.KeyField != nil && *a.KeyField == *b.KeyField))
+			})...)
+			return
+		}(fldPath.Child("listPtrKeyField"), obj.ListPtrKeyField, safe.Field(oldObj, func(oldObj *Struct) []PtrKeyStruct { return oldObj.ListPtrKeyField }))...)
+
 	return errs
 }
