@@ -873,7 +873,7 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 			// ridx is the index of the extended resource request in the sorted all requests in the container.
 			// crq is the quantity of the extended resource request.
 			extendedResourceEncoding := ""
-			if string(r) == resourceapi.ResourceDeviceClassPrefix+className {
+			if strings.HasPrefix(string(r), resourceapi.ResourceDeviceClassPrefix) && strings.HasSuffix(string(r), className) && (len(r) == len(resourceapi.ResourceDeviceClassPrefix)+len(className)) {
 				extendedResourceEncoding = "-i"
 			}
 			deviceRequests = append(deviceRequests,
