@@ -45,6 +45,7 @@ import (
 
 // the name used for object count quota
 var podObjectCountName = generic.ObjectCountQuotaResourceNameFor(corev1.SchemeGroupVersion.WithResource("pods").GroupResource())
+var resourceRequestsDeviceClassPrefix = corev1.DefaultResourceRequestsPrefix + resourceapi.ResourceDeviceClassPrefix
 
 // podResources are the set of resources managed by quota associated with pods.
 var podResources = []corev1.ResourceName{
@@ -87,7 +88,7 @@ func isExtendedResourceNameForQuota(name corev1.ResourceName) bool {
 	// quota objects in format of "requests.resourceName" is allowed,
 	// allow the implicit extended resource name in the format of
 	// requests.deviceclass.resource.kubernetes.io/deivce-class-name
-	return (!helper.IsNativeResource(name) || strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix+resourceapi.ResourceDeviceClassPrefix)) && strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
+	return (!helper.IsNativeResource(name) || strings.HasPrefix(string(name), resourceRequestsDeviceClassPrefix)) && strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
 }
 
 // NOTE: it was a mistake, but if a quota tracks cpu or memory related resources,
