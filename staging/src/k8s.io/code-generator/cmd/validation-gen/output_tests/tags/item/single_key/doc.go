@@ -57,6 +57,11 @@ type Struct struct {
 	// +k8s:listMapKey=key
 	// +k8s:item(key: "target")=+k8s:validateFalse="item AtomicUniqueMapItems[key=target]"
 	AtomicUniqueMapItems []Item `json:"atomicUniqueMapItems"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=key
+	// +k8s:item(key: "target-ptr")=+k8s:validateFalse="item PtrKeyItems[key=target-ptr]"
+	PtrKeyItems []PtrKeyItem `json:"ptrKeyItems"`
 }
 
 type StructWithNestedTypedef struct {
@@ -94,4 +99,9 @@ type StringAlias string
 type NestedTypedefItem struct {
 	Key  StringAlias `json:"key"`
 	Name string      `json:"name"`
+}
+
+type PtrKeyItem struct {
+	Key  *string `json:"key"`
+	Data string  `json:"data"`
 }
