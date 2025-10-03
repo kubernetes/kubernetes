@@ -600,6 +600,7 @@ message DeviceClaimConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated string requests = 1;
 
   optional DeviceConfiguration deviceConfiguration = 2;
@@ -706,6 +707,7 @@ message DeviceConstraint {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated string requests = 1;
 
   // MatchAttribute requires that all devices in question have this
@@ -804,6 +806,7 @@ message DeviceRequest {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceSelector selectors = 3;
 
   // AllocationMode and its related fields define how devices are allocated
@@ -878,6 +881,7 @@ message DeviceRequest {
   // +oneOf=deviceRequestType
   // +listType=atomic
   // +featureGate=DRAPrioritizedList
+  // +k8s:maxItems=8
   repeated DeviceSubRequest firstAvailable = 7;
 
   // If specified, the request's tolerations.
@@ -987,6 +991,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
+  // +k8s:maxItems=16
   repeated DeviceToleration tolerations = 6;
 
   // BindingConditions contains a copy of the BindingConditions
@@ -1084,6 +1089,7 @@ message DeviceSubRequest {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceSelector selectors = 3;
 
   // AllocationMode and its related fields define how devices are allocated
