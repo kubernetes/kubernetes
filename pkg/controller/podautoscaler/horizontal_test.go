@@ -5191,7 +5191,8 @@ func TestMultipleHPAs(t *testing.T) {
 	const hpaCount = 1000
 	const testNamespace = "dummy-namespace"
 
-	processed := make(chan string, hpaCount)
+	processedUpdates := make(chan string, hpaCount)
+	processedDeletes := make(chan string, hpaCount)
 
 	testClient := &fake.Clientset{}
 	testScaleClient := &scalefake.FakeScaleClient{}
@@ -5409,21 +5410,16 @@ func TestMultipleHPAs(t *testing.T) {
 	})
 
 	testClient.AddReactor("update", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		handled, obj, err := func() (handled bool, ret *autoscalingv2.HorizontalPodAutoscaler, err error) {
-			obj := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
-			assert.Equal(t, testNamespace, obj.Namespace, "the HPA namespace should be as expected")
-
-			return true, obj, nil
-		}()
-		processed <- obj.Name
-
-		return handled, obj, err
+		obj := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
+		assert.Equal(t, testNamespace, obj.Namespace, "the HPA namespace should be as expected")
+		processedUpdates <- obj.Name
+		return true, obj, nil
 	})
 
 	testClient.AddReactor("delete", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		deleteAction := action.(core.DeleteAction)
 		hpaName := deleteAction.GetName()
-		processed <- hpaName
+		processedDeletes <- hpaName
 		return true, nil, nil
 	})
 
@@ -5457,7 +5453,7 @@ func TestMultipleHPAs(t *testing.T) {
 	processedHPA := make(map[string]bool)
 	for timeout == false && len(processedHPA) < hpaCount {
 		select {
-		case hpaName := <-processed:
+		case hpaName := <-processedUpdates:
 			processedHPA[hpaName] = true
 		case <-timeoutTime:
 			timeout = true
@@ -5481,7 +5477,7 @@ func TestMultipleHPAs(t *testing.T) {
 
 	// Wait for deletion to be processed
 	select {
-	case deletedHPAName := <-processed:
+	case deletedHPAName := <-processedDeletes:
 		assert.Equal(t, hpaName, deletedHPAName, "Expected the deleted HPA name to match")
 	case <-time.After(5 * time.Second):
 		t.Fatalf("Timeout waiting for HPA deletion to be processed")
