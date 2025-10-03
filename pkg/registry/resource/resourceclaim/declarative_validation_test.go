@@ -142,34 +142,34 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: mkValidResourceClaim(tweakConfigRequests(32)),
 		},
 		"valid opaque driver, lowercase": {
-			input: mkDeviceConfig(mkValidResourceClaim(), "dra.example.com"),
+			input: mkValidResourceClaim(tweakDeviceConfigWithDriver("dra.example.com")),
 		},
 		"valid opaque driver, mixed case": {
-			input: mkDeviceConfig(mkValidResourceClaim(), "DRA.Example.COM"),
+			input: mkValidResourceClaim(tweakDeviceConfigWithDriver("DRA.Example.COM")),
 		},
 		"valid opaque driver, max length": {
-			input: mkDeviceConfig(mkValidResourceClaim(), strings.Repeat("a", 63)),
+			input: mkValidResourceClaim(tweakDeviceConfigWithDriver(strings.Repeat("a", 63))),
 		},
 		"invalid opaque driver, empty": {
-			input: mkDeviceConfig(mkValidResourceClaim(), ""),
+			input: mkValidResourceClaim(tweakDeviceConfigWithDriver("")),
 			expectedErrs: field.ErrorList{
 				field.Required(opaqueDriverPath, ""),
 			},
 		},
 		"invalid opaque driver, too long": {
-			input: mkDeviceConfig(mkValidResourceClaim(), strings.Repeat("a", 64)),
+			input: mkValidResourceClaim(tweakDeviceConfigWithDriver(strings.Repeat("a", 64))),
 			expectedErrs: field.ErrorList{
 				field.TooLong(opaqueDriverPath, "", 63),
 			},
 		},
 		"invalid opaque driver, invalid character": {
-			input: mkDeviceConfig(mkValidResourceClaim(), "dra_example.com"),
+			input: mkValidResourceClaim(tweakDeviceConfigWithDriver("dra_example.com")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(opaqueDriverPath, "dra_example.com", "").WithOrigin("format=k8s-long-name-caseless"),
 			},
 		},
 		"invalid opaque driver, invalid DNS name (leading dot)": {
-			input: mkDeviceConfig(mkValidResourceClaim(), ".example.com"),
+			input: mkValidResourceClaim(tweakDeviceConfigWithDriver(".example.com")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(opaqueDriverPath, ".example.com", "").WithOrigin("format=k8s-long-name-caseless"),
 			},
@@ -694,17 +694,18 @@ func tweakSpecAddConstraint(c resource.DeviceConstraint) func(rc *resource.Resou
 	}
 }
 
-func mkDeviceConfig(claim resource.ResourceClaim, driverName string) resource.ResourceClaim {
-	claim.Spec.Devices.Config = []resource.DeviceClaimConfiguration{
-		{
-			Requests: []string{"req-0"},
-			DeviceConfiguration: resource.DeviceConfiguration{
-				Opaque: &resource.OpaqueDeviceConfiguration{
-					Driver:     driverName,
-					Parameters: runtime.RawExtension{Raw: []byte(`{"key":"value"}`)},
+func tweakDeviceConfigWithDriver(driverName string) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Spec.Devices.Config = []resource.DeviceClaimConfiguration{
+			{
+				Requests: []string{"req-0"},
+				DeviceConfiguration: resource.DeviceConfiguration{
+					Opaque: &resource.OpaqueDeviceConfiguration{
+						Driver:     driverName,
+						Parameters: runtime.RawExtension{Raw: []byte(`{"key":"value"}`)},
+					},
 				},
 			},
-		},
+		}
 	}
-	return claim
 }
