@@ -173,11 +173,13 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		}
 
 		//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
-		if c.spec.PersistentVolume.Spec.AccessModes != nil {
+		if c.spec.PersistentVolume != nil && c.spec.PersistentVolume.Spec.AccessModes != nil {
 			accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
 		}
 
-		mountOptions = c.spec.PersistentVolume.Spec.MountOptions
+		if c.spec.PersistentVolume != nil {
+			mountOptions = c.spec.PersistentVolume.Spec.MountOptions
+		}
 
 		// Check for STAGE_UNSTAGE_VOLUME set and populate deviceMountPath if so
 		stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
