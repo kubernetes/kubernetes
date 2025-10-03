@@ -252,7 +252,7 @@ func readDirNames(dirname string) ([]string, error) {
 // walkDeep can be used to traverse directories and has two minor differences
 // from filepath.Walk:
 //   - List of files/dirs is not sorted for performance reasons
-//   - callback walkFunc is invoked on root directory after visiting children dirs and files
+//   - callback walkFunc is invoked on root directory after visiting child dirs and files
 func walkDeep(root string, walkFunc filepath.WalkFunc) error {
 	info, err := os.Lstat(root)
 	if err != nil {

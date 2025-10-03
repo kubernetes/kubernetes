@@ -308,7 +308,7 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 		}
 	}
 
-	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+	// TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 	accessMode := v1.ReadWriteOnce
 	if m.spec.PersistentVolume.Spec.AccessModes != nil {
 		accessMode = m.spec.PersistentVolume.Spec.AccessModes[0]
@@ -370,7 +370,7 @@ func (m *csiBlockMapper) MapPodDevice() (string, error) {
 		}
 	}
 
-	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+	// TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 	accessMode := v1.ReadWriteOnce
 	if m.spec.PersistentVolume.Spec.AccessModes != nil {
 		accessMode = m.spec.PersistentVolume.Spec.AccessModes[0]
