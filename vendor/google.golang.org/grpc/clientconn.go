@@ -118,12 +118,26 @@ func (dcs *defaultConfigSelector) SelectConfig(rpcInfo iresolver.RPCInfo) (*ires
 
 // NewClient creates a new gRPC "channel" for the target URI provided.  No I/O
 // is performed.  Use of the ClientConn for RPCs will automatically cause it to
-// connect.  Connect may be used to manually create a connection, but for most
-// users this is unnecessary.
+// connect.  The Connect method may be called to manually create a connection,
+// but for most users this should be unnecessary.
 //
 // The target name syntax is defined in
-// https://github.com/grpc/grpc/blob/master/doc/naming.md.  e.g. to use dns
-// resolver, a "dns:///" prefix should be applied to the target.
+// https://github.com/grpc/grpc/blob/master/doc/naming.md.  E.g. to use the dns
+// name resolver, a "dns:///" prefix may be applied to the target.  The default
+// name resolver will be used if no scheme is detected, or if the parsed scheme
+// is not a registered name resolver.  The default resolver is "dns" but can be
+// overridden using the resolver package's SetDefaultScheme.
+//
+// Examples:
+//
+//   - "foo.googleapis.com:8080"
+//   - "dns:///foo.googleapis.com:8080"
+//   - "dns:///foo.googleapis.com"
+//   - "dns:///10.0.0.213:8080"
+//   - "dns:///%5B2001:db8:85a3:8d3:1319:8a2e:370:7348%5D:443"
+//   - "dns://8.8.8.8/foo.googleapis.com:8080"
+//   - "dns://8.8.8.8/foo.googleapis.com"
+//   - "zookeeper://zk.example.com:9900/example_service"
 //
 // The DialOptions returned by WithBlock, WithTimeout,
 // WithReturnConnectionError, and FailOnNonTempDialError are ignored by this
@@ -181,7 +195,7 @@ func NewClient(target string, opts ...DialOption) (conn *ClientConn, err error) 
 		}
 		cc.dopts.defaultServiceConfig, _ = scpr.Config.(*ServiceConfig)
 	}
-	cc.mkp = cc.dopts.copts.KeepaliveParams
+	cc.keepaliveParams = cc.dopts.copts.KeepaliveParams
 
 	if err = cc.initAuthority(); err != nil {
 		return nil, err
@@ -225,7 +239,12 @@ func Dial(target string, opts ...DialOption) (*ClientConn, error) {
 func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *ClientConn, err error) {
 	// At the end of this method, we kick the channel out of idle, rather than
 	// waiting for the first rpc.
-	opts = append([]DialOption{withDefaultScheme("passthrough")}, opts...)
+	//
+	// WithLocalDNSResolution dial option in `grpc.Dial` ensures that it
+	// preserves behavior: when default scheme passthrough is used, skip
+	// hostname resolution, when "dns" is used for resolution, perform
+	// resolution on the client.
+	opts = append([]DialOption{withDefaultScheme("passthrough"), WithLocalDNSResolution()}, opts...)
 	cc, err := NewClient(target, opts...)
 	if err != nil {
 		return nil, err
@@ -618,7 +637,7 @@ type ClientConn struct {
 	balancerWrapper *ccBalancerWrapper         // Always recreated whenever entering idle to simplify Close.
 	sc              *ServiceConfig             // Latest service config received from the resolver.
 	conns           map[*addrConn]struct{}     // Set to nil on close.
-	mkp             keepalive.ClientParameters // May be updated upon receipt of a GoAway.
+	keepaliveParams keepalive.ClientParameters // May be updated upon receipt of a GoAway.
 	// firstResolveEvent is used to track whether the name resolver sent us at
 	// least one update. RPCs block on this event.  May be accessed without mu
 	// if we know we cannot be asked to enter idle mode while accessing it (e.g.
@@ -775,10 +794,7 @@ func (cc *ClientConn) updateResolverStateAndUnlock(s resolver.State, err error) 
 		}
 	}
 
-	var balCfg serviceconfig.LoadBalancingConfig
-	if cc.sc != nil && cc.sc.lbConfig != nil {
-		balCfg = cc.sc.lbConfig
-	}
+	balCfg := cc.sc.lbConfig
 	bw := cc.balancerWrapper
 	cc.mu.Unlock()
 
@@ -870,7 +886,13 @@ func (cc *ClientConn) Target() string {
 	return cc.target
 }
 
-// CanonicalTarget returns the canonical target string of the ClientConn.
+// CanonicalTarget returns the canonical target string used when creating cc.
+//
+// This always has the form "<scheme>://[authority]/<endpoint>".  For example:
+//
+//   - "dns:///example.com:42"
+//   - "dns://8.8.8.8/example.com:42"
+//   - "unix:///path/to/socket"
 func (cc *ClientConn) CanonicalTarget() string {
 	return cc.parsedTarget.String()
 }
@@ -1213,8 +1235,8 @@ func (ac *addrConn) adjustParams(r transport.GoAwayReason) {
 	case transport.GoAwayTooManyPings:
 		v := 2 * ac.dopts.copts.KeepaliveParams.Time
 		ac.cc.mu.Lock()
-		if v > ac.cc.mkp.Time {
-			ac.cc.mkp.Time = v
+		if v > ac.cc.keepaliveParams.Time {
+			ac.cc.keepaliveParams.Time = v
 		}
 		ac.cc.mu.Unlock()
 	}
@@ -1310,7 +1332,7 @@ func (ac *addrConn) tryAllAddrs(ctx context.Context, addrs []resolver.Address, c
 		ac.mu.Lock()
 
 		ac.cc.mu.RLock()
-		ac.dopts.copts.KeepaliveParams = ac.cc.mkp
+		ac.dopts.copts.KeepaliveParams = ac.cc.keepaliveParams
 		ac.cc.mu.RUnlock()
 
 		copts := ac.dopts.copts
@@ -1374,7 +1396,7 @@ func (ac *addrConn) createTransport(ctx context.Context, addr resolver.Address, 
 	defer cancel()
 	copts.ChannelzParent = ac.channelz
 
-	newTr, err := transport.NewClientTransport(connectCtx, ac.cc.ctx, addr, copts, onClose)
+	newTr, err := transport.NewHTTP2Client(connectCtx, ac.cc.ctx, addr, copts, onClose)
 	if err != nil {
 		if logger.V(2) {
 			logger.Infof("Creating new client transport to %q: %v", addr, err)
@@ -1448,7 +1470,7 @@ func (ac *addrConn) startHealthCheck(ctx context.Context) {
 	if !ac.scopts.HealthCheckEnabled {
 		return
 	}
-	healthCheckFunc := ac.cc.dopts.healthCheckFunc
+	healthCheckFunc := internal.HealthCheckFunc
 	if healthCheckFunc == nil {
 		// The health package is not imported to set health check function.
 		//
@@ -1480,7 +1502,7 @@ func (ac *addrConn) startHealthCheck(ctx context.Context) {
 	}
 	// Start the health checking stream.
 	go func() {
-		err := ac.cc.dopts.healthCheckFunc(ctx, newStream, setConnectivityState, healthCheckConfig.ServiceName)
+		err := healthCheckFunc(ctx, newStream, setConnectivityState, healthCheckConfig.ServiceName)
 		if err != nil {
 			if status.Code(err) == codes.Unimplemented {
 				channelz.Error(logger, ac.channelz, "Subchannel health check is unimplemented at server side, thus health check is disabled")
