@@ -1202,7 +1202,7 @@ message ValidatingWebhook {
   repeated MatchCondition matchConditions = 11;
 }
 
-// ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
+// ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects an object without changing it.
 // Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 ValidatingWebhookConfiguration instead.
 message ValidatingWebhookConfiguration {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
