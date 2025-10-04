@@ -1,0 +1,15 @@
+# See the OWNERS file documentation: https://git.k8s.io/community/contributors/guide/owners.md
+
+approvers:
+  - sig-autoscaling-maintainers
+  - klueska
+  - pohly
+reviewers:
+  - sig-autoscaling-maintainers
+  - sig-scheduling-maintainers
+  - klueska
+  - pohly
+labels:
+  - sig/autoscaling
+  - wg/device-management
+  - sig/scheduling
