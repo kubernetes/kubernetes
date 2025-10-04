@@ -271,7 +271,7 @@ func (spc *StatefulPodControl) PodClaimIsStale(set *apps.StatefulSet, pod *v1.Po
 			continue
 		case err != nil:
 			return false, err
-		case err == nil:
+		default:
 			if hasStaleOwnerRef(pvc, pod, podKind) {
 				return true, nil
 			}
