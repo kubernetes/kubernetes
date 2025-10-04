@@ -670,6 +670,22 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
 }
 
+func (d *Driver) SetResources(nodes *Nodes, driverResourcesGenerator driverResourcesGenFunc, driverResourcesMutators ...driverResourcesMutatorFunc) {
+	driverResources := driverResourcesGenerator(nodes)
+	for _, mutator := range driverResourcesMutators {
+		mutator(driverResources)
+	}
+
+	if _, useMultiHostDriverResources := driverResources[multiHostDriverResources]; useMultiHostDriverResources {
+		framework.Fail("Setting ResourceSlices owned by the control plane is not implemented")
+	}
+
+	for nodename, plugin := range d.Nodes {
+		dr := driverResources[nodename]
+		framework.ExpectNoError(plugin.PublishResources(d.ctx, dr), "publish driver resources for node %s", nodename)
+	}
+}
+
 func (d *Driver) ImpersonateKubeletPlugin(pod *v1.Pod) kubernetes.Interface {
 	ginkgo.GinkgoHelper()
 	driverUserInfo := (&serviceaccount.ServiceAccountInfo{
