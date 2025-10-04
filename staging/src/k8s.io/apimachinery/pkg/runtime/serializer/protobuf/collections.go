@@ -120,29 +120,29 @@ func listSize(listMeta metav1.ListMeta, items []runtime.Object) (totalSize, list
 	return totalSize, listMetaSize, itemSizes, nil
 }
 
-func streamingEncodeUnknownList(w io.Writer, unk runtime.Unknown, listData streamingListData, memAlloc runtime.MemoryAllocator) error {
+func streamingEncodeUnknownList(w io.Writer, unk runtime.Unknown, listData streamingListData) error {
 	_, err := w.Write(protoEncodingPrefix)
 	if err != nil {
 		return err
 	}
 	// encodeList is responsible for encoding the List into the unknown Raw.
 	encodeList := func(writer io.Writer) (int, error) {
-		return streamingEncodeList(writer, listData, memAlloc)
+		return streamingEncodeList(writer, listData)
 	}
 	_, err = unk.MarshalToWriter(w, listData.totalSize, encodeList)
 	return err
 }
 
-func streamingEncodeList(w io.Writer, listData streamingListData, memAlloc runtime.MemoryAllocator) (size int, err error) {
+func streamingEncodeList(w io.Writer, listData streamingListData) (size int, err error) {
 	// ListMeta; 0xa = (1 << 3) | 2; field number: 1, type: 2 (LEN). https://protobuf.dev/programming-guides/encoding/#structure
-	n, err := doEncodeWithHeader(&listData.listMeta, w, 0xa, listData.listMetaSize, memAlloc)
+	n, err := doEncodeWithHeader(&listData.listMeta, w, 0xa, listData.listMetaSize)
 	size += n
 	if err != nil {
 		return size, err
 	}
 	// Items; 0x12 = (2 << 3) | 2; field number: 2, type: 2 (LEN). https://protobuf.dev/programming-guides/encoding/#structure
 	for i, item := range listData.items {
-		n, err := doEncodeWithHeader(item, w, 0x12, listData.itemsSizes[i], memAlloc)
+		n, err := doEncodeWithHeader(item, w, 0x12, listData.itemsSizes[i])
 		size += n
 		if err != nil {
 			return size, err
