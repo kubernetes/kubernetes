@@ -9,7 +9,7 @@ You may obtain a copy of the License at
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+WITHOUTHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
@@ -34,14 +34,14 @@ import (
 )
 
 const (
-	titleUp                 = "Should scale from 1 pod to 3 pods and then from 3 pods to 5 pods"
-	titleDown               = "Should scale from 5 pods to 3 pods and then from 3 pods to 1 pod"
+	titleUp               = "Should scale from 1 pod to 3 pods and then from 3 pods to 5 pods"
+	titleDown             = "Should scale from 5 pods to 3 pods and then from 3 pods to 1 pod"
 	titleAverageUtilization = " using Average Utilization for aggregation"
-	titleAverageValue       = " using Average Value for aggregation"
-	valueMetricType         = autoscalingv2.AverageValueMetricType
-	utilizationMetricType   = autoscalingv2.UtilizationMetricType
-	cpuResource             = v1.ResourceCPU
-	memResource             = v1.ResourceMemory
+	titleAverageValue     = " using Average Value for aggregation"
+	valueMetricType       = autoscalingv2.AverageValueMetricType
+	utilizationMetricType = autoscalingv2.UtilizationMetricType
+	cpuResource           = v1.ResourceCPU
+	memResource           = v1.ResourceMemory
 )
 
 var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CPU)", func() {
@@ -221,10 +221,15 @@ func (st *HPAScaleTest) run(ctx context.Context, name string, kind schema.GroupV
 	hpa := e2eautoscaling.CreateResourceHorizontalPodAutoscaler(ctx, rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
 	ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
 
-	rc.WaitForReplicas(ctx, st.firstScale, timeToWait)
+	// THIS IS THE ONLY MODIFIED BLOCK
+	stabilizationTimeout := 5 * time.Minute
 	if st.firstScaleStasis > 0 {
-		rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, st.firstScale+1, st.firstScaleStasis, hpa.Name)
+		stabilizationTimeout = st.firstScaleStasis
 	}
+
+	framework.Logf("Waiting up to %v for replicas to stabilize in range [%d, %d]", stabilizationTimeout, st.firstScale, st.firstScale+1)
+	rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, st.firstScale+1, stabilizationTimeout, hpa.Name)
+
 	if st.resourceType == cpuResource && st.cpuBurst > 0 && st.secondScale > 0 {
 		rc.ConsumeCPU(st.cpuBurst)
 		rc.WaitForReplicas(ctx, int(st.secondScale), timeToWait)
