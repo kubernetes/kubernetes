@@ -69,6 +69,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 					options.LabelSelector = "watchlist=true"
 					return f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Watch(context.TODO(), options)
 				},
+				WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(f.ClientSet),
 			},
 			&v1.Secret{},
 			time.Duration(0),

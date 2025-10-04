@@ -60,6 +60,17 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.DiscoveryClient
 }
 
+// IsWatchListSemanticsSupported informs the reflector that this client
+// explicitly supports WatchList semantics.
+//
+// This is a synthetic method whose sole purpose is to satisfy the optional
+// interface check performed by the reflector.
+// Returning true signals that WatchList can be used.
+// No additional logic is implemented here.
+func (c *Clientset) IsWatchListSemanticsSupported() bool {
+	return true
+}
+
 // NewForConfig creates a new Clientset for the given config.
 // If config's RateLimiter is not set and QPS and Burst are acceptable,
 // NewForConfig will generate a rate-limiter in configShallowCopy.

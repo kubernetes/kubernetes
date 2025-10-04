@@ -26,6 +26,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 	singleapiv1 "k8s.io/code-generator/examples/single/api/v1"
 	versioned "k8s.io/code-generator/examples/single/clientset/versioned"
 	internalinterfaces "k8s.io/code-generator/examples/single/informers/externalversions/internalinterfaces"
@@ -81,6 +82,7 @@ func NewFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod
 				}
 				return client.ExampleV1().ClusterTestTypes().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&singleapiv1.ClusterTestType{},
 		resyncPeriod,

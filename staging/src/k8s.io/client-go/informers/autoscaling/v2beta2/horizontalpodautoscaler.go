@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	autoscalingv2beta2 "k8s.io/client-go/listers/autoscaling/v2beta2"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // HorizontalPodAutoscalerInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredHorizontalPodAutoscalerInformer(client kubernetes.Interface, nam
 				}
 				return client.AutoscalingV2beta2().HorizontalPodAutoscalers(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiautoscalingv2beta2.HorizontalPodAutoscaler{},
 		resyncPeriod,

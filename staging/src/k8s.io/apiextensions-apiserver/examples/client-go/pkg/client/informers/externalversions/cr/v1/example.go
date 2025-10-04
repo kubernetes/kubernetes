@@ -30,6 +30,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ExampleInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredExampleInformer(client versioned.Interface, namespace string, re
 				}
 				return client.CrV1().Examples(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiscrv1.Example{},
 		resyncPeriod,

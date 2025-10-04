@@ -27,7 +27,18 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/watchlist"
 )
+
+func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	target, err := kubernetes.NewForConfig(&rest.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !watchlist.DoesClientSupportWatchListSemantics(target) {
+		t.Fatalf("Client should support WatchList semantics")
+	}
+}
 
 func TestClientUserAgent(t *testing.T) {
 	tests := []struct {

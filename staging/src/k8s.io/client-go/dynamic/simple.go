@@ -110,6 +110,17 @@ func (c *DynamicClient) Resource(resource schema.GroupVersionResource) Namespace
 	return &dynamicResourceClient{client: c, resource: resource}
 }
 
+// IsWatchListSemanticsSupported informs the reflector that this client
+// explicitly supports WatchList semantics.
+//
+// This is a synthetic method whose sole purpose is to satisfy the optional
+// interface check performed by the reflector.
+// Returning true signals that WatchList can be used.
+// No additional logic is implemented here.
+func (c *DynamicClient) IsWatchListSemanticsSupported() bool {
+	return true
+}
+
 func (c *dynamicResourceClient) Namespace(ns string) ResourceInterface {
 	ret := *c
 	ret.namespace = ns
