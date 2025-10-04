@@ -91,7 +91,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 	m := newMockDriverSetup(f)
 	recursive := v1.SELinuxChangePolicyRecursive
 	mount := v1.SELinuxChangePolicyMountOption
-	f.Context("SELinuxMount [LinuxOnly]", feature.SELinux, func() {
+	f.Context("SELinuxMount", framework.WithLinuxOnly(), feature.SELinux, func() {
 		processLabel, fileLabel := getDefaultContainerSELinuxLabels()
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
@@ -431,7 +431,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 	m := newMockDriverSetup(f)
 
 	// [Serial]: the tests read global node metrics, so no other test changes them in parallel.
-	f.Context("SELinuxMount metrics [LinuxOnly]", feature.SELinux, f.WithSerial(), func() {
+	f.Context("SELinuxMount metrics", feature.SELinux, f.WithLinuxOnly(), f.WithSerial(), func() {
 		processLabel, _ := getDefaultContainerSELinuxLabels()
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
