@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
@@ -92,6 +93,9 @@ type Manager interface {
 
 	// GetMemory returns the memory allocated by a container from NUMA nodes
 	GetMemory(ctx context.Context, podUID, containerName string) []state.Block
+
+	// GetWarnings returns warnings for pod admission.
+	GetWarnings(pod *v1.Pod) []lifecycle.PodAdmitWarning
 }
 
 type manager struct {
@@ -477,4 +481,11 @@ func (m *manager) GetAllocatableMemory(ctx context.Context) []state.Block {
 // GetMemory returns the memory allocated by a container from NUMA nodes
 func (m *manager) GetMemory(ctx context.Context, podUID, containerName string) []state.Block {
 	return m.state.GetMemoryBlocks(podUID, containerName)
+}
+
+func (m *manager) GetWarnings(pod *v1.Pod) []lifecycle.PodAdmitWarning {
+	if policy, ok := m.policy.(lifecycle.PodWarningProvider); ok {
+		return policy.GetWarnings(pod)
+	}
+	return nil
 }
