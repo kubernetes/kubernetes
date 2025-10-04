@@ -95,7 +95,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
-      hostNetwork: true
       serviceAccountName: kube-proxy
       volumes:
       - name: kube-proxy

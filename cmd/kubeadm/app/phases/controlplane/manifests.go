@@ -27,7 +27,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	utilsnet "k8s.io/utils/net"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -71,6 +70,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 				{
 					Name:          kubeadmconstants.ProbePort,
 					ContainerPort: endpoint.BindPort,
+					HostPort:      endpoint.BindPort,
 					Protocol:      v1.ProtocolTCP,
 				},
 			},
@@ -90,6 +90,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 				{
 					Name:          kubeadmconstants.ProbePort,
 					ContainerPort: kubeadmconstants.KubeControllerManagerPort,
+					HostPort:      kubeadmconstants.KubeControllerManagerPort,
 					Protocol:      v1.ProtocolTCP,
 				},
 			},
@@ -109,6 +110,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 				{
 					Name:          kubeadmconstants.ProbePort,
 					ContainerPort: kubeadmconstants.KubeSchedulerPort,
+					HostPort:      kubeadmconstants.KubeSchedulerPort,
 					Protocol:      v1.ProtocolTCP,
 				},
 			},
@@ -185,6 +187,10 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		{Name: "proxy-client-key-file", Value: filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName)},
 	}
 
+	if cfg.APIServer.ExtraArgs == nil {
+		cfg.APIServer.ExtraArgs = []kubeadmapi.Arg{}
+	}
+
 	command := []string{"kube-apiserver"}
 
 	// If the user set endpoints for an external etcd cluster
@@ -201,18 +207,17 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 
 		}
 	} else {
-		// Default to etcd static pod on localhost
-		// localhost IP family should be the same that the AdvertiseAddress
-		etcdLocalhostAddress := "127.0.0.1"
-		if utilsnet.IsIPv6String(localAPIEndpoint.AdvertiseAddress) {
-			etcdLocalhostAddress = "::1"
-		}
-		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-servers", fmt.Sprintf("https://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdListenClientPort))), 1)
 		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-cafile", filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName), 1)
 		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-certfile", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName), 1)
 		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-keyfile", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName), 1)
+		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-servers", fmt.Sprintf("https://%s", net.JoinHostPort(localAPIEndpoint.AdvertiseAddress, strconv.Itoa(kubeadmconstants.EtcdListenClientPort))), 1)
 
-		// Apply user configurations for local etcd
+		// By default the --etcd-servers flag is same as the API endpoint address from the config.
+		// If --advertise-address is set on the API server it takes precendeces over the default.
+		// If the --advertise-client-urls is set on the local etcd it takes precedence over the API server flag.
+		if value, idx := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, "advertise-address", -1); idx > -1 {
+			defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-servers", fmt.Sprintf("https://%s", net.JoinHostPort(value, strconv.Itoa(kubeadmconstants.EtcdListenClientPort))), 1)
+		}
 		if cfg.Etcd.Local != nil {
 			if value, idx := kubeadmapi.GetArgValue(cfg.Etcd.Local.ExtraArgs, "advertise-client-urls", -1); idx > -1 {
 				defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "etcd-servers", value, 1)
@@ -220,9 +225,6 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		}
 	}
 
-	if cfg.APIServer.ExtraArgs == nil {
-		cfg.APIServer.ExtraArgs = []kubeadmapi.Arg{}
-	}
 	authzVal, _ := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, "authorization-mode", -1)
 	_, hasStructuredAuthzVal := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, "authorization-config", -1)
 	if hasStructuredAuthzVal == -1 {
@@ -299,7 +301,6 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 	caFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName)
 
 	defaultArguments := []kubeadmapi.Arg{
-		{Name: "bind-address", Value: "127.0.0.1"},
 		{Name: "leader-elect", Value: "true"},
 		{Name: "kubeconfig", Value: kubeconfigFile},
 		{Name: "authentication-kubeconfig", Value: kubeconfigFile},
@@ -346,7 +347,6 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 func getSchedulerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
 	defaultArguments := []kubeadmapi.Arg{
-		{Name: "bind-address", Value: "127.0.0.1"},
 		{Name: "leader-elect", Value: "true"},
 		{Name: "kubeconfig", Value: kubeconfigFile},
 		{Name: "authentication-kubeconfig", Value: kubeconfigFile},

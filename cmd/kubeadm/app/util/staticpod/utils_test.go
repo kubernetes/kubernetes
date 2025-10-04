@@ -31,6 +31,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -432,9 +433,9 @@ func TestComponentPod(t *testing.T) {
 							Name: "foo",
 						},
 					},
+					HostUsers:         ptr.To(false),
 					Priority:          &priority,
 					PriorityClassName: "system-node-critical",
-					HostNetwork:       true,
 					Volumes:           []v1.Volume{},
 				},
 			},

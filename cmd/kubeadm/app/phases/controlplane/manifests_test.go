@@ -86,6 +86,7 @@ func TestGetStaticPodSpecs(t *testing.T) {
 				{
 					Name:          kubeadmconstants.ProbePort,
 					ContainerPort: kubeadmconstants.KubeAPIServerPort,
+					HostPort:      kubeadmconstants.KubeAPIServerPort,
 					Protocol:      v1.ProtocolTCP,
 				},
 			},
@@ -101,6 +102,7 @@ func TestGetStaticPodSpecs(t *testing.T) {
 				{
 					Name:          kubeadmconstants.ProbePort,
 					ContainerPort: kubeadmconstants.KubeControllerManagerPort,
+					HostPort:      kubeadmconstants.KubeControllerManagerPort,
 					Protocol:      v1.ProtocolTCP,
 				},
 			},
@@ -117,6 +119,7 @@ func TestGetStaticPodSpecs(t *testing.T) {
 				{
 					Name:          kubeadmconstants.ProbePort,
 					ContainerPort: kubeadmconstants.KubeSchedulerPort,
+					HostPort:      kubeadmconstants.KubeSchedulerPort,
 					Protocol:      v1.ProtocolTCP,
 				},
 			},
@@ -308,7 +311,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=Node,RBAC",
 				"--advertise-address=1.2.3.4",
-				fmt.Sprintf("--etcd-servers=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--etcd-servers=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
 				"--etcd-cafile=" + filepath.Join(testCertsDir, "etcd/ca.crt"),
 				"--etcd-certfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.crt"),
 				"--etcd-keyfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.key"),
@@ -346,7 +349,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=Node,RBAC",
 				"--advertise-address=2001:db8::1",
-				fmt.Sprintf("--etcd-servers=https://[::1]:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--etcd-servers=https://[2001:db8::1]:%d", kubeadmconstants.EtcdListenClientPort),
 				"--etcd-cafile=" + filepath.Join(testCertsDir, "etcd/ca.crt"),
 				"--etcd-certfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.crt"),
 				"--etcd-keyfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.key"),
@@ -480,7 +483,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=Node,RBAC",
 				"--advertise-address=9.9.9.9",
-				fmt.Sprintf("--etcd-servers=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--etcd-servers=https://9.9.9.9:%d", kubeadmconstants.EtcdListenClientPort),
 				"--etcd-cafile=" + filepath.Join(testCertsDir, "etcd/ca.crt"),
 				"--etcd-certfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.crt"),
 				"--etcd-keyfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.key"),
@@ -527,7 +530,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=ABAC",
 				"--advertise-address=1.2.3.4",
-				fmt.Sprintf("--etcd-servers=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--etcd-servers=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
 				"--etcd-cafile=" + filepath.Join(testCertsDir, "etcd/ca.crt"),
 				"--etcd-certfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.crt"),
 				"--etcd-keyfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.key"),
@@ -576,7 +579,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=Node,RBAC,Webhook",
 				"--advertise-address=1.2.3.4",
-				fmt.Sprintf("--etcd-servers=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--etcd-servers=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
 				"--etcd-cafile=" + filepath.Join(testCertsDir, "etcd/ca.crt"),
 				"--etcd-certfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.crt"),
 				"--etcd-keyfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.key"),
@@ -621,7 +624,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-config=/path/to/authorization/config/file",
 				"--advertise-address=1.2.3.4",
-				fmt.Sprintf("--etcd-servers=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--etcd-servers=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
 				"--etcd-cafile=" + filepath.Join(testCertsDir, "etcd/ca.crt"),
 				"--etcd-certfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.crt"),
 				"--etcd-keyfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.key"),
@@ -673,7 +676,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--authorization-config=/path/to/authorization/config/file",
 				"--authorization-mode=Node,RBAC,Webhook",
 				"--advertise-address=1.2.3.4",
-				fmt.Sprintf("--etcd-servers=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--etcd-servers=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
 				"--etcd-cafile=" + filepath.Join(testCertsDir, "etcd/ca.crt"),
 				"--etcd-certfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.crt"),
 				"--etcd-keyfile=" + filepath.Join(testCertsDir, "apiserver-etcd-client.key"),
@@ -726,7 +729,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "controller-manager.conf"),
 				"--root-ca-file=" + filepath.Join(testCertsDir, "ca.crt"),
@@ -750,7 +752,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "controller-manager.conf"),
 				"--root-ca-file=" + filepath.Join(testCertsDir, "ca.crt"),
@@ -774,7 +775,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "controller-manager.conf"),
 				"--root-ca-file=" + filepath.Join(testCertsDir, "ca.crt"),
@@ -804,7 +804,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "controller-manager.conf"),
 				"--root-ca-file=" + filepath.Join(testCertsDir, "ca.crt"),
@@ -834,7 +833,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "controller-manager.conf"),
 				"--root-ca-file=" + filepath.Join(testCertsDir, "ca.crt"),
@@ -866,7 +864,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "controller-manager.conf"),
 				"--root-ca-file=" + filepath.Join(testCertsDir, "ca.crt"),
@@ -900,7 +897,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "controller-manager.conf"),
 				"--root-ca-file=" + filepath.Join(testCertsDir, "ca.crt"),
@@ -931,7 +927,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "controller-manager.conf"),
 				"--root-ca-file=" + filepath.Join(testCertsDir, "ca.crt"),
@@ -967,7 +962,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "controller-manager.conf"),
 				"--root-ca-file=" + filepath.Join(testCertsDir, "ca.crt"),
@@ -1020,7 +1014,6 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 			expectedArgFunc: func(tmpdir string) []string {
 				return []string{
 					"kube-controller-manager",
-					"--bind-address=127.0.0.1",
 					"--leader-elect=true",
 					"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "controller-manager.conf"),
 					"--root-ca-file=" + filepath.Join(tmpdir, "ca.crt"),
@@ -1049,7 +1042,6 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 			expectedArgFunc: func(tmpdir string) []string {
 				return []string{
 					"kube-controller-manager",
-					"--bind-address=127.0.0.1",
 					"--leader-elect=true",
 					"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "controller-manager.conf"),
 					"--root-ca-file=" + filepath.Join(tmpdir, "ca.crt"),
@@ -1111,7 +1103,6 @@ func TestGetSchedulerCommand(t *testing.T) {
 			cfg:  &kubeadmapi.ClusterConfiguration{},
 			expected: []string{
 				"kube-scheduler",
-				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "scheduler.conf"),
 				"--authentication-kubeconfig=" + filepath.Join(kubeadmconstants.KubernetesDir, "scheduler.conf"),

@@ -225,8 +225,19 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 			Env:            kubeadmutil.MergeKubeadmEnvVars(cfg.Etcd.Local.ExtraEnvs),
 			Ports: []v1.ContainerPort{
 				{
+					ContainerPort: kubeadmconstants.EtcdListenClientPort,
+					HostPort:      kubeadmconstants.EtcdListenClientPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: kubeadmconstants.EtcdListenPeerPort,
+					HostPort:      kubeadmconstants.EtcdListenPeerPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
 					Name:          kubeadmconstants.ProbePort,
 					ContainerPort: probePort,
+					HostPort:      probePort,
 					Protocol:      v1.ProtocolTCP,
 				},
 			},
@@ -239,16 +250,26 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 
 // getEtcdCommand builds the right etcd command from the given config object
 func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member) []string {
-	// localhost IP family should be the same that the AdvertiseAddress
-	etcdLocalhostAddress := "127.0.0.1"
+	localhostAddress := "127.0.0.1"
+	anyAddress := "0.0.0.0"
 	if utilsnet.IsIPv6String(endpoint.AdvertiseAddress) {
-		etcdLocalhostAddress = "::1"
+		localhostAddress = "::1"
+		anyAddress = "::"
 	}
+
+	joinHostPort := func(addr string, port int, isHTTPS bool) string {
+		scheme := "http"
+		if isHTTPS {
+			scheme = "https"
+		}
+		return fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(addr, strconv.Itoa(port)))
+	}
+
 	defaultArguments := []kubeadmapi.Arg{
 		{Name: "name", Value: nodeName},
-		{Name: "listen-client-urls", Value: fmt.Sprintf("%s,%s", etcdutil.GetClientURLByIP(etcdLocalhostAddress), etcdutil.GetClientURL(endpoint))},
+		{Name: "listen-client-urls", Value: joinHostPort(anyAddress, kubeadmconstants.EtcdListenClientPort, true)},
 		{Name: "advertise-client-urls", Value: etcdutil.GetClientURL(endpoint)},
-		{Name: "listen-peer-urls", Value: etcdutil.GetPeerURL(endpoint)},
+		{Name: "listen-peer-urls", Value: joinHostPort(anyAddress, kubeadmconstants.EtcdListenPeerPort, true)},
 		{Name: "initial-advertise-peer-urls", Value: etcdutil.GetPeerURL(endpoint)},
 		{Name: "data-dir", Value: cfg.Etcd.Local.DataDir},
 		{Name: "cert-file", Value: filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName)},
@@ -260,7 +281,7 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		{Name: "peer-trusted-ca-file", Value: filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName)},
 		{Name: "peer-client-cert-auth", Value: "true"},
 		{Name: "snapshot-count", Value: "10000"},
-		{Name: "listen-metrics-urls", Value: fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdMetricsPort)))},
+		{Name: "listen-metrics-urls", Value: joinHostPort(localhostAddress, kubeadmconstants.EtcdMetricsPort, false)},
 	}
 
 	etcdImageTag := images.GetEtcdImageTag(cfg)
