@@ -22,6 +22,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,6 +44,7 @@ import (
 
 // the name used for object count quota
 var podObjectCountName = generic.ObjectCountQuotaResourceNameFor(corev1.SchemeGroupVersion.WithResource("pods").GroupResource())
+var resourceRequestsDeviceClassPrefix = corev1.DefaultResourceRequestsPrefix + resourceapi.ResourceDeviceClassPrefix
 
 // podResources are the set of resources managed by quota associated with pods.
 var podResources = []corev1.ResourceName{
@@ -83,7 +85,9 @@ func maskResourceWithPrefix(resource corev1.ResourceName, prefix string) corev1.
 func isExtendedResourceNameForQuota(name corev1.ResourceName) bool {
 	// As overcommit is not supported by extended resources for now,
 	// only quota objects in format of "requests.resourceName" is allowed.
-	return !helper.IsNativeResource(name) && strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
+	// allow the implicit extended resource name in the format of
+	// requests.deviceclass.resource.kubernetes.io/deivce-class-name
+	return (!helper.IsNativeResource(name) || strings.HasPrefix(string(name), resourceRequestsDeviceClassPrefix)) && strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
 }
 
 // NOTE: it was a mistake, but if a quota tracks cpu or memory related resources,
