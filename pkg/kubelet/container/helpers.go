@@ -101,7 +101,7 @@ func ShouldContainerBeRestarted(logger klog.Logger, container *v1.Container, pod
 	}
 	// Check RestartPolicy for dead container
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-		return podutil.ContainerShouldRestart(*container, pod.Spec, int32(status.ExitCode))
+		return podutil.ContainerShouldRestart(*container, *pod, int32(status.ExitCode))
 	}
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
 		logger.V(4).Info("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)

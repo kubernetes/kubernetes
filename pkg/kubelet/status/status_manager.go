@@ -678,7 +678,8 @@ func initializedContainers(containers []v1.ContainerStatus) []v1.ContainerStatus
 // checkContainerStateTransition ensures that no container is trying to transition
 // from a terminated to non-terminated state, which is illegal and indicates a
 // logical error in the kubelet.
-func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSpec *v1.PodSpec) error {
+func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, pod *v1.Pod) error {
+	podSpec := pod.Spec
 	// If we should always restart, containers are allowed to leave the terminated state
 	if podSpec.RestartPolicy == v1.RestartPolicyAlways {
 		return nil
@@ -696,7 +697,7 @@ func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSp
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
 			restartable := false
 			for _, container := range podSpec.Containers {
-				if container.Name == oldStatus.Name && podutil.ContainerShouldRestart(container, *podSpec, oldStatus.State.Terminated.ExitCode) {
+				if container.Name == oldStatus.Name && podutil.ContainerShouldRestart(container, *pod, oldStatus.State.Terminated.ExitCode) {
 					restartable = true
 				}
 			}
@@ -732,7 +733,7 @@ func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSp
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
 			restartable := false
 			for _, container := range podSpec.InitContainers {
-				if container.Name == oldStatus.Name && podutil.ContainerShouldRestart(container, *podSpec, oldStatus.State.Terminated.ExitCode) {
+				if container.Name == oldStatus.Name && podutil.ContainerShouldRestart(container, *pod, oldStatus.State.Terminated.ExitCode) {
 					restartable = true
 				}
 			}
@@ -771,7 +772,7 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	}
 
 	// Check for illegal state transition in containers
-	if err := checkContainerStateTransition(&oldStatus, &status, &pod.Spec); err != nil {
+	if err := checkContainerStateTransition(&oldStatus, &status, pod); err != nil {
 		logger.Error(err, "Status update on pod aborted", "pod", klog.KObj(pod))
 		return
 	}
@@ -793,6 +794,9 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 
 	// Set DisruptionTarget.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.DisruptionTarget)
+
+	// Set PodRestartInPlace.LastTransitionTime
+	updateLastTransitionTime(&status, &oldStatus, v1.PodRestartInPlace)
 
 	// ensure that the start time does not change across updates.
 	if oldStatus.StartTime != nil && !oldStatus.StartTime.IsZero() {

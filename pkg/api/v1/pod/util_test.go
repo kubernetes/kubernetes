@@ -1401,7 +1401,8 @@ func TestContainerHasRestartablePolicy(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Execute the function under test
-			got := ContainerShouldRestart(tc.container, tc.podSpec, tc.exitCode)
+			pod := v1.Pod{Spec: tc.podSpec}
+			got := ContainerShouldRestart(tc.container, pod, tc.exitCode)
 
 			// Assert the result
 			if got != tc.expected {
@@ -1489,7 +1490,7 @@ func TestFindMatchingContainerRestartRule(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			rule, found := findMatchingContainerRestartRule(tc.container, tc.exitCode)
+			rule, found := FindMatchingContainerRestartRule(tc.container, tc.exitCode)
 			if found != tc.expectedFound {
 				t.Errorf("FindMatchingContainerRestartRule() found = %v, want %v", found, tc.expectedFound)
 			}

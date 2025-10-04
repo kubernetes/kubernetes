@@ -1671,7 +1671,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 			if exitCode != 0 {
 				failedInitialization++
 				if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-					if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+					if !podutil.ContainerShouldRestart(container, *pod, exitCode) {
 						failedInitializationNotRestartable++
 					}
 				}
@@ -1682,7 +1682,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 				if exitCode != 0 {
 					failedInitialization++
 					if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-						if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+						if !podutil.ContainerShouldRestart(container, *pod, exitCode) {
 							failedInitializationNotRestartable++
 						}
 					}
@@ -1752,7 +1752,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 			stopped++
 			exitCode := containerStatus.State.Terminated.ExitCode
 			if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-				if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+				if !podutil.ContainerShouldRestart(container, *pod, exitCode) {
 					stoppedNotRestartable++
 				}
 			}
@@ -1764,7 +1764,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 				stopped++
 				if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
 					exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
-					if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+					if !podutil.ContainerShouldRestart(container, *pod, exitCode) {
 						stoppedNotRestartable++
 					}
 				}
@@ -1976,6 +1976,9 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, v1.PodScheduled),
 		Status:             v1.ConditionTrue,
 	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+		s.Conditions = append(s.Conditions, status.GeneratePodRestartCondition(pod, podStatus, s.Phase))
+	}
 	// set HostIP/HostIPs and initialize PodIP/PodIPs for host network pods
 	if kl.kubeClient != nil {
 		hostIPs, err := kl.getHostIPsAnyWay()
@@ -2125,10 +2128,20 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 		if oldStatus != nil {
 			status.VolumeMounts = oldStatus.VolumeMounts // immutable
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+				if oldStatus.RestartCount > status.RestartCount {
+					status.RestartCount = oldStatus.RestartCount
+				}
+			}
 		}
 		switch {
 		case cs.State == kubecontainer.ContainerStateRunning:
 			status.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(cs.StartedAt)}
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+				if oldStatus != nil && oldStatus.State.Terminated != nil {
+					status.RestartCount = oldStatus.RestartCount + 1
+				}
+			}
 		case cs.State == kubecontainer.ContainerStateCreated:
 			// containers that are created but not running are "waiting to be running"
 			status.State.Waiting = &v1.ContainerStateWaiting{}
