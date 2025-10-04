@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
@@ -301,7 +302,6 @@ func doBurstablePodResizeTests(f *framework.Framework) {
 			true,
 		),
 	)
-
 }
 
 func doPodResizePatchErrorTests(f *framework.Framework) {
@@ -656,14 +656,65 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 	})
 }
 
-// NOTE: Pod resize scheduler resource quota tests are out of scope in e2e_node tests,
-//       because in e2e_node tests
-//          a) scheduler and controller manager is not running by the Node e2e
-//          b) api-server in services doesn't start with --enable-admission-plugins=ResourceQuota
-//             and is not possible to start it from TEST_ARGS
-//       Above tests are performed by doSheduletTests() and doPodResizeResourceQuotaTests()
-//       in test/e2e/node/pod_resize.go
+func doPodResizeReadAndReplaceTests(f *framework.Framework) {
+	// All other tests provide expansive coverage of resize functionality via
+	// the `patch` endpoint. This test provides basic coverage for the `read`
+	// and `replace` endpoints.
+	// This test needs to promoted to conformance prior to GA.
+	ginkgo.It("resize pod via the replace endpoint", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		original := []podresize.ResizableContainerInfo{{
+			Name:      "c1",
+			Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+		}}
+		desiredContainers := []podresize.ResizableContainerInfo{{
+			Name:      "c1",
+			Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, MemReq: increasedMem},
+		}}
+		desired := v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse(increasedCPU),
+				v1.ResourceMemory: resource.MustParse(increasedMem),
+			},
+		}
 
+		ginkgo.By("creating and verifying pod")
+		pod := createAndVerifyPod(ctx, f, podClient, original)
+		gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(1))
+
+		podToUpdate, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get pod")
+		podToUpdate.Spec.Containers[0].Resources = desired
+
+		ginkgo.By("updating the pod resources")
+		_, err = podClient.UpdateResize(ctx, pod.Name, podToUpdate, metav1.UpdateOptions{})
+		framework.ExpectNoError(err, "failed to resize pod")
+
+		ginkgo.By("fetching updated pod")
+		podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+		unstruct, err := f.DynamicClient.Resource(podResource).Namespace(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{}, "resize")
+		framework.ExpectNoError(err, "failed to fetch pod after resize")
+		updatedPod, err := unstructuredToPod(unstruct)
+		framework.ExpectNoError(err, "couldn't convert result to pod object")
+
+		ginkgo.By("verifying pod resources")
+		podresize.VerifyPodResources(updatedPod, desiredContainers)
+		gomega.Expect(updatedPod.Generation).To(gomega.BeEquivalentTo(2))
+
+		ginkgo.By("verifying pod resources after patch")
+		expected := podresize.UpdateExpectedContainerRestarts(ctx, updatedPod, desiredContainers)
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, updatedPod, expected)
+		podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+	})
+}
+
+// NOTE: Pod resize scheduler, resource quota, limit ranger, deferred resize tests are out of scope in e2e_node tests,
+//
+//	because in e2e_node tests
+//	   a) scheduler and controller manager is not running by the Node e2e
+//	   b) api-server in services doesn't start with --enable-admission-plugins=ResourceQuota
+//	      and is not possible to start it from TEST_ARGS
+//	Above tests in test/e2e/node/pod_resize.go
 var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-resize-tests")
 
@@ -677,6 +728,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithFeatureGate(fe
 
 	doGuaranteedPodResizeTests(f)
 	doBurstablePodResizeTests(f)
+	doPodResizeReadAndReplaceTests(f)
 	doPodResizePatchErrorTests(f)
 	doPodResizeMemoryLimitDecreaseTest(f)
 })
