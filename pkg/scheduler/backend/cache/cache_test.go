@@ -1994,17 +1994,31 @@ func BenchmarkExpirePods(b *testing.B) {
 	for _, podNum := range podNums {
 		name := fmt.Sprintf("%dPods", podNum)
 		b.Run(name, func(b *testing.B) {
-			benchmarkExpire(b, podNum)
+			benchmarkExpire(b, time.Second, podNum)
 		})
 	}
 }
 
-func benchmarkExpire(b *testing.B, podNum int) {
+func BenchmarkExpirePodsTTL0(b *testing.B) {
+	podNums := []int{
+		100,
+		1000,
+		10000,
+	}
+	for _, podNum := range podNums {
+		name := fmt.Sprintf("%dPods", podNum)
+		b.Run(name, func(b *testing.B) {
+			benchmarkExpire(b, 0, podNum)
+		})
+	}
+}
+
+func benchmarkExpire(b *testing.B, ttl time.Duration, podNum int) {
 	logger, _ := ktesting.NewTestContext(b)
 	now := time.Now()
 	for n := 0; n < b.N; n++ {
 		b.StopTimer()
-		cache := setupCacheWithAssumedPods(b, podNum, now)
+		cache := setupCacheWithAssumedPods(b, ttl, podNum, now)
 		b.StartTimer()
 		cache.cleanupAssumedPods(logger, now.Add(2*time.Second))
 	}
@@ -2076,12 +2090,12 @@ func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
 	return cache
 }
 
-func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) *cacheImpl {
+func setupCacheWithAssumedPods(b *testing.B, ttl time.Duration, podNum int, assumedTime time.Time) *cacheImpl {
 	logger, ctx := ktesting.NewTestContext(b)
 	ctx, cancel := context.WithCancel(ctx)
 	addedNodes := make(map[string]struct{})
 	defer cancel()
-	cache := newCache(ctx, time.Second, time.Second, nil)
+	cache := newCache(ctx, ttl, time.Second, nil)
 	for i := 0; i < podNum; i++ {
 		nodeName := fmt.Sprintf("node-%d", i/10)
 		if _, ok := addedNodes[nodeName]; !ok {
