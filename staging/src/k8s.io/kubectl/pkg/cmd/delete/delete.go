@@ -507,7 +507,7 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 	}
 
 	if info.Namespaced() {
-		operation = fmt.Sprintf("%s from %s namespace", operation, info.Namespace)
+		operation = fmt.Sprintf("%s from namespace \"%s\"", operation, info.Namespace)
 	}
 
 	switch o.DryRunStrategy {
