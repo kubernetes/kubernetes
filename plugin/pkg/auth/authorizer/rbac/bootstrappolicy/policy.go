@@ -517,6 +517,13 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 		{
+			// a role making the csrapprover controller approve a node serving CSR requested by the node itself
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:certificatesigningrequests:selfnodeserving"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("create").Groups(certificatesGroup).Resources("certificatesigningrequests/selfnodeserving").RuleOrDie(),
+			},
+		},
+		{
 			ObjectMeta: metav1.ObjectMeta{Name: "system:volume-scheduler"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
