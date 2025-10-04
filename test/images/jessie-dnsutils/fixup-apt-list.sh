@@ -14,19 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-DEB_ARCH=$(dpkg --print-architecture)
-
-# http://security.debian.org/debian-security/dists/jessie/updates/InRelease is missing
-# entries for some platforms, so we just remove the last line in sources.list in
-# /etc/apt/sources.list which is "deb http://deb.debian.org/debian jessie-updates main"
-
-case ${DEB_ARCH} in
-    s390x|arm64|ppc64el)
-        # We have to use the archive mirrors.
-        # See: https://lists.debian.org/debian-devel-announce/2019/03/msg00006.html
-        echo "deb http://archive.debian.org/debian/ jessie main contrib non-free" | tee /etc/apt/sources.list
-        echo "deb-src http://archive.debian.org/debian/ jessie main contrib non-free" | tee -a /etc/apt/sources.list
-       ;;
-esac
+# This script was originally needed for jessie to fix apt repository issues.
+# Since we've upgraded to bookworm, this script is no longer needed but kept
+# for compatibility reasons.
 
 exit 0
