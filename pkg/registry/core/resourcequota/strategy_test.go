@@ -17,6 +17,8 @@ limitations under the License.
 package resourcequota
 
 import (
+	"context"
+	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -56,5 +58,86 @@ func TestResourceQuotaStrategy(t *testing.T) {
 	Strategy.PrepareForCreate(genericapirequest.NewContext(), resourceQuota)
 	if resourceQuota.Status.Used != nil {
 		t.Errorf("ResourceQuota does not allow setting status on create")
+	}
+}
+
+func Test_WarningsOnCreate(t *testing.T) {
+	tests := []struct {
+		name         string
+		args         *api.ResourceQuota
+		wantWarnings []string
+	}{
+		{
+			name:         "Empty Hard Spec",
+			args:         &api.ResourceQuota{},
+			wantWarnings: []string{},
+		},
+		{
+			name: "Request less than limit",
+			args: &api.ResourceQuota{
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceName("requests.cpu"):               resource.MustParse("500m"),
+						api.ResourceName("limits.cpu"):                 resource.MustParse("1"),
+						api.ResourceName("requests.memory"):            resource.MustParse("1Gi"),
+						api.ResourceName("limits.memory"):              resource.MustParse("2Gi"),
+						api.ResourceName("requests.storage"):           resource.MustParse("1Gi"),
+						api.ResourceName("limits.storage"):             resource.MustParse("2Gi"),
+						api.ResourceName("requests.ephemeral-storage"): resource.MustParse("1Gi"),
+						api.ResourceName("limits.ephemeral-storage"):   resource.MustParse("2Gi"),
+					},
+				},
+			},
+			wantWarnings: []string{},
+		},
+		{
+			name: "Request greater than limit",
+			args: &api.ResourceQuota{
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceName("requests.cpu"):               resource.MustParse("2"),
+						api.ResourceName("limits.cpu"):                 resource.MustParse("1"),
+						api.ResourceName("requests.memory"):            resource.MustParse("3Gi"),
+						api.ResourceName("limits.memory"):              resource.MustParse("2Gi"),
+						api.ResourceName("requests.storage"):           resource.MustParse("3Gi"),
+						api.ResourceName("limits.storage"):             resource.MustParse("2Gi"),
+						api.ResourceName("requests.ephemeral-storage"): resource.MustParse("3Gi"),
+						api.ResourceName("limits.ephemeral-storage"):   resource.MustParse("2Gi"),
+					},
+				},
+			},
+			wantWarnings: []string{
+				"ResourceQuota requests.cpu (2) should be less than limits.cpu (1)",
+				"ResourceQuota requests.memory (3Gi) should be less than limits.memory (2Gi)",
+				"ResourceQuota requests.storage (3Gi) should be less than limits.storage (2Gi)",
+				"ResourceQuota requests.ephemeral-storage (3Gi) should be less than limits.ephemeral-storage (2Gi)",
+			},
+		},
+		{
+			name: "Request greater than limit, bare names",
+			args: &api.ResourceQuota{
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceName("cpu"):           resource.MustParse("2"),
+						api.ResourceName("limits.cpu"):    resource.MustParse("1"),
+						api.ResourceName("memory"):        resource.MustParse("3Gi"),
+						api.ResourceName("limits.memory"): resource.MustParse("2Gi"),
+					},
+				},
+			},
+			wantWarnings: []string{
+				"ResourceQuota cpu (2) should be less than limits.cpu (1)",
+				"ResourceQuota memory (3Gi) should be less than limits.memory (2Gi)",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warnings := Strategy.WarningsOnCreate(context.Background(), tt.args)
+			if len(warnings)+len(tt.wantWarnings) > 0 && !reflect.DeepEqual(warnings, tt.wantWarnings) {
+				t.Errorf("WarningsOnCreate()\n   got: %q\n  want: %q", warnings, tt.wantWarnings)
+			}
+		})
 	}
 }
