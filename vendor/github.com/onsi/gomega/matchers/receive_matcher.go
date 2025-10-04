@@ -11,12 +11,12 @@ import (
 )
 
 type ReceiveMatcher struct {
-	Args          []interface{}
+	Args          []any
 	receivedValue reflect.Value
 	channelClosed bool
 }
 
-func (matcher *ReceiveMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *ReceiveMatcher) Match(actual any) (success bool, err error) {
 	if !isChan(actual) {
 		return false, fmt.Errorf("ReceiveMatcher expects a channel.  Got:\n%s", format.Object(actual, 1))
 	}
@@ -30,7 +30,7 @@ func (matcher *ReceiveMatcher) Match(actual interface{}) (success bool, err erro
 
 	var subMatcher omegaMatcher
 	var hasSubMatcher bool
-	var resultReference interface{}
+	var resultReference any
 
 	// Valid arg formats are as follows, always with optional POINTER before
 	// optional MATCHER:
@@ -115,8 +115,8 @@ func (matcher *ReceiveMatcher) Match(actual interface{}) (success bool, err erro
 	return false, nil
 }
 
-func (matcher *ReceiveMatcher) FailureMessage(actual interface{}) (message string) {
-	var matcherArg interface{}
+func (matcher *ReceiveMatcher) FailureMessage(actual any) (message string) {
+	var matcherArg any
 	if len(matcher.Args) > 0 {
 		matcherArg = matcher.Args[len(matcher.Args)-1]
 	}
@@ -136,8 +136,8 @@ func (matcher *ReceiveMatcher) FailureMessage(actual interface{}) (message strin
 	return format.Message(actual, "to receive something."+closedAddendum)
 }
 
-func (matcher *ReceiveMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	var matcherArg interface{}
+func (matcher *ReceiveMatcher) NegatedFailureMessage(actual any) (message string) {
+	var matcherArg any
 	if len(matcher.Args) > 0 {
 		matcherArg = matcher.Args[len(matcher.Args)-1]
 	}
@@ -157,7 +157,7 @@ func (matcher *ReceiveMatcher) NegatedFailureMessage(actual interface{}) (messag
 	return format.Message(actual, "not to receive anything."+closedAddendum)
 }
 
-func (matcher *ReceiveMatcher) MatchMayChangeInTheFuture(actual interface{}) bool {
+func (matcher *ReceiveMatcher) MatchMayChangeInTheFuture(actual any) bool {
 	if !isChan(actual) {
 		return false
 	}

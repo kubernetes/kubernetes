@@ -1,10 +1,13 @@
 package outline
 
 import (
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/token"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/ast/inspector"
@@ -84,8 +87,10 @@ func (o *outline) String() string {
 // StringIndent returns a CSV-formated outline, but every line is indented by
 // one 'width' of spaces for every level of nesting.
 func (o *outline) StringIndent(width int) string {
-	var b strings.Builder
+	var b bytes.Buffer
 	b.WriteString("Name,Text,Start,End,Spec,Focused,Pending,Labels\n")
+
+	csvWriter := csv.NewWriter(&b)
 
 	currentIndent := 0
 	pre := func(n *ginkgoNode) {
@@ -96,8 +101,22 @@ func (o *outline) StringIndent(width int) string {
 		} else {
 			labels = strings.Join(n.Labels, ", ")
 		}
-		//enclosing labels in a double quoted comma separate listed so that when inmported into a CSV app the Labels column has comma separate strings
-		b.WriteString(fmt.Sprintf("%s,%s,%d,%d,%t,%t,%t,\"%s\"\n", n.Name, n.Text, n.Start, n.End, n.Spec, n.Focused, n.Pending, labels))
+
+		row := []string{
+			n.Name,
+			n.Text,
+			strconv.Itoa(n.Start),
+			strconv.Itoa(n.End),
+			strconv.FormatBool(n.Spec),
+			strconv.FormatBool(n.Focused),
+			strconv.FormatBool(n.Pending),
+			labels,
+		}
+		csvWriter.Write(row)
+
+		// Ensure we write to `b' before the next `b.WriteString()', which might be adding indentation
+		csvWriter.Flush()
+
 		currentIndent += width
 	}
 	post := func(n *ginkgoNode) {
@@ -106,5 +125,6 @@ func (o *outline) StringIndent(width int) string {
 	for _, n := range o.Nodes {
 		n.Walk(pre, post)
 	}
+
 	return b.String()
 }
