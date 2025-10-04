@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndflib "k8s.io/component-helpers/nodedeclaredfeatures"
@@ -79,11 +80,11 @@ func TestGuaranteedPodExclusiveCPUsFeatureDiscovery(t *testing.T) {
 			})
 			kubelet.containerManager = fakeCM
 			helper, err := ndflib.NewHelper(ndffeatures.AllFeatures)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			kubelet.nodeDeclaredFeaturesHelper = helper
 
 			features, err := kubelet.discoverNodeDeclaredFeatures()
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if tc.expectFeature {
 				assert.Contains(t, features, tc.expectedFeature)
 			} else {
