@@ -595,6 +595,7 @@ func setMockFactory(config api.Config) {
 
 func prepareCompletionTest() (*cmdtesting.TestFactory, *cobra.Command) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	SetFactoryForCompletion(tf)
 	defer tf.Cleanup()
 
 	streams, _, _, _ := genericiooptions.NewTestIOStreams()
