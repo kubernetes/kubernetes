@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -92,6 +93,8 @@ func stubRegisterControlFunc() bool {
 }
 
 func main() {
+	ctx := context.Background()
+	logger := klog.FromContext(ctx)
 	// respond to syscalls for termination
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -102,24 +105,24 @@ func main() {
 	}
 
 	pluginSocksDir := os.Getenv("PLUGIN_SOCK_DIR")
-	klog.Infof("pluginSocksDir: %s", pluginSocksDir)
+	logger.Info("pluginSocksDir: %s", pluginSocksDir)
 	if pluginSocksDir == "" {
 		pluginSocksDir = pluginapi.DevicePluginPath
 	}
 
 	socketPath := pluginSocksDir + "/dp." + fmt.Sprintf("%d", time.Now().Unix())
 
-	dp1 := plugin.NewDevicePluginStub(devs, socketPath, resourceName, false, false)
-	if err := dp1.Start(); err != nil {
+	dp1 := plugin.NewDevicePluginStub(logger, devs, socketPath, resourceName, false, false)
+	if err := dp1.Start(ctx); err != nil {
 		panic(err)
 
 	}
 	dp1.SetAllocFunc(stubAllocFunc)
 
 	cdiEnabled := os.Getenv("CDI_ENABLED")
-	klog.Infof("CDI_ENABLED: %s", cdiEnabled)
+	logger.Info("CDI_ENABLED: %s", cdiEnabled)
 	if cdiEnabled != "" {
-		if err := createCDIFile(devs); err != nil {
+		if err := createCDIFile(logger, devs); err != nil {
 			panic(err)
 		}
 		defer func() {
@@ -142,15 +145,15 @@ func main() {
 	}
 
 	if !autoregister {
-		go dp1.Watch(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath)
+		go dp1.Watch(ctx, pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath)
 
 		triggerPath := filepath.Dir(registerControlFile)
 
-		klog.InfoS("Registration process will be managed explicitly", "triggerPath", triggerPath, "triggerEntry", registerControlFile)
+		logger.Info("Registration process will be managed explicitly", "triggerPath", triggerPath, "triggerEntry", registerControlFile)
 
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
-			klog.Errorf("Watcher creation failed: %v ", err)
+			logger.Error(err, "Watcher creation failed")
 			panic(err)
 		}
 		defer watcher.Close()
@@ -158,26 +161,26 @@ func main() {
 		updateCh := make(chan bool)
 		defer close(updateCh)
 
-		go handleRegistrationProcess(registerControlFile, dp1, watcher, updateCh)
+		go handleRegistrationProcess(logger, registerControlFile, dp1, watcher, updateCh)
 
 		err = watcher.Add(triggerPath)
 		if err != nil {
-			klog.Errorf("Failed to add watch to %q: %v", triggerPath, err)
+			logger.Error(err, "Failed to add watch", "triggerPath", triggerPath)
 			panic(err)
 		}
 		for {
 			select {
 			case received := <-updateCh:
 				if received {
-					if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
+					if err := dp1.Register(ctx, pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
 						panic(err)
 					}
-					klog.InfoS("Control file was deleted, registration succeeded")
+					logger.Info("Control file was deleted, registration succeeded")
 				}
 			// Catch termination signals
 			case sig := <-sigCh:
-				klog.InfoS("Shutting down, received signal", "signal", sig)
-				if err := dp1.Stop(); err != nil {
+				logger.Info("Shutting down, received signal", "signal", sig)
+				if err := dp1.Stop(logger); err != nil {
 					panic(err)
 				}
 				return
@@ -185,44 +188,44 @@ func main() {
 			time.Sleep(5 * time.Second)
 		}
 	} else {
-		if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
+		if err := dp1.Register(ctx, pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
 			panic(err)
 		}
 
-		go dp1.Watch(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath)
+		go dp1.Watch(ctx, pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath)
 		// Catch termination signals
 		sig := <-sigCh
-		klog.InfoS("Shutting down, received signal", "signal", sig)
-		if err := dp1.Stop(); err != nil {
+		logger.Info("Shutting down, received signal", "signal", sig)
+		if err := dp1.Stop(logger); err != nil {
 			panic(err)
 		}
 		return
 	}
 }
 
-func handleRegistrationProcess(registerControlFile string, dpStub *plugin.Stub, watcher *fsnotify.Watcher, updateCh chan<- bool) {
-	klog.InfoS("Starting watching routine")
+func handleRegistrationProcess(logger klog.Logger, registerControlFile string, dpStub *plugin.Stub, watcher *fsnotify.Watcher, updateCh chan<- bool) {
+	logger.Info("Starting watching routine")
 	for {
-		klog.InfoS("handleRegistrationProcess for loop")
+		logger.Info("handleRegistrationProcess for loop")
 		select {
 		case event, ok := <-watcher.Events:
 			if !ok {
 				return
 			}
-			klog.InfoS("Received event", "name", event.Name, "operation", event.Op)
+			logger.Info("Received event", "name", event.Name, "operation", event.Op)
 			if event.Op&fsnotify.Remove == fsnotify.Remove {
 				if event.Name == registerControlFile {
-					klog.InfoS("Expected delete", "name", event.Name, "operation", event.Op)
+					logger.Info("Expected delete", "name", event.Name, "operation", event.Op)
 					updateCh <- true
 					continue
 				}
-				klog.InfoS("Spurious delete", "name", event.Name, "operation", event.Op)
+				logger.Info("Spurious delete", "name", event.Name, "operation", event.Op)
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return
 			}
-			klog.ErrorS(err, "error")
+			logger.Error(err, "error")
 			panic(err)
 		default:
 			time.Sleep(5 * time.Second)
@@ -230,7 +233,7 @@ func handleRegistrationProcess(registerControlFile string, dpStub *plugin.Stub, 
 	}
 }
 
-func createCDIFile(devs []*pluginapi.Device) error {
+func createCDIFile(logger klog.Logger, devs []*pluginapi.Device) error {
 	content := fmt.Sprintf(`{"cdiVersion":"%s","kind":"%s","devices":[`, cdiVersion, resourceName)
 	for i, dev := range devs {
 		name := cdiPrefix + dev.ID
@@ -243,6 +246,6 @@ func createCDIFile(devs []*pluginapi.Device) error {
 	if err := os.WriteFile(cdiPath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to create CDI file: %s", err)
 	}
-	klog.InfoS("Created CDI file", "path", cdiPath, "devices", devs)
+	logger.Info("Created CDI file", "path", cdiPath, "devices", devs)
 	return nil
 }
