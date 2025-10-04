@@ -115,7 +115,10 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, testcase.preferSameEnabled)
+			if !testcase.preferSameEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, false)
+			}
 
 			dropDisabledFieldsOnCreate(testcase.eps)
 			if !apiequality.Semantic.DeepEqual(testcase.eps, testcase.expectedEPS) {
