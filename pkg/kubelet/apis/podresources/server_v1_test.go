@@ -899,8 +899,10 @@ func TestAllocatableResources(t *testing.T) {
 }
 
 func TestGetPodResourcesV1(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesGet, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		pkgfeatures.KubeletPodResourcesGet:              true,
+		pkgfeatures.KubeletPodResourcesDynamicResources: true,
+	})
 
 	tCtx := ktesting.Init(t)
 	podName := "pod-name"
@@ -1077,8 +1079,10 @@ func TestGetPodResourcesV1(t *testing.T) {
 }
 
 func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesGet, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		pkgfeatures.KubeletPodResourcesGet:              true,
+		pkgfeatures.KubeletPodResourcesDynamicResources: true,
+	})
 
 	tCtx := ktesting.Init(t)
 	podName := "pod-name"

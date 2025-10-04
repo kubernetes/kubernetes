@@ -52,8 +52,10 @@ import (
 // 7. Perform another Storage Version Migration for secrets
 // 8. Verify that the resource version of the secret is not updated. i.e. it was a no-op update
 func TestStorageVersionMigration(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.StorageVersionMigrator:                                  true,
+		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+	})
 
 	// this makes the test super responsive. It's set to a default of 1 minute.
 	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Second
@@ -152,8 +154,10 @@ func TestStorageVersionMigration(t *testing.T) {
 // 10. Verify RV and Generations of CRs
 // 11. Verify the list of CRs at v2 works
 func TestStorageVersionMigrationWithCRD(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.StorageVersionMigrator:                                  true,
+		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+	})
 	// decode errors are expected when using conversation webhooks
 	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
 	t.Cleanup(func() { etcd3watcher.TestOnlySetFatalOnDecodeError(true) })
@@ -300,8 +304,10 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 // It asserts that all migrations are successful and that none of the static instances
 // were changed after they were initially created (as the migrations must be a no-op).
 func TestStorageVersionMigrationDuringChaos(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.StorageVersionMigrator:                                  true,
+		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
+	})
 
 	ctx := ktesting.Init(t)
 

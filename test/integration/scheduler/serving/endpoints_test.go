@@ -39,8 +39,10 @@ import (
 )
 
 func TestEndpointHandlers(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentStatusz, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ComponentFlagz:   true,
+		features.ComponentStatusz: true,
+	})
 
 	server, configStr, _, err := startTestAPIServer(t)
 	if err != nil {
