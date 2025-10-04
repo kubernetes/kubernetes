@@ -2079,6 +2079,19 @@
     Pod and the service must now have empty set of endpoints.
   release: v1.9
   file: test/e2e/network/service.go
+- testname: Service, should support named targetPorts that resolve to different ports
+    on different endpoints.
+  codename: '[sig-network] Services should support named targetPorts that resolve
+    to different ports on different endpoints [Conformance]'
+  description: Given a Service with a named targetPort and two backing pods, the Service
+    can be rolled out with an update to the pods that changes the named port, and
+    it MUST reach both endpoints at all points during the rollout. Update the Service
+    by recreating a new pod with the same port name and the different port number,
+    it MUST be able to forward traffic to both pods. Update the Service by recreating
+    a new pod with the same port name and number, it MUST be able to forward traffic
+    to both pods.
+  release: v1.35
+  file: test/e2e/network/service.go
 - testname: Endpoint resource lifecycle
   codename: '[sig-network] Services should test the lifecycle of an Endpoint [Conformance]'
   description: Create an endpoint, the endpoint MUST exist. The endpoint is updated
