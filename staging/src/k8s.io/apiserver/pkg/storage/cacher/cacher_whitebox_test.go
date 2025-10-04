@@ -141,6 +141,10 @@ func (d *dummyStorage) CompactRevision() int64 {
 	return 0
 }
 
+func (d *dummyStorage) IsWatchListSemanticsUnSupported() bool {
+	return true
+}
+
 type dummyWatch struct {
 	ch chan watch.Event
 }

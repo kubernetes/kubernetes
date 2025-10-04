@@ -33,6 +33,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/watchlist"
 	"k8s.io/kubectl/pkg/util/interrupt"
 )
 
@@ -86,6 +87,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 			options.FieldSelector = fieldSelector
 			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(ctx, options)
 		},
+		UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(o.DynamicClient),
 	}
 
 	// this function is used to refresh the cache to prevent timeout waits on resources that have disappeared

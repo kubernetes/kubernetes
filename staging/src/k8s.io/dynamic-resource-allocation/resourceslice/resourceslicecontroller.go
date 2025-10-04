@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	cgocore "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/watchlist"
 	"k8s.io/client-go/util/workqueue"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/klog/v2"
@@ -469,6 +470,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				logger.V(5).Info("Started watching ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "err", err)
 				return w, err
 			},
+			UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(c.resourceClient),
 		},
 		&resourceapi.ResourceSlice{},
 		// No resync because all it would do is periodically trigger syncing pools

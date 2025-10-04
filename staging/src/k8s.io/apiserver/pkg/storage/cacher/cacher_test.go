@@ -42,6 +42,7 @@ import (
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
@@ -568,9 +569,15 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	// Inject one list error to make sure we test the relist case.
+	listErrors := 1
+	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient) {
+		// The WatchListClient feature changes the reflector to use WATCH
+		// instead of LIST, therefore we don't expect any errors
+		listErrors = 0
+	}
 	wrappedStorage := &storagetesting.StorageInjectingListErrors{
 		Interface: etcdStorage,
-		Errors:    1,
+		Errors:    listErrors,
 	}
 
 	config := Config{

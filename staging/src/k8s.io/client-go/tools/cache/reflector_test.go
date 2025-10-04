@@ -710,6 +710,7 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return item.list, item.listErr
 			},
+			UnsupportedWatchListSemantics: true,
 		}
 		r := NewReflector(lw, &v1.Pod{}, s, 0)
 		err := r.ListAndWatchWithContext(ctx)
@@ -999,6 +1000,7 @@ func TestReflectorResync(t *testing.T) {
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "0"}}, nil
 		},
+		UnsupportedWatchListSemantics: true,
 	}
 	resyncPeriod := 1 * time.Millisecond
 	r := NewReflector(lw, &v1.Pod{}, s, resyncPeriod)
@@ -1043,6 +1045,7 @@ func TestReflectorWatchListPageSize(t *testing.T) {
 			}
 			return nil, nil
 		},
+		UnsupportedWatchListSemantics: true,
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 	// Set resource version to test pagination also for not consistent reads.
@@ -1082,6 +1085,7 @@ func TestReflectorNotPaginatingNotConsistentReads(t *testing.T) {
 			}
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods}, nil
 		},
+		UnsupportedWatchListSemantics: true,
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 	r.setLastSyncResourceVersion("10")
@@ -1126,6 +1130,7 @@ func TestReflectorPaginatingNonConsistentReadsIfWatchCacheDisabled(t *testing.T)
 			}
 			return nil, nil
 		},
+		UnsupportedWatchListSemantics: true,
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 
@@ -1178,6 +1183,7 @@ func TestReflectorResyncWithResourceVersion(t *testing.T) {
 			}
 			return nil, nil
 		},
+		UnsupportedWatchListSemantics: true,
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 
@@ -1242,6 +1248,7 @@ func TestReflectorExpiredExactResourceVersion(t *testing.T) {
 			}
 			return nil, nil
 		},
+		UnsupportedWatchListSemantics: true,
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 
@@ -1311,6 +1318,7 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 				return nil, err
 			}
 		},
+		UnsupportedWatchListSemantics: true,
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 	r.WatchListPageSize = 4
@@ -1388,6 +1396,7 @@ func TestReflectorFullListIfTooLarge(t *testing.T) {
 				return nil, fmt.Errorf("unexpected List call: %s", options.ResourceVersion)
 			}
 		},
+		UnsupportedWatchListSemantics: true,
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 
@@ -1588,6 +1597,7 @@ func TestReflectorResourceVersionUpdate(t *testing.T) {
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
 		},
+		UnsupportedWatchListSemantics: true,
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 
@@ -2017,6 +2027,7 @@ func TestReflectorReplacesStoreOnUnsafeDelete(t *testing.T) {
 			}
 			return list, nil
 		},
+		UnsupportedWatchListSemantics: true,
 	}
 
 	r := NewReflector(lw, &v1.Pod{}, store, 0)
