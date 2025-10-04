@@ -473,7 +473,7 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 	}
 
 	go wait.UntilWithContext(ctx, dc.worker, time.Second)
-	go wait.Until(dc.recheckWorker, time.Second, ctx.Done())
+	go wait.UntilWithContext(ctx, func(ctx context.Context) { dc.recheckWorker() }, time.Second)
 	go wait.UntilWithContext(ctx, dc.stalePodDisruptionWorker, time.Second)
 
 	<-ctx.Done()
