@@ -53,7 +53,7 @@ type FileStorer struct {
 	filePath string
 }
 
-func (fs *FileStorer) store(data state) (err error) {
+func (fs *FileStorer) store(data state) error {
 	file, err := os.OpenFile(fs.filePath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("unable to create oom watcher state file at %v: %w", fs.filePath, err)
@@ -68,7 +68,7 @@ func (fs *FileStorer) store(data state) (err error) {
 	return nil
 }
 
-func (fs *FileStorer) load(data *state) (err error) {
+func (fs *FileStorer) load(data *state) error {
 	file, err := os.OpenFile(fs.filePath, os.O_CREATE|os.O_RDONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("unable to create oom watcher state file at %v: %w", fs.filePath, err)
@@ -77,7 +77,7 @@ func (fs *FileStorer) load(data *state) (err error) {
 		err = file.Close()
 	}()
 	err = json.NewDecoder(file).Decode(data)
-	if err != nil && errors.Is(err, io.EOF) {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return fmt.Errorf("unable to decode oom watcher state file at %v: %w", fs.filePath, err)
 	}
 	return nil
