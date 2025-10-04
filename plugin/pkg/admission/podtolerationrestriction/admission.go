@@ -35,6 +35,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	qoshelper "k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/util/affinities"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
@@ -110,6 +111,9 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	if len(extraTolerations) > 0 {
 		pod.Spec.Tolerations = tolerations.MergeTolerations(pod.Spec.Tolerations, extraTolerations)
 	}
+	klog.Info("admission affinity: ", pod.Spec.Affinity)
+	pod.Spec.Affinity = affinities.DedupAffinityFields(pod.Spec.Affinity)
+	klog.Info("admission affinity updated: ", pod.Spec.Affinity)
 	return p.Validate(ctx, a, o)
 }
 
