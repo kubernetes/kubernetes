@@ -17,34 +17,33 @@ limitations under the License.
 package statusupdater
 
 import (
-	"fmt"
-	"k8s.io/klog/v2"
+	"context"
+	"math"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 )
 
-func NewFakeNodeStatusUpdater(returnError bool) NodeStatusUpdater {
-	return &fakeNodeStatusUpdater{
-		returnError: returnError,
+// Passing nil to simulate update failure
+func NewFakeNodeStatusUpdater(asw cache.ActualStateOfWorld) NodeStatusUpdater {
+	u := &fakeNodeStatusUpdater{
+		asw: asw,
 	}
+	if asw != nil {
+		asw.SetNodeUpdateHook(u.QueueUpdate)
+	}
+	return u
 }
 
 type fakeNodeStatusUpdater struct {
-	returnError bool
+	asw cache.ActualStateOfWorld
 }
 
-func (fnsu *fakeNodeStatusUpdater) UpdateNodeStatuses(logger klog.Logger) error {
-	if fnsu.returnError {
-		return fmt.Errorf("fake error on update node status")
-	}
-
-	return nil
+func (fnsu *fakeNodeStatusUpdater) QueueUpdate(nodeName types.NodeName) {
+	go fnsu.asw.SetNodeStatusUpdateFinished(klog.Background(), nodeName, math.MaxInt64)
 }
 
-func (fnsu *fakeNodeStatusUpdater) UpdateNodeStatusForNode(logger klog.Logger, nodeName types.NodeName) error {
-	if fnsu.returnError {
-		return fmt.Errorf("fake error on update node status")
-	}
-
-	return nil
+func (fnsu *fakeNodeStatusUpdater) Run(ctx context.Context, workers int) {
+	<-ctx.Done()
 }
