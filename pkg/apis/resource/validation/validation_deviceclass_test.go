@@ -219,7 +219,7 @@ func TestValidateClass(t *testing.T) {
 		},
 		"too-many-selectors": {
 			wantFailures: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "selectors"), resource.DeviceSelectorsMaxSize+1, resource.DeviceSelectorsMaxSize).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+				field.TooMany(field.NewPath("spec", "selectors"), resource.DeviceSelectorsMaxSize+1, resource.DeviceSelectorsMaxSize),
 			},
 			class: func() *resource.DeviceClass {
 				class := testClass(goodName)

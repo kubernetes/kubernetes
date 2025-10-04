@@ -792,6 +792,7 @@ type DeviceRequest struct {
 	//
 	// +optional
 	// +oneOf=deviceRequestType
+	// +k8s:optional
 	Exactly *ExactDeviceRequest `json:"exactly,omitempty" protobuf:"bytes,2,name=exactly"`
 
 	// FirstAvailable contains subrequests, of which exactly one will be
@@ -812,6 +813,7 @@ type DeviceRequest struct {
 	// +oneOf=deviceRequestType
 	// +listType=atomic
 	// +featureGate=DRAPrioritizedList
+	// +k8s:maxItems=8
 	FirstAvailable []DeviceSubRequest `json:"firstAvailable,omitempty" protobuf:"bytes,3,name=firstAvailable"`
 }
 
@@ -839,6 +841,7 @@ type ExactDeviceRequest struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:maxItems=32
 	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,2,name=selectors"`
 
 	// AllocationMode and its related fields define how devices are allocated
@@ -965,6 +968,7 @@ type DeviceSubRequest struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:maxItems=32
 	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,3,name=selectors"`
 
 	// AllocationMode and its related fields define how devices are allocated
@@ -1190,6 +1194,7 @@ type DeviceConstraint struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:maxItems=32
 	Requests []string `json:"requests,omitempty" protobuf:"bytes,1,opt,name=requests"`
 
 	// MatchAttribute requires that all devices in question have this
@@ -1247,6 +1252,7 @@ type DeviceClaimConfiguration struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:maxItems=32
 	Requests []string `json:"requests,omitempty" protobuf:"bytes,1,opt,name=requests"`
 
 	DeviceConfiguration `json:",inline" protobuf:"bytes,2,name=deviceConfiguration"`

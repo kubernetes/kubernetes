@@ -34,7 +34,7 @@ import (
 // is informative.
 func assertFailures(tb testing.TB, want, got field.ErrorList) bool {
 	tb.Helper()
-	if diff := cmp.Diff(want, got, cmpopts.IgnoreFields(field.Error{}, "Origin"), cmp.AllowUnexported(api.UniqueString{})); diff != "" {
+	if diff := cmp.Diff(want, got, cmpopts.IgnoreFields(field.Error{}, "Origin", "CoveredByDeclarative"), cmp.AllowUnexported(api.UniqueString{})); diff != "" {
 		tb.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 		return false
 	}
