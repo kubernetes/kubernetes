@@ -66,6 +66,7 @@ import (
 	testutil "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
@@ -109,6 +110,8 @@ type TestServerInstanceOptions struct {
 	BinaryVersion string
 	// Set non-default request timeout in the server.
 	RequestTimeout time.Duration
+	// Resets metrics when the server starts up and tears down
+	ResetMetrics bool
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -189,6 +192,11 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 			tearDown()
 		}
 	}()
+
+	if instanceOptions.ResetMetrics {
+		// reset default registry metrics on startup
+		legacyregistry.Reset()
+	}
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
@@ -521,6 +529,10 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	result.TearDownFn = func() {
 		tearDown()
 		etcdClient.Close()
+		if instanceOptions.ResetMetrics {
+			// reset default registry metrics on teardown
+			legacyregistry.Reset()
+		}
 	}
 	result.EtcdClient = etcdClient
 	result.EtcdStoragePrefix = storageConfig.Prefix
