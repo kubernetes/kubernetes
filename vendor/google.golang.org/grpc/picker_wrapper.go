@@ -29,7 +29,6 @@ import (
 	"google.golang.org/grpc/internal/channelz"
 	istatus "google.golang.org/grpc/internal/status"
 	"google.golang.org/grpc/internal/transport"
-	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 )
 
@@ -48,14 +47,11 @@ type pickerGeneration struct {
 // actions and unblock when there's a picker update.
 type pickerWrapper struct {
 	// If pickerGen holds a nil pointer, the pickerWrapper is closed.
-	pickerGen     atomic.Pointer[pickerGeneration]
-	statsHandlers []stats.Handler // to record blocking picker calls
+	pickerGen atomic.Pointer[pickerGeneration]
 }
 
-func newPickerWrapper(statsHandlers []stats.Handler) *pickerWrapper {
-	pw := &pickerWrapper{
-		statsHandlers: statsHandlers,
-	}
+func newPickerWrapper() *pickerWrapper {
+	pw := &pickerWrapper{}
 	pw.pickerGen.Store(&pickerGeneration{
 		blockingCh: make(chan struct{}),
 	})
@@ -93,6 +89,12 @@ func doneChannelzWrapper(acbw *acBalancerWrapper, result *balancer.PickResult) {
 	}
 }
 
+type pick struct {
+	transport transport.ClientTransport // the selected transport
+	result    balancer.PickResult       // the contents of the pick from the LB policy
+	blocked   bool                      // set if a picker call queued for a new picker
+}
+
 // pick returns the transport that will be used for the RPC.
 // It may block in the following cases:
 // - there's no picker
@@ -100,15 +102,16 @@ func doneChannelzWrapper(acbw *acBalancerWrapper, result *balancer.PickResult) {
 // - the current picker returns other errors and failfast is false.
 // - the subConn returned by the current picker is not READY
 // When one of these situations happens, pick blocks until the picker gets updated.
-func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.PickInfo) (transport.ClientTransport, balancer.PickResult, error) {
+func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.PickInfo) (pick, error) {
 	var ch chan struct{}
 
 	var lastPickErr error
+	pickBlocked := false
 
 	for {
 		pg := pw.pickerGen.Load()
 		if pg == nil {
-			return nil, balancer.PickResult{}, ErrClientConnClosing
+			return pick{}, ErrClientConnClosing
 		}
 		if pg.picker == nil {
 			ch = pg.blockingCh
@@ -127,9 +130,9 @@ func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.
 				}
 				switch ctx.Err() {
 				case context.DeadlineExceeded:
-					return nil, balancer.PickResult{}, status.Error(codes.DeadlineExceeded, errStr)
+					return pick{}, status.Error(codes.DeadlineExceeded, errStr)
 				case context.Canceled:
-					return nil, balancer.PickResult{}, status.Error(codes.Canceled, errStr)
+					return pick{}, status.Error(codes.Canceled, errStr)
 				}
 			case <-ch:
 			}
@@ -145,9 +148,7 @@ func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.
 		// In the second case, the only way it will get to this conditional is
 		// if there is a new picker.
 		if ch != nil {
-			for _, sh := range pw.statsHandlers {
-				sh.HandleRPC(ctx, &stats.PickerUpdated{})
-			}
+			pickBlocked = true
 		}
 
 		ch = pg.blockingCh
@@ -164,7 +165,7 @@ func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.
 				if istatus.IsRestrictedControlPlaneCode(st) {
 					err = status.Errorf(codes.Internal, "received picker error with illegal status: %v", err)
 				}
-				return nil, balancer.PickResult{}, dropError{error: err}
+				return pick{}, dropError{error: err}
 			}
 			// For all other errors, wait for ready RPCs should block and other
 			// RPCs should fail with unavailable.
@@ -172,7 +173,7 @@ func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.
 				lastPickErr = err
 				continue
 			}
-			return nil, balancer.PickResult{}, status.Error(codes.Unavailable, err.Error())
+			return pick{}, status.Error(codes.Unavailable, err.Error())
 		}
 
 		acbw, ok := pickResult.SubConn.(*acBalancerWrapper)
@@ -183,9 +184,8 @@ func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.
 		if t := acbw.ac.getReadyTransport(); t != nil {
 			if channelz.IsOn() {
 				doneChannelzWrapper(acbw, &pickResult)
-				return t, pickResult, nil
 			}
-			return t, pickResult, nil
+			return pick{transport: t, result: pickResult, blocked: pickBlocked}, nil
 		}
 		if pickResult.Done != nil {
 			// Calling done with nil error, no bytes sent and no bytes received.
