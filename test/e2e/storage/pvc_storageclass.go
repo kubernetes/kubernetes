@@ -72,7 +72,7 @@ var _ = utils.SIGDescribe("Retroactive StorageClass Assignment", func() {
 		}
 
 		// Create a PVC with nil StorageClass
-		pvc := createPVC(ctx, client, namespace)
+		pvc := createPVCDefaultSC(ctx, client, namespace)
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err := client.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, pvc.Name, *metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err, "Error deleting PVC")
@@ -119,7 +119,7 @@ func ensureNoDefaultStorageClasses(ctx context.Context, client clientset.Interfa
 		Should(gomega.BeZero(), "Expected no default StorageClasses")
 }
 
-func createPVC(ctx context.Context, client clientset.Interface, namespace string) *v1.PersistentVolumeClaim {
+func createPVCDefaultSC(ctx context.Context, client clientset.Interface, namespace string) *v1.PersistentVolumeClaim {
 	ginkgo.By("Creating a PVC")
 
 	c := e2epv.PersistentVolumeClaimConfig{
