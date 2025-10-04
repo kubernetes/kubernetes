@@ -4849,16 +4849,13 @@ const (
 	// zone as the client. Users should not set this value unless they have ensured
 	// that clients and endpoints are distributed in such a way that the "same zone"
 	// preference will not result in endpoints getting overloaded.
-	// This is an alias for "PreferClose", but it is an Alpha feature and is only
-	// recognized if the PreferSameTrafficDistribution feature gate is enabled.
+	// This is an alias for "PreferClose".
 	ServiceTrafficDistributionPreferSameZone = "PreferSameZone"
 
 	// Indicates a preference for routing traffic to endpoints that are on the same
 	// node as the client. Users should not set this value unless they have ensured
 	// that clients and endpoints are distributed in such a way that the "same node"
 	// preference will not result in endpoints getting overloaded.
-	// This is an Alpha feature and is only recognized if the
-	// PreferSameTrafficDistribution feature gate is enabled.
 	ServiceTrafficDistributionPreferSameNode = "PreferSameNode"
 )
 
