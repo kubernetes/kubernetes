@@ -649,7 +649,7 @@ func TestStrategyUpdate(t *testing.T) {
 			oldObj:                obj,
 			newObj:                objWithPrioritizedList,
 			prioritizedList:       false,
-			expectValidationError: deviceRequestError,
+			expectValidationError: fieldImmutableError,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")

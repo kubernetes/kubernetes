@@ -136,8 +136,7 @@ func (s *resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
 	// AuthorizedForAdmin isn't needed here because the spec is immutable.
-	errorList := validation.ValidateResourceClaim(newClaim)
-	errorList = append(errorList, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
+	errorList := validation.ValidateResourceClaimUpdate(newClaim, oldClaim)
 	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClaim, oldClaim, errorList, operation.Update, rest.WithNormalizationRules(resourceClaimNormalizationRules))
 }
 
