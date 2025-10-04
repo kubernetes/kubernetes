@@ -61,7 +61,8 @@ type objectCacheItem struct {
 	lastAccessTime time.Time
 	stopped        bool
 	immutable      bool
-	stopCh         chan struct{}
+	parentCtx      context.Context
+	cancel         context.CancelFunc
 }
 
 func (i *objectCacheItem) stop() bool {
@@ -75,7 +76,7 @@ func (i *objectCacheItem) stopThreadUnsafe() bool {
 		return false
 	}
 	i.stopped = true
-	close(i.stopCh)
+	i.cancel()
 	if !i.immutable {
 		i.store.unsetInitialized()
 	}
@@ -113,16 +114,21 @@ func (i *objectCacheItem) restartReflectorIfNeeded() {
 	if i.immutable || !i.stopped {
 		return
 	}
-	i.stopCh = make(chan struct{})
+
+	i.cancel()
+
+	ctx, cancel := context.WithCancel(i.parentCtx)
+	i.cancel = cancel
+
 	i.stopped = false
-	go i.startReflector()
+	go i.startReflector(ctx)
 }
 
-func (i *objectCacheItem) startReflector() {
+func (i *objectCacheItem) startReflector(ctx context.Context) {
 	i.waitGroup.Wait()
 	i.waitGroup.Add(1)
 	defer i.waitGroup.Done()
-	i.reflector.Run(i.stopCh)
+	i.reflector.RunWithContext(ctx)
 }
 
 // cacheStore is in order to rewrite Replace function to mark initialized flag
@@ -166,6 +172,9 @@ type objectCache struct {
 	clock         clock.Clock
 	maxIdleTime   time.Duration
 
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	lock    sync.RWMutex
 	items   map[objectKey]*objectCacheItem
 	stopped bool
@@ -175,6 +184,7 @@ const minIdleTime = 1 * time.Minute
 
 // NewObjectCache returns a new watch-based instance of Store interface.
 func NewObjectCache(
+	parentCtx context.Context,
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
@@ -182,11 +192,12 @@ func NewObjectCache(
 	groupResource schema.GroupResource,
 	clock clock.Clock,
 	maxIdleTime time.Duration,
-	stopCh <-chan struct{}) Store {
-
+) Store {
 	if maxIdleTime < minIdleTime {
 		maxIdleTime = minIdleTime
 	}
+
+	ctx, cancel := context.WithCancel(parentCtx)
 
 	store := &objectCache{
 		listObject:    listObject,
@@ -197,10 +208,12 @@ func NewObjectCache(
 		clock:         clock,
 		maxIdleTime:   maxIdleTime,
 		items:         make(map[objectKey]*objectCacheItem),
+		ctx:           ctx,
+		cancel:        cancel,
 	}
 
-	go wait.Until(store.startRecycleIdleWatch, time.Minute, stopCh)
-	go store.shutdownWhenStopped(stopCh)
+	go wait.UntilWithContext(store.ctx, store.startRecycleIdleWatch, time.Minute)
+	go store.shutdownWhenStopped()
 	return store
 }
 
@@ -214,7 +227,7 @@ func (c *objectCache) newStore() *cacheStore {
 	return &cacheStore{store, sync.Mutex{}, false}
 }
 
-func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheItem {
+func (c *objectCache) newReflectorLocked(parentCtx context.Context, namespace, name string) *objectCacheItem {
 	fieldSelector := fields.Set{"metadata.name": name}.AsSelector().String()
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
 		options.FieldSelector = fieldSelector
@@ -236,17 +249,19 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 			MinWatchTimeout: 30 * time.Minute,
 		},
 	)
+	ctx, cancel := context.WithCancel(parentCtx)
 	item := &objectCacheItem{
 		refMap:    make(map[types.UID]int),
 		store:     store,
 		reflector: reflector,
 		hasSynced: func() (bool, error) { return store.hasSynced(), nil },
-		stopCh:    make(chan struct{}),
+		parentCtx: parentCtx,
+		cancel:    cancel,
 	}
 
 	// Don't start reflector if Kubelet is already shutting down.
 	if !c.stopped {
-		go item.startReflector()
+		go item.startReflector(ctx)
 	}
 	return item
 }
@@ -263,7 +278,7 @@ func (c *objectCache) AddReference(namespace, name string, referencedFrom types.
 	defer c.lock.Unlock()
 	item, exists := c.items[key]
 	if !exists {
-		item = c.newReflectorLocked(namespace, name)
+		item = c.newReflectorLocked(c.ctx, namespace, name)
 		c.items[key] = item
 	}
 	item.refMap[referencedFrom]++
@@ -355,9 +370,7 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 	return nil, fmt.Errorf("unexpected object type: %v", obj)
 }
 
-func (c *objectCache) startRecycleIdleWatch() {
-	// TODO: it needs to be replaced by a proper context in the future
-	ctx := context.TODO()
+func (c *objectCache) startRecycleIdleWatch(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -369,8 +382,8 @@ func (c *objectCache) startRecycleIdleWatch() {
 	}
 }
 
-func (c *objectCache) shutdownWhenStopped(stopCh <-chan struct{}) {
-	<-stopCh
+func (c *objectCache) shutdownWhenStopped() {
+	<-c.ctx.Done()
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -388,6 +401,7 @@ func (c *objectCache) shutdownWhenStopped(stopCh <-chan struct{}) {
 //     referenced objects that aren't referenced from other registered pods
 //   - every GetObject() returns a value from local cache propagated via watches
 func NewWatchBasedManager(
+	ctx context.Context,
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
@@ -403,6 +417,6 @@ func NewWatchBasedManager(
 	maxIdleTime := resyncInterval * 5
 
 	// TODO propagate stopCh from the higher level.
-	objectStore := NewObjectCache(listObject, watchObject, newObject, isImmutable, groupResource, clock.RealClock{}, maxIdleTime, wait.NeverStop)
+	objectStore := NewObjectCache(ctx, listObject, watchObject, newObject, isImmutable, groupResource, clock.RealClock{}, maxIdleTime)
 	return NewCacheBasedManager(objectStore, getReferencedObjects)
 }
