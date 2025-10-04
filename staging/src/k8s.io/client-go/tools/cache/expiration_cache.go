@@ -35,11 +35,25 @@ import (
 // Note that the ExpirationCache is inherently slower than a normal
 // threadSafeStore because it takes a write lock every time it checks if
 // an item has expired.
-type ExpirationCache struct {
-	cacheStorage     ThreadSafeStore
+type ExpirationCache = TypedExpirationCache[any]
+
+// TypedExpirationCache implements the store interface
+//  1. All entries are automatically time stamped on insert
+//     a. The key is computed based off the original item/keyFunc
+//     b. The value inserted under that key is the timestamped item
+//  2. Expiration happens lazily on read based on the expiration policy
+//     a. No item can be inserted into the store while we're expiring
+//     *any* item in the cache.
+//  3. Time-stamps are stripped off unexpired entries before return
+//
+// Note that the TypedExpirationCache is inherently slower than a normal
+// threadSafeStore because it takes a write lock every time it checks if
+// an item has expired.
+type TypedExpirationCache[T any] struct {
+	cacheStorage     ThreadSafeTypedStore[*TypedTimestampedEntry[T]]
 	keyFunc          KeyFunc
 	clock            clock.Clock
-	expirationPolicy ExpirationPolicy
+	expirationPolicy TypedExpirationPolicy[T]
 	// expirationLock is a write lock used to guarantee that we don't clobber
 	// newly inserted objects because of a stale expiration timestamp comparison
 	expirationLock sync.Mutex
@@ -47,12 +61,19 @@ type ExpirationCache struct {
 
 // ExpirationPolicy dictates when an object expires. Currently only abstracted out
 // so unittests don't rely on the system clock.
-type ExpirationPolicy interface {
-	IsExpired(obj *TimestampedEntry) bool
+type ExpirationPolicy = TypedExpirationPolicy[any]
+
+// TypedExpirationPolicy dictates when an object expires. Currently only abstracted out
+// so unittests don't rely on the system clock.
+type TypedExpirationPolicy[T any] interface {
+	IsExpired(obj *TypedTimestampedEntry[T]) bool
 }
 
 // TTLPolicy implements a ttl based ExpirationPolicy.
-type TTLPolicy struct {
+type TTLPolicy = TypedTTLPolicy[any]
+
+// TypedTTLPolicy implements a ttl based TypedExpirationPolicy.
+type TypedTTLPolicy[T any] struct {
 	//	 >0: Expire entries with an age > ttl
 	//	<=0: Don't expire any entry
 	TTL time.Duration
@@ -63,7 +84,7 @@ type TTLPolicy struct {
 
 // IsExpired returns true if the given object is older than the ttl, or it can't
 // determine its age.
-func (p *TTLPolicy) IsExpired(obj *TimestampedEntry) bool {
+func (p *TypedTTLPolicy[T]) IsExpired(obj *TypedTimestampedEntry[T]) bool {
 	return p.TTL > 0 && p.Clock.Since(obj.Timestamp) > p.TTL
 }
 
@@ -71,24 +92,22 @@ func (p *TTLPolicy) IsExpired(obj *TimestampedEntry) bool {
 // Keep in mind that it is not safe to share timestamps between computers.
 // Behavior may be inconsistent if you get a timestamp from the API Server and
 // use it on the client machine as part of your ExpirationCache.
-type TimestampedEntry struct {
-	Obj       interface{}
+type TimestampedEntry = TypedTimestampedEntry[any]
+
+type TypedTimestampedEntry[T any] struct {
+	Obj       T
 	Timestamp time.Time
 	key       string
 }
 
 // getTimestampedEntry returns the TimestampedEntry stored under the given key.
-func (c *ExpirationCache) getTimestampedEntry(key string) (*TimestampedEntry, bool) {
-	item, _ := c.cacheStorage.Get(key)
-	if tsEntry, ok := item.(*TimestampedEntry); ok {
-		return tsEntry, true
-	}
-	return nil, false
+func (c *TypedExpirationCache[T]) getTimestampedEntry(key string) (*TypedTimestampedEntry[T], bool) {
+	return c.cacheStorage.Get(key)
 }
 
 // getOrExpire retrieves the object from the TimestampedEntry if and only if it hasn't
 // already expired. It holds a write lock across deletion.
-func (c *ExpirationCache) getOrExpire(key string) (interface{}, bool) {
+func (c *TypedExpirationCache[T]) getOrExpire(key string) (T, bool) {
 	// Prevent all inserts from the time we deem an item as "expired" to when we
 	// delete it, so an un-expired item doesn't sneak in under the same key, just
 	// before the Delete.
@@ -96,27 +115,27 @@ func (c *ExpirationCache) getOrExpire(key string) (interface{}, bool) {
 	defer c.expirationLock.Unlock()
 	timestampedItem, exists := c.getTimestampedEntry(key)
 	if !exists {
-		return nil, false
+		return *new(T), false
 	}
 	if c.expirationPolicy.IsExpired(timestampedItem) {
 		c.cacheStorage.Delete(key)
-		return nil, false
+		return *new(T), false
 	}
 	return timestampedItem.Obj, true
 }
 
 // GetByKey returns the item stored under the key, or sets exists=false.
-func (c *ExpirationCache) GetByKey(key string) (interface{}, bool, error) {
+func (c *TypedExpirationCache[T]) GetByKey(key string) (T, bool, error) {
 	obj, exists := c.getOrExpire(key)
 	return obj, exists, nil
 }
 
 // Get returns unexpired items. It purges the cache of expired items in the
 // process.
-func (c *ExpirationCache) Get(obj interface{}) (interface{}, bool, error) {
+func (c *TypedExpirationCache[T]) Get(obj T) (T, bool, error) {
 	key, err := c.keyFunc(obj)
 	if err != nil {
-		return nil, false, KeyError{obj, err}
+		return *new(T), false, KeyError{obj, err}
 	}
 	obj, exists := c.getOrExpire(key)
 	return obj, exists, nil
@@ -124,12 +143,12 @@ func (c *ExpirationCache) Get(obj interface{}) (interface{}, bool, error) {
 
 // List retrieves a list of unexpired items. It purges the cache of expired
 // items in the process.
-func (c *ExpirationCache) List() []interface{} {
+func (c *TypedExpirationCache[T]) List() []T {
 	items := c.cacheStorage.List()
 
-	list := make([]interface{}, 0, len(items))
+	list := make([]T, 0, len(items))
 	for _, item := range items {
-		key := item.(*TimestampedEntry).key
+		key := item.key
 		if obj, exists := c.getOrExpire(key); exists {
 			list = append(list, obj)
 		}
@@ -138,13 +157,13 @@ func (c *ExpirationCache) List() []interface{} {
 }
 
 // ListKeys returns a list of all keys in the expiration cache.
-func (c *ExpirationCache) ListKeys() []string {
+func (c *TypedExpirationCache[T]) ListKeys() []string {
 	return c.cacheStorage.ListKeys()
 }
 
 // Add timestamps an item and inserts it into the cache, overwriting entries
 // that might exist under the same key.
-func (c *ExpirationCache) Add(obj interface{}) error {
+func (c *TypedExpirationCache[T]) Add(obj T) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
@@ -152,18 +171,18 @@ func (c *ExpirationCache) Add(obj interface{}) error {
 	c.expirationLock.Lock()
 	defer c.expirationLock.Unlock()
 
-	c.cacheStorage.Add(key, &TimestampedEntry{obj, c.clock.Now(), key})
+	c.cacheStorage.Add(key, &TypedTimestampedEntry[T]{obj, c.clock.Now(), key})
 	return nil
 }
 
 // Update has not been implemented yet for lack of a use case, so this method
 // simply calls `Add`. This effectively refreshes the timestamp.
-func (c *ExpirationCache) Update(obj interface{}) error {
+func (c *TypedExpirationCache[T]) Update(obj T) error {
 	return c.Add(obj)
 }
 
 // Delete removes an item from the cache.
-func (c *ExpirationCache) Delete(obj interface{}) error {
+func (c *TypedExpirationCache[T]) Delete(obj T) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
@@ -177,15 +196,15 @@ func (c *ExpirationCache) Delete(obj interface{}) error {
 // Replace will convert all items in the given list to TimestampedEntries
 // before attempting the replace operation. The replace operation will
 // delete the contents of the ExpirationCache `c`.
-func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) error {
-	items := make(map[string]interface{}, len(list))
+func (c *TypedExpirationCache[T]) Replace(list []T, resourceVersion string) error {
+	items := make(map[string]*TypedTimestampedEntry[T], len(list))
 	ts := c.clock.Now()
 	for _, item := range list {
 		key, err := c.keyFunc(item)
 		if err != nil {
 			return KeyError{item, err}
 		}
-		items[key] = &TimestampedEntry{item, ts, key}
+		items[key] = &TypedTimestampedEntry[T]{item, ts, key}
 	}
 	c.expirationLock.Lock()
 	defer c.expirationLock.Unlock()
@@ -194,7 +213,7 @@ func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) er
 }
 
 // Resync is a no-op for one of these
-func (c *ExpirationCache) Resync() error {
+func (c *TypedExpirationCache[T]) Resync() error {
 	return nil
 }
 
@@ -205,8 +224,13 @@ func NewTTLStore(keyFunc KeyFunc, ttl time.Duration) Store {
 
 // NewExpirationStore creates and returns a ExpirationCache for a given policy
 func NewExpirationStore(keyFunc KeyFunc, expirationPolicy ExpirationPolicy) Store {
-	return &ExpirationCache{
-		cacheStorage:     NewThreadSafeStore(Indexers{}, Indices{}),
+	return NewTypedExpirationStore[any](keyFunc, expirationPolicy)
+}
+
+// NewTypedExpirationStore creates and returns a TypedExpirationCache for a given policy
+func NewTypedExpirationStore[T any](keyFunc KeyFunc, expirationPolicy TypedExpirationPolicy[T]) TypedStore[T] {
+	return &TypedExpirationCache[T]{
+		cacheStorage:     NewThreadSafeTypedStore[*TypedTimestampedEntry[T]](Indexers{}, Indices{}),
 		keyFunc:          keyFunc,
 		clock:            clock.RealClock{},
 		expirationPolicy: expirationPolicy,
