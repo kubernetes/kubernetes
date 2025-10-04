@@ -300,7 +300,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
 		})
 
-		f.It("mirror pod: update activeDeadlineSeconds", func(ctx context.Context) {
+		f.It("mirror pod: update activeDeadlineSeconds", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -323,7 +323,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(0)))
 		})
 
-		f.It("mirror pod: update container image", func(ctx context.Context) {
+		f.It("mirror pod: update container image", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -346,7 +346,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(0)))
 		})
 
-		f.It("mirror pod: update initContainer image", func(ctx context.Context) {
+		f.It("mirror pod: update initContainer image", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
