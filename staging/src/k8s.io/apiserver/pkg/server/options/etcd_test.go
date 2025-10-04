@@ -361,6 +361,13 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 				EncryptionProviderConfigFilepath:        tc.encryptionConfigPath,
 				EncryptionProviderConfigAutomaticReload: tc.reload,
 				SkipHealthEndpoints:                     tc.skipHealth,
+				// We need to configure an etcd endpoint, even though there is no server there,
+				// otherwise we get an immediate error when applying options.
+				StorageConfig: storagebackend.Config{
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://example.com:2379"},
+					},
+				},
 			}
 			if err := etcdOptions.ApplyTo(serverConfig); err != nil {
 				t.Fatalf("Failed to add healthz error: %v", err)
@@ -434,7 +441,17 @@ func TestReadinessCheck(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			serverConfig := server.NewConfig(codecs)
-			etcdOptions := &EtcdOptions{SkipHealthEndpoints: tc.skipHealth, EtcdServersOverrides: tc.etcdServersOverrides}
+			etcdOptions := &EtcdOptions{
+				SkipHealthEndpoints:  tc.skipHealth,
+				EtcdServersOverrides: tc.etcdServersOverrides,
+				// We need to configure an etcd endpoint, even though there is no server there,
+				// otherwise we get an immediate error when applying options.
+				StorageConfig: storagebackend.Config{
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://example.com:2379"},
+					},
+				},
+			}
 			if err := etcdOptions.ApplyTo(serverConfig); err != nil {
 				t.Fatalf("Failed to add healthz error: %v", err)
 			}
@@ -465,7 +482,15 @@ func healthChecksAreEqual(t *testing.T, want []string, healthChecks []healthz.He
 
 func TestRestOptionsStorageObjectCountTracker(t *testing.T) {
 	serverConfig := server.NewConfig(codecs)
-	etcdOptions := &EtcdOptions{}
+	etcdOptions := &EtcdOptions{
+		// We need to configure an etcd endpoint, even though there is no server there,
+		// otherwise we get an immediate error when applying options.
+		StorageConfig: storagebackend.Config{
+			Transport: storagebackend.TransportConfig{
+				ServerList: []string{"http://example.com:2379"},
+			},
+		},
+	}
 	if err := etcdOptions.ApplyTo(serverConfig); err != nil {
 		t.Fatalf("Failed to apply etcd options error: %v", err)
 	}
