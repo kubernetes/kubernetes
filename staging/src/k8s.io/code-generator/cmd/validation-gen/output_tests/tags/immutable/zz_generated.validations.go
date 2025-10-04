@@ -52,17 +52,12 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_ImmutableType validates an instance of ImmutableType according
 // to declarative validation rules in the API schema.
 func Validate_ImmutableType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ImmutableType) (errs field.ErrorList) {
-<<<<<<< HEAD
-	if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-		errs = append(errs, e...)
-=======
 	earlyReturn := false
-	if e := validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+	if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 		errs = append(errs, e...)
 		earlyReturn = true
 	}
 	if earlyReturn {
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 		return // do not proceed
 	}
 
@@ -82,17 +77,12 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-<<<<<<< HEAD
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-=======
 			earlyReturn := false
-			if e := validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			return
@@ -106,17 +96,12 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-<<<<<<< HEAD
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-=======
 			earlyReturn := false
-			if e := validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			return
@@ -130,17 +115,12 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-<<<<<<< HEAD
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-=======
 			earlyReturn := false
-			if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			return
@@ -154,17 +134,12 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-<<<<<<< HEAD
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-=======
 			earlyReturn := false
-			if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			return
@@ -178,17 +153,12 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-<<<<<<< HEAD
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-=======
 			earlyReturn := false
-			if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			return
@@ -202,17 +172,12 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-<<<<<<< HEAD
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-=======
 			earlyReturn := false
-			if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			return
@@ -226,17 +191,12 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-<<<<<<< HEAD
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-=======
 			earlyReturn := false
-			if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			return
@@ -250,17 +210,12 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-<<<<<<< HEAD
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-=======
 			earlyReturn := false
-			if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 				return // do not proceed
 			}
 			return

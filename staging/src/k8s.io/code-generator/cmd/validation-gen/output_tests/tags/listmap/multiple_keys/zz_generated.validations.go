@@ -73,29 +73,20 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-<<<<<<< HEAD
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
-				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-			}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
-			}
-			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
-				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-			})...)
-=======
 			earlyReturn := false
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
 				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-			}, validate.DirectEqual, validate.ImmutableByCompare); len(e) != 0 {
+			}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
+				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
+			})...)
 			return
 		}(fldPath.Child("listField"), obj.ListField, safe.Field(oldObj, func(oldObj *Struct) []OtherStruct { return oldObj.ListField }))...)
 
@@ -107,29 +98,20 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-<<<<<<< HEAD
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherTypedefStruct, b OtherTypedefStruct) bool {
-				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-			}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
-			}
-			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a OtherTypedefStruct, b OtherTypedefStruct) bool {
-				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-			})...)
-=======
 			earlyReturn := false
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherTypedefStruct, b OtherTypedefStruct) bool {
 				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-			}, validate.DirectEqual, validate.ImmutableByCompare); len(e) != 0 {
+			}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a OtherTypedefStruct, b OtherTypedefStruct) bool {
+				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
+			})...)
 			return
 		}(fldPath.Child("listTypedefField"), obj.ListTypedefField, safe.Field(oldObj, func(oldObj *Struct) []OtherTypedefStruct { return oldObj.ListTypedefField }))...)
 
@@ -141,27 +123,18 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-<<<<<<< HEAD
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
-				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-			}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_ListType(ctx, op, fldPath, obj, oldObj)...)
-=======
 			earlyReturn := false
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
 				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-			}, validate.DirectEqual, validate.ImmutableByCompare); len(e) != 0 {
+			}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
+			// call the type's validation function
+			errs = append(errs, Validate_ListType(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("typedefField"), obj.TypedefField, safe.Field(oldObj, func(oldObj *Struct) ListType { return oldObj.TypedefField }))...)
 
