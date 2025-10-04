@@ -421,7 +421,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 
 	// Service Granular Checks as in k8s.io/kubernetes/test/e2e/network/networking.go
 	// but using the secondary IP, so we run the same tests for each ClusterIP family
-	ginkgo.Describe("Granular Checks: Services Secondary IP Family [LinuxOnly]", func() {
+	framework.Describe("Granular Checks: Services Secondary IP Family", f.WithLinuxOnly(), func() {
 
 		ginkgo.It("should function for pod-Service: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableDualStack)
@@ -558,7 +558,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
-		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func(ctx context.Context) {
+		framework.It("should function for client IP based session affinity: http", f.WithLinuxOnly(), func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterHTTPPort))
 
@@ -576,7 +576,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
-		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func(ctx context.Context) {
+		framework.It("should function for client IP based session affinity: udp", f.WithLinuxOnly(), func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterUDPPort))
 

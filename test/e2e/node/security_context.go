@@ -75,7 +75,7 @@ var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should support pod.Spec.SecurityContext.SupplementalGroups [LinuxOnly]", func(ctx context.Context) {
+	framework.It("should support pod.Spec.SecurityContext.SupplementalGroups", f.WithLinuxOnly(), func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].Command = []string{"id", "-G"}
 		pod.Spec.SecurityContext.SupplementalGroups = []int64{1234, 5678}
@@ -83,8 +83,8 @@ var _ = SIGDescribe("Security Context", func() {
 		e2eoutput.TestContainerOutput(ctx, f, "pod.Spec.SecurityContext.SupplementalGroups", pod, 0, groups)
 	})
 
-	ginkgo.When("if the container's primary UID belongs to some groups in the image [LinuxOnly]", func() {
-		ginkgo.It("should add pod.Spec.SecurityContext.SupplementalGroups to them [LinuxOnly] in resultant supplementary groups for the container processes", func(ctx context.Context) {
+	framework.It("if the container's primary UID belongs to some groups in the image", f.WithLinuxOnly(), func() {
+		framework.It("should add pod.Spec.SecurityContext.SupplementalGroups to them in resultant supplementary groups for the container processes", f.WithLinuxOnly(), func(ctx context.Context) {
 			uidInImage := int64(1000)
 			gidDefinedInImage := int64(50000)
 			supplementalGroup := int64(60000)
@@ -114,7 +114,7 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 	})
 
-	ginkgo.It("should support pod.Spec.SecurityContext.RunAsUser [LinuxOnly]", func(ctx context.Context) {
+	framework.It("should support pod.Spec.SecurityContext.RunAsUser", f.WithLinuxOnly(), func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
 		pod.Spec.SecurityContext.RunAsUser = &userID
@@ -132,7 +132,7 @@ var _ = SIGDescribe("Security Context", func() {
 		Description: Container is created with runAsUser and runAsGroup option by passing uid 1001 and gid 2002 at pod level. Pod MUST be in Succeeded phase.
 		[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should support pod.Spec.SecurityContext.RunAsUser And pod.Spec.SecurityContext.RunAsGroup [LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should support pod.Spec.SecurityContext.RunAsUser And pod.Spec.SecurityContext.RunAsGroup", f.WithLinuxOnly(), func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
 		groupID := int64(2002)
@@ -146,7 +146,7 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 	})
 
-	ginkgo.It("should support container.SecurityContext.RunAsUser [LinuxOnly]", func(ctx context.Context) {
+	framework.It("should support container.SecurityContext.RunAsUser", f.WithLinuxOnly(), func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
 		overrideUserID := int64(1002)
@@ -167,7 +167,7 @@ var _ = SIGDescribe("Security Context", func() {
 		Description: Container is created with runAsUser and runAsGroup option by passing uid 1001 and gid 2002 at containr level. Pod MUST be in Succeeded phase.
 		[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup [LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup", f.WithLinuxOnly(), func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
 		groupID := int64(2001)
@@ -198,7 +198,7 @@ var _ = SIGDescribe("Security Context", func() {
 		testPodSELinuxLabeling(ctx, f, false, true)
 	})
 
-	ginkgo.It("should support seccomp unconfined on the container [LinuxOnly]", func(ctx context.Context) {
+	framework.It("should support seccomp unconfined on the container", f.WithLinuxOnly(), func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}}
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}
@@ -206,21 +206,21 @@ var _ = SIGDescribe("Security Context", func() {
 		e2eoutput.TestContainerOutput(ctx, f, "seccomp unconfined container", pod, 0, []string{"0"}) // seccomp disabled
 	})
 
-	ginkgo.It("should support seccomp unconfined on the pod [LinuxOnly]", func(ctx context.Context) {
+	framework.It("should support seccomp unconfined on the pod", f.WithLinuxOnly(), func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}}
 		pod.Spec.Containers[0].Command = []string{"grep", SeccompProcStatusField, ProcSelfStatusPath}
 		e2eoutput.TestContainerOutput(ctx, f, "seccomp unconfined pod", pod, 0, []string{"0"}) // seccomp disabled
 	})
 
-	ginkgo.It("should support seccomp runtime/default [LinuxOnly]", func(ctx context.Context) {
+	framework.It("should support seccomp runtime/default", f.WithLinuxOnly(), func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}
 		pod.Spec.Containers[0].Command = []string{"grep", SeccompProcStatusField, ProcSelfStatusPath}
 		e2eoutput.TestContainerOutput(ctx, f, "seccomp runtime/default", pod, 0, []string{"2"}) // seccomp filtered
 	})
 
-	ginkgo.It("should support seccomp default which is unconfined [LinuxOnly]", func(ctx context.Context) {
+	framework.It("should support seccomp default which is unconfined", f.WithLinuxOnly(), func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].Command = []string{"grep", SeccompProcStatusField, ProcSelfStatusPath}
 		e2eoutput.TestContainerOutput(ctx, f, "seccomp default unconfined", pod, 0, []string{"0"}) // seccomp disabled

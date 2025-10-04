@@ -52,7 +52,7 @@ var _ = SIGDescribe("PrivilegedPod", framework.WithNodeConformance(), func() {
 		notPrivilegedContainer: "not-privileged-container",
 	}
 
-	ginkgo.It("should enable privileged commands [LinuxOnly]", func(ctx context.Context) {
+	f.It("should enable privileged commands", f.WithLinuxOnly(), func(ctx context.Context) {
 		// Windows does not support privileged containers.
 		ginkgo.By("Creating a pod with a privileged container")
 		config.createPods(ctx)
