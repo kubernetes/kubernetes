@@ -91,7 +91,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		}
 
-		f.It("must create the user namespace if set to false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("must create the user namespace if set to false", framework.WithLinuxOnly(), feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// with hostUsers=false the pod must use a new user namespace
 			podClient := e2epod.PodClientNS(f, f.Namespace.Name)
 
@@ -129,7 +129,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("must create the user namespace in the configured hostUID/hostGID range [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("must create the user namespace in the configured hostUID/hostGID range", framework.WithLinuxOnly(), feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// We need to check with the binary "getsubuids" the mappings for the kubelet.
 			// If something is not present, we skip the test as the node wasn't configured to run this test.
 			id, length, err := kubeletUsernsMappings(getsubuidsBinary)
@@ -197,7 +197,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("must not create the user namespace if set to true [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("must not create the user namespace if set to true", framework.WithLinuxOnly(), feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// with hostUsers=true the pod must use the host user namespace
 			pod := makePod(true)
 			// When running in the host's user namespace, the /proc/self/uid_map file content looks like:
@@ -208,7 +208,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		f.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("should mount all volumes with proper permissions with hostUsers=false", framework.WithLinuxOnly(), feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
@@ -330,7 +330,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		f.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("should set FSGroup to user inside the container with hostUsers=false", framework.WithLinuxOnly(), feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
@@ -389,7 +389,7 @@ var _ = SIGDescribe("Security Context", func() {
 				strings.Repeat(fmt.Sprintf("=%v\n", fsGroup), len(configMap.Data)),
 			})
 		})
-		f.It("metrics should report count of started and failed user namespaced pods [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("metrics should report count of started and failed user namespaced pods", framework.WithLinuxOnly(), feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			targetNode, err := findLinuxNode(ctx, f)
 			framework.ExpectNoError(err, "Error finding Linux node")
 			framework.Logf("Using node: %v", targetNode.Name)
@@ -461,7 +461,7 @@ var _ = SIGDescribe("Security Context", func() {
 			Description: Container is created with runAsUser option by passing uid 65534 to run as unpriviledged user. Pod MUST be in Succeeded phase.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		framework.ConformanceIt("should run the container with uid 65534 [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+		framework.ConformanceIt("should run the container with uid 65534", f.WithLinuxOnly(), f.WithNodeConformance(), func(ctx context.Context) {
 			createAndWaitUserPod(ctx, 65534)
 		})
 
@@ -472,7 +472,7 @@ var _ = SIGDescribe("Security Context", func() {
 			This e2e can not be promoted to Conformance because a Conformant platform may not allow to run containers with 'uid 0' or running privileged operations.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		f.It("should run the container with uid 0 [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+		f.It("should run the container with uid 0", f.WithLinuxOnly(), f.WithNodeConformance(), func(ctx context.Context) {
 			createAndWaitUserPod(ctx, 0)
 		})
 	})
@@ -502,7 +502,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		}
 
-		ginkgo.It("should run with an explicit non-root user ID [LinuxOnly]", func(ctx context.Context) {
+		framework.It("should run with an explicit non-root user ID", f.WithLinuxOnly(), func(ctx context.Context) {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-nonroot-uid"
@@ -512,7 +512,7 @@ var _ = SIGDescribe("Security Context", func() {
 			podClient.WaitForSuccess(ctx, name, framework.PodStartTimeout)
 			framework.ExpectNoError(podClient.MatchContainerOutput(ctx, name, name, "1000"))
 		})
-		ginkgo.It("should not run with an explicit root user ID [LinuxOnly]", func(ctx context.Context) {
+		framework.It("should not run with an explicit root user ID", f.WithLinuxOnly(), func(ctx context.Context) {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-root-uid"
@@ -590,7 +590,7 @@ var _ = SIGDescribe("Security Context", func() {
 			At this moment we are not considering this test for Conformance due to use of SecurityContext.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support creating containers with read-only access.
 		*/
-		f.It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+		f.It("should run the container with readonly rootfs when readOnlyRootFilesystem=true", f.WithLinuxOnly(), f.WithNodeConformance(), func(ctx context.Context) {
 			createAndWaitUserPod(ctx, true)
 		})
 
@@ -642,7 +642,7 @@ var _ = SIGDescribe("Security Context", func() {
 			Description: Create a container to run in unprivileged mode by setting pod's SecurityContext Privileged option as false. Pod MUST be in Succeeded phase.
 			[LinuxOnly]: This test is marked as LinuxOnly since it runs a Linux-specific command.
 		*/
-		framework.ConformanceIt("should run the container as unprivileged when false [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+		framework.ConformanceIt("should run the container as unprivileged when false", f.WithLinuxOnly(), f.WithNodeConformance(), func(ctx context.Context) {
 			podName := createAndWaitUserPod(ctx, false)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
@@ -655,7 +655,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("should run the container as privileged when true [LinuxOnly]", feature.HostAccess, func(ctx context.Context) {
+		f.It("should run the container as privileged when true", f.WithLinuxOnly(), feature.HostAccess, func(ctx context.Context) {
 			podName := createAndWaitUserPod(ctx, true)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
@@ -708,7 +708,7 @@ var _ = SIGDescribe("Security Context", func() {
 			This e2e Can not be promoted to Conformance as it is Container Runtime dependent and not all conformant platforms will require this behavior.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		f.It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+		f.It("should allow privilege escalation when not explicitly set and uid != 0", f.WithLinuxOnly(), f.WithNodeConformance(), func(ctx context.Context) {
 			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
 			if err := createAndMatchOutput(ctx, podName, "Effective uid: 0", nil, nonRootTestUserID); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
@@ -723,7 +723,7 @@ var _ = SIGDescribe("Security Context", func() {
 			When the container is run, container's output MUST match with expected output verifying container ran with given uid i.e. uid=1000.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		framework.ConformanceIt("should not allow privilege escalation when false [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+		framework.ConformanceIt("should not allow privilege escalation when false", f.WithLinuxOnly(), f.WithNodeConformance(), func(ctx context.Context) {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
 			apeFalse := false
 			if err := createAndMatchOutput(ctx, podName, fmt.Sprintf("Effective uid: %d", nonRootTestUserID), &apeFalse, nonRootTestUserID); err != nil {
@@ -740,7 +740,7 @@ var _ = SIGDescribe("Security Context", func() {
 			This e2e Can not be promoted to Conformance as it is Container Runtime dependent and runtime may not allow to run.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		f.It("should allow privilege escalation when true [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+		f.It("should allow privilege escalation when true", f.WithLinuxOnly(), f.WithNodeConformance(), func(ctx context.Context) {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
 			apeTrue := true
 			if err := createAndMatchOutput(ctx, podName, "Effective uid: 0", &apeTrue, nonRootTestUserID); err != nil {
@@ -749,7 +749,7 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 	})
 
-	f.Context("SupplementalGroupsPolicy [LinuxOnly]", feature.SupplementalGroupsPolicy, framework.WithFeatureGate(features.SupplementalGroupsPolicy), func() {
+	f.Context("SupplementalGroupsPolicy", f.WithLinuxOnly(), feature.SupplementalGroupsPolicy, framework.WithFeatureGate(features.SupplementalGroupsPolicy), func() {
 		timeout := 1 * time.Minute
 
 		agnhostImage := imageutils.GetE2EImage(imageutils.Agnhost)
@@ -904,7 +904,7 @@ var _ = SIGDescribe("Security Context", func() {
 							e2eskipper.Skipf("scheduled node does support SupplementalGroupsPolicy")
 						}
 					})
-					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+					framework.It("it should add SupplementalGroups to them", f.WithLinuxOnly(), func(ctx context.Context) {
 						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, false)
 					})
 				})
@@ -915,7 +915,7 @@ var _ = SIGDescribe("Security Context", func() {
 							e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
 						}
 					})
-					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+					framework.It("it should add SupplementalGroups to them", f.WithLinuxOnly(), func(ctx context.Context) {
 						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
 					})
 				})
@@ -936,7 +936,7 @@ var _ = SIGDescribe("Security Context", func() {
 							e2eskipper.Skipf("scheduled node does support SupplementalGroupsPolicy")
 						}
 					})
-					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+					framework.It("it should add SupplementalGroups to them", f.WithLinuxOnly(), func(ctx context.Context) {
 						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, false)
 					})
 				})
@@ -947,7 +947,7 @@ var _ = SIGDescribe("Security Context", func() {
 							e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
 						}
 					})
-					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+					framework.It("it should add SupplementalGroups to them", f.WithLinuxOnly(), func(ctx context.Context) {
 						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
 					})
 				})
@@ -972,7 +972,7 @@ var _ = SIGDescribe("Security Context", func() {
 							e2eskipper.Skipf("scheduled node does support SupplementalGroupsPolicy")
 						}
 					})
-					ginkgo.It("it should reject the pod [LinuxOnly]", func(ctx context.Context) {
+					framework.It("it should reject the pod", f.WithLinuxOnly(), func(ctx context.Context) {
 						expectRejectionEventIssued(ctx, f, pod)
 					})
 				})
@@ -984,7 +984,7 @@ var _ = SIGDescribe("Security Context", func() {
 						}
 						framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 					})
-					ginkgo.It("it should NOT add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+					framework.It("it should NOT add SupplementalGroups to them", f.WithLinuxOnly(), func(ctx context.Context) {
 						expectStrictPolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
 					})
 				})
@@ -993,7 +993,7 @@ var _ = SIGDescribe("Security Context", func() {
 	})
 })
 
-var _ = SIGDescribe("User Namespaces for Pod Security Standards [LinuxOnly]", func() {
+var _ = SIGDescribe("User Namespaces for Pod Security Standards", framework.WithLinuxOnly(), func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 	})

@@ -53,7 +53,7 @@ var (
 	getsubuidsBinary            = "getsubids"
 )
 
-var _ = SIGDescribe("UserNamespaces", "[LinuxOnly]", feature.UserNamespacesSupport, framework.WithSerial(), func() {
+var _ = SIGDescribe("UserNamespaces", framework.WithLinuxOnly(), feature.UserNamespacesSupport, framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("user-namespace-off-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	f.Context("when UserNamespacesSupport=false in the kubelet", func() {

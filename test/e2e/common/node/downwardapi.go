@@ -139,7 +139,7 @@ var _ = SIGDescribe("Downward API", func() {
 		testDownwardAPI(ctx, f, podName, env, expectations)
 	})
 
-	ginkgo.It("should provide host IP and pod IP as an env var if pod uses host network [LinuxOnly]", func(ctx context.Context) {
+	framework.It("should provide host IP and pod IP as an env var if pod uses host network", f.WithLinuxOnly(), func(ctx context.Context) {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{

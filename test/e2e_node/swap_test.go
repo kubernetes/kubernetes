@@ -57,7 +57,7 @@ var (
 	noLimits *resource.Quantity = nil
 )
 
-var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framework.WithSerial(), func() {
+var _ = SIGDescribe("Swap", ginkgo.Ordered, feature.Swap, framework.WithSerial(), framework.WithLinuxOnly(), func() {
 	f := framework.NewDefaultFramework("swap-qos")
 	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline

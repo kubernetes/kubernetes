@@ -257,7 +257,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 
 	case storageframework.DynamicPV:
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
-			f.It("should fail in binding dynamic provisioned PV to PVC", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+			f.It("should fail in binding dynamic provisioned PV to PVC", f.WithSlow(), f.WithLinuxOnly(), func(ctx context.Context) {
 				manualInit(ctx)
 				ginkgo.DeferCleanup(cleanup)
 
@@ -351,7 +351,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodPending), "Pod phase isn't pending")
 	})
 
-	ginkgo.It("should not mount / map unused volumes in a pod [LinuxOnly]", func(ctx context.Context) {
+	framework.It("should not mount / map unused volumes in a pod", f.WithLinuxOnly(), func(ctx context.Context) {
 		if pattern.VolMode == v1.PersistentVolumeBlock {
 			skipTestIfBlockNotSupported(driver)
 		}

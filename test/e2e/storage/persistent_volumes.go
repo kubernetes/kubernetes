@@ -816,7 +816,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 	// doesn't have the ntfs parameter, we can't change the status of the cluster
 	// to add a StorageClass that's compatible with windows which is also the
 	// default StorageClass
-	ginkgo.Describe("Default StorageClass [LinuxOnly]", func() {
+	framework.Describe("Default StorageClass", f.WithLinuxOnly(), func() {
 		ginkgo.Context("pods that use multiple volumes", func() {
 
 			ginkgo.AfterEach(func(ctx context.Context) {

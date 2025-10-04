@@ -91,7 +91,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			checkConnectivityToHost(ctx, f, "", "connectivity-test", "8.8.8.8", 53, 30))
 	})
 
-	f.It("should provide Internet connection for containers", feature.NetworkingIPv6, "[Experimental][LinuxOnly]", func(ctx context.Context) {
+	f.It("should provide Internet connection for containers", feature.NetworkingIPv6, "[Experimental]", f.WithLinuxOnly(), func(ctx context.Context) {
 		// IPv6 is not supported on Windows.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		ginkgo.By("Running container which tries to connect to 2001:4860:4860::8888")
@@ -410,7 +410,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
-		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func(ctx context.Context) {
+		framework.It("should function for client IP based session affinity: http", f.WithLinuxOnly(), func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterHTTPPort))
 
@@ -428,7 +428,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
-		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func(ctx context.Context) {
+		framework.It("should function for client IP based session affinity: udp", f.WithLinuxOnly(), func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterUDPPort))
 
@@ -632,7 +632,7 @@ var _ = common.SIGDescribe("Networking", func() {
 
 	// This is [Serial] because it can't run at the same time as the
 	// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
-	f.It("should allow creating a Pod with an SCTP HostPort [LinuxOnly]", f.WithSerial(), func(ctx context.Context) {
+	f.It("should allow creating a Pod with an SCTP HostPort", f.WithLinuxOnly(), f.WithSerial(), func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		hostExec := utils.NewHostExec(f)

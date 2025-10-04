@@ -33,7 +33,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("ContainerMetrics", "[LinuxOnly]", framework.WithNodeConformance(), func() {
+var _ = SIGDescribe("ContainerMetrics", framework.WithNodeConformance(), framework.WithLinuxOnly(), func() {
 	f := framework.NewDefaultFramework("container-metrics")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /metrics/cadvisor", func() {
