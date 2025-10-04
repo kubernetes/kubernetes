@@ -48,6 +48,11 @@ func (f *fakeDRAManager) DeviceClasses() fwk.DeviceClassLister {
 	return f.deviceClassLister
 }
 
+func (f *fakeDRAManager) ExtendedResourceCache() fwk.ExtendedResourceCache {
+	// Return a fake cache that calls DeviceClassMapping directly for testing
+	return &fakeExtendedResourceCache{draManager: f}
+}
+
 type deviceClassLister struct {
 	classLister resourcelisters.DeviceClassLister
 }
@@ -58,6 +63,31 @@ func (l *deviceClassLister) Get(className string) (*resourceapi.DeviceClass, err
 
 func (l *deviceClassLister) List() ([]*resourceapi.DeviceClass, error) {
 	return l.classLister.List(labels.Everything())
+}
+
+type fakeExtendedResourceCache struct {
+	draManager fwk.SharedDRAManager
+}
+
+func (f *fakeExtendedResourceCache) GetDeviceClass(resourceName v1.ResourceName) (string, bool) {
+	mapping, err := DeviceClassMapping(f.draManager)
+	if err != nil {
+		return "", false
+	}
+	deviceClass, exists := mapping[resourceName]
+	return deviceClass, exists
+}
+
+func (f *fakeExtendedResourceCache) GetAllMappings() map[v1.ResourceName]string {
+	mapping, err := DeviceClassMapping(f.draManager)
+	if err != nil {
+		return make(map[v1.ResourceName]string)
+	}
+	return mapping
+}
+
+func (f *fakeExtendedResourceCache) Refresh() {
+	// No-op for fake implementation
 }
 
 func TestDeviceClassMapping(t *testing.T) {

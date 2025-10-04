@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -108,6 +109,17 @@ type ResourceClaimTracker interface {
 	AssumedClaimRestore(namespace, claimName string)
 }
 
+// ExtendedResourceCache provides access to the global cache of extended resource to device class mappings.
+type ExtendedResourceCache interface {
+	// GetDeviceClass returns the device class name for the given extended resource name.
+	// Returns the device class name and true if found, empty string and false otherwise.
+	GetDeviceClass(resourceName v1.ResourceName) (string, bool)
+	// GetAllMappings returns a copy of all current mappings.
+	GetAllMappings() map[v1.ResourceName]string
+	// Refresh manually triggers a cache refresh.
+	Refresh()
+}
+
 // SharedDRAManager can be used to obtain DRA objects, and track modifications to them in-memory - mainly by the DRA plugin.
 // The plugin's default implementation obtains the objects from the API. A different implementation can be
 // plugged into the framework in order to simulate the state of DRA objects. For example, Cluster Autoscaler
@@ -116,4 +128,5 @@ type SharedDRAManager interface {
 	ResourceClaims() ResourceClaimTracker
 	ResourceSlices() ResourceSliceLister
 	DeviceClasses() DeviceClassLister
+	ExtendedResourceCache() ExtendedResourceCache
 }

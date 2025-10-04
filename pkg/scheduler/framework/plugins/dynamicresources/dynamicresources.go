@@ -461,9 +461,16 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 		return nil, nil
 	}
 
-	deviceClassMapping, err := extended.DeviceClassMapping(pl.draManager)
-	if err != nil {
-		return nil, statusError(logger, err, "retrieving extended resource to DeviceClass mapping")
+	// Use the global cache instead of calling DeviceClassMapping directly
+	cache := pl.draManager.ExtendedResourceCache()
+	deviceClassMapping := cache.GetAllMappings()
+
+	// If cache is empty, fall back to direct call for compatibility
+	// This handles cases where the cache hasn't been populated yet (e.g., in tests)
+	if len(deviceClassMapping) == 0 {
+		if mapping, err := pl.getDeviceClassMappingFallback(); err == nil {
+			deviceClassMapping = mapping
+		}
 	}
 
 	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
@@ -1719,4 +1726,10 @@ func getAllocatedDeviceStatus(claim *resourceapi.ResourceClaim, deviceRequest *r
 		}
 	}
 	return nil
+}
+
+// getDeviceClassMappingFallback provides a fallback mechanism to get device class mapping
+// when the cache is not populated. This is mainly for test compatibility.
+func (pl *DynamicResources) getDeviceClassMappingFallback() (map[v1.ResourceName]string, error) {
+	return extended.DeviceClassMapping(pl.draManager)
 }

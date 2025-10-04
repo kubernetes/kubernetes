@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"sync"
 
+	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources/extended"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
@@ -42,9 +45,10 @@ var _ fwk.SharedDRAManager = &DefaultDRAManager{}
 // from API informers, and uses an AssumeCache and a map of in-flight allocations in order
 // to avoid race conditions when modifying ResourceClaims.
 type DefaultDRAManager struct {
-	resourceClaimTracker *claimTracker
-	resourceSliceLister  *resourceSliceLister
-	deviceClassLister    *deviceClassLister
+	resourceClaimTracker  *claimTracker
+	resourceSliceLister   *resourceSliceLister
+	deviceClassLister     *deviceClassLister
+	extendedResourceCache fwk.ExtendedResourceCache
 }
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
@@ -59,6 +63,25 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 		},
 		resourceSliceLister: &resourceSliceLister{tracker: resourceSliceTracker},
 		deviceClassLister:   &deviceClassLister{classLister: informerFactory.Resource().V1().DeviceClasses().Lister()},
+	}
+
+	// Initialize the extended resource cache only if DRAExtendedResource feature is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		manager.extendedResourceCache = extended.NewExtendedResourceCache(manager, logger)
+
+		// Add event handler for device class changes to update the cache
+		if extCache, ok := manager.extendedResourceCache.(*extended.ExtendedResourceCache); ok {
+			if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(&deviceClassEventHandler{
+				cache: extCache,
+			}); err != nil {
+				logger.Error(err, "Failed to add event handler for device classes")
+			}
+		} else {
+			logger.Error(nil, "Failed to cast extendedResourceCache to ExtendedResourceCache")
+		}
+
+		// Populate the cache with existing device classes after event handler is set up
+		manager.extendedResourceCache.Refresh()
 	}
 
 	// Reacting to events is more efficient than iterating over the list
@@ -78,6 +101,14 @@ func (s *DefaultDRAManager) ResourceSlices() fwk.ResourceSliceLister {
 
 func (s *DefaultDRAManager) DeviceClasses() fwk.DeviceClassLister {
 	return s.deviceClassLister
+}
+
+func (s *DefaultDRAManager) ExtendedResourceCache() fwk.ExtendedResourceCache {
+	if s.extendedResourceCache == nil {
+		// Return a no-op cache when the feature gate is disabled
+		return &noopExtendedResourceCache{}
+	}
+	return s.extendedResourceCache
 }
 
 var _ fwk.ResourceSliceLister = &resourceSliceLister{}
@@ -262,4 +293,43 @@ func (c *claimTracker) AssumeClaimAfterAPICall(claim *resourceapi.ResourceClaim)
 
 func (c *claimTracker) AssumedClaimRestore(namespace, claimName string) {
 	c.cache.Restore(namespace + "/" + claimName)
+}
+
+// deviceClassEventHandler handles device class informer events to update the extended resource cache.
+type deviceClassEventHandler struct {
+	cache *extended.ExtendedResourceCache
+}
+
+func (h *deviceClassEventHandler) OnAdd(obj interface{}, isInInitialList bool) {
+	if deviceClass, ok := obj.(*resourceapi.DeviceClass); ok {
+		h.cache.OnDeviceClassEvent(watch.Added, deviceClass)
+	}
+}
+
+func (h *deviceClassEventHandler) OnUpdate(oldObj, newObj interface{}) {
+	if deviceClass, ok := newObj.(*resourceapi.DeviceClass); ok {
+		h.cache.OnDeviceClassEvent(watch.Modified, deviceClass)
+	}
+}
+
+func (h *deviceClassEventHandler) OnDelete(obj interface{}) {
+	if deviceClass, ok := obj.(*resourceapi.DeviceClass); ok {
+		h.cache.OnDeviceClassEvent(watch.Deleted, deviceClass)
+	}
+}
+
+// noopExtendedResourceCache is a no-op implementation of ExtendedResourceCache
+// used when the DRAExtendedResource feature gate is disabled.
+type noopExtendedResourceCache struct{}
+
+func (n *noopExtendedResourceCache) GetDeviceClass(resourceName v1.ResourceName) (string, bool) {
+	return "", false
+}
+
+func (n *noopExtendedResourceCache) GetAllMappings() map[v1.ResourceName]string {
+	return make(map[v1.ResourceName]string)
+}
+
+func (n *noopExtendedResourceCache) Refresh() {
+	// No-op
 }
