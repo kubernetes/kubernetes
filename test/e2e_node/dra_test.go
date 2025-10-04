@@ -936,7 +936,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		//
 		// NOTE: This is a copy of a similar test to test service connection reuse with enabled
 		// ResourceHealth. It should be merged with the original test when the ResourceHealth feature matures.
-		ginkgo.It("must reuse one gRPC connection for service and health-monitoring calls", func(ctx context.Context) {
+		ginkgo.It(">>> must reuse one gRPC connection for service and health-monitoring calls", func(ctx context.Context) {
 			var listener *countingListener
 			var err error
 			getListener := func(_ context.Context, socketPath string) (net.Listener, error) {
