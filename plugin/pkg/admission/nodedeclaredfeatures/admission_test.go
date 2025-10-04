@@ -1,0 +1,216 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package nodedeclaredfeatures
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
+)
+
+func TestAdmission(t *testing.T) {
+
+	nodeWithFeature := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+		Status: v1.NodeStatus{
+			DeclaredFeatures: []string{"TestFeature"},
+			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.30.0"},
+		},
+	}
+	nodeWithoutFeature := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-node-no-feature"},
+		Status: v1.NodeStatus{
+			DeclaredFeatures: []string{},
+			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.30.0"},
+		},
+	}
+
+	client := fake.NewClientset(nodeWithFeature, nodeWithoutFeature)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	oldPod := &core.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "test-ns"},
+		Spec: core.PodSpec{
+			NodeName: "test-node",
+			Containers: []core.Container{
+				{
+					Name:  "container",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceCPU:    resource.MustParse("1000m"),
+							core.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				}},
+		},
+	}
+	newPod := oldPod.DeepCopy()
+	newPod.Spec.Containers[0].Resources.Requests[core.ResourceCPU] = resource.MustParse("2000m")
+	podWithNoNode := oldPod.DeepCopy()
+	podWithNoNode.Spec.NodeName = ""
+	podWithInvalidNode := oldPod.DeepCopy()
+	podWithInvalidNode.Spec.NodeName = "invalid-node"
+
+	testCases := []struct {
+		name               string
+		pod                *core.Pod
+		oldPod             *core.Pod
+		features           []ndf.Feature
+		featureGateEnabled bool
+		expectErr          bool
+		errContains        string
+	}{
+		{
+			name:               "Feature gate disabled",
+			pod:                newPod,
+			oldPod:             oldPod,
+			features:           []ndf.Feature{},
+			featureGateEnabled: false,
+			expectErr:          false,
+		},
+		{
+			name:               "Pod not bound to a node",
+			pod:                podWithNoNode,
+			oldPod:             oldPod,
+			features:           []ndf.Feature{},
+			featureGateEnabled: true,
+			expectErr:          false,
+		},
+		{
+			name:               "Node not found",
+			pod:                func() *core.Pod { p := newPod.DeepCopy(); p.Spec.NodeName = "not-found-node"; return p }(),
+			oldPod:             oldPod,
+			featureGateEnabled: true,
+			features: []ndf.Feature{
+				&ndftesting.MockFeature{
+					NameFunc:            func() string { return "TestFeature" },
+					InferFromUpdateFunc: func(old, new *ndf.PodInfo) bool { return true },
+				},
+			},
+			expectErr:   true,
+			errContains: "node \"not-found-node\" not found",
+		},
+		{
+			name:               "No feature requirements",
+			pod:                newPod,
+			oldPod:             oldPod,
+			featureGateEnabled: true,
+			features: []ndf.Feature{
+				&ndftesting.MockFeature{
+					InferFromUpdateFunc: func(old, new *ndf.PodInfo) bool { return false },
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name:               "Feature requirement met",
+			pod:                newPod,
+			oldPod:             oldPod,
+			featureGateEnabled: true,
+			features: []ndf.Feature{
+				&ndftesting.MockFeature{
+					NameFunc:            func() string { return "TestFeature" },
+					InferFromUpdateFunc: func(old, new *ndf.PodInfo) bool { return true },
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "Feature requirement not met",
+			pod: func() *core.Pod {
+				p := newPod.DeepCopy()
+				p.Spec.NodeName = "test-node-no-feature"
+				return p
+			}(),
+			oldPod:             oldPod,
+			featureGateEnabled: true,
+			features: []ndf.Feature{
+				&ndftesting.MockFeature{
+					NameFunc:            func() string { return "TestFeature" },
+					InferFromUpdateFunc: func(old, new *ndf.PodInfo) bool { return true },
+				},
+			},
+			expectErr:   true,
+			errContains: "pod update requires features TestFeature which are not available on node \"test-node-no-feature\"",
+		},
+		{
+			name:               "Inference error",
+			pod:                newPod,
+			oldPod:             oldPod,
+			featureGateEnabled: true,
+			features: []ndf.Feature{
+				&ndftesting.MockFeature{
+					InferFromUpdateFunc: func(old, new *ndf.PodInfo) bool { return true },
+					MinVersionFunc:      func() *version.Version { return version.MustParseSemantic("1.31.0") },
+				},
+			},
+			expectErr:   true,
+			errContains: "failed to infer pod capability requirements",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureGateEnabled)
+
+			target := NewPlugin()
+			helper, err := ndf.NewHelper(tc.features)
+			require.NoError(t, err)
+			target.nodeDeclaredFeatureHelper = helper
+
+			target.SetExternalKubeInformerFactory(informerFactory)
+			target.InspectFeatureGates(utilfeature.DefaultFeatureGate)
+			err = target.ValidateInitialization()
+			require.NoError(t, err)
+
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			informerFactory.Start(stopCh)
+			informerFactory.WaitForCacheSync(stopCh)
+
+			attrs := admission.NewAttributesRecord(tc.pod, tc.oldPod, core.Kind("Pod").WithVersion("v1"), tc.pod.Namespace, tc.pod.Name, core.Resource("pods").WithVersion("v1"), "", admission.Update, &metav1.UpdateOptions{}, false, nil)
+
+			err = target.Validate(context.Background(), attrs, nil)
+
+			if tc.expectErr {
+				assert.Error(t, err)
+				if tc.errContains != "" {
+					assert.Contains(t, err.Error(), tc.errContains)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

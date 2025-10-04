@@ -29,12 +29,18 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	nodedeclaredfeatures "k8s.io/component-helpers/nodedeclaredfeatures"
+	featuretesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -869,6 +875,86 @@ func TestRunSleepHandler(t *testing.T) {
 			}
 			if tt.expectErr && err.Error() != tt.expectedErr {
 				t.Errorf("%s: expected error want %s, got %s", tt.name, tt.expectedErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pod",
+		},
+	}
+
+	testCases := []struct {
+		name                 string
+		nodeDeclaredFeatures []string
+		version              string
+		features             []nodedeclaredfeatures.Feature
+		expectedAdmit        bool
+		expectedReason       string
+		expectedMessage      string
+	}{
+		{
+			name:                 "Admit: no requirements",
+			nodeDeclaredFeatures: []string{"mock-feature"},
+			version:              "1.30.0",
+			features: []nodedeclaredfeatures.Feature{
+				&featuretesting.MockFeature{NameFunc: func() string { return "mock-feature" }, InferFromCreateFunc: func(podInfo *nodedeclaredfeatures.PodInfo) bool { return false }},
+			},
+			expectedAdmit: true,
+		},
+		{
+			name:                 "Admit: requirements met",
+			nodeDeclaredFeatures: []string{"mock-feature"},
+			version:              "1.30.0",
+			features: []nodedeclaredfeatures.Feature{
+				&featuretesting.MockFeature{NameFunc: func() string { return "mock-feature" }, InferFromCreateFunc: func(podInfo *nodedeclaredfeatures.PodInfo) bool { return true }},
+			},
+			expectedAdmit: true,
+		},
+		{
+			name:                 "Reject: requirements not met",
+			nodeDeclaredFeatures: []string{},
+			version:              "1.30.0",
+			features: []nodedeclaredfeatures.Feature{
+				&featuretesting.MockFeature{NameFunc: func() string { return "mock-feature" }, InferFromCreateFunc: func(podInfo *nodedeclaredfeatures.PodInfo) bool { return true }},
+			},
+			expectedAdmit:   false,
+			expectedReason:  MissingNodeDeclaredFeatures,
+			expectedMessage: "pod requires node features that are not available: mock-feature",
+		},
+		{
+			name:                 "Reject: inference error due to version incompatibility",
+			nodeDeclaredFeatures: []string{},
+			version:              "1.29.0",
+			features: []nodedeclaredfeatures.Feature{
+				&featuretesting.MockFeature{
+					NameFunc:            func() string { return "mock-feature" },
+					InferFromCreateFunc: func(podInfo *nodedeclaredfeatures.PodInfo) bool { return true },
+					MinVersionFunc:      func() *version.Version { return version.MustParseSemantic("1.30.0") },
+				},
+			},
+			expectedAdmit:   false,
+			expectedReason:  FeatureRequirementInferError,
+			expectedMessage: "failed to infer pod's feature requirements: feature \"mock-feature\" is not available in version 1.29.0, requires at least 1.30.0",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			helper, err := nodedeclaredfeatures.NewHelper(tc.features)
+			require.NoError(t, err)
+			handler := NewDeclaredFeaturesAdmitHandler(helper, tc.nodeDeclaredFeatures, tc.version)
+			attrs := &PodAdmitAttributes{Pod: pod}
+
+			result := handler.Admit(attrs)
+
+			assert.Equal(t, tc.expectedAdmit, result.Admit)
+			if !result.Admit {
+				assert.Equal(t, tc.expectedReason, result.Reason)
+				assert.True(t, strings.Contains(result.Message, tc.expectedMessage), "Expected message '%s' to contain '%s'", result.Message, tc.expectedMessage)
 			}
 		})
 	}
