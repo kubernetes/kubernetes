@@ -467,11 +467,22 @@ aliases:
     - MadhavJivrajani
     - mfahlandt
     - Priyankasaggu11929
+  # See https://github.com/kubernetes/org/blob/main/OWNERS_ALIASES
+  # for the authoritative list of SIG Docs leads, or look for
+  # https://github.com/kubernetes/website/blob/main/OWNERS_ALIASES
+  # for the list that this was derived from. SIG Docs' leads can
+  # confirm modifications here.
   sig-docs-approvers:
-    - jimangel
-    - kbhawkey
-    - onlydole
-    - sftim
+    - dipesh-rawat
+    - divya-mohan0209
+    - katcosgrove
+    - lmktfy
+    - natalisucks
+    - nate-double-u
+    - reylejano
+    - salaxander
+    - SayakMukhopadhyay
+    - tengqm
   sig-node-api-reviewers:
     - dchen1107
     - derekwaynecarr
