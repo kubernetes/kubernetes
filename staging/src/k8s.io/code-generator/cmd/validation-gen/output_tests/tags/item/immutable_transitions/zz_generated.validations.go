@@ -65,36 +65,24 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// lists with map semantics require unique keys
 			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key1 == b.Key1 })...)
 			func() { // cohort {"key1": "a"}
-<<<<<<< HEAD
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key1 == "a" }, validate.DirectEqual, validate.Immutable); len(e) != 0 {
-					errs = append(errs, e...)
-=======
 				earlyReturn := false
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key1 == "a" }, validate.DirectEqual, validate.ImmutableByCompare); len(e) != 0 {
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key1 == "a" }, validate.DirectEqual, validate.Immutable); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
 				if earlyReturn {
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 					return // do not proceed
 				}
 			}()
 			func() { // cohort {"key1": "b"}
-<<<<<<< HEAD
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key1 == "b" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
-					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *Item) *string { return &o.StringField }, validate.DirectEqualPtr, validate.Immutable)
-				}); len(e) != 0 {
-					errs = append(errs, e...)
-=======
 				earlyReturn := false
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key1 == "b" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
-					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *Item) *string { return &o.StringField }, validate.DirectEqualPtr, validate.ImmutableByCompare)
+					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *Item) *string { return &o.StringField }, validate.DirectEqualPtr, validate.Immutable)
 				}); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
 				if earlyReturn {
->>>>>>> 9178eebc0a2 (feat: make it so that all ShortCircuit validators are run for short circuiting check)
 					return // do not proceed
 				}
 			}()
