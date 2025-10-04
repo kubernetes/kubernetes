@@ -608,6 +608,16 @@ func (p *patcher) applyPatch(ctx context.Context, _, currentObject runtime.Objec
 
 	// if this object supports namespace info
 	if objectMeta, err := meta.Accessor(objToUpdate); err == nil {
+		// wipe system fields for create operation if allowed
+		if p.forceAllowCreate && !currentObjectHasUID {
+			preserveObjectMetaSystemFields := false
+			if c, ok := p.restPatcher.(rest.SubresourceObjectMetaPreserver); ok && len(p.subresource) > 0 {
+				preserveObjectMetaSystemFields = c.PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate()
+			}
+			if !preserveObjectMetaSystemFields {
+				rest.WipeObjectMetaSystemFields(objectMeta)
+			}
+		}
 		// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
 		if err := rest.EnsureObjectNamespaceMatchesRequestNamespace(rest.ExpectedNamespaceForResource(p.namespace, p.resource), objectMeta); err != nil {
 			return nil, err
