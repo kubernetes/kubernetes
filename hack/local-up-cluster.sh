@@ -95,6 +95,7 @@ KUBELET_PROVIDER_ID=${KUBELET_PROVIDER_ID:-"$(hostname)"}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
 EMULATED_VERSION=${EMULATED_VERSION:+kube=$EMULATED_VERSION}
 TOPOLOGY_MANAGER_POLICY=${TOPOLOGY_MANAGER_POLICY:-""}
+MEMORY_MANAGER_POLICY=${MEMORY_MANAGER_POLICY:-""}
 CPUMANAGER_POLICY=${CPUMANAGER_POLICY:-""}
 CPUMANAGER_RECONCILE_PERIOD=${CPUMANAGER_RECONCILE_PERIOD:-""}
 CPUMANAGER_POLICY_OPTIONS=${CPUMANAGER_POLICY_OPTIONS:-""}
@@ -181,6 +182,15 @@ function usage {
             echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
             echo "           KUBELET_FLAGS=\"--kube-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi --system-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi\" \\"
             echo "           hack/local-up-cluster.sh (build a local copy of the source with full-pcpus-only CPU Management policy)"
+            echo "Example 5: PATH=\"\${PATH}:/usr/local/go/src/k8s.io/kubernetes/third_party/etcd\" \\"
+            echo "           FEATURE_GATES=CPUManagerPolicyOptions=true,MemoryManager=true,InPlacePodVerticalScalingExclusiveCPUs=true \\"
+            echo "           TOPOLOGY_MANAGER_POLICY=\"single-numa-node\" \\"
+            echo "           MEMORY_MANAGER_POLICY=\"Static\" \\"
+            echo "           CPUMANAGER_POLICY=\"static\" \\"
+            echo "           CPUMANAGER_POLICY_OPTIONS=full-pcpus-only=\"true\" \\"
+            echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
+            echo "           KUBELET_FLAGS=\"--kube-reserved=cpu=1,memory=4Gi --system-reserved=cpu=1,memory=1Gi --reserved-memory 0:memory=3Gi;1:memory=2148Mi --resolv-conf=/run/systemd/resolve/resolv.conf\" \\"
+            echo "           hack/local-up-cluster.sh ( run with Topology, CPU, Memory Management policies alongside InPlacePodVerticalScaling, extra flags for etcd and coredns)"
             echo ""
             echo "-d         dry-run: prepare for running commands, then show their command lines instead of running them"
 }
@@ -1014,6 +1024,11 @@ EOF
       # topology maanager policy
       if [[ -n ${TOPOLOGY_MANAGER_POLICY} ]]; then
         echo "topologyManagerPolicy: \"${TOPOLOGY_MANAGER_POLICY}\""
+      fi
+
+      # memorymanager policy
+      if [[ -n ${MEMORY_MANAGER_POLICY} ]]; then
+        echo "memoryManagerPolicy: \"${MEMORY_MANAGER_POLICY}\""
       fi
 
       # cpumanager policy
