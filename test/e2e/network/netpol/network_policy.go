@@ -1243,7 +1243,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 	})
 })
 
-var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
+var _ = common.SIGDescribe("Netpol", framework.WithLinuxOnly(), func() {
 	f := framework.NewDefaultFramework("udp-network-policy")
 	f.SkipNamespaceCreation = true
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
@@ -1323,7 +1323,7 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 	})
 })
 
-var _ = common.SIGDescribe("Netpol", feature.SCTPConnectivity, "[LinuxOnly]", func() {
+var _ = common.SIGDescribe("Netpol", feature.SCTPConnectivity, framework.WithLinuxOnly(), func() {
 	f := framework.NewDefaultFramework("sctp-network-policy")
 	f.SkipNamespaceCreation = true
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline

@@ -54,12 +54,12 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of '0x400'
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set", f.WithNodeConformance(), f.WithLinuxOnly(), func(ctx context.Context) {
 		defaultMode := int32(0400)
 		doConfigMapE2EWithoutMappings(ctx, f, false, 0, &defaultMode)
 	})
 
-	f.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]", func(ctx context.Context) {
+	f.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set", f.WithLinuxOnly(), func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
@@ -75,7 +75,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(ctx, f, true, 0, nil)
 	})
 
-	f.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly]", func(ctx context.Context) {
+	f.It("should be consumable from pods in volume as non-root with FSGroup", f.WithLinuxOnly(), func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		doConfigMapE2EWithoutMappings(ctx, f, true, 1001, nil)
@@ -96,7 +96,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of '0x400'
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set", f.WithNodeConformance(), f.WithLinuxOnly(), func(ctx context.Context) {
 		mode := int32(0400)
 		doConfigMapE2EWithMappings(ctx, f, false, 0, &mode)
 	})
@@ -110,7 +110,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		doConfigMapE2EWithMappings(ctx, f, true, 0, nil)
 	})
 
-	f.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly]", func(ctx context.Context) {
+	f.It("should be consumable from pods in volume with mappings as non-root with FSGroup", f.WithLinuxOnly(), func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		doConfigMapE2EWithMappings(ctx, f, true, 1001, nil)
