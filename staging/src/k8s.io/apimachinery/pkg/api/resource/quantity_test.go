@@ -18,6 +18,7 @@ package resource
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -1818,5 +1819,71 @@ func TestQuantityRoundtripCBOR(t *testing.T) {
 			}
 			t.Errorf("Expected equal: %v, %v (cbor was '%s')", initial, final, diag)
 		}
+	}
+}
+
+func TestMilliChecked(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		q               *Quantity
+		expectOverflow  bool
+		expectUnderflow bool
+	}{
+		{
+			name:           "peta overflow",
+			q:              func() *Quantity { q := MustParse("16Pi"); return &q }(),
+			expectOverflow: true,
+		},
+		{
+			name:           "exa overflow",
+			q:              func() *Quantity { q := MustParse("42Ei"); return &q }(),
+			expectOverflow: true,
+		},
+		{
+			name:           "tera overflow",
+			q:              func() *Quantity { q := MustParse("420000Ti"); return &q }(),
+			expectOverflow: true,
+		},
+		{
+			name:            "peta underflow",
+			q:               func() *Quantity { q := MustParse("-16Pi"); return &q }(),
+			expectUnderflow: true,
+		},
+		{
+			name:            "exa underflow",
+			q:               func() *Quantity { q := MustParse("-42Ei"); return &q }(),
+			expectUnderflow: true,
+		},
+		{
+			name:            "tera underflow",
+			q:               func() *Quantity { q := MustParse("-420000Ti"); return &q }(),
+			expectUnderflow: true,
+		},
+		{
+			name: "1 SI",
+			q:    NewQuantity(1, BinarySI),
+		},
+		{
+			name: "0 SI",
+			q:    NewQuantity(0, BinarySI),
+		},
+		{
+			name: "-1 SI",
+			q:    NewQuantity(-1, BinarySI),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.q.CheckedMilliValue()
+			expectErr := tc.expectOverflow || tc.expectUnderflow
+			if err == nil && expectErr {
+				t.Errorf("expected error but got none for %v", tc.q)
+			} else if err != nil && !expectErr {
+				t.Errorf("expected no error error but got %v for %v", err, tc.q)
+			} else if tc.expectOverflow && !errors.Is(err, ErrOverflow) {
+				t.Errorf("expected overflow error but got %v for %v", err, tc.q)
+			} else if tc.expectUnderflow && !errors.Is(err, ErrUnderflow) {
+				t.Errorf("expected underflow error but got %v for %v", err, tc.q)
+			}
+		})
 	}
 }
