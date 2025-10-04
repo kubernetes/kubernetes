@@ -2708,16 +2708,36 @@ func Test_createDeviceRequests(t *testing.T) {
 		v1.ResourceName(extendedResourceName):          1,
 		v1.ResourceName(extendedResourceName + "init"): 2,
 	}
-	devMap := map[v1.ResourceName]string{
-		v1.ResourceName(extendedResourceName): "class",
+	devMap := map[v1.ResourceName]*resourceapi.DeviceClass{
+		v1.ResourceName(extendedResourceName): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class",
+			},
+		},
 	}
-	devMap2 := map[v1.ResourceName]string{
-		v1.ResourceName(extendedResourceName):       "class",
-		v1.ResourceName(extendedResourceName + "1"): "class1",
+	devMap2 := map[v1.ResourceName]*resourceapi.DeviceClass{
+		v1.ResourceName(extendedResourceName): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class",
+			},
+		},
+		v1.ResourceName(extendedResourceName + "1"): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class1",
+			},
+		},
 	}
-	devMapInit := map[v1.ResourceName]string{
-		v1.ResourceName(extendedResourceName):          "class",
-		v1.ResourceName(extendedResourceName + "init"): "classInit",
+	devMapInit := map[v1.ResourceName]*resourceapi.DeviceClass{
+		v1.ResourceName(extendedResourceName): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "class",
+			},
+		},
+		v1.ResourceName(extendedResourceName + "init"): {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "classInit",
+			},
+		},
 	}
 	devReq := resourceapi.DeviceRequest{
 		Name: "container-0-request-0",
@@ -2763,7 +2783,7 @@ func Test_createDeviceRequests(t *testing.T) {
 	testcases := map[string]struct {
 		pod                *v1.Pod
 		extendedResources  map[v1.ResourceName]int64
-		deviceClassMapping map[v1.ResourceName]string
+		deviceClassMapping map[v1.ResourceName]*resourceapi.DeviceClass
 		wantDeviceRequests []resourceapi.DeviceRequest
 	}{
 		"nil": {
