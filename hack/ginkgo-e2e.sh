@@ -185,7 +185,13 @@ case "${E2E_TEST_DEBUG_TOOL:-ginkgo}" in
     fi
     program+=("${ginkgo_args[@]:+${ginkgo_args[@]}}")
     ;;
-  delve) program=("dlv" "exec") ;;
+  delve) 
+    program=("dlv" "exec" "--headless=true")
+    if [[ -z "${DELVE_PORT:-}" ]]; then
+      DELVE_PORT="2345"
+    fi
+    program+=("--listen=:${DELVE_PORT}")
+    ;;
   gdb) program=("gdb") ;;
   *) kube::log::error_exit "Unsupported E2E_TEST_DEBUG_TOOL=${E2E_TEST_DEBUG_TOOL}" ;;
 esac
