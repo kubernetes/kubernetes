@@ -409,6 +409,9 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 		})
 
 		ginkgo.It("should report Memory pressure in PSI metrics", func(ctx context.Context) {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
+				ginkgo.Skip("MemoryQoS feature gate is not enabled")
+			}
 			podName := "memory-pressure-pod"
 			ginkgo.By("Creating a pod to generate Memory pressure")
 			// Create a pod that generates memory pressure by continuously writing to files,
@@ -423,10 +426,10 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			}
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("200M"),
+					v1.ResourceMemory: resource.MustParse("260M"),
 				},
 				Requests: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("200M"),
+					v1.ResourceMemory: resource.MustParse("100M"),
 				},
 			}
 			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
