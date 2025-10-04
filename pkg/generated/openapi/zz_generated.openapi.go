@@ -71931,7 +71931,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"failCgroupV1": {
 						SchemaProps: spec.SchemaProps{
-							Description: "FailCgroupV1 prevents the kubelet from starting on hosts that use cgroup v1. By default, this is set to 'false', meaning the kubelet is allowed to start on cgroup v1 hosts unless this option is explicitly enabled. Default: false",
+							Description: "FailCgroupV1 prevents the kubelet from starting on hosts that use cgroup v1. By default, this is set to 'true', meaning the kubelet will not start on cgroup v1 hosts unless this option is explicitly disabled. Default: true",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
