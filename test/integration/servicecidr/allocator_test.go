@@ -61,11 +61,6 @@ func TestServiceAllocation(t *testing.T) {
 			ipAllocatorGate:      true,
 			disableDualWriteGate: true,
 		},
-		{
-			name:                 "disable dual write with bitmap allocator",
-			ipAllocatorGate:      false,
-			disableDualWriteGate: true,
-		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -344,7 +339,7 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			"--emulated-version=1.33",
-			fmt.Sprintf("--feature-gates=%s=false,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
+			fmt.Sprintf("--feature-gates=%s=false,%s=false", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
 		etcdOptions)
 	defer s2.TearDownFn()
 
