@@ -18,6 +18,9 @@ package topologymanager
 
 import (
 	"testing"
+
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestPolicyNoneName(t *testing.T) {
@@ -101,9 +104,12 @@ func TestPolicyNoneMerge(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
+
 	for _, tc := range tcases {
 		policy := NewNonePolicy()
-		result, admit := policy.Merge(tc.providersHints)
+		result, admit := policy.Merge(logger, tc.providersHints)
 		if !result.IsEqual(tc.expectedHint) || admit != tc.expectedAdmit {
 			t.Errorf("Test Case: %s: Expected merge hint to be %v, got %v", tc.name, tc.expectedHint, result)
 		}

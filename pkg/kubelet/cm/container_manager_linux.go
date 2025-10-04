@@ -206,6 +206,10 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
 func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
+
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -293,6 +297,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 
 	cm.topologyManager, err = topologymanager.NewManager(
+		ctx,
 		machineInfo.Topology,
 		nodeConfig.TopologyManagerPolicy,
 		nodeConfig.TopologyManagerScope,
@@ -308,7 +313,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if err != nil {
 		return nil, err
 	}
-	cm.topologyManager.AddHintProvider(cm.deviceManager)
+	cm.topologyManager.AddHintProvider(ctx, cm.deviceManager)
 
 	// Initialize DRA manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
@@ -336,7 +341,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		klog.ErrorS(err, "Failed to initialize cpu manager")
 		return nil, err
 	}
-	cm.topologyManager.AddHintProvider(cm.cpuManager)
+	cm.topologyManager.AddHintProvider(ctx, cm.cpuManager)
 
 	cm.memoryManager, err = memorymanager.NewManager(
 		context.TODO(),
@@ -351,7 +356,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		klog.ErrorS(err, "Failed to initialize memory manager")
 		return nil, err
 	}
-	cm.topologyManager.AddHintProvider(cm.memoryManager)
+	cm.topologyManager.AddHintProvider(ctx, cm.memoryManager)
 
 	// Create a single channel for all resource updates. This channel is consumed
 	// by the Kubelet's main sync loop.
