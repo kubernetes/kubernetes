@@ -38,3 +38,10 @@ const (
 	LimitedSwap SwapBehavior = "LimitedSwap"
 	NoSwap      SwapBehavior = "NoSwap"
 )
+
+// InPlacePodVerticalScaling types
+const (
+	ErrorInconsistentCPUAllocation = "inconsistentCPUAllocationError"
+	ErrorProhibitedCPUAllocation   = "prohibitedCPUAllocationError"
+	ErrorGetPromisedCPUSet         = "getPromisedCPUSetError"
+)
