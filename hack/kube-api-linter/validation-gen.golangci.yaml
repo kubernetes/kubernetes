@@ -1,0 +1,49 @@
+# This golangci-lint configuration is specifically for linting declarative
+# validation \tags on API resource files that have been migrated.
+# It is used by hack/verify-api-lint.sh and only enables the 'kubeapilinter'
+# with a custom configuration to check for specific tag conflicts.
+run:
+  timeout: 30m
+  relative-path-mode: gomod
+
+version: "2"
+
+output:
+  formats:
+    text:
+      path: stderr
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  default: none
+  enable:
+    - kubeapilinter
+
+  settings:
+    custom:
+      kubeapilinter:
+        path: _output/local/bin/kube-api-linter.so
+        description: kube-api-linter and lints Kube like APIs based on API conventions and best practices.
+        original-url: sigs.k8s.io/kube-api-linter
+        settings:
+          linters:
+            disable:
+              - '*'
+            enable:
+              - "conflictingmarkers"
+          lintersConfig:
+            conflictingmarkers:
+              conflicts:
+              - name: "optional_vs_required"
+                sets:
+                - ["k8s:optional"]
+                - ["k8s:required"]
+                description: "fields cannot be both optional and required"
+              - name: "required_vs_default"
+                sets:
+                - ["k8s:required"]
+                - ["default"]
+                description: "fields with default values are always optional"
