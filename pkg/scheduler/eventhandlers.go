@@ -150,6 +150,30 @@ func (sched *Scheduler) syncPodWithDispatcher(pod *v1.Pod) *v1.Pod {
 	return enrichedPod
 }
 
+func (sched *Scheduler) handleAssumedPodDeletion(pod *v1.Pod) {
+	logger := sched.logger
+	fwk, err := sched.frameworkForPod(pod)
+	if err != nil {
+		// This shouldn't happen, because we only accept for scheduling the pods
+		// which specify a scheduler name that matches one of the profiles.
+		utilruntime.HandleErrorWithLogger(logger, err, "Unable to get profile", "pod", klog.KObj(pod))
+		return
+	}
+	if !fwk.RejectWaitingPod(pod.UID) {
+		// Pod is in another phase, likely PreBind or Bind.
+		// We have to forget the pod in the cache, to make sure it won't be taking the space on the nodes.
+		if err := sched.Cache.ForgetPod(logger, pod); err != nil {
+			utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache ForgetPod failed", "pod", klog.KObj(pod))
+		}
+	}
+	// If a waiting pod is rejected, it indicates it's previously assumed and we're
+	// removing it from the scheduler cache. In this case, signal a AssignedPodDelete
+	// event to immediately retry some unscheduled Pods.
+	// If the pod reserved some resources in memory,
+	// it will wake up the pods again after freeing up the resources in `handleBindingCycleError`.
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, nil)
+}
+
 func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	start := time.Now()
 	logger := sched.logger
@@ -178,6 +202,11 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(newPod))
 	}
 	if isAssumed {
+		if newPod.DeletionTimestamp != nil && oldPod.DeletionTimestamp == nil {
+			// Assumed pod deletion has started. We should handle that differently,
+			// because we can't update such pod in any structure directly.
+			sched.handleAssumedPodDeletion(newPod)
+		}
 		return
 	}
 
@@ -218,22 +247,18 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 
 	logger.V(3).Info("Delete event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.SchedulingQueue.Delete(pod)
-	fwk, err := sched.frameworkForPod(pod)
+	isAssumed, err := sched.Cache.IsAssumedPod(pod)
 	if err != nil {
-		// This shouldn't happen, because we only accept for scheduling the pods
-		// which specify a scheduler name that matches one of the profiles.
-		utilruntime.HandleErrorWithLogger(logger, err, "Unable to get profile", "pod", klog.KObj(pod))
-		return
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(pod))
 	}
-	// If a waiting pod is rejected, it indicates it's previously assumed and we're
-	// removing it from the scheduler cache. In this case, signal a AssignedPodDelete
-	// event to immediately retry some unscheduled Pods.
-	// Similarly when a pod that had nominated node is deleted, it can unblock scheduling of other pods,
-	// because the lower or equal priority pods treat such a pod as if it was assigned.
-	if fwk.RejectWaitingPod(pod.UID) {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, nil)
+	if isAssumed {
+		// Assumed pod is deleted. We should handle that differently,
+		// because we can't delete such pod from any structure directly.
+		sched.handleAssumedPodDeletion(pod)
 	} else if pod.Status.NominatedNodeName != "" {
-		// Note that a nominated pod can fall into `RejectWaitingPod` case as well,
+		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
+		// because the lower or equal priority pods treat such a pod as if it was assigned.
+		// Note that a nominated pod can fall into `handleAssumedPodDeletion` case as well,
 		// but in that case the `MoveAllToActiveOrBackoffQueue` already covered lower priority pods.
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(pod)))
 	}
