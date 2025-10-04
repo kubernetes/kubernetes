@@ -148,7 +148,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			if tcase.featureGate != "" {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tcase.featureGate, tcase.featureGateEnable)
 			}
-			opts, err := NewPolicyOptions(tcase.policyOptions)
+			opts, err := NewPolicyOptions(t.Context(), tcase.policyOptions)
 			if tcase.expectedErr != nil {
 				if !strings.Contains(err.Error(), tcase.expectedErr.Error()) {
 					t.Errorf("Unexpected error message. Have: %s, wants %s", err.Error(), tcase.expectedErr.Error())
