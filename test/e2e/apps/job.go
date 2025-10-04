@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+        "fmt"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -1187,7 +1188,7 @@ done`}
 		gomega.Expect(job).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("Patching the Job")
-		payload := "{\"metadata\":{\"labels\":{\"" + jobName + "\":\"patched\"}}}"
+		payload := fmt.Sprintf(`{"metadata":{"labels":{"%s":"patched"}}}`, jobName)
 		patchedJob, err := f.ClientSet.BatchV1().Jobs(ns).Patch(ctx, jobName, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Job %s in namespace %s", jobName, ns)
 		gomega.Expect(resourceversion.CompareResourceVersion(job.ResourceVersion, patchedJob.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
