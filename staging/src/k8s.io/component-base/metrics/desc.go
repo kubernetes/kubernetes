@@ -115,7 +115,7 @@ func (d *Desc) determineDeprecationStatus(currentVersion semver.Version) {
 	d.markDeprecationOnce.Do(func() {
 		d.isDeprecated = isDeprecated(currentVersion, *deprecatedVersion)
 		if shouldHide(d.stabilityLevel, &currentVersion, deprecatedVersion) {
-			if shouldShowHidden() {
+			if ShouldShowHidden() {
 				klog.Warningf("Hidden metrics(%s) have been manually overridden, showing this very deprecated metric.", d.fqName)
 				return
 			}
