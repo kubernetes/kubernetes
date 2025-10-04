@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -78,15 +79,16 @@ const (
 
 // Start watches for system oom's and records an event for every system oom encountered.
 func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error {
+	logger := klog.FromContext(ctx)
 	if err := ow.state.load(); err != nil {
-		return fmt.Errorf("unable to load oom watcher state: %w", err)
+		ow.state.LastProcessedTimestamp = time.Now()
+		logger.Info("unable to restore state from file, continue with state", "state", ow.state.LastProcessedTimestamp, "error", err)
 	}
 
 	outStream := make(chan *oomparser.OomInstance, 10)
 	go ow.oomStreamer.StreamOoms(outStream)
 
 	go func() {
-		logger := klog.FromContext(ctx)
 		defer runtime.HandleCrashWithContext(ctx)
 
 		for event := range outStream {
