@@ -32,8 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"sigs.k8s.io/yaml"
@@ -43,7 +45,6 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/printers"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 )
 
@@ -380,6 +381,103 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
+		})
+	})
+})
+
+var _ = SIGDescribe("MirrorPod with EnvFiles", framework.WithFeatureGate(features.EnvFiles), func() {
+	f := framework.NewDefaultFramework("mirror-pod-envfiles")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	var ns, podPath, staticPodName, mirrorPodName string
+
+	ginkgo.Context("when creating a static pod with EnvFiles", func() {
+		ginkgo.BeforeEach(func() {
+			ns = f.Namespace.Name
+			staticPodName = "static-pod-envfiles-" + string(uuid.NewUUID())
+			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
+			podPath = kubeletCfg.StaticPodPath
+		})
+
+		ginkgo.AfterEach(func(ctx context.Context) {
+			ginkgo.By("delete the static pod")
+			err := deleteStaticPod(podPath, staticPodName, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to disappear")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("should be able to consume variables from a file", func(ctx context.Context) {
+			podSpec := v1.PodSpec{
+				InitContainers: []v1.Container{
+					{
+						Name:    "setup-envfile",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", `echo CONFIG_1='value1' > /data/config.env && echo CONFIG_2=\'value2\' >> /data/config.env`},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "config",
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    "use-envfile",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", "env | grep -E '(CONFIG_1|CONFIG_2)' | sort"},
+						Env: []v1.EnvVar{
+							{
+								Name: "CONFIG_1",
+								ValueFrom: &v1.EnvVarSource{
+									FileKeyRef: &v1.FileKeySelector{
+										VolumeName: "config",
+										Path:       "config.env",
+										Key:        "CONFIG_1",
+									},
+								},
+							},
+							{
+								Name: "CONFIG_2",
+								ValueFrom: &v1.EnvVarSource{
+									FileKeyRef: &v1.FileKeySelector{
+										VolumeName: "config",
+										Path:       "config.env",
+										Key:        "CONFIG_2",
+									},
+								},
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				Volumes: []v1.Volume{
+					{
+						Name: "config",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("create the static pod with envfiles")
+			err := createStaticPodWithSpec(podPath, staticPodName, ns, podSpec)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to succeed")
+			err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, mirrorPodName, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("checking the logs of the mirror pod")
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, ns, mirrorPodName, "use-envfile")
+			framework.ExpectNoError(err)
+
+			gomega.Expect(logs).To(gomega.ContainSubstring("CONFIG_1=value1"))
+			gomega.Expect(logs).To(gomega.ContainSubstring("CONFIG_2=value2"))
 		})
 	})
 })
