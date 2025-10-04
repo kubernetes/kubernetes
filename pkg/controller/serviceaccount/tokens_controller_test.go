@@ -483,9 +483,6 @@ func TestTokenCreation(t *testing.T) {
 				secrets.Add(tc.AddedSecret)
 				controller.queueSecretSync(tc.AddedSecret)
 			}
-			if tc.AddedSecretLocal != nil {
-				controller.updatedSecrets.Mutation(tc.AddedSecretLocal)
-			}
 			if tc.UpdatedSecret != nil {
 				secrets.Add(tc.UpdatedSecret)
 				controller.queueSecretUpdateSync(nil, tc.UpdatedSecret)
