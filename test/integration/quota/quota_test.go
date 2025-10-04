@@ -95,6 +95,7 @@ func TestQuota(t *testing.T) {
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
+		DeviceClassInformer:       informers.Resource().V1().DeviceClasses(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		InformerFactory:           informers,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
@@ -324,6 +325,7 @@ plugins:
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
+		DeviceClassInformer:       informers.Resource().V1().DeviceClasses(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		InformerFactory:           informers,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
@@ -450,6 +452,7 @@ plugins:
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
+		DeviceClassInformer:       informers.Resource().V1().DeviceClasses(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		InformerFactory:           informers,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
