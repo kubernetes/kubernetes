@@ -932,12 +932,6 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					return result, fmt.Errorf("failed to get host path for volume %q: %w", volume, err)
 				}
 
-				// Validate key length, must not exceed 128 characters.
-				// TODO: @HirazawaUi This limit will be relaxed after the EnvFiles feature gate beta stage.
-				if len(key) > 128 {
-					return result, fmt.Errorf("environment variable key %q exceeds maximum length of 128 characters", key)
-				}
-
 				// Construct the full path to the environment variable file
 				// by combining hostPath with the specified path in FileKeyRef
 				envFilePath, err := securejoin.SecureJoin(hostPath, f.Path)
@@ -949,12 +943,6 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				if err != nil {
 					klog.ErrorS(err, "Failed to parse env file", "pod", klog.KObj(pod))
 					return result, fmt.Errorf("couldn't parse env file")
-				}
-
-				// Validate value size, must not exceed 32KB.
-				// TODO: @HirazawaUi This limit will be relaxed after the EnvFiles feature gate beta stage.
-				if len(runtimeVal) > 32*1024 {
-					return result, fmt.Errorf("environment variable value for key %q exceeds maximum size of 32KB", key)
 				}
 
 				// If the key was not found, and it's not optional, return an error
