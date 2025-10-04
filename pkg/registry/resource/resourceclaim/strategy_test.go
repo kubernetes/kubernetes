@@ -646,10 +646,14 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"drop-fields-prioritized-list": {
-			oldObj:                obj,
-			newObj:                objWithPrioritizedList,
+			oldObj: obj,
+			newObj: func() *resource.ResourceClaim {
+				o := objWithPrioritizedList.DeepCopy()
+				o.Namespace = obj.Namespace
+				return o
+			}(),
 			prioritizedList:       false,
-			expectValidationError: deviceRequestError,
+			expectValidationError: fieldImmutableError,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -657,8 +661,12 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-fields-prioritized-list": {
-			oldObj:                obj,
-			newObj:                objWithPrioritizedList,
+			oldObj: obj,
+			newObj: func() *resource.ResourceClaim {
+				o := objWithPrioritizedList.DeepCopy()
+				o.Namespace = obj.Namespace
+				return o
+			}(),
 			prioritizedList:       true,
 			expectValidationError: fieldImmutableError, // Spec is immutable.
 			verify: func(t *testing.T, as []testclient.Action) {
