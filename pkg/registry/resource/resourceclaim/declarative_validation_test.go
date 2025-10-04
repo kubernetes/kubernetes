@@ -21,8 +21,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/kubernetes/fake"
@@ -32,6 +34,9 @@ import (
 )
 
 var apiVersions = []string{"v1beta1", "v1beta2", "v1"} // "v1alpha3" is excluded because it doesn't have ResourceClaim
+
+const validUUID = "550e8400-e29b-41d4-a716-446655440000"
+const validUUID1 = "550e8400-e29b-41d4-a716-446655440001"
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -253,6 +258,34 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 				field.Invalid(poolPath, "", "").WithOrigin("format=k8s-resource-pool-name"),
 			},
 		},
+		// UID in status.ReservedFor
+		"duplicate uid in status.ReservedFor": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusReservedFor([]resource.ResourceClaimConsumerReference{
+					resourceClaimReference(validUUID),
+					resourceClaimReference(uuid.New().String()),
+					resourceClaimReference(validUUID),
+				})),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "reservedFor").Index(2), "").WithOrigin("unique"),
+			},
+		},
+		"multiple- duplicate uid in status.ReservedFor": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusReservedFor([]resource.ResourceClaimConsumerReference{
+				resourceClaimReference(validUUID),
+				resourceClaimReference(uuid.New().String()),
+				resourceClaimReference(validUUID),
+				resourceClaimReference(validUUID1),
+				resourceClaimReference(validUUID1),
+				resourceClaimReference(uuid.New().String()),
+			})),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "reservedFor").Index(2), "").WithOrigin("unique"),
+				field.Duplicate(field.NewPath("status", "reservedFor").Index(4), "").WithOrigin("unique"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -322,6 +355,11 @@ func mkResourceClaimWithStatus(tweaks ...func(rc *resource.ResourceClaim)) resou
 					},
 				},
 			},
+			ReservedFor: []resource.ResourceClaimConsumerReference{
+				resourceClaimReference(validUUID),
+				resourceClaimReference(uuid.New().String()),
+				resourceClaimReference(uuid.New().String()),
+			},
 		},
 	}
 	for _, tweak := range tweaks {
@@ -335,5 +373,19 @@ func tweakStatusDeviceRequestAllocationResultPool(pool string) func(rc *resource
 		for i := range rc.Status.Allocation.Devices.Results {
 			rc.Status.Allocation.Devices.Results[i].Pool = pool
 		}
+	}
+}
+
+func resourceClaimReference(uid string) resource.ResourceClaimConsumerReference {
+	return resource.ResourceClaimConsumerReference{
+		UID:      types.UID(uid),
+		Resource: "Pod",
+		Name:     "pod-name",
+	}
+}
+
+func tweakStatusReservedFor(refs []resource.ResourceClaimConsumerReference) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Status.ReservedFor = refs
 	}
 }
