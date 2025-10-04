@@ -179,8 +179,12 @@ func Validate_T01(ctx context.Context, op operation.Operation, fldPath *field.Pa
 // Validate_T02 validates an instance of T02 according
 // to declarative validation rules in the API schema.
 func Validate_T02(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T02) (errs field.ErrorList) {
+	earlyReturn := false
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T02, ShortCircuit"); len(e) != 0 {
 		errs = append(errs, e...)
+		earlyReturn = true
+	}
+	if earlyReturn {
 		return // do not proceed
 	}
 
@@ -194,8 +198,12 @@ func Validate_T02(ctx context.Context, op operation.Operation, fldPath *field.Pa
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T02.S, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			return
@@ -209,8 +217,12 @@ func Validate_T02(ctx context.Context, op operation.Operation, fldPath *field.Pa
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T02.PS, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			return
@@ -224,8 +236,12 @@ func Validate_T02(ctx context.Context, op operation.Operation, fldPath *field.Pa
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T02.T, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			// call the type's validation function
@@ -241,8 +257,12 @@ func Validate_T02(ctx context.Context, op operation.Operation, fldPath *field.Pa
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T02.PT, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			// call the type's validation function
@@ -256,8 +276,12 @@ func Validate_T02(ctx context.Context, op operation.Operation, fldPath *field.Pa
 // Validate_T03 validates an instance of T03 according
 // to declarative validation rules in the API schema.
 func Validate_T03(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T03) (errs field.ErrorList) {
+	earlyReturn := false
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03, ShortCircuit"); len(e) != 0 {
 		errs = append(errs, e...)
+		earlyReturn = true
+	}
+	if earlyReturn {
 		return // do not proceed
 	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03, no flags")...)
@@ -272,8 +296,12 @@ func Validate_T03(ctx context.Context, op operation.Operation, fldPath *field.Pa
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.S, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.S, no flags")...)
@@ -288,8 +316,12 @@ func Validate_T03(ctx context.Context, op operation.Operation, fldPath *field.Pa
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.PS, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.PS, no flags")...)
@@ -304,8 +336,12 @@ func Validate_T03(ctx context.Context, op operation.Operation, fldPath *field.Pa
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.T, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.T, no flags")...)
@@ -322,8 +358,12 @@ func Validate_T03(ctx context.Context, op operation.Operation, fldPath *field.Pa
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.PT, ShortCircuit"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03.PT, no flags")...)
@@ -338,12 +378,16 @@ func Validate_T03(ctx context.Context, op operation.Operation, fldPath *field.Pa
 // Validate_TMultiple validates an instance of TMultiple according
 // to declarative validation rules in the API schema.
 func Validate_TMultiple(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *TMultiple) (errs field.ErrorList) {
+	earlyReturn := false
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple, ShortCircuit 1"); len(e) != 0 {
 		errs = append(errs, e...)
-		return // do not proceed
+		earlyReturn = true
 	}
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple, ShortCircuit 2"); len(e) != 0 {
 		errs = append(errs, e...)
+		earlyReturn = true
+	}
+	if earlyReturn {
 		return // do not proceed
 	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple, no flags 1")...)
@@ -360,12 +404,16 @@ func Validate_TMultiple(ctx context.Context, op operation.Operation, fldPath *fi
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.S, ShortCircuit 1"); len(e) != 0 {
 				errs = append(errs, e...)
-				return // do not proceed
+				earlyReturn = true
 			}
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.S, ShortCircuit 2"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.S, no flags 1")...)
@@ -382,12 +430,16 @@ func Validate_TMultiple(ctx context.Context, op operation.Operation, fldPath *fi
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PS, ShortCircuit 1"); len(e) != 0 {
 				errs = append(errs, e...)
-				return // do not proceed
+				earlyReturn = true
 			}
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PS, ShortCircuit 2"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PS, no flags 1")...)
@@ -404,12 +456,16 @@ func Validate_TMultiple(ctx context.Context, op operation.Operation, fldPath *fi
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.T, ShortCircuit 1"); len(e) != 0 {
 				errs = append(errs, e...)
-				return // do not proceed
+				earlyReturn = true
 			}
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.T, ShortCircuit 2"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.T, no flags 1")...)
@@ -428,12 +484,16 @@ func Validate_TMultiple(ctx context.Context, op operation.Operation, fldPath *fi
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PT, ShortCircuit 1"); len(e) != 0 {
 				errs = append(errs, e...)
-				return // do not proceed
+				earlyReturn = true
 			}
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PT, ShortCircuit 2"); len(e) != 0 {
 				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple.PT, no flags 1")...)
