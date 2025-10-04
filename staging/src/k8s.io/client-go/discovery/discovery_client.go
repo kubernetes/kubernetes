@@ -63,8 +63,9 @@ const (
 	// Aggregated discovery content-type (v2beta1). NOTE: content-type parameters
 	// MUST be ordered (g, v, as) for server in "Accept" header (BUT we are resilient
 	// to ordering when comparing returned values in "Content-Type" header).
-	AcceptV2Beta1 = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
-	AcceptV2      = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
+	AcceptV2Beta1    = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
+	AcceptV2         = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
+	AcceptV2Unmerged = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=unmerged"
 	// Prioritize aggregated discovery by placing first in the order of discovery accept types.
 	acceptDiscoveryFormats = AcceptV2 + "," + AcceptV2Beta1 + "," + AcceptV1
 )
@@ -167,7 +168,8 @@ type DiscoveryClient struct {
 
 	LegacyPrefix string
 	// Forces the client to request only "unaggregated" (legacy) discovery.
-	UseLegacyDiscovery bool
+	UseLegacyDiscovery     bool
+	ForceUnmergedDiscovery bool
 }
 
 var _ AggregatedDiscoveryInterface = &DiscoveryClient{}
@@ -241,10 +243,7 @@ func (d *DiscoveryClient) downloadLegacy() (
 	map[schema.GroupVersion]*metav1.APIResourceList,
 	map[schema.GroupVersion]error,
 	error) {
-	accept := acceptDiscoveryFormats
-	if d.UseLegacyDiscovery {
-		accept = AcceptV1
-	}
+	accept := selectDiscoveryAcceptHeader(d.UseLegacyDiscovery, d.ForceUnmergedDiscovery)
 	var responseContentType string
 	body, err := d.restClient.Get().
 		AbsPath("/api").
@@ -307,10 +306,7 @@ func (d *DiscoveryClient) downloadAPIs() (
 	map[schema.GroupVersion]*metav1.APIResourceList,
 	map[schema.GroupVersion]error,
 	error) {
-	accept := acceptDiscoveryFormats
-	if d.UseLegacyDiscovery {
-		accept = AcceptV1
-	}
+	accept := selectDiscoveryAcceptHeader(d.UseLegacyDiscovery, d.ForceUnmergedDiscovery)
 	var responseContentType string
 	body, err := d.restClient.Get().
 		AbsPath("/apis").
@@ -349,6 +345,16 @@ func (d *DiscoveryClient) downloadAPIs() (
 	}
 
 	return apiGroupList, resourcesByGV, failedGVs, nil
+}
+
+func selectDiscoveryAcceptHeader(useLegacy, forceUnmerged bool) string {
+	if useLegacy {
+		return AcceptV1
+	}
+	if forceUnmerged {
+		return AcceptV2Unmerged + "," + acceptDiscoveryFormats
+	}
+	return acceptDiscoveryFormats
 }
 
 // ContentTypeIsGVK checks of the content-type string is both
