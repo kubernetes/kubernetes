@@ -31,6 +31,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -422,6 +423,7 @@ func TestComponentPod(t *testing.T) {
 					Labels:    map[string]string{"component": "foo", "tier": "control-plane"},
 				},
 				Spec: v1.PodSpec{
+					HostUsers: ptr.To(false),
 					SecurityContext: &v1.PodSecurityContext{
 						SeccompProfile: &v1.SeccompProfile{
 							Type: v1.SeccompProfileTypeRuntimeDefault,
