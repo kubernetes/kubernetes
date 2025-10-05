@@ -64,16 +64,16 @@ func Test(t *testing.T) {
 	st.Value(&structA).OldValue(&structA2).ExpectValid()
 	st.Value(&structA2).OldValue(&structA).ExpectValid()
 
-	st.Value(&structA).OldValue(&structB).ExpectInvalid(
-		field.Forbidden(field.NewPath("stringField"), "field is immutable"),
-		field.Forbidden(field.NewPath("stringPtrField"), "field is immutable"),
-		field.Forbidden(field.NewPath("structField"), "field is immutable"),
-		field.Forbidden(field.NewPath("structPtrField"), "field is immutable"),
-		field.Forbidden(field.NewPath("noncomparableStructField"), "field is immutable"),
-		field.Forbidden(field.NewPath("noncomparableStructPtrField"), "field is immutable"),
-		field.Forbidden(field.NewPath("sliceField"), "field is immutable"),
-		field.Forbidden(field.NewPath("mapField"), "field is immutable"),
-		field.Forbidden(field.NewPath("immutableField"), "field is immutable"),
-		field.Forbidden(field.NewPath("immutablePtrField"), "field is immutable"),
-	)
+	st.Value(&structA).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Forbidden(field.NewPath("stringField"), "immutable"),
+		field.Forbidden(field.NewPath("stringPtrField"), "immutable"),
+		field.Forbidden(field.NewPath("structField"), "immutable"),
+		field.Forbidden(field.NewPath("structPtrField"), "immutable"),
+		field.Forbidden(field.NewPath("noncomparableStructField"), "immutable"),
+		field.Forbidden(field.NewPath("noncomparableStructPtrField"), "immutable"),
+		field.Forbidden(field.NewPath("sliceField"), "immutable"),
+		field.Forbidden(field.NewPath("mapField"), "immutable"),
+		field.Forbidden(field.NewPath("immutableField"), "immutable"),
+		field.Forbidden(field.NewPath("immutablePtrField"), "immutable"),
+	})
 }

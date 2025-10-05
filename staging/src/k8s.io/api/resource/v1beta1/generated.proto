@@ -568,6 +568,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceRequest requests = 1;
 
   // These constraints must be satisfied by the set of devices that get
@@ -575,6 +576,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceConstraint constraints = 2;
 
   // This field holds configuration for multiple potential drivers which
@@ -583,6 +585,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceClaimConfiguration config = 3;
 }
 
@@ -647,6 +650,8 @@ message DeviceClassSpec {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:maxItems=32
   repeated DeviceSelector selectors = 1;
 
   // Config defines configuration parameters that apply to each device that is claimed via this class.
@@ -657,6 +662,8 @@ message DeviceClassSpec {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:maxItems=32
   repeated DeviceClassConfiguration config = 2;
 
   // ExtendedResourceName is the extended resource name for the devices of this class.

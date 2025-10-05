@@ -49,22 +49,39 @@ func (r *responseWriter) Write([]byte) (int, error) {
 
 func TestHandshake(t *testing.T) {
 	tests := map[string]struct {
-		clientProtocols  []string
-		serverProtocols  []string
-		expectedProtocol string
-		expectError      bool
+		clientProtocols    []string
+		serverProtocols    []string
+		expectedProtocol   string
+		expectError        bool
+		expectedStatusCode int
 	}{
+		"no protocol": {
+			clientProtocols:    []string{},
+			serverProtocols:    []string{"a", "b"},
+			expectedProtocol:   "",
+			expectError:        true,
+			expectedStatusCode: http.StatusBadRequest,
+		},
+		"empty client protocol header": {
+			clientProtocols:    []string{",, "},
+			serverProtocols:    []string{"a", "b"},
+			expectedProtocol:   "",
+			expectError:        true,
+			expectedStatusCode: http.StatusBadRequest,
+		},
 		"no common protocol": {
-			clientProtocols:  []string{"c"},
-			serverProtocols:  []string{"a", "b"},
-			expectedProtocol: "",
-			expectError:      true,
+			clientProtocols:    []string{"c"},
+			serverProtocols:    []string{"a", "b"},
+			expectedProtocol:   "",
+			expectError:        true,
+			expectedStatusCode: http.StatusForbidden,
 		},
 		"no common protocol with comma separated list": {
-			clientProtocols:  []string{"c, d"},
-			serverProtocols:  []string{"a", "b"},
-			expectedProtocol: "",
-			expectError:      true,
+			clientProtocols:    []string{"c, d"},
+			serverProtocols:    []string{"a", "b"},
+			expectedProtocol:   "",
+			expectError:        true,
+			expectedStatusCode: http.StatusForbidden,
 		},
 		"common protocol": {
 			clientProtocols:  []string{"b"},
@@ -79,57 +96,72 @@ func TestHandshake(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		req, err := http.NewRequest(http.MethodGet, "http://www.example.com/", nil)
-		if err != nil {
-			t.Fatalf("%s: error creating request: %v", name, err)
-		}
-
-		for _, p := range test.clientProtocols {
-			req.Header.Add(HeaderProtocolVersion, p)
-		}
-
-		w := newResponseWriter()
-		negotiated, err := Handshake(req, w, test.serverProtocols)
-
-		// verify negotiated protocol
-		if e, a := test.expectedProtocol, negotiated; e != a {
-			t.Errorf("%s: protocol: expected %q, got %q", name, e, a)
-		}
-
-		if test.expectError {
-			if err == nil {
-				t.Errorf("%s: expected error but did not get one", name)
+		t.Run(name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, "http://www.example.com/", nil)
+			if err != nil {
+				t.Fatalf("%s: error creating request: %v", name, err)
 			}
-			if w.statusCode == nil {
-				t.Errorf("%s: expected w.statusCode to be set", name)
-			} else if e, a := http.StatusForbidden, *w.statusCode; e != a {
-				t.Errorf("%s: w.statusCode: expected %d, got %d", name, e, a)
-			}
-			if e, a := test.serverProtocols, w.Header()[HeaderAcceptedProtocolVersions]; !reflect.DeepEqual(e, a) {
-				t.Errorf("%s: accepted server protocols: expected %v, got %v", name, e, a)
-			}
-			continue
-		}
-		if !test.expectError && err != nil {
-			t.Errorf("%s: unexpected error: %v", name, err)
-			continue
-		}
-		if w.statusCode != nil {
-			t.Errorf("%s: unexpected non-nil w.statusCode: %d", name, w.statusCode)
-		}
 
-		if len(test.expectedProtocol) == 0 {
-			if len(w.Header()[HeaderProtocolVersion]) > 0 {
-				t.Errorf("%s: unexpected protocol version response header: %s", name, w.Header()[HeaderProtocolVersion])
+			for _, p := range test.clientProtocols {
+				req.Header.Add(HeaderProtocolVersion, p)
 			}
-			continue
-		}
 
-		// verify response headers
-		if e, a := []string{test.expectedProtocol}, w.Header()[HeaderProtocolVersion]; !reflect.DeepEqual(e, a) {
-			t.Errorf("%s: protocol response header: expected %v, got %v", name, e, a)
-		}
+			w := newResponseWriter()
+			negotiated, err := Handshake(req, w, test.serverProtocols)
+
+			// verify negotiated protocol
+			if e, a := test.expectedProtocol, negotiated; e != a {
+				t.Fatalf("%s: protocol: expected %q, got %q", name, e, a)
+			}
+
+			if test.expectError {
+				if err == nil {
+					t.Fatalf("%s: expected error but did not get one", name)
+				}
+				if w.statusCode == nil {
+					t.Fatalf("%s: expected w.statusCode to be set", name)
+				} else if e, a := test.expectedStatusCode, *w.statusCode; e != a {
+					t.Fatalf("%s: w.statusCode: expected %d, got %d", name, e, a)
+				}
+				if test.expectedStatusCode == http.StatusForbidden {
+					if e, a := test.serverProtocols, w.Header()[HeaderAcceptedProtocolVersions]; !reflect.DeepEqual(e, a) {
+						t.Fatalf("%s: accepted server protocols: expected %v, got %v", name, e, a)
+					}
+				}
+				return
+			}
+			if !test.expectError && err != nil {
+				t.Fatalf("%s: unexpected error: %v", name, err)
+			}
+			if w.statusCode != nil {
+				t.Fatalf("%s: unexpected non-nil w.statusCode: %d", name, w.statusCode)
+			}
+
+			if len(test.expectedProtocol) == 0 {
+				if len(w.Header()[HeaderProtocolVersion]) > 0 {
+					t.Fatalf("%s: unexpected protocol version response header: %s", name, w.Header()[HeaderProtocolVersion])
+				}
+				return
+			}
+
+			// verify response headers
+			if e, a := []string{test.expectedProtocol}, w.Header()[HeaderProtocolVersion]; !reflect.DeepEqual(e, a) {
+				t.Fatalf("%s: protocol response header: expected %v, got %v", name, e, a)
+			}
+		})
 	}
+
+	t.Run("empty server protocols should panic", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("The code did not panic")
+			}
+		}()
+		req, _ := http.NewRequest(http.MethodGet, "http://www.example.com/", nil)
+		req.Header.Add(HeaderProtocolVersion, "a")
+		w := newResponseWriter()
+		_, _ = Handshake(req, w, []string{})
+	})
 }
 
 func TestIsUpgradeFailureError(t *testing.T) {

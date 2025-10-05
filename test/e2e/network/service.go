@@ -46,6 +46,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -56,6 +57,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
@@ -3281,8 +3283,9 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to list Endpoints")
 
 		ginkgo.By("creating an Endpoint")
-		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Create(ctx, &testEndpoints, metav1.CreateOptions{})
+		createdEP, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Create(ctx, &testEndpoints, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Endpoint")
+		gomega.Expect(createdEP).To(apimachineryutils.HaveValidResourceVersion())
 		ginkgo.By("waiting for available Endpoint")
 		ctxUntil, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
@@ -3368,8 +3371,10 @@ var _ = common.SIGDescribe("Services", func() {
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON for WatchEvent patch")
 		ginkgo.By("patching the Endpoint")
-		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Patch(ctx, testEndpointName, types.StrategicMergePatchType, []byte(endpointPatch), metav1.PatchOptions{})
+		patchedEP, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Patch(ctx, testEndpointName, types.StrategicMergePatchType, []byte(endpointPatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Endpoint")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdEP.ResourceVersion, patchedEP.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
+
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		_, err = watchtools.Until(ctxUntil, endpoints.ResourceVersion, w, func(event watch.Event) (bool, error) {
@@ -3817,11 +3822,13 @@ var _ = common.SIGDescribe("Services", func() {
 		if err != nil {
 			framework.Failf("failed to get Service %q: %v", serviceName, err)
 		}
+		gomega.Expect(service).To(apimachineryutils.HaveValidResourceVersion())
 		service.Spec.Ports = []v1.ServicePort{svcTCPport}
-		_, err = cs.CoreV1().Services(ns).Update(ctx, service, metav1.UpdateOptions{})
+		updatedSVC, err := cs.CoreV1().Services(ns).Update(ctx, service, metav1.UpdateOptions{})
 		if err != nil {
 			framework.Failf("failed to get Service %q: %v", serviceName, err)
 		}
+		gomega.Expect(resourceversion.CompareResourceVersion(service.ResourceVersion, updatedSVC.ResourceVersion)).To(gomega.BeNumerically("==", -1), "updated object should have a larger resource version")
 
 		ginkgo.By("Checking if the Service forwards traffic to TCP only")
 		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolTCP, execPod, 30*time.Second)

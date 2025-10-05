@@ -142,7 +142,7 @@ func Validate_NestedDirectComparableStruct(ctx context.Context, op operation.Ope
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field intField")...)
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field directComparableStructField")...)
 			// call the type's validation function
 			errs = append(errs, Validate_DirectComparableStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -166,7 +166,7 @@ func Validate_NestedNonDirectComparableStruct(ctx context.Context, op operation.
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field intField")...)
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field nonDirectComparableStructField")...)
 			// call the type's validation function
 			errs = append(errs, Validate_NonDirectComparableStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -190,7 +190,7 @@ func Validate_NonDirectComparableStruct(ctx context.Context, op operation.Operat
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field intField")...)
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field intPtrField")...)
 			return
 		}(fldPath.Child("intPtrField"), obj.IntPtrField, safe.Field(oldObj, func(oldObj *NonDirectComparableStruct) *int { return oldObj.IntPtrField }))...)
 

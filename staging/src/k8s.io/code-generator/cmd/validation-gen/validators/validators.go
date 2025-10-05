@@ -445,6 +445,10 @@ type FunctionGen struct {
 	// TagName is the tag which triggered this function.
 	TagName string
 
+	// Cohort indicates a set of related functions which are processed
+	// together.
+	Cohort string
+
 	// Flags holds the options for this validator function.
 	Flags FunctionFlags
 

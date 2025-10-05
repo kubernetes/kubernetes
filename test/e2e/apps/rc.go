@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -39,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/controller/replication"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -152,8 +154,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.WatchEventSequenceVerifier(ctx, dc, rcResource, testRcNamespace, testRcName, metav1.ListOptions{LabelSelector: "test-rc-static=true"}, expectedWatchEvents, func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
 			ginkgo.By("creating a ReplicationController")
 			// Create a ReplicationController
-			_, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Create(ctx, &rcTest, metav1.CreateOptions{})
+			testRcCreated, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Create(ctx, &rcTest, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Failed to create ReplicationController")
+			gomega.Expect(testRcCreated).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By("waiting for RC to be added")
 			eventFound := false
@@ -208,6 +211,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			testRcPatched, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(ctx, testRcName, types.StrategicMergePatchType, []byte(rcLabelPatchPayload), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "Failed to patch ReplicationController")
 			gomega.Expect(testRcPatched.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-rc", "patched"), "failed to patch RC")
+			gomega.Expect(resourceversion.CompareResourceVersion(testRcCreated.ResourceVersion, testRcPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 			ginkgo.By("waiting for RC to be modified")
 			eventFound = false
 			ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)

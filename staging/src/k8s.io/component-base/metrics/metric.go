@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -65,8 +66,8 @@ with the kubeCollector itself as an argument.
 */
 type lazyMetric struct {
 	fqName              string
-	isDeprecated        bool
-	isHidden            bool
+	isDeprecated        atomic.Bool
+	isHidden            atomic.Bool
 	isCreated           bool
 	createLock          sync.RWMutex
 	markDeprecationOnce sync.Once
@@ -104,7 +105,7 @@ func (r *lazyMetric) preprocessMetric(currentVersion semver.Version) {
 	defer disabledMetricsLock.RUnlock()
 	// disabling metrics is higher in precedence than showing hidden metrics
 	if _, ok := disabledMetrics[r.fqName]; ok {
-		r.isHidden = true
+		r.isHidden.Store(true)
 		return
 	}
 	deprecatedVersion := r.self.DeprecatedVersion()
@@ -112,7 +113,7 @@ func (r *lazyMetric) preprocessMetric(currentVersion semver.Version) {
 		return
 	}
 	r.markDeprecationOnce.Do(func() {
-		r.isDeprecated = isDeprecated(currentVersion, *deprecatedVersion)
+		r.isDeprecated.Store(isDeprecated(currentVersion, *deprecatedVersion))
 
 		if shouldHide(r.stabilityLevel, &currentVersion, deprecatedVersion) {
 			if shouldShowHidden() {
@@ -121,17 +122,17 @@ func (r *lazyMetric) preprocessMetric(currentVersion semver.Version) {
 			}
 			// TODO(RainbowMango): Remove this log temporarily. https://github.com/kubernetes/kubernetes/issues/85369
 			// klog.Warningf("This metric has been deprecated for more than one release, hiding.")
-			r.isHidden = true
+			r.isHidden.Store(true)
 		}
 	})
 }
 
 func (r *lazyMetric) IsHidden() bool {
-	return r.isHidden
+	return r.isHidden.Load()
 }
 
 func (r *lazyMetric) IsDeprecated() bool {
-	return r.isDeprecated
+	return r.isDeprecated.Load()
 }
 
 // Create forces the initialization of metric which has been deferred until
@@ -174,8 +175,8 @@ func (r *lazyMetric) ClearState() {
 	r.createLock.Lock()
 	defer r.createLock.Unlock()
 
-	r.isDeprecated = false
-	r.isHidden = false
+	r.isDeprecated.Store(false)
+	r.isHidden.Store(false)
 	r.isCreated = false
 	r.markDeprecationOnce = sync.Once{}
 	r.createOnce = sync.Once{}

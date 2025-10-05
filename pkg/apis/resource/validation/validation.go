@@ -128,15 +128,15 @@ func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path,
 		func(request resource.DeviceRequest) (string, string) {
 			return request.Name, "name"
 		},
-		fldPath.Child("requests"))...)
+		fldPath.Child("requests"), sizeCovered)...)
 	allErrs = append(allErrs, validateSlice(deviceClaim.Constraints, resource.DeviceConstraintsMaxSize,
 		func(constraint resource.DeviceConstraint, fldPath *field.Path) field.ErrorList {
 			return validateDeviceConstraint(constraint, fldPath, requestNames)
-		}, fldPath.Child("constraints"))...)
+		}, fldPath.Child("constraints"), sizeCovered)...)
 	allErrs = append(allErrs, validateSlice(deviceClaim.Config, resource.DeviceConfigMaxSize,
 		func(config resource.DeviceClaimConfiguration, fldPath *field.Path) field.ErrorList {
 			return validateDeviceClaimConfiguration(config, fldPath, requestNames, stored)
-		}, fldPath.Child("config"))...)
+		}, fldPath.Child("config"), sizeCovered)...)
 	return allErrs
 }
 
@@ -485,7 +485,7 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateRequestNameRef(result.Request, fldPath.Child("request"), requestNames)...)
 	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"))...)
-	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool"))...)
+	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
 	allErrs = append(allErrs, validateDeviceBindingParameters(result.BindingConditions, result.BindingFailureConditions, fldPath)...)
 	if result.ShareID != nil {
@@ -544,8 +544,9 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
 			return validateSelector(selector, fldPath, stored)
 		},
-		fldPath.Child("selectors"))...)
+		fldPath.Child("selectors"), sizeCovered)...)
 	// Same logic as above for configs.
+	stored = false
 	if oldSpec != nil {
 		stored = apiequality.Semantic.DeepEqual(spec.Config, oldSpec.Config)
 	}
@@ -553,7 +554,7 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 		func(config resource.DeviceClassConfiguration, fldPath *field.Path) field.ErrorList {
 			return validateDeviceClassConfiguration(config, fldPath, stored)
 		},
-		fldPath.Child("config"))...)
+		fldPath.Child("config"), sizeCovered)...)
 	if spec.ExtendedResourceName != nil && !v1helper.IsExtendedResourceName(corev1.ResourceName(*spec.ExtendedResourceName)) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("extendedResourceName"), *spec.ExtendedResourceName,
 			"must be a valid extended resource name"))
@@ -1126,7 +1127,7 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 		// Dumping the entire field into the error message is likely to be too long,
 		// in particular when it is already beyond the maximum size. Instead this
 		// just shows the number of entries.
-		err := field.TooMany(fldPath, len(slice), maxSize)
+		err := field.TooMany(fldPath, len(slice), maxSize).WithOrigin("maxItems")
 		if slices.Contains(opts, sizeCovered) {
 			err = err.MarkCoveredByDeclarative()
 		}
@@ -1208,7 +1209,7 @@ func truncateIfTooLong(str string, maxLen int) string {
 func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.Path, allocatedDevices sets.Set[structured.SharedDeviceID]) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(device.Driver, fldPath.Child("driver"))...)
-	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool"))...)
 	allErrs = append(allErrs, validateDeviceName(device.Device, fldPath.Child("device"))...)
 	if device.ShareID != nil {
 		allErrs = append(allErrs, validateUID(*device.ShareID, fldPath.Child("shareID"))...)
