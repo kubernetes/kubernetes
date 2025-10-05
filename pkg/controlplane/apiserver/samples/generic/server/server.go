@@ -44,6 +44,7 @@ import (
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
+	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
 
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
@@ -189,6 +190,9 @@ func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregat
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage providers: %w", err)
 	}
+	// add resource.k8s.io, because resource quota evaluator needs deviceclass informer
+	storageProviders = append(storageProviders,
+		resourcerest.RESTStorageProvider{NamespaceClient: client.CoreV1().Namespaces()})
 	if err := nativeAPIs.InstallAPIs(storageProviders...); err != nil {
 		return nil, fmt.Errorf("failed to install APIs: %w", err)
 	}

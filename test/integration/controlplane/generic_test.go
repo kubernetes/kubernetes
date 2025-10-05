@@ -105,6 +105,11 @@ func TestGenericControlplaneStartUp(t *testing.T) {
 		"validatingwebhookconfigurations.admissionregistration.k8s.io",
 		"mutatingadmissionpolicies.admissionregistration.k8s.io",
 		"mutatingadmissionpolicybindings.admissionregistration.k8s.io",
+		"deviceclasses.resource.k8s.io",
+		"devicetaintrules.resource.k8s.io",
+		"resourceclaims.resource.k8s.io",
+		"resourceclaimtemplates.resource.k8s.io",
+		"resourceslices.resource.k8s.io",
 	)
 	if diff := cmp.Diff(sets.List(expected), sets.List(grs)); diff != "" {
 		t.Fatalf("unexpected API groups: +want, -got\n%s", diff)
