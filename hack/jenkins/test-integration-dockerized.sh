@@ -29,4 +29,4 @@ set -x;
 # stabilizing the tests / CI Setting this to a hardcoded value is fragile.
 export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
 
-make test-integration KUBE_KEEP_VERBOSE_TEST_OUTPUT=y LOG_LEVEL=4
+make test-integration KUBE_KEEP_VERBOSE_TEST_OUTPUT=y LOG_LEVEL=1 WHAT=./test/integration/scheduler/queueing/queueinghint GOFLAGS="-v" KUBE_TEST_ARGS="-run ^TestCoreResourceEnqueue$"
