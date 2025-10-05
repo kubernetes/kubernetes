@@ -140,7 +140,8 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue"
+            "recursiveReadOnly": "recursiveReadOnlyValue",
+            "imageRef": "imageRefValue"
           }
         ],
         "user": {
@@ -233,7 +234,8 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue"
+            "recursiveReadOnly": "recursiveReadOnlyValue",
+            "imageRef": "imageRefValue"
           }
         ],
         "user": {
@@ -327,7 +329,8 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue"
+            "recursiveReadOnly": "recursiveReadOnlyValue",
+            "imageRef": "imageRefValue"
           }
         ],
         "user": {
