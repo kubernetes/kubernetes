@@ -253,19 +253,14 @@ func (c *containerLogManager) rotateLogs(ctx context.Context) error {
 
 	// First, prioritize high-throughput containers
 	c.highThroughputMutex.RLock()
-	highThroughputIDs := make([]string, 0, len(c.highThroughputContainers))
-	for id := range c.highThroughputContainers {
-		highThroughputIDs = append(highThroughputIDs, id)
-	}
-	c.highThroughputMutex.RUnlock()
-
 	// Add high-throughput containers first for priority processing
-	for _, id := range highThroughputIDs {
+	for id := range c.highThroughputContainers {
 		if v := logger.V(4); v.Enabled() {
 			logger.V(4).Info("Adding high-throughput container to queue for priority processing", "id", id)
 		}
 		c.queue.Add(id)
 	}
+	c.highThroughputMutex.RUnlock()
 
 	// Then add all other running containers
 	for _, container := range containers {
@@ -277,14 +272,10 @@ func (c *containerLogManager) rotateLogs(ctx context.Context) error {
 
 		// Skip if already added as high-throughput
 		containerID := container.GetId()
-		skip := false
-		for _, id := range highThroughputIDs {
-			if id == containerID {
-				skip = true
-				break
-			}
-		}
-		if skip {
+		c.highThroughputMutex.RLock()
+		_, isHighThroughput := c.highThroughputContainers[containerID]
+		c.highThroughputMutex.RUnlock()
+		if isHighThroughput {
 			continue
 		}
 
