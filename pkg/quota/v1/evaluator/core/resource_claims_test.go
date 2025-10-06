@@ -190,8 +190,8 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			}(),
 			usage: corev1.ResourceList{
 				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("32"),
-				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("32"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("33"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("33"),
 			},
 		},
 		"prioritized-list-multiple-subrequests-different-device-classes": {

@@ -138,19 +138,25 @@ func isImplicitRequestName(name string) bool {
 
 func (p *claimEvaluator) setResourceQuantity(resourceMap map[corev1.ResourceName]resource.Quantity, quantity resource.Quantity, deviceClassName, name string, isExtendedResourceClaim bool) {
 	deviceClassClaim := V1ResourceByDeviceClass(deviceClassName)
-	resourceMap[deviceClassClaim] = quantity
+	q := resourceMap[deviceClassClaim]
+	q.Add(quantity)
+	resourceMap[deviceClassClaim] = q
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
 		return
 	}
 	implicitExtendedResourceClaim := V1ImplicitExtendedResourceByDeviceClass(deviceClassName)
-	extendedResourceClaim := p.extendedResourceQuota(deviceClassName)
 	isImplicitExtendedResourceRequest := isImplicitRequestName(name)
 	if !isExtendedResourceClaim || !isImplicitExtendedResourceRequest {
-		resourceMap[implicitExtendedResourceClaim] = quantity
+		q := resourceMap[implicitExtendedResourceClaim]
+		q.Add(quantity)
+		resourceMap[implicitExtendedResourceClaim] = q
 	}
+	extendedResourceClaim := p.extendedResourceQuota(deviceClassName)
 	if extendedResourceClaim != "" {
 		if !isExtendedResourceClaim || isImplicitExtendedResourceRequest {
-			resourceMap[extendedResourceClaim] = quantity
+			q := resourceMap[extendedResourceClaim]
+			q.Add(quantity)
+			resourceMap[extendedResourceClaim] = q
 		}
 	}
 }
@@ -200,7 +206,6 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 			}
 			continue
 		case request.Exactly != nil:
-			deviceClassClaim := V1ResourceByDeviceClass(request.Exactly.DeviceClassName)
 			var numDevices int64
 			switch request.Exactly.AllocationMode {
 			case resourceapi.DeviceAllocationModeExactCount:
@@ -213,9 +218,8 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 				// don't count towards the quota and users shouldn't
 				// expect that when downgrading.
 			}
-			quantity := result[deviceClassClaim]
-			quantity.Add(*(resource.NewQuantity(numDevices, resource.DecimalSI)))
-			p.setResourceQuantity(result, quantity, request.Exactly.DeviceClassName, request.Name, isExtendedResourceClaim)
+			q := resource.NewQuantity(numDevices, resource.DecimalSI)
+			p.setResourceQuantity(result, *q, request.Exactly.DeviceClassName, request.Name, isExtendedResourceClaim)
 		default:
 			// Some unknown, future request type. Cannot do quota for it.
 		}
