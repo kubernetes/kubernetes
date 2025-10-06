@@ -1106,6 +1106,7 @@ type Kubelet struct {
 	hostname string
 
 	nodeName        types.NodeName
+	cachedNode      *v1.Node
 	runtimeCache    kubecontainer.RuntimeCache
 	kubeClient      clientset.Interface
 	heartbeatClient clientset.Interface
