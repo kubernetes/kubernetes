@@ -780,41 +780,6 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	aggregator := s.listErrAggrFactory()
 
-	processListItem := func(kv *mvccpb.KeyValue) error {
-		data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
-		if err != nil {
-			if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
-				return aggregator.Err()
-			}
-			return nil
-		}
-
-		// Check if the request has already timed out before decode object
-		select {
-		case <-ctx.Done():
-			// parent context is canceled or timed out, no point in continuing
-			return storage.NewTimeoutError(string(kv.Key), "request did not complete within requested timeout")
-		default:
-		}
-
-		obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
-		if err != nil {
-			recordDecodeError(s.groupResource, string(kv.Key))
-			if done := aggregator.Aggregate(string(kv.Key), err); done {
-				return aggregator.Err()
-			}
-			return nil
-		}
-
-		// being unable to set the version does not prevent the object from being extracted
-		if matched, err := opts.Predicate.Matches(obj); err == nil && matched {
-			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
-		}
-
-		numEvald++
-		return nil
-	}
-
 	for {
 		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
 			Revision: withRev,
@@ -862,8 +827,12 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			}
 			lastKey = kv.Key
 
-			if err := processListItem(kv); err != nil {
+			evaluated, err := s.processListItem(ctx, aggregator, opts.Predicate, v, newItemFunc, kv)
+			if err != nil {
 				return err
+			}
+			if evaluated {
+				numEvald++
 			}
 
 			// free kv early. Long lists can take O(seconds) to decode.
@@ -904,6 +873,40 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		return err
 	}
 	return s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount)
+}
+
+func (s *store) processListItem(ctx context.Context, aggregator ListErrorAggregator, predicate storage.SelectionPredicate, v reflect.Value, newItemFunc func() runtime.Object, kv *mvccpb.KeyValue) (bool, error) {
+	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
+	if err != nil {
+		if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
+			return false, aggregator.Err()
+		}
+		return false, nil
+	}
+
+	// Check if the request has already timed out before decode object
+	select {
+	case <-ctx.Done():
+		// parent context is canceled or timed out, no point in continuing
+		return false, storage.NewTimeoutError(string(kv.Key), "request did not complete within requested timeout")
+	default:
+	}
+
+	obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
+	if err != nil {
+		recordDecodeError(s.groupResource, string(kv.Key))
+		if done := aggregator.Aggregate(string(kv.Key), err); done {
+			return false, aggregator.Err()
+		}
+		return false, nil
+	}
+
+	// being unable to set the version does not prevent the object from being extracted
+	if matched, err := predicate.Matches(obj); err == nil && matched {
+		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
+	}
+
+	return true, nil
 }
 
 func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
