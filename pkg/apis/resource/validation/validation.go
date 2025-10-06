@@ -424,7 +424,7 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 			deviceID := structured.MakeDeviceID(device.Driver, device.Pool, device.Device)
 			return structured.MakeSharedDeviceID(deviceID, (*types.UID)(device.ShareID))
 		},
-		fldPath.Child("devices"))...)
+		fldPath.Child("devices"), uniquenessCovered)...)
 
 	// Now check for invariants that must be valid for a ResourceClaim.
 	if len(status.ReservedFor) > 0 {
