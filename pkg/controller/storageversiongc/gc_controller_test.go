@@ -26,6 +26,7 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -328,7 +329,7 @@ func Test_StorageVersionDeletedOnLeaseDeletion(t *testing.T) {
 		},
 	}
 
-	clientset := fake.NewSimpleClientset(lease1, storageVersion)
+	clientset := fake.NewClientset(lease1, storageVersion)
 	_, ctx := ktesting.NewTestContext(t)
 	setupController(ctx, clientset)
 
@@ -337,12 +338,12 @@ func Test_StorageVersionDeletedOnLeaseDeletion(t *testing.T) {
 		t.Fatalf("error deleting lease object: %v", err)
 	}
 
-	// add a delay to ensure controller had a chance to reconcile
-	time.Sleep(2 * time.Second)
-
-	// expect deleted
-	_, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
-	if !apierrors.IsNotFound(err) {
-		t.Fatalf("expected IsNotFound error, got: %v", err)
+	err := wait.PollUntilContextTimeout(context.Background(), time.Second, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		// expect deleted
+		_, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
+		return apierrors.IsNotFound(err), nil
+	})
+	if err != nil {
+		t.Fatalf("expected IsNotFound error, but got error: %v", err)
 	}
 }
