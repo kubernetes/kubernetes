@@ -96,7 +96,8 @@ func ValidateResourceClaim(resourceClaim *resource.ResourceClaim) field.ErrorLis
 
 // ValidateResourceClaimUpdate tests if an update to ResourceClaim is valid.
 func ValidateResourceClaimUpdate(resourceClaim, oldClaim *resource.ResourceClaim) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldClaim.ObjectMeta, field.NewPath("metadata"))
+	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, corevalidation.ValidateResourceClaimName, field.NewPath("metadata"))
+	allErrs = append(allErrs, corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldClaim.ObjectMeta, field.NewPath("metadata"))...)
 	// The spec is immutable. On update, we only check for immutability.
 	// Re-validating other fields is skipped because the user cannot change them;
 	// the only actionable error is for the immutability violation.
