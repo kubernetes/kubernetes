@@ -22,11 +22,13 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -121,6 +123,13 @@ type preScoreState struct {
 	// podRequests have the same order as the resources defined in NodeResourcesBalancedAllocationArgs.Resources,
 	// same for other place we store a list like that.
 	podRequests []int64
+
+	// allocatedState holds the DRA allocated state for DRA extended resources scoring.
+	allocatedState *structured.AllocatedState
+	// resourceSlices holds the list of resource slices for DRA extended resource scoring.
+	resourceSlices []*resourceapi.ResourceSlice
+	// deviceClassMapping holds the mapping of device classes for DRA extended resource scoring.
+	deviceClassMapping map[v1.ResourceName]*resourceapi.DeviceClass
 }
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
@@ -129,11 +138,65 @@ func (s *preScoreState) Clone() fwk.StateData {
 	return s
 }
 
+// canBeHandledByDRA determines whether the specified pod resource requests can be handled by the DRA.
+// It checks if each requested resource is mapped to a device class and not handled by a Device Plugin
+// on any of the provided nodes.
+// Returns true if at least one resource is eligible to be handled by DRA, false otherwise.
+func (f *Fit) canBeHandledByDRA(nodes []fwk.NodeInfo, podRequests []int64) (bool, error) {
+	var mappingInit bool
+	var deviceClassMapping map[v1.ResourceName]string
+	var err error
+	for i := range podRequests {
+		resource := v1.ResourceName(f.resources[i].Name)
+		if !v1helper.IsExtendedResourceName(resource) {
+			continue
+		}
+
+		if !mappingInit {
+			deviceClassMapping, err = extended.DeviceClassMapping(f.draManager)
+			if err != nil {
+				return false, err
+			}
+			mappingInit = true
+		}
+
+		// check if resource is mapped to device class (can be handled by DRA)
+		if _, exists := deviceClassMapping[resource]; !exists {
+			continue
+		}
+
+		for _, nodeInfo := range nodes {
+			// check if resources is not handled by Device Plugin
+			if nodeInfo.GetAllocatable().GetScalarResources()[resource] == 0 {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 // PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
 func (f *Fit) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
+	podRequests := f.calculatePodResourceRequestList(pod, f.resources)
 	state := &preScoreState{
-		podRequests: f.calculatePodResourceRequestList(pod, f.resources),
+		podRequests: podRequests,
 	}
+	if f.enableDRAExtendedResource {
+		ok, err := f.canBeHandledByDRA(nodes, podRequests)
+		if err != nil {
+			return fwk.AsStatus(err)
+		}
+		if ok {
+			allocatedState, resourceSlices, deviceClassMapping, status := getDRAPreScoredParams(f.draManager)
+			if status != nil {
+				return status
+			}
+			state.allocatedState = allocatedState
+			state.resourceSlices = resourceSlices
+			state.deviceClassMapping = deviceClassMapping
+		}
+	}
+
 	cycleState.Write(preScoreStateKey, state)
 	return nil
 }
@@ -678,7 +741,16 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 		s = &preScoreState{
 			podRequests: f.calculatePodResourceRequestList(pod, f.resources),
 		}
+		if f.enableDRAExtendedResource {
+			allocatedState, resourceSlices, deviceClassMapping, status := getDRAPreScoredParams(f.draManager)
+			if status != nil {
+				return 0, status
+			}
+			s.allocatedState = allocatedState
+			s.resourceSlices = resourceSlices
+			s.deviceClassMapping = deviceClassMapping
+		}
 	}
 
-	return f.score(ctx, pod, nodeInfo, s.podRequests)
+	return f.score(ctx, pod, nodeInfo, s.podRequests, s.allocatedState, s.resourceSlices, s.deviceClassMapping)
 }
