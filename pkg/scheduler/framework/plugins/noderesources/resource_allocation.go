@@ -58,7 +58,11 @@ func (r *resourceAllocationScorer) score(
 	ctx context.Context,
 	pod *v1.Pod,
 	nodeInfo fwk.NodeInfo,
-	podRequests []int64) (int64, *fwk.Status) {
+	podRequests []int64,
+	allocatedState *structured.AllocatedState,
+	resourceSlices []*resourceapi.ResourceSlice,
+	deviceClassMapping map[v1.ResourceName]*resourceapi.DeviceClass,
+) (int64, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
@@ -70,7 +74,7 @@ func (r *resourceAllocationScorer) score(
 	requested := make([]int64, len(r.resources))
 	allocatable := make([]int64, len(r.resources))
 	for i := range r.resources {
-		alloc, req := r.calculateResourceAllocatableRequest(ctx, nodeInfo, v1.ResourceName(r.resources[i].Name), podRequests[i])
+		alloc, req := r.calculateResourceAllocatableRequest(ctx, nodeInfo, v1.ResourceName(r.resources[i].Name), podRequests[i], allocatedState, resourceSlices, deviceClassMapping)
 		// Only fill the extended resource entry when it's non-zero.
 		if alloc == 0 {
 			continue
@@ -95,7 +99,15 @@ func (r *resourceAllocationScorer) score(
 // - 1st param: quantity of allocatable resource on the node.
 // - 2nd param: aggregated quantity of requested resource on the node.
 // Note: if it's an extended resource, and the pod doesn't request it, (0, 0) is returned.
-func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(ctx context.Context, nodeInfo fwk.NodeInfo, resource v1.ResourceName, podRequest int64) (int64, int64) {
+func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(
+	ctx context.Context,
+	nodeInfo fwk.NodeInfo,
+	resource v1.ResourceName,
+	podRequest int64,
+	allocatedState *structured.AllocatedState,
+	resourceSlices []*resourceapi.ResourceSlice,
+	deviceClassMapping map[v1.ResourceName]*resourceapi.DeviceClass,
+) (int64, int64) {
 	requested := nodeInfo.GetNonZeroRequested()
 	if r.useRequested {
 		requested = nodeInfo.GetRequested()
@@ -118,7 +130,7 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(ctx conte
 		if allocatable == 0 && r.enableDRAExtendedResource {
 			// Allocatable 0 means that this resource is not handled by device plugin.
 			// Calculate allocatable and requested for resources backed by DRA.
-			allocatable, allocated := r.calculateDRAExtendedResourceAllocatableRequest(ctx, nodeInfo.Node(), resource)
+			allocatable, allocated := r.calculateDRAExtendedResourceAllocatableRequest(ctx, nodeInfo.Node(), resource, allocatedState, resourceSlices, deviceClassMapping)
 			if allocatable > 0 {
 				return allocatable, allocated + podRequest
 			}
@@ -174,36 +186,57 @@ func (r *resourceAllocationScorer) isBestEffortPod(podRequests []int64) bool {
 	return true
 }
 
-// calculateDRAExtendedResourceAllocatableRequest calculates allocatable and allocated
-// quantities for extended resources backed by DRA.
-func (r *resourceAllocationScorer) calculateDRAExtendedResourceAllocatableRequest(ctx context.Context, node *v1.Node, resource v1.ResourceName) (int64, int64) {
-	logger := klog.FromContext(ctx)
-	// Get device class mapping to find the device class for this resource
-	deviceClassMapping, err := extended.DeviceClassMapping(r.draManager)
+// getDRAPreScoredParams returns the DRA allocated state and resource slices for DRA extended resource scoring.
+func getDRAPreScoredParams(draManager fwk.SharedDRAManager) (*structured.AllocatedState, []*resourceapi.ResourceSlice, map[v1.ResourceName]*resourceapi.DeviceClass, *fwk.Status) {
+	mapping, err := extended.DeviceClassMapping(draManager)
 	if err != nil {
-		logger.Error(err, "Failed to get device class mapping for DRA extended resource scoring")
-		return 0, 0
+		return nil, nil, nil, fwk.AsStatus(err)
+	}
+	deviceClassMapping := make(map[v1.ResourceName]*resourceapi.DeviceClass, len(mapping))
+	for resourceName, deviceClassName := range mapping {
+		deviceClass, err := draManager.DeviceClasses().Get(deviceClassName)
+		if err != nil {
+			return nil, nil, nil, fwk.AsStatus(err)
+		}
+		deviceClassMapping[resourceName] = deviceClass
 	}
 
-	deviceClassName, exists := deviceClassMapping[resource]
-	if !exists {
+	allocatedState, err := draManager.ResourceClaims().GatherAllocatedState()
+	if err != nil {
+		return nil, nil, nil, fwk.AsStatus(err)
+	}
+	resourceSlices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
+	if err != nil {
+		return nil, nil, nil, fwk.AsStatus(err)
+	}
+	return allocatedState, resourceSlices, deviceClassMapping, nil
+}
+
+// calculateDRAExtendedResourceAllocatableRequest calculates allocatable and allocated
+// quantities for extended resources backed by DRA.
+func (r *resourceAllocationScorer) calculateDRAExtendedResourceAllocatableRequest(
+	ctx context.Context,
+	node *v1.Node,
+	resource v1.ResourceName,
+	allocatedState *structured.AllocatedState,
+	resourceSlices []*resourceapi.ResourceSlice,
+	deviceClassMapping map[v1.ResourceName]*resourceapi.DeviceClass,
+) (int64, int64) {
+	logger := klog.FromContext(ctx)
+	deviceClass := deviceClassMapping[resource]
+	if deviceClass == nil {
+		// This resource is not backed by DRA.
 		logger.Error(nil, "Extended resource not found in device class mapping", "resource", resource)
 		return 0, 0
 	}
 
-	deviceClass, err := r.draManager.DeviceClasses().Get(deviceClassName)
+	capacity, allocated, err := r.calculateDRAResourceTotals(ctx, node, deviceClass, allocatedState, resourceSlices)
 	if err != nil {
-		logger.Error(err, "Failed to get device class for DRA extended resource scoring", "resource", resource, "deviceClass", deviceClassName)
+		logger.Error(err, "Failed to calculate DRA resource capacity and allocated", "node", node.Name, "resource", resource, "deviceClass", deviceClass.Name)
 		return 0, 0
 	}
 
-	capacity, allocated, err := r.calculateDRAResourceTotals(ctx, node, deviceClass)
-	if err != nil {
-		logger.Error(err, "Failed to calculate DRA resource capacity and allocated", "node", node.Name, "resource", resource, "deviceClass", deviceClassName)
-		return 0, 0
-	}
-
-	logger.V(7).Info("DRA extended resource calculation", "node", node.Name, "resource", resource, "deviceClass", deviceClassName, "capacity", capacity, "allocated", allocated)
+	logger.V(7).Info("DRA extended resource calculation", "node", node.Name, "resource", resource, "deviceClass", deviceClass.Name, "capacity", capacity, "allocated", allocated)
 	return capacity, allocated
 }
 
@@ -223,17 +256,8 @@ func (r *resourceAllocationScorer) calculateDRAExtendedResourceAllocatableReques
 //	totalCapacity  - total number of devices matching the device class on the node
 //	totalAllocated - number of devices currently allocated from the matching set
 //	error          - any error encountered during processing
-func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Context, node *v1.Node, deviceClass *resourceapi.DeviceClass) (int64, int64, error) {
-	allocatedState, err := r.draManager.ResourceClaims().GatherAllocatedState()
-	if err != nil {
-		return 0, 0, err
-	}
-
-	resourceSlices, err := r.draManager.ResourceSlices().ListWithDeviceTaintRules()
-	if err != nil {
-		return 0, 0, err
-	}
-
+func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Context, node *v1.Node, deviceClass *resourceapi.DeviceClass, allocatedState *structured.AllocatedState, resourceSlices []*resourceapi.ResourceSlice,
+) (int64, int64, error) {
 	var totalCapacity, totalAllocated int64
 	for _, slice := range resourceSlices {
 		driver := slice.Spec.Driver

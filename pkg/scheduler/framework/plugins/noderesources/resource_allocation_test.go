@@ -34,6 +34,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -576,8 +577,17 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 				celCache:                  celCache,
 			}
 
+			var allocatedState *structured.AllocatedState
+			var resourceSlices []*resourceapi.ResourceSlice
+			var deviceClassMapping map[v1.ResourceName]*resourceapi.DeviceClass
+			if tc.enableDRAExtendedResource {
+				var status *fwk.Status
+				allocatedState, resourceSlices, deviceClassMapping, status = getDRAPreScoredParams(draManager)
+				require.Nil(t, status)
+			}
+
 			// Test calculateResourceAllocatableRequest API
-			allocatable, requested := scorer.calculateResourceAllocatableRequest(tCtx, nodeInfo, tc.extendedResource, tc.podRequest)
+			allocatable, requested := scorer.calculateResourceAllocatableRequest(tCtx, nodeInfo, tc.extendedResource, tc.podRequest, allocatedState, resourceSlices, deviceClassMapping)
 			assert.Equal(t, tc.expectedAllocatable, allocatable)
 			assert.Equal(t, tc.expectedRequested, requested)
 		})
