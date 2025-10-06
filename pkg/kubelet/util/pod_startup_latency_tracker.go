@@ -143,11 +143,7 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 			podStartSLOduration -= state.totalInitContainerRuntime
 		}
 
-		if podStartSLOduration < 0 {
-			podStartSLOduration = 0
-		}
-
-		isStatefulPod := isStatefulPod(pod)
+		podIsStateful := isStatefulPod(pod)
 
 		logger.Info("Observed pod startup duration",
 			"pod", klog.KObj(pod),
@@ -155,7 +151,7 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 			"podStartE2EDuration", podStartingDuration,
 			"totalImagesPullingTime", totalImagesPullingTime,
 			"totalInitContainerRuntime", state.totalInitContainerRuntime,
-			"isStatefulPod", isStatefulPod,
+			"isStatefulPod", podIsStateful,
 			"podCreationTimestamp", pod.CreationTimestamp.Time,
 			"imagePullSessionsCount", len(state.imagePullSessions),
 			"imagePullSessionsStartsCount", len(state.imagePullSessionsStarts),
@@ -163,7 +159,7 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 			"watchObservedRunningTime", when)
 
 		metrics.PodStartTotalDuration.WithLabelValues().Observe(podStartingDuration.Seconds())
-		if !isStatefulPod {
+		if !podIsStateful {
 			metrics.PodStartSLIDuration.WithLabelValues().Observe(podStartSLOduration.Seconds())
 			// if is the first Pod with network track the start values
 			// these metrics will help to identify problems with the CNI plugin
@@ -326,12 +322,7 @@ func isStatefulPod(pod *v1.Pod) bool {
 		if volume.Secret == nil &&
 			volume.ConfigMap == nil &&
 			volume.DownwardAPI == nil &&
-			volume.EmptyDir == nil &&
-			volume.Projected == nil &&
-			volume.GitRepo == nil &&
-			volume.Image == nil &&
-			volume.Ephemeral == nil &&
-			(volume.CSI == nil || volume.CSI.VolumeAttributes["csi.storage.k8s.io/ephemeral"] != "true") {
+			volume.EmptyDir == nil {
 			return true
 		}
 	}
