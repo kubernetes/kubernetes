@@ -179,12 +179,7 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 	if takeover {
 		recommendation = "Consider disabling the DeclarativeValidationTakeover feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes."
 	}
-	fuzzyMatcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid()
-	if len(normalizationRules) > 0 {
-		fuzzyMatcher = fuzzyMatcher.ByFieldNormalized(normalizationRules)
-	} else {
-		fuzzyMatcher = fuzzyMatcher.ByField()
-	}
+	fuzzyMatcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid().ByFieldNormalized(normalizationRules)
 	exactMatcher := field.ErrorMatcher{}.Exactly()
 
 	// Dedupe imperative errors of exact error matches as they are
