@@ -461,6 +461,7 @@ func createPodWorkersWithLogger(_ klog.Logger) (*podWorkers, *containertest.Fake
 		time.Millisecond,
 		fakeCache,
 		allocation.NewInMemoryManager(nil, nil, nil, nil, nil, nil),
+		nil,
 	)
 	workers := w.(*podWorkers)
 	workers.clock = clock
@@ -2169,6 +2170,7 @@ func TestFakePodWorkers(t *testing.T) {
 		time.Second,
 		fakeCache,
 		allocation.NewInMemoryManager(nil, nil, nil, nil, nil, nil),
+		nil,
 	)
 	fakePodWorkers := &fakePodWorkers{
 		syncPodFn: kubeletForFakeWorkers.SyncPod,
