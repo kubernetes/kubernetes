@@ -1437,6 +1437,11 @@ type ResourceClaimStatus struct {
 	// +listMapKey=pool
 	// +listMapKey=shareID
 	// +featureGate=DRAResourceClaimDeviceStatus
+	// +k8s:listType=map
+	// +k8s:listMapKey=driver
+	// +k8s:listMapKey=device
+	// +k8s:listMapKey=pool
+	// +k8s:listMapKey=shareID
 	Devices []AllocatedDeviceStatus `json:"devices,omitempty" protobuf:"bytes,4,opt,name=devices"`
 }
 
