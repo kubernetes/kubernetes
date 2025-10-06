@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/subscription"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
@@ -79,6 +80,7 @@ type manager struct {
 	podDeletionSafety PodDeletionSafetyProvider
 
 	podStartupLatencyHelper PodStartupLatencyStateHelper
+	subscribers             []subscription.StatusUpdateSubscriber
 }
 
 type podResizeConditions struct {
@@ -189,7 +191,7 @@ type Manager interface {
 const syncPeriod = 10 * time.Second
 
 // NewManager returns a functional Manager.
-func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper) Manager {
+func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper, subscribers []subscription.StatusUpdateSubscriber) Manager {
 	return &manager{
 		kubeClient:              kubeClient,
 		podManager:              podManager,
@@ -199,6 +201,7 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 		apiStatusVersions:       make(map[kubetypes.MirrorPodUID]uint64),
 		podDeletionSafety:       podDeletionSafety,
 		podStartupLatencyHelper: podStartupLatencyHelper,
+		subscribers:             subscribers,
 	}
 }
 
@@ -904,6 +907,10 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	}
 
 	m.podStatuses[pod.UID] = newStatus
+
+	for _, s := range m.subscribers {
+		s.OnPodStatusUpdated(pod, status)
+	}
 
 	select {
 	case m.podStatusChannel <- struct{}{}:
