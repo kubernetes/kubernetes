@@ -19,6 +19,7 @@ package resourceclaim
 import (
 	"context"
 	"errors"
+	"regexp"
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
@@ -50,6 +51,15 @@ type resourceclaimStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 	nsClient v1.NamespaceInterface
+}
+
+var resourceClaimNormalizationRules = []field.NormalizationRule{
+	{
+		// The "exactly" struct was added in v1beta2. In earlier API
+		// versions, its fields were directly part of the DeviceRequest.
+		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.selectors`),
+		Replacement: "spec.devices.requests[$1].exactly.selectors",
+	},
 }
 
 // NewStrategy is the default logic that applies when creating and updating ResourceClaim objects.
@@ -100,7 +110,7 @@ func (s *resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object
 
 	allErrs := resourceutils.AuthorizedForAdmin(ctx, claim.Spec.Devices.Requests, claim.Namespace, s.nsClient)
 	allErrs = append(allErrs, validation.ValidateResourceClaim(claim)...)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, claim, nil, allErrs, operation.Create)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, claim, nil, allErrs, operation.Create, rest.WithNormalizationRules(resourceClaimNormalizationRules))
 }
 
 func (*resourceclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -128,7 +138,7 @@ func (s *resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	// AuthorizedForAdmin isn't needed here because the spec is immutable.
 	errorList := validation.ValidateResourceClaim(newClaim)
 	errorList = append(errorList, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClaim, oldClaim, errorList, operation.Update)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClaim, oldClaim, errorList, operation.Update, rest.WithNormalizationRules(resourceClaimNormalizationRules))
 }
 
 func (*resourceclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {

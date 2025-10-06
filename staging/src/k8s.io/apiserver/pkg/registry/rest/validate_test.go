@@ -213,6 +213,7 @@ func TestGatherDeclarativeValidationMismatches(t *testing.T) {
 	errB := field.Invalid(minReadySecondsPath, -1, "covered error B").WithOrigin("minimum")
 	coveredErrB := field.Invalid(minReadySecondsPath, -1, "covered error B").WithOrigin("minimum")
 	errBWithDiffDetail := field.Invalid(minReadySecondsPath, -1, "covered error B - different detail").WithOrigin("minimum")
+	errBWithDiffPath := field.Invalid(field.NewPath("spec").Child("fakeminReadySeconds"), -1, "covered error B").WithOrigin("minimum")
 	coveredErrB.CoveredByDeclarative = true
 	errC := field.Invalid(replicasPath, nil, "covered error C").WithOrigin("minimum")
 	coveredErrC := field.Invalid(replicasPath, nil, "covered error C").WithOrigin("minimum")
@@ -227,6 +228,7 @@ func TestGatherDeclarativeValidationMismatches(t *testing.T) {
 		takeover                bool
 		expectMismatches        bool
 		expectDetailsContaining []string
+		normalizedRules         []field.NormalizationRule
 	}{
 		{
 			name:                    "Declarative and imperative return 0 errors - no mismatch",
@@ -358,11 +360,29 @@ func TestGatherDeclarativeValidationMismatches(t *testing.T) {
 			expectMismatches:        false,
 			expectDetailsContaining: []string{},
 		},
+		{
+			name: "Field normalization, errors don't match - mismatch",
+			imperativeErrors: field.ErrorList{
+				coveredErrB,
+			},
+			declarativeErrors: field.ErrorList{
+				errBWithDiffPath,
+			},
+			normalizedRules: []field.NormalizationRule{
+				{
+					Regexp:      regexp.MustCompile(`spec.fakeminReadySeconds`),
+					Replacement: "spec.minReadySeconds",
+				},
+			},
+			takeover:                false,
+			expectMismatches:        false,
+			expectDetailsContaining: []string{},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			details := gatherDeclarativeValidationMismatches(tc.imperativeErrors, tc.declarativeErrors, tc.takeover)
+			details := gatherDeclarativeValidationMismatches(tc.imperativeErrors, tc.declarativeErrors, tc.takeover, tc.normalizedRules)
 			// Check if mismatches were found if expected
 			if tc.expectMismatches && len(details) == 0 {
 				t.Errorf("Expected mismatches but got none")
@@ -429,7 +449,7 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 			defer klog.LogToStderr(true)
 			ctx := context.Background()
 
-			compareDeclarativeErrorsAndEmitMismatches(ctx, tc.imperativeErrs, tc.declarativeErrs, tc.takeover, "test_validationIdentifier")
+			compareDeclarativeErrorsAndEmitMismatches(ctx, tc.imperativeErrs, tc.declarativeErrs, tc.takeover, "test_validationIdentifier", nil)
 
 			klog.Flush()
 			logOutput := buf.String()

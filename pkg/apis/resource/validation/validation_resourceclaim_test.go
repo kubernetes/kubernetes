@@ -648,7 +648,7 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"prioritized-list-too-many-subrequests": {
 			wantFailures: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable"), 9, 8),
+				field.TooMany(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable"), 9, 8).MarkCoveredByDeclarative(),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)

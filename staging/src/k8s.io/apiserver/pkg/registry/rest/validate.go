@@ -68,12 +68,20 @@ func WithSubresourceMapper(subresourceMapper GroupVersionKindProvider) Validatio
 	}
 }
 
+// WithNormalizationRules sets the normalization rules for validation.
+func WithNormalizationRules(rules []field.NormalizationRule) ValidationConfig {
+	return func(config *validationConfigOption) {
+		config.normalizationRules = rules
+	}
+}
+
 type validationConfigOption struct {
 	opType               operation.Type
 	options              []string
 	takeover             bool
 	subresourceGVKMapper GroupVersionKindProvider
 	validationIdentifier string
+	normalizationRules   []field.NormalizationRule
 }
 
 // validateDeclaratively validates obj and oldObj against declarative
@@ -146,9 +154,9 @@ func parseSubresourcePath(subresourcePath string) ([]string, error) {
 
 // compareDeclarativeErrorsAndEmitMismatches checks for mismatches between imperative and declarative validation
 // and logs + emits metrics when inconsistencies are found
-func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, takeover bool, validationIdentifier string) {
+func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, takeover bool, validationIdentifier string, normalizationRules []field.NormalizationRule) {
 	logger := klog.FromContext(ctx)
-	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, takeover)
+	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, takeover, normalizationRules)
 	for _, detail := range mismatchDetails {
 		// Log information about the mismatch using contextual logger
 		logger.Error(nil, detail)
@@ -160,7 +168,7 @@ func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeEr
 
 // gatherDeclarativeValidationMismatches compares imperative and declarative validation errors
 // and returns detailed information about any mismatches found. Errors are compared via type, field, and origin
-func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field.ErrorList, takeover bool) []string {
+func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field.ErrorList, takeover bool, normalizationRules []field.NormalizationRule) []string {
 	var mismatchDetails []string
 	// short circuit here to minimize allocs for usual case of 0 validation errors
 	if len(imperativeErrs) == 0 && len(declarativeErrs) == 0 {
@@ -171,7 +179,7 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 	if takeover {
 		recommendation = "Consider disabling the DeclarativeValidationTakeover feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes."
 	}
-	fuzzyMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().RequireOriginWhenInvalid()
+	fuzzyMatcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid().ByFieldNormalized(normalizationRules)
 	exactMatcher := field.ErrorMatcher{}.Exactly()
 
 	// Dedupe imperative errors of exact error matches as they are
@@ -353,8 +361,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	// Call the panic-safe wrapper with the real validation function.
 	declarativeErrs := panicSafeValidateFunc(validateDeclaratively, cfg.takeover, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
 
-	compareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier)
-
+	compareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, validationIdentifier, cfg.normalizationRules)
 	if takeover {
 		errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
 	}
