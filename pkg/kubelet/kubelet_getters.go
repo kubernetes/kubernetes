@@ -216,9 +216,14 @@ func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
 	return filepath.Join(kl.getPodDir(podUID), kubeletconfig.DefaultKubeletContainersDirName, ctrName)
 }
 
-// getPodResourcesSocket returns the full path to the directory containing the pod resources socket
+// getPodResourcesDir returns the full path to the directory containing the pod resources socket
 func (kl *Kubelet) getPodResourcesDir() string {
 	return filepath.Join(kl.getRootDir(), kubeletconfig.DefaultKubeletPodResourcesDirName)
+}
+
+// getPodsAPIDir returns the full path to the directory containing the pods API socket
+func (kl *Kubelet) getPodsAPIDir() string {
+	return filepath.Join(kl.getRootDir(), kubeletconfig.DefaultKubeletPodsAPIDirName)
 }
 
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror

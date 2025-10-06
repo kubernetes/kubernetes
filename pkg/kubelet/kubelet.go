@@ -88,6 +88,7 @@ import (
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	"k8s.io/kubernetes/pkg/kubelet/apis/pods"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
@@ -123,6 +124,7 @@ import (
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/subscription"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -299,6 +301,7 @@ type Bootstrap interface {
 	ListenAndServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions, auth server.AuthInterface, tp trace.TracerProvider)
 	ListenAndServeReadOnly(ctx context.Context, address net.IP, port uint, tp trace.TracerProvider)
 	ListenAndServePodResources(ctx context.Context)
+	ListenAndServePods(ctx context.Context)
 	Run(<-chan kubetypes.PodUpdate)
 }
 
@@ -691,7 +694,17 @@ func NewMainKubelet(ctx context.Context,
 	klet.mirrorPodClient = kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
 	klet.podManager = kubepod.NewBasicPodManager()
 
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
+	var podSubscribers []subscription.PodUpdateSubscriber
+	var statusSubscribers []subscription.StatusUpdateSubscriber
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
+		broadcaster := pods.NewBroadcaster()
+		klet.podsServer = pods.NewPodsServer(broadcaster)
+		podSubscribers = append(podSubscribers, klet.podsServer)
+		statusSubscribers = append(statusSubscribers, klet.podsServer)
+	}
+
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker, statusSubscribers)
 	klet.allocationManager = allocation.NewManager(
 		klet.getRootDir(),
 		klet.containerManager.GetNodeConfig(),
@@ -736,6 +749,7 @@ func NewMainKubelet(ctx context.Context,
 		backOffPeriod,
 		klet.podCache,
 		klet.allocationManager,
+		podSubscribers,
 	)
 
 	var singleProcessOOMKill *bool
@@ -1520,6 +1534,9 @@ type Kubelet struct {
 
 	// flagz is the Reader interface to get flags for flagz page.
 	flagz flagz.Reader
+
+	// podsServer is the server that provides the pods gRPC service.
+	podsServer *pods.PodsServer
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -3157,23 +3174,42 @@ func (pp *kubeletPodsProvider) GetPodByName(namespace, name string) (*v1.Pod, bo
 	return pp.kl.podManager.GetPodByName(namespace, name)
 }
 
-// ListenAndServePodResources runs the kubelet podresources grpc service
+// ListenAndServePodResources runs the kubelet podresources grpc service.
 func (kl *Kubelet) ListenAndServePodResources(ctx context.Context) {
-	endpoint, err := util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket)
-	if err != nil {
-		klog.V(2).InfoS("Failed to get local endpoint for PodResources endpoint", "err", err)
-		return
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
+		endpoint, err := util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket)
+		if err != nil {
+			klog.ErrorS(err, "Failed to get local endpoint for pod resources")
+			return
+		}
+		server.ListenAndServePodResources(
+			ctx,
+			endpoint,
+			podresources.PodResourcesProviders{
+				Pods:             &kubeletPodsProvider{kl: kl},
+				Devices:          kl.containerManager,
+				Cpus:             kl.containerManager,
+				Memory:           kl.containerManager,
+				DynamicResources: kl.containerManager,
+			},
+		)
 	}
+}
 
-	providers := podresources.PodResourcesProviders{
-		Pods:             &kubeletPodsProvider{kl: kl},
-		Devices:          kl.containerManager,
-		Cpus:             kl.containerManager,
-		Memory:           kl.containerManager,
-		DynamicResources: kl.containerManager,
+// ListenAndServePod initializes an HTTP server to serve the Pod API.
+func (kl *Kubelet) ListenAndServePods(ctx context.Context) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
+		endpoint, err := util.LocalEndpoint(kl.getPodsAPIDir(), pods.Socket)
+		if err != nil {
+			klog.ErrorS(err, "Failed to get local endpoint for pod api")
+			return
+		}
+		server.ListenAndServePodsServer(
+			ctx,
+			endpoint,
+			kl.podsServer,
+		)
 	}
-
-	server.ListenAndServePodResources(ctx, endpoint, providers)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
