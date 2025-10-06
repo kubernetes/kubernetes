@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/utils/ptr"
 )
@@ -86,7 +87,7 @@ const (
 	OutOfPods             = "OutOfpods"
 )
 
-type getNodeAnyWayFuncType func() (*v1.Node, error)
+type getNodeFunc func() (*v1.Node, error)
 
 type pluginResourceUpdateFuncType func(*schedulerframework.NodeInfo, *PodAdmitAttributes) error
 
@@ -97,7 +98,8 @@ type AdmissionFailureHandler interface {
 }
 
 type predicateAdmitHandler struct {
-	getNodeAnyWayFunc        getNodeAnyWayFuncType
+	getCachedNode            getNodeFunc
+	getNodeSync              getNodeFunc
 	pluginResourceUpdateFunc pluginResourceUpdateFuncType
 	admissionFailureHandler  AdmissionFailureHandler
 }
@@ -106,9 +108,10 @@ var _ PodAdmitHandler = &predicateAdmitHandler{}
 
 // NewPredicateAdmitHandler returns a PodAdmitHandler which is used to evaluates
 // if a pod can be admitted from the perspective of predicates.
-func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) PodAdmitHandler {
+func NewPredicateAdmitHandler(getCachedNode, getNodeSync getNodeFunc, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) PodAdmitHandler {
 	return &predicateAdmitHandler{
-		getNodeAnyWayFunc,
+		getCachedNode,
+		getNodeSync,
 		pluginResourceUpdateFunc,
 		admissionFailureHandler,
 	}
@@ -119,7 +122,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// contextual logging
 	ctx := context.TODO()
 	logger := klog.FromContext(ctx)
-	node, err := w.getNodeAnyWayFunc()
+	node, err := w.getCachedNode()
 	if err != nil {
 		logger.Error(err, "Cannot get Node info")
 		return PodAdmitResult{
@@ -182,7 +185,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
-	reasons := generalFilter(podWithoutMissingExtendedResources, nodeInfo)
+	reasons := w.generalFilter(podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0
 	if !fit {
 		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons)
@@ -245,6 +248,59 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	return PodAdmitResult{
 		Admit: true,
 	}
+}
+
+// generalFilter checks a group of filterings that the kubelet cares about.
+func (w *predicateAdmitHandler) generalFilter(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
+	reasons := w.runAdmissionCheck(pod, nodeInfo, true)
+
+	// Check taint/toleration except for static pods
+	if !types.IsStaticPod(pod) {
+		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+			// Kubelet is only interested in the NoExecute taint.
+			return t.Effect == v1.TaintEffectNoExecute
+		})
+		if isUntolerated {
+			reasons = append(reasons, &PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch})
+		}
+	}
+
+	return reasons
+}
+
+func (w *predicateAdmitHandler) runAdmissionCheck(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo, retryOnAffinityFailure bool) []PredicateFailureReason {
+	admissionResults := scheduler.AdmissionCheck(pod, nodeInfo, true)
+	var reasons []PredicateFailureReason
+	nodeAffinityFailure := 0
+	for _, r := range admissionResults {
+		if r.InsufficientResource != nil {
+			reasons = append(reasons, &InsufficientResourceError{
+				ResourceName: r.InsufficientResource.ResourceName,
+				Requested:    r.InsufficientResource.Requested,
+				Used:         r.InsufficientResource.Used,
+				Capacity:     r.InsufficientResource.Capacity,
+			})
+		} else {
+			if r.Reason == nodeaffinity.ErrReasonPod {
+				nodeAffinityFailure++
+			}
+			reasons = append(reasons, &PredicateFailureError{r.Name, r.Reason})
+		}
+	}
+
+	if retryOnAffinityFailure && nodeAffinityFailure > 0 && len(reasons) == nodeAffinityFailure {
+		// If the only reason for failure is the node affinity labels, fetch the node synchronously
+		// and try again.
+		node, err := w.getNodeSync()
+		if err != nil {
+			klog.Errorf("Failed to synchronously fetch node info: %v", err)
+			return reasons
+		}
+		nodeInfo.SetNode(node)
+		return w.runAdmissionCheck(pod, nodeInfo, false)
+	}
+
+	return reasons
 }
 
 // rejectPodAdmissionBasedOnOSSelector rejects pod if it's nodeSelector doesn't match
@@ -384,35 +440,4 @@ func (e *PredicateFailureError) Error() string {
 // GetReason returns the reason of the PredicateFailureError.
 func (e *PredicateFailureError) GetReason() string {
 	return e.PredicateDesc
-}
-
-// generalFilter checks a group of filterings that the kubelet cares about.
-func generalFilter(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
-	admissionResults := scheduler.AdmissionCheck(pod, nodeInfo, true)
-	var reasons []PredicateFailureReason
-	for _, r := range admissionResults {
-		if r.InsufficientResource != nil {
-			reasons = append(reasons, &InsufficientResourceError{
-				ResourceName: r.InsufficientResource.ResourceName,
-				Requested:    r.InsufficientResource.Requested,
-				Used:         r.InsufficientResource.Used,
-				Capacity:     r.InsufficientResource.Capacity,
-			})
-		} else {
-			reasons = append(reasons, &PredicateFailureError{r.Name, r.Reason})
-		}
-	}
-
-	// Check taint/toleration except for static pods
-	if !types.IsStaticPod(pod) {
-		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
-			// Kubelet is only interested in the NoExecute taint.
-			return t.Effect == v1.TaintEffectNoExecute
-		})
-		if isUntolerated {
-			reasons = append(reasons, &PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch})
-		}
-	}
-
-	return reasons
 }
