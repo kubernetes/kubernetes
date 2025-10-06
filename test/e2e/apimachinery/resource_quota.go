@@ -21,12 +21,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -660,7 +662,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 	ginkgo.It("should create a ResourceQuota and capture the life of a custom resource.", func(ctx context.Context) {
 		ginkgo.By("Creating a Custom Resource Definition")
-		testcrd, err := crd.CreateTestCRD(f)
+		testcrd, err := crd.CreateTestCRD(f, ensureShortCRDNamesForResourceQuota())
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(testcrd.CleanUp)
 		countResourceName := "count/" + testcrd.Crd.Spec.Names.Plural + "." + testcrd.Crd.Spec.Group
@@ -2145,6 +2147,35 @@ func newTestResourceQuotaWithScopeForVolumeAttributesClass(name string, hard v1.
 				},
 			},
 		},
+	}
+}
+
+// ensureShortCRDNamesForResourceQuota returns a CRD Option that truncates the plural name
+// if needed to ensure "count/{plural}.{group}" fits within 63 characters (Kubernetes resource name limit).
+func ensureShortCRDNamesForResourceQuota() crd.Option {
+	return func(c *apiextensionsv1.CustomResourceDefinition) {
+		const maxResourceNameLength = 63
+		countResourcePrefix := "count/"
+
+		// Calculate what the resource name would be
+		fullResourceName := countResourcePrefix + c.Spec.Names.Plural + "." + c.Spec.Group
+
+		if len(fullResourceName) > maxResourceNameLength {
+			// Calculate max length for the plural name
+			maxPluralLen := maxResourceNameLength - len(countResourcePrefix) - len(".") - len(c.Spec.Group)
+
+			if maxPluralLen > 0 && len(c.Spec.Names.Plural) > maxPluralLen {
+				// Truncate the plural name
+				originalPlural := c.Spec.Names.Plural
+				truncatedPlural := strings.TrimRight(originalPlural[:maxPluralLen], "-.")
+
+				// Update the CRD spec
+				c.Spec.Names.Plural = truncatedPlural
+				c.ObjectMeta.Name = truncatedPlural + "." + c.Spec.Group
+
+				framework.Logf("Truncated CRD plural name from %q to %q to fit ResourceQuota naming constraints", originalPlural, truncatedPlural)
+			}
+		}
 	}
 }
 
