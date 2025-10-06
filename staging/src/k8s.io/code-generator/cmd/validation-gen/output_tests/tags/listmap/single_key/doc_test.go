@@ -172,7 +172,7 @@ func TestUniquenessPtrKey(t *testing.T) {
 			{ptr.To("key2"), "two"},
 			{ptr.To("key2"), "three"}, // duplicate key
 			{nil, "four"},
-			{nil, "five"},             // duplicate nil key
+			{nil, "five"}, // duplicate nil key
 		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Duplicate(field.NewPath("listPtrKeyField").Index(2), nil),
