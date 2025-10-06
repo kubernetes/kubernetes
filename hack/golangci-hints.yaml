@@ -293,7 +293,7 @@ linters:
             enable:
               # - "commentstart" # Ensure comments start with the serialized version of the field name.
               - "conditions" # Ensure conditions have the correct json tags and markers.
-              # - "conflictingmarkers" - Detect mutually exclusive markers on the same field.
+              - "conflictingmarkers" # Detect mutually exclusive markers on the same field.
               # - "integers" # Ensure only int32 and int64 are used for integers.
               # - "jsontags" # Ensure every field has a json tag.
               # - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items. ONLY for CRDs until declarative markers exist in core types.
@@ -312,13 +312,18 @@ linters:
               isFirstField: Ignore
               usePatchStrategy: SuggestFix
               useProtobuf: SuggestFix
-            # conflictingMarkers:
-            #   conflicts:
-            #   - name: "default_vs_required"
-            #     sets:
-            #     - ["default", "kubebuilder:default"]
-            #     - ["required", "kubebuilder:validation:Required", "k8s:required"]
-            #     description: "A field with a default value cannot be required"
+            conflictingmarkers:
+              conflicts:
+              - name: "optional_vs_required"
+                sets:
+                - ["k8s:optional", "optional", "kubebuilder:validation:Optional"]
+                - ["k8s:required", "required", "kubebuilder:validation:Required"]
+                description: "fields cannot be both optional and required"
+              - name: "required_vs_default"
+                sets:
+                - ["k8s:required", "required", "kubebuilder:validation:Required"]
+                - ["default"]
+                description: "fields with default values are always optional"
             # jsonTags:
             #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
             # nomaps:
