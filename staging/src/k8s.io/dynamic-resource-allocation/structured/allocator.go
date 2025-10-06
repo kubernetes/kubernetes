@@ -140,18 +140,18 @@ func NewAllocator(ctx context.Context,
 	// file name!) into "stable", or individual chunks can be copied over.
 	//
 	// Unit tests are shared between all implementations.
-	enabledAllocators := []string{}
-	for _, api := range availableAPIs {
+	var enabledAllocators []string
+	for _, allocator := range availableAllocators {
 		// Disabled?
-		if !allocatorEnabled(api.name) {
+		if !allocatorEnabled(allocator.name) {
 			continue
 		}
-		enabledAllocators = append(enabledAllocators, api.name)
+		enabledAllocators = append(enabledAllocators, allocator.name)
 
 		// All required features supported?
-		if api.supportedFeatures.Set().IsSuperset(features.Set()) {
+		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
 			// Use it!
-			return api.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
+			return allocator.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		}
 	}
 	return nil, fmt.Errorf("internal error: no allocator available for feature set %+v, enabled allocators: %s", features, strings.Join(enabledAllocators, ", "))
@@ -172,7 +172,7 @@ func allocatorEnabled(name string) bool {
 	return len(explicitlyEnabledAllocators) == 0 || explicitlyEnabledAllocators.Has(name)
 }
 
-var availableAPIs = []struct {
+var availableAllocators = []struct {
 	name              string
 	supportedFeatures Features
 	newAllocator      func(ctx context.Context,
@@ -237,13 +237,13 @@ var availableAPIs = []struct {
 // It calls one of the available implementations(stable, incubating, experimental) based
 // on the provided DRA features.
 func NodeMatches(features Features, node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
-	for _, api := range availableAPIs {
-		if api.supportedFeatures.Set().IsSuperset(features.Set()) {
-			return api.nodeMatches(node, nodeNameToMatch, allNodesMatch, nodeSelector)
+	for _, allocator := range availableAllocators {
+		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
+			return allocator.nodeMatches(node, nodeNameToMatch, allNodesMatch, nodeSelector)
 		}
 	}
 
-	return false, fmt.Errorf("internal error: no NodeMatches API available for feature set %v", features)
+	return false, fmt.Errorf("internal error: no NodeMatches implementation available for feature set %v", features)
 }
 
 // IsDeviceAllocated checks if a device is allocated, considering both fully allocated devices
@@ -254,8 +254,8 @@ func IsDeviceAllocated(deviceID DeviceID, allocatedState *AllocatedState) bool {
 		return true
 	}
 
-	// Check if device is partially consumed via shared allocations (consumable capacity case)
-	// We need to check if any shared device ID corresponds to our device
+	// Check if device is partially consumed via shared allocations (consumable capacity case).
+	// We need to check if any shared device ID corresponds to our device.
 	for sharedDeviceID := range allocatedState.AllocatedSharedDeviceIDs {
 		// Extract the base device ID from the shared device ID by recreating it
 		baseDeviceID := MakeDeviceID(

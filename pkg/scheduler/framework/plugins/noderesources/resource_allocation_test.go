@@ -20,20 +20,26 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -532,11 +538,12 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			// Setup environment, create required objects
 			logger, tCtx := ktesting.NewTestContext(t)
 			tCtx, cancel := context.WithCancel(tCtx)
 			defer cancel()
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 
 			client := fake.NewClientset(tc.objects...)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -547,7 +554,9 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 				KubeClient:    client,
 			}
 			resourceSliceTracker, err := tracker.StartTracker(tCtx, resourceSliceTrackerOpts)
-			require.NoError(t, err, "couldn't start resource slice tracker")
+			if err != nil {
+				t.Fatalf("couldn't start resource slice tracker: %v", err)
+			}
 			draManager := dynamicresources.NewDRAManager(
 				tCtx,
 				assumecache.NewAssumeCache(
@@ -558,6 +567,13 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 					nil),
 				resourceSliceTracker,
 				informerFactory)
+
+			if tc.enableDRAExtendedResource {
+				cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+				if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache); err != nil {
+					logger.Error(err, "failed to add device class informer event handler")
+				}
+			}
 
 			informerFactory.Start(tCtx.Done())
 			t.Cleanup(func() {
@@ -573,13 +589,323 @@ func TestCalculateResourceAllocatableRequest(t *testing.T) {
 				enableDRAExtendedResource: tc.enableDRAExtendedResource,
 				draManager:                draManager,
 				draFeatures:               draFeatures,
-				celCache:                  celCache,
+				DRACaches: DRACaches{
+					celCache: celCache,
+				},
+			}
+
+			var draPreScoreState *draPreScoreState
+			if tc.enableDRAExtendedResource {
+				var status *fwk.Status
+				draPreScoreState, status = getDRAPreScoredParams(draManager, []config.ResourceSpec{{Name: string(tc.extendedResource)}})
+				if status != nil {
+					t.Fatalf("getting DRA pre-scored params failed: %v", status)
+				}
 			}
 
 			// Test calculateResourceAllocatableRequest API
-			allocatable, requested := scorer.calculateResourceAllocatableRequest(tCtx, nodeInfo, tc.extendedResource, tc.podRequest)
-			assert.Equal(t, tc.expectedAllocatable, allocatable)
-			assert.Equal(t, tc.expectedRequested, requested)
+			allocatable, requested := scorer.calculateResourceAllocatableRequest(tCtx, nodeInfo, tc.extendedResource, tc.podRequest, draPreScoreState)
+			if !cmp.Equal(allocatable, tc.expectedAllocatable) {
+				t.Errorf("Expected allocatable=%v, but got allocatable=%v", tc.expectedAllocatable, allocatable)
+			}
+			if !cmp.Equal(requested, tc.expectedRequested) {
+				t.Errorf("Expected requested=%v, but got requested=%v", tc.expectedRequested, requested)
+			}
 		})
 	}
+}
+
+// getCachedDeviceMatch checks the cache for a DeviceMatches result
+// returns (matches, found)
+func (r *resourceAllocationScorer) getCachedDeviceMatch(expression string, driver string, poolName string, deviceName string) (bool, bool) {
+	key := buildDeviceMatchCacheKey(expression, driver, poolName, deviceName)
+
+	if value, ok := r.deviceMatchCache.Load(key); ok {
+		return value.(bool), true
+	}
+
+	return false, false
+}
+
+// setCachedDeviceMatch stores a DeviceMatches result in the cache
+func (r *resourceAllocationScorer) setCachedDeviceMatch(expression string, driver string, poolName string, deviceName string, matches bool) {
+	key := buildDeviceMatchCacheKey(expression, driver, poolName, deviceName)
+	r.deviceMatchCache.Store(key, matches)
+}
+
+func TestDeviceMatchCaching(t *testing.T) {
+	// Create a scorer with caching enabled
+	scorer := &resourceAllocationScorer{
+		DRACaches: DRACaches{
+			celCache: cel.NewCache(10, cel.Features{}),
+		},
+	}
+
+	expression := `device.attributes["example.com"].test_attr == "test-value"`
+	driverName := "example.com/test-driver"
+	poolName := "example-pool"
+	deviceName := "device-1"
+
+	// Test cache operations
+	// Initially, cache should be empty
+	matches, found := scorer.getCachedDeviceMatch(expression, driverName, poolName, deviceName)
+	if found {
+		t.Errorf("Cache should be empty initially, but found an entry")
+	}
+	if matches {
+		t.Errorf("Matches should be false initially, but got true")
+	}
+
+	// Store a result in cache
+	scorer.setCachedDeviceMatch(expression, driverName, poolName, deviceName, true)
+
+	// Retrieve from cache
+	matches, found = scorer.getCachedDeviceMatch(expression, driverName, poolName, deviceName)
+	if !found {
+		t.Errorf("Result should be found in cache, but was not")
+	}
+	if !matches {
+		t.Errorf("Cached result should match what we stored, expected true but got false")
+	}
+
+	// Test caching with error
+	scorer.setCachedDeviceMatch(expression, driverName, poolName, deviceName, false)
+
+	matches, found = scorer.getCachedDeviceMatch(expression, driverName, poolName, deviceName)
+	if !found {
+		t.Errorf("Result should be found in cache")
+	}
+	if matches {
+		t.Errorf("Cached result should match what we stored, expected false but got true")
+	}
+
+	// Test that different devices have different cache keys
+	matches, found = scorer.getCachedDeviceMatch(expression, driverName, poolName, "device-2")
+	if found {
+		t.Errorf("Different device should not hit cache")
+	}
+	if matches {
+		t.Errorf("Matches should be false for uncached entry")
+	}
+
+	// Test that different pools have different cache keys
+	matches, found = scorer.getCachedDeviceMatch(expression, driverName, "other-pool", deviceName)
+	if found {
+		t.Errorf("Different pool should not hit cache")
+	}
+	if matches {
+		t.Errorf("Matches should be false for uncached entry")
+	}
+}
+
+func BenchmarkDeviceMatchCaching(b *testing.B) {
+	expression := `device.attributes["example.com"].test_attr == "test-value"`
+	driverName := "example.com/test-driver"
+	poolName := "example-pool"
+	deviceName := "device-1"
+
+	// Create a scorer with caching enabled
+	scorer := &resourceAllocationScorer{
+		DRACaches: DRACaches{
+			celCache: cel.NewCache(10, cel.Features{}),
+		},
+	}
+
+	b.Run("WithoutCache", func(b *testing.B) {
+		// Disable caching by creating a new scorer each time
+		for i := 0; i < b.N; i++ {
+			freshScorer := &resourceAllocationScorer{
+				DRACaches: DRACaches{
+					celCache: cel.NewCache(10, cel.Features{}),
+				},
+			}
+
+			// This will always be a cache miss
+			_, _ = freshScorer.getCachedDeviceMatch(expression, driverName, poolName, deviceName)
+		}
+	})
+
+	b.Run("WithCache", func(b *testing.B) {
+		// Pre-warm the cache
+		scorer.setCachedDeviceMatch(expression, driverName, poolName, deviceName, true)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			// This should always be a cache hit
+			_, _ = scorer.getCachedDeviceMatch(expression, driverName, poolName, deviceName)
+		}
+	})
+}
+
+// getCachedNodeMatch checks the cache for a NodeMatches result
+func (r *resourceAllocationScorer) getCachedNodeMatch(nodeName string, nodeNameToMatch string, allNodesMatch bool, nodeSelectorHash string) (bool, bool) {
+	key := buildNodeMatchCacheKey(nodeName, nodeNameToMatch, allNodesMatch, nodeSelectorHash)
+
+	if value, ok := r.nodeMatchCache.Load(key); ok {
+		return value.(bool), true
+	}
+
+	return false, false
+}
+
+// setCachedNodeMatch stores a NodeMatches result in the cache
+func (r *resourceAllocationScorer) setCachedNodeMatch(nodeName string, nodeNameToMatch string, allNodesMatch bool, nodeSelectorHash string, matches bool) {
+	key := buildNodeMatchCacheKey(nodeName, nodeNameToMatch, allNodesMatch, nodeSelectorHash)
+	r.nodeMatchCache.Store(key, matches)
+}
+
+func TestNodeMatchCaching(t *testing.T) {
+	// Create a scorer with caching enabled
+	scorer := &resourceAllocationScorer{
+		DRACaches: DRACaches{
+			celCache: cel.NewCache(10, cel.Features{}),
+		},
+	}
+
+	// Create test node
+	testNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node-1",
+			Labels: map[string]string{
+				"zone":          "us-east-1a",
+				"instance.type": "gpu-xlarge",
+			},
+		},
+	}
+
+	// Test cases for different NodeMatches scenarios
+	testCases := []struct {
+		name            string
+		nodeNameToMatch string
+		allNodesMatch   bool
+		nodeSelector    *v1.NodeSelector
+		expectedMatch   bool
+	}{
+		{
+			name:            "exact node name match",
+			nodeNameToMatch: "test-node-1",
+			allNodesMatch:   false,
+			nodeSelector:    nil,
+			expectedMatch:   true,
+		},
+		{
+			name:            "node name mismatch",
+			nodeNameToMatch: "different-node",
+			allNodesMatch:   false,
+			nodeSelector:    nil,
+			expectedMatch:   false,
+		},
+		{
+			name:            "all nodes match",
+			nodeNameToMatch: "",
+			allNodesMatch:   true,
+			nodeSelector:    nil,
+			expectedMatch:   true,
+		},
+		{
+			name:            "node selector match",
+			nodeNameToMatch: "",
+			allNodesMatch:   false,
+			nodeSelector: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "zone",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			expectedMatch: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			nodeSelectorStr := tc.nodeSelector.String()
+
+			// First call should be a cache miss
+			_, found1 := scorer.getCachedNodeMatch(testNode.Name, tc.nodeNameToMatch, tc.allNodesMatch, nodeSelectorStr)
+			assert.False(t, found1, "Cache should be empty initially")
+
+			// Simulate setting a cached result
+			scorer.setCachedNodeMatch(testNode.Name, tc.nodeNameToMatch, tc.allNodesMatch, nodeSelectorStr, tc.expectedMatch)
+
+			// Second call should be a cache hit
+			matches2, found2 := scorer.getCachedNodeMatch(testNode.Name, tc.nodeNameToMatch, tc.allNodesMatch, nodeSelectorStr)
+			assert.True(t, found2, "Result should be found in cache")
+			assert.Equal(t, tc.expectedMatch, matches2, "Cached result should match expected value")
+		})
+	}
+}
+
+func BenchmarkNodeMatchCaching(b *testing.B) {
+	// Create test node
+	testNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node-1",
+			Labels: map[string]string{
+				"zone":          "us-east-1a",
+				"instance.type": "gpu-xlarge",
+			},
+		},
+	}
+
+	// Create a complex NodeSelector to make the test meaningful
+	nodeSelector := &v1.NodeSelector{
+		NodeSelectorTerms: []v1.NodeSelectorTerm{
+			{
+				MatchExpressions: []v1.NodeSelectorRequirement{
+					{
+						Key:      "zone",
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{"us-east-1a", "us-east-1b", "us-west-2a"},
+					},
+					{
+						Key:      "instance.type",
+						Operator: v1.NodeSelectorOpExists,
+					},
+				},
+			},
+		},
+	}
+
+	b.Run("WithoutCache", func(b *testing.B) {
+		nodeSelectorStr := nodeSelector.String()
+
+		// Create a new scorer for each iteration to avoid caching
+		for i := 0; i < b.N; i++ {
+			freshScorer := &resourceAllocationScorer{
+				DRACaches: DRACaches{
+					celCache: cel.NewCache(10, cel.Features{}),
+				},
+			}
+
+			// This will always be a cache miss
+			_, _ = freshScorer.getCachedNodeMatch(testNode.Name, "", false, nodeSelectorStr)
+		}
+	})
+
+	b.Run("WithCache", func(b *testing.B) {
+		nodeSelectorStr := nodeSelector.String()
+
+		// Create a scorer and pre-warm the cache
+		scorer := &resourceAllocationScorer{
+			DRACaches: DRACaches{
+				celCache: cel.NewCache(10, cel.Features{}),
+			},
+		}
+
+		// Pre-warm the cache
+		scorer.setCachedNodeMatch(testNode.Name, "", false, nodeSelectorStr, true)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			// This should always be a cache hit
+			_, _ = scorer.getCachedNodeMatch(testNode.Name, "", false, nodeSelectorStr)
+		}
+	})
 }

@@ -1,21 +1,25 @@
-# Copyright 2025 The Kubernetes Authors.
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime. 
+# It basically covers all test cases but with their smallest workload. 
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds) 
+# to provide meaningful samples for the pod scheduling rate.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
+#
+# Combining `performance` and `short` selects suitable workloads for a local
+# before/after comparisons with benchstat.
 
-# Configuration specifically for testing DRA extended resource scoring performance.
-# This config ensures that multiple nodes can satisfy each pod's extended resource
+# This config is specific for testing DRA extended resource scoring performance.
+# It ensures that multiple nodes can satisfy each pod's extended resource
 # requirements, forcing the scheduler to use scoring to choose between nodes.
-
 
 # ExtendedResourceScoring uses pods with extended resources that can be satisfied
 # by multiple nodes, triggering scoring competition to test the DRA scoring implementation.
