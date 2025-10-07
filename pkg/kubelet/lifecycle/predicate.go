@@ -30,6 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
@@ -277,6 +278,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	var nodeInfo *schedulerframework.NodeInfo
 	if w.cache.needsUpdate(pods, node) {
 		// Cache is stale, reconstruct NodeInfo
+		kubeletmetrics.AdmissionNodeInfoCacheMissesTotal.Inc()
 		logger.V(4).Info("NodeInfo cache miss, reconstructing", "node", node.Name, "podCount", len(pods))
 		nodeInfo = schedulerframework.NewNodeInfo(pods...)
 		nodeInfo.SetNode(node)
@@ -285,6 +287,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		w.cache.update(pods, node, nodeInfo)
 	} else {
 		// Cache is valid, use it
+		kubeletmetrics.AdmissionNodeInfoCacheHitsTotal.Inc()
 		logger.V(5).Info("NodeInfo cache hit", "node", node.Name, "podCount", len(pods))
 		nodeInfo = w.cache.get()
 		// Note: We still need to set the node in case node object changed
