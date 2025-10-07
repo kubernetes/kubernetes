@@ -1180,6 +1180,7 @@ message ExactDeviceRequest {
   // requests with unknown modes.
   //
   // +optional
+  // +k8s:optional
   optional string allocationMode = 3;
 
   // Count is used only when the count mode is "ExactCount". Must be greater than zero.
