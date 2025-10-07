@@ -2555,6 +2555,9 @@ func TestAdmitResourceSlice(t *testing.T) {
 			attributes := admission.NewAttributesRecord(
 				test.obj, test.oldObj, schema.GroupVersionKind{},
 				"", "foo", apiResource, "", test.operation, test.options, false, mynode)
+			if !test.featureEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DynamicResourceAllocation, test.featureEnabled)
 			a := &admitTestCase{
 				name:       name,
