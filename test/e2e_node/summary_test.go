@@ -422,7 +422,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 				// This command runs an infinite loop that uses `dd` to write 50MB files,
 				// cycling through 5 files to target 250MB of reclaimable file cache usage.
 				// This exceeds the 200MB memory limit, forcing the kernel to reclaim memory and generate pressure stalls.
-				"sleep 10; echo 218103808 > /sys/fs/cgroup/kubepods.slice/kubepods-burstable.slice/memory.high; i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
+				"sleep 10; i=0; while true; do find /sys/fs/cgroup/kubepods.slice/kubepods-burstable.slice -type f -name \"memory.high\" -exec sh -c 'echo \"195103808\" | tee {} > /dev/null' \\;; dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%9)); sleep 0.1; done",
 			}
 			podSpec.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
 				{
@@ -444,7 +444,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			}
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("260M"),
+					v1.ResourceMemory: resource.MustParse("460M"),
 				},
 				Requests: v1.ResourceList{
 					v1.ResourceMemory: resource.MustParse("100M"),
@@ -464,7 +464,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 						"Memory": pressureDetected("full", 0.1),
 					}),
 				}))
-			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
+			}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
 			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
 		})
 
