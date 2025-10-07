@@ -174,6 +174,60 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(opaqueDriverPath, ".example.com", "").WithOrigin("format=k8s-long-name-caseless"),
 			},
 		},
+		// spec.Devices.Requests[%d].Exactly.Tolerations.Key
+		"valid Exactly.Tolerations.Key": {
+			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+			})),
+		},
+		"valid Exactly.Tolerations.Key empty": {
+			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
+				{Key: "", Operator: resource.DeviceTolerationOpExists},
+			})),
+		},
+		"invalid Exactly.Tolerations.Key": {
+			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
+				{Key: "invalid_key!", Operator: resource.DeviceTolerationOpExists},
+			})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("key"), "invalid_key!", "").WithOrigin("format=k8s-label-key"),
+			},
+		},
+		"invalid  Exactly.Tolerations.Key - multiple slashes": {
+			input: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
+				{Key: "a/b/c", Operator: resource.DeviceTolerationOpExists},
+			})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("key"), "a/b/c", "").WithOrigin("format=k8s-label-key"),
+			},
+		},
+		// spec.Devices.Requests[%d].FirsAvailable[%d].Tolerations.Key
+		"valid FirstAvailable.Tolerations.Key": {
+			input: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+			})),
+		},
+		"valid FirstAvailable.Tolerations.Key empty": {
+			input: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
+				{Key: "", Operator: resource.DeviceTolerationOpExists},
+			})),
+		},
+		"invalid FirstAvailable.Tolerations.Key": {
+			input: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
+				{Key: "invalid_key!", Operator: resource.DeviceTolerationOpExists},
+			})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("key"), "invalid_key!", "").WithOrigin("format=k8s-label-key"),
+			},
+		},
+		"invalid FirstAvailable.Tolerations.Key - multiple slashes": {
+			input: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
+				{Key: "a/b/c", Operator: resource.DeviceTolerationOpExists},
+			})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("key"), "a/b/c", "").WithOrigin("format=k8s-label-key"),
+			},
+		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
@@ -373,6 +427,47 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		"spec immutable: short-circuits other errors (e.g. TooMany)": {
 			update: mkValidResourceClaim(tweakDevicesRequests(33)),
 			old:    mkValidResourceClaim(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
+			},
+		},
+		"spec immutable: add Exactly.Tolerations": {
+			update: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+			})),
+			old: validClaim,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
+			},
+		},
+		"spec immutable: change Exactly.Tolerations.Key": {
+			update: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
+				{Key: "another-valid-key", Operator: resource.DeviceTolerationOpExists},
+			})),
+			old: mkValidResourceClaim(tweakExactlyTolerations([]resource.DeviceToleration{
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+			})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
+			},
+		},
+		// spec.Devices.Requests[%d].FirsAvailable[%d].Tolerations.Key
+		"spec immutable: add FirstAvailable.Tolerations": {
+			update: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+			})),
+			old: mkValidResourceClaim(tweakFirstAvailable(1)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
+			},
+		},
+		"spec immutable: change FirstAvailable.Tolerations.Key": {
+			update: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
+				{Key: "another-valid-key", Operator: resource.DeviceTolerationOpExists},
+			})),
+			old: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
+			})),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
 			},
@@ -706,6 +801,24 @@ func tweakDeviceConfigWithDriver(driverName string) func(rc *resource.ResourceCl
 					},
 				},
 			},
+		}
+	}
+}
+
+func tweakExactlyTolerations(tolerations []resource.DeviceToleration) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		for i := range rc.Spec.Devices.Requests {
+			rc.Spec.Devices.Requests[i].Exactly.Tolerations = tolerations
+		}
+	}
+}
+
+func tweakFirstAvailableTolerations(tolerations []resource.DeviceToleration) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		for i := range rc.Spec.Devices.Requests {
+			for j := range rc.Spec.Devices.Requests[i].FirstAvailable {
+				rc.Spec.Devices.Requests[i].FirstAvailable[j].Tolerations = tolerations
+			}
 		}
 	}
 }

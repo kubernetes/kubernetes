@@ -1318,6 +1318,8 @@ type DeviceToleration struct {
 	// Must be a label name.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:format=k8s-label-key
 	Key string `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
 
 	// Operator represents a key's relationship to the value.
