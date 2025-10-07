@@ -45,6 +45,23 @@ const (
 	user1creds = "dXNlcjpwYXNzd29yZA==" // user:password
 )
 
+// SetupRegistry runs the `fake-registry-server --private` from the agnhost image.
+// The registry is run with HostPort 5000 exposed in order to allow locally-scheduled
+// pods to query the registry via kubelet.
+// The registry only runs in HTTP (no TLS) mode, and so this hack-path is used as
+// localhost is typically allowed by CRIs and so no CRI-specific configuration is needed
+//
+// By default, the function runs the registry as a DaemonSet on all nodes, but it supports running
+// it in just a `pod` for cases where kube-controller-manager is not running (like in
+// the Node Conformance test suite).
+//
+// This function returns:
+// - set of node names that the registry runs on, mostly useful only in the podOnly case
+// - an error
+//
+// TODO: once https://github.com/kubernetes/kubernetes/issues/132955 is
+// addressed, we might be able to proxy a single endpoint from the cluster to each
+// node's localhost port instead of using DaemonSets.
 func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) ([]string, error) {
 	podTestLabel := "test-registry-pod-" + f.UniqueName
 	pod, err := podManifest(podTestLabel)
@@ -113,6 +130,8 @@ func podManifest(podTestLabel string) (*v1.Pod, error) {
 	return pod, nil
 }
 
+// User1DockerSecret creates a secret containing the docker credentials for pulling from
+// the agnhost fake-registry-server.
 func User1DockerSecret(registryAddress string) *v1.Secret {
 	return &v1.Secret{
 		Type: v1.SecretTypeDockerConfigJson,
