@@ -1006,7 +1006,7 @@ func Test_UnionedGVKs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pluginConfig := defaults.PluginConfigsV1
 
-			if !tt.enableSchedulerQueueingHints {
+			if !tt.enableSchedulerQueueingHints || !tt.enableDynamicResourceAllocation {
 				// Set emulated version before setting other feature gates, since it can impact feature dependencies.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 			}
