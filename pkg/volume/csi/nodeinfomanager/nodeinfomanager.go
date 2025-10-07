@@ -403,6 +403,10 @@ func (nim *nodeInfoManager) tryUpdateCSINode(
 		return err
 	}
 
+	if err = nim.ensureNodeOwnsCSINode(nodeInfo); err != nil {
+		return err
+	}
+
 	return nim.installDriverToCSINode(nodeInfo, driverName, driverNodeID, maxAttachLimit, topology)
 }
 
@@ -446,14 +450,8 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 		return err
 	}
 
-	if ok, csiNodeOwnerID := nim.nodeOwnsCSINode(nodeInfo); !ok {
-		klog.V(2).Infof("existing CSINode %q is owned by different node (oldNodeID=%q, newNodeID=%q), cleaning up...", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
-		err = nim.DeleteCSINode()
-		if err != nil {
-			return fmt.Errorf("error deleting existing CSINode %q: %w", nodeInfo.Name, err)
-		}
-		// Returning now so that the next attempt can create a new CSINode object
-		return fmt.Errorf("CSINode %q was owned by different node (oldNodeID=%q, newNodeID=%q), deleted it", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
+	if err = nim.ensureNodeOwnsCSINode(nodeInfo); err != nil {
+		return err
 	}
 
 	annotationModified := setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
@@ -464,6 +462,21 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 	}
 	return nil
 
+}
+
+// ensureNodeOwnsCSINode will ensure that the current CSINode object is owned by the node represented by this nodeInfoManager.
+// If not, it will delete the existing CSINode object and return an error.
+func (nim *nodeInfoManager) ensureNodeOwnsCSINode(nodeInfo *storagev1.CSINode) error {
+	if ok, csiNodeOwnerID := nim.nodeOwnsCSINode(nodeInfo); !ok {
+		klog.V(2).Infof("existing CSINode %q is owned by different node (oldNodeID=%q, newNodeID=%q), cleaning up...", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
+		err := nim.DeleteCSINode()
+		if err != nil {
+			return fmt.Errorf("error deleting existing CSINode %q: %w", nodeInfo.Name, err)
+		}
+		// Returning now so that the next attempt can create a new CSINode object
+		return fmt.Errorf("CSINode %q was owned by different node (oldNodeID=%q, newNodeID=%q), deleted it", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
+	}
+	return nil
 }
 
 // nodeOwnsCSINode checks if the CSINode object is owned by the node represented by this nodeInfoManager.
