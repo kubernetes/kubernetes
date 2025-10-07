@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const preScoreStateKey = "PreScore" + Name
@@ -223,7 +222,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState fwk.CycleStat
 }
 
 // NormalizeScore invoked after scoring all nodes.
-func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *fwk.Status {
+func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, scores fwk.NodeScoreList) *fwk.Status {
 	s, err := getPreScoreState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
@@ -255,17 +254,17 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState fwk.
 			continue
 		}
 		if maxScore == 0 {
-			scores[i].Score = framework.MaxNodeScore
+			scores[i].Score = fwk.MaxNodeScore
 			continue
 		}
 		s := scores[i].Score
-		scores[i].Score = framework.MaxNodeScore * (maxScore + minScore - s) / maxScore
+		scores[i].Score = fwk.MaxNodeScore * (maxScore + minScore - s) / maxScore
 	}
 	return nil
 }
 
 // ScoreExtensions of the Score plugin.
-func (pl *PodTopologySpread) ScoreExtensions() framework.ScoreExtensions {
+func (pl *PodTopologySpread) ScoreExtensions() fwk.ScoreExtensions {
 	return pl
 }
 

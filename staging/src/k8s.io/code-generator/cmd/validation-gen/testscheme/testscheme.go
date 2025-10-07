@@ -28,7 +28,6 @@ import (
 	"os"
 	"path"
 	"reflect"
-	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -311,14 +310,11 @@ func (v *ValidationTester) ExpectValid() *ValidationTester {
 	return v
 }
 
-// ExpectInvalid validates the value and calls t.Errorf if want does not match the actual errors.
-// Returns ValidationTester to support call chaining.
-func (v *ValidationTester) ExpectInvalid(want ...*field.Error) *ValidationTester {
-	v.T.Helper()
-
-	return v.expectInvalid(byFullError, want...)
-}
-
+// ExpectValidateFalseByPath validates the value and looks for the errors
+// specifically produced by `+k8s:validateFalse` tags. Each field (the map key)
+// can have multiple error strings (the map value). Test which are trying
+// to prove that the validation logic itself (e.g. validation-gen) produces the
+// expected errors should use this method.
 func (v *ValidationTester) ExpectValidateFalseByPath(expectedByPath map[string][]string) *ValidationTester {
 	v.T.Helper()
 
@@ -358,65 +354,10 @@ func (v *ValidationTester) validateFalseArgsByPath() map[string][]string {
 	return byPath
 }
 
-func (v *ValidationTester) ExpectRegexpsByPath(regexpStringsByPath map[string][]string) *ValidationTester {
-	v.T.Helper()
-
-	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
-		t.Helper()
-
-		errorsByPath := v.getErrorsByPath()
-
-		// sanity check
-		if want, got := len(regexpStringsByPath), len(errorsByPath); got != want {
-			t.Fatalf("wrong number of error-fields: expected %d, got %d:\nwanted:\n%sgot:\n%s",
-				want, got, renderByPath(regexpStringsByPath), renderByPath(errorsByPath))
-		}
-
-		// compile regexps
-		regexpsByPath := map[string][]*regexp.Regexp{}
-		for field, strs := range regexpStringsByPath {
-			regexps := make([]*regexp.Regexp, 0, len(strs))
-			for _, str := range strs {
-				regexps = append(regexps, regexp.MustCompile(str))
-			}
-			regexpsByPath[field] = regexps
-		}
-
-		for field := range errorsByPath {
-			errors := errorsByPath[field]
-			regexps := regexpsByPath[field]
-
-			// sanity check
-			if want, got := len(regexps), len(errors); got != want {
-				t.Fatalf("field %q: wrong number of errors: expected %d, got %d:\nwanted:\n%sgot:\n%s",
-					field, want, got, renderList(regexpStringsByPath[field]), renderList(errors))
-			}
-
-			// build a set of errors and expectations, so we can track them,
-			expSet := sets.New(regexps...)
-
-			for _, err := range errors {
-				var found *regexp.Regexp
-				for _, re := range regexps {
-					if re.MatchString(err) {
-						found = re
-						break // done with regexps
-					}
-				}
-				if found != nil {
-					expSet.Delete(found)
-					continue // next error
-				}
-				t.Errorf("field %q, error %q did not match any expectation", field, err)
-			}
-			if len(expSet) != 0 {
-				t.Errorf("field %q had unsatisfied expectations: %q", field, expSet.UnsortedList())
-			}
-		}
-	})
-	return v
-}
-
+// ExpectMatches compares the expected errors with the actual errors returned
+// by the validation, using the provided ErrorMatcher. Tests which are trying
+// to prove that a use-case of validation (e.g. testing pod validation)
+// produces the expected errors should use this method.
 func (v *ValidationTester) ExpectMatches(matcher field.ErrorMatcher, expected field.ErrorList) *ValidationTester {
 	v.Helper()
 
@@ -426,84 +367,6 @@ func (v *ValidationTester) ExpectMatches(matcher field.ErrorMatcher, expected fi
 		matcher.Test(t, expected, actual)
 	})
 	return v
-}
-
-func (v *ValidationTester) getErrorsByPath() map[string][]string {
-	byPath := map[string][]string{}
-	errs := v.validate()
-	for _, e := range errs {
-		f := e.Field
-		if f == "<nil>" {
-			f = ""
-		}
-		byPath[f] = append(byPath[f], e.ErrorBody())
-	}
-	// ensure args are sorted
-	for _, args := range byPath {
-		sort.Strings(args)
-	}
-	return byPath
-}
-
-func renderByPath(byPath map[string][]string) string {
-	keys := []string{}
-	for key := range byPath {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	for _, vals := range byPath {
-		sort.Strings(vals)
-	}
-
-	buf := strings.Builder{}
-	for _, key := range keys {
-		vals := byPath[key]
-		for _, val := range vals {
-			buf.WriteString(fmt.Sprintf("\t%s: %q\n", key, val))
-		}
-	}
-	return buf.String()
-}
-
-func renderList(list []string) string {
-	buf := strings.Builder{}
-	for _, item := range list {
-		buf.WriteString(fmt.Sprintf("\t%q\n", item))
-	}
-	return buf.String()
-}
-
-func (v *ValidationTester) expectInvalid(matcher matcher, errs ...*field.Error) *ValidationTester {
-	v.T.Helper()
-
-	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
-		t.Helper()
-
-		want := sets.New[string]()
-		for _, e := range errs {
-			want.Insert(matcher(e))
-		}
-
-		got := sets.New[string]()
-		for _, e := range v.validate() {
-			got.Insert(matcher(e))
-		}
-		if !got.Equal(want) {
-			t.Errorf("validation errors differed from expected:\n%v\n", cmp.Diff(want, got, cmpopts.SortMaps(stdcmp.Less[string])))
-
-			for x := range got.Difference(want) {
-				fmt.Printf("%q,\n", strings.TrimPrefix(x, "forced failure: "))
-			}
-		}
-	})
-	return v
-}
-
-type matcher func(err *field.Error) string
-
-func byFullError(err *field.Error) string {
-	return err.Error()
 }
 
 func (v *ValidationTester) validate() field.ErrorList {

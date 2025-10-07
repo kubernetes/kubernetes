@@ -353,26 +353,6 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3
-		gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"): {
-			Stub:              `{"metadata": {"name": "fs-2"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
-			ExpectedEtcdPath:  "/registry/flowschemas/fs-2",
-			ExpectedGVK:       gvkP("flowcontrol.apiserver.k8s.io", "v1", "FlowSchema"),
-			IntroducedVersion: "1.26",
-			RemovedVersion:    "1.32",
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3
-		gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"): {
-			Stub:              `{"metadata": {"name": "conf4"}, "spec": {"type": "Limited", "limited": {"nominalConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
-			ExpectedEtcdPath:  "/registry/prioritylevelconfigurations/conf4",
-			ExpectedGVK:       gvkP("flowcontrol.apiserver.k8s.io", "v1", "PriorityLevelConfiguration"),
-			IntroducedVersion: "1.26",
-			RemovedVersion:    "1.32",
-		},
-		// --
-
 		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1
 		gvr("flowcontrol.apiserver.k8s.io", "v1", "flowschemas"): {
 			Stub:              `{"metadata": {"name": "fs-3"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
@@ -502,14 +482,12 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicies"): {
 			Stub:              `{"metadata":{"name":"map1b1"},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicies/map1b1",
-			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1alpha1", "MutatingAdmissionPolicy"),
 			IntroducedVersion: "1.34",
 			RemovedVersion:    "1.40",
 		},
 		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicybindings"): {
 			Stub:              `{"metadata":{"name":"mpb1b1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com", "parameterNotFoundAction": "Allow"}}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicybindings/mpb1b1",
-			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1alpha1", "MutatingAdmissionPolicyBinding"),
 			IntroducedVersion: "1.34",
 			RemovedVersion:    "1.40",
 		},
@@ -519,12 +497,14 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicies"): {
 			Stub:              `{"metadata":{"name":"map1"},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicies/map1",
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1beta1", "MutatingAdmissionPolicy"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicybindings"): {
 			Stub:              `{"metadata":{"name":"mpb1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com", "parameterNotFoundAction": "Allow"}}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicybindings/mpb1",
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1beta1", "MutatingAdmissionPolicyBinding"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
@@ -606,28 +586,28 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("resource.k8s.io", "v1beta1", "deviceclasses"): {
 			Stub:              `{"metadata": {"name": "class2name"}}`,
 			ExpectedEtcdPath:  "/registry/deviceclasses/class2name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "DeviceClass"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "DeviceClass"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
 		gvr("resource.k8s.io", "v1beta1", "resourceclaims"): {
 			Stub:              `{"metadata": {"name": "claim2name"}, "spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}]}}}`,
 			ExpectedEtcdPath:  "/registry/resourceclaims/" + namespace + "/claim2name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "ResourceClaim"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "ResourceClaim"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
 		gvr("resource.k8s.io", "v1beta1", "resourceclaimtemplates"): {
 			Stub:              `{"metadata": {"name": "claimtemplate2name"}, "spec": {"spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}]}}}}`,
 			ExpectedEtcdPath:  "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate2name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "ResourceClaimTemplate"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "ResourceClaimTemplate"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
 		gvr("resource.k8s.io", "v1beta1", "resourceslices"): {
 			Stub:              `{"metadata": {"name": "node2slice"}, "spec": {"nodeName": "worker1", "driver": "dra.example.com", "pool": {"name": "worker1", "resourceSliceCount": 1}}}`,
 			ExpectedEtcdPath:  "/registry/resourceslices/node2slice",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "ResourceSlice"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "ResourceSlice"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
@@ -640,28 +620,28 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("resource.k8s.io", "v1beta2", "deviceclasses"): {
 			Stub:              `{"metadata": {"name": "class3name"}}`,
 			ExpectedEtcdPath:  "/registry/deviceclasses/class3name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "DeviceClass"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "DeviceClass"),
 			IntroducedVersion: "1.33",
 			RemovedVersion:    "1.39",
 		},
 		gvr("resource.k8s.io", "v1beta2", "resourceclaims"): {
 			Stub:              `{"metadata": {"name": "claim3name"}, "spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}}]}}}`,
 			ExpectedEtcdPath:  "/registry/resourceclaims/" + namespace + "/claim3name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "ResourceClaim"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "ResourceClaim"),
 			IntroducedVersion: "1.33",
 			RemovedVersion:    "1.39",
 		},
 		gvr("resource.k8s.io", "v1beta2", "resourceclaimtemplates"): {
 			Stub:              `{"metadata": {"name": "claimtemplate3name"}, "spec": {"spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}}]}}}}`,
 			ExpectedEtcdPath:  "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate3name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "ResourceClaimTemplate"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "ResourceClaimTemplate"),
 			IntroducedVersion: "1.33",
 			RemovedVersion:    "1.39",
 		},
 		gvr("resource.k8s.io", "v1beta2", "resourceslices"): {
 			Stub:              `{"metadata": {"name": "node3slice"}, "spec": {"nodeName": "worker1", "driver": "dra.example.com", "pool": {"name": "worker1", "resourceSliceCount": 1}}}`,
 			ExpectedEtcdPath:  "/registry/resourceslices/node3slice",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "ResourceSlice"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "ResourceSlice"),
 			IntroducedVersion: "1.33",
 			RemovedVersion:    "1.39",
 		},
@@ -671,25 +651,25 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("resource.k8s.io", "v1", "deviceclasses"): {
 			Stub:              `{"metadata": {"name": "class4name"}}`,
 			ExpectedEtcdPath:  "/registry/deviceclasses/class4name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "DeviceClass"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "DeviceClass"),
 			IntroducedVersion: "1.34",
 		},
 		gvr("resource.k8s.io", "v1", "resourceclaims"): {
 			Stub:              `{"metadata": {"name": "claim4name"}, "spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}}]}}}`,
 			ExpectedEtcdPath:  "/registry/resourceclaims/" + namespace + "/claim4name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "ResourceClaim"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "ResourceClaim"),
 			IntroducedVersion: "1.34",
 		},
 		gvr("resource.k8s.io", "v1", "resourceclaimtemplates"): {
 			Stub:              `{"metadata": {"name": "claimtemplate4name"}, "spec": {"spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}}]}}}}`,
 			ExpectedEtcdPath:  "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate4name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "ResourceClaimTemplate"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "ResourceClaimTemplate"),
 			IntroducedVersion: "1.34",
 		},
 		gvr("resource.k8s.io", "v1", "resourceslices"): {
 			Stub:              `{"metadata": {"name": "node4slice"}, "spec": {"nodeName": "worker1", "driver": "dra.example.com", "pool": {"name": "worker1", "resourceSliceCount": 1}}}`,
 			ExpectedEtcdPath:  "/registry/resourceslices/node4slice",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "ResourceSlice"),
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "ResourceSlice"),
 			IntroducedVersion: "1.34",
 		},
 		// --

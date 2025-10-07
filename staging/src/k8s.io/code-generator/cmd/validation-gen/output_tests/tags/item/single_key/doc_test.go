@@ -29,7 +29,10 @@ func Test(t *testing.T) {
 			{Key: "target", Data: "d2"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`items[1]`: {"item Items[key=target]"},
+		`items[1]`: {
+			"item Items[key=target] 1",
+			"item Items[key=target] 2",
+		},
 	})
 
 	st.Value(&Struct{
@@ -58,7 +61,10 @@ func Test(t *testing.T) {
 			{IntField: 42, Data: "d2"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`intKeyItems[1]`: {"item IntKeyItems[intField=42]"},
+		`intKeyItems[1]`: {
+			"item IntKeyItems[intField=42] 1",
+			"item IntKeyItems[intField=42] 2",
+		},
 	})
 
 	st.Value(&Struct{
@@ -67,7 +73,10 @@ func Test(t *testing.T) {
 			{BoolField: true, Data: "d2"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`boolKeyItems[1]`: {"item BoolKeyItems[boolField=true]"},
+		`boolKeyItems[1]`: {
+			"item BoolKeyItems[boolField=true] 1",
+			"item BoolKeyItems[boolField=true] 2",
+		},
 	})
 
 	// Test typedef slice.
@@ -77,7 +86,10 @@ func Test(t *testing.T) {
 			{ID: "typedef-target", Description: "d2"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`typedefItems[1]`: {"item TypedefItems[id=typedef-target]"},
+		`typedefItems[1]`: {
+			"item TypedefItems[id=typedef-target] 1",
+			"item TypedefItems[id=typedef-target] 2",
+		},
 	})
 
 	st.Value(&Struct{
@@ -102,5 +114,32 @@ func Test(t *testing.T) {
 			{Key: "a", Name: "n1"},
 			{Key: "b", Name: "n2"},
 		},
+	}).ExpectValid()
+
+	// Test atomic + unique=map + item combination
+	st.Value(&Struct{
+		AtomicUniqueMapItems: []Item{
+			{Key: "a", Data: "d1"},
+			{Key: "target", Data: "d2"},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		`atomicUniqueMapItems[1]`: {
+			"item AtomicUniqueMapItems[key=target]",
+		},
+	})
+
+	st.Value(&Struct{
+		AtomicUniqueMapItems: []Item{
+			{Key: "a", Data: "d1"},
+			{Key: "b", Data: "d2"},
+		},
+	}).ExpectValid()
+
+	st.Value(&Struct{
+		AtomicUniqueMapItems: []Item{},
+	}).ExpectValid()
+
+	st.Value(&Struct{
+		AtomicUniqueMapItems: nil,
 	}).ExpectValid()
 }

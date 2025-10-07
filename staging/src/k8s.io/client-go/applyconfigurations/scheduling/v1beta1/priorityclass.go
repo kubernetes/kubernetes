@@ -30,13 +30,31 @@ import (
 
 // PriorityClassApplyConfiguration represents a declarative configuration of the PriorityClass type for use
 // with apply.
+//
+// DEPRECATED - This group version of PriorityClass is deprecated by scheduling.k8s.io/v1/PriorityClass.
+// PriorityClass defines mapping from a priority class name to the priority
+// integer value. The value can be any valid integer.
 type PriorityClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Value                            *int32                   `json:"value,omitempty"`
-	GlobalDefault                    *bool                    `json:"globalDefault,omitempty"`
-	Description                      *string                  `json:"description,omitempty"`
-	PreemptionPolicy                 *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
+	// value represents the integer value of this priority class. This is the actual priority that pods
+	// receive when they have the name of this class in their pod spec.
+	Value *int32 `json:"value,omitempty"`
+	// globalDefault specifies whether this PriorityClass should be considered as
+	// the default priority for pods that do not have any priority class.
+	// Only one PriorityClass can be marked as `globalDefault`. However, if more than
+	// one PriorityClasses exists with their `globalDefault` field set to true,
+	// the smallest value of such global default PriorityClasses will be used as the default priority.
+	GlobalDefault *bool `json:"globalDefault,omitempty"`
+	// description is an arbitrary string that usually provides guidelines on
+	// when this priority class should be used.
+	Description *string `json:"description,omitempty"`
+	// preemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	PreemptionPolicy *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 
 // PriorityClass constructs a declarative configuration of the PriorityClass type for use with
@@ -56,7 +74,6 @@ func PriorityClass(name string) *PriorityClassApplyConfiguration {
 // ExtractPriorityClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPriorityClassFrom(priorityClass *schedulingv1beta1.PriorityClass, fieldManager string, subresource string) (*PriorityClassApplyConfiguration, error) {
 	b := &PriorityClassApplyConfiguration{}
 	err := managedfields.ExtractInto(priorityClass, internal.Parser().Type("io.k8s.api.scheduling.v1beta1.PriorityClass"), fieldManager, b, subresource)
@@ -80,7 +97,6 @@ func ExtractPriorityClassFrom(priorityClass *schedulingv1beta1.PriorityClass, fi
 // ExtractPriorityClass provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractPriorityClass(priorityClass *schedulingv1beta1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
 	return ExtractPriorityClassFrom(priorityClass, fieldManager, "")
 }

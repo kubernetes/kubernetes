@@ -112,7 +112,7 @@ func (tc *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting TTL after finished controller")
 	defer logger.Info("Shutting down TTL after finished controller")
 
-	if !cache.WaitForNamedCacheSync("TTL after finished", ctx.Done(), tc.jListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.jListerSynced) {
 		return
 	}
 

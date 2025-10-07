@@ -30,7 +30,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,12 +44,12 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
-	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
+	"k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -421,10 +420,6 @@ func TestPrepareCandidate(t *testing.T) {
 			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 			Obj()
 
-		notFoundVictim1 = st.MakePod().Name("not-found-victim").UID("victim1").
-				Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
-				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
-				Obj()
 		failVictim = st.MakePod().Name("fail-victim").UID("victim1").
 				Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
@@ -456,12 +451,6 @@ func TestPrepareCandidate(t *testing.T) {
 		errPatchStatusFailed = errors.New("patch pod status failed")
 	)
 
-	victimWithDeletionTimestamp := victim1.DeepCopy()
-	victimWithDeletionTimestamp.Name = "victim1-with-deletion-timestamp"
-	victimWithDeletionTimestamp.UID = "victim1-with-deletion-timestamp"
-	victimWithDeletionTimestamp.DeletionTimestamp = &metav1.Time{Time: time.Now().Add(-100 * time.Second)}
-	victimWithDeletionTimestamp.Finalizers = []string{"test"}
-
 	tests := []struct {
 		name      string
 		nodeNames []string
@@ -490,8 +479,9 @@ func TestPrepareCandidate(t *testing.T) {
 			testPods: []*v1.Pod{
 				victim1,
 			},
-			nodeNames:      []string{node1Name},
-			expectedStatus: nil,
+			nodeNames:             []string{node1Name},
+			expectedStatus:        nil,
+			expectedPreemptingMap: sets.New(types.UID("preemptor")),
 		},
 		{
 			name: "one victim without condition",
@@ -511,42 +501,6 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
-			expectedPreemptingMap: sets.New(types.UID("preemptor")),
-		},
-		{
-			name: "one victim, but victim is already being deleted",
-
-			candidate: &fakeCandidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						victimWithDeletionTimestamp,
-					},
-				},
-			},
-			preemptor: preemptor,
-			testPods: []*v1.Pod{
-				victimWithDeletionTimestamp,
-			},
-			nodeNames:      []string{node1Name},
-			expectedStatus: nil,
-		},
-		{
-			name: "one victim, but victim is already deleted",
-
-			candidate: &fakeCandidate{
-				name: node1Name,
-				victims: &extenderv1.Victims{
-					Pods: []*v1.Pod{
-						notFoundVictim1,
-					},
-				},
-			},
-			preemptor:             preemptor,
-			testPods:              []*v1.Pod{},
-			nodeNames:             []string{node1Name},
-			expectedStatus:        nil,
-			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
 		},
 		{
@@ -709,11 +663,6 @@ func TestPrepareCandidate(t *testing.T) {
 							deletionFailure = true
 							return true, nil, errDeletePodFailed
 						}
-						// fake clientset does not return an error for not-found pods, so we simulate it here.
-						if name == "not-found-victim" {
-							// Simulate a not-found error.
-							return true, nil, apierrors.NewNotFound(v1.Resource("pods"), name)
-						}
 
 						deletedPods.Insert(name)
 						return true, nil, nil
@@ -725,10 +674,6 @@ func TestPrepareCandidate(t *testing.T) {
 						if action.(clienttesting.PatchAction).GetName() == "fail-victim" {
 							patchFailure = true
 							return true, nil, errPatchStatusFailed
-						}
-						// fake clientset does not return an error for not-found pods, so we simulate it here.
-						if action.(clienttesting.PatchAction).GetName() == "not-found-victim" {
-							return true, nil, apierrors.NewNotFound(v1.Resource("pods"), "not-found-victim")
 						}
 						return true, nil, nil
 					})
@@ -932,7 +877,7 @@ func (f *fakeExtender) IsIgnorable() bool {
 func (f *fakeExtender) ProcessPreemption(
 	_ *v1.Pod,
 	victims map[string]*extenderv1.Victims,
-	_ framework.NodeInfoLister,
+	_ fwk.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
 	if f.supportsPreemption {
 		if f.errProcessPreemption {
@@ -1006,21 +951,21 @@ func TestCallExtenders(t *testing.T) {
 	)
 	tests := []struct {
 		name           string
-		extenders      []framework.Extender
+		extenders      []fwk.Extender
 		candidates     []Candidate
 		wantStatus     *fwk.Status
 		wantCandidates []Candidate
 	}{
 		{
 			name:           "no extenders",
-			extenders:      []framework.Extender{},
+			extenders:      []fwk.Extender{},
 			candidates:     makeCandidates(node1Name, victim),
 			wantStatus:     nil,
 			wantCandidates: makeCandidates(node1Name, victim),
 		},
 		{
 			name: "one extender supports preemption",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true),
 			},
 			candidates:     makeCandidates(node1Name, victim),
@@ -1029,7 +974,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender with return no victims",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true).WithReturnNoVictims(true),
 			},
 			candidates:     makeCandidates(node1Name, victim),
@@ -1038,7 +983,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender does not support preemption",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(false),
 			},
 			candidates:     makeCandidates(node1Name, victim),
@@ -1047,7 +992,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender with no return victims and is ignorable",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true).
 					WithReturnNoVictims(true).WithIgnorable(true),
 			},
@@ -1057,7 +1002,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender returns error and is ignorable",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithIgnorable(true).
 					WithSupportsPreemption(true).WithErrProcessPreemption(true),
 			},
@@ -1067,7 +1012,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender returns error and is not ignorable",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithErrProcessPreemption(true).
 					WithSupportsPreemption(true),
 			},
@@ -1077,7 +1022,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender with empty victims input",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true),
 			},
 			candidates:     []Candidate{},
@@ -1202,7 +1147,7 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 
-				var apiCacher framework.APICacher
+				var apiCacher fwk.APICacher
 				if asyncAPICallsEnabled {
 					apiDispatcher := apidispatcher.New(cs, 16, apicalls.Relevances)
 					apiDispatcher.Run(logger)

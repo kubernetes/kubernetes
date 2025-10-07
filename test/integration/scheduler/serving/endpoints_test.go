@@ -136,10 +136,11 @@ func TestEndpointHandlers(t *testing.T) {
 			path:             "/statusz",
 			requestHeader:    map[string]string{"Accept": "text/plain"},
 			wantResponseCode: http.StatusOK,
-			wantResponseBodyRegx: `^\n` +
+			wantResponseBodyRegx: `(?s)^\n` +
 				`kube-scheduler statusz\n` +
 				`Warning: This endpoint is not meant to be machine parseable, ` +
-				`has no formatting compatibility guarantees and is for debugging purposes only.`,
+				`has no formatting compatibility guarantees and is for debugging purposes only.+` +
+				`Paths([:=\s]+)/configz /flagz /healthz /livez /metrics /readyz\n$`,
 		},
 	}
 

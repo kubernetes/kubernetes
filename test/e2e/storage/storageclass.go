@@ -25,7 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -68,6 +70,7 @@ var _ = utils.SIGDescribe("StorageClasses", func() {
 			ginkgo.By("Creating a StorageClass")
 			createdStorageClass, err := scClient.Create(ctx, initialSC, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create the requested StorageClass")
+			gomega.Expect(createdStorageClass).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By(fmt.Sprintf("Get StorageClass %q", createdStorageClass.Name))
 			retrievedStorageClass, err := scClient.Get(ctx, createdStorageClass.Name, metav1.GetOptions{})
@@ -78,6 +81,7 @@ var _ = utils.SIGDescribe("StorageClasses", func() {
 			patchedStorageClass, err := scClient.Patch(ctx, retrievedStorageClass.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "failed to patch StorageClass %q", retrievedStorageClass.Name)
 			gomega.Expect(patchedStorageClass.Labels).To(gomega.HaveKeyWithValue(patchedStorageClass.Name, "patched"), "checking that patched label has been applied")
+			gomega.Expect(resourceversion.CompareResourceVersion(retrievedStorageClass.ResourceVersion, patchedStorageClass.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 			ginkgo.By(fmt.Sprintf("Delete StorageClass %q", patchedStorageClass.Name))
 			err = scClient.Delete(ctx, patchedStorageClass.Name, metav1.DeleteOptions{})

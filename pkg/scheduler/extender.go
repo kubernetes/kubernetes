@@ -85,7 +85,7 @@ func makeTransport(config *schedulerapi.Extender) (http.RoundTripper, error) {
 }
 
 // NewHTTPExtender creates an HTTPExtender object.
-func NewHTTPExtender(config *schedulerapi.Extender) (framework.Extender, error) {
+func NewHTTPExtender(config *schedulerapi.Extender) (fwk.Extender, error) {
 	if config.HTTPTimeout.Duration.Nanoseconds() == 0 {
 		config.HTTPTimeout.Duration = time.Duration(DefaultExtenderTimeout)
 	}
@@ -137,7 +137,7 @@ func (h *HTTPExtender) SupportsPreemption() bool {
 func (h *HTTPExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeNameToVictims map[string]*extenderv1.Victims,
-	nodeInfos framework.NodeInfoLister,
+	nodeInfos fwk.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
 	var (
 		result extenderv1.ExtenderPreemptionResult
@@ -180,7 +180,7 @@ func (h *HTTPExtender) ProcessPreemption(
 // such as UIDs and names, to object pointers.
 func (h *HTTPExtender) convertToVictims(
 	nodeNameToMetaVictims map[string]*extenderv1.MetaVictims,
-	nodeInfos framework.NodeInfoLister,
+	nodeInfos fwk.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
 	nodeNameToVictims := map[string]*extenderv1.Victims{}
 	for nodeName, metaVictims := range nodeNameToMetaVictims {

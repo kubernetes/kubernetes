@@ -71,1205 +71,478 @@ func offsetMemory(index int64, value string) string {
 	return ptr.String()
 }
 
-func doPodResizeTests(f *framework.Framework) {
-	type testCase struct {
-		name                string
-		containers          []podresize.ResizableContainerInfo
-		expected            []podresize.ResizableContainerInfo
-		addExtendedResource bool
-		// TODO(123940): test rollback for all test cases once resize is more responsive.
-		testRollback bool
-	}
+func doGuaranteedPodResizeTests(f *framework.Framework) {
+	ginkgo.DescribeTableSubtree("guaranteed qos - 1 container with resize policy", func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy, resizeInitCtrs bool) {
+		ginkgo.DescribeTable("resizing", func(ctx context.Context, desiredCPU, desiredMem string) {
 
-	noRestart := v1.NotRequired
-	doRestart := v1.RestartContainer
-	tests := []testCase{
-		{
-			name: "Guaranteed QoS pod, one container - increase CPU & memory",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: increasedMem, MemLim: increasedMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
+			// The tests for guaranteed pods include extended resources.
+			nodes, err := e2enode.GetReadySchedulableNodes(context.Background(), f.ClientSet)
+			framework.ExpectNoError(err)
+			for _, node := range nodes.Items {
+				e2enode.AddExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource, resource.MustParse("123"))
+			}
+			defer func() {
+				for _, node := range nodes.Items {
+					e2enode.RemoveExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource)
+				}
+			}()
+
+			originalContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, true, originalCPU, originalMem)
+			expectedContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, true, desiredCPU, desiredMem)
+			for i, c := range expectedContainers {
+				// If the pod has init containers, but we are not resizing them, keep the original resources.
+				if c.InitCtr && !resizeInitCtrs {
+					c.Resources = originalContainers[i].Resources
+					expectedContainers[i] = c
+					continue
+				}
+				// For containers where the resize policy is "restart", we expect a restart.
+				expectRestart := int32(0)
+				if cpuPolicy == v1.RestartContainer && desiredCPU != originalCPU {
+					expectRestart = 1
+				}
+				if memPolicy == v1.RestartContainer && desiredMem != originalMem {
+					expectRestart = 1
+				}
+				c.RestartCount = expectRestart
+				expectedContainers[i] = c
+			}
+
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
+
 		},
-		{
-			name: "Guaranteed QoS pod, one container - decrease CPU only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
+			// All tests will perform the requested resize, and once completed, will roll back the change.
+			// This results in the coverage of both increase and decrease of resources.
+			ginkgo.Entry("cpu", increasedCPU, originalMem),
+			ginkgo.Entry("mem", originalCPU, increasedMem),
+			ginkgo.Entry("cpu & mem in the same direction", increasedCPU, increasedMem),
+			ginkgo.Entry("cpu & mem in opposite directions", increasedCPU, reducedMem),
+		)
+	},
+		ginkgo.Entry("no restart", v1.NotRequired, v1.NotRequired, false),
+		ginkgo.Entry("no restart + resize initContainers", v1.NotRequired, v1.NotRequired, true),
+		ginkgo.Entry("mem restart", v1.NotRequired, v1.RestartContainer, false),
+		ginkgo.Entry("cpu restart", v1.RestartContainer, v1.NotRequired, false),
+		ginkgo.Entry("cpu & mem restart", v1.RestartContainer, v1.RestartContainer, false),
+		ginkgo.Entry("cpu & mem restart + resize initContainers", v1.RestartContainer, v1.RestartContainer, true),
+	)
+
+	ginkgo.DescribeTable("guaranteed pods with multiple containers", func(ctx context.Context, expectedContainers []podresize.ResizableContainerInfo) {
+		originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+		for i := range originalContainers {
+			originalContainers[i].CPUPolicy = nil
+			originalContainers[i].MemPolicy = nil
+		}
+
+		doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
+	},
+		// All tests will perform the requested resize, and once completed, will roll back the change.
+		// This results in coverage of both the operation as described, and its reverse.
+		ginkgo.Entry("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase", []podresize.ResizableContainerInfo{
+			{
+				Name:      "c1",
+				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, increasedMem), MemLim: offsetMemory(0, increasedMem)},
 			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
+			{
+				Name:      "c2",
+				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, increasedCPU), CPULim: offsetCPU(1, increasedCPU), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMem)},
 			},
-			testRollback: true,
+			{
+				Name:      "c3",
+				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPU), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMem)},
+			},
+		}),
+		ginkgo.Entry("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease", []podresize.ResizableContainerInfo{
+			{
+				Name:      "c1",
+				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, increasedMem), MemLim: offsetMemory(0, increasedMem)},
+			},
+			{
+				Name:      "c2",
+				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, reducedCPU), CPULim: offsetCPU(1, reducedCPU), MemReq: offsetMemory(1, reducedMem), MemLim: offsetMemory(1, reducedMem)},
+			},
+			{
+				Name:      "c3",
+				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPU), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMem)},
+			},
+		}),
+		ginkgo.Entry("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2)", []podresize.ResizableContainerInfo{
+			{
+				Name:      "c1",
+				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(0, increasedCPU), CPULim: offsetCPU(0, increasedCPU), MemReq: offsetMemory(0, originalMem), MemLim: offsetMemory(0, originalMem)},
+			},
+			{
+				Name:      "c2",
+				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, reducedCPU), CPULim: offsetCPU(1, reducedCPU), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMem)},
+			},
+			{
+				Name:      "c3",
+				Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, increasedCPU), CPULim: offsetCPU(2, increasedCPU), MemReq: offsetMemory(2, increasedMem), MemLim: offsetMemory(2, increasedMem)},
+			},
+		}),
+	)
+}
+
+func doBurstablePodResizeTests(f *framework.Framework) {
+	ginkgo.DescribeTableSubtree("burstable pods - 1 container with all requests & limits set and resize policy", func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy) {
+		ginkgo.DescribeTable("resizing", func(ctx context.Context, desiredCPU, desiredCPULimit, desiredMem, desiredMemLimit string) {
+			originalContainers := makeBurstableContainers(1, cpuPolicy, memPolicy, originalCPU, originalCPULimit, originalMem, originalMemLimit)
+			expectedContainers := makeBurstableContainers(1, cpuPolicy, memPolicy, desiredCPU, desiredCPULimit, desiredMem, desiredMemLimit)
+			for i, c := range expectedContainers {
+				// For containers where the resize policy is "restart", we expect a restart.
+				expectRestart := int32(0)
+				if cpuPolicy == v1.RestartContainer && (desiredCPU != originalCPU || desiredCPULimit != originalCPULimit) {
+					expectRestart = 1
+				}
+				if memPolicy == v1.RestartContainer && (desiredMem != originalMem || desiredMemLimit != originalMemLimit) {
+					expectRestart = 1
+				}
+				c.RestartCount = expectRestart
+				expectedContainers[i] = c
+			}
+
+			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, true)
 		},
-		{
-			name: "Guaranteed QoS pod, three containers (c1, c2, c3) - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2)",
-			containers: []podresize.ResizableContainerInfo{
+			// All tests will perform the requested resize, and once completed, will roll back the change.
+			// This results in the coverage of both increase and decrease of resources.
+			ginkgo.Entry("cpu requests", increasedCPU, originalCPULimit, originalMem, originalMemLimit),
+			ginkgo.Entry("cpu limits", originalCPU, increasedCPULimit, originalMem, originalMemLimit),
+			ginkgo.Entry("mem requests", originalCPU, originalCPULimit, increasedMem, originalMemLimit),
+			ginkgo.Entry("mem limits", originalCPU, originalCPULimit, originalMem, increasedMemLimit),
+			ginkgo.Entry("all resources in the same direction", increasedCPU, increasedCPULimit, increasedMem, increasedMemLimit),
+			ginkgo.Entry("cpu & mem in opposite directions", increasedCPU, increasedCPULimit, reducedMem, reducedMemLimit),
+			ginkgo.Entry("requests & limits in opposite directions", reducedCPU, increasedCPULimit, increasedMem, reducedMemLimit),
+		)
+	},
+		ginkgo.Entry("no restart", v1.NotRequired, v1.NotRequired),
+		ginkgo.Entry("cpu restart", v1.RestartContainer, v1.NotRequired),
+		ginkgo.Entry("mem restart", v1.NotRequired, v1.RestartContainer),
+		ginkgo.Entry("cpu & mem restart", v1.RestartContainer, v1.RestartContainer),
+	)
+
+	// The following tests cover the remaining burstable pod scenarios:
+	// - multiple containers
+	// - adding limits where only requests were previously set
+	// - adding requests where none were previously set
+	// - resizing with equivalents (e.g. 2m -> 1m)
+	ginkgo.DescribeTable("burstable pods - extended", func(ctx context.Context, originalContainers, expectedContainers []podresize.ResizableContainerInfo, doRollback bool) {
+		doPatchAndRollback(ctx, f, originalContainers, expectedContainers, doRollback)
+	},
+		ginkgo.Entry("6 containers - various operations performed (including adding limits and requests)",
+			[]podresize.ResizableContainerInfo{
 				{
+					// c1 starts with CPU requests only; increase CPU requests + add CPU limits
 					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU},
 				},
 				{
+					// c2 starts with memory requests only; increase memory requests + add memory limits
 					Name:      "c2",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, originalCPU), CPULim: offsetCPU(1, originalCPU), MemReq: offsetMemory(1, originalMem), MemLim: offsetMemory(1, originalMem)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
+					Resources: &cgroups.ContainerResources{MemReq: originalMem},
 				},
 				{
+					// c3 starts with CPU and memory requests; decrease memory requests only
 					Name:      "c3",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, originalCPU), CPULim: offsetCPU(2, originalCPU), MemReq: offsetMemory(2, originalMem), MemLim: offsetMemory(2, originalMem)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, reducedCPU), CPULim: offsetCPU(1, reducedCPU), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMem)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c3",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, increasedCPU), CPULim: offsetCPU(2, increasedCPU), MemReq: offsetMemory(2, increasedMem), MemLim: offsetMemory(2, increasedMem)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: reducedMem, MemLim: originalMemLimit},
-				},
-			},
-			testRollback: true,
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: increasedMem, MemLim: originalMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase memory limits only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: increasedMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod with memory requests + limits - decrease memory limit",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: reducedMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: reducedCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			testRollback: true,
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU limits only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: reducedCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			testRollback: true,
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU limits only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: increasedCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests and limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and increase CPU limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: reducedCPU, CPULim: increasedCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests and decrease CPU limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: reducedCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: increasedMem, MemLim: increasedMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests and increase memory limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: reducedMem, MemLim: increasedMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and increase memory limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: reducedCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: increasedMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests and increase CPU limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: increasedCPULimit, MemReq: reducedMem, MemLim: originalMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and decrease CPU limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: reducedCPULimit, MemReq: increasedMem, MemLim: originalMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests - decrease memory request",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
 					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
 				},
-			},
-			expected: []podresize.ResizableContainerInfo{
 				{
+					// c4 starts with CPU requests only; decrease CPU requests + add memory requests
+					Name:      "c4",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU},
+				},
+				{
+					// c5 starts with memory requests only; increase memory requests + add CPU requests
+					Name:      "c5",
+					Resources: &cgroups.ContainerResources{MemReq: originalMem},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					// c1 starts with CPU requests only; increase CPU requests + add CPU limits
 					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPULimit},
+				},
+				{
+					// c2 starts with memory requests only; decrease memory requests + add memory limits
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{MemReq: reducedMem, MemLim: increasedMemLimit},
+				},
+				{
+					// c3 starts with CPU and memory requests; decrease memory requests onloy
+					Name:      "c3",
 					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: reducedMem},
 				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests - increase cpu request",
-			containers: []podresize.ResizableContainerInfo{
 				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+					// c4 starts with CPU requests only; decrease CPU requests + add memory requests
+					Name:      "c4",
+					Resources: &cgroups.ContainerResources{CPUReq: reducedCPU, MemReq: originalMem},
+				},
+				{
+					// c5 starts with memory requests only; increase memory requests + add CPU requests
+					Name:      "c5",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: increasedMem},
 				},
 			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, MemReq: originalMem},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu requests and limits - resize with equivalents",
-			containers: []podresize.ResizableContainerInfo{
+			false,
+		),
+		ginkgo.Entry("resize with equivalents",
+			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
 					Resources: &cgroups.ContainerResources{CPUReq: "2m", CPULim: "10m"},
 				},
 			},
-			expected: []podresize.ResizableContainerInfo{
+			[]podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
 					Resources: &cgroups.ContainerResources{CPUReq: "1m", CPULim: "5m"},
 				},
 			},
-		},
-		{
-			name: "Guaranteed QoS pod, one container - increase CPU (NotRequired) & memory (RestartContainer)",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &doRestart,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:         "c1",
-					Resources:    &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: increasedMem, MemLim: increasedMem},
-					CPUPolicy:    &noRestart,
-					MemPolicy:    &doRestart,
-					RestartCount: 1,
-				},
-			},
-			testRollback: true,
-		},
-		{
-			name: "Burstable QoS pod, one container - decrease CPU (NotRequired) & memory (RestartContainer)",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					CPUPolicy: &noRestart,
-					MemPolicy: &doRestart,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:         "c1",
-					Resources:    &cgroups.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit, MemReq: reducedMem, MemLim: reducedMemLimit},
-					CPUPolicy:    &noRestart,
-					MemPolicy:    &doRestart,
-					RestartCount: 1,
-				},
-			},
-			testRollback: true,
-		},
-		{
-			name: "Burstable QoS pod, one container - decrease memory request (RestartContainer memory resize policy)",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					CPUPolicy: &noRestart,
-					MemPolicy: &doRestart,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:         "c1",
-					Resources:    &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: reducedMem, MemLim: originalMemLimit},
-					CPUPolicy:    &noRestart,
-					MemPolicy:    &doRestart,
-					RestartCount: 1,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container - increase memory request (NoRestart memory resize policy)",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:         "c1",
-					Resources:    &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: increasedMem, MemLim: originalMemLimit},
-					CPUPolicy:    &noRestart,
-					MemPolicy:    &noRestart,
-					RestartCount: 0,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, three containers - increase c1 resources, no change for c2, decrease c3 resources (no net change for pod)",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, originalCPU), CPULim: offsetCPU(1, originalCPULimit), MemReq: offsetMemory(1, originalMem), MemLim: offsetMemory(1, originalMemLimit)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &doRestart,
-				},
-				{
-					Name:      "c3",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, originalCPU), CPULim: offsetCPU(2, originalCPULimit), MemReq: offsetMemory(2, originalMem), MemLim: offsetMemory(2, originalMemLimit)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPULimit, MemReq: increasedMem, MemLim: increasedMemLimit},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, originalCPU), CPULim: offsetCPU(1, originalCPULimit), MemReq: offsetMemory(1, originalMem), MemLim: offsetMemory(1, originalMemLimit)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &doRestart,
-				},
-				{
-					Name:      "c3",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPULimit), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, originalMemLimit)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, three containers - decrease c1 resources, increase c2 resources, no change for c3 (net increase for pod)",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, originalCPU), CPULim: offsetCPU(1, originalCPULimit), MemReq: offsetMemory(1, originalMem), MemLim: offsetMemory(1, originalMemLimit)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &doRestart,
-				},
-				{
-					Name:      "c3",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, originalCPU), CPULim: offsetCPU(2, originalCPULimit), MemReq: offsetMemory(2, originalMem), MemLim: offsetMemory(2, originalMemLimit)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit, MemReq: reducedMem, MemLim: originalMemLimit},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:         "c2",
-					Resources:    &cgroups.ContainerResources{CPUReq: offsetCPU(2, increasedCPU), CPULim: offsetCPU(2, increasedCPULimit), MemReq: offsetMemory(2, increasedMem), MemLim: offsetMemory(2, increasedMemLimit)},
-					CPUPolicy:    &noRestart,
-					MemPolicy:    &doRestart,
-					RestartCount: 1,
-				},
-				{
-					Name:      "c3",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, originalCPU), CPULim: offsetCPU(2, originalCPULimit), MemReq: offsetMemory(2, originalMem), MemLim: offsetMemory(2, originalMemLimit)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, three containers - no change for c1, increase c2 resources, decrease c3 (net decrease for pod)",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					CPUPolicy: &doRestart,
-					MemPolicy: &doRestart,
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(1, originalCPU), CPULim: offsetCPU(1, originalCPULimit), MemReq: offsetMemory(1, originalMem), MemLim: offsetMemory(1, originalMemLimit)},
-					CPUPolicy: &doRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c3",
-					Resources: &cgroups.ContainerResources{CPUReq: offsetCPU(2, originalCPU), CPULim: offsetCPU(2, originalCPULimit), MemReq: offsetMemory(2, originalMem), MemLim: offsetMemory(2, originalMemLimit)},
-					CPUPolicy: &noRestart,
-					MemPolicy: &doRestart,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					CPUPolicy: &doRestart,
-					MemPolicy: &doRestart,
-				},
-				{
-					Name:         "c2",
-					Resources:    &cgroups.ContainerResources{CPUReq: offsetCPU(1, increasedCPU), CPULim: offsetCPU(1, increasedCPULimit), MemReq: offsetMemory(1, increasedMem), MemLim: offsetMemory(1, increasedMemLimit)},
-					CPUPolicy:    &doRestart,
-					MemPolicy:    &noRestart,
-					RestartCount: 1,
-				},
-				{
-					Name:         "c3",
-					Resources:    &cgroups.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit, MemReq: reducedMem, MemLim: reducedMemLimit},
-					CPUPolicy:    &noRestart,
-					MemPolicy:    &doRestart,
-					RestartCount: 1,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, mixed containers - scale up cpu and memory",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: increasedMem, MemLim: increasedMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, mixed containers - add requests",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, mixed containers - add limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-		},
-		{
-			name: "Guaranteed QoS pod, one container - increase CPU & memory with an extended resource",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name: "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem,
-						ExtendedResourceReq: "1", ExtendedResourceLim: "1"},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name: "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: increasedMem, MemLim: increasedMem,
-						ExtendedResourceReq: "1", ExtendedResourceLim: "1"},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-			addExtendedResource: true,
-		},
-		{
-			name: "BestEffort QoS pod - empty resize",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{},
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{},
-				},
-			},
-		},
-		{
-			name: "Guaranteed QoS pod, one restartable init container - increase CPU & memory",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy:     &noRestart,
-					MemPolicy:     &noRestart,
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: increasedMem, MemLim: increasedMem},
-					CPUPolicy:     &noRestart,
-					MemPolicy:     &noRestart,
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-		{
-			name: "Guaranteed QoS pod, one restartable init container - decrease CPU & increase memory",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPU, MemReq: increasedMem, MemLim: increasedMem},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-		{
-			name: "Guaranteed QoS pod, one container, one restartable init container - decrease init container CPU",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPU, MemReq: originalMem, MemLim: originalMem},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container, one restartable init container - increase init container CPU & memory",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPULimit, MemReq: increasedMem, MemLim: increasedMemLimit},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container, one restartable init container - decrease init container CPU only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container, one restartable init container - increase init container CPU only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container, one restartable init container - decrease init container memory requests only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: reducedMem, MemLim: originalMemLimit},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container, one restartable init container - increase init container memory only",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			expected: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: increasedMem, MemLim: increasedMemLimit},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-	}
+			true,
+		),
+	)
 
-	for idx := range tests {
-		tc := tests[idx]
-
-		ginkgo.It(tc.name, func(ctx context.Context) {
-			podClient := e2epod.NewPodClient(f)
-			var testPod, patchedPod *v1.Pod
-			var pErr error
-
-			tStamp := strconv.Itoa(time.Now().Nanosecond())
-			testPod = podresize.MakePodWithResizableContainers(f.Namespace.Name, "", tStamp, tc.containers)
-			testPod.GenerateName = "resize-test-"
-			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
-
-			if tc.addExtendedResource {
-				nodes, err := e2enode.GetReadySchedulableNodes(context.Background(), f.ClientSet)
-				framework.ExpectNoError(err)
-
-				for _, node := range nodes.Items {
-					e2enode.AddExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource, resource.MustParse("123"))
-				}
-				defer func() {
-					for _, node := range nodes.Items {
-						e2enode.RemoveExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource)
-					}
-				}()
-			}
-
-			ginkgo.By("creating pod")
-			newPod := podClient.CreateSync(ctx, testPod)
-
-			ginkgo.By("verifying initial pod resources are as expected")
-			podresize.VerifyPodResources(newPod, tc.containers)
-			ginkgo.By("verifying initial pod resize policy is as expected")
-			podresize.VerifyPodResizePolicy(newPod, tc.containers)
-
-			ginkgo.By("verifying initial pod status resources are as expected")
-			framework.ExpectNoError(podresize.VerifyPodStatusResources(newPod, tc.containers))
-			ginkgo.By("verifying initial cgroup config are as expected")
-			framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, newPod, tc.containers))
-
-			patchAndVerify := func(containers, desiredContainers []podresize.ResizableContainerInfo, opStr string) {
-				ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
-				patch := podresize.MakeResizePatch(containers, desiredContainers)
-				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
-					types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-				framework.ExpectNoError(pErr, fmt.Sprintf("failed to patch pod for %s", opStr))
-				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, desiredContainers)
-
-				ginkgo.By(fmt.Sprintf("verifying pod patched for %s", opStr))
-				podresize.VerifyPodResources(patchedPod, expected)
-
-				ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
-				resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPod, expected)
-				podresize.ExpectPodResized(ctx, f, resizedPod, expected)
-			}
-
-			patchAndVerify(tc.containers, tc.expected, "resize")
-
-			if tc.testRollback {
-				// Resize has been actuated, test rollback
-				rollbackContainers := make([]podresize.ResizableContainerInfo, len(tc.containers))
-				copy(rollbackContainers, tc.containers)
-				for i, c := range rollbackContainers {
-					gomega.Expect(c.Name).To(gomega.Equal(tc.expected[i].Name),
-						"test case containers & expectations should be in the same order")
-					// Resizes that trigger a restart should trigger a second restart when rolling back.
-					rollbackContainers[i].RestartCount = tc.expected[i].RestartCount
-				}
-
-				patchAndVerify(tc.expected, rollbackContainers, "rollback")
-			}
-
-			ginkgo.By("deleting pod")
-			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-		})
-	}
 }
 
-func doPodResizeErrorTests(f *framework.Framework) {
+func doPodResizePatchErrorTests(f *framework.Framework) {
+	ginkgo.DescribeTable("apply invalid resize patch requests", func(ctx context.Context, originalContainers, desiredContainers []podresize.ResizableContainerInfo, patchError string, waitForStart bool) {
+		podClient := e2epod.NewPodClient(f)
+		var newPod *v1.Pod
 
-	type testCase struct {
-		name          string
-		containers    []podresize.ResizableContainerInfo
-		attemptResize []podresize.ResizableContainerInfo // attempted resize target
-		patchError    string
-	}
-
-	tests := []testCase{
-		{
-			name: "BestEffort pod - try requesting memory, expect error",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name: "c1",
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name: "c1",
-					Resources: &cgroups.ContainerResources{
-						MemReq: originalMem,
-					},
-				},
-			},
-			patchError: "Pod QOS Class may not change as a result of resizing",
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - remove memory limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
-				},
-			},
-			patchError: "resource limits cannot be removed",
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - remove CPU limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			patchError: "resource limits cannot be removed",
-		},
-		{
-			name: "Burstable QoS pod, one container with memory requests + limits, cpu requests - remove CPU requests",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			patchError: "resource requests cannot be removed",
-		},
-		{
-			name: "Burstable QoS pod, one container with CPU requests + limits, cpu requests - remove memory requests",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
-				},
-			},
-			patchError: "resource requests cannot be removed",
-		},
-		{
-			name: "Burstable QoS pod, two containers with cpu & memory requests + limits - reorder containers",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c2",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			patchError: "spec.containers[0].name: Forbidden: containers may not be renamed or reordered on resize, spec.containers[1].name: Forbidden: containers may not be renamed or reordered on resize",
-		},
-	}
-
-	for idx := range tests {
-		tc := tests[idx]
-
-		ginkgo.It(tc.name, func(ctx context.Context) {
-			podClient := e2epod.NewPodClient(f)
-			var testPod, patchedPod *v1.Pod
-			var pErr error
-
+		ginkgo.By("creating and verifying pod")
+		if waitForStart {
+			newPod = createAndVerifyPod(ctx, f, podClient, originalContainers)
+		} else {
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
-			testPod = podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, tc.containers)
+			testPod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, originalContainers)
 			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+			newPod = podClient.Create(ctx, testPod)
+		}
 
-			ginkgo.By("creating pod")
-			newPod := podClient.CreateSync(ctx, testPod)
+		ginkgo.By("patching pod for resize")
+		patch := podresize.MakeResizePatch(originalContainers, desiredContainers)
+		_, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+		gomega.Expect(pErr).To(gomega.HaveOccurred())
+		gomega.Expect(pErr.Error()).To(gomega.ContainSubstring(patchError))
 
-			ginkgo.By("verifying initial pod resources, and policy are as expected")
-			podresize.VerifyPodResources(newPod, tc.containers)
-			podresize.VerifyPodResizePolicy(newPod, tc.containers)
+		patchedPod, getErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Get(ctx, newPod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(getErr)
 
-			ginkgo.By("verifying initial pod status resources and cgroup config are as expected")
-			framework.ExpectNoError(podresize.VerifyPodStatusResources(newPod, tc.containers))
+		ginkgo.By("verifying pod resources after patch")
+		podresize.VerifyPodResources(patchedPod, originalContainers)
 
-			ginkgo.By("patching pod for resize")
-			patch := podresize.MakeResizePatch(tc.containers, tc.attemptResize)
-			patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
-				types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-			if tc.patchError == "" {
-				framework.ExpectNoError(pErr, "failed to patch pod for resize")
-			} else {
-				gomega.Expect(pErr).To(gomega.HaveOccurred())
-				gomega.Expect(pErr.Error()).To(gomega.ContainSubstring(tc.patchError))
-				patchedPod = newPod
-			}
-
-			ginkgo.By("verifying pod resources after patch")
-			podresize.VerifyPodResources(patchedPod, tc.containers)
-
+		if waitForStart {
 			ginkgo.By("verifying pod status resources after patch")
-			framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, tc.containers))
+			framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, originalContainers))
+		}
 
-			ginkgo.By("deleting pod")
-			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-		})
-	}
+		ginkgo.By("deleting pod")
+		podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+	},
+		ginkgo.Entry("BestEffort pod - request memory",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name: "c1",
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{MemReq: originalMem},
+				},
+			},
+			"Pod QOS Class may not change as a result of resizing",
+			true,
+		),
+		ginkgo.Entry("BestEffort pod - request cpu",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name: "c1",
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU},
+				},
+			},
+			"Pod QOS Class may not change as a result of resizing",
+			true,
+		),
+		ginkgo.Entry("Guaranteed pod - remove cpu & memory limits",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+				},
+			},
+			"resource limits cannot be removed",
+			true,
+		),
+		ginkgo.Entry("Burstable pod - remove cpu & memory limits + increase requests",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: increasedCPULimit, MemReq: originalMem, MemLim: increasedMemLimit},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: increasedCPU, MemReq: increasedMem},
+				},
+			},
+			"resource limits cannot be removed",
+			true,
+		),
+		ginkgo.Entry("Burstable pod - remove memory requests",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{MemReq: originalMem},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{},
+				},
+			},
+			"resource requests cannot be removed",
+			true,
+		),
+		ginkgo.Entry("Burstable pod - remove cpu requests",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{},
+				},
+			},
+			"resource requests cannot be removed",
+			true,
+		),
+		ginkgo.Entry("Burstable pod - reorder containers",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU},
+				},
+				{
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c2",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU},
+				},
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU},
+				},
+			},
+			"spec.containers[0].name: Forbidden: containers may not be renamed or reordered on resize, spec.containers[1].name: Forbidden: containers may not be renamed or reordered on resize",
+			true,
+		),
+		ginkgo.Entry("Guaranteed pod - rename containers",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1-old",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+				},
+				{
+					Name:      "c2-old",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1-new",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+				},
+				{
+					Name:      "c2-new",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+				},
+			},
+			"spec.containers[0].name: Forbidden: containers may not be renamed or reordered on resize, spec.containers[1].name: Forbidden: containers may not be renamed or reordered on resize",
+			true,
+		),
+		ginkgo.Entry("Burstable pod - set requests == limits",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: increasedCPULimit, MemReq: originalMem, MemLim: increasedMemLimit},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: increasedCPULimit, CPULim: increasedCPULimit, MemReq: increasedMemLimit, MemLim: increasedMemLimit},
+				},
+			},
+			"Pod QOS Class may not change as a result of resizing",
+			true,
+		),
+		ginkgo.Entry("Burstable pod - resize ephemeral storage",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, EphStorReq: "1"},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, EphStorReq: "3"},
+				},
+			},
+			"only cpu and memory resources are mutable",
+			true,
+		),
+		ginkgo.Entry("Burstable pod - nonrestartable initContainer",
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:          "c1-init",
+					InitCtr:       true,
+					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+					RestartPolicy: v1.ContainerRestartPolicyNever,
+				},
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{},
+				},
+			},
+			[]podresize.ResizableContainerInfo{
+				{
+					Name:          "c1-init",
+					InitCtr:       true,
+					Resources:     &cgroups.ContainerResources{CPUReq: increasedCPU, MemReq: increasedMem},
+					RestartPolicy: v1.ContainerRestartPolicyNever,
+				},
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{},
+				},
+			},
+			"resources for non-sidecar init containers are immutable",
+			false,
+		),
+	)
 }
 
 func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
@@ -1279,30 +552,13 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 	// 3. Revert the limit back to the original value - should succeed
 	ginkgo.It("decrease memory limit below usage", func(ctx context.Context) {
 		podClient := e2epod.NewPodClient(f)
-		var testPod *v1.Pod
-		var pErr error
-
 		original := []podresize.ResizableContainerInfo{{
 			Name:      "c1",
 			Resources: &cgroups.ContainerResources{MemReq: originalMem, MemLim: originalMem},
 		}}
 
-		tStamp := strconv.Itoa(time.Now().Nanosecond())
-		testPod = podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, original)
-		testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
-
-		ginkgo.By("creating pod")
-		testPod = podClient.CreateSync(ctx, testPod)
-
-		ginkgo.By("verifying initial pod resources are as expected")
-		podresize.VerifyPodResources(testPod, original)
-		ginkgo.By("verifying initial pod resize policy is as expected")
-		podresize.VerifyPodResizePolicy(testPod, original)
-
-		ginkgo.By("verifying initial pod status resources are as expected")
-		framework.ExpectNoError(podresize.VerifyPodStatusResources(testPod, original))
-		ginkgo.By("verifying initial cgroup config are as expected")
-		framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, testPod, original))
+		ginkgo.By("creating and verifying pod")
+		testPod := createAndVerifyPod(ctx, f, podClient, original)
 
 		// 1. Decrease the limit a little bit - should succeed
 		ginkgo.By("Patching pod with a slightly lowered memory limit")
@@ -1311,7 +567,7 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 			Resources: &cgroups.ContainerResources{MemReq: reducedMem, MemLim: reducedMem},
 		}}
 		patch := podresize.MakeResizePatch(original, viableLoweredLimit)
-		testPod, pErr = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
+		testPod, pErr := f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(pErr, "failed to patch pod for viable lowered limit")
 
@@ -1419,7 +675,127 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithFeatureGate(fe
 		}
 	})
 
-	doPodResizeTests(f)
-	doPodResizeErrorTests(f)
+	doGuaranteedPodResizeTests(f)
+	doBurstablePodResizeTests(f)
+	doPodResizePatchErrorTests(f)
 	doPodResizeMemoryLimitDecreaseTest(f)
 })
+
+func doPatchAndRollback(ctx context.Context, f *framework.Framework, originalContainers, expectedContainers []podresize.ResizableContainerInfo, doRollback bool) {
+	ginkgo.By("creating and verifying pod")
+	podClient := e2epod.NewPodClient(f)
+	newPod := createAndVerifyPod(ctx, f, podClient, originalContainers)
+
+	ginkgo.By("patching and verifying pod for resize")
+	patchAndVerify(ctx, f, podClient, newPod, originalContainers, expectedContainers, "resize")
+
+	if doRollback {
+		// Resize has been actuated, test the reverse operation.
+		rollbackContainers := createRollbackContainers(originalContainers, expectedContainers)
+		ginkgo.By("patching and verifying pod for rollback")
+		patchAndVerify(ctx, f, podClient, newPod, expectedContainers, rollbackContainers, "rollback")
+	}
+
+	ginkgo.By("deleting pod")
+	podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+}
+
+func patchAndVerify(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, newPod *v1.Pod, originalContainers, expectedContainers []podresize.ResizableContainerInfo, opStr string) {
+	patch := podresize.MakeResizePatch(originalContainers, expectedContainers)
+	patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+		types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+	framework.ExpectNoError(pErr, fmt.Sprintf("failed to patch pod for %s", opStr))
+
+	expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
+
+	podresize.VerifyPodResources(patchedPod, expected)
+	resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPod, expected)
+	podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+}
+
+func createAndVerifyPod(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, originalContainers []podresize.ResizableContainerInfo) *v1.Pod {
+	tStamp := strconv.Itoa(time.Now().Nanosecond())
+	testPod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "", tStamp, originalContainers)
+	testPod.GenerateName = "resize-test-"
+	testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+	newPod := podClient.CreateSync(ctx, testPod)
+	podresize.VerifyPodResources(newPod, originalContainers)
+	podresize.VerifyPodResizePolicy(newPod, originalContainers)
+	framework.ExpectNoError(podresize.VerifyPodStatusResources(newPod, originalContainers))
+	framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, newPod, originalContainers))
+
+	return newPod
+}
+
+func makeGuaranteedContainers(numContainers int,
+	cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy,
+	initContainers, extendedResources bool,
+	cpu, mem string) []podresize.ResizableContainerInfo {
+
+	containers := []podresize.ResizableContainerInfo{}
+	for i := range numContainers {
+		// Offset the resources a bit so that in multi-container pods, not all containers have the same resources.
+		resources := &cgroups.ContainerResources{
+			CPUReq: offsetCPU(i, cpu),
+			CPULim: offsetCPU(i, cpu),
+			MemReq: offsetMemory(int64(i), mem),
+			MemLim: offsetMemory(int64(i), mem),
+		}
+
+		if extendedResources {
+			resources.ExtendedResourceReq = "1"
+			resources.ExtendedResourceLim = "1"
+		}
+
+		containers = append(containers, podresize.ResizableContainerInfo{
+			Name:      fmt.Sprintf("c%d", i+1),
+			Resources: resources,
+			CPUPolicy: &cpuPolicy,
+			MemPolicy: &memPolicy,
+		})
+	}
+
+	if initContainers {
+		containers = append(containers, podresize.ResizableContainerInfo{
+			Name:          "c1-init",
+			Resources:     &cgroups.ContainerResources{CPUReq: cpu, CPULim: cpu, MemReq: mem, MemLim: mem},
+			InitCtr:       true,
+			RestartPolicy: v1.ContainerRestartPolicyAlways,
+			CPUPolicy:     &cpuPolicy,
+			MemPolicy:     &memPolicy,
+		})
+	}
+
+	return containers
+}
+
+func makeBurstableContainers(numContainers int,
+	cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy,
+	cpu, cpuLimit, mem, memLimit string) []podresize.ResizableContainerInfo {
+
+	containers := []podresize.ResizableContainerInfo{}
+	for i := range numContainers {
+		// Offset the resources a bit so that in multi-container pods, not all containers have the same resources.
+		resources := &cgroups.ContainerResources{CPUReq: offsetCPU(i, cpu), CPULim: offsetCPU(i, cpuLimit), MemReq: offsetMemory(int64(i), mem), MemLim: offsetMemory(int64(i), memLimit)}
+		containers = append(containers, podresize.ResizableContainerInfo{
+			Name:      fmt.Sprintf("c%d", i+1),
+			Resources: resources,
+			CPUPolicy: &cpuPolicy,
+			MemPolicy: &memPolicy,
+		})
+	}
+	return containers
+}
+
+func createRollbackContainers(originalContainers, expectedContainers []podresize.ResizableContainerInfo) []podresize.ResizableContainerInfo {
+	rollbackContainers := make([]podresize.ResizableContainerInfo, len(originalContainers))
+	copy(rollbackContainers, originalContainers)
+	for i, c := range rollbackContainers {
+		gomega.Expect(c.Name).To(gomega.Equal(expectedContainers[i].Name),
+			"test case containers & expectations should be in the same order")
+		// Resizes that trigger a restart should trigger a second restart when rolling back.
+		rollbackContainers[i].RestartCount = expectedContainers[i].RestartCount
+	}
+	return rollbackContainers
+}

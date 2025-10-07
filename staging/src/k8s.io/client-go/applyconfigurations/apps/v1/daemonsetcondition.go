@@ -26,12 +26,20 @@ import (
 
 // DaemonSetConditionApplyConfiguration represents a declarative configuration of the DaemonSetCondition type for use
 // with apply.
+//
+// TODO: Add valid condition types of a DaemonSet.
+// DaemonSetCondition describes the state of a DaemonSet at a certain point.
 type DaemonSetConditionApplyConfiguration struct {
-	Type               *appsv1.DaemonSetConditionType `json:"type,omitempty"`
-	Status             *corev1.ConditionStatus        `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                   `json:"lastTransitionTime,omitempty"`
-	Reason             *string                        `json:"reason,omitempty"`
-	Message            *string                        `json:"message,omitempty"`
+	// Type of DaemonSet condition.
+	Type *appsv1.DaemonSetConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // DaemonSetConditionApplyConfiguration constructs a declarative configuration of the DaemonSetCondition type for use with

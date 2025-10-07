@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -37,6 +38,7 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -86,7 +88,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 	f = framework.NewDefaultFramework("controllerrevisions")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	image := WebserverImage
+	image := AgnhostImage
 	dsName := "e2e-" + utilrand.String(5) + "-daemon-set"
 
 	var ns string
@@ -164,12 +166,14 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 			framework.ExpectNoError(err, "failed to lookup ControllerRevision: %v", err)
 			gomega.Expect(initialRevision).NotTo(gomega.BeNil(), "failed to lookup ControllerRevision: %v", initialRevision)
 		}
+		gomega.Expect(&rev).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By(fmt.Sprintf("Patching ControllerRevision %q", initialRevision.Name))
 		payload := "{\"metadata\":{\"labels\":{\"" + initialRevision.Name + "\":\"patched\"}}}"
 		patchedControllerRevision, err := csAppsV1.ControllerRevisions(ns).Patch(ctx, initialRevision.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch ControllerRevision %s in namespace %s", initialRevision.Name, ns)
 		gomega.Expect(patchedControllerRevision.Labels).To(gomega.HaveKeyWithValue(initialRevision.Name, "patched"), "Did not find 'patched' label for this ControllerRevision. Current labels: %v", patchedControllerRevision.Labels)
+		gomega.Expect(resourceversion.CompareResourceVersion(rev.ResourceVersion, patchedControllerRevision.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 		framework.Logf("%s has been patched", patchedControllerRevision.Name)
 
 		ginkgo.By("Create a new ControllerRevision")

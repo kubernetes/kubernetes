@@ -346,14 +346,14 @@ func TestStartupProbeFailureThreshold(t *testing.T) {
 }
 
 func TestCleanUp(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
 		key := probeKey{testPodUID, testContainerName, probeType}
 		w := newTestWorker(m, probeType, v1.Probe{})
 		m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(probeType != startup))
-		go w.run()
+		go w.run(ctx)
 		m.workers[key] = w
 
 		// Wait for worker to run.
@@ -496,6 +496,7 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 
 func TestResultRunOnStartupCheckFailure(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
+
 	m := newTestManager()
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(false))
@@ -551,6 +552,7 @@ func TestLivenessProbeDisabledByStarted(t *testing.T) {
 
 func TestStartupProbeDisabledByStarted(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
+
 	m := newTestManager()
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 2})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(false))

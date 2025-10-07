@@ -458,6 +458,10 @@ var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFea
 				},
 				Spec: v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("250m"),
+							v1.ResourceMemory: resource.MustParse("32Mi"),
+						},
 						Limits: v1.ResourceList{
 							v1.ResourceCPU:    resource.MustParse("1250m"),
 							v1.ResourceMemory: resource.MustParse("64Mi"),
@@ -506,6 +510,10 @@ var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFea
 				},
 				Spec: v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("250m"),
+							v1.ResourceMemory: resource.MustParse("32Mi"),
+						},
 						Limits: v1.ResourceList{
 							v1.ResourceCPU: resource.MustParse("1250m"),
 						},

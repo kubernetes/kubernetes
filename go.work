@@ -1,6 +1,8 @@
-go 1.24.0
+// This is a generated file. Do not edit directly.
 
-godebug default=go1.24
+go 1.25.0
+
+godebug default=go1.25
 
 use (
 	.

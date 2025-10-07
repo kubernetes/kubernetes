@@ -85,7 +85,7 @@ func TestTLSConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = storage.Create(context.TODO(), "/abc", &example.Pod{}, nil, 0)
+	err = storage.Create(context.TODO(), "/pods/abc", &example.Pod{}, nil, 0)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}

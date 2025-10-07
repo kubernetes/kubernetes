@@ -29,11 +29,24 @@ import (
 
 // ReplicaSetApplyConfiguration represents a declarative configuration of the ReplicaSet type for use
 // with apply.
+//
+// ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 type ReplicaSetApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// If the Labels of a ReplicaSet are empty, they are defaulted to
+	// be the same as the Pod(s) that the ReplicaSet manages.
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ReplicaSetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *ReplicaSetStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the specification of the desired behavior of the ReplicaSet.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *ReplicaSetSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is the most recently observed status of the ReplicaSet.
+	// This data may be out of date by some window of time.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *ReplicaSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ReplicaSet constructs a declarative configuration of the ReplicaSet type for use with
@@ -54,7 +67,6 @@ func ReplicaSet(name, namespace string) *ReplicaSetApplyConfiguration {
 // ExtractReplicaSetFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractReplicaSetFrom(replicaSet *appsv1.ReplicaSet, fieldManager string, subresource string) (*ReplicaSetApplyConfiguration, error) {
 	b := &ReplicaSetApplyConfiguration{}
 	err := managedfields.ExtractInto(replicaSet, internal.Parser().Type("io.k8s.api.apps.v1.ReplicaSet"), fieldManager, b, subresource)
@@ -79,21 +91,18 @@ func ExtractReplicaSetFrom(replicaSet *appsv1.ReplicaSet, fieldManager string, s
 // ExtractReplicaSet provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
 func ExtractReplicaSet(replicaSet *appsv1.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
 	return ExtractReplicaSetFrom(replicaSet, fieldManager, "")
 }
 
 // ExtractReplicaSetScale extracts the applied configuration owned by fieldManager from
 // replicaSet for the scale subresource.
-// Experimental!
 func ExtractReplicaSetScale(replicaSet *appsv1.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
 	return ExtractReplicaSetFrom(replicaSet, fieldManager, "scale")
 }
 
 // ExtractReplicaSetStatus extracts the applied configuration owned by fieldManager from
 // replicaSet for the status subresource.
-// Experimental!
 func ExtractReplicaSetStatus(replicaSet *appsv1.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
 	return ExtractReplicaSetFrom(replicaSet, fieldManager, "status")
 }

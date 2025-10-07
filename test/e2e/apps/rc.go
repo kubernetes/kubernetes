@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -39,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/controller/replication"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -152,8 +154,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.WatchEventSequenceVerifier(ctx, dc, rcResource, testRcNamespace, testRcName, metav1.ListOptions{LabelSelector: "test-rc-static=true"}, expectedWatchEvents, func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
 			ginkgo.By("creating a ReplicationController")
 			// Create a ReplicationController
-			_, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Create(ctx, &rcTest, metav1.CreateOptions{})
+			testRcCreated, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Create(ctx, &rcTest, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Failed to create ReplicationController")
+			gomega.Expect(testRcCreated).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By("waiting for RC to be added")
 			eventFound := false
@@ -208,6 +211,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			testRcPatched, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(ctx, testRcName, types.StrategicMergePatchType, []byte(rcLabelPatchPayload), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "Failed to patch ReplicationController")
 			gomega.Expect(testRcPatched.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-rc", "patched"), "failed to patch RC")
+			gomega.Expect(resourceversion.CompareResourceVersion(testRcCreated.ResourceVersion, testRcPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 			ginkgo.By("waiting for RC to be modified")
 			eventFound = false
 			ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
@@ -430,7 +434,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		expectedRCReplicaCount := int32(2)
 
 		ginkgo.By(fmt.Sprintf("Creating ReplicationController %q", rcName))
-		rc := newRC(rcName, initialRCReplicaCount, map[string]string{"name": rcName}, WebserverImageName, WebserverImage, nil)
+		rc := newRC(rcName, initialRCReplicaCount, map[string]string{"name": rcName}, AgnhostImageName, AgnhostImage, nil)
 		_, err := rcClient.Create(ctx, rc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create ReplicationController: %v", err)
 
@@ -563,7 +567,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Creating rc %q that asks for more than the allowed pod quota", name))
-	rc := newRC(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage, nil)
+	rc := newRC(name, 3, map[string]string{"name": name}, AgnhostImageName, AgnhostImage, nil)
 	rc, err = c.CoreV1().ReplicationControllers(namespace).Create(ctx, rc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
@@ -633,7 +637,7 @@ func testRCAdoptMatchingOrphans(ctx context.Context, f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: WebserverImage,
+					Image: AgnhostImage,
 				},
 			},
 		},
@@ -641,7 +645,7 @@ func testRCAdoptMatchingOrphans(ctx context.Context, f *framework.Framework) {
 
 	ginkgo.By("When a replication controller with a matching selector is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage, nil)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, AgnhostImage, nil)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(ctx, rcSt, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
@@ -671,7 +675,7 @@ func testRCReleaseControlledNotMatching(ctx context.Context, f *framework.Framew
 	rcLabels := map[string]string{"name": name}
 	ginkgo.By("Given a ReplicationController is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, rcLabels, name, WebserverImage, nil)
+	rcSt := newRC(name, replicas, rcLabels, name, AgnhostImage, nil)
 	rcSt.Spec.Selector = rcLabels
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(ctx, rcSt, metav1.CreateOptions{})
 	framework.ExpectNoError(err)

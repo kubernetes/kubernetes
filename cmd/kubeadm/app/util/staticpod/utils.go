@@ -27,7 +27,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/pmezard/go-difflib/difflib"
 
@@ -43,7 +42,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
 const (
@@ -52,11 +50,6 @@ const (
 
 	// kubeSchedulerBindAddressArg represents the bind-address argument of the kube-scheduler configuration.
 	kubeSchedulerBindAddressArg = "bind-address"
-)
-
-var (
-	usersAndGroups     *users.UsersAndGroups
-	usersAndGroupsOnce sync.Once
 )
 
 // ComponentPod returns a Pod object from the container, volume and annotations specifications
@@ -418,16 +411,6 @@ func getProbeAddress(addr string) string {
 	return addr
 }
 
-// GetUsersAndGroups returns the local usersAndGroups, but first creates it
-// in a thread safe way once.
-func GetUsersAndGroups() (*users.UsersAndGroups, error) {
-	var err error
-	usersAndGroupsOnce.Do(func() {
-		usersAndGroups, err = users.AddUsersAndGroups()
-	})
-	return usersAndGroups, err
-}
-
 // DeepHashObject writes specified object to hash using the spew library
 // which follows pointers and prints actual values of the nested objects
 // ensuring the hash does not change when a pointer changes.
@@ -435,4 +418,19 @@ func GetUsersAndGroups() (*users.UsersAndGroups, error) {
 func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	hasher.Reset()
 	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
+}
+
+// IsControlPlaneNode returns true if the kube-apiserver static pod manifest is present
+// on the host.
+func IsControlPlaneNode() bool {
+	isControlPlaneNode := true
+
+	filepath := kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer,
+		kubeadmconstants.GetStaticPodDirectory())
+
+	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		isControlPlaneNode = false
+	}
+
+	return isControlPlaneNode
 }

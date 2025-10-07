@@ -28,8 +28,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -38,17 +36,17 @@ import (
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.InterPodAffinity
 
-var _ framework.PreFilterPlugin = &InterPodAffinity{}
-var _ framework.FilterPlugin = &InterPodAffinity{}
-var _ framework.PreScorePlugin = &InterPodAffinity{}
-var _ framework.ScorePlugin = &InterPodAffinity{}
-var _ framework.EnqueueExtensions = &InterPodAffinity{}
+var _ fwk.PreFilterPlugin = &InterPodAffinity{}
+var _ fwk.FilterPlugin = &InterPodAffinity{}
+var _ fwk.PreScorePlugin = &InterPodAffinity{}
+var _ fwk.ScorePlugin = &InterPodAffinity{}
+var _ fwk.EnqueueExtensions = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
-	parallelizer              parallelize.Parallelizer
+	parallelizer              fwk.Parallelizer
 	args                      config.InterPodAffinityArgs
-	sharedLister              framework.SharedLister
+	sharedLister              fwk.SharedLister
 	nsLister                  listersv1.NamespaceLister
 	enableSchedulingQueueHint bool
 }
@@ -84,7 +82,7 @@ func (pl *InterPodAffinity) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, plArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}

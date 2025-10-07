@@ -52,9 +52,9 @@ func Test(t *testing.T) {
 			{Key: "immutable", Data: "changed"},
 		},
 	}
-	st.Value(newStruct).OldValue(oldStruct).ExpectInvalid(
-		field.Forbidden(field.NewPath("typedefItems").Index(0), "field is immutable"),
-	)
+	st.Value(newStruct).OldValue(oldStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Forbidden(field.NewPath("typedefItems").Index(0), "immutable"),
+	})
 
 	// Test nested typedef (typedef of typedef).
 	st.Value(&Struct{
@@ -76,5 +76,18 @@ func Test(t *testing.T) {
 	}).ExpectValidateFalseByPath(map[string][]string{
 		`dualItems[1]`: {"item DualItems[id=typedef-target] from typedef"},
 		`dualItems[2]`: {"item DualItems[id=field-target] from field"},
+	})
+
+	// Test tag on field and typedef with same key.
+	st.Value(&Struct{
+		ConflictingItems: ConflictingItemList{
+			{ID: "a", Name: "n1"},
+			{ID: "target", Name: "n2"},
+		},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		`conflictingItems[1]`: {
+			"item ConflictingItems[id=target] from typedef",
+			"item ConflictingItems[id=target] from field",
+		},
 	})
 }

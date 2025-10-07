@@ -27,7 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/client-go/util/retry"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -80,6 +82,7 @@ var _ = SIGDescribe("Node Lifecycle", func() {
 		createdNode, err := nodeClient.Create(ctx, &fakeNode, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create node %q", fakeNode.Name)
 		gomega.Expect(createdNode.Name).To(gomega.Equal(fakeNode.Name), "Checking that the node has been created")
+		gomega.Expect(createdNode).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By(fmt.Sprintf("Getting %q", fakeNode.Name))
 		retrievedNode, err := nodeClient.Get(ctx, fakeNode.Name, metav1.GetOptions{})
@@ -92,6 +95,7 @@ var _ = SIGDescribe("Node Lifecycle", func() {
 		framework.ExpectNoError(err, "Failed to patch %q", fakeNode.Name)
 		gomega.Expect(patchedNode.Labels).To(gomega.HaveKeyWithValue(fakeNode.Name, "patched"), "Checking that patched label has been applied")
 		patchedSelector := labels.Set{fakeNode.Name: "patched"}.AsSelector().String()
+		gomega.Expect(resourceversion.CompareResourceVersion(createdNode.ResourceVersion, patchedNode.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By(fmt.Sprintf("Listing nodes with LabelSelector %q", patchedSelector))
 		nodes, err := nodeClient.List(ctx, metav1.ListOptions{LabelSelector: patchedSelector})

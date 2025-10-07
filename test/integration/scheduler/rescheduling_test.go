@@ -30,18 +30,17 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
-var _ framework.PermitPlugin = &PermitPlugin{}
-var _ framework.EnqueueExtensions = &PermitPlugin{}
-var _ framework.ReservePlugin = &ReservePlugin{}
-var _ framework.EnqueueExtensions = &ReservePlugin{}
+var _ fwk.PermitPlugin = &PermitPlugin{}
+var _ fwk.EnqueueExtensions = &PermitPlugin{}
+var _ fwk.ReservePlugin = &ReservePlugin{}
+var _ fwk.EnqueueExtensions = &ReservePlugin{}
 
 type ResettablePlugin interface {
-	framework.Plugin
+	fwk.Plugin
 	Reset()
 }
 

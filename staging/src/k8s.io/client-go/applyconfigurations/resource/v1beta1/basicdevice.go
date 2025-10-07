@@ -25,18 +25,90 @@ import (
 
 // BasicDeviceApplyConfiguration represents a declarative configuration of the BasicDevice type for use
 // with apply.
+//
+// BasicDevice defines one device instance.
 type BasicDeviceApplyConfiguration struct {
-	Attributes               map[resourcev1beta1.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
-	Capacity                 map[resourcev1beta1.QualifiedName]DeviceCapacityApplyConfiguration  `json:"capacity,omitempty"`
-	ConsumesCounters         []DeviceCounterConsumptionApplyConfiguration                        `json:"consumesCounters,omitempty"`
-	NodeName                 *string                                                             `json:"nodeName,omitempty"`
-	NodeSelector             *v1.NodeSelectorApplyConfiguration                                  `json:"nodeSelector,omitempty"`
-	AllNodes                 *bool                                                               `json:"allNodes,omitempty"`
-	Taints                   []DeviceTaintApplyConfiguration                                     `json:"taints,omitempty"`
-	BindsToNode              *bool                                                               `json:"bindsToNode,omitempty"`
-	BindingConditions        []string                                                            `json:"bindingConditions,omitempty"`
-	BindingFailureConditions []string                                                            `json:"bindingFailureConditions,omitempty"`
-	AllowMultipleAllocations *bool                                                               `json:"allowMultipleAllocations,omitempty"`
+	// Attributes defines the set of attributes for this device.
+	// The name of each attribute must be unique in that set.
+	//
+	// The maximum number of attributes and capacities combined is 32.
+	Attributes map[resourcev1beta1.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
+	// Capacity defines the set of capacities for this device.
+	// The name of each capacity must be unique in that set.
+	//
+	// The maximum number of attributes and capacities combined is 32.
+	Capacity map[resourcev1beta1.QualifiedName]DeviceCapacityApplyConfiguration `json:"capacity,omitempty"`
+	// ConsumesCounters defines a list of references to sharedCounters
+	// and the set of counters that the device will
+	// consume from those counter sets.
+	//
+	// There can only be a single entry per counterSet.
+	//
+	// The total number of device counter consumption entries
+	// must be <= 32. In addition, the total number in the
+	// entire ResourceSlice must be <= 1024 (for example,
+	// 64 devices with 16 counters each).
+	ConsumesCounters []DeviceCounterConsumptionApplyConfiguration `json:"consumesCounters,omitempty"`
+	// NodeName identifies the node where the device is available.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	NodeName *string `json:"nodeName,omitempty"`
+	// NodeSelector defines the nodes where the device is available.
+	//
+	// Must use exactly one term.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
+	// AllNodes indicates that all nodes have access to the device.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	AllNodes *bool `json:"allNodes,omitempty"`
+	// If specified, these are the driver-defined taints.
+	//
+	// The maximum number of taints is 4.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	Taints []DeviceTaintApplyConfiguration `json:"taints,omitempty"`
+	// BindsToNode indicates if the usage of an allocation involving this device
+	// has to be limited to exactly the node that was chosen when allocating the claim.
+	// If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
+	// to match the node where the allocation was made.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	BindsToNode *bool `json:"bindsToNode,omitempty"`
+	// BindingConditions defines the conditions for proceeding with binding.
+	// All of these conditions must be set in the per-device status
+	// conditions with a value of True to proceed with binding the pod to the node
+	// while scheduling the pod.
+	//
+	// The maximum number of binding conditions is 4.
+	//
+	// The conditions must be a valid condition type string.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	BindingConditions []string `json:"bindingConditions,omitempty"`
+	// BindingFailureConditions defines the conditions for binding failure.
+	// They may be set in the per-device status conditions.
+	// If any is true, a binding failure occurred.
+	//
+	// The maximum number of binding failure conditions is 4.
+	//
+	// The conditions must be a valid condition type string.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
+	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty"`
+	// AllowMultipleAllocations marks whether the device is allowed to be allocated to multiple DeviceRequests.
+	//
+	// If AllowMultipleAllocations is set to true, the device can be allocated more than once,
+	// and all of its capacity is consumable, regardless of whether the requestPolicy is defined or not.
+	AllowMultipleAllocations *bool `json:"allowMultipleAllocations,omitempty"`
 }
 
 // BasicDeviceApplyConfiguration constructs a declarative configuration of the BasicDevice type for use with
