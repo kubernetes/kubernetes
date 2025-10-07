@@ -613,6 +613,10 @@ func Validate_ResourceClaimStatus(ctx context.Context, op operation.Operation, f
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta2.ResourceClaimConsumerReference, b resourcev1beta2.ResourceClaimConsumerReference) bool {
+				return a.UID == b.UID
+			})...)
 			return
 		}(fldPath.Child("reservedFor"), obj.ReservedFor, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceClaimStatus) []resourcev1beta2.ResourceClaimConsumerReference {
 			return oldObj.ReservedFor
