@@ -1,0 +1,84 @@
+# Copyright 2025 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Configuration specifically for testing DRA extended resource scoring performance.
+# This config ensures that multiple nodes can satisfy each pod's extended resource
+# requirements, forcing the scheduler to use scoring to choose between nodes.
+
+
+# ExtendedResourceScoring uses pods with extended resources that can be satisfied
+# by multiple nodes, triggering scoring competition to test the DRA scoring implementation.
+- name: ExtendedResourceScoring
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAExtendedResource: true
+  schedulerConfigPath: scheduler-config.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: ../../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: ../../templates/deviceclass-extended-resource-scoring.yaml
+    countParam: $classes
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: ../../templates/pod-with-extended-resource-scoring.yaml
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: ../../templates/pod-with-extended-resource-scoring.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      DRAExtendedResource: true
+    labels: [integration-test, short]
+    params:
+      # Use fewer classes than nodes to ensure multiple nodes can satisfy
+      # each pod's extended resource requirements, forcing scoring competition.
+      classes: 2
+      nodesWithDRA: 3
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+  - name: 2000pods_200nodes
+    featureGates:
+      DRAExtendedResource: true
+    labels: [integration-test, performance]
+    params:
+      classes: 10
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 2000
+      maxClaimsPerNode: 20
+  - name: 5000pods_500nodes
+    featureGates:
+      DRAExtendedResource: true
+    labels: [integration-test, performance]
+    params:
+      classes: 20
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 5000
+      maxClaimsPerNode: 20
