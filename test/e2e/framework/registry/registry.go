@@ -49,6 +49,19 @@ const (
 	registryNodeSelectorValue = "kube-e2e-test-registry"
 )
 
+// SetupRegistry runs the `fake-registry-server --private` from the agnhost image.
+// The registry is run with HostPort 5000 exposed in order to allow locally-scheduled
+// pods to query the registry via kubelet.
+// The registry only runs in HTTP (no TLS) mode, and so this hack-path is used as
+// localhost is typically allowed by CRIs and so no CRI-specific configuration is needed
+//
+// By default, the function runs the registry as a Deployment, but it supports running
+// it in just a `pod` for cases where kube-controller-manager is not running (like in
+// the Node Conformance test suite).
+//
+// This function returns:
+// - set of node names that the registry runs on
+// - an error
 func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) ([]string, error) {
 	const registryReplicas = 1
 
@@ -125,6 +138,13 @@ func podManifest(podTestLabel string) (*v1.Pod, error) {
 	return pod, nil
 }
 
+// SetupRegistryLabelNodes is like SetupRegistry() but instead of returning node
+// names, it labels the nodes the registry runs on so that any pod that needs
+// to use the registry can use PodNodeSelector() in its nodeSelector in order to
+// be scheduled to one of the registry nodes.
+//
+// If successful, returns cleanup() function that needs to be run in order to remove
+// the labels from the nodes.
 func SetupRegistryLabelNodes(ctx context.Context, f *framework.Framework, podOnly bool) (cleanup func(context.Context) error, err error) {
 	cleanups := []func(ctx context.Context) error{}
 	cleanup = func(ctx context.Context) error {
@@ -174,10 +194,14 @@ func SetupRegistryLabelNodes(ctx context.Context, f *framework.Framework, podOnl
 	return cleanup, err
 }
 
+// PodNodeSelector should be used in pod spec for a node selector in case there is
+// a need to schedule a pod on a node that runs a registry deployed by SetupRegistryLabelNodes()
 func PodNodeSelector(f *framework.Framework) map[string]string {
 	return map[string]string{f.UniqueName: registryNodeSelectorValue}
 }
 
+// User1DockerSecret creates a secret containing the docker credentials for pulling from
+// the agnhost fake-registry-server.
 func User1DockerSecret(registryAddress string) *v1.Secret {
 	return &v1.Secret{
 		Type: v1.SecretTypeDockerConfigJson,
