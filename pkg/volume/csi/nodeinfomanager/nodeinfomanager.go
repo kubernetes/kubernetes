@@ -446,14 +446,14 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 		return err
 	}
 
-	if !nim.nodeOwnsCSINode(nodeInfo) {
-		klog.V(2).Infof("existing CSINode %q is owned by different node, cleaning up...", nodeInfo.Name)
+	if ok, csiNodeOwnerID := nim.nodeOwnsCSINode(nodeInfo); !ok {
+		klog.V(2).Infof("existing CSINode %q is owned by different node (oldNodeID=%q, newNodeID=%q), cleaning up...", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
 		err = nim.DeleteCSINode()
 		if err != nil {
 			return fmt.Errorf("error deleting existing CSINode %q: %w", nodeInfo.Name, err)
 		}
 		// Returning now so that the next attempt can create a new CSINode object
-		return fmt.Errorf("CSINode %q was owned by different node, deleted it", nodeInfo.Name)
+		return fmt.Errorf("CSINode %q was owned by different node (oldNodeID=%q, newNodeID=%q), deleted it", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
 	}
 
 	annotationModified := setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
@@ -466,13 +466,27 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 
 }
 
-func (nim *nodeInfoManager) nodeOwnsCSINode(nodeInfo *storagev1.CSINode) bool {
+// nodeOwnsCSINode checks if the CSINode object is owned by the node represented by this nodeInfoManager.
+// It also returns the current owner UID.
+func (nim *nodeInfoManager) nodeOwnsCSINode(nodeInfo *storagev1.CSINode) (bool, types.UID) {
+	var csiNodeOwnerID types.UID
+	var found bool
 	for _, ownerRef := range nodeInfo.OwnerReferences {
-		if ownerRef.Kind == nodeKind.Kind && ownerRef.Name == string(nim.nodeName) && ownerRef.UID == nim.nodeID {
-			return true
+		if ownerRef.Kind != nodeKind.Kind {
+			continue
+		}
+
+		csiNodeOwnerID = ownerRef.UID
+		if ownerRef.Name != string(nim.nodeName) {
+			continue
+		}
+
+		if csiNodeOwnerID == nim.nodeID {
+			found = true
+			break
 		}
 	}
-	return false
+	return found, csiNodeOwnerID
 }
 
 func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
