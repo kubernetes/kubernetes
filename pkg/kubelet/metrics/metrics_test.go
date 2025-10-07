@@ -72,6 +72,30 @@ func TestImagePullDurationMetric(t *testing.T) {
 	})
 }
 
+func TestGoroutinesMetric(t *testing.T) {
+	t.Run("increment and decrement goroutines metric", func(t *testing.T) {
+		Register()
+		defer clearMetrics()
+
+		// Simulate pod worker goroutine
+		Goroutines.WithLabelValues(PodWorkerOperation).Inc()
+		Goroutines.WithLabelValues(PodWorkerOperation).Inc()
+
+		// Simulate image pulling goroutine
+		Goroutines.WithLabelValues(ImagePullingOperation).Inc()
+
+		// Simulate container deletion goroutine
+		Goroutines.WithLabelValues(ContainerDeletionOperation).Inc()
+
+		// Decrement metrics
+		Goroutines.WithLabelValues(PodWorkerOperation).Dec()
+		Goroutines.WithLabelValues(ImagePullingOperation).Dec()
+		Goroutines.WithLabelValues(ContainerDeletionOperation).Dec()
+		Goroutines.WithLabelValues(PodWorkerOperation).Dec()
+	})
+}
+
 func clearMetrics() {
 	ImagePullDuration.Reset()
+	Goroutines.Reset()
 }
