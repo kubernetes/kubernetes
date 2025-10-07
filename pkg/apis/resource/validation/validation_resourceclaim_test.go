@@ -412,7 +412,7 @@ func TestValidateClaim(t *testing.T) {
 		"allocation-mode": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(2).Child("exactly", "count"), int64(-1), "must be greater than zero"),
-				field.NotSupported(field.NewPath("spec", "devices", "requests").Index(3).Child("exactly", "allocationMode"), resource.DeviceAllocationMode("other"), []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}),
+				field.NotSupported(field.NewPath("spec", "devices", "requests").Index(3).Child("exactly", "allocationMode"), resource.DeviceAllocationMode("other"), []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}).WithOrigin("enum").MarkCoveredByDeclarative(),
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(4).Child("exactly", "count"), int64(2), "must not be specified when allocationMode is 'All'"),
 				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(5), "foo").MarkCoveredByDeclarative(),
 			},
@@ -636,7 +636,7 @@ func TestValidateClaim(t *testing.T) {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
 				field.Required(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), ""),
-				field.NotSupported(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("allocationMode"), resource.DeviceAllocationMode(""), []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}),
+				field.NotSupported(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("allocationMode"), resource.DeviceAllocationMode(""), []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}).WithOrigin("enum").MarkCoveredByDeclarative(),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
