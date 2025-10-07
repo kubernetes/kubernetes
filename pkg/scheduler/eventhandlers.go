@@ -126,12 +126,83 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 	}
 }
 
-func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
+func (sched *Scheduler) addPod(obj interface{}) {
+	logger := sched.logger
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", obj)
+		return
+	}
+
+	if assignedPod(pod) {
+		sched.addPodToCache(pod)
+	} else if responsibleForPod(pod, sched.Profiles) {
+		sched.addPodToSchedulingQueue(pod)
+	}
+}
+
+func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
+	logger := sched.logger
+	oldPod, ok := oldObj.(*v1.Pod)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1.Pod", "oldObj", oldObj)
+		return
+	}
+	newPod, ok := newObj.(*v1.Pod)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
+		return
+	}
+
+	if assignedPod(oldPod) {
+		sched.updatePodInCache(oldPod, newPod)
+	} else if assignedPod(newPod) {
+		// This update means binding operation. We can treat it as adding the pod to a cache
+		// (addition to the cache will handle this binding appropriately).
+		// Pod is not in the scheduling queue, so we don't have to remove it from there.
+		sched.addPodToCache(newPod)
+	} else if responsibleForPod(oldPod, sched.Profiles) {
+		sched.updatePodInSchedulingQueue(oldPod, newPod)
+	}
+}
+
+func (sched *Scheduler) deletePod(obj interface{}) {
+	logger := sched.logger
+	var pod *v1.Pod
+	switch t := obj.(type) {
+	case *v1.Pod:
+		pod = t
+		if assignedPod(pod) {
+			sched.deletePodFromCache(pod)
+		} else if responsibleForPod(pod, sched.Profiles) {
+			sched.deletePodFromSchedulingQueue(pod)
+		}
+		return
+	case cache.DeletedFinalStateUnknown:
+		var ok bool
+		pod, ok = t.Obj.(*v1.Pod)
+		if !ok {
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
+			return
+		}
+		// The carried object may be stale, so we don't use it to check if
+		// it's assigned or not. Attempting to cleanup anyways.
+		sched.deletePodFromCache(pod)
+		if responsibleForPod(pod, sched.Profiles) {
+			sched.deletePodFromSchedulingQueue(pod)
+		}
+		return
+	default:
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unable to handle object", "objType", fmt.Sprintf("%T", obj), "obj", obj)
+		return
+	}
+}
+
+func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 	start := time.Now()
 	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventUnscheduledPodAdd.Label()).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
-	pod := obj.(*v1.Pod)
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.SchedulingQueue.Add(logger, pod)
 }
@@ -192,10 +263,9 @@ func (sched *Scheduler) handleAssumedPodDeletion(pod *v1.Pod) {
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, nil)
 }
 
-func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
+func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 	start := time.Now()
 	logger := sched.logger
-	oldPod, newPod := oldObj.(*v1.Pod), newObj.(*v1.Pod)
 	// Bypass update event that carries identical objects; otherwise, a duplicated
 	// Pod may go through scheduling and cause unexpected behavior (see #96071).
 	if oldPod.ResourceVersion == newPod.ResourceVersion {
@@ -242,26 +312,11 @@ func hasNominatedNodeNameChanged(oldPod, newPod *v1.Pod) bool {
 	return len(oldPod.Status.NominatedNodeName) > 0 && oldPod.Status.NominatedNodeName != newPod.Status.NominatedNodeName
 }
 
-func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
+func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod) {
 	start := time.Now()
 	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventUnscheduledPodDelete.Label()).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
-	var pod *v1.Pod
-	switch t := obj.(type) {
-	case *v1.Pod:
-		pod = obj.(*v1.Pod)
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		pod, ok = t.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
-			return
-		}
-	default:
-		utilruntime.HandleErrorWithLogger(logger, nil, "Unable to handle object", "objType", fmt.Sprintf("%T", obj), "obj", obj)
-		return
-	}
 
 	logger.V(3).Info("Delete event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.SchedulingQueue.Delete(pod)
@@ -289,16 +344,11 @@ func getLEPriorityPreCheck(priority int32) queue.PreEnqueueCheck {
 	}
 }
 
-func (sched *Scheduler) addPodToCache(obj interface{}) {
+func (sched *Scheduler) addPodToCache(pod *v1.Pod) {
 	start := time.Now()
 	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodAdd.Label()).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", obj)
-		return
-	}
 
 	logger.V(3).Info("Add event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.AddPod(logger, pod); err != nil {
@@ -321,21 +371,11 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 	}
 }
 
-func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
+func (sched *Scheduler) updatePodInCache(oldPod, newPod *v1.Pod) {
 	start := time.Now()
 	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodUpdate.Label()).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
-	oldPod, ok := oldObj.(*v1.Pod)
-	if !ok {
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1.Pod", "oldObj", oldObj)
-		return
-	}
-	newPod, ok := newObj.(*v1.Pod)
-	if !ok {
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
-		return
-	}
 
 	if sched.APIDispatcher != nil {
 		// If the API dispatcher is available, sync the new pod with the details.
@@ -374,26 +414,11 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	}
 }
 
-func (sched *Scheduler) deletePodFromCache(obj interface{}) {
+func (sched *Scheduler) deletePodFromCache(pod *v1.Pod) {
 	start := time.Now()
 	defer metrics.EventHandlingLatency.WithLabelValues(framework.EventAssignedPodDelete.Label()).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
-	var pod *v1.Pod
-	switch t := obj.(type) {
-	case *v1.Pod:
-		pod = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		pod, ok = t.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
-			return
-		}
-	default:
-		utilruntime.HandleErrorWithLogger(logger, nil, "Unable to handle object", "objType", fmt.Sprintf("%T", obj), "obj", obj)
-		return
-	}
 
 	logger.V(3).Info("Delete event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.RemovePod(logger, pod); err != nil {
@@ -448,64 +473,12 @@ func addAllEventHandlers(
 	)
 
 	logger := sched.logger
-	// scheduled pod cache
-	if handlerRegistration, err = informerFactory.Core().V1().Pods().Informer().AddEventHandler(
-		cache.FilteringResourceEventHandler{
-			FilterFunc: func(obj interface{}) bool {
-				switch t := obj.(type) {
-				case *v1.Pod:
-					return assignedPod(t)
-				case cache.DeletedFinalStateUnknown:
-					if _, ok := t.Obj.(*v1.Pod); ok {
-						// The carried object may be stale, so we don't use it to check if
-						// it's assigned or not. Attempting to cleanup anyways.
-						return true
-					}
-					utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
-					return false
-				default:
-					utilruntime.HandleErrorWithLogger(logger, nil, "Unable to handle object", "objType", fmt.Sprintf("%T", obj), "obj", obj)
-					return false
-				}
-			},
-			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    sched.addPodToCache,
-				UpdateFunc: sched.updatePodInCache,
-				DeleteFunc: sched.deletePodFromCache,
-			},
-		},
-	); err != nil {
-		return err
-	}
-	handlers = append(handlers, handlerRegistration)
 
-	// unscheduled pod queue
-	if handlerRegistration, err = informerFactory.Core().V1().Pods().Informer().AddEventHandler(
-		cache.FilteringResourceEventHandler{
-			FilterFunc: func(obj interface{}) bool {
-				switch t := obj.(type) {
-				case *v1.Pod:
-					return !assignedPod(t) && responsibleForPod(t, sched.Profiles)
-				case cache.DeletedFinalStateUnknown:
-					if pod, ok := t.Obj.(*v1.Pod); ok {
-						// The carried object may be stale, so we don't use it to check if
-						// it's assigned or not.
-						return responsibleForPod(pod, sched.Profiles)
-					}
-					utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
-					return false
-				default:
-					utilruntime.HandleErrorWithLogger(logger, nil, "Unable to handle object", "objType", fmt.Sprintf("%T", obj), "obj", obj)
-					return false
-				}
-			},
-			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    sched.addPodToSchedulingQueue,
-				UpdateFunc: sched.updatePodInSchedulingQueue,
-				DeleteFunc: sched.deletePodFromSchedulingQueue,
-			},
-		},
-	); err != nil {
+	if handlerRegistration, err = informerFactory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    sched.addPod,
+		UpdateFunc: sched.updatePod,
+		DeleteFunc: sched.deletePod,
+	}); err != nil {
 		return err
 	}
 	handlers = append(handlers, handlerRegistration)
