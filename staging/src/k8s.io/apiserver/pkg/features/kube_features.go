@@ -245,6 +245,12 @@ const (
 	// Enables Egress Selector in Structured Authentication Configuration
 	StructuredAuthenticationConfigurationEgressSelector featuregate.Feature = "StructuredAuthenticationConfigurationEgressSelector"
 
+	// owner: @aramase, @enj, @nabokihms
+	// kep: https://kep.k8s.io/3331
+	//
+	// Enables JWKs metrics for Structured Authentication Configuration
+	StructuredAuthenticationConfigurationJWKSMetrics featuregate.Feature = "StructuredAuthenticationConfigurationJWKSMetrics"
+
 	// owner: @palnabarun
 	// kep: https://kep.k8s.io/3221
 	//
@@ -470,6 +476,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	StructuredAuthenticationConfigurationEgressSelector: {
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	StructuredAuthenticationConfigurationJWKSMetrics: {
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	StructuredAuthorizationConfiguration: {

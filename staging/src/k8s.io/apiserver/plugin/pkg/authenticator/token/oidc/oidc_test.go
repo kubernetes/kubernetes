@@ -31,6 +31,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"text/template"
@@ -42,8 +43,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -152,6 +157,25 @@ type claimsTest struct {
 	fetchKeysFromRemote bool
 }
 
+type testClaimsServer struct {
+	*httptest.Server
+
+	keys jose.JSONWebKeySet
+	mu   sync.RWMutex
+}
+
+func (c *testClaimsServer) setKeys(keys jose.JSONWebKeySet) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.keys = keys
+}
+
+func (c *testClaimsServer) getKeys() jose.JSONWebKeySet {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.keys
+}
+
 // Replace formats the contents of v into the provided template.
 func replace(tmpl string, v interface{}) string {
 	t := template.Must(template.New("test").Parse(tmpl))
@@ -166,18 +190,28 @@ func replace(tmpl string, v interface{}) string {
 // OIDC responses to requests that resolve distributed claims. signer is the
 // signer used for the served JWT tokens.  claimToResponseMap is a map of
 // responses that the server will return for each claim it is given.
-func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, claimToResponseMap map[string]string, openIDConfig *string) *httptest.Server {
-	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, claimToResponseMap map[string]string, openIDConfig *string) *testClaimsServer {
+	cs := &testClaimsServer{
+		keys: keys,
+		mu:   sync.RWMutex{},
+	}
+
+	cs.Server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		klog.V(5).Infof("request: %+v", *r)
 		switch r.URL.Path {
 		case "/.testing/keys":
 			w.Header().Set("Content-Type", "application/json")
-			keyBytes, err := json.Marshal(keys)
+			keyBytes, err := json.Marshal(cs.getKeys())
 			if err != nil {
 				t.Fatalf("unexpected error while marshaling keys: %v", err)
 			}
 			klog.V(5).Infof("%v: returning: %+v", r.URL, string(keyBytes))
 			w.Write(keyBytes)
+
+		case "/.testing/invalidkeys":
+			w.Header().Set("Content-Type", "application/json")
+		case "/.testing/keys/badstatus":
+			w.WriteHeader(http.StatusInternalServerError)
 
 		// /c/d/bar/.well-known/openid-configuration is used to test issuer url and discovery url with a path
 		case "/.well-known/openid-configuration", "/c/d/bar/.well-known/openid-configuration":
@@ -211,8 +245,8 @@ func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, c
 			fmt.Fprintf(w, "unexpected URL: %v", r.URL)
 		}
 	}))
-	klog.V(4).Infof("Serving OIDC at: %v", ts.URL)
-	return ts
+	klog.V(4).Infof("Serving OIDC at: %v", cs.Server.URL)
+	return cs
 }
 
 func toKeySet(keys []*jose.JSONWebKey) jose.JSONWebKeySet {
@@ -4608,6 +4642,417 @@ func TestUnmarshalClaim(t *testing.T) {
 				t.Errorf("wanted=%#v, got=%#v", test.want, got)
 			}
 		})
+	}
+}
+
+func TestJWKSMetricsKeySetError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfigurationJWKSMetrics, true)
+
+	synchronizeTokenIDVerifierForTest = true
+	signingKey := loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256)
+	pubKeys := []*jose.JSONWebKey{
+		loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+	}
+	signer, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(signingKey.Algorithm),
+		Key:       signingKey,
+	}, nil)
+	if err != nil {
+		t.Fatalf("initialize signer: %v", err)
+	}
+
+	tests := []struct {
+		name         string
+		openIDConfig string
+	}{
+		{
+			name: "invalid keyset",
+			openIDConfig: `{
+				"issuer": "{{.URL}}",
+				"jwks_uri": "{{.URL}}/.testing/invalidkeys"
+			}`,
+		},
+		{
+			name: "bad status code",
+			openIDConfig: `{
+				"issuer": "{{.URL}}",
+				"jwks_uri": "{{.URL}}/.testing/keys/badstatus"
+			}`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ResetMetrics()
+
+			ts := newClaimServer(t, toKeySet(pubKeys), signer, nil, &test.openIDConfig)
+			defer ts.Close()
+
+			v := struct {
+				URL string
+			}{
+				URL: ts.URL,
+			}
+			test.openIDConfig = replace(test.openIDConfig, &v)
+
+			opts := Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       ts.URL,
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: ptr.To(""),
+						},
+					},
+				},
+				now:         func() time.Time { return now },
+				APIServerID: "testAPIServerID",
+			}
+
+			// Make the certificate of the helper server available to the authenticator
+			caBundle := pem.EncodeToMemory(&pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: ts.Certificate().Raw,
+			})
+			caContent, err := dynamiccertificates.NewStaticCAContent("oidc-authenticator", caBundle)
+			if err != nil {
+				t.Fatalf("initialize ca: %v", err)
+			}
+			opts.CAContentProvider = caContent
+
+			ctx := testContext(t)
+			// Initialize the authenticator.
+			a, err := New(ctx, opts)
+			if err != nil {
+				t.Fatalf("initialize authenticator: %v", err)
+			}
+
+			claims := fmt.Sprintf(`{
+"iss": "%s",
+"aud": "my-client",
+"username": "jane",
+"exp": %d
+}`, ts.URL, valid.Unix())
+
+			jws, err := signer.Sign([]byte(claims))
+			if err != nil {
+				t.Fatalf("sign claims: %v", err)
+			}
+			token, err := jws.CompactSerialize()
+			if err != nil {
+				t.Fatalf("serialize token: %v", err)
+			}
+
+			ia, ok := a.(*instrumentedAuthenticator)
+			if !ok {
+				t.Fatalf("expected authenticator to be instrumented")
+			}
+			authenticator, ok := ia.delegate.(*jwtAuthenticator)
+			if !ok {
+				t.Fatalf("expected delegate to be Authenticator")
+			}
+			// wait for the authenticator to be initialized
+			err = wait.PollUntilContextCancel(ctx, time.Millisecond, true, func(context.Context) (bool, error) {
+				if v, _ := authenticator.idTokenVerifier(); v == nil {
+					return false, nil
+				}
+				return true, nil
+			})
+			if err != nil {
+				t.Fatalf("failed to initialize the authenticator: %v", err)
+			}
+
+			if _, _, err = a.AuthenticateToken(ctx, token); err == nil {
+				t.Fatalf("expected error but got nil")
+			}
+
+			metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+			if err != nil {
+				t.Fatalf("failed to gather metrics: %v", err)
+			}
+
+			jwtIssuerHash := getHash(ts.URL)
+			var timestamp float64
+			for _, family := range metricFamilies {
+				if family.GetName() != "apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds" {
+					continue
+				}
+
+				labelFilter := map[string]string{
+					"apiserver_id_hash": "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",
+					"jwt_issuer_hash":   jwtIssuerHash,
+					"result":            "failure",
+				}
+				if !testutil.LabelsMatch(family.Metric[0], labelFilter) {
+					t.Fatalf("unexpected metric: %v", family.Metric[0])
+				}
+
+				timestamp = *family.Metric[0].Gauge.Value
+				break
+			}
+			if timestamp == 0 {
+				t.Fatalf("failed to get the timestamp")
+			}
+		})
+	}
+}
+
+func TestJWKSMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfigurationJWKSMetrics, true)
+	ResetMetrics()
+
+	synchronizeTokenIDVerifierForTest = true
+	signingKey := loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256)
+	pubKeys := []*jose.JSONWebKey{
+		loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+	}
+	signer, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(signingKey.Algorithm),
+		Key:       signingKey,
+	}, nil)
+	if err != nil {
+		t.Fatalf("initialize signer: %v", err)
+	}
+	openIDConfig := `{
+		"issuer": "{{.URL}}",
+		"jwks_uri": "{{.URL}}/.testing/keys"
+	}`
+
+	ts := newClaimServer(t, toKeySet(pubKeys), signer, nil, &openIDConfig)
+	defer ts.Close()
+
+	v := struct {
+		URL string
+	}{
+		URL: ts.URL,
+	}
+	openIDConfig = replace(openIDConfig, &v)
+
+	opts := Options{
+		JWTAuthenticator: apiserver.JWTAuthenticator{
+			Issuer: apiserver.Issuer{
+				URL:       ts.URL,
+				Audiences: []string{"my-client"},
+			},
+			ClaimMappings: apiserver.ClaimMappings{
+				Username: apiserver.PrefixedClaimOrExpression{
+					Claim:  "username",
+					Prefix: ptr.To(""),
+				},
+			},
+		},
+		now:         func() time.Time { return now },
+		APIServerID: "testAPIServerID",
+	}
+
+	// Make the certificate of the helper server available to the authenticator
+	caBundle := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: ts.Certificate().Raw,
+	})
+	caContent, err := dynamiccertificates.NewStaticCAContent("oidc-authenticator", caBundle)
+	if err != nil {
+		t.Fatalf("initialize ca: %v", err)
+	}
+	opts.CAContentProvider = caContent
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Initialize the authenticator.
+	a, err := New(ctx, opts)
+	if err != nil {
+		t.Fatalf("initialize authenticator: %v", err)
+	}
+
+	claims := fmt.Sprintf(`{
+"iss": "%s",
+"aud": "my-client",
+"username": "jane",
+"exp": %d
+}`, ts.URL, valid.Unix())
+
+	jws, err := signer.Sign([]byte(claims))
+	if err != nil {
+		t.Fatalf("sign claims: %v", err)
+	}
+	token, err := jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serialize token: %v", err)
+	}
+
+	ia, ok := a.(*instrumentedAuthenticator)
+	if !ok {
+		t.Fatalf("expected authenticator to be instrumented")
+	}
+	authenticator, ok := ia.delegate.(*jwtAuthenticator)
+	if !ok {
+		t.Fatalf("expected delegate to be Authenticator")
+	}
+	// wait for the authenticator to be initialized
+	err = wait.PollUntilContextCancel(ctx, time.Millisecond, true, func(context.Context) (bool, error) {
+		if v, _ := authenticator.idTokenVerifier(); v == nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to initialize the authenticator: %v", err)
+	}
+
+	jwtIssuerHash := getHash(ts.URL)
+	// 1. Remote JWKS fetch success the first time we fetch the keys.
+	if _, _, err = a.AuthenticateToken(ctx, token); err != nil {
+		t.Fatalf("authenticate token: %v", err)
+	}
+	checkJWKSMetrics(t, jwtIssuerHash, "sha256:6c22a3ad4bfe350786cb03d06c6e6d40a6d642d168935b88f1e72c407d969c83")
+
+	// 2. Rotate the keys and update the server.
+	signingKey = loadRSAPrivKey(t, "testdata/rsa_2.pem", jose.RS256)
+	pubKeys = []*jose.JSONWebKey{
+		loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+		loadRSAKey(t, "testdata/rsa_2.pem", jose.RS256),
+	}
+	signer, err = jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(signingKey.Algorithm),
+		Key:       signingKey,
+	}, nil)
+	if err != nil {
+		t.Fatalf("initialize signer: %v", err)
+	}
+	ts.setKeys(toKeySet(pubKeys))
+	// Sign and serialize the claims in a JWT with the new key.
+	// This should trigger a new JWKS fetch as kid not found in the cache.
+	jws, err = signer.Sign([]byte(claims))
+	if err != nil {
+		t.Fatalf("sign claims: %v", err)
+	}
+	token, err = jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serialize token: %v", err)
+	}
+	if _, _, err = a.AuthenticateToken(ctx, token); err != nil {
+		t.Fatalf("authenticate token: %v", err)
+	}
+	checkJWKSMetrics(t, jwtIssuerHash, "sha256:42444728eaa3a55f7a0192d60cfea88ff5a69ecb7bf9ef0d2ffa3f9db9ceff41")
+
+	// 3. Cancel the context and verify metrics are NOT updated after cancellation.
+	// Capture current metrics before cancellation.
+	metricsBeforeCancel := captureTimestampMetric(t, jwtIssuerHash, "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37")
+
+	// Cancel the authenticator's lifecycle context
+	cancel()
+
+	// Rotate keys again to trigger another JWKS fetch attempt.
+	// This should fail because the context is cancelled, but more importantly,
+	// even if the RoundTrip happens, metrics should NOT be recorded.
+	signingKey = loadRSAPrivKey(t, "testdata/rsa_3.pem", jose.RS256)
+	pubKeys = []*jose.JSONWebKey{
+		loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+		loadRSAKey(t, "testdata/rsa_2.pem", jose.RS256),
+		loadRSAKey(t, "testdata/rsa_3.pem", jose.RS256),
+	}
+	signer, err = jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(signingKey.Algorithm),
+		Key:       signingKey,
+	}, nil)
+	if err != nil {
+		t.Fatalf("initialize signer: %v", err)
+	}
+	ts.setKeys(toKeySet(pubKeys))
+
+	// Try to authenticate with a new token (this will likely fail due to cancelled context,
+	// but we're testing that even if any HTTP request happens, metrics won't be updated)
+	jws, err = signer.Sign([]byte(claims))
+	if err != nil {
+		t.Fatalf("sign claims: %v", err)
+	}
+	token, err = jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serialize token: %v", err)
+	}
+	// Authentication will likely fail with cancelled context, which is expected
+	_, _, err = a.AuthenticateToken(context.Background(), token)
+	if err == nil || !strings.Contains(err.Error(), "context canceled") {
+		t.Fatalf("expected context canceled error, got: %v", err)
+	}
+
+	// Verify metrics did NOT change after context cancellation
+	metricsAfterCancel := captureTimestampMetric(t, jwtIssuerHash, "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37")
+	if metricsAfterCancel != metricsBeforeCancel {
+		t.Errorf("metrics changed after context cancellation: before=%v, after=%v (should remain unchanged)", metricsBeforeCancel, metricsAfterCancel)
+	}
+}
+
+func captureTimestampMetric(t *testing.T, jwtIssuerHash, apiServerIDHash string) float64 {
+	t.Helper()
+
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+
+	for _, family := range metricFamilies {
+		if family.GetName() != "apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds" {
+			continue
+		}
+
+		for _, metric := range family.Metric {
+			labelFilter := map[string]string{
+				"apiserver_id_hash": apiServerIDHash,
+				"jwt_issuer_hash":   jwtIssuerHash,
+				"result":            "success",
+			}
+			if testutil.LabelsMatch(metric, labelFilter) {
+				return *metric.Gauge.Value
+			}
+		}
+	}
+
+	return 0
+}
+
+func checkJWKSMetrics(t *testing.T, jwtIssuerHash string, expectedJWKSHash string) {
+	t.Helper()
+
+	expectedMetricValue := fmt.Sprintf(`
+       # HELP apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info [ALPHA] Information about the last JWKS fetched by the JWT authenticator with hash as label, split by api server identity and jwt issuer.
+	   # TYPE apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info gauge
+	   apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",hash="%s",jwt_issuer_hash="%s"} 1
+	`, expectedJWKSHash, jwtIssuerHash)
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedMetricValue), "apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info"); err != nil {
+		t.Fatalf("unexpected metrics:\n%s", err)
+	}
+
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+
+	var ts float64
+	for _, family := range metricFamilies {
+		if family.GetName() != "apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds" {
+			continue
+		}
+
+		labelFilter := map[string]string{
+			"apiserver_id_hash": "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",
+			"jwt_issuer_hash":   jwtIssuerHash,
+			"result":            "success",
+		}
+		if !testutil.LabelsMatch(family.Metric[0], labelFilter) {
+			t.Fatalf("unexpected metric: %v", family.Metric[0])
+		}
+
+		ts = *family.Metric[0].Gauge.Value
+		break
+	}
+	if ts == 0 {
+		t.Fatalf("failed to get the timestamp")
 	}
 }
 
