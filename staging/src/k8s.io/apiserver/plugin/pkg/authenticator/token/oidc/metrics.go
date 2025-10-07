@@ -47,18 +47,166 @@ var (
 		},
 		[]string{"result", "jwt_issuer_hash"},
 	)
+
+	jwksFetchLastTimestampSeconds = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "jwt_authenticator_jwks_fetch_last_timestamp_seconds",
+			Help: "Timestamp of the last successful or failed JWKS fetch split by result, api server identity " +
+				"and jwt issuer for the JWT authenticator.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result", "jwt_issuer_hash", "apiserver_id_hash"},
+	)
+
+	jwksFetchLastKeySetInfo = metrics.NewDesc(
+		metrics.BuildFQName(namespace, subsystem, "jwt_authenticator_jwks_fetch_last_key_set_info"),
+		"Information about the last JWKS fetched by the JWT authenticator with hash as label, split by api server identity and jwt issuer.",
+		[]string{"jwt_issuer_hash", "apiserver_id_hash", "hash"},
+		nil,
+		metrics.ALPHA,
+		"",
+	)
 )
 
+// jwksHashKey uniquely identifies a JWKS by issuer and API server ID
+type jwksHashKey struct {
+	jwtIssuerHash   string
+	apiServerIDHash string
+}
+
+// jwksHashProvider manages JWKS hashes for all authenticators
+type jwksHashProvider struct {
+	mu     sync.RWMutex
+	hashes map[jwksHashKey]string
+}
+
+func newJWKSHashProvider() *jwksHashProvider {
+	return &jwksHashProvider{
+		hashes: make(map[jwksHashKey]string),
+	}
+}
+
+func (p *jwksHashProvider) setHash(jwtIssuer, apiServerID, keySet string) {
+	key := jwksHashKey{
+		jwtIssuerHash:   getHash(jwtIssuer),
+		apiServerIDHash: getHash(apiServerID),
+	}
+	jwksHash := getHash(keySet)
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.hashes[key] = jwksHash
+}
+
+func (p *jwksHashProvider) getHashes() map[jwksHashKey]string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	// Return a copy to prevent external modification
+	result := make(map[jwksHashKey]string, len(p.hashes))
+	for k, v := range p.hashes {
+		result[k] = v
+	}
+	return result
+}
+
+func (p *jwksHashProvider) reset() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.hashes = make(map[jwksHashKey]string)
+}
+
+func (p *jwksHashProvider) deleteHash(jwtIssuer, apiServerID string) {
+	key := jwksHashKey{
+		jwtIssuerHash:   getHash(jwtIssuer),
+		apiServerIDHash: getHash(apiServerID),
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.hashes, key)
+}
+
+// jwksHashCollector is a custom collector that emits JWKS hash metrics
+type jwksHashCollector struct {
+	metrics.BaseStableCollector
+	desc         *metrics.Desc
+	hashProvider *jwksHashProvider
+}
+
+func newJWKSHashCollector(desc *metrics.Desc, hashProvider *jwksHashProvider) metrics.StableCollector {
+	return &jwksHashCollector{
+		desc:         desc,
+		hashProvider: hashProvider,
+	}
+}
+
+func (c *jwksHashCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
+	ch <- c.desc
+}
+
+func (c *jwksHashCollector) CollectWithStability(ch chan<- metrics.Metric) {
+	hashes := c.hashProvider.getHashes()
+	for key, hash := range hashes {
+		ch <- metrics.NewLazyConstMetric(
+			c.desc,
+			metrics.GaugeValue,
+			1,
+			key.jwtIssuerHash,
+			key.apiServerIDHash,
+			hash,
+		)
+	}
+}
+
 var registerMetrics sync.Once
+var hashProvider = newJWKSHashProvider()
 
 func RegisterMetrics() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(jwtAuthenticatorLatencyMetric)
+		legacyregistry.MustRegister(jwksFetchLastTimestampSeconds)
+		legacyregistry.CustomMustRegister(newJWKSHashCollector(jwksFetchLastKeySetInfo, hashProvider))
 	})
 }
 
 func recordAuthenticationLatency(result, jwtIssuerHash string, duration time.Duration) {
 	jwtAuthenticatorLatencyMetric.WithLabelValues(result, jwtIssuerHash).Observe(duration.Seconds())
+}
+
+func recordJWKSFetchTimestamp(result, jwtIssuer, apiServerID string) {
+	jwksFetchLastTimestampSeconds.WithLabelValues(result, getHash(jwtIssuer), getHash(apiServerID)).SetToCurrentTime()
+}
+
+func recordJWKSFetchKeySetSuccess(jwtIssuer, apiServerID, keySet string) {
+	recordJWKSFetchKeySetHash(jwtIssuer, apiServerID, keySet)
+	recordJWKSFetchTimestamp("success", jwtIssuer, apiServerID)
+}
+
+func recordJWKSFetchKeySetFailure(jwtIssuer, apiServerID string) {
+	recordJWKSFetchTimestamp("failure", jwtIssuer, apiServerID)
+}
+
+func recordJWKSFetchKeySetHash(jwtIssuer, apiServerID, keySet string) {
+	hashProvider.setHash(jwtIssuer, apiServerID, keySet)
+}
+
+// DeleteJWKSFetchKeySetHash deletes the hash for a specific issuer and API server from the metric.
+// This should be called when an issuer is removed from the configuration to clean up stale metrics.
+func DeleteJWKSFetchKeySetHash(jwtIssuer, apiServerID string) {
+	hashProvider.deleteHash(jwtIssuer, apiServerID)
+}
+
+func deleteJWKSFetchKeySetHash(jwtIssuer, apiServerID string) {
+	hashProvider.deleteHash(jwtIssuer, apiServerID)
+}
+
+func ResetMetrics() {
+	jwtAuthenticatorLatencyMetric.Reset()
+	jwksFetchLastTimestampSeconds.Reset()
+	hashProvider.reset()
 }
 
 func getHash(data string) string {
@@ -73,7 +221,6 @@ func newInstrumentedAuthenticator(jwtIssuer string, delegate AuthenticatorTokenW
 }
 
 func newInstrumentedAuthenticatorWithClock(jwtIssuer string, delegate AuthenticatorTokenWithHealthCheck, clock clock.PassiveClock) *instrumentedAuthenticator {
-	RegisterMetrics()
 	return &instrumentedAuthenticator{
 		jwtIssuerHash: getHash(jwtIssuer),
 		delegate:      delegate,
