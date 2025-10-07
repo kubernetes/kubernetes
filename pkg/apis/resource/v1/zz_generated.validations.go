@@ -32,6 +32,7 @@ import (
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -162,6 +163,16 @@ func Validate_DeviceAllocationConfiguration(ctx context.Context, op operation.Op
 		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("resourcev1.DeviceConfiguration") }), &obj.DeviceConfiguration, safe.Field(oldObj, func(oldObj *resourcev1.DeviceAllocationConfiguration) *resourcev1.DeviceConfiguration {
 			return &oldObj.DeviceConfiguration
 		}))...)
+
+	return errs
+}
+
+var symbolsForDeviceAllocationMode = sets.New(resourcev1.DeviceAllocationModeAll, resourcev1.DeviceAllocationModeExactCount)
+
+// Validate_DeviceAllocationMode validates an instance of DeviceAllocationMode according
+// to declarative validation rules in the API schema.
+func Validate_DeviceAllocationMode(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1.DeviceAllocationMode) (errs field.ErrorList) {
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDeviceAllocationMode, nil)...)
 
 	return errs
 }
@@ -647,7 +658,20 @@ func Validate_DeviceSubRequest(ctx context.Context, op operation.Operation, fldP
 			return
 		}(fldPath.Child("selectors"), obj.Selectors, safe.Field(oldObj, func(oldObj *resourcev1.DeviceSubRequest) []resourcev1.DeviceSelector { return oldObj.Selectors }))...)
 
-	// field resourcev1.DeviceSubRequest.AllocationMode has no validation
+	// field resourcev1.DeviceSubRequest.AllocationMode
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1.DeviceAllocationMode) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceAllocationMode(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("allocationMode"), &obj.AllocationMode, safe.Field(oldObj, func(oldObj *resourcev1.DeviceSubRequest) *resourcev1.DeviceAllocationMode {
+			return &oldObj.AllocationMode
+		}))...)
+
 	// field resourcev1.DeviceSubRequest.Count has no validation
 
 	// field resourcev1.DeviceSubRequest.Tolerations
@@ -719,7 +743,28 @@ func Validate_ExactDeviceRequest(ctx context.Context, op operation.Operation, fl
 			return
 		}(fldPath.Child("selectors"), obj.Selectors, safe.Field(oldObj, func(oldObj *resourcev1.ExactDeviceRequest) []resourcev1.DeviceSelector { return oldObj.Selectors }))...)
 
-	// field resourcev1.ExactDeviceRequest.AllocationMode has no validation
+	// field resourcev1.ExactDeviceRequest.AllocationMode
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1.DeviceAllocationMode) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceAllocationMode(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("allocationMode"), &obj.AllocationMode, safe.Field(oldObj, func(oldObj *resourcev1.ExactDeviceRequest) *resourcev1.DeviceAllocationMode {
+			return &oldObj.AllocationMode
+		}))...)
+
 	// field resourcev1.ExactDeviceRequest.Count has no validation
 	// field resourcev1.ExactDeviceRequest.AdminAccess has no validation
 
