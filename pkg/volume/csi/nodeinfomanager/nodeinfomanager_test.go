@@ -308,6 +308,37 @@ func TestInstallCSIDriver(t *testing.T) {
 			},
 		},
 		{
+			name: "pre-existing node info, but owned by previous node",
+			existingNode: func() *v1.Node {
+				node := generateNode(nil /*nodeIDs*/, nil /*labels*/, nil /*capacity*/)
+				node.UID = types.UID("node1")
+				return node
+			}(),
+			existingCSINode: func() *storage.CSINode {
+				csiNode := generateCSINode(nil /*nodeIDs*/, nil /*volumeLimits*/, nil /*topologyKeys*/)
+				csiNode.OwnerReferences[0].UID = types.UID("node2")
+				return csiNode
+			}(),
+			inputNodeID: "com.example.csi/csi-node1",
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "node1",
+					UID:         types.UID("node1"),
+					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"": "com.example.csi/csi-node1"})},
+				},
+			},
+			expectedCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec: storage.CSINodeSpec{
+					Drivers: []storage.CSINodeDriver{
+						{
+							NodeID: "com.example.csi/csi-node1",
+						},
+					},
+				},
+			},
+		},
+		{
 			name:          "nil topology, empty node",
 			driverName:    "com.example.csi.driver1",
 			existingNode:  generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
