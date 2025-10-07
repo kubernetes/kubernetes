@@ -33,6 +33,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -48,13 +49,64 @@ const (
 	registryNodeSelectorValue = "kube-e2e-test-registry"
 )
 
-func SetupRegistry(ctx context.Context, f *framework.Framework) ([]string, error) {
+func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) ([]string, error) {
 	const registryReplicas = 1
 
+	podTestLabel := "test-registry-pod-" + f.UniqueName
+	pod, err := podManifest(podTestLabel)
+	if err != nil {
+		return nil, err
+	}
+
+	if podOnly {
+		podClient := e2epod.NewPodClient(f)
+		pod = podClient.Create(ctx, pod)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+	} else {
+		labels := map[string]string{"kube-e2e": podTestLabel}
+		deployment := e2edeployment.NewDeployment("", registryReplicas, labels, "", "", appsv1.RollingUpdateDeploymentStrategyType)
+		deployment.GenerateName = "test-registry-"
+		deployment.Spec.Template.Spec = pod.Spec
+
+		deployment, err = f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 120*time.Second, true, func(ctx context.Context) (done bool, err error) {
+			dep, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Get(ctx, deployment.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, nil
+			}
+			return dep.Status.UpdatedReplicas == registryReplicas &&
+				dep.Status.AvailableReplicas == registryReplicas &&
+				dep.Status.ReadyReplicas == registryReplicas, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "kube-e2e=" + podTestLabel})
+	if err != nil {
+		return nil, err
+	}
+	podNodes := make([]string, 0, len(pods.Items))
+	for _, pod := range pods.Items {
+		podNodes = append(podNodes, pod.Spec.NodeName)
+	}
+
+	return podNodes, nil
+}
+
+func podManifest(podTestLabel string) (*v1.Pod, error) {
 	pod, err := test.GetMinimalValidLinuxPod(api.LevelRestricted, api.MajorMinorVersion(1, 22))
 	if err != nil {
 		return nil, err
 	}
+
+	pod.ObjectMeta.GenerateName = "test-registry-"
+	pod.ObjectMeta.Labels = map[string]string{"kube-e2e": podTestLabel}
 
 	pod.Spec.InitContainers = nil
 	pod.Spec.Containers[0].Name = "registry"
@@ -70,43 +122,10 @@ func SetupRegistry(ctx context.Context, f *framework.Framework) ([]string, error
 	}
 	pod.Spec.Containers[0].SecurityContext.RunAsUser = ptr.To[int64](5123)
 
-	podTestLabel := "test-registry-pod-" + f.UniqueName
-	labels := map[string]string{"kube-e2e": podTestLabel}
-	deployment := e2edeployment.NewDeployment("", registryReplicas, labels, "", "", appsv1.RollingUpdateDeploymentStrategyType)
-	deployment.GenerateName = "test-registry-"
-	deployment.Spec.Template.Spec = pod.Spec
-
-	deployment, err = f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 120*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		dep, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Get(ctx, deployment.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, nil
-		}
-		return dep.Status.UpdatedReplicas == registryReplicas &&
-			dep.Status.AvailableReplicas == registryReplicas &&
-			dep.Status.ReadyReplicas == registryReplicas, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "kube-e2e=" + podTestLabel})
-	if err != nil {
-		return nil, err
-	}
-	podNodes := make([]string, 0, len(pods.Items))
-	for _, pod := range pods.Items {
-		podNodes = append(podNodes, pod.Spec.NodeName)
-	}
-
-	return podNodes, nil
+	return pod, nil
 }
 
-func SetupRegistryLabelNodes(ctx context.Context, f *framework.Framework) (cleanup func(context.Context) error, err error) {
+func SetupRegistryLabelNodes(ctx context.Context, f *framework.Framework, podOnly bool) (cleanup func(context.Context) error, err error) {
 	cleanups := []func(ctx context.Context) error{}
 	cleanup = func(ctx context.Context) error {
 		var errs []error
@@ -127,7 +146,7 @@ func SetupRegistryLabelNodes(ctx context.Context, f *framework.Framework) (clean
 	}()
 
 	var registryNodes []string
-	registryNodes, err = SetupRegistry(ctx, f)
+	registryNodes, err = SetupRegistry(ctx, f, podOnly)
 	if err != nil {
 		return cleanup, err
 	}
