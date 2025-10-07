@@ -762,6 +762,7 @@ message Container {
   optional ResourceRequirements resources = 8;
 
   // Resources resize policy for the container.
+  // You cannot set this field on ephemeral containers.
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   // +listType=atomic
@@ -1538,7 +1539,7 @@ message EphemeralContainerCommon {
   // +optional
   optional string workingDir = 5;
 
-  // Ports are not allowed for ephemeral containers.
+  // You cannot set this field on ephemeral containers.
   // +optional
   // +patchMergeKey=containerPort
   // +patchStrategy=merge
@@ -1566,12 +1567,13 @@ message EphemeralContainerCommon {
   // +listMapKey=name
   repeated EnvVar env = 7;
 
-  // Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
-  // already allocated to the pod.
+  // You cannot set this field on ephemeral containers.
+  // Ephemeral containers use spare resources already allocated to the pod.
   // +optional
   optional ResourceRequirements resources = 8;
 
   // Resources resize policy for the container.
+  // You cannot set this field on ephemeral containers.
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   // +listType=atomic
@@ -1608,19 +1610,19 @@ message EphemeralContainerCommon {
   // +optional
   repeated VolumeDevice volumeDevices = 21;
 
-  // Probes are not allowed for ephemeral containers.
+  // You cannot set this field on ephemeral containers.
   // +optional
   optional Probe livenessProbe = 10;
 
-  // Probes are not allowed for ephemeral containers.
+  // You cannot set this field on ephemeral containers.
   // +optional
   optional Probe readinessProbe = 11;
 
-  // Probes are not allowed for ephemeral containers.
+  // You cannot set this field on ephemeral containers.
   // +optional
   optional Probe startupProbe = 22;
 
-  // Lifecycle is not allowed for ephemeral containers.
+  // You cannot set this field on ephemeral containers.
   // +optional
   optional Lifecycle lifecycle = 12;
 

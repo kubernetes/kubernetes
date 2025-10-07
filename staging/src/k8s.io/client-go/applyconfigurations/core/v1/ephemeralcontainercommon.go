@@ -59,7 +59,7 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	// might be configured in the container image.
 	// Cannot be updated.
 	WorkingDir *string `json:"workingDir,omitempty"`
-	// Ports are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	Ports []ContainerPortApplyConfiguration `json:"ports,omitempty"`
 	// List of sources to populate environment variables in the container.
 	// The keys defined within a source may consist of any printable ASCII characters except '='.
@@ -71,10 +71,11 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	// List of environment variables to set in the container.
 	// Cannot be updated.
 	Env []EnvVarApplyConfiguration `json:"env,omitempty"`
-	// Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
-	// already allocated to the pod.
+	// You cannot set this field on ephemeral containers.
+	// Ephemeral containers use spare resources already allocated to the pod.
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 	// Resources resize policy for the container.
+	// You cannot set this field on ephemeral containers.
 	ResizePolicy []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
 	// Restart policy for the container to manage the restart behavior of each
 	// container within a pod.
@@ -89,13 +90,13 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	VolumeMounts []VolumeMountApplyConfiguration `json:"volumeMounts,omitempty"`
 	// volumeDevices is the list of block devices to be used by the container.
 	VolumeDevices []VolumeDeviceApplyConfiguration `json:"volumeDevices,omitempty"`
-	// Probes are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	LivenessProbe *ProbeApplyConfiguration `json:"livenessProbe,omitempty"`
-	// Probes are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	ReadinessProbe *ProbeApplyConfiguration `json:"readinessProbe,omitempty"`
-	// Probes are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	StartupProbe *ProbeApplyConfiguration `json:"startupProbe,omitempty"`
-	// Lifecycle is not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	Lifecycle *LifecycleApplyConfiguration `json:"lifecycle,omitempty"`
 	// Optional: Path at which the file to which the container's termination message
 	// will be written is mounted into the container's filesystem.

@@ -4336,7 +4336,7 @@ type EphemeralContainerCommon struct {
 	// Optional: Defaults to the container runtime's default working directory.
 	// +optional
 	WorkingDir string
-	// Ports are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	// +optional
 	Ports []ContainerPort
 	// List of sources to populate environment variables in the container.
@@ -4349,11 +4349,12 @@ type EphemeralContainerCommon struct {
 	EnvFrom []EnvFromSource
 	// +optional
 	Env []EnvVar
-	// Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
-	// already allocated to the pod.
+	// You cannot set this field on ephemeral containers.
+	// Ephemeral containers use spare resources already allocated to the pod.
 	// +optional
 	Resources ResourceRequirements
 	// Resources resize policy for the container.
+	// You cannot set this field on ephemeral containers.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	ResizePolicy []ContainerResizePolicy
@@ -4363,8 +4364,9 @@ type EphemeralContainerCommon struct {
 	// +optional
 	RestartPolicy *ContainerRestartPolicy
 	// Represents a list of rules to be checked to determine if the
-	// container should be restarted on exit. The rules are evaluated in
-	// order. Once a rule matches a container exit condition, the remaining
+	// container should be restarted on exit. You cannot set this field on
+	// ephemeral containers.
+	// The rules are evaluated in order. Once a rule matches a container exit condition, the remaining
 	// rules are ignored. If no rule matches the container exit condition,
 	// the Pod-level restart policy determines the whether the container
 	// is restarted or not. Constraints on the rules:
@@ -4381,16 +4383,16 @@ type EphemeralContainerCommon struct {
 	// volumeDevices is the list of block devices to be used by the container.
 	// +optional
 	VolumeDevices []VolumeDevice
-	// Probes are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	// +optional
 	LivenessProbe *Probe
-	// Probes are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	// +optional
 	ReadinessProbe *Probe
-	// Probes are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	// +optional
 	StartupProbe *Probe
-	// Lifecycle is not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	// +optional
 	Lifecycle *Lifecycle
 	// Required.
