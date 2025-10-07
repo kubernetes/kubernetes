@@ -625,7 +625,7 @@ func TestTotalUnmanagedPods(t *testing.T) {
 	dc.sync(ctx, pdbName)
 	var pods []*v1.Pod
 	pods = append(pods, pod)
-	_, unmanagedPods, _ := dc.getExpectedScale(ctx, pdb, pods)
+	_, unmanagedPods, _ := dc.getExpectedScale(ctx, pods)
 	if len(unmanagedPods) != 1 {
 		t.Fatalf("expected one pod to be unmanaged pod but found %d", len(unmanagedPods))
 	}

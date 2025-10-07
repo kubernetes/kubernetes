@@ -953,6 +953,9 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 
 	a.setStatus(hpa, currentReplicas, desiredReplicas, metricStatuses, rescale)
 
+	// Monitor the desired replicas
+	a.monitor.ObserveDesiredReplicas(hpa.Namespace, hpa.Name, desiredReplicas)
+
 	err = a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa)
 	if err != nil {
 		// we can overwrite retErr in this case because it's an internal error.

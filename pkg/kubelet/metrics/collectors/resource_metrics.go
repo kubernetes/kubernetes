@@ -213,7 +213,7 @@ func (rc *resourceMetricsCollector) collectNodeSwapMetrics(ch chan<- metrics.Met
 		return
 	}
 
-	ch <- metrics.NewLazyMetricWithTimestamp(s.Memory.Time.Time,
+	ch <- metrics.NewLazyMetricWithTimestamp(s.Swap.Time.Time,
 		metrics.NewLazyConstMetric(nodeSwapUsageDesc, metrics.GaugeValue, float64(*s.Swap.SwapUsageBytes)))
 }
 

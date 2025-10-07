@@ -29,22 +29,26 @@ type Struct struct {
 
 	// +k8s:listType=map
 	// +k8s:listMapKey=key
-	// +k8s:item(key: "target")=+k8s:validateFalse="item Items[key=target]"
+	// +k8s:item(key: "target")=+k8s:validateFalse="item Items[key=target] 1"
+	// +k8s:item(key: "target")=+k8s:validateFalse="item Items[key=target] 2"
 	Items []Item `json:"items"`
 
 	// +k8s:listType=map
 	// +k8s:listMapKey=intField
-	// +k8s:item(intField: 42)=+k8s:validateFalse="item IntKeyItems[intField=42]"
+	// +k8s:item(intField: 42)=+k8s:validateFalse="item IntKeyItems[intField=42] 1"
+	// +k8s:item(intField: 42)=+k8s:validateFalse="item IntKeyItems[intField=42] 2"
 	IntKeyItems []IntKeyItem `json:"intKeyItems"`
 
 	// +k8s:listType=map
 	// +k8s:listMapKey=boolField
-	// +k8s:item(boolField: true)=+k8s:validateFalse="item BoolKeyItems[boolField=true]"
+	// +k8s:item(boolField: true)=+k8s:validateFalse="item BoolKeyItems[boolField=true] 1"
+	// +k8s:item(boolField: true)=+k8s:validateFalse="item BoolKeyItems[boolField=true] 2"
 	BoolKeyItems []BoolKeyItem `json:"boolKeyItems"`
 
 	// +k8s:listType=map
 	// +k8s:listMapKey=id
-	// +k8s:item(id: "typedef-target")=+k8s:validateFalse="item TypedefItems[id=typedef-target]"
+	// +k8s:item(id: "typedef-target")=+k8s:validateFalse="item TypedefItems[id=typedef-target] 1"
+	// +k8s:item(id: "typedef-target")=+k8s:validateFalse="item TypedefItems[id=typedef-target] 2"
 	TypedefItems TypedefItemList `json:"typedefItems"`
 
 	// Test atomic + unique=map + item combination

@@ -7101,13 +7101,7 @@ func TestValidateEnvVarValueFromFileKeyRef(t *testing.T) {
 			},
 			opts: PodValidationOptions{},
 			expectedErrs: field.ErrorList{
-				{
-					Type:     field.ErrorTypeInvalid,
-					Field:    field.NewPath("valueFrom.fileKeyRef.volumeName").String(),
-					BadValue: "INVALID_NAME!",
-					Detail:   "a lowercase RFC 1123 label must consist of",
-					Origin:   "format=dns-label",
-				},
+				field.Invalid(field.NewPath("valueFrom.fileKeyRef.volumeName"), "INVALID_NAME!", "").WithOrigin("format=k8s-short-name"),
 			},
 		},
 		{
@@ -7159,13 +7153,7 @@ func TestValidateEnvVarValueFromFileKeyRef(t *testing.T) {
 			opts: PodValidationOptions{},
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("valueFrom.fileKeyRef.key"), "bad=key", "environment variable"),
-				{
-					Type:     field.ErrorTypeInvalid,
-					Field:    field.NewPath("valueFrom.fileKeyRef.volumeName").String(),
-					BadValue: "!badname",
-					Detail:   "a lowercase RFC 1123 label must consist of",
-					Origin:   "format=dns-label",
-				},
+				field.Invalid(field.NewPath("valueFrom.fileKeyRef.volumeName"), "!badname", "").WithOrigin("format=k8s-short-name"),
 				field.Invalid(field.NewPath("valueFrom.fileKeyRef.path"), "../badpath", "must not contain '..'"),
 			},
 		},

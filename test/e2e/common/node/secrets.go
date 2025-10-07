@@ -25,7 +25,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -158,7 +160,7 @@ var _ = SIGDescribe("Secrets", func() {
 		secretTestName := "test-secret-" + string(uuid.NewUUID())
 
 		// create a secret in the test namespace
-		_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, &v1.Secret{
+		createdSecret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: secretTestName,
 				Labels: map[string]string{
@@ -171,6 +173,7 @@ var _ = SIGDescribe("Secrets", func() {
 			Type: "Opaque",
 		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create secret")
+		gomega.Expect(createdSecret).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing secrets in all namespaces to ensure that there are more than zero")
 		// list all secrets in all namespaces to ensure endpoint coverage
@@ -208,6 +211,7 @@ var _ = SIGDescribe("Secrets", func() {
 
 		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(ctx, secretCreatedName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get secret")
+		gomega.Expect(resourceversion.CompareResourceVersion(createdSecret.ResourceVersion, secret.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		secretDecodedstring, err := base64.StdEncoding.DecodeString(string(secret.Data["key"]))
 		framework.ExpectNoError(err, "failed to decode secret from Base64")

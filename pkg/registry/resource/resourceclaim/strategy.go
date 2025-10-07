@@ -19,7 +19,11 @@ package resourceclaim
 import (
 	"context"
 	"errors"
+	"regexp"
 
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	resourceutils "k8s.io/kubernetes/pkg/registry/resource"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // resourceclaimStrategy implements behavior for ResourceClaim objects
@@ -48,6 +51,15 @@ type resourceclaimStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 	nsClient v1.NamespaceInterface
+}
+
+var resourceClaimNormalizationRules = []field.NormalizationRule{
+	{
+		// The "exactly" struct was added in v1beta2. In earlier API
+		// versions, its fields were directly part of the DeviceRequest.
+		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.selectors`),
+		Replacement: "spec.devices.requests[$1].exactly.selectors",
+	},
 }
 
 // NewStrategy is the default logic that applies when creating and updating ResourceClaim objects.
@@ -98,17 +110,7 @@ func (s *resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object
 
 	allErrs := resourceutils.AuthorizedForAdmin(ctx, claim.Spec.Devices.Requests, claim.Namespace, s.nsClient)
 	allErrs = append(allErrs, validation.ValidateResourceClaim(claim)...)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
-		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-		const validationIdentifier = "resourceclaim_create"
-		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, claim, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover, validationIdentifier)
-		if takeover {
-			allErrs = append(allErrs.RemoveCoveredByDeclarative(), declarativeErrs...)
-		}
-	}
-	return allErrs
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, claim, nil, allErrs, operation.Create, rest.WithNormalizationRules(resourceClaimNormalizationRules))
 }
 
 func (*resourceclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -136,17 +138,7 @@ func (s *resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	// AuthorizedForAdmin isn't needed here because the spec is immutable.
 	errorList := validation.ValidateResourceClaim(newClaim)
 	errorList = append(errorList, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
-		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-		const validationIdentifier = "resourceclaim_update"
-		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newClaim, oldClaim, rest.WithTakeover(takeover), rest.WithValidationIdentifier(validationIdentifier))
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errorList, declarativeErrs, takeover, validationIdentifier)
-		if takeover {
-			errorList = append(errorList.RemoveCoveredByDeclarative(), declarativeErrs...)
-		}
-	}
-	return errorList
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClaim, oldClaim, errorList, operation.Update, rest.WithNormalizationRules(resourceClaimNormalizationRules))
 }
 
 func (*resourceclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
@@ -207,8 +199,9 @@ func (r *resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, o
 	if oldClaim.Status.Allocation != nil {
 		oldAllocationResult = oldClaim.Status.Allocation.Devices.Results
 	}
-	allErrs := resourceutils.AuthorizedForAdminStatus(ctx, newAllocationResult, oldAllocationResult, newClaim.Namespace, r.nsClient)
-	return append(allErrs, validation.ValidateResourceClaimStatusUpdate(newClaim, oldClaim)...)
+	errs := resourceutils.AuthorizedForAdminStatus(ctx, newAllocationResult, oldAllocationResult, newClaim.Namespace, r.nsClient)
+	errs = append(errs, validation.ValidateResourceClaimStatusUpdate(newClaim, oldClaim)...)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClaim, oldClaim, errs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

@@ -43,6 +43,8 @@ func TestUnique(t *testing.T) {
 			{Key: "key1", Data: "one"},
 			{Key: "key2", Data: "two"},
 		},
+		CustomUniqueListWithTypeSet: []string{"a", "b", "a"},
+		CustomUniqueListWithTypeMap: []Item{{Key: "a"}, {Key: "b"}, {Key: "a"}},
 	}).ExpectValid()
 
 	// Test empty lists
@@ -51,6 +53,8 @@ func TestUnique(t *testing.T) {
 		SliceMapFieldWithMultipleKeys: []ItemWithMultipleKeys{},
 		AtomicListUniqueSet:           []Item{},
 		AtomicListUniqueMap:           []Item{},
+		CustomUniqueListWithTypeSet:   []string{},
+		CustomUniqueListWithTypeMap:   []Item{},
 	}).ExpectValid()
 
 	// Test single element lists
@@ -59,6 +63,8 @@ func TestUnique(t *testing.T) {
 		SliceMapFieldWithMultipleKeys: []ItemWithMultipleKeys{{Key1: "a", Key2: "b", Data: "one"}},
 		AtomicListUniqueSet:           []Item{{Key: "single", Data: "one"}},
 		AtomicListUniqueMap:           []Item{{Key: "single", Data: "one"}},
+		CustomUniqueListWithTypeSet:   []string{"single"},
+		CustomUniqueListWithTypeMap:   []Item{{Key: "single"}},
 	}).ExpectValid()
 
 	// Test duplicate values (should fail validation)
@@ -79,6 +85,8 @@ func TestUnique(t *testing.T) {
 			{Key: "key2", Data: "two"},
 			{Key: "key1", Data: "three"},
 		},
+		CustomUniqueListWithTypeSet: []string{"a", "b", "a"},
+		CustomUniqueListWithTypeMap: []Item{{Key: "a"}, {Key: "b"}, {Key: "a"}},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Duplicate(field.NewPath("primitiveListUniqueSet").Index(3), nil),
 		field.Duplicate(field.NewPath("primitiveListUniqueSet").Index(4), nil),
@@ -96,6 +104,8 @@ func TestUnique(t *testing.T) {
 			{Key: "a", Data: "two"},
 			{Key: "", Data: "three"},
 		},
+		CustomUniqueListWithTypeSet: []string{"", "a", ""},
+		CustomUniqueListWithTypeMap: []Item{{Key: ""}, {Key: "a"}, {Key: ""}},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Duplicate(field.NewPath("primitiveListUniqueSet").Index(2), nil),
 		field.Duplicate(field.NewPath("atomicListUniqueMap").Index(2), nil),
@@ -119,6 +129,8 @@ func TestRatcheting(t *testing.T) {
 			{Key: "key1", Data: "one"},
 			{Key: "key2", Data: "two"},
 		},
+		CustomUniqueListWithTypeSet: []string{"a", "b", "a"},
+		CustomUniqueListWithTypeMap: []Item{{Key: "a"}, {Key: "b"}, {Key: "a"}},
 	}
 
 	// Same data, different order.
@@ -136,6 +148,8 @@ func TestRatcheting(t *testing.T) {
 			{Key: "key2", Data: "two"},
 			{Key: "key1", Data: "one"},
 		},
+		CustomUniqueListWithTypeSet: []string{"a", "a", "b"},
+		CustomUniqueListWithTypeMap: []Item{{Key: "a"}, {Key: "a"}, {Key: "b"}},
 	}
 
 	// Test that reordering doesn't trigger validation errors

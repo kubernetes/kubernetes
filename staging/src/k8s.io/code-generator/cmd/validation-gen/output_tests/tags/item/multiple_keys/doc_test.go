@@ -45,7 +45,10 @@ func Test(t *testing.T) {
 			{StringKey: "other", IntKey: 99, BoolKey: false, Data: "no match, all different"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`items[0]`: {"item Items[stringKey=target,intKey=42,boolKey=true]"},
+		`items[0]`: {
+			"item Items[stringKey=target,intKey=42,boolKey=true] 1",
+			"item Items[stringKey=target,intKey=42,boolKey=true] 2",
+		},
 	})
 
 	st.Value(&Struct{

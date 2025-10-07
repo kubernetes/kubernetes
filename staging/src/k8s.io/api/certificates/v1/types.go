@@ -181,6 +181,7 @@ type CertificateSigningRequestStatus struct {
 	// +optional
 	// +k8s:listType=map
 	// +k8s:listMapKey=type
+	// +k8s:customUnique
 	// +k8s:optional
 	// +k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
 	// +k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember

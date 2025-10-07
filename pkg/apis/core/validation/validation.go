@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -35,7 +36,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/validate"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -136,7 +139,7 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsDNS1123Label(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).WithOrigin("format=dns-label"))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).WithOrigin("format=k8s-short-name"))
 	}
 	return allErrs
 }
@@ -253,16 +256,14 @@ func ValidateEndpointsSpecificAnnotations(annotations map[string]string, fldPath
 // value that were not valid.  Otherwise this returns an empty list or nil.
 type ValidateNameFunc apimachineryvalidation.ValidateNameFunc
 
+// ValidateNameFuncWithErrors validates that the provided name is valid for a
+// given resource type.
+type ValidateNameFuncWithErrors = apimachineryvalidation.ValidateNameFuncWithErrors
+
 // ValidatePodName can be used to check whether the given pod name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 var ValidatePodName = apimachineryvalidation.NameIsDNSSubdomain
-
-// ValidateReplicationControllerName can be used to check whether the given replication
-// controller name is valid.
-// Prefix indicates this name will be used as part of generation, in which case
-// trailing dashes are allowed.
-var ValidateReplicationControllerName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateServiceName can be used to check whether the given service name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -384,9 +385,19 @@ func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string
 	return allErrs
 }
 
+// ValidateObjectMetaWithOpts validates an object's metadata on creation. It expects that name generation has already
+// been performed.
+func ValidateObjectMetaWithOpts(meta *metav1.ObjectMeta, isNamespaced bool, nameFn ValidateNameFuncWithErrors, fldPath *field.Path) field.ErrorList {
+	allErrs := apimachineryvalidation.ValidateObjectMetaWithOpts(meta, isNamespaced, nameFn, fldPath)
+	// run additional checks for the finalizer name
+	for i := range meta.Finalizers {
+		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
+	}
+	return allErrs
+}
+
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
-// It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 // TODO: Remove calls to this method scattered in validations of specific resources, e.g., ValidatePodUpdate.
 func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
 	allErrs := apimachineryvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
@@ -1753,19 +1764,46 @@ func validatePVSecretReference(secretRef *core.SecretReference, fldPath *field.P
 	return allErrs
 }
 
-func ValidateCSIDriverName(driverName string, fldPath *field.Path) field.ErrorList {
+// ValidateCSIDriverNameOption is an option for ValidateCSIDriverName.
+// These options are for marking if a validation error message is covered
+// by declarative validation
+type ValidateCSIDriverNameOption int
+
+const (
+	// The required check is covered by declarative validation
+	RequiredCovered ValidateCSIDriverNameOption = iota
+	// The list size check is covered by declarative validation.
+	SizeCovered
+	// The format check is covered by declarative validation.
+	FormatCovered
+)
+
+func ValidateCSIDriverName(driverName string, fldPath *field.Path, opts ...ValidateCSIDriverNameOption) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(driverName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+		err := field.Required(fldPath, "")
+		if slices.Contains(opts, RequiredCovered) {
+			err = err.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
+		return allErrs
 	}
 
 	if len(driverName) > 63 {
-		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, 63))
+		err := field.TooLong(fldPath, "" /*unused*/, 63)
+		if slices.Contains(opts, SizeCovered) {
+			err = err.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
 	}
 
 	for _, msg := range validation.IsDNS1123Subdomain(strings.ToLower(driverName)) {
-		allErrs = append(allErrs, field.Invalid(fldPath, driverName, msg)).WithOrigin("format=k8s-long-name")
+		err := field.Invalid(fldPath, driverName, msg)
+		if slices.Contains(opts, FormatCovered) {
+			err = err.WithOrigin("format=k8s-long-name-caseless").MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
 	}
 
 	return allErrs
@@ -6700,7 +6738,10 @@ func ValidateServiceStatusUpdate(service, oldService *core.Service) field.ErrorL
 
 // ValidateReplicationController tests if required fields in the replication controller are set.
 func ValidateReplicationController(controller *core.ReplicationController, opts PodValidationOptions) field.ErrorList {
-	allErrs := ValidateObjectMeta(&controller.ObjectMeta, true, ValidateReplicationControllerName, field.NewPath("metadata"))
+	validateLongName := func(fldPath *field.Path, name string) field.ErrorList {
+		return validate.LongName(context.Background(), operation.Operation{}, fldPath, &name, nil).MarkCoveredByDeclarative()
+	}
+	allErrs := ValidateObjectMetaWithOpts(&controller.ObjectMeta, true, validateLongName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec, nil, field.NewPath("spec"), opts)...)
 	return allErrs
 }
