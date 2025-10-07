@@ -409,20 +409,38 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 		})
 
 		ginkgo.It("should report Memory pressure in PSI metrics", func(ctx context.Context) {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
-				ginkgo.Skip("MemoryQoS feature gate is not enabled")
-			}
 			podName := "memory-pressure-pod"
 			ginkgo.By("Creating a pod to generate Memory pressure")
 			// Create a pod that generates memory pressure by continuously writing to files,
 			// forcing kernel page cache reclamation.
 			podSpec := getStressTestPod(podName, "memory-stress", []string{})
 			podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
+			podSpec.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+				Privileged: &[]bool{true}[0],
+			}
 			podSpec.Spec.Containers[0].Args = []string{
 				// This command runs an infinite loop that uses `dd` to write 50MB files,
 				// cycling through 5 files to target 250MB of reclaimable file cache usage.
 				// This exceeds the 200MB memory limit, forcing the kernel to reclaim memory and generate pressure stalls.
-				"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
+				"sleep 10; echo 218103808 > /sys/fs/cgroup/kubepods.slice/kubepods-burstable.slice/memory.high; i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
+			}
+			podSpec.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+				{
+					Name:      "cgroup",
+					MountPath: "/sys/fs/cgroup",
+				},
+			}
+
+			// Add volume
+			podSpec.Spec.Volumes = []v1.Volume{
+				{
+					Name: "cgroup",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: "/sys/fs/cgroup",
+						},
+					},
+				},
 			}
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
