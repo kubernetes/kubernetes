@@ -57,7 +57,7 @@ var resourceClaimNormalizationRules = []field.NormalizationRule{
 	{
 		// The "exactly" struct was added in v1beta2. In earlier API
 		// versions, its fields were directly part of the DeviceRequest.
-		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(selectors|allocationMode|count|adminAccess)`),
+		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(selectors|allocationMode|count|adminAccess|tolerations)`),
 		Replacement: "spec.devices.requests[$1].exactly.$2",
 	},
 }

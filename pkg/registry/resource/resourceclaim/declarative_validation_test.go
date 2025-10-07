@@ -164,6 +164,55 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				).WithOrigin("enum"),
 			},
 		},
+		"valid DeviceTolerationOperator/Effect - Exactly": {
+			input: mkValidResourceClaim(tweakTolerations(resource.DeviceTolerationOpEqual, resource.DeviceTaintEffectNoSchedule)),
+		},
+		// "valid DeviceTolerationOperator/Effect (empty effect) - Exactly": {
+		// 	input: mkValidResourceClaim(tweakTolerations(resource.DeviceTolerationOpExists, "")),
+		// },
+		"invalid DeviceTolerationOperator - Exactly": {
+			input: mkValidResourceClaim(tweakTolerations("InvalidOp", resource.DeviceTaintEffectNoSchedule)),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("operator"),
+					resource.DeviceTolerationOperator("InvalidOp"),
+					[]string{"Equal", "Exists"},
+				).WithOrigin("enum"),
+			},
+		},
+		"invalid DeviceTaintEffect - Exactly": {
+			input: mkValidResourceClaim(tweakTolerations(resource.DeviceTolerationOpEqual, "InvalidEffect")),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("effect"),
+					resource.DeviceTaintEffect("InvalidEffect"),
+					[]string{"NoExecute", "NoSchedule"},
+				).WithOrigin("enum"),
+			},
+		},
+		"valid DeviceTolerationOperator/Effect - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailableTolerations(resource.DeviceTolerationOpEqual, resource.DeviceTaintEffectNoSchedule)),
+		},
+		"invalid DeviceTolerationOperator - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailableTolerations("InvalidOp", resource.DeviceTaintEffectNoSchedule)),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("operator"),
+					resource.DeviceTolerationOperator("InvalidOp"),
+					[]string{"Equal", "Exists"},
+				).WithOrigin("enum"),
+			},
+		},
+		"invalid DeviceTaintEffect - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailableTolerations(resource.DeviceTolerationOpEqual, "InvalidEffect")),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("effect"),
+					resource.DeviceTaintEffect("InvalidEffect"),
+					[]string{"NoExecute", "NoSchedule"},
+				).WithOrigin("enum"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -294,6 +343,52 @@ func tweakFirstAvailableAllocationMode(mode resource.DeviceAllocationMode, count
 					DeviceClassName: "class",
 					AllocationMode:  mode,
 					Count:           count,
+				},
+			}
+		}
+	}
+}
+
+func tweakTolerations(op resource.DeviceTolerationOperator, effect resource.DeviceTaintEffect) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Requests) > 0 && rc.Spec.Devices.Requests[0].Exactly != nil {
+			val := "value"
+			if op == resource.DeviceTolerationOpExists {
+				val = ""
+			}
+			rc.Spec.Devices.Requests[0].Exactly.Tolerations = []resource.DeviceToleration{
+				{
+					Key:      "key",
+					Operator: op,
+					Value:    val,
+					Effect:   effect,
+				},
+			}
+		}
+	}
+}
+
+func tweakFirstAvailableTolerations(op resource.DeviceTolerationOperator, effect resource.DeviceTaintEffect) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Requests) > 0 {
+			// Clear Exactly and set FirstAvailable
+			rc.Spec.Devices.Requests[0].Exactly = nil
+			val := "value"
+			if op == resource.DeviceTolerationOpExists {
+				val = ""
+			}
+			rc.Spec.Devices.Requests[0].FirstAvailable = []resource.DeviceSubRequest{
+				{
+					Name:            "sub-0",
+					DeviceClassName: "class",
+					AllocationMode:  resource.DeviceAllocationModeExactCount,
+					Count:           1,
+					Tolerations: []resource.DeviceToleration{{
+						Key:      "key",
+						Operator: op,
+						Value:    val,
+						Effect:   effect,
+					}},
 				},
 			}
 		}
