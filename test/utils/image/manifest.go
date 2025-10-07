@@ -129,6 +129,8 @@ func readFromURL(url string, writer io.Writer) error {
 
 var (
 	initRegistry = RegistryList{
+		// TODO: https://github.com/kubernetes/kubernetes/issues/130271
+		// Eliminate PrivateRegistry.
 		PromoterE2eRegistry:      "registry.k8s.io/e2e-test-images",
 		BuildImageRegistry:       "registry.k8s.io/build-image",
 		InvalidRegistry:          "invalid.registry.k8s.io/invalid",
