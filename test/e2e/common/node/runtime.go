@@ -263,7 +263,7 @@ while true; do sleep 1; done
 			var registrySetup bool
 			registryAddress := net.JoinHostPort("localhost", "5000")
 			ginkgo.BeforeEach(func(ctx context.Context) {
-				_, err := e2eregistry.SetupRegistry(ctx, f)
+				_, err := e2eregistry.SetupRegistry(ctx, f, false)
 				framework.ExpectNoError(err)
 			})
 

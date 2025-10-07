@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -44,11 +45,56 @@ const (
 	user1creds = "dXNlcjpwYXNzd29yZA==" // user:password
 )
 
-func SetupRegistry(ctx context.Context, f *framework.Framework) ([]string, error) {
+func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) ([]string, error) {
+	podTestLabel := "test-registry-pod-" + f.UniqueName
+	pod, err := podManifest(podTestLabel)
+	if err != nil {
+		return nil, err
+	}
+
+	if podOnly {
+		podClient := e2epod.NewPodClient(f)
+		pod = podClient.Create(ctx, pod)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+	} else {
+		labels := map[string]string{"kube-e2e": podTestLabel}
+		daemonset := e2edaemonset.NewDaemonSet("", "", labels, nil, nil, nil)
+		daemonset.GenerateName = "test-registry-"
+		daemonset.Spec.Template.Spec = pod.Spec
+
+		daemonset, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ctx, daemonset, metav1.CreateOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 120*time.Second, true, func(ctx context.Context) (done bool, err error) {
+			return e2edaemonset.CheckRunningOnAllNodes(ctx, f, daemonset)
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "kube-e2e=" + podTestLabel})
+	if err != nil {
+		return nil, err
+	}
+	podNodes := make([]string, 0, len(pods.Items))
+	for _, pod := range pods.Items {
+		podNodes = append(podNodes, pod.Spec.NodeName)
+	}
+
+	return podNodes, nil
+}
+
+func podManifest(podTestLabel string) (*v1.Pod, error) {
 	pod, err := test.GetMinimalValidLinuxPod(api.LevelRestricted, api.MajorMinorVersion(1, 22))
 	if err != nil {
 		return nil, err
 	}
+
+	pod.ObjectMeta.GenerateName = "test-registry-"
+	pod.ObjectMeta.Labels = map[string]string{"kube-e2e": podTestLabel}
 
 	pod.Spec.InitContainers = nil
 	pod.Spec.Containers[0].Name = "registry"
@@ -64,34 +110,7 @@ func SetupRegistry(ctx context.Context, f *framework.Framework) ([]string, error
 	}
 	pod.Spec.Containers[0].SecurityContext.RunAsUser = ptr.To[int64](5123)
 
-	podTestLabel := "test-registry-pod-" + f.UniqueName
-	labels := map[string]string{"kube-e2e": podTestLabel}
-	daemonset := e2edaemonset.NewDaemonSet("", "", labels, nil, nil, nil)
-	daemonset.GenerateName = "test-registry-"
-	daemonset.Spec.Template.Spec = pod.Spec
-
-	daemonset, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ctx, daemonset, metav1.CreateOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 120*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		return e2edaemonset.CheckRunningOnAllNodes(ctx, f, daemonset)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "kube-e2e=" + podTestLabel})
-	if err != nil {
-		return nil, err
-	}
-	podNodes := make([]string, 0, len(pods.Items))
-	for _, pod := range pods.Items {
-		podNodes = append(podNodes, pod.Spec.NodeName)
-	}
-
-	return podNodes, nil
+	return pod, nil
 }
 
 func User1DockerSecret(registryAddress string) *v1.Secret {
