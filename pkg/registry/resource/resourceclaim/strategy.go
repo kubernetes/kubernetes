@@ -60,6 +60,10 @@ var resourceClaimNormalizationRules = []field.NormalizationRule{
 		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.selectors`),
 		Replacement: "spec.devices.requests[$1].exactly.selectors",
 	},
+	{
+		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.tolerations`),
+		Replacement: "spec.devices.requests[$1].exactly.tolerations",
+	},
 }
 
 // NewStrategy is the default logic that applies when creating and updating ResourceClaim objects.

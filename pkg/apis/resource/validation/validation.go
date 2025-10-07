@@ -1359,7 +1359,7 @@ func validateDeviceToleration(toleration resource.DeviceToleration, fldPath *fie
 	var allErrs field.ErrorList
 
 	if toleration.Key != "" {
-		allErrs = append(allErrs, metav1validation.ValidateLabelName(toleration.Key, fldPath.Child("key"))...)
+		allErrs = append(allErrs, metav1validation.ValidateLabelName(toleration.Key, fldPath.Child("key")).MarkCoveredByDeclarative()...)
 	}
 	switch toleration.Operator {
 	case resource.DeviceTolerationOpExists:
