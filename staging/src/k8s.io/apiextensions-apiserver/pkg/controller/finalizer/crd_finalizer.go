@@ -64,7 +64,7 @@ type CRDFinalizer struct {
 	crdSynced cache.InformerSynced
 
 	// To allow injection for testing.
-	syncFn func(key string) error
+	syncFn func(ctx context.Context, key string) error
 
 	queue workqueue.TypedRateLimitingInterface[string]
 }
@@ -109,7 +109,7 @@ func NewCRDFinalizer(
 	return c
 }
 
-func (c *CRDFinalizer) sync(key string) error {
+func (c *CRDFinalizer) sync(ctx context.Context, key string) error {
 	cachedCRD, err := c.crdLister.Get(key)
 	if apierrors.IsNotFound(err) {
 		return nil
@@ -132,7 +132,7 @@ func (c *CRDFinalizer) sync(key string) error {
 		Reason:  "InstanceDeletionInProgress",
 		Message: "CustomResource deletion is in progress",
 	})
-	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
+	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(ctx, crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil
@@ -262,38 +262,46 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensionsv1.CustomResourceDefini
 	}, nil
 }
 
+// Run is a legacy wrapper that starts the controller.
 func (c *CRDFinalizer) Run(workers int, stopCh <-chan struct{}) {
+	c.RunWithContext(workers, wait.ContextForChannel(stopCh))
+}
+
+// RunWithContext starts the controller with a context.
+//
+//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
+func (c *CRDFinalizer) RunWithContext(workers int, ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Info("Starting CRDFinalizer")
-	defer klog.Info("Shutting down CRDFinalizer")
+	klog.Infof("Starting CRDFinalizer")
+	defer klog.Infof("Shutting down CRDFinalizer")
 
-	if !cache.WaitForCacheSync(stopCh, c.crdSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.crdSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(c.runWorker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (c *CRDFinalizer) runWorker() {
-	for c.processNextWorkItem() {
+func (c *CRDFinalizer) runWorker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (c *CRDFinalizer) processNextWorkItem() bool {
+func (c *CRDFinalizer) processNextWorkItem(ctx context.Context) bool {
 	key, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncFn(key)
+	err := c.syncFn(ctx, key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true
