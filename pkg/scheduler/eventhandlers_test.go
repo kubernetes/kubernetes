@@ -558,6 +558,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if !tt.enableDRA {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DynamicResourceAllocation: tt.enableDRA,
 				features.DRADeviceTaints:           tt.enableDRADeviceTaints,

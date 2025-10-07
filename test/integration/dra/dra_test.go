@@ -47,6 +47,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourceapiac "k8s.io/client-go/applyconfigurations/resource/v1"
 	"k8s.io/client-go/informers"
@@ -337,6 +338,10 @@ func TestDRA(t *testing.T) {
 			sort.Strings(entries)
 			t.Logf("Config: %s", strings.Join(entries, ","))
 
+			// We need to set emulation version for DynamicResourceAllocation feature gate, which is locked at 1.35.
+			if draEnabled, draExists := tc.features[features.DynamicResourceAllocation]; draExists && !draEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.features)
 
 			etcdOptions := framework.SharedEtcd()
