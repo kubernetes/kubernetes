@@ -39,6 +39,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	node "k8s.io/kubernetes/pkg/apis/node"
 	apinodev1 "k8s.io/kubernetes/pkg/apis/node/v1"
+	"k8s.io/kubernetes/pkg/util/affinities"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 )
 
@@ -212,6 +213,7 @@ func setScheduling(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1.Ru
 
 	pod.Spec.NodeSelector = newNodeSelector
 	pod.Spec.Tolerations = newTolerations
+	pod.Spec.Affinity = affinities.DedupAffinityFields(pod.Spec.Affinity)
 
 	return nil
 }
