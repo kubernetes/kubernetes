@@ -3145,6 +3145,11 @@ func (in *NodeStatus) DeepCopyInto(out *NodeStatus) {
 		*out = new(NodeFeatures)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.DeclaredFeatures != nil {
+		in, out := &in.DeclaredFeatures, &out.DeclaredFeatures
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

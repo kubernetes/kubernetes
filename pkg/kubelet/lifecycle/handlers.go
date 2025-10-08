@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	nodedeclaredfeatures "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -47,6 +48,11 @@ const (
 
 	AppArmorNotAdmittedReason          = "AppArmor"
 	PodLevelResourcesNotAdmittedReason = "PodLevelResourcesNotSupported"
+
+	// Reasons for pod features admission failure
+	FeatureRequirementInferError = "FeatureRequirementInferError"
+	FeatureMatchError            = "FeatureMatchError"
+	MissingNodeDeclaredFeatures  = "MissingNodeDeclaredFeatures"
 )
 
 type handlerRunner struct {
@@ -255,4 +261,58 @@ type podFeaturesAdmitHandler struct{}
 
 func (h *podFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	return isPodLevelResourcesSupported(attrs.Pod)
+}
+
+// declaredFeaturesAdmitHandler is a PodAdmitHandler that checks a pod's feature requirements.
+type declaredFeaturesAdmitHandler struct {
+	nodeDeclaredFeaturesHelper *nodedeclaredfeatures.Helper
+	nodeDeclaredFeatures       []string
+	version                    string
+}
+
+// NewDeclaredFeaturesAdmitHandler returns a new features admit handler.
+func NewDeclaredFeaturesAdmitHandler(nodeDeclaredFeaturesHelper *nodedeclaredfeatures.Helper, nodeDeclaredFeatures []string, version string) PodAdmitHandler {
+	return &declaredFeaturesAdmitHandler{
+		nodeDeclaredFeaturesHelper: nodeDeclaredFeaturesHelper,
+		nodeDeclaredFeatures:       nodeDeclaredFeatures,
+		version:                    version,
+	}
+}
+
+// Admit checks if a pod's feature requirements are met by the node.
+func (c *declaredFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	pod := attrs.Pod
+
+	podInfo := &nodedeclaredfeatures.PodInfo{Pod: pod}
+	reqs, err := c.nodeDeclaredFeaturesHelper.InferForPodCreate(podInfo, c.version)
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  FeatureRequirementInferError,
+			Message: fmt.Sprintf("failed to infer pod's feature requirements: %v", err),
+		}
+	}
+
+	if len(reqs) == 0 {
+		return PodAdmitResult{Admit: true}
+	}
+
+	matchResult, err := c.nodeDeclaredFeaturesHelper.MatchCurrentNode(reqs, c.nodeDeclaredFeatures)
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  FeatureMatchError,
+			Message: fmt.Sprintf("failed to match pod's feature requirements against the node: %v", err),
+		}
+	}
+
+	if !matchResult.IsMatch {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  MissingNodeDeclaredFeatures,
+			Message: fmt.Sprintf("pod requires node features that are not available: %s", strings.Join(matchResult.UnsatisfiedRequirements, ", ")),
+		}
+	}
+
+	return PodAdmitResult{Admit: true}
 }

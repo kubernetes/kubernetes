@@ -5559,6 +5559,7 @@ func autoConvert_v1_NodeStatus_To_core_NodeStatus(in *corev1.NodeStatus, out *co
 	out.Config = (*core.NodeConfigStatus)(unsafe.Pointer(in.Config))
 	out.RuntimeHandlers = *(*[]core.NodeRuntimeHandler)(unsafe.Pointer(&in.RuntimeHandlers))
 	out.Features = (*core.NodeFeatures)(unsafe.Pointer(in.Features))
+	out.DeclaredFeatures = *(*[]string)(unsafe.Pointer(&in.DeclaredFeatures))
 	return nil
 }
 
@@ -5585,6 +5586,7 @@ func autoConvert_core_NodeStatus_To_v1_NodeStatus(in *core.NodeStatus, out *core
 	out.Config = (*corev1.NodeConfigStatus)(unsafe.Pointer(in.Config))
 	out.RuntimeHandlers = *(*[]corev1.NodeRuntimeHandler)(unsafe.Pointer(&in.RuntimeHandlers))
 	out.Features = (*corev1.NodeFeatures)(unsafe.Pointer(in.Features))
+	out.DeclaredFeatures = *(*[]string)(unsafe.Pointer(&in.DeclaredFeatures))
 	return nil
 }
 
