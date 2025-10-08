@@ -1,8 +1,8 @@
-//go:build linux
-// +build linux
+//go:build windows
+// +build windows
 
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import (
 
 var k8sBinDir = flag.String("k8s-bin-dir", "", "Directory containing k8s kubelet binaries.")
 var useDockerizedBuild = flag.Bool("use-dockerized-build", false, "Use dockerized build for test artifacts")
-var targetBuildArch = flag.String("target-build-arch", "linux/amd64", "Target architecture for the test artifacts for dockerized build")
+var targetBuildArch = flag.String("target-build-arch", "windows/amd64", "Target architecture for the test artifacts for dockerized build")
 
 var buildCGOTargets = []string{
 	"cmd/kubelet",
@@ -142,7 +142,7 @@ func getK8sBin(bin string) (string, error) {
 
 // GetKubeletServerBin returns the path of kubelet binary.
 func GetKubeletServerBin() string {
-	bin, err := getK8sBin("kubelet")
+	bin, err := getK8sBin("kubelet.exe")
 	if err != nil {
 		klog.Fatalf("Could not locate kubelet binary %v.", err)
 	}
