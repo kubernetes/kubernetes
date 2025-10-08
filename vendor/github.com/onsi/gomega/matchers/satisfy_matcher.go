@@ -8,13 +8,13 @@ import (
 )
 
 type SatisfyMatcher struct {
-	Predicate interface{}
+	Predicate any
 
 	// cached type
 	predicateArgType reflect.Type
 }
 
-func NewSatisfyMatcher(predicate interface{}) *SatisfyMatcher {
+func NewSatisfyMatcher(predicate any) *SatisfyMatcher {
 	if predicate == nil {
 		panic("predicate cannot be nil")
 	}
@@ -35,7 +35,7 @@ func NewSatisfyMatcher(predicate interface{}) *SatisfyMatcher {
 	}
 }
 
-func (m *SatisfyMatcher) Match(actual interface{}) (success bool, err error) {
+func (m *SatisfyMatcher) Match(actual any) (success bool, err error) {
 	// prepare a parameter to pass to the predicate
 	var param reflect.Value
 	if actual != nil && reflect.TypeOf(actual).AssignableTo(m.predicateArgType) {
@@ -57,10 +57,10 @@ func (m *SatisfyMatcher) Match(actual interface{}) (success bool, err error) {
 	return result[0].Bool(), nil
 }
 
-func (m *SatisfyMatcher) FailureMessage(actual interface{}) (message string) {
+func (m *SatisfyMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, "to satisfy predicate", m.Predicate)
 }
 
-func (m *SatisfyMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (m *SatisfyMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "to not satisfy predicate", m.Predicate)
 }

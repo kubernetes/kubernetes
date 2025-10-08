@@ -343,7 +343,7 @@ func tokenize(input string) func() (*treeNode, error) {
 	consumeUntil := func(cutset string) (string, int) {
 		j := i
 		for ; j < len(runes); j++ {
-			if strings.IndexRune(cutset, runes[j]) >= 0 {
+			if strings.ContainsRune(cutset, runes[j]) {
 				break
 			}
 		}

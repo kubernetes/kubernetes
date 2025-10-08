@@ -8,11 +8,11 @@ import (
 )
 
 type PanicMatcher struct {
-	Expected interface{}
-	object   interface{}
+	Expected any
+	object   any
 }
 
-func (matcher *PanicMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *PanicMatcher) Match(actual any) (success bool, err error) {
 	if actual == nil {
 		return false, fmt.Errorf("PanicMatcher expects a non-nil actual.")
 	}
@@ -52,7 +52,7 @@ func (matcher *PanicMatcher) Match(actual interface{}) (success bool, err error)
 	return
 }
 
-func (matcher *PanicMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *PanicMatcher) FailureMessage(actual any) (message string) {
 	if matcher.Expected == nil {
 		// We wanted any panic to occur, but none did.
 		return format.Message(actual, "to panic")
@@ -91,7 +91,7 @@ func (matcher *PanicMatcher) FailureMessage(actual interface{}) (message string)
 	}
 }
 
-func (matcher *PanicMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *PanicMatcher) NegatedFailureMessage(actual any) (message string) {
 	if matcher.Expected == nil {
 		// We didn't want any panic to occur, but one did.
 		return format.Message(actual, fmt.Sprintf("not to panic, but panicked with\n%s", format.Object(matcher.object, 1)))
