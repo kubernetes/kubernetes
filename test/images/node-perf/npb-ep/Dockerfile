@@ -17,7 +17,13 @@ FROM $BASEIMAGE as build_node_perf_npb_ep
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-RUN apt-get update && apt-get install -y build-essential gfortran
+RUN rm -f /etc/apt/sources.list
+RUN echo "deb [trusted=yes] http://archive.debian.org/debian buster main" >> /etc/apt/sources.list
+RUN echo "deb-src [trusted=yes] http://archive.debian.org/debian buster main" >> /etc/apt/sources.list
+RUN echo "deb [trusted=yes] http://archive.debian.org/debian buster-updates main" >> /etc/apt/sources.list
+RUN echo "deb-src [trusted=yes] http://archive.debian.org/debian buster-updates main" >> /etc/apt/sources.list
+
+RUN apt-get update && apt-get install -y --allow-downgrades libbz2-1.0=1.0.6-9.2~deb10u1 libc6=2.28-10+deb10u1 libc6-dev g++ bzip2 dpkg-dev gfortran-8 build-essential gfortran
 
 ADD http://www.nas.nasa.gov/assets/npb/NPB3.3.1.tar.gz .
 RUN tar xzf NPB3.3.1.tar.gz
