@@ -147,13 +147,7 @@
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3",
         "go.etcd.io/raft/v3",
-        "k8s.io/api",
-        "k8s.io/apiextensions-apiserver",
-        "k8s.io/apimachinery",
-        "k8s.io/apiserver",
-        "k8s.io/code-generator",
-        "k8s.io/kube-aggregator",
-        "k8s.io/metrics"
+        "k8s.io/code-generator"
       ],
       "github.com/golang/groupcache": [
         "go.etcd.io/etcd/server/v3"

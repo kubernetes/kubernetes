@@ -80,7 +80,7 @@ type protobufPackage struct {
 }
 
 func (p *protobufPackage) Clean() error {
-	for _, s := range []string{p.ImportPath(), p.OutputPath()} {
+	for _, s := range []string{p.ImportPath(), p.OutputPath(), p.ProtomessageOutputPath()} {
 		if err := os.Remove(filepath.Join(p.Dir(), filepath.Base(s))); err != nil && !os.IsNotExist(err) {
 			return err
 		}
@@ -198,6 +198,10 @@ func (p *protobufPackage) ImportPath() string {
 
 func (p *protobufPackage) OutputPath() string {
 	return filepath.Join(p.Path(), "generated.pb.go")
+}
+
+func (p *protobufPackage) ProtomessageOutputPath() string {
+	return filepath.Join(p.Path(), "generated.protomessage.pb.go")
 }
 
 var (
