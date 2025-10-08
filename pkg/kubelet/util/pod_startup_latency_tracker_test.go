@@ -689,3 +689,78 @@ func buildPodWithStatus(cs []corev1.ContainerStatus) *corev1.Pod {
 		},
 	}
 }
+
+func TestCalculateImagePullingTime(t *testing.T) {
+	baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	t.Run("empty sessions should return zero", func(t *testing.T) {
+		sessions := []imagePullSession{}
+		result := calculateImagePullingTime(sessions)
+		assert.Equal(t, time.Duration(0), result)
+	})
+
+	t.Run("incomplete sessions should be ignored (for example: kubelet restart)", func(t *testing.T) {
+		sessions := []imagePullSession{
+			{start: baseTime, end: baseTime.Add(3 * time.Second)},                        // valid: 3s
+			{start: baseTime.Add(5 * time.Second), end: time.Time{}},                     // incomplete, ignored
+			{start: baseTime.Add(10 * time.Second), end: baseTime.Add(12 * time.Second)}, // valid: 2s
+		}
+		result := calculateImagePullingTime(sessions)
+		assert.Equal(t, 5*time.Second, result) // 3s + 2s
+	})
+
+	t.Run("non-overlapping sessions", func(t *testing.T) {
+		sessions := []imagePullSession{
+			{start: baseTime, end: baseTime.Add(2 * time.Second)},                        // 2s
+			{start: baseTime.Add(5 * time.Second), end: baseTime.Add(8 * time.Second)},   // 3s
+			{start: baseTime.Add(10 * time.Second), end: baseTime.Add(15 * time.Second)}, // 5s
+		}
+		result := calculateImagePullingTime(sessions)
+		assert.Equal(t, 10*time.Second, result) // 2s + 3s + 5s
+	})
+
+	t.Run("partially overlapping sessions", func(t *testing.T) {
+		sessions := []imagePullSession{
+			{start: baseTime, end: baseTime.Add(5 * time.Second)},                       // 0-5s
+			{start: baseTime.Add(3 * time.Second), end: baseTime.Add(8 * time.Second)},  // 3-8s (overlap 3-5s)
+			{start: baseTime.Add(7 * time.Second), end: baseTime.Add(12 * time.Second)}, // 7-12s (overlap 7-8s)
+		}
+		result := calculateImagePullingTime(sessions)
+		assert.Equal(t, 12*time.Second, result) // 12s
+	})
+
+	t.Run("completely overlapped sessions", func(t *testing.T) {
+		sessions := []imagePullSession{
+			{start: baseTime, end: baseTime.Add(10 * time.Second)},                     // 0-10s
+			{start: baseTime.Add(2 * time.Second), end: baseTime.Add(8 * time.Second)}, // 2-8s (completely inside)
+			{start: baseTime.Add(3 * time.Second), end: baseTime.Add(5 * time.Second)}, // 3-5s (completely inside)
+		}
+		result := calculateImagePullingTime(sessions)
+		assert.Equal(t, 10*time.Second, result) // Only outer session: 10s
+	})
+
+	t.Run("partially and completely overlapping sessions", func(t *testing.T) {
+		sessions := []imagePullSession{
+			{start: baseTime, end: baseTime.Add(10 * time.Second)},                     // 0-10s
+			{start: baseTime.Add(2 * time.Second), end: baseTime.Add(5 * time.Second)}, // 2-5s (completely inside first)
+			{start: baseTime.Add(3 * time.Second), end: baseTime.Add(7 * time.Second)}, // 3-7s (completely inside first and partially overlapping second)
+		}
+		result := calculateImagePullingTime(sessions)
+		assert.Equal(t, 10*time.Second, result) // 10s
+	})
+
+	t.Run("completely overlapped and partially overlapped sessions with gap", func(t *testing.T) {
+		// Test mixing completely overlapped sessions with separate sessions
+		sessions := []imagePullSession{
+			{start: baseTime, end: baseTime.Add(8 * time.Second)},                        // 0-8s
+			{start: baseTime.Add(2 * time.Second), end: baseTime.Add(6 * time.Second)},   // 2-6s (completely inside first)
+			{start: baseTime.Add(3 * time.Second), end: baseTime.Add(5 * time.Second)},   // 3-5s (completely inside first)
+			{start: baseTime.Add(15 * time.Second), end: baseTime.Add(20 * time.Second)}, // 15-20s (separate)
+			{start: baseTime.Add(16 * time.Second), end: baseTime.Add(18 * time.Second)}, // 16-18s (completely inside fourth)
+			{start: baseTime.Add(17 * time.Second), end: baseTime.Add(21 * time.Second)}, // 17-21s (partially overlapping fourth and fifth)
+		}
+		result := calculateImagePullingTime(sessions)
+		// 8s (first group) + 6s (second group) = 14s
+		assert.Equal(t, 14*time.Second, result)
+	})
+}
