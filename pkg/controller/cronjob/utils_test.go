@@ -141,7 +141,7 @@ func TestGetJobFromTemplate2(t *testing.T) {
 				t.Errorf("Wrong timezone location")
 			}
 			if len(job.ObjectMeta.Annotations) != 0 && scheduledAnnotation != tt.expectedScheduledTime().Format(time.RFC3339) {
-				t.Errorf("Wrong cronJob scheduled timestamp annotation, expexted %s, got %s.", tt.expectedScheduledTime().In(timeZoneLocation).Format(time.RFC3339), scheduledAnnotation)
+				t.Errorf("Wrong cronJob scheduled timestamp annotation, expected %s, got %s.", tt.expectedScheduledTime().In(timeZoneLocation).Format(time.RFC3339), scheduledAnnotation)
 			}
 		})
 	}
@@ -271,7 +271,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(10 * time.Second)}
 		cj.Status.LastScheduleTime = nil
 		now := *deltaTimeAfterTopOfTheHour(1 * time.Hour)
-		// rouge schedule
+		// rogue schedule
 		schedule, err := nextScheduleTime(logger, &cj, now, ParseSchedule("59 23 31 2 *"), recorder)
 		if schedule != nil {
 			t.Errorf("expected no start time, got:  %v", schedule)
