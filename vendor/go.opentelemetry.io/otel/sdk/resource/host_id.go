@@ -8,7 +8,7 @@ import (
 	"errors"
 	"strings"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 )
 
 type hostIDProvider func() (string, error)
@@ -96,7 +96,7 @@ func (r *hostIDReaderLinux) read() (string, error) {
 type hostIDDetector struct{}
 
 // Detect returns a *Resource containing the platform specific host id.
-func (hostIDDetector) Detect(ctx context.Context) (*Resource, error) {
+func (hostIDDetector) Detect(context.Context) (*Resource, error) {
 	hostID, err := hostID()
 	if err != nil {
 		return nil, err
