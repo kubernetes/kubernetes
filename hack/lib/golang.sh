@@ -297,6 +297,10 @@ kube::golang::server_test_targets() {
     targets+=( test/e2e_node/e2e_node.test )
   fi
 
+  if [[ "${KUBE_BUILD_PLATFORMS:-}" == *"windows"* ]]; then
+    targets+=( test/e2e_node_windows/e2e_node_windows.test )
+  fi
+
   echo "${targets[@]}"
 }
 

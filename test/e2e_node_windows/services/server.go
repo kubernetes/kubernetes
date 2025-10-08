@@ -1,8 +1,8 @@
-//go:build linux
-// +build linux
+//go:build windows
+// +build windows
 
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2026 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,12 +26,13 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"reflect"
 	"strconv"
 	"strings"
-	"syscall"
+	"sync"
 	"time"
+	"unsafe"
 
+	"golang.org/x/sys/windows"
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -39,8 +40,12 @@ import (
 
 var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
 
-// A server manages a separate server process started and killed with
-// commands.
+var (
+	once      sync.Once
+	jobHandle windows.Handle
+)
+
+// A server manages a separate server process started and killed with commands.
 type server struct {
 	// name is the name of the server, it is only used for logging.
 	name string
@@ -141,31 +146,15 @@ func (s *server) start() error {
 		s.startCommand.Stdout = outfile
 		s.startCommand.Stderr = outfile
 
-		// If monitorParent is set, set Pdeathsig when starting the server.
-		if s.monitorParent {
-			// Death of this test process should kill the server as well.
-			attrs := &syscall.SysProcAttr{}
-			// Hack to set linux-only field without build tags.
-			deathSigField := reflect.ValueOf(attrs).Elem().FieldByName("Pdeathsig")
-			if deathSigField.IsValid() {
-				deathSigField.Set(reflect.ValueOf(syscall.SIGTERM))
-			} else {
-				errCh <- fmt.Errorf("failed to set Pdeathsig field (non-linux build)")
-				return
-			}
-			s.startCommand.SysProcAttr = attrs
-		}
+		// Start the server using the Windows-specific startProcess function
+		err = startProcess(s.startCommand, s.monitorParent)
 
-		// Start the command
-		err = s.startCommand.Start()
 		if err != nil {
 			errCh <- fmt.Errorf("failed to run %s: %w", s, err)
 			return
 		}
 		if !s.restartOnExit {
 			klog.Infof("Waiting for server %q start command to complete", s.name)
-			// If we aren't planning on restarting, ok to Wait() here to release resources.
-			// Otherwise, we Wait() in the restart loop.
 			err = s.startCommand.Wait()
 			if err != nil {
 				errCh <- fmt.Errorf("failed to run start command for server %q: %w", s.name, err)
@@ -175,20 +164,17 @@ func (s *server) start() error {
 			usedStartCmd := true
 			for {
 				klog.Infof("Running health check for service %q", s.name)
-				// Wait for an initial health check to pass, so that we are sure the server started.
 				err := readinessCheck(s.name, s.healthCheckUrls, nil)
 				if err != nil {
 					if usedStartCmd {
 						klog.Infof("Waiting for server %q start command to complete after initial health check failed", s.name)
-						s.startCommand.Wait() // Release resources if necessary.
+						s.startCommand.Wait()
 					}
-					// This should not happen, immediately stop the e2eService process.
 					klog.Fatalf("Restart loop readinessCheck failed for %q", s.name)
 				} else {
 					klog.Infof("Initial health check passed for service %q", s.name)
 				}
 
-				// Initial health check passed, wait until a health check fails again.
 			stillAlive:
 				for {
 					select {
@@ -206,12 +192,10 @@ func (s *server) start() error {
 				}
 
 				if usedStartCmd {
-					s.startCommand.Wait() // Release resources from last cmd
+					s.startCommand.Wait()
 					usedStartCmd = false
 				}
 				if s.restartCommand != nil {
-					// Always make a fresh copy of restartCommand before
-					// running, we may have to restart multiple times
 					s.restartCommand = &exec.Cmd{
 						Path:        s.restartCommand.Path,
 						Args:        s.restartCommand.Args,
@@ -223,12 +207,9 @@ func (s *server) start() error {
 						ExtraFiles:  s.restartCommand.ExtraFiles,
 						SysProcAttr: s.restartCommand.SysProcAttr,
 					}
-					// Run and wait for exit. This command is assumed to have
-					// short duration, e.g. systemctl restart
 					klog.Infof("Restarting server %q with restart command", s.name)
 					err = s.restartCommand.Run()
 					if err != nil {
-						// This should not happen, immediately stop the e2eService process.
 						klog.Fatalf("Restarting server %s with restartCommand failed. Error: %v.", s, err)
 					}
 				} else {
@@ -247,7 +228,6 @@ func (s *server) start() error {
 					err = s.startCommand.Start()
 					usedStartCmd = true
 					if err != nil {
-						// This should not happen, immediately stop the e2eService process.
 						klog.Fatalf("Restarting server %s with startCommand failed. Error: %v.", s, err)
 					}
 				}
@@ -264,7 +244,6 @@ func (s *server) kill() error {
 	name := s.name
 	cmd := s.startCommand
 
-	// If s has a restart loop, turn it off.
 	if s.restartOnExit {
 		s.stopRestartingCh <- true
 		<-s.ackStopRestartingCh
@@ -287,7 +266,6 @@ func (s *server) kill() error {
 		return fmt.Errorf("invalid PID %d for %q", pid, name)
 	}
 
-	// Attempt to shut down the process in a friendly manner before forcing it.
 	waitChan := make(chan error)
 	go func() {
 		_, err := cmd.Process.Wait()
@@ -310,7 +288,6 @@ func (s *server) kill() error {
 			if err != nil {
 				return fmt.Errorf("error stopping %q: %w", name, err)
 			}
-			// Success!
 			return nil
 		case <-time.After(timeout):
 			// Continue.
@@ -321,12 +298,72 @@ func (s *server) kill() error {
 }
 
 func (s *server) stopUnit() error {
-	klog.Infof("Stopping systemd unit for server %q with unit name: %q", s.name, s.systemdUnitName)
-	if s.systemdUnitName != "" {
-		err := exec.Command("sudo", "systemctl", "stop", s.systemdUnitName).Run()
-		if err != nil {
-			return fmt.Errorf("Failed to stop systemd unit name: %q: %w", s.systemdUnitName, err)
-		}
-	}
+	// No systemd on Windows; this is a no-op.
 	return nil
+}
+
+// startProcess starts the process with the given command and arguments.
+func startProcess(cmd *exec.Cmd, monitorParent bool) error {
+	if monitorParent {
+		jobHandle, err := getJobHandle()
+		if err != nil {
+			return err
+		}
+
+		go func() {
+			defer windows.CloseHandle(jobHandle)
+			waitForTerminationSignal()
+		}()
+
+		err = cmd.Start()
+		if err != nil {
+			return err
+		}
+
+		return assignProcessToJob(jobHandle, cmd.Process.Pid)
+	}
+	return cmd.Start()
+}
+
+// getJobHandle returns the single instance of job handle.
+func getJobHandle() (windows.Handle, error) {
+	var err error
+	once.Do(func() {
+		jobHandle, err = createJobObject()
+	})
+	return jobHandle, err
+}
+
+// createJobObject creates a Windows job object.
+func createJobObject() (windows.Handle, error) {
+	jobHandle, err := windows.CreateJobObject(nil, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	var info windows.JOBOBJECT_BASIC_LIMIT_INFORMATION
+	info.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+	var extendedInfo windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+	extendedInfo.BasicLimitInformation = info
+	_, err = windows.SetInformationJobObject(
+		jobHandle,
+		windows.JobObjectExtendedLimitInformation,
+		uintptr(unsafe.Pointer(&extendedInfo)),
+		uint32(unsafe.Sizeof(extendedInfo)),
+	)
+	if err != nil {
+		windows.CloseHandle(jobHandle)
+		return 0, err
+	}
+	return jobHandle, nil
+}
+
+// assignProcessToJob assigns the process to the job object.
+func assignProcessToJob(jobHandle windows.Handle, pid int) error {
+	processHandle, err := windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE, false, uint32(pid))
+	if err != nil {
+		return err
+	}
+	defer windows.CloseHandle(processHandle)
+	return windows.AssignProcessToJobObject(jobHandle, processHandle)
 }
