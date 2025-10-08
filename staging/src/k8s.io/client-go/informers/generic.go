@@ -71,6 +71,7 @@ import (
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	storagemigrationv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	storagemigrationv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -470,6 +471,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=storagemigration.k8s.io, Version=v1alpha1
 	case storagemigrationv1alpha1.SchemeGroupVersion.WithResource("storageversionmigrations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storagemigration().V1alpha1().StorageVersionMigrations().Informer()}, nil
+
+		// Group=storagemigration.k8s.io, Version=v1beta1
+	case storagemigrationv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Storagemigration().V1beta1().StorageVersionMigrations().Informer()}, nil
 
 	}
 
