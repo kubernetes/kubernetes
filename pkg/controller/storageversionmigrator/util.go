@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	corev1 "k8s.io/api/core/v1"
-	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,7 +36,7 @@ func convertResourceVersionToInt(rv string) (int64, error) {
 	return resourceVersion, nil
 }
 
-func getGVRFromResource(svm *svmv1alpha1.StorageVersionMigration) schema.GroupVersionResource {
+func getGVRFromResource(svm *svmv1beta1.StorageVersionMigration) schema.GroupVersionResource {
 	return schema.GroupVersionResource{
 		Group:    svm.Spec.Resource.Group,
 		Version:  svm.Spec.Resource.Version,
@@ -46,11 +46,11 @@ func getGVRFromResource(svm *svmv1alpha1.StorageVersionMigration) schema.GroupVe
 
 // IsConditionTrue returns true if the StorageVersionMigration has the given condition
 // It is exported for use in tests
-func IsConditionTrue(svm *svmv1alpha1.StorageVersionMigration, conditionType svmv1alpha1.MigrationConditionType) bool {
+func IsConditionTrue(svm *svmv1beta1.StorageVersionMigration, conditionType svmv1beta1.MigrationConditionType) bool {
 	return indexOfCondition(svm, conditionType) != -1
 }
 
-func indexOfCondition(svm *svmv1alpha1.StorageVersionMigration, conditionType svmv1alpha1.MigrationConditionType) int {
+func indexOfCondition(svm *svmv1beta1.StorageVersionMigration, conditionType svmv1beta1.MigrationConditionType) int {
 	for i, c := range svm.Status.Conditions {
 		if c.Type == conditionType && c.Status == corev1.ConditionTrue {
 			return i
@@ -60,19 +60,19 @@ func indexOfCondition(svm *svmv1alpha1.StorageVersionMigration, conditionType sv
 }
 
 func setStatusConditions(
-	toBeUpdatedSVM *svmv1alpha1.StorageVersionMigration,
-	conditionType svmv1alpha1.MigrationConditionType,
+	toBeUpdatedSVM *svmv1beta1.StorageVersionMigration,
+	conditionType svmv1beta1.MigrationConditionType,
 	reason, message string,
-) *svmv1alpha1.StorageVersionMigration {
+) *svmv1beta1.StorageVersionMigration {
 	if !IsConditionTrue(toBeUpdatedSVM, conditionType) {
-		if conditionType == svmv1alpha1.MigrationSucceeded || conditionType == svmv1alpha1.MigrationFailed {
-			runningConditionIdx := indexOfCondition(toBeUpdatedSVM, svmv1alpha1.MigrationRunning)
+		if conditionType == svmv1beta1.MigrationSucceeded || conditionType == svmv1beta1.MigrationFailed {
+			runningConditionIdx := indexOfCondition(toBeUpdatedSVM, svmv1beta1.MigrationRunning)
 			if runningConditionIdx != -1 {
 				toBeUpdatedSVM.Status.Conditions[runningConditionIdx].Status = corev1.ConditionFalse
 			}
 		}
 
-		toBeUpdatedSVM.Status.Conditions = append(toBeUpdatedSVM.Status.Conditions, svmv1alpha1.MigrationCondition{
+		toBeUpdatedSVM.Status.Conditions = append(toBeUpdatedSVM.Status.Conditions, svmv1beta1.MigrationCondition{
 			Type:           conditionType,
 			Status:         corev1.ConditionTrue,
 			LastUpdateTime: metav1.Now(),
