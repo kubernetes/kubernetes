@@ -1,0 +1,17 @@
+syntax = "proto2";
+
+package issue312.events;
+
+import "github.com/gogo/protobuf/test/issue312/issue312.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option go_package = "events";
+option (gogoproto.gostring_all) = true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.testgen_all) = true;
+
+message Subtype {
+  optional issue312.TaskState state = 4;
+}
+

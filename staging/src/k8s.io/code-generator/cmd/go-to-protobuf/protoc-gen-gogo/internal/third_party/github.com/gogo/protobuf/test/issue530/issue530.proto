@@ -1,0 +1,104 @@
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2019, The GoGo Authors. All rights reserved.
+// http://github.com/gogo/protobuf
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto2";
+
+package issue530;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.stringer_all) = true;
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.goproto_unrecognized_all) = false;
+option (gogoproto.goproto_sizecache_all) = false;
+option (gogoproto.goproto_unkeyed_all) = false;
+
+//option (gogoproto.equal_all) = true;
+option (gogoproto.testgen_all) = true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.equal_all) = true;
+
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+
+message Foo5 {
+    optional Bar1 bar1  = 1 [(gogoproto.nullable) = false];
+    optional Bar1 bar2  = 2 [(gogoproto.nullable) = true];
+    optional Bar2 bar3  = 3 [(gogoproto.nullable) = false];
+    optional Bar2 bar4  = 4 [(gogoproto.nullable) = true];
+    repeated Bar1 bars1 = 5 [(gogoproto.nullable) = false];
+    repeated Bar1 bars2 = 6 [(gogoproto.nullable) = true];
+    repeated Bar2 bars3 = 7 [(gogoproto.nullable) = false];
+    repeated Bar2 bars4 = 8 [(gogoproto.nullable) = true];
+
+    repeated Bar3 barrs1 = 9 [(gogoproto.nullable) = false];
+    repeated Bar5 barrs2 = 10 [(gogoproto.nullable) = false];
+
+    map<string, Bar3> barmap1 = 11;
+    map<string, Bar5> barmap2 = 12;
+}
+
+message Bar1 {
+    optional string str = 1 [(gogoproto.nullable) = false];
+}
+
+message Bar2 {
+    optional string str = 1 [(gogoproto.nullable) = true];
+}
+
+message Bar3 {
+    repeated Bar4 bars4 = 1 [(gogoproto.nullable) = false];
+    repeated Bar2 bars2 = 2 [(gogoproto.nullable) = false];
+}
+
+message Bar4 {
+    optional string str = 1 [(gogoproto.nullable) = false];
+}
+
+message Bar5 {
+    repeated Bar2 bars2 = 1 [(gogoproto.nullable) = true];
+    repeated Bar1 bars1 = 2 [(gogoproto.nullable) = true];
+}
+
+message Bar7 {
+    repeated Bar7 bars71 = 1 [(gogoproto.nullable) = false];
+    repeated Bar7 bars72 = 2 [(gogoproto.nullable) = true];
+    optional string str1 = 3 [(gogoproto.nullable) = false];
+    optional string str2 = 4 [(gogoproto.nullable) = true];
+}
+
+message Bar8 {
+    repeated Bar9 bars1 = 1 [(gogoproto.nullable) = false];
+}
+
+message Bar9 {
+    option (gogoproto.stringer) = false;
+    option (gogoproto.goproto_stringer) = true;
+    optional string str = 1 [(gogoproto.nullable) = false];
+}

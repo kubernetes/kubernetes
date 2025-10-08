@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package typedeclimport;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+import "github.com/gogo/protobuf/test/typedeclimport/subpkg/subpkg.proto";
+
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+
+message SomeMessage {
+    option (gogoproto.typedecl) = false;
+    subpkg.AnotherMessage imported = 1 [(gogoproto.nullable) = false];
+}

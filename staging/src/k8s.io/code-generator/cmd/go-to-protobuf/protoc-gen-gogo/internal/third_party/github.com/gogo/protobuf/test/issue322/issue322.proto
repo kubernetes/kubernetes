@@ -1,0 +1,16 @@
+syntax = "proto2";
+package test;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.gostring_all) = true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.testgen_all) = true;
+option (gogoproto.compare_all) = true;
+
+message OneofTest {
+    oneof union {
+        int32 i = 1 [default = 4];
+    }
+}

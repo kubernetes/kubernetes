@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package issue330;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.benchgen_all)    = true;
+option (gogoproto.equal_all)       = true;
+option (gogoproto.marshaler_all)   = true;
+option (gogoproto.populate_all)    = true;
+option (gogoproto.sizer_all)       = true;
+option (gogoproto.testgen_all)     = true;
+option (gogoproto.unmarshaler_all) = true;
+
+message Object {
+    uint32 type         = 1 [(gogoproto.casttype) = "TypeIdentifier"];
+}

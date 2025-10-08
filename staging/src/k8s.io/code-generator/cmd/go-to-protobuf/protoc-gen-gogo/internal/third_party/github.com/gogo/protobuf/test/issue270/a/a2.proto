@@ -1,0 +1,12 @@
+syntax = "proto2";
+
+package issue270.a;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "github.com/gogo/protobuf/test/issue270/b/b.proto";
+
+option (gogoproto.populate_all) = true;
+
+message A2 {
+    optional issue270.b.B b = 1;
+}
