@@ -34,7 +34,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 )
 
 //func SetRawExtension(base extendableProto, id int32, b []byte) {
@@ -145,7 +145,7 @@ func TestUnsafeExtension(t *testing.T) {
 	check(t, m, fieldA, E_FieldA)
 }
 
-//See another version of this test in proto/extensions_test.go
+// See another version of this test in proto/extensions_test.go
 func TestGetExtensionStability(t *testing.T) {
 	check := func(m *NoExtensionsMap) bool {
 		ext1, err := proto.GetExtension(m, E_FieldB1)

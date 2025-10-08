@@ -5,18 +5,20 @@
 Package typedeclimport is a generated protocol buffer package.
 
 It is generated from these files:
+
 	typedeclimport.proto
 
 It has these top-level messages:
+
 	SomeMessage
 */
 package typedeclimport
 
-import proto "github.com/gogo/protobuf/proto"
+import proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import _ "github.com/gogo/protobuf/gogoproto"
-import subpkg "github.com/gogo/protobuf/test/typedeclimport/subpkg"
+import _ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
+import subpkg "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/typedeclimport/subpkg"
 
 import io "io"
 

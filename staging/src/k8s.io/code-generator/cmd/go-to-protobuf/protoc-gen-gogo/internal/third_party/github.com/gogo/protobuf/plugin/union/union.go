@@ -31,11 +31,11 @@ The onlyone plugin generates code for the onlyone extension.
 All fields must be nullable and only one of the fields may be set, like a union.
 Two methods are generated
 
-  GetValue() interface{}
+	GetValue() interface{}
 
 and
 
-  SetValue(v interface{}) (set bool)
+	SetValue(v interface{}) (set bool)
 
 These provide easier interaction with a onlyone.
 
@@ -54,19 +54,19 @@ The onlyone plugin also generates a test given it is enabled using one of the fo
 
 Lets look at:
 
-  github.com/gogo/protobuf/test/example/example.proto
+	github.com/gogo/protobuf/test/example/example.proto
 
 Btw all the output can be seen at:
 
-  github.com/gogo/protobuf/test/example/*
+	github.com/gogo/protobuf/test/example/*
 
 The following message:
 
-  message U {
-	  option (gogoproto.onlyone) = true;
-	  optional A A = 1;
-	  optional B B = 2;
-  }
+	  message U {
+		  option (gogoproto.onlyone) = true;
+		  optional A A = 1;
+		  optional B B = 2;
+	  }
 
 given to the onlyone plugin, will generate code which looks a lot like this:
 
@@ -94,25 +94,24 @@ given to the onlyone plugin, will generate code which looks a lot like this:
 
 and the following test code:
 
-  func TestUUnion(t *testing.T) {
-	popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
-	p := NewPopulatedU(popr)
-	v := p.GetValue()
-	msg := &U{}
-	if !msg.SetValue(v) {
-		t.Fatalf("Union: Could not set Value")
-	}
-	if !p.Equal(msg) {
-		t.Fatalf("%#v !Union Equal %#v", msg, p)
-	}
-  }
-
+	  func TestUUnion(t *testing.T) {
+		popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
+		p := NewPopulatedU(popr)
+		v := p.GetValue()
+		msg := &U{}
+		if !msg.SetValue(v) {
+			t.Fatalf("Union: Could not set Value")
+		}
+		if !p.Equal(msg) {
+			t.Fatalf("%#v !Union Equal %#v", msg, p)
+		}
+	  }
 */
 package union
 
 import (
-	"github.com/gogo/protobuf/gogoproto"
-	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/generator"
 )
 
 type union struct {

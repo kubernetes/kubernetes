@@ -6,8 +6,8 @@ package types
 import (
 	bytes "bytes"
 	fmt "fmt"
-	proto "github.com/gogo/protobuf/proto"
 	io "io"
+	proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
@@ -29,9 +29,9 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 // empty messages in your APIs. A typical example is to use it as the request
 // or the response type of an API method. For instance:
 //
-//     service Foo {
-//       rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);
-//     }
+//	service Foo {
+//	  rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);
+//	}
 //
 // The JSON representation for `Empty` is empty JSON object `{}`.
 type Empty struct {

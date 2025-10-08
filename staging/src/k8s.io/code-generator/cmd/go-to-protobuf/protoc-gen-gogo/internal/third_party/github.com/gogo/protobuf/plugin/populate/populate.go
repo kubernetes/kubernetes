@@ -37,40 +37,40 @@ It is enabled by the following extensions:
 
 Let us look at:
 
-  github.com/gogo/protobuf/test/example/example.proto
+	github.com/gogo/protobuf/test/example/example.proto
 
 Btw all the output can be seen at:
 
-  github.com/gogo/protobuf/test/example/*
+	github.com/gogo/protobuf/test/example/*
 
 The following message:
 
-  option (gogoproto.populate_all) = true;
+	  option (gogoproto.populate_all) = true;
 
-  message B {
-	optional A A = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-	repeated bytes G = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
-  }
+	  message B {
+		optional A A = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+		repeated bytes G = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
+	  }
 
 given to the populate plugin, will generate code the following code:
 
-  func NewPopulatedB(r randyExample, easy bool) *B {
-	this := &B{}
-	v2 := NewPopulatedA(r, easy)
-	this.A = *v2
-	if r.Intn(10) != 0 {
-		v3 := r.Intn(10)
-		this.G = make([]github_com_gogo_protobuf_test_custom.Uint128, v3)
-		for i := 0; i < v3; i++ {
-			v4 := github_com_gogo_protobuf_test_custom.NewPopulatedUint128(r)
-			this.G[i] = *v4
+	  func NewPopulatedB(r randyExample, easy bool) *B {
+		this := &B{}
+		v2 := NewPopulatedA(r, easy)
+		this.A = *v2
+		if r.Intn(10) != 0 {
+			v3 := r.Intn(10)
+			this.G = make([]github_com_gogo_protobuf_test_custom.Uint128, v3)
+			for i := 0; i < v3; i++ {
+				v4 := github_com_gogo_protobuf_test_custom.NewPopulatedUint128(r)
+				this.G[i] = *v4
+			}
 		}
-	}
-	if !easy && r.Intn(10) != 0 {
-		this.XXX_unrecognized = randUnrecognizedExample(r, 3)
-	}
-	return this
-  }
+		if !easy && r.Intn(10) != 0 {
+			this.XXX_unrecognized = randUnrecognizedExample(r, 3)
+		}
+		return this
+	  }
 
 The idea that is useful for testing.
 Most of the other plugins' generated test code uses it.
@@ -79,7 +79,6 @@ if you turn off the popluate plugin and write your own custom NewPopulated funct
 
 If the easy flag is not set the XXX_unrecognized and XXX_extensions fields are also populated.
 These have caused problems with JSON marshalling and unmarshalling tests.
-
 */
 package populate
 
@@ -89,11 +88,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gogo/protobuf/gogoproto"
-	"github.com/gogo/protobuf/proto"
-	descriptor "github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
-	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
-	"github.com/gogo/protobuf/vanity"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
+	descriptor "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/generator"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/vanity"
 )
 
 type VarGen interface {
@@ -523,9 +522,9 @@ func (p *plugin) Generate(file *generator.FileDescriptor) {
 	p.PluginImports = generator.NewPluginImports(p.Generator)
 	p.varGen = NewVarGen()
 	proto3 := gogoproto.IsProto3(file.FileDescriptorProto)
-	p.typesPkg = p.NewImport("github.com/gogo/protobuf/types")
+	p.typesPkg = p.NewImport("k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types")
 	p.localName = generator.FileName(file)
-	protoPkg := p.NewImport("github.com/gogo/protobuf/proto")
+	protoPkg := p.NewImport("k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto")
 	if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
 		protoPkg = p.NewImport("github.com/golang/protobuf/proto")
 	}

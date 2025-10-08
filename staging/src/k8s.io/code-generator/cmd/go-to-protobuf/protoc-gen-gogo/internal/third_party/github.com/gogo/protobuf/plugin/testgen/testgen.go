@@ -41,22 +41,22 @@ Benchmarks are enabled using the following extensions:
 
 Let us look at:
 
-  github.com/gogo/protobuf/test/example/example.proto
+	github.com/gogo/protobuf/test/example/example.proto
 
 Btw all the output can be seen at:
 
-  github.com/gogo/protobuf/test/example/*
+	github.com/gogo/protobuf/test/example/*
 
 The following message:
 
-  option (gogoproto.testgen_all) = true;
-  option (gogoproto.benchgen_all) = true;
+	  option (gogoproto.testgen_all) = true;
+	  option (gogoproto.benchgen_all) = true;
 
-  message A {
-	optional string Description = 1 [(gogoproto.nullable) = false];
-	optional int64 Number = 2 [(gogoproto.nullable) = false];
-	optional bytes Id = 3 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uuid", (gogoproto.nullable) = false];
-  }
+	  message A {
+		optional string Description = 1 [(gogoproto.nullable) = false];
+		optional int64 Number = 2 [(gogoproto.nullable) = false];
+		optional bytes Id = 3 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uuid", (gogoproto.nullable) = false];
+	  }
 
 given to the testgen plugin, will generate the following test code:
 
@@ -178,17 +178,17 @@ given to the testgen plugin, will generate the following test code:
 Other registered tests are also generated.
 Tests are registered to this test plugin by calling the following function.
 
-  func RegisterTestPlugin(newFunc NewTestPlugin)
+	func RegisterTestPlugin(newFunc NewTestPlugin)
 
 where NewTestPlugin is:
 
-  type NewTestPlugin func(g *generator.Generator) TestPlugin
+	type NewTestPlugin func(g *generator.Generator) TestPlugin
 
 and TestPlugin is an interface:
 
-  type TestPlugin interface {
-	Generate(imports generator.PluginImports, file *generator.FileDescriptor) (used bool)
-  }
+	  type TestPlugin interface {
+		Generate(imports generator.PluginImports, file *generator.FileDescriptor) (used bool)
+	  }
 
 Plugins that use this interface include:
 
@@ -200,13 +200,12 @@ Plugins that use this interface include:
 
 Please look at these plugins as examples of how to create your own.
 A good idea is to let each plugin generate its own tests.
-
 */
 package testgen
 
 import (
-	"github.com/gogo/protobuf/gogoproto"
-	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/generator"
 )
 
 type TestPlugin interface {
@@ -270,7 +269,7 @@ func (p *testProto) Generate(imports generator.PluginImports, file *generator.Fi
 	testingPkg := imports.NewImport("testing")
 	randPkg := imports.NewImport("math/rand")
 	timePkg := imports.NewImport("time")
-	protoPkg := imports.NewImport("github.com/gogo/protobuf/proto")
+	protoPkg := imports.NewImport("k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto")
 	if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
 		protoPkg = imports.NewImport("github.com/golang/protobuf/proto")
 	}
@@ -468,7 +467,7 @@ func (p *testJson) Generate(imports generator.PluginImports, file *generator.Fil
 	testingPkg := imports.NewImport("testing")
 	randPkg := imports.NewImport("math/rand")
 	timePkg := imports.NewImport("time")
-	jsonPkg := imports.NewImport("github.com/gogo/protobuf/jsonpb")
+	jsonPkg := imports.NewImport("k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/jsonpb")
 	for _, message := range file.Messages() {
 		ccTypeName := generator.CamelCaseSlice(message.TypeName())
 		if message.DescriptorProto.GetOptions().GetMapEntry() {
@@ -527,7 +526,7 @@ func (p *testText) Generate(imports generator.PluginImports, file *generator.Fil
 	testingPkg := imports.NewImport("testing")
 	randPkg := imports.NewImport("math/rand")
 	timePkg := imports.NewImport("time")
-	protoPkg := imports.NewImport("github.com/gogo/protobuf/proto")
+	protoPkg := imports.NewImport("k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto")
 	if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
 		protoPkg = imports.NewImport("github.com/golang/protobuf/proto")
 	}

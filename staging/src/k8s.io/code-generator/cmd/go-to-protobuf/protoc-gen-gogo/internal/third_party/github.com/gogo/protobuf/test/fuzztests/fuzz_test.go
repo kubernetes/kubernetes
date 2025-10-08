@@ -29,7 +29,7 @@
 package fuzztests
 
 import (
-	"github.com/gogo/protobuf/proto"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	"testing"
 )
 
@@ -88,7 +88,7 @@ func DisabledTestFuzzOverrideField(t *testing.T) {
 	}
 }
 
-//Generated code is correct, non generated returns an incorrect error
+// Generated code is correct, non generated returns an incorrect error
 func DisabledTestFuzzBadWireType(t *testing.T) {
 	msg := &NinRepPackedNative{}
 	//input := []byte("j\x160\xfc0000\xf6\xfa000\xc1\xaf\xf5000\xcf" + "00\xb90z\r0\x850\xd30000'0000")
@@ -111,7 +111,7 @@ func TestFuzzIntegerOverflow(t *testing.T) {
 	}
 }
 
-//Generated code is correct, non generated returns an incorrect error
+// Generated code is correct, non generated returns an incorrect error
 func DisabledTestFuzzUnexpectedEOF(t *testing.T) {
 	msg := &NinRepPackedNative{}
 	//input := []byte("j\x16000000000000000000" + "00\xb90")
@@ -123,7 +123,7 @@ func DisabledTestFuzzUnexpectedEOF(t *testing.T) {
 	}
 }
 
-//Generated code is correct, non generated returns an incorrect error
+// Generated code is correct, non generated returns an incorrect error
 func DisabledTestFuzzCantSkipWireType(t *testing.T) {
 	msg := &NinRepPackedNative{}
 	//input := []byte("j\x160\xfc0000\xf6\xfa000\xc1\xaf\xf5000\xcf" + "00\xb90z\r0\x850\xd3000\xa80\xa7000")

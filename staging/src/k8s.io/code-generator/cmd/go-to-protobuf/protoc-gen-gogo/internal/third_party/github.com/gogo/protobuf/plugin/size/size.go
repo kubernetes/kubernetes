@@ -50,43 +50,43 @@ And a benchmark given it is enabled using one of the following extensions:
 
 Let us look at:
 
-  github.com/gogo/protobuf/test/example/example.proto
+	github.com/gogo/protobuf/test/example/example.proto
 
 Btw all the output can be seen at:
 
-  github.com/gogo/protobuf/test/example/*
+	github.com/gogo/protobuf/test/example/*
 
 The following message:
 
-  option (gogoproto.sizer_all) = true;
+	  option (gogoproto.sizer_all) = true;
 
-  message B {
-	option (gogoproto.description) = true;
-	optional A A = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-	repeated bytes G = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
-  }
+	  message B {
+		option (gogoproto.description) = true;
+		optional A A = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+		repeated bytes G = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
+	  }
 
 given to the size plugin, will generate the following code:
 
-  func (m *B) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	l = m.A.Size()
-	n += 1 + l + sovExample(uint64(l))
-	if len(m.G) > 0 {
-		for _, e := range m.G {
-			l = e.Size()
-			n += 1 + l + sovExample(uint64(l))
+	  func (m *B) Size() (n int) {
+		if m == nil {
+			return 0
 		}
-	}
-	if m.XXX_unrecognized != nil {
-		n += len(m.XXX_unrecognized)
-	}
-	return n
-  }
+		var l int
+		_ = l
+		l = m.A.Size()
+		n += 1 + l + sovExample(uint64(l))
+		if len(m.G) > 0 {
+			for _, e := range m.G {
+				l = e.Size()
+				n += 1 + l + sovExample(uint64(l))
+			}
+		}
+		if m.XXX_unrecognized != nil {
+			n += len(m.XXX_unrecognized)
+		}
+		return n
+	  }
 
 and the following test code:
 
@@ -118,7 +118,6 @@ and the following test code:
 	}
 
 The sovExample function is a size of varint function for the example.pb.go file.
-
 */
 package size
 
@@ -128,11 +127,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gogo/protobuf/gogoproto"
-	"github.com/gogo/protobuf/proto"
-	descriptor "github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
-	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
-	"github.com/gogo/protobuf/vanity"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
+	descriptor "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/generator"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/vanity"
 )
 
 type size struct {
@@ -581,8 +580,8 @@ func (p *size) Generate(file *generator.FileDescriptor) {
 	p.PluginImports = generator.NewPluginImports(p.Generator)
 	p.atleastOne = false
 	p.localName = generator.FileName(file)
-	p.typesPkg = p.NewImport("github.com/gogo/protobuf/types")
-	protoPkg := p.NewImport("github.com/gogo/protobuf/proto")
+	p.typesPkg = p.NewImport("k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types")
+	protoPkg := p.NewImport("k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto")
 	p.bitsPkg = p.NewImport("math/bits")
 	if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
 		protoPkg = p.NewImport("github.com/golang/protobuf/proto")

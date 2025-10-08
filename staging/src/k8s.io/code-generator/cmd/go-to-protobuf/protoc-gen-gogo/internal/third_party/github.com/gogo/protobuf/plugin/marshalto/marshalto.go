@@ -57,74 +57,74 @@ And benchmarks given it is enabled using one of the following extensions:
 
 Let us look at:
 
-  github.com/gogo/protobuf/test/example/example.proto
+	github.com/gogo/protobuf/test/example/example.proto
 
 Btw all the output can be seen at:
 
-  github.com/gogo/protobuf/test/example/*
+	github.com/gogo/protobuf/test/example/*
 
 The following message:
 
 option (gogoproto.marshaler_all) = true;
 
-message B {
-	option (gogoproto.description) = true;
-	optional A A = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-	repeated bytes G = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
-}
+	message B {
+		option (gogoproto.description) = true;
+		optional A A = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+		repeated bytes G = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
+	}
 
 given to the marshalto plugin, will generate the following code:
 
-  func (m *B) Marshal() (dAtA []byte, err error) {
-          size := m.Size()
-          dAtA = make([]byte, size)
-          n, err := m.MarshalToSizedBuffer(dAtA[:size])
-          if err != nil {
-                  return nil, err
-          }
-          return dAtA[:n], nil
-  }
+	func (m *B) Marshal() (dAtA []byte, err error) {
+	        size := m.Size()
+	        dAtA = make([]byte, size)
+	        n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	        if err != nil {
+	                return nil, err
+	        }
+	        return dAtA[:n], nil
+	}
 
-  func (m *B) MarshalTo(dAtA []byte) (int, error) {
-          size := m.Size()
-          return m.MarshalToSizedBuffer(dAtA[:size])
-  }
+	func (m *B) MarshalTo(dAtA []byte) (int, error) {
+	        size := m.Size()
+	        return m.MarshalToSizedBuffer(dAtA[:size])
+	}
 
-  func (m *B) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-          i := len(dAtA)
-          _ = i
-          var l int
-          _ = l
-          if m.XXX_unrecognized != nil {
-                  i -= len(m.XXX_unrecognized)
-                  copy(dAtA[i:], m.XXX_unrecognized)
-          }
-          if len(m.G) > 0 {
-                  for iNdEx := len(m.G) - 1; iNdEx >= 0; iNdEx-- {
-                          {
-                                  size := m.G[iNdEx].Size()
-                                  i -= size
-                                  if _, err := m.G[iNdEx].MarshalTo(dAtA[i:]); err != nil {
-                                          return 0, err
-                                  }
-                                  i = encodeVarintExample(dAtA, i, uint64(size))
-                          }
-                          i--
-                          dAtA[i] = 0x12
-                  }
-          }
-          {
-                  size, err := m.A.MarshalToSizedBuffer(dAtA[:i])
-                  if err != nil {
-                          return 0, err
-                  }
-                  i -= size
-                  i = encodeVarintExample(dAtA, i, uint64(size))
-          }
-          i--
-          dAtA[i] = 0xa
-          return len(dAtA) - i, nil
-  }
+	func (m *B) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	        i := len(dAtA)
+	        _ = i
+	        var l int
+	        _ = l
+	        if m.XXX_unrecognized != nil {
+	                i -= len(m.XXX_unrecognized)
+	                copy(dAtA[i:], m.XXX_unrecognized)
+	        }
+	        if len(m.G) > 0 {
+	                for iNdEx := len(m.G) - 1; iNdEx >= 0; iNdEx-- {
+	                        {
+	                                size := m.G[iNdEx].Size()
+	                                i -= size
+	                                if _, err := m.G[iNdEx].MarshalTo(dAtA[i:]); err != nil {
+	                                        return 0, err
+	                                }
+	                                i = encodeVarintExample(dAtA, i, uint64(size))
+	                        }
+	                        i--
+	                        dAtA[i] = 0x12
+	                }
+	        }
+	        {
+	                size, err := m.A.MarshalToSizedBuffer(dAtA[:i])
+	                if err != nil {
+	                        return 0, err
+	                }
+	                i -= size
+	                i = encodeVarintExample(dAtA, i, uint64(size))
+	        }
+	        i--
+	        dAtA[i] = 0xa
+	        return len(dAtA) - i, nil
+	}
 
 As shown above Marshal calculates the size of the not yet marshalled message
 and allocates the appropriate buffer.
@@ -149,11 +149,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gogo/protobuf/gogoproto"
-	"github.com/gogo/protobuf/proto"
-	descriptor "github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
-	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
-	"github.com/gogo/protobuf/vanity"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
+	descriptor "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/generator"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/vanity"
 )
 
 type NumGen interface {
@@ -891,14 +891,14 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 	p.localName = generator.FileName(file)
 
 	p.mathPkg = p.NewImport("math")
-	p.sortKeysPkg = p.NewImport("github.com/gogo/protobuf/sortkeys")
-	p.protoPkg = p.NewImport("github.com/gogo/protobuf/proto")
+	p.sortKeysPkg = p.NewImport("k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/sortkeys")
+	p.protoPkg = p.NewImport("k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto")
 	if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
 		p.protoPkg = p.NewImport("github.com/golang/protobuf/proto")
 	}
 	p.errorsPkg = p.NewImport("errors")
 	p.binaryPkg = p.NewImport("encoding/binary")
-	p.typesPkg = p.NewImport("github.com/gogo/protobuf/types")
+	p.typesPkg = p.NewImport("k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types")
 
 	for _, message := range file.Messages() {
 		if message.DescriptorProto.GetOptions().GetMapEntry() {

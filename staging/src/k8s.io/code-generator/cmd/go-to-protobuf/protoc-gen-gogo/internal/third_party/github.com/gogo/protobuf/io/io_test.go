@@ -31,9 +31,9 @@ package io_test
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/gogo/protobuf/io"
-	"github.com/gogo/protobuf/test"
 	goio "io"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/io"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test"
 	"math/rand"
 	"testing"
 	"time"
@@ -165,7 +165,7 @@ func TestVarintNoClose(t *testing.T) {
 	}
 }
 
-//issue 32
+// issue 32
 func TestVarintMaxSize(t *testing.T) {
 	buf := newBuffer()
 	writer := io.NewDelimitedWriter(buf)

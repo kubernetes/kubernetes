@@ -35,7 +35,7 @@ Package gogoproto provides extensions for protocol buffers to achieve:
   - less typing by optionally generating extra helper code.
   - goprotobuf compatibility
 
-More Canonical Go Structures
+# More Canonical Go Structures
 
 A lot of time working with a goprotobuf struct will lead you to a place where you create another struct that is easier to work with and then have a function to copy the values between the two structs.
 You might also find that basic structs that started their life as part of an API need to be sent over the wire. With gob, you could just send it. With goprotobuf, you need to make a parallel struct.
@@ -59,15 +59,15 @@ for a quicker overview.
 
 The following message:
 
-  package test;
+	  package test;
 
-  import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+	  import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
-	message A {
-		optional string Description = 1 [(gogoproto.nullable) = false];
-		optional int64 Number = 2 [(gogoproto.nullable) = false];
-		optional bytes Id = 3 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uuid", (gogoproto.nullable) = false];
-	}
+		message A {
+			optional string Description = 1 [(gogoproto.nullable) = false];
+			optional int64 Number = 2 [(gogoproto.nullable) = false];
+			optional bytes Id = 3 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uuid", (gogoproto.nullable) = false];
+		}
 
 Will generate a go struct which looks a lot like this:
 
@@ -120,12 +120,12 @@ This is typically useful when working with a protocol buffer that was designed b
 Gogoprotobuf also has some more subtle changes, these could be changed back:
 
   - the generated package name for imports do not have the extra /filename.pb,
-  but are actually the imports specified in the .proto file.
+    but are actually the imports specified in the .proto file.
 
 Gogoprotobuf also has lost some features which should be brought back with time:
 
   - Marshalling and unmarshalling with reflect and without the unsafe package,
-  this requires work in pointer_reflect.go
+    this requires work in pointer_reflect.go
 
 Why does nullable break protocol buffer specifications:
 
@@ -152,7 +152,7 @@ The enumprefix, getters and stringer extensions can be used to remove some of th
 
 Less Typing and Peace of Mind is explained in their specific plugin folders godoc:
 
-	- github.com/gogo/protobuf/plugin/<extension_name>
+  - github.com/gogo/protobuf/plugin/<extension_name>
 
 If you do not use any of these extension the code that is generated
 will be the same as if goprotobuf has generated it.
@@ -164,6 +164,5 @@ The most complete way to see examples is to look at
 Gogoprototest is a seperate project,
 because we want to keep gogoprotobuf independent of goprotobuf,
 but we still want to test it thoroughly.
-
 */
 package gogoproto

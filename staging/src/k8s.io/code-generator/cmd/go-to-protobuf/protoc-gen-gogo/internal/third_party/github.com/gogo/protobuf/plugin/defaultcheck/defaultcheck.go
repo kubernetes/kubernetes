@@ -46,15 +46,14 @@ It is enabled by the following extensions:
 
 For incorrect usage of nullable with tests see:
 
-  github.com/gogo/protobuf/test/nullableconflict
-
+	github.com/gogo/protobuf/test/nullableconflict
 */
 package defaultcheck
 
 import (
 	"fmt"
-	"github.com/gogo/protobuf/gogoproto"
-	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/generator"
 	"os"
 )
 

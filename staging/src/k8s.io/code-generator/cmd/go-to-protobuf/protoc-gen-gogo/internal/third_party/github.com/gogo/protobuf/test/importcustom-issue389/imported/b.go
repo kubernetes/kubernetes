@@ -3,7 +3,7 @@ package imported
 import (
 	"encoding/json"
 
-	"github.com/gogo/protobuf/proto"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 )
 
 type B struct {

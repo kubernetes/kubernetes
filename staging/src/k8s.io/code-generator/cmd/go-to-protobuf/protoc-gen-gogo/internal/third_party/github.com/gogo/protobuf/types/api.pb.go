@@ -6,8 +6,8 @@ package types
 import (
 	bytes "bytes"
 	fmt "fmt"
-	proto "github.com/gogo/protobuf/proto"
 	io "io"
+	proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
@@ -271,45 +271,45 @@ func (*Method) XXX_MessageName() string {
 // interface must redeclare all the methods from the included interface, but
 // documentation and options are inherited as follows:
 //
-// - If after comment and whitespace stripping, the documentation
-//   string of the redeclared method is empty, it will be inherited
-//   from the original method.
+//   - If after comment and whitespace stripping, the documentation
+//     string of the redeclared method is empty, it will be inherited
+//     from the original method.
 //
-// - Each annotation belonging to the service config (http,
-//   visibility) which is not set in the redeclared method will be
-//   inherited.
+//   - Each annotation belonging to the service config (http,
+//     visibility) which is not set in the redeclared method will be
+//     inherited.
 //
-// - If an http annotation is inherited, the path pattern will be
-//   modified as follows. Any version prefix will be replaced by the
-//   version of the including interface plus the [root][] path if
-//   specified.
+//   - If an http annotation is inherited, the path pattern will be
+//     modified as follows. Any version prefix will be replaced by the
+//     version of the including interface plus the [root][] path if
+//     specified.
 //
 // Example of a simple mixin:
 //
-//     package google.acl.v1;
-//     service AccessControl {
-//       // Get the underlying ACL object.
-//       rpc GetAcl(GetAclRequest) returns (Acl) {
-//         option (google.api.http).get = "/v1/{resource=**}:getAcl";
-//       }
-//     }
+//	package google.acl.v1;
+//	service AccessControl {
+//	  // Get the underlying ACL object.
+//	  rpc GetAcl(GetAclRequest) returns (Acl) {
+//	    option (google.api.http).get = "/v1/{resource=**}:getAcl";
+//	  }
+//	}
 //
-//     package google.storage.v2;
-//     service Storage {
-//       rpc GetAcl(GetAclRequest) returns (Acl);
+//	package google.storage.v2;
+//	service Storage {
+//	  rpc GetAcl(GetAclRequest) returns (Acl);
 //
-//       // Get a data record.
-//       rpc GetData(GetDataRequest) returns (Data) {
-//         option (google.api.http).get = "/v2/{resource=**}";
-//       }
-//     }
+//	  // Get a data record.
+//	  rpc GetData(GetDataRequest) returns (Data) {
+//	    option (google.api.http).get = "/v2/{resource=**}";
+//	  }
+//	}
 //
 // Example of a mixin configuration:
 //
-//     apis:
-//     - name: google.storage.v2.Storage
-//       mixins:
-//       - name: google.acl.v1.AccessControl
+//	apis:
+//	- name: google.storage.v2.Storage
+//	  mixins:
+//	  - name: google.acl.v1.AccessControl
 //
 // The mixin construct implies that all methods in `AccessControl` are
 // also declared with same name and request/response types in
@@ -317,34 +317,34 @@ func (*Method) XXX_MessageName() string {
 // see the effective `Storage.GetAcl` method after inherting
 // documentation and annotations as follows:
 //
-//     service Storage {
-//       // Get the underlying ACL object.
-//       rpc GetAcl(GetAclRequest) returns (Acl) {
-//         option (google.api.http).get = "/v2/{resource=**}:getAcl";
-//       }
-//       ...
-//     }
+//	service Storage {
+//	  // Get the underlying ACL object.
+//	  rpc GetAcl(GetAclRequest) returns (Acl) {
+//	    option (google.api.http).get = "/v2/{resource=**}:getAcl";
+//	  }
+//	  ...
+//	}
 //
 // Note how the version in the path pattern changed from `v1` to `v2`.
 //
 // If the `root` field in the mixin is specified, it should be a
 // relative path under which inherited HTTP paths are placed. Example:
 //
-//     apis:
-//     - name: google.storage.v2.Storage
-//       mixins:
-//       - name: google.acl.v1.AccessControl
-//         root: acls
+//	apis:
+//	- name: google.storage.v2.Storage
+//	  mixins:
+//	  - name: google.acl.v1.AccessControl
+//	    root: acls
 //
 // This implies the following inherited HTTP annotation:
 //
-//     service Storage {
-//       // Get the underlying ACL object.
-//       rpc GetAcl(GetAclRequest) returns (Acl) {
-//         option (google.api.http).get = "/v2/acls/{resource=**}:getAcl";
-//       }
-//       ...
-//     }
+//	service Storage {
+//	  // Get the underlying ACL object.
+//	  rpc GetAcl(GetAclRequest) returns (Acl) {
+//	    option (google.api.http).get = "/v2/acls/{resource=**}:getAcl";
+//	  }
+//	  ...
+//	}
 type Mixin struct {
 	// The fully qualified name of the interface which is included.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`

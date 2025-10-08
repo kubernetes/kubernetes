@@ -5,8 +5,8 @@ package conformance
 
 import (
 	fmt "fmt"
-	proto "github.com/gogo/protobuf/proto"
-	types "github.com/gogo/protobuf/types"
+	proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
+	types "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types"
 	math "math"
 )
 
@@ -110,9 +110,9 @@ func (TestAllTypes_NestedEnum) EnumDescriptor() ([]byte, []int) {
 
 // Represents a single test case's input.  The testee should:
 //
-//   1. parse this proto (which should always succeed)
-//   2. parse the protobuf or JSON payload in "payload" (which may fail)
-//   3. if the parse succeeded, serialize the message in the requested format.
+//  1. parse this proto (which should always succeed)
+//  2. parse the protobuf or JSON payload in "payload" (which may fail)
+//  3. if the parse succeeded, serialize the message in the requested format.
 type ConformanceRequest struct {
 	// The payload (whether protobuf of JSON) is always for a TestAllTypes proto
 	// (see below).

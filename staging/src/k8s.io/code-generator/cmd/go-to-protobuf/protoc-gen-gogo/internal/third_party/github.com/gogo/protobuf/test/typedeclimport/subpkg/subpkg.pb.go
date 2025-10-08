@@ -5,17 +5,19 @@
 Package subpkg is a generated protocol buffer package.
 
 It is generated from these files:
+
 	subpkg/subpkg.proto
 
 It has these top-level messages:
+
 	AnotherMessage
 */
 package subpkg
 
-import proto "github.com/gogo/protobuf/proto"
+import proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import _ "github.com/gogo/protobuf/gogoproto"
+import _ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
 
 import io "io"
 

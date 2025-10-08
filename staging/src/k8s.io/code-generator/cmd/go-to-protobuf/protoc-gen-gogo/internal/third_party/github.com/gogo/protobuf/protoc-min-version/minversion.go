@@ -34,7 +34,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/gogo/protobuf/version"
+	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/version"
 )
 
 func filter(ss []string, flag string) ([]string, string) {

@@ -6,11 +6,11 @@ package importing
 import (
 	bytes "bytes"
 	fmt "fmt"
-	_ "github.com/gogo/protobuf/gogoproto"
-	proto "github.com/gogo/protobuf/proto"
-	_ "github.com/gogo/protobuf/test/importcustom-issue389/imported"
-	github_com_gogo_protobuf_test_importcustom_issue389_imported "github.com/gogo/protobuf/test/importcustom-issue389/imported"
 	io "io"
+	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
+	proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
+	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/importcustom-issue389/imported"
+	github_com_gogo_protobuf_test_importcustom_issue389_imported "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/importcustom-issue389/imported"
 	math "math"
 	math_bits "math/bits"
 )

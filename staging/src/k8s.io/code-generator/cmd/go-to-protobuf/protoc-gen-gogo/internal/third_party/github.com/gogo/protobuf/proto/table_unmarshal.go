@@ -2004,12 +2004,14 @@ func makeUnmarshalMap(f *reflect.StructField) unmarshaler {
 
 // makeUnmarshalOneof makes an unmarshaler for oneof fields.
 // for:
-// message Msg {
-//   oneof F {
-//     int64 X = 1;
-//     float64 Y = 2;
-//   }
-// }
+//
+//	message Msg {
+//	  oneof F {
+//	    int64 X = 1;
+//	    float64 Y = 2;
+//	  }
+//	}
+//
 // typ is the type of the concrete entry for a oneof case (e.g. Msg_X).
 // ityp is the interface type of the oneof field (e.g. isMsg_F).
 // unmarshal is the unmarshaler for the base type of the oneof case (e.g. int64).
