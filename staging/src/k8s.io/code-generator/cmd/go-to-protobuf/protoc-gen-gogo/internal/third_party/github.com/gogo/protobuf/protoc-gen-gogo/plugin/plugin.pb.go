@@ -243,7 +243,9 @@ type CodeGeneratorResponse_File struct {
 	// produced by another code generator.  The original generator may provide
 	// insertion points by placing special annotations in the file that look
 	// like:
-	//   @@protoc_insertion_point(NAME)
+	//
+	//	@@protoc_insertion_point(NAME)
+	//
 	// The annotation can have arbitrary text before and after it on the line,
 	// which allows it to be placed in a comment.  NAME should be replaced with
 	// an identifier naming the point -- this is what other generators will use
@@ -255,7 +257,9 @@ type CodeGeneratorResponse_File struct {
 	//
 	// For example, the C++ code generator places the following line in the
 	// .pb.h files that it generates:
-	//   // @@protoc_insertion_point(namespace_scope)
+	//
+	//	// @@protoc_insertion_point(namespace_scope)
+	//
 	// This line appears within the scope of the file's package namespace, but
 	// outside of any particular class.  Another plugin can then specify the
 	// insertion_point "namespace_scope" to generate additional classes or

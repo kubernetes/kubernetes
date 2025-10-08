@@ -399,6 +399,7 @@ type TestUTF8 struct {
 	Scalar string   `protobuf:"bytes,1,opt,name=scalar,proto3" json:"scalar,omitempty"`
 	Vector []string `protobuf:"bytes,2,rep,name=vector,proto3" json:"vector,omitempty"`
 	// Types that are valid to be assigned to Oneof:
+	//
 	//	*TestUTF8_Field
 	Oneof                isTestUTF8_Oneof `protobuf_oneof:"oneof"`
 	MapKey               map[string]int64 `protobuf:"bytes,4,rep,name=map_key,json=mapKey,proto3" json:"map_key,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`

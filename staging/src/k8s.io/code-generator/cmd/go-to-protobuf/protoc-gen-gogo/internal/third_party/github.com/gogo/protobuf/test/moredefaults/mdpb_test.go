@@ -6,8 +6,8 @@ package moredefaults
 import (
 	fmt "fmt"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
-	github_com_gogo_protobuf_jsonpb "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/jsonpb"
-	github_com_gogo_protobuf_proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/jsonpb"
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/example"
 	math "math"
@@ -25,12 +25,12 @@ func TestMoreDefaultsBProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMoreDefaultsB(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &MoreDefaultsB{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -48,7 +48,7 @@ func TestMoreDefaultsBProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -56,12 +56,12 @@ func TestMoreDefaultsAProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMoreDefaultsA(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &MoreDefaultsA{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -79,7 +79,7 @@ func TestMoreDefaultsAProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -87,13 +87,13 @@ func TestMoreDefaultsBJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMoreDefaultsB(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &MoreDefaultsB{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -105,13 +105,13 @@ func TestMoreDefaultsAJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMoreDefaultsA(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &MoreDefaultsA{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -123,9 +123,9 @@ func TestMoreDefaultsBProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMoreDefaultsB(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &MoreDefaultsB{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if !p.Equal(msg) {
@@ -137,9 +137,9 @@ func TestMoreDefaultsBProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMoreDefaultsB(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &MoreDefaultsB{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if !p.Equal(msg) {
@@ -151,9 +151,9 @@ func TestMoreDefaultsAProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMoreDefaultsA(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &MoreDefaultsA{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if !p.Equal(msg) {
@@ -165,9 +165,9 @@ func TestMoreDefaultsAProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMoreDefaultsA(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &MoreDefaultsA{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if !p.Equal(msg) {

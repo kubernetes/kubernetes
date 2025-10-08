@@ -116,14 +116,14 @@ type Any struct {
 	// scheme `http`, `https`, or no scheme, one can optionally set up a type
 	// server that maps type URLs to message definitions as follows:
 	//
-	// * If no scheme is provided, `https` is assumed.
-	// * An HTTP GET on the URL must yield a [google.protobuf.Type][]
-	//   value in binary format, or produce an error.
-	// * Applications are allowed to cache lookup results based on the
-	//   URL, or have them precompiled into a binary to avoid any
-	//   lookup. Therefore, binary compatibility needs to be preserved
-	//   on changes to types. (Use versioned type names to manage
-	//   breaking changes.)
+	//   - If no scheme is provided, `https` is assumed.
+	//   - An HTTP GET on the URL must yield a [google.protobuf.Type][]
+	//     value in binary format, or produce an error.
+	//   - Applications are allowed to cache lookup results based on the
+	//     URL, or have them precompiled into a binary to avoid any
+	//     lookup. Therefore, binary compatibility needs to be preserved
+	//     on changes to types. (Use versioned type names to manage
+	//     breaking changes.)
 	//
 	// Note: this functionality is not currently available in the official
 	// protobuf release, and it is not used for type URLs beginning with
@@ -131,7 +131,6 @@ type Any struct {
 	//
 	// Schemes other than `http`, `https` (or the empty scheme) might be
 	// used with implementation specific semantics.
-	//
 	TypeUrl string `protobuf:"bytes,1,opt,name=type_url,json=typeUrl,proto3" json:"type_url,omitempty"`
 	// Must be a valid serialized protocol buffer of the above specified type.
 	Value                []byte   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`

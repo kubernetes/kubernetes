@@ -7,8 +7,8 @@ import (
 	fmt "fmt"
 	go_parser "go/parser"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
-	github_com_gogo_protobuf_jsonpb "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/jsonpb"
-	github_com_gogo_protobuf_proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/jsonpb"
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/issue312"
 	math "math"
@@ -26,12 +26,12 @@ func TestSubtypeProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedSubtype(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &Subtype{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -49,7 +49,7 @@ func TestSubtypeProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -57,13 +57,13 @@ func TestSubtypeJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedSubtype(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &Subtype{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -75,9 +75,9 @@ func TestSubtypeProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedSubtype(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &Subtype{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if !p.Equal(msg) {
@@ -89,9 +89,9 @@ func TestSubtypeProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedSubtype(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &Subtype{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if !p.Equal(msg) {

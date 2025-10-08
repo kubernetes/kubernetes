@@ -6,7 +6,7 @@ package vanity
 import (
 	fmt "fmt"
 	io "io"
-	github_com_gogo_protobuf_proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	math "math"
 	math_bits "math/bits"
@@ -251,7 +251,7 @@ func (m *A) Unmarshal(dAtA []byte) error {
 		}
 	}
 	if hasFields[0]&uint64(0x00000001) == 0 {
-		return github_com_gogo_protobuf_proto.NewRequiredNotSetError("Int")
+		return k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.NewRequiredNotSetError("Int")
 	}
 
 	if iNdEx > l {

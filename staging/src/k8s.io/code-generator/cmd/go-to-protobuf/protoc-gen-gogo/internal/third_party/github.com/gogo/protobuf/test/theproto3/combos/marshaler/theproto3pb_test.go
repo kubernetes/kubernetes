@@ -7,8 +7,8 @@ import (
 	fmt "fmt"
 	go_parser "go/parser"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
-	github_com_gogo_protobuf_jsonpb "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/jsonpb"
-	github_com_gogo_protobuf_proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/jsonpb"
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/combos/both"
 	math "math"
@@ -26,12 +26,12 @@ func TestMessageProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMessage(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &Message{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -52,7 +52,7 @@ func TestMessageProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -70,7 +70,7 @@ func TestMessageMarshalTo(t *testing.T) {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &Message{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	for i := range dAtA {
@@ -93,7 +93,7 @@ func BenchmarkMessageProtoMarshal(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
 		if err != nil {
 			panic(err)
 		}
@@ -107,7 +107,7 @@ func BenchmarkMessageProtoUnmarshal(b *testing.B) {
 	total := 0
 	datas := make([][]byte, 10000)
 	for i := 0; i < 10000; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedMessage(popr, false))
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(NewPopulatedMessage(popr, false))
 		if err != nil {
 			panic(err)
 		}
@@ -117,7 +117,7 @@ func BenchmarkMessageProtoUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		total += len(datas[i%10000])
-		if err := github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
+		if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
 			panic(err)
 		}
 	}
@@ -128,12 +128,12 @@ func TestNestedProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedNested(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &Nested{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -154,7 +154,7 @@ func TestNestedProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -172,7 +172,7 @@ func TestNestedMarshalTo(t *testing.T) {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &Nested{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	for i := range dAtA {
@@ -195,7 +195,7 @@ func BenchmarkNestedProtoMarshal(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
 		if err != nil {
 			panic(err)
 		}
@@ -209,7 +209,7 @@ func BenchmarkNestedProtoUnmarshal(b *testing.B) {
 	total := 0
 	datas := make([][]byte, 10000)
 	for i := 0; i < 10000; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedNested(popr, false))
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(NewPopulatedNested(popr, false))
 		if err != nil {
 			panic(err)
 		}
@@ -219,7 +219,7 @@ func BenchmarkNestedProtoUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		total += len(datas[i%10000])
-		if err := github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
+		if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
 			panic(err)
 		}
 	}
@@ -230,12 +230,12 @@ func TestAllMapsProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedAllMaps(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &AllMaps{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -256,7 +256,7 @@ func TestAllMapsProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -274,7 +274,7 @@ func TestAllMapsMarshalTo(t *testing.T) {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &AllMaps{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	for i := range dAtA {
@@ -297,7 +297,7 @@ func BenchmarkAllMapsProtoMarshal(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
 		if err != nil {
 			panic(err)
 		}
@@ -311,7 +311,7 @@ func BenchmarkAllMapsProtoUnmarshal(b *testing.B) {
 	total := 0
 	datas := make([][]byte, 10000)
 	for i := 0; i < 10000; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedAllMaps(popr, false))
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(NewPopulatedAllMaps(popr, false))
 		if err != nil {
 			panic(err)
 		}
@@ -321,7 +321,7 @@ func BenchmarkAllMapsProtoUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		total += len(datas[i%10000])
-		if err := github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
+		if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
 			panic(err)
 		}
 	}
@@ -332,12 +332,12 @@ func TestAllMapsOrderedProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedAllMapsOrdered(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &AllMapsOrdered{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -358,7 +358,7 @@ func TestAllMapsOrderedProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -376,7 +376,7 @@ func TestAllMapsOrderedMarshalTo(t *testing.T) {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &AllMapsOrdered{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	for i := range dAtA {
@@ -399,7 +399,7 @@ func BenchmarkAllMapsOrderedProtoMarshal(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
 		if err != nil {
 			panic(err)
 		}
@@ -413,7 +413,7 @@ func BenchmarkAllMapsOrderedProtoUnmarshal(b *testing.B) {
 	total := 0
 	datas := make([][]byte, 10000)
 	for i := 0; i < 10000; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedAllMapsOrdered(popr, false))
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(NewPopulatedAllMapsOrdered(popr, false))
 		if err != nil {
 			panic(err)
 		}
@@ -423,7 +423,7 @@ func BenchmarkAllMapsOrderedProtoUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		total += len(datas[i%10000])
-		if err := github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
+		if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
 			panic(err)
 		}
 	}
@@ -434,12 +434,12 @@ func TestMessageWithMapProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMessageWithMap(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &MessageWithMap{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -460,7 +460,7 @@ func TestMessageWithMapProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -478,7 +478,7 @@ func TestMessageWithMapMarshalTo(t *testing.T) {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &MessageWithMap{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	for i := range dAtA {
@@ -501,7 +501,7 @@ func BenchmarkMessageWithMapProtoMarshal(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
 		if err != nil {
 			panic(err)
 		}
@@ -515,7 +515,7 @@ func BenchmarkMessageWithMapProtoUnmarshal(b *testing.B) {
 	total := 0
 	datas := make([][]byte, 10000)
 	for i := 0; i < 10000; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedMessageWithMap(popr, false))
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(NewPopulatedMessageWithMap(popr, false))
 		if err != nil {
 			panic(err)
 		}
@@ -525,7 +525,7 @@ func BenchmarkMessageWithMapProtoUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		total += len(datas[i%10000])
-		if err := github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
+		if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
 			panic(err)
 		}
 	}
@@ -536,12 +536,12 @@ func TestFloatingPointProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedFloatingPoint(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &FloatingPoint{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -562,7 +562,7 @@ func TestFloatingPointProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -580,7 +580,7 @@ func TestFloatingPointMarshalTo(t *testing.T) {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &FloatingPoint{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	for i := range dAtA {
@@ -603,7 +603,7 @@ func BenchmarkFloatingPointProtoMarshal(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
 		if err != nil {
 			panic(err)
 		}
@@ -617,7 +617,7 @@ func BenchmarkFloatingPointProtoUnmarshal(b *testing.B) {
 	total := 0
 	datas := make([][]byte, 10000)
 	for i := 0; i < 10000; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedFloatingPoint(popr, false))
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(NewPopulatedFloatingPoint(popr, false))
 		if err != nil {
 			panic(err)
 		}
@@ -627,7 +627,7 @@ func BenchmarkFloatingPointProtoUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		total += len(datas[i%10000])
-		if err := github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
+		if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
 			panic(err)
 		}
 	}
@@ -638,12 +638,12 @@ func TestUint128PairProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedUint128Pair(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &Uint128Pair{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -664,7 +664,7 @@ func TestUint128PairProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -682,7 +682,7 @@ func TestUint128PairMarshalTo(t *testing.T) {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &Uint128Pair{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	for i := range dAtA {
@@ -705,7 +705,7 @@ func BenchmarkUint128PairProtoMarshal(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
 		if err != nil {
 			panic(err)
 		}
@@ -719,7 +719,7 @@ func BenchmarkUint128PairProtoUnmarshal(b *testing.B) {
 	total := 0
 	datas := make([][]byte, 10000)
 	for i := 0; i < 10000; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedUint128Pair(popr, false))
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(NewPopulatedUint128Pair(popr, false))
 		if err != nil {
 			panic(err)
 		}
@@ -729,7 +729,7 @@ func BenchmarkUint128PairProtoUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		total += len(datas[i%10000])
-		if err := github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
+		if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
 			panic(err)
 		}
 	}
@@ -740,12 +740,12 @@ func TestContainsNestedMapProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedContainsNestedMap(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &ContainsNestedMap{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -766,7 +766,7 @@ func TestContainsNestedMapProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -784,7 +784,7 @@ func TestContainsNestedMapMarshalTo(t *testing.T) {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &ContainsNestedMap{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	for i := range dAtA {
@@ -807,7 +807,7 @@ func BenchmarkContainsNestedMapProtoMarshal(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
 		if err != nil {
 			panic(err)
 		}
@@ -821,7 +821,7 @@ func BenchmarkContainsNestedMapProtoUnmarshal(b *testing.B) {
 	total := 0
 	datas := make([][]byte, 10000)
 	for i := 0; i < 10000; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedContainsNestedMap(popr, false))
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(NewPopulatedContainsNestedMap(popr, false))
 		if err != nil {
 			panic(err)
 		}
@@ -831,7 +831,7 @@ func BenchmarkContainsNestedMapProtoUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		total += len(datas[i%10000])
-		if err := github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
+		if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
 			panic(err)
 		}
 	}
@@ -842,12 +842,12 @@ func TestContainsNestedMap_NestedMapProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedContainsNestedMap_NestedMap(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &ContainsNestedMap_NestedMap{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -868,7 +868,7 @@ func TestContainsNestedMap_NestedMapProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -886,7 +886,7 @@ func TestContainsNestedMap_NestedMapMarshalTo(t *testing.T) {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &ContainsNestedMap_NestedMap{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	for i := range dAtA {
@@ -909,7 +909,7 @@ func BenchmarkContainsNestedMap_NestedMapProtoMarshal(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
 		if err != nil {
 			panic(err)
 		}
@@ -923,7 +923,7 @@ func BenchmarkContainsNestedMap_NestedMapProtoUnmarshal(b *testing.B) {
 	total := 0
 	datas := make([][]byte, 10000)
 	for i := 0; i < 10000; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedContainsNestedMap_NestedMap(popr, false))
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(NewPopulatedContainsNestedMap_NestedMap(popr, false))
 		if err != nil {
 			panic(err)
 		}
@@ -933,7 +933,7 @@ func BenchmarkContainsNestedMap_NestedMapProtoUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		total += len(datas[i%10000])
-		if err := github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
+		if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
 			panic(err)
 		}
 	}
@@ -944,12 +944,12 @@ func TestNotPackedProto(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedNotPacked(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &NotPacked{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	littlefuzz := make([]byte, len(dAtA))
@@ -970,7 +970,7 @@ func TestNotPackedProto(t *testing.T) {
 			littlefuzz = append(littlefuzz, byte(popr.Intn(256)))
 		}
 		// shouldn't panic
-		_ = github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
+		_ = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(littlefuzz, msg)
 	}
 }
 
@@ -988,7 +988,7 @@ func TestNotPackedMarshalTo(t *testing.T) {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &NotPacked{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	for i := range dAtA {
@@ -1011,7 +1011,7 @@ func BenchmarkNotPackedProtoMarshal(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(pops[i%10000])
 		if err != nil {
 			panic(err)
 		}
@@ -1025,7 +1025,7 @@ func BenchmarkNotPackedProtoUnmarshal(b *testing.B) {
 	total := 0
 	datas := make([][]byte, 10000)
 	for i := 0; i < 10000; i++ {
-		dAtA, err := github_com_gogo_protobuf_proto.Marshal(NewPopulatedNotPacked(popr, false))
+		dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(NewPopulatedNotPacked(popr, false))
 		if err != nil {
 			panic(err)
 		}
@@ -1035,7 +1035,7 @@ func BenchmarkNotPackedProtoUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		total += len(datas[i%10000])
-		if err := github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
+		if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(datas[i%10000], msg); err != nil {
 			panic(err)
 		}
 	}
@@ -1046,13 +1046,13 @@ func TestMessageJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMessage(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &Message{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -1067,13 +1067,13 @@ func TestNestedJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedNested(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &Nested{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -1088,13 +1088,13 @@ func TestAllMapsJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedAllMaps(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &AllMaps{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -1109,13 +1109,13 @@ func TestAllMapsOrderedJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedAllMapsOrdered(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &AllMapsOrdered{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -1130,13 +1130,13 @@ func TestMessageWithMapJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMessageWithMap(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &MessageWithMap{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -1151,13 +1151,13 @@ func TestFloatingPointJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedFloatingPoint(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &FloatingPoint{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -1172,13 +1172,13 @@ func TestUint128PairJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedUint128Pair(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &Uint128Pair{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -1193,13 +1193,13 @@ func TestContainsNestedMapJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedContainsNestedMap(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &ContainsNestedMap{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -1214,13 +1214,13 @@ func TestContainsNestedMap_NestedMapJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedContainsNestedMap_NestedMap(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &ContainsNestedMap_NestedMap{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -1235,13 +1235,13 @@ func TestNotPackedJSON(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedNotPacked(popr, true)
-	marshaler := github_com_gogo_protobuf_jsonpb.Marshaler{}
+	marshaler := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.Marshaler{}
 	jsondata, err := marshaler.MarshalToString(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	msg := &NotPacked{}
-	err = github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
+	err = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_jsonpb.UnmarshalString(jsondata, msg)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -1256,9 +1256,9 @@ func TestMessageProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMessage(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &Message{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1273,9 +1273,9 @@ func TestMessageProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMessage(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &Message{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1290,9 +1290,9 @@ func TestNestedProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedNested(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &Nested{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1307,9 +1307,9 @@ func TestNestedProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedNested(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &Nested{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1324,9 +1324,9 @@ func TestAllMapsProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedAllMaps(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &AllMaps{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1341,9 +1341,9 @@ func TestAllMapsProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedAllMaps(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &AllMaps{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1358,9 +1358,9 @@ func TestAllMapsOrderedProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedAllMapsOrdered(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &AllMapsOrdered{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1375,9 +1375,9 @@ func TestAllMapsOrderedProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedAllMapsOrdered(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &AllMapsOrdered{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1392,9 +1392,9 @@ func TestMessageWithMapProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMessageWithMap(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &MessageWithMap{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1409,9 +1409,9 @@ func TestMessageWithMapProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMessageWithMap(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &MessageWithMap{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1426,9 +1426,9 @@ func TestFloatingPointProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedFloatingPoint(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &FloatingPoint{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1443,9 +1443,9 @@ func TestFloatingPointProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedFloatingPoint(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &FloatingPoint{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1460,9 +1460,9 @@ func TestUint128PairProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedUint128Pair(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &Uint128Pair{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1477,9 +1477,9 @@ func TestUint128PairProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedUint128Pair(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &Uint128Pair{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1494,9 +1494,9 @@ func TestContainsNestedMapProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedContainsNestedMap(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &ContainsNestedMap{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1511,9 +1511,9 @@ func TestContainsNestedMapProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedContainsNestedMap(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &ContainsNestedMap{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1528,9 +1528,9 @@ func TestContainsNestedMap_NestedMapProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedContainsNestedMap_NestedMap(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &ContainsNestedMap_NestedMap{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1545,9 +1545,9 @@ func TestContainsNestedMap_NestedMapProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedContainsNestedMap_NestedMap(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &ContainsNestedMap_NestedMap{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1562,9 +1562,9 @@ func TestNotPackedProtoText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedNotPacked(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.MarshalTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.MarshalTextString(p)
 	msg := &NotPacked{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1579,9 +1579,9 @@ func TestNotPackedProtoCompactText(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedNotPacked(popr, true)
-	dAtA := github_com_gogo_protobuf_proto.CompactTextString(p)
+	dAtA := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.CompactTextString(p)
 	msg := &NotPacked{}
-	if err := github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.UnmarshalText(dAtA, msg); err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1598,12 +1598,12 @@ func TestTheproto3Description(t *testing.T) {
 func TestMessageVerboseEqual(t *testing.T) {
 	popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	p := NewPopulatedMessage(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
 	msg := &Message{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		panic(err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1613,12 +1613,12 @@ func TestMessageVerboseEqual(t *testing.T) {
 func TestNestedVerboseEqual(t *testing.T) {
 	popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	p := NewPopulatedNested(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
 	msg := &Nested{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		panic(err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1628,12 +1628,12 @@ func TestNestedVerboseEqual(t *testing.T) {
 func TestAllMapsVerboseEqual(t *testing.T) {
 	popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	p := NewPopulatedAllMaps(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
 	msg := &AllMaps{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		panic(err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1643,12 +1643,12 @@ func TestAllMapsVerboseEqual(t *testing.T) {
 func TestAllMapsOrderedVerboseEqual(t *testing.T) {
 	popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	p := NewPopulatedAllMapsOrdered(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
 	msg := &AllMapsOrdered{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		panic(err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1658,12 +1658,12 @@ func TestAllMapsOrderedVerboseEqual(t *testing.T) {
 func TestMessageWithMapVerboseEqual(t *testing.T) {
 	popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	p := NewPopulatedMessageWithMap(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
 	msg := &MessageWithMap{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		panic(err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1673,12 +1673,12 @@ func TestMessageWithMapVerboseEqual(t *testing.T) {
 func TestFloatingPointVerboseEqual(t *testing.T) {
 	popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	p := NewPopulatedFloatingPoint(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
 	msg := &FloatingPoint{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		panic(err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1688,12 +1688,12 @@ func TestFloatingPointVerboseEqual(t *testing.T) {
 func TestUint128PairVerboseEqual(t *testing.T) {
 	popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	p := NewPopulatedUint128Pair(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
 	msg := &Uint128Pair{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		panic(err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1703,12 +1703,12 @@ func TestUint128PairVerboseEqual(t *testing.T) {
 func TestContainsNestedMapVerboseEqual(t *testing.T) {
 	popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	p := NewPopulatedContainsNestedMap(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
 	msg := &ContainsNestedMap{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		panic(err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1718,12 +1718,12 @@ func TestContainsNestedMapVerboseEqual(t *testing.T) {
 func TestContainsNestedMap_NestedMapVerboseEqual(t *testing.T) {
 	popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	p := NewPopulatedContainsNestedMap_NestedMap(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
 	msg := &ContainsNestedMap_NestedMap{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		panic(err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1733,12 +1733,12 @@ func TestContainsNestedMap_NestedMapVerboseEqual(t *testing.T) {
 func TestNotPackedVerboseEqual(t *testing.T) {
 	popr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
 	p := NewPopulatedNotPacked(popr, false)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
 	msg := &NotPacked{}
-	if err := github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
+	if err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Unmarshal(dAtA, msg); err != nil {
 		panic(err)
 	}
 	if err := p.VerboseEqual(msg); err != nil {
@@ -1959,8 +1959,8 @@ func TestMessageSize(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMessage(popr, true)
-	size2 := github_com_gogo_protobuf_proto.Size(p)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	size2 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -1971,7 +1971,7 @@ func TestMessageSize(t *testing.T) {
 	if size2 != size {
 		t.Errorf("seed = %d, size %v != before marshal proto.Size %v", seed, size, size2)
 	}
-	size3 := github_com_gogo_protobuf_proto.Size(p)
+	size3 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
 	if size3 != size {
 		t.Errorf("seed = %d, size %v != after marshal proto.Size %v", seed, size, size3)
 	}
@@ -1995,8 +1995,8 @@ func TestNestedSize(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedNested(popr, true)
-	size2 := github_com_gogo_protobuf_proto.Size(p)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	size2 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -2007,7 +2007,7 @@ func TestNestedSize(t *testing.T) {
 	if size2 != size {
 		t.Errorf("seed = %d, size %v != before marshal proto.Size %v", seed, size, size2)
 	}
-	size3 := github_com_gogo_protobuf_proto.Size(p)
+	size3 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
 	if size3 != size {
 		t.Errorf("seed = %d, size %v != after marshal proto.Size %v", seed, size, size3)
 	}
@@ -2031,8 +2031,8 @@ func TestAllMapsSize(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedAllMaps(popr, true)
-	size2 := github_com_gogo_protobuf_proto.Size(p)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	size2 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -2043,7 +2043,7 @@ func TestAllMapsSize(t *testing.T) {
 	if size2 != size {
 		t.Errorf("seed = %d, size %v != before marshal proto.Size %v", seed, size, size2)
 	}
-	size3 := github_com_gogo_protobuf_proto.Size(p)
+	size3 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
 	if size3 != size {
 		t.Errorf("seed = %d, size %v != after marshal proto.Size %v", seed, size, size3)
 	}
@@ -2067,8 +2067,8 @@ func TestAllMapsOrderedSize(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedAllMapsOrdered(popr, true)
-	size2 := github_com_gogo_protobuf_proto.Size(p)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	size2 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -2079,7 +2079,7 @@ func TestAllMapsOrderedSize(t *testing.T) {
 	if size2 != size {
 		t.Errorf("seed = %d, size %v != before marshal proto.Size %v", seed, size, size2)
 	}
-	size3 := github_com_gogo_protobuf_proto.Size(p)
+	size3 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
 	if size3 != size {
 		t.Errorf("seed = %d, size %v != after marshal proto.Size %v", seed, size, size3)
 	}
@@ -2103,8 +2103,8 @@ func TestMessageWithMapSize(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedMessageWithMap(popr, true)
-	size2 := github_com_gogo_protobuf_proto.Size(p)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	size2 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -2115,7 +2115,7 @@ func TestMessageWithMapSize(t *testing.T) {
 	if size2 != size {
 		t.Errorf("seed = %d, size %v != before marshal proto.Size %v", seed, size, size2)
 	}
-	size3 := github_com_gogo_protobuf_proto.Size(p)
+	size3 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
 	if size3 != size {
 		t.Errorf("seed = %d, size %v != after marshal proto.Size %v", seed, size, size3)
 	}
@@ -2139,8 +2139,8 @@ func TestFloatingPointSize(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedFloatingPoint(popr, true)
-	size2 := github_com_gogo_protobuf_proto.Size(p)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	size2 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -2151,7 +2151,7 @@ func TestFloatingPointSize(t *testing.T) {
 	if size2 != size {
 		t.Errorf("seed = %d, size %v != before marshal proto.Size %v", seed, size, size2)
 	}
-	size3 := github_com_gogo_protobuf_proto.Size(p)
+	size3 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
 	if size3 != size {
 		t.Errorf("seed = %d, size %v != after marshal proto.Size %v", seed, size, size3)
 	}
@@ -2175,8 +2175,8 @@ func TestUint128PairSize(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedUint128Pair(popr, true)
-	size2 := github_com_gogo_protobuf_proto.Size(p)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	size2 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -2187,7 +2187,7 @@ func TestUint128PairSize(t *testing.T) {
 	if size2 != size {
 		t.Errorf("seed = %d, size %v != before marshal proto.Size %v", seed, size, size2)
 	}
-	size3 := github_com_gogo_protobuf_proto.Size(p)
+	size3 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
 	if size3 != size {
 		t.Errorf("seed = %d, size %v != after marshal proto.Size %v", seed, size, size3)
 	}
@@ -2211,8 +2211,8 @@ func TestContainsNestedMapSize(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedContainsNestedMap(popr, true)
-	size2 := github_com_gogo_protobuf_proto.Size(p)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	size2 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -2223,7 +2223,7 @@ func TestContainsNestedMapSize(t *testing.T) {
 	if size2 != size {
 		t.Errorf("seed = %d, size %v != before marshal proto.Size %v", seed, size, size2)
 	}
-	size3 := github_com_gogo_protobuf_proto.Size(p)
+	size3 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
 	if size3 != size {
 		t.Errorf("seed = %d, size %v != after marshal proto.Size %v", seed, size, size3)
 	}
@@ -2247,8 +2247,8 @@ func TestContainsNestedMap_NestedMapSize(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedContainsNestedMap_NestedMap(popr, true)
-	size2 := github_com_gogo_protobuf_proto.Size(p)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	size2 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -2259,7 +2259,7 @@ func TestContainsNestedMap_NestedMapSize(t *testing.T) {
 	if size2 != size {
 		t.Errorf("seed = %d, size %v != before marshal proto.Size %v", seed, size, size2)
 	}
-	size3 := github_com_gogo_protobuf_proto.Size(p)
+	size3 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
 	if size3 != size {
 		t.Errorf("seed = %d, size %v != after marshal proto.Size %v", seed, size, size3)
 	}
@@ -2283,8 +2283,8 @@ func TestNotPackedSize(t *testing.T) {
 	seed := time.Now().UnixNano()
 	popr := math_rand.New(math_rand.NewSource(seed))
 	p := NewPopulatedNotPacked(popr, true)
-	size2 := github_com_gogo_protobuf_proto.Size(p)
-	dAtA, err := github_com_gogo_protobuf_proto.Marshal(p)
+	size2 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
+	dAtA, err := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Marshal(p)
 	if err != nil {
 		t.Fatalf("seed = %d, err = %v", seed, err)
 	}
@@ -2295,7 +2295,7 @@ func TestNotPackedSize(t *testing.T) {
 	if size2 != size {
 		t.Errorf("seed = %d, size %v != before marshal proto.Size %v", seed, size, size2)
 	}
-	size3 := github_com_gogo_protobuf_proto.Size(p)
+	size3 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Size(p)
 	if size3 != size {
 		t.Errorf("seed = %d, size %v != after marshal proto.Size %v", seed, size, size3)
 	}

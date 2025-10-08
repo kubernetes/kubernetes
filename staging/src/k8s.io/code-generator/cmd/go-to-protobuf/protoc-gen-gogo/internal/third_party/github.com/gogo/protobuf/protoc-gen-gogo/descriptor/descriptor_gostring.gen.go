@@ -5,7 +5,7 @@ package descriptor
 
 import (
 	fmt "fmt"
-	github_com_gogo_protobuf_proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	math "math"
 	reflect "reflect"
@@ -732,8 +732,8 @@ func valueToGoStringDescriptor(v interface{}, typ string) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
 }
-func extensionToGoStringDescriptor(m github_com_gogo_protobuf_proto.Message) string {
-	e := github_com_gogo_protobuf_proto.GetUnsafeExtensionsMap(m)
+func extensionToGoStringDescriptor(m k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.Message) string {
+	e := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_proto.GetUnsafeExtensionsMap(m)
 	if e == nil {
 		return "nil"
 	}

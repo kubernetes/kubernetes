@@ -8,9 +8,9 @@ import (
 	fmt "fmt"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
 	proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
-	github_com_gogo_protobuf_sortkeys "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/sortkeys"
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/sortkeys"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types"
-	github_com_gogo_protobuf_types "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types"
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types"
 	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
@@ -650,6 +650,7 @@ func (m *MapStdTypes) GetNonnullBytes() map[int32][]byte {
 
 type OneofStdTypes struct {
 	// Types that are valid to be assigned to OneOfStdTimes:
+	//
 	//	*OneofStdTypes_Timestamp
 	//	*OneofStdTypes_Duration
 	//	*OneofStdTypes_RepDouble
@@ -877,93 +878,97 @@ func init() {
 func init() { proto.RegisterFile("stdtypes.proto", fileDescriptor_fa784ced32c4280a) }
 
 var fileDescriptor_fa784ced32c4280a = []byte{
-	// 1372 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x99, 0x4f, 0x6f, 0x1b, 0xc5,
-	0x1b, 0xc7, 0xbd, 0x19, 0x3b, 0xb5, 0xc7, 0x76, 0x9a, 0x4c, 0x7f, 0xad, 0xf6, 0x67, 0xd0, 0xa6,
-	0x0a, 0x88, 0x06, 0x51, 0x1c, 0xd8, 0x45, 0x08, 0x21, 0x50, 0xc1, 0x0a, 0x25, 0x81, 0xfe, 0x01,
-	0xd7, 0x6e, 0x2c, 0xa0, 0x50, 0x9b, 0x6c, 0x4d, 0x84, 0xe3, 0xb5, 0xec, 0x35, 0x28, 0x37, 0x5e,
-	0x02, 0x47, 0x8e, 0x1c, 0xb9, 0x73, 0xe1, 0xc8, 0xb1, 0x47, 0x5e, 0x01, 0x34, 0xe6, 0x0d, 0x20,
-	0xb8, 0xf4, 0x82, 0x84, 0x76, 0x66, 0x76, 0x77, 0x76, 0xf7, 0x99, 0xdd, 0x95, 0x35, 0xbe, 0x25,
-	0x99, 0x79, 0x3e, 0xfe, 0xee, 0xe3, 0x51, 0x3e, 0x7e, 0x3c, 0x78, 0x63, 0xe6, 0x1e, 0xbb, 0x67,
-	0x13, 0x7b, 0xd6, 0x9c, 0x4c, 0x1d, 0xd7, 0x21, 0x65, 0xff, 0xf7, 0xc6, 0xcb, 0xc3, 0x13, 0xf7,
-	0xab, 0xf9, 0xa0, 0xf9, 0xa5, 0x73, 0xba, 0x37, 0x74, 0x86, 0xce, 0x1e, 0xdd, 0x30, 0x98, 0x3f,
-	0xa2, 0xbf, 0xd1, 0x5f, 0xe8, 0x4f, 0xac, 0xb0, 0x61, 0x0c, 0x1d, 0x67, 0x38, 0xb2, 0xc3, 0x5d,
-	0xc7, 0xf3, 0x69, 0xdf, 0x3d, 0x71, 0xc6, 0x7c, 0x7d, 0x3b, 0xbe, 0xee, 0x9e, 0x9c, 0xda, 0x33,
-	0xb7, 0x7f, 0x3a, 0x91, 0x01, 0xbe, 0x9d, 0xf6, 0x27, 0x13, 0x7b, 0xca, 0x93, 0xed, 0xfc, 0x5d,
-	0xc3, 0xe5, 0x7b, 0xee, 0x71, 0xc7, 0x0b, 0x47, 0xee, 0xe0, 0xad, 0xf1, 0x7c, 0x34, 0xea, 0x0f,
-	0x46, 0x76, 0xc7, 0xe7, 0xe8, 0xda, 0x55, 0x6d, 0xb7, 0x6a, 0x36, 0x9a, 0x0c, 0xd4, 0xf4, 0x41,
-	0xcd, 0x60, 0x47, 0xab, 0xf8, 0xfd, 0x1f, 0xdb, 0x5a, 0x3b, 0x59, 0x4a, 0x3e, 0xc4, 0x9b, 0xfe,
-	0x1f, 0xf7, 0x79, 0x6e, 0x7d, 0x8d, 0xe2, 0xfe, 0x9f, 0xc0, 0xf9, 0x1b, 0x5a, 0xc5, 0x1f, 0x3c,
-	0x5a, 0xa2, 0x90, 0xb4, 0x70, 0x25, 0x78, 0x38, 0x1d, 0x65, 0x86, 0x2a, 0x3f, 0xfe, 0x7d, 0xbb,
-	0x40, 0x83, 0x85, 0x65, 0xe4, 0x06, 0x2e, 0xfb, 0x0d, 0xd4, 0x8b, 0x59, 0x41, 0x28, 0x81, 0x86,
-	0x09, 0x8a, 0xc8, 0x07, 0x78, 0x23, 0x08, 0xe6, 0xcc, 0x07, 0x23, 0x5b, 0x2f, 0x51, 0xcc, 0xb3,
-	0x49, 0x0c, 0x5d, 0xbe, 0xdf, 0x1f, 0xcd, 0xed, 0x56, 0xf1, 0x47, 0x8f, 0x12, 0xab, 0x24, 0xb7,
-	0x70, 0x7d, 0xec, 0x8c, 0xbd, 0x3f, 0x72, 0xd4, 0x7a, 0x0e, 0x14, 0x0d, 0x45, 0x71, 0xd1, 0x62,
-	0xf2, 0x3e, 0xae, 0xfb, 0xfc, 0x9b, 0x23, 0xa7, 0xef, 0xea, 0x17, 0x28, 0xed, 0x99, 0x04, 0x8d,
-	0xae, 0x8a, 0xb9, 0xa2, 0x75, 0xe4, 0x10, 0xd7, 0x38, 0x99, 0x71, 0xca, 0xd9, 0x9c, 0x30, 0x54,
-	0xa4, 0x54, 0xcc, 0x74, 0x38, 0x76, 0x5f, 0x7f, 0x4d, 0xaf, 0x48, 0x58, 0x74, 0x15, 0xcc, 0x44,
-	0x57, 0x84, 0x4c, 0x8c, 0x83, 0xb3, 0x39, 0xc9, 0x4c, 0x0c, 0x25, 0xbc, 0x83, 0x5d, 0x06, 0xab,
-	0x4a, 0xda, 0xde, 0x4d, 0xa4, 0x8a, 0x55, 0x0a, 0xef, 0x20, 0x47, 0xd5, 0x72, 0xa0, 0x92, 0xef,
-	0x20, 0xa7, 0x45, 0xbb, 0x65, 0x99, 0x7a, 0x5d, 0xfe, 0x94, 0x96, 0x29, 0xeb, 0x96, 0x65, 0x46,
-	0xbb, 0x65, 0x99, 0xfa, 0x46, 0x36, 0x07, 0xec, 0x96, 0x65, 0xc6, 0xbb, 0x65, 0x99, 0xfa, 0xc5,
-	0x94, 0x47, 0x8c, 0xa6, 0x8a, 0x55, 0xc6, 0xba, 0x65, 0x99, 0xfa, 0x66, 0x0e, 0x14, 0xdc, 0x2d,
-	0xcb, 0x24, 0xfb, 0xb8, 0xe6, 0xf3, 0x5b, 0x8e, 0x33, 0xd2, 0xb7, 0x24, 0xff, 0x11, 0xbc, 0x45,
-	0x31, 0x55, 0xa4, 0x8a, 0xdc, 0xc4, 0x55, 0x8e, 0xa5, 0x10, 0x92, 0x09, 0x09, 0xf3, 0x88, 0x85,
-	0x62, 0x9f, 0xee, 0xb9, 0xd3, 0x93, 0xf1, 0x50, 0xbf, 0x24, 0x79, 0x38, 0xb6, 0x0c, 0xf6, 0x89,
-	0x2d, 0x09, 0x7d, 0xe2, 0xa8, 0xff, 0xe5, 0x40, 0x25, 0xfb, 0xc4, 0x69, 0xc2, 0xa9, 0x6a, 0x9d,
-	0xb9, 0xf6, 0x4c, 0xbf, 0x2c, 0x39, 0x0d, 0x74, 0x15, 0x3c, 0x55, 0x74, 0x45, 0x38, 0x55, 0x8c,
-	0x73, 0x25, 0x9b, 0x93, 0x3c, 0x55, 0x74, 0x71, 0xe7, 0xdf, 0x1a, 0xae, 0xb6, 0xed, 0x49, 0xe0,
-	0x9d, 0x8f, 0x30, 0x49, 0xc8, 0x63, 0xa6, 0x6b, 0x57, 0x51, 0x2e, 0xf1, 0x00, 0xb5, 0xe4, 0x76,
-	0x68, 0x32, 0xff, 0xff, 0xf9, 0x4c, 0x5f, 0xa3, 0xc0, 0x4c, 0xf5, 0x24, 0x2b, 0xc9, 0x3e, 0xc6,
-	0x6e, 0x18, 0x0c, 0x65, 0x06, 0x0b, 0xe5, 0x23, 0xd4, 0x91, 0x77, 0x71, 0xe5, 0x38, 0x08, 0x53,
-	0xcc, 0x0a, 0x13, 0xea, 0x27, 0xac, 0x02, 0xfd, 0x83, 0xd4, 0xf9, 0x07, 0x29, 0xf5, 0x0f, 0x52,
-	0xe4, 0x1f, 0xa4, 0xd0, 0x3f, 0x48, 0x91, 0x7f, 0x90, 0x4a, 0xff, 0x20, 0x75, 0xfe, 0x41, 0x4a,
-	0xfd, 0x83, 0x14, 0xf9, 0x07, 0xa9, 0xf4, 0x0f, 0x52, 0xe7, 0x1f, 0xa4, 0xd2, 0x3f, 0x48, 0x85,
-	0x7f, 0x90, 0x3a, 0xff, 0x20, 0x75, 0xfe, 0x41, 0x4a, 0xfd, 0x83, 0x14, 0xf9, 0x07, 0x2d, 0xeb,
-	0x9f, 0x9f, 0xb7, 0x71, 0xf5, 0x76, 0x3f, 0xf4, 0xcf, 0x43, 0x78, 0xee, 0xf1, 0xf8, 0xd7, 0x9b,
-	0xc1, 0x28, 0x27, 0x54, 0x34, 0xef, 0xc4, 0xb7, 0xbf, 0x37, 0x76, 0xa7, 0x67, 0xf2, 0x49, 0xe8,
-	0x96, 0x38, 0xbc, 0x30, 0x0f, 0x3d, 0x0f, 0x93, 0x63, 0x44, 0x70, 0x8c, 0x79, 0x00, 0xcc, 0x55,
-	0x4c, 0x4a, 0x2f, 0xa5, 0xc7, 0xf5, 0x77, 0xf3, 0xb4, 0x92, 0x49, 0xeb, 0x30, 0x32, 0x25, 0x79,
-	0xd8, 0xe7, 0x60, 0x6c, 0x14, 0x07, 0xcd, 0x4b, 0x47, 0x12, 0x5f, 0xbd, 0x98, 0x91, 0x93, 0xee,
-	0xe5, 0x29, 0x41, 0x79, 0xf5, 0x60, 0x79, 0xed, 0x4a, 0xb8, 0xe2, 0x56, 0x21, 0x2d, 0x24, 0xb2,
-	0x0e, 0x2c, 0xb2, 0xdd, 0xf4, 0xc4, 0x74, 0xab, 0x18, 0x38, 0x66, 0xb5, 0x2e, 0x68, 0xb5, 0x6b,
-	0xa9, 0x71, 0x05, 0xa6, 0xcc, 0x70, 0x1d, 0xd8, 0x70, 0x19, 0x61, 0xe9, 0x56, 0x30, 0x2c, 0x33,
-	0x41, 0x17, 0xd4, 0x5d, 0x7a, 0x58, 0x81, 0x29, 0x53, 0xdf, 0x91, 0x44, 0x7d, 0x19, 0x87, 0xa1,
-	0x9b, 0x88, 0x1b, 0xf7, 0x60, 0x0f, 0xf6, 0x60, 0xfa, 0x61, 0xe8, 0x82, 0x89, 0x63, 0x4e, 0xec,
-	0xc0, 0x4e, 0xcc, 0xee, 0xaf, 0x65, 0xca, 0xfa, 0x6b, 0x99, 0xd1, 0xfe, 0x06, 0x82, 0xcc, 0xec,
-	0xaf, 0xcf, 0x94, 0xc9, 0xf2, 0x48, 0x22, 0xcb, 0x1c, 0xfd, 0x8d, 0xc6, 0x8d, 0x9b, 0xb3, 0x07,
-	0x9b, 0x33, 0xbb, 0xbf, 0xc9, 0xc4, 0x31, 0x8b, 0x7e, 0x0c, 0x5a, 0xf4, 0x5a, 0x7a, 0x60, 0x6f,
-	0xa7, 0x18, 0x37, 0xaa, 0xd4, 0x36, 0xa4, 0xd4, 0x17, 0x52, 0xa3, 0x86, 0x40, 0x89, 0x5e, 0x8f,
-	0x24, 0x7a, 0xcd, 0xe8, 0x2c, 0xdb, 0x0b, 0x76, 0x96, 0xdb, 0xb1, 0x07, 0xbb, 0x36, 0xbd, 0xb3,
-	0x22, 0x56, 0xea, 0xdd, 0x0e, 0xec, 0xdd, 0x8c, 0x93, 0x4b, 0xb7, 0x82, 0x27, 0x97, 0x49, 0xb8,
-	0x0b, 0x4a, 0x38, 0xfd, 0xe4, 0x0a, 0x4c, 0x89, 0x90, 0x1b, 0x0f, 0xf1, 0x15, 0xd8, 0xa8, 0x64,
-	0x13, 0xa3, 0xaf, 0xed, 0x33, 0xfa, 0x25, 0x64, 0xa9, 0xed, 0xfd, 0x48, 0x5e, 0xc1, 0xa5, 0x6f,
-	0x3c, 0xbb, 0xf3, 0x6f, 0x12, 0x53, 0xc6, 0xb0, 0x36, 0xdb, 0xf8, 0xe6, 0xda, 0x1b, 0x5a, 0xa3,
-	0x87, 0x37, 0x56, 0x44, 0xfe, 0x1c, 0x5f, 0x06, 0xf5, 0x0a, 0xbc, 0xc0, 0x5e, 0xf4, 0x05, 0xe4,
-	0xc3, 0x9f, 0xc8, 0xbf, 0x8f, 0xeb, 0x2b, 0xe1, 0x7e, 0x81, 0x2f, 0x01, 0xba, 0x05, 0xe8, 0x66,
-	0x94, 0x9e, 0x3a, 0x1f, 0x46, 0x1b, 0x43, 0x92, 0xde, 0x55, 0xc8, 0x7f, 0x80, 0x49, 0xd2, 0xbe,
-	0x00, 0xff, 0xd5, 0x28, 0x3f, 0x6d, 0x92, 0x14, 0xf1, 0x9f, 0xe1, 0xad, 0x84, 0x87, 0xd5, 0xd1,
-	0x85, 0xf0, 0xa1, 0x87, 0x96, 0xc1, 0x87, 0x93, 0x1d, 0x1c, 0x7e, 0x15, 0x74, 0xe1, 0xe8, 0x74,
-	0x53, 0xf9, 0x99, 0x6f, 0x6d, 0x17, 0x7e, 0x81, 0xf0, 0xe8, 0xac, 0x86, 0x1f, 0xed, 0x3e, 0xb7,
-	0xd4, 0x92, 0xfd, 0xe1, 0x93, 0xa2, 0xb4, 0xfb, 0xca, 0xe9, 0xb1, 0xee, 0xcb, 0xf9, 0xb9, 0xba,
-	0x03, 0xbc, 0x40, 0xb4, 0xfb, 0xea, 0xf9, 0x9f, 0xe2, 0xad, 0x84, 0xca, 0x97, 0xf9, 0x77, 0x1c,
-	0x4c, 0xc5, 0x22, 0xfc, 0x13, 0xbc, 0x19, 0xb7, 0xba, 0x32, 0xb6, 0xd0, 0x79, 0xc1, 0xc1, 0xcb,
-	0x74, 0x46, 0x18, 0x9d, 0xe1, 0xce, 0xaf, 0x86, 0x2f, 0x9c, 0xfb, 0xd0, 0xca, 0xcb, 0x9c, 0xcc,
-	0x70, 0xc8, 0x86, 0xcf, 0xfd, 0x0a, 0xe8, 0x3b, 0xff, 0x94, 0x70, 0xfd, 0xee, 0xd8, 0x76, 0x1e,
-	0x05, 0x73, 0xfb, 0x3b, 0xe2, 0x54, 0x9d, 0xf3, 0x9e, 0xf2, 0xa0, 0x20, 0x4e, 0xd2, 0x6f, 0x0b,
-	0xa3, 0x6e, 0xbe, 0x9b, 0xc9, 0x83, 0x82, 0x30, 0xde, 0xb6, 0x70, 0x65, 0x6a, 0x4f, 0xf8, 0x04,
-	0x8a, 0xf2, 0xde, 0x04, 0x7a, 0x11, 0x82, 0x32, 0x72, 0x03, 0x97, 0xa7, 0xf6, 0x84, 0x4d, 0x85,
-	0xc5, 0x9c, 0x77, 0x76, 0x5e, 0x08, 0xbf, 0x88, 0x03, 0xd8, 0xe0, 0x53, 0xca, 0x79, 0xc1, 0xc6,
-	0x01, 0x6c, 0xc8, 0x61, 0x4f, 0xc1, 0x47, 0xa7, 0xf5, 0xbc, 0xb7, 0x61, 0xfc, 0x29, 0xf8, 0xa0,
-	0x14, 0x84, 0xb0, 0x4c, 0xe9, 0xcd, 0x63, 0xfc, 0x1b, 0xba, 0x30, 0x84, 0x65, 0x0a, 0x21, 0x2c,
-	0x93, 0xdf, 0x39, 0xe6, 0xf8, 0x92, 0x4f, 0x08, 0x61, 0x99, 0xe4, 0x2d, 0x7c, 0x61, 0x6a, 0x4f,
-	0xe8, 0xc7, 0xfe, 0x4a, 0xbe, 0xeb, 0xa0, 0x83, 0x42, 0xdb, 0x2f, 0xe1, 0x09, 0xf8, 0xe7, 0x70,
-	0x9c, 0xf7, 0xfa, 0x86, 0x27, 0xe0, 0x9f, 0xba, 0x59, 0x1b, 0xd8, 0x67, 0xe3, 0x6a, 0xce, 0x8b,
-	0x16, 0xde, 0x06, 0xfa, 0xe7, 0xd6, 0x45, 0x7a, 0xc6, 0xef, 0xd2, 0x33, 0xee, 0x9d, 0xd2, 0xd6,
-	0xf5, 0x27, 0xe7, 0x86, 0xf6, 0xd7, 0xb9, 0xa1, 0x3d, 0x3d, 0x37, 0xb4, 0x9f, 0x16, 0x86, 0xf6,
-	0xcb, 0xc2, 0xd0, 0x7e, 0x5d, 0x18, 0xda, 0xe3, 0x85, 0x51, 0xf8, 0x6d, 0x61, 0x14, 0x9e, 0x2c,
-	0x0c, 0xed, 0xe9, 0xc2, 0x28, 0x7c, 0xf7, 0xa7, 0x51, 0x18, 0xac, 0xd3, 0x57, 0xb1, 0xfe, 0x0b,
-	0x00, 0x00, 0xff, 0xff, 0xd9, 0x80, 0xa9, 0x4d, 0x81, 0x20, 0x00, 0x00,
+	// 1431 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x99, 0x5f, 0x6f, 0xdb, 0x54,
+	0x18, 0x87, 0xe3, 0x9e, 0xb4, 0x4b, 0x4f, 0xda, 0xae, 0x3d, 0x63, 0x93, 0x29, 0xc8, 0x9d, 0x0a,
+	0x62, 0x45, 0xac, 0x09, 0xd8, 0x08, 0x4d, 0x08, 0x34, 0x88, 0xca, 0x68, 0x61, 0x7f, 0x20, 0x4b,
+	0xd6, 0x0a, 0x18, 0x5b, 0xda, 0x78, 0x59, 0xb4, 0xd4, 0x8e, 0x1c, 0x07, 0x14, 0x71, 0xc3, 0x47,
+	0xe0, 0x92, 0x4b, 0x2e, 0xb9, 0xe7, 0x86, 0x4b, 0x2e, 0x77, 0xc9, 0x27, 0x80, 0x35, 0x7c, 0x01,
+	0x04, 0x37, 0xbb, 0x41, 0x42, 0x3e, 0x3e, 0xb6, 0x8f, 0xed, 0xf7, 0xd8, 0x56, 0x74, 0x72, 0x97,
+	0xe4, 0x9c, 0xf7, 0xc9, 0xcf, 0x6f, 0x8e, 0xf2, 0xe4, 0x8d, 0xf1, 0xda, 0xc8, 0xed, 0xba, 0x93,
+	0xa1, 0x39, 0xaa, 0x0d, 0x1d, 0xdb, 0xb5, 0x49, 0x25, 0x78, 0xbe, 0xf9, 0xdd, 0x93, 0x6b, 0xa3,
+	0x5a, 0xdf, 0xae, 0x9f, 0xd8, 0x5d, 0x73, 0xb7, 0x67, 0x5a, 0xa6, 0xd3, 0x71, 0x6d, 0xa7, 0x7e,
+	0x72, 0xda, 0xad, 0xf7, 0xec, 0x5d, 0xd7, 0xde, 0xa5, 0x05, 0xc7, 0xe3, 0x47, 0x75, 0xfa, 0xe0,
+	0xc4, 0xdb, 0xb3, 0xdb, 0xb3, 0x7b, 0x76, 0xbd, 0x6f, 0xb9, 0xa6, 0x63, 0x75, 0x06, 0x75, 0xf7,
+	0x71, 0xdf, 0xe9, 0x3e, 0x18, 0x76, 0x1c, 0x77, 0x52, 0xef, 0xf5, 0xdd, 0xc7, 0xe3, 0xe3, 0xda,
+	0x89, 0x7d, 0x5a, 0xa7, 0x9b, 0xc2, 0x6a, 0xef, 0x19, 0x7d, 0x42, 0x1f, 0xf9, 0x31, 0x36, 0xb5,
+	0x9e, 0x6d, 0xf7, 0x06, 0x66, 0xb4, 0xab, 0x3b, 0x76, 0x3a, 0x6e, 0xdf, 0xb6, 0xd8, 0xfa, 0x56,
+	0x72, 0xdd, 0xed, 0x9f, 0x9a, 0x23, 0xb7, 0x73, 0x3a, 0x14, 0x01, 0xbe, 0x75, 0x3a, 0xc3, 0xa1,
+	0xe9, 0xb0, 0xeb, 0xdc, 0xfe, 0x67, 0x05, 0x57, 0xee, 0xba, 0xdd, 0x96, 0x77, 0xa9, 0xe4, 0x36,
+	0xde, 0xb0, 0xc6, 0x83, 0x41, 0xe7, 0x78, 0x60, 0xb6, 0x02, 0x8e, 0xaa, 0x5c, 0x56, 0x76, 0xaa,
+	0xfa, 0x66, 0xcd, 0x07, 0xd5, 0x02, 0x50, 0x2d, 0xdc, 0xd1, 0x28, 0xff, 0xf0, 0xe7, 0x96, 0xd2,
+	0x4c, 0x97, 0x92, 0x4f, 0xf1, 0x7a, 0xf0, 0xe2, 0x1e, 0xcb, 0xad, 0x2e, 0x50, 0xdc, 0x8b, 0x29,
+	0x5c, 0xb0, 0xa1, 0x51, 0xfe, 0xd1, 0xa3, 0xa5, 0x0a, 0x49, 0x03, 0x2f, 0x87, 0x17, 0xa7, 0xa2,
+	0xdc, 0x50, 0x95, 0xa7, 0x7f, 0x6c, 0x95, 0x68, 0xb0, 0xa8, 0x8c, 0x5c, 0xc7, 0x95, 0xa0, 0x81,
+	0x6a, 0x39, 0x2f, 0x08, 0x25, 0xd0, 0x30, 0x61, 0x11, 0xf9, 0x04, 0xaf, 0x85, 0xc1, 0xec, 0xf1,
+	0xf1, 0xc0, 0x54, 0x17, 0x29, 0xe6, 0xe5, 0x34, 0x86, 0x2e, 0xdf, 0xeb, 0x0c, 0xc6, 0x66, 0xa3,
+	0xfc, 0x93, 0x47, 0x49, 0x54, 0x92, 0x9b, 0x78, 0xd5, 0xb2, 0x2d, 0xef, 0x45, 0x86, 0x5a, 0x2a,
+	0x80, 0xa2, 0xa1, 0x28, 0x2e, 0x5e, 0x4c, 0x3e, 0xc6, 0xab, 0x01, 0xff, 0xc6, 0xc0, 0xee, 0xb8,
+	0xea, 0x39, 0x4a, 0x7b, 0x29, 0x45, 0xa3, 0xab, 0x7c, 0xae, 0x78, 0x1d, 0x39, 0xc0, 0x2b, 0x8c,
+	0xec, 0x73, 0x2a, 0xf9, 0x9c, 0x28, 0x54, 0xac, 0x94, 0xcf, 0x74, 0x60, 0xb9, 0xef, 0xbc, 0xad,
+	0x2e, 0x0b, 0x58, 0x74, 0x15, 0xcc, 0x44, 0x57, 0xb8, 0x4c, 0x3e, 0x07, 0xe7, 0x73, 0xd2, 0x99,
+	0x7c, 0x14, 0xf7, 0x09, 0xb6, 0x7d, 0x58, 0x55, 0xd0, 0xf6, 0x76, 0x2a, 0x55, 0xa2, 0x92, 0xfb,
+	0x04, 0x19, 0x6a, 0xa5, 0x00, 0x2a, 0xfd, 0x09, 0x32, 0x5a, 0xbc, 0x5b, 0x86, 0xae, 0xae, 0x8a,
+	0xaf, 0xd2, 0xd0, 0x45, 0xdd, 0x32, 0xf4, 0x78, 0xb7, 0x0c, 0x5d, 0x5d, 0xcb, 0xe7, 0x80, 0xdd,
+	0x32, 0xf4, 0x64, 0xb7, 0x0c, 0x5d, 0x3d, 0x9f, 0x71, 0x89, 0xf1, 0x54, 0x89, 0xca, 0x44, 0xb7,
+	0x0c, 0x5d, 0x5d, 0x2f, 0x80, 0x82, 0xbb, 0x65, 0xe8, 0x64, 0x0f, 0xaf, 0x04, 0xfc, 0x86, 0x6d,
+	0x0f, 0xd4, 0x0d, 0xc1, 0x37, 0x82, 0xb7, 0xc8, 0xa7, 0x8a, 0x55, 0x91, 0x1b, 0xb8, 0xca, 0xb0,
+	0x14, 0x42, 0x72, 0x21, 0x51, 0x1e, 0xbe, 0x90, 0xef, 0xd3, 0x5d, 0xd7, 0xe9, 0x5b, 0x3d, 0xf5,
+	0x82, 0xe0, 0xe2, 0xfc, 0x65, 0xb0, 0x4f, 0xfe, 0x12, 0xd7, 0x27, 0x86, 0x7a, 0xa1, 0x00, 0x2a,
+	0xdd, 0x27, 0x46, 0xe3, 0x4e, 0x55, 0x63, 0xe2, 0x9a, 0x23, 0xf5, 0xa2, 0xe0, 0x34, 0xd0, 0x55,
+	0xf0, 0x54, 0xd1, 0x15, 0xee, 0x54, 0xf9, 0x9c, 0x4b, 0xf9, 0x9c, 0xf4, 0xa9, 0xa2, 0x8b, 0xdb,
+	0xff, 0xad, 0xe0, 0x6a, 0xd3, 0x1c, 0x86, 0xde, 0xf9, 0x0c, 0x93, 0x94, 0x3c, 0x46, 0xaa, 0x72,
+	0x19, 0x15, 0x12, 0x0f, 0x50, 0x4b, 0x6e, 0x45, 0x26, 0x0b, 0xbe, 0xcf, 0x47, 0xea, 0x02, 0x05,
+	0xe6, 0xaa, 0x27, 0x5d, 0x49, 0xf6, 0x30, 0x76, 0xa3, 0x60, 0x28, 0x37, 0x58, 0x24, 0x1f, 0xae,
+	0x8e, 0x7c, 0x88, 0x97, 0xbb, 0x61, 0x98, 0x72, 0x5e, 0x98, 0x48, 0x3f, 0x51, 0x15, 0xe8, 0x1f,
+	0x24, 0xcf, 0x3f, 0x48, 0xaa, 0x7f, 0x90, 0x24, 0xff, 0x20, 0x89, 0xfe, 0x41, 0x92, 0xfc, 0x83,
+	0x64, 0xfa, 0x07, 0xc9, 0xf3, 0x0f, 0x92, 0xea, 0x1f, 0x24, 0xc9, 0x3f, 0x48, 0xa6, 0x7f, 0x90,
+	0x3c, 0xff, 0x20, 0x99, 0xfe, 0x41, 0x32, 0xfc, 0x83, 0xe4, 0xf9, 0x07, 0xc9, 0xf3, 0x0f, 0x92,
+	0xea, 0x1f, 0x24, 0xc9, 0x3f, 0x68, 0x56, 0xff, 0xfc, 0xb2, 0x85, 0xab, 0xb7, 0x3a, 0x91, 0x7f,
+	0x1e, 0xc2, 0x73, 0x8f, 0xc7, 0xbf, 0x5a, 0x0b, 0x07, 0x43, 0xae, 0xa2, 0x76, 0x3b, 0xb9, 0xfd,
+	0x23, 0xcb, 0x75, 0x26, 0xe2, 0x49, 0xe8, 0x26, 0x3f, 0xbc, 0xf8, 0x1e, 0x7a, 0x15, 0x26, 0x27,
+	0x88, 0xe0, 0x18, 0x73, 0x1f, 0x98, 0xab, 0x7c, 0x29, 0xbd, 0x91, 0x1d, 0x37, 0xd8, 0xcd, 0xd2,
+	0x0a, 0x26, 0xad, 0x83, 0xd8, 0x94, 0xe4, 0x61, 0x5f, 0x81, 0xb1, 0x71, 0x1c, 0x34, 0x2f, 0x1d,
+	0x0a, 0x7c, 0xf5, 0x7a, 0x4e, 0x4e, 0xba, 0x97, 0xa5, 0x04, 0xe5, 0x75, 0x04, 0xcb, 0x6b, 0x47,
+	0xc0, 0xe5, 0xb7, 0x72, 0x69, 0x21, 0x91, 0xb5, 0x60, 0x91, 0xed, 0x64, 0x27, 0xa6, 0x5b, 0xf9,
+	0xc0, 0x09, 0xab, 0xb5, 0x41, 0xab, 0x5d, 0xc9, 0x8c, 0xcb, 0x31, 0x45, 0x86, 0x6b, 0xc1, 0x86,
+	0xcb, 0x09, 0x4b, 0xb7, 0x82, 0x61, 0x7d, 0x13, 0xb4, 0x41, 0xdd, 0x65, 0x87, 0xe5, 0x98, 0x22,
+	0xf5, 0x1d, 0x0a, 0xd4, 0x97, 0x73, 0x18, 0xda, 0xa9, 0xb8, 0x49, 0x0f, 0x1e, 0xc1, 0x1e, 0xcc,
+	0x3e, 0x0c, 0x6d, 0x30, 0x71, 0xc2, 0x89, 0x2d, 0xd8, 0x89, 0xf9, 0xfd, 0x35, 0x74, 0x51, 0x7f,
+	0x0d, 0x3d, 0xde, 0xdf, 0x50, 0x90, 0xb9, 0xfd, 0x0d, 0x98, 0x22, 0x59, 0x1e, 0x0a, 0x64, 0x59,
+	0xa0, 0xbf, 0xf1, 0xb8, 0x49, 0x73, 0x1e, 0xc1, 0xe6, 0xcc, 0xef, 0x6f, 0x3a, 0x71, 0xc2, 0xa2,
+	0x9f, 0x83, 0x16, 0xbd, 0x92, 0x1d, 0xd8, 0xdb, 0xc9, 0xc7, 0x8d, 0x2b, 0xb5, 0x09, 0x29, 0xf5,
+	0xb5, 0xcc, 0xa8, 0x11, 0x50, 0xa0, 0xd7, 0x43, 0x81, 0x5e, 0x73, 0x3a, 0xeb, 0xef, 0x05, 0x3b,
+	0xcb, 0xec, 0x78, 0x04, 0xbb, 0x36, 0xbb, 0xb3, 0x3c, 0x56, 0xe8, 0xdd, 0x16, 0xec, 0xdd, 0x9c,
+	0x93, 0x4b, 0xb7, 0x82, 0x27, 0xd7, 0x97, 0x70, 0x1b, 0x94, 0x70, 0xf6, 0xc9, 0xe5, 0x98, 0x02,
+	0x21, 0x6f, 0x3e, 0xc4, 0x97, 0x60, 0xa3, 0x92, 0x75, 0x8c, 0x9e, 0x98, 0x13, 0xfa, 0x27, 0xe4,
+	0x62, 0xd3, 0x7b, 0x48, 0xde, 0xc4, 0x8b, 0xdf, 0x78, 0x76, 0x67, 0xff, 0x24, 0x66, 0x8c, 0x61,
+	0x4d, 0x7f, 0xe3, 0xbb, 0x0b, 0xd7, 0x94, 0xcd, 0x23, 0xbc, 0x36, 0x27, 0xf2, 0xd7, 0xf8, 0x22,
+	0xa8, 0x57, 0xe0, 0x0d, 0xea, 0xf1, 0x37, 0x10, 0x0f, 0x7f, 0x3c, 0xff, 0x1e, 0x5e, 0x9d, 0x0b,
+	0xf7, 0x01, 0xbe, 0x00, 0xe8, 0x16, 0xa0, 0xeb, 0x71, 0x7a, 0xe6, 0x7c, 0x18, 0x6f, 0x0c, 0x49,
+	0x7b, 0x57, 0x22, 0xff, 0x3e, 0x26, 0x69, 0xfb, 0x02, 0xfc, 0xb7, 0xe2, 0xfc, 0xac, 0x49, 0x92,
+	0xc7, 0x7f, 0x85, 0x37, 0x52, 0x1e, 0x96, 0x47, 0xe7, 0xc2, 0x47, 0x1e, 0x9a, 0x05, 0x1f, 0x4d,
+	0x76, 0x70, 0xf8, 0x79, 0xd0, 0xb9, 0xa3, 0xd3, 0xce, 0xe4, 0xe7, 0x7e, 0xb4, 0x6d, 0xf8, 0x0d,
+	0xa2, 0xa3, 0x33, 0x1f, 0x7e, 0xbc, 0xfb, 0xcc, 0x52, 0x33, 0xf6, 0x87, 0x4d, 0x8a, 0xc2, 0xee,
+	0x4b, 0xa7, 0x27, 0xba, 0x2f, 0xe6, 0x17, 0xea, 0x0e, 0xf0, 0x06, 0xf1, 0xee, 0xcb, 0xe7, 0x7f,
+	0x89, 0x37, 0x52, 0x2a, 0x9f, 0xe5, 0xeb, 0x38, 0x9c, 0x8a, 0x79, 0xf8, 0x17, 0x78, 0x3d, 0x69,
+	0x75, 0x69, 0x6c, 0xae, 0xf3, 0x9c, 0x83, 0x67, 0xe9, 0x0c, 0x37, 0x3a, 0xc3, 0x9d, 0x9f, 0x0f,
+	0x9f, 0x3b, 0xf7, 0x91, 0x95, 0x67, 0x39, 0x99, 0xd1, 0x90, 0x0d, 0x9f, 0xfb, 0x39, 0xd0, 0xb7,
+	0xff, 0x5d, 0xc4, 0xab, 0x77, 0x2c, 0xd3, 0x7e, 0x14, 0xce, 0xed, 0x1f, 0xf0, 0x53, 0x75, 0xc1,
+	0xfb, 0x94, 0xfb, 0x25, 0x7e, 0x92, 0x7e, 0x9f, 0x1b, 0x75, 0x8b, 0xdd, 0x99, 0xdc, 0x2f, 0x71,
+	0xe3, 0x6d, 0x03, 0x2f, 0x3b, 0xe6, 0x90, 0x4d, 0xa0, 0xa8, 0xe8, 0x9d, 0x40, 0x2f, 0x42, 0x58,
+	0x46, 0xae, 0xe3, 0x8a, 0x63, 0x0e, 0xfd, 0xa9, 0xb0, 0x5c, 0xf0, 0x9e, 0x9d, 0x17, 0x22, 0x28,
+	0x62, 0x00, 0x7f, 0xf0, 0x59, 0x2c, 0x78, 0x83, 0x8d, 0x01, 0xfc, 0x21, 0xc7, 0xbf, 0x0a, 0x36,
+	0x3a, 0x2d, 0x15, 0xbd, 0x1b, 0xc6, 0xae, 0x82, 0x0d, 0x4a, 0x61, 0x08, 0x43, 0x17, 0xde, 0x79,
+	0x4c, 0xfe, 0x43, 0x17, 0x85, 0x30, 0x74, 0x2e, 0x84, 0xa1, 0xb3, 0x7b, 0x8e, 0x05, 0xfe, 0xe4,
+	0xe3, 0x42, 0x18, 0x3a, 0x79, 0x0f, 0x9f, 0x73, 0xcc, 0x21, 0xfd, 0xd9, 0xbf, 0x5c, 0xec, 0x76,
+	0xd0, 0x7e, 0xa9, 0x19, 0x94, 0xb0, 0x04, 0xec, 0x77, 0x38, 0x2e, 0x7a, 0xfb, 0x86, 0x25, 0x60,
+	0xbf, 0xba, 0xfd, 0x36, 0xf8, 0xbf, 0x8d, 0xab, 0x05, 0x6f, 0xb4, 0xb0, 0x36, 0xd0, 0x97, 0x1b,
+	0xe7, 0xe9, 0x19, 0xbf, 0x43, 0xcf, 0xb8, 0x77, 0x4a, 0x1b, 0x57, 0x9f, 0x9d, 0x69, 0xca, 0xdf,
+	0x67, 0x9a, 0xf2, 0xfc, 0x4c, 0x53, 0x7e, 0x9e, 0x6a, 0xca, 0xaf, 0x53, 0x4d, 0xf9, 0x6d, 0xaa,
+	0x29, 0x4f, 0xa7, 0x5a, 0xe9, 0xf7, 0xa9, 0x56, 0x7a, 0x36, 0xd5, 0x94, 0xe7, 0x53, 0xad, 0xf4,
+	0xfd, 0x5f, 0x5a, 0xe9, 0x78, 0x89, 0xbe, 0x8b, 0xf1, 0x7f, 0x00, 0x00, 0x00, 0xff, 0xff, 0xcb,
+	0x4b, 0x92, 0x05, 0xcf, 0x20, 0x00, 0x00,
 }
 
 func (this *StdTypes) VerboseEqual(that interface{}) error {
@@ -3028,7 +3033,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NullableTimestamp {
 		keysForNullableTimestamp = append(keysForNullableTimestamp, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableTimestamp)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableTimestamp)
 	mapStringForNullableTimestamp := "map[int32]*time.Time{"
 	for _, k := range keysForNullableTimestamp {
 		mapStringForNullableTimestamp += fmt.Sprintf("%#v: %#v,", k, this.NullableTimestamp[k])
@@ -3041,7 +3046,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.Timestamp {
 		keysForTimestamp = append(keysForTimestamp, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForTimestamp)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForTimestamp)
 	mapStringForTimestamp := "map[int32]time.Time{"
 	for _, k := range keysForTimestamp {
 		mapStringForTimestamp += fmt.Sprintf("%#v: %#v,", k, this.Timestamp[k])
@@ -3054,7 +3059,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NullableDuration {
 		keysForNullableDuration = append(keysForNullableDuration, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableDuration)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableDuration)
 	mapStringForNullableDuration := "map[int32]*time.Duration{"
 	for _, k := range keysForNullableDuration {
 		mapStringForNullableDuration += fmt.Sprintf("%#v: %#v,", k, this.NullableDuration[k])
@@ -3067,7 +3072,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.Duration {
 		keysForDuration = append(keysForDuration, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForDuration)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForDuration)
 	mapStringForDuration := "map[int32]time.Duration{"
 	for _, k := range keysForDuration {
 		mapStringForDuration += fmt.Sprintf("%#v: %#v,", k, this.Duration[k])
@@ -3080,7 +3085,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NullableDouble {
 		keysForNullableDouble = append(keysForNullableDouble, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableDouble)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableDouble)
 	mapStringForNullableDouble := "map[int32]*float64{"
 	for _, k := range keysForNullableDouble {
 		mapStringForNullableDouble += fmt.Sprintf("%#v: %#v,", k, this.NullableDouble[k])
@@ -3093,7 +3098,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NonnullDouble {
 		keysForNonnullDouble = append(keysForNonnullDouble, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullDouble)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullDouble)
 	mapStringForNonnullDouble := "map[int32]float64{"
 	for _, k := range keysForNonnullDouble {
 		mapStringForNonnullDouble += fmt.Sprintf("%#v: %#v,", k, this.NonnullDouble[k])
@@ -3106,7 +3111,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NullableFloat {
 		keysForNullableFloat = append(keysForNullableFloat, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableFloat)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableFloat)
 	mapStringForNullableFloat := "map[int32]*float32{"
 	for _, k := range keysForNullableFloat {
 		mapStringForNullableFloat += fmt.Sprintf("%#v: %#v,", k, this.NullableFloat[k])
@@ -3119,7 +3124,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NonnullFloat {
 		keysForNonnullFloat = append(keysForNonnullFloat, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullFloat)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullFloat)
 	mapStringForNonnullFloat := "map[int32]float32{"
 	for _, k := range keysForNonnullFloat {
 		mapStringForNonnullFloat += fmt.Sprintf("%#v: %#v,", k, this.NonnullFloat[k])
@@ -3132,7 +3137,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NullableInt64 {
 		keysForNullableInt64 = append(keysForNullableInt64, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableInt64)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableInt64)
 	mapStringForNullableInt64 := "map[int32]*int64{"
 	for _, k := range keysForNullableInt64 {
 		mapStringForNullableInt64 += fmt.Sprintf("%#v: %#v,", k, this.NullableInt64[k])
@@ -3145,7 +3150,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NonnullInt64 {
 		keysForNonnullInt64 = append(keysForNonnullInt64, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullInt64)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullInt64)
 	mapStringForNonnullInt64 := "map[int32]int64{"
 	for _, k := range keysForNonnullInt64 {
 		mapStringForNonnullInt64 += fmt.Sprintf("%#v: %#v,", k, this.NonnullInt64[k])
@@ -3158,7 +3163,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NullableUInt64 {
 		keysForNullableUInt64 = append(keysForNullableUInt64, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableUInt64)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableUInt64)
 	mapStringForNullableUInt64 := "map[int32]*uint64{"
 	for _, k := range keysForNullableUInt64 {
 		mapStringForNullableUInt64 += fmt.Sprintf("%#v: %#v,", k, this.NullableUInt64[k])
@@ -3171,7 +3176,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NonnullUInt64 {
 		keysForNonnullUInt64 = append(keysForNonnullUInt64, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullUInt64)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullUInt64)
 	mapStringForNonnullUInt64 := "map[int32]uint64{"
 	for _, k := range keysForNonnullUInt64 {
 		mapStringForNonnullUInt64 += fmt.Sprintf("%#v: %#v,", k, this.NonnullUInt64[k])
@@ -3184,7 +3189,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NullableInt32 {
 		keysForNullableInt32 = append(keysForNullableInt32, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableInt32)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableInt32)
 	mapStringForNullableInt32 := "map[int32]*int32{"
 	for _, k := range keysForNullableInt32 {
 		mapStringForNullableInt32 += fmt.Sprintf("%#v: %#v,", k, this.NullableInt32[k])
@@ -3197,7 +3202,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NonnullInt32 {
 		keysForNonnullInt32 = append(keysForNonnullInt32, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullInt32)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullInt32)
 	mapStringForNonnullInt32 := "map[int32]int32{"
 	for _, k := range keysForNonnullInt32 {
 		mapStringForNonnullInt32 += fmt.Sprintf("%#v: %#v,", k, this.NonnullInt32[k])
@@ -3210,7 +3215,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NullableUInt32 {
 		keysForNullableUInt32 = append(keysForNullableUInt32, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableUInt32)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableUInt32)
 	mapStringForNullableUInt32 := "map[int32]*uint32{"
 	for _, k := range keysForNullableUInt32 {
 		mapStringForNullableUInt32 += fmt.Sprintf("%#v: %#v,", k, this.NullableUInt32[k])
@@ -3223,7 +3228,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NonnullUInt32 {
 		keysForNonnullUInt32 = append(keysForNonnullUInt32, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullUInt32)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullUInt32)
 	mapStringForNonnullUInt32 := "map[int32]uint32{"
 	for _, k := range keysForNonnullUInt32 {
 		mapStringForNonnullUInt32 += fmt.Sprintf("%#v: %#v,", k, this.NonnullUInt32[k])
@@ -3236,7 +3241,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NullableBool {
 		keysForNullableBool = append(keysForNullableBool, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableBool)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableBool)
 	mapStringForNullableBool := "map[int32]*bool{"
 	for _, k := range keysForNullableBool {
 		mapStringForNullableBool += fmt.Sprintf("%#v: %#v,", k, this.NullableBool[k])
@@ -3249,7 +3254,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NonnullBool {
 		keysForNonnullBool = append(keysForNonnullBool, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullBool)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullBool)
 	mapStringForNonnullBool := "map[int32]bool{"
 	for _, k := range keysForNonnullBool {
 		mapStringForNonnullBool += fmt.Sprintf("%#v: %#v,", k, this.NonnullBool[k])
@@ -3262,7 +3267,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NullableString {
 		keysForNullableString = append(keysForNullableString, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableString)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableString)
 	mapStringForNullableString := "map[int32]*string{"
 	for _, k := range keysForNullableString {
 		mapStringForNullableString += fmt.Sprintf("%#v: %#v,", k, this.NullableString[k])
@@ -3275,7 +3280,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NonnullString {
 		keysForNonnullString = append(keysForNonnullString, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullString)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullString)
 	mapStringForNonnullString := "map[int32]string{"
 	for _, k := range keysForNonnullString {
 		mapStringForNonnullString += fmt.Sprintf("%#v: %#v,", k, this.NonnullString[k])
@@ -3288,7 +3293,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NullableBytes {
 		keysForNullableBytes = append(keysForNullableBytes, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableBytes)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNullableBytes)
 	mapStringForNullableBytes := "map[int32]*[]byte{"
 	for _, k := range keysForNullableBytes {
 		mapStringForNullableBytes += fmt.Sprintf("%#v: %#v,", k, this.NullableBytes[k])
@@ -3301,7 +3306,7 @@ func (this *MapStdTypes) GoString() string {
 	for k := range this.NonnullBytes {
 		keysForNonnullBytes = append(keysForNonnullBytes, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullBytes)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Int32s(keysForNonnullBytes)
 	mapStringForNonnullBytes := "map[int32][]byte{"
 	for _, k := range keysForNonnullBytes {
 		mapStringForNonnullBytes += fmt.Sprintf("%#v: %#v,", k, this.NonnullBytes[k])
@@ -3430,59 +3435,59 @@ func valueToGoStringStdtypes(v interface{}, typ string) string {
 func NewPopulatedStdTypes(r randyStdtypes, easy bool) *StdTypes {
 	this := &StdTypes{}
 	if r.Intn(5) != 0 {
-		this.NullableTimestamp = github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
+		this.NullableTimestamp = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
 	}
 	if r.Intn(5) != 0 {
-		this.NullableDuration = github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
+		this.NullableDuration = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
 	}
-	v1 := github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
+	v1 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
 	this.Timestamp = *v1
-	v2 := github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
+	v2 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
 	this.Duration = *v2
 	if r.Intn(5) != 0 {
-		this.NullableDouble = github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy)
+		this.NullableDouble = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy)
 	}
-	v3 := github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy)
+	v3 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy)
 	this.NonnullDouble = *v3
 	if r.Intn(5) != 0 {
-		this.NullableFloat = github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy)
+		this.NullableFloat = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy)
 	}
-	v4 := github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy)
+	v4 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy)
 	this.NonnullFloat = *v4
 	if r.Intn(5) != 0 {
-		this.NullableInt64 = github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy)
+		this.NullableInt64 = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy)
 	}
-	v5 := github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy)
+	v5 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy)
 	this.NonnullInt64 = *v5
 	if r.Intn(5) != 0 {
-		this.NullableUInt64 = github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy)
+		this.NullableUInt64 = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy)
 	}
-	v6 := github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy)
+	v6 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy)
 	this.NonnullUInt64 = *v6
 	if r.Intn(5) != 0 {
-		this.NullableInt32 = github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy)
+		this.NullableInt32 = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy)
 	}
-	v7 := github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy)
+	v7 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy)
 	this.NonnullInt32 = *v7
 	if r.Intn(5) != 0 {
-		this.NullableUInt32 = github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy)
+		this.NullableUInt32 = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy)
 	}
-	v8 := github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy)
+	v8 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy)
 	this.NonnullUInt32 = *v8
 	if r.Intn(5) != 0 {
-		this.NullableBool = github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy)
+		this.NullableBool = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy)
 	}
-	v9 := github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy)
+	v9 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy)
 	this.NonnullBool = *v9
 	if r.Intn(5) != 0 {
-		this.NullableString = github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy)
+		this.NullableString = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy)
 	}
-	v10 := github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy)
+	v10 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy)
 	this.NonnullString = *v10
 	if r.Intn(5) != 0 {
-		this.NullableBytes = github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy)
+		this.NullableBytes = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy)
 	}
-	v11 := github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy)
+	v11 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy)
 	this.NonnullBytes = *v11
 	if !easy && r.Intn(10) != 0 {
 		this.XXX_unrecognized = randUnrecognizedStdtypes(r, 23)
@@ -3496,21 +3501,21 @@ func NewPopulatedRepStdTypes(r randyStdtypes, easy bool) *RepStdTypes {
 		v12 := r.Intn(5)
 		this.NullableTimestamps = make([]*time.Time, v12)
 		for i := 0; i < v12; i++ {
-			this.NullableTimestamps[i] = github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
+			this.NullableTimestamps[i] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v13 := r.Intn(5)
 		this.NullableDurations = make([]*time.Duration, v13)
 		for i := 0; i < v13; i++ {
-			this.NullableDurations[i] = github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
+			this.NullableDurations[i] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v14 := r.Intn(5)
 		this.Timestamps = make([]time.Time, v14)
 		for i := 0; i < v14; i++ {
-			v15 := github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
+			v15 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
 			this.Timestamps[i] = *v15
 		}
 	}
@@ -3518,7 +3523,7 @@ func NewPopulatedRepStdTypes(r randyStdtypes, easy bool) *RepStdTypes {
 		v16 := r.Intn(5)
 		this.Durations = make([]time.Duration, v16)
 		for i := 0; i < v16; i++ {
-			v17 := github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
+			v17 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
 			this.Durations[i] = *v17
 		}
 	}
@@ -3526,14 +3531,14 @@ func NewPopulatedRepStdTypes(r randyStdtypes, easy bool) *RepStdTypes {
 		v18 := r.Intn(5)
 		this.NullableDouble = make([]*float64, v18)
 		for i := 0; i < v18; i++ {
-			this.NullableDouble[i] = github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy)
+			this.NullableDouble[i] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v19 := r.Intn(5)
 		this.NonnullDouble = make([]float64, v19)
 		for i := 0; i < v19; i++ {
-			v20 := github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy)
+			v20 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy)
 			this.NonnullDouble[i] = *v20
 		}
 	}
@@ -3541,14 +3546,14 @@ func NewPopulatedRepStdTypes(r randyStdtypes, easy bool) *RepStdTypes {
 		v21 := r.Intn(5)
 		this.NullableFloat = make([]*float32, v21)
 		for i := 0; i < v21; i++ {
-			this.NullableFloat[i] = github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy)
+			this.NullableFloat[i] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v22 := r.Intn(5)
 		this.NonnullFloat = make([]float32, v22)
 		for i := 0; i < v22; i++ {
-			v23 := github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy)
+			v23 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy)
 			this.NonnullFloat[i] = *v23
 		}
 	}
@@ -3556,14 +3561,14 @@ func NewPopulatedRepStdTypes(r randyStdtypes, easy bool) *RepStdTypes {
 		v24 := r.Intn(5)
 		this.NullableInt64 = make([]*int64, v24)
 		for i := 0; i < v24; i++ {
-			this.NullableInt64[i] = github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy)
+			this.NullableInt64[i] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v25 := r.Intn(5)
 		this.NonnullInt64 = make([]int64, v25)
 		for i := 0; i < v25; i++ {
-			v26 := github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy)
+			v26 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy)
 			this.NonnullInt64[i] = *v26
 		}
 	}
@@ -3571,14 +3576,14 @@ func NewPopulatedRepStdTypes(r randyStdtypes, easy bool) *RepStdTypes {
 		v27 := r.Intn(5)
 		this.NullableUInt64 = make([]*uint64, v27)
 		for i := 0; i < v27; i++ {
-			this.NullableUInt64[i] = github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy)
+			this.NullableUInt64[i] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v28 := r.Intn(5)
 		this.NonnullUInt64 = make([]uint64, v28)
 		for i := 0; i < v28; i++ {
-			v29 := github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy)
+			v29 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy)
 			this.NonnullUInt64[i] = *v29
 		}
 	}
@@ -3586,14 +3591,14 @@ func NewPopulatedRepStdTypes(r randyStdtypes, easy bool) *RepStdTypes {
 		v30 := r.Intn(5)
 		this.NullableInt32 = make([]*int32, v30)
 		for i := 0; i < v30; i++ {
-			this.NullableInt32[i] = github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy)
+			this.NullableInt32[i] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v31 := r.Intn(5)
 		this.NonnullInt32 = make([]int32, v31)
 		for i := 0; i < v31; i++ {
-			v32 := github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy)
+			v32 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy)
 			this.NonnullInt32[i] = *v32
 		}
 	}
@@ -3601,14 +3606,14 @@ func NewPopulatedRepStdTypes(r randyStdtypes, easy bool) *RepStdTypes {
 		v33 := r.Intn(5)
 		this.NullableUInt32 = make([]*uint32, v33)
 		for i := 0; i < v33; i++ {
-			this.NullableUInt32[i] = github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy)
+			this.NullableUInt32[i] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v34 := r.Intn(5)
 		this.NonnullUInt32 = make([]uint32, v34)
 		for i := 0; i < v34; i++ {
-			v35 := github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy)
+			v35 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy)
 			this.NonnullUInt32[i] = *v35
 		}
 	}
@@ -3616,14 +3621,14 @@ func NewPopulatedRepStdTypes(r randyStdtypes, easy bool) *RepStdTypes {
 		v36 := r.Intn(5)
 		this.NullableBool = make([]*bool, v36)
 		for i := 0; i < v36; i++ {
-			this.NullableBool[i] = github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy)
+			this.NullableBool[i] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v37 := r.Intn(5)
 		this.NonnullBool = make([]bool, v37)
 		for i := 0; i < v37; i++ {
-			v38 := github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy)
+			v38 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy)
 			this.NonnullBool[i] = *v38
 		}
 	}
@@ -3631,14 +3636,14 @@ func NewPopulatedRepStdTypes(r randyStdtypes, easy bool) *RepStdTypes {
 		v39 := r.Intn(5)
 		this.NullableString = make([]*string, v39)
 		for i := 0; i < v39; i++ {
-			this.NullableString[i] = github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy)
+			this.NullableString[i] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v40 := r.Intn(5)
 		this.NonnullString = make([]string, v40)
 		for i := 0; i < v40; i++ {
-			v41 := github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy)
+			v41 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy)
 			this.NonnullString[i] = *v41
 		}
 	}
@@ -3646,14 +3651,14 @@ func NewPopulatedRepStdTypes(r randyStdtypes, easy bool) *RepStdTypes {
 		v42 := r.Intn(5)
 		this.NullableBytes = make([]*[]byte, v42)
 		for i := 0; i < v42; i++ {
-			this.NullableBytes[i] = github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy)
+			this.NullableBytes[i] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v43 := r.Intn(5)
 		this.NonnullBytes = make([][]byte, v43)
 		for i := 0; i < v43; i++ {
-			v44 := github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy)
+			v44 := k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy)
 			this.NonnullBytes[i] = *v44
 		}
 	}
@@ -3669,154 +3674,154 @@ func NewPopulatedMapStdTypes(r randyStdtypes, easy bool) *MapStdTypes {
 		v45 := r.Intn(10)
 		this.NullableTimestamp = make(map[int32]*time.Time)
 		for i := 0; i < v45; i++ {
-			this.NullableTimestamp[int32(r.Int31())] = github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
+			this.NullableTimestamp[int32(r.Int31())] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v46 := r.Intn(10)
 		this.Timestamp = make(map[int32]time.Time)
 		for i := 0; i < v46; i++ {
-			this.Timestamp[int32(r.Int31())] = *github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
+			this.Timestamp[int32(r.Int31())] = *k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v47 := r.Intn(10)
 		this.NullableDuration = make(map[int32]*time.Duration)
 		for i := 0; i < v47; i++ {
-			this.NullableDuration[int32(r.Int31())] = github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
+			this.NullableDuration[int32(r.Int31())] = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v48 := r.Intn(10)
 		this.Duration = make(map[int32]time.Duration)
 		for i := 0; i < v48; i++ {
-			this.Duration[int32(r.Int31())] = *github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
+			this.Duration[int32(r.Int31())] = *k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
 		}
 	}
 	if r.Intn(5) != 0 {
 		v49 := r.Intn(10)
 		this.NullableDouble = make(map[int32]*float64)
 		for i := 0; i < v49; i++ {
-			this.NullableDouble[int32(r.Int31())] = (*float64)(github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy))
+			this.NullableDouble[int32(r.Int31())] = (*float64)(k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v50 := r.Intn(10)
 		this.NonnullDouble = make(map[int32]float64)
 		for i := 0; i < v50; i++ {
-			this.NonnullDouble[int32(r.Int31())] = (float64)(*github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy))
+			this.NonnullDouble[int32(r.Int31())] = (float64)(*k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v51 := r.Intn(10)
 		this.NullableFloat = make(map[int32]*float32)
 		for i := 0; i < v51; i++ {
-			this.NullableFloat[int32(r.Int31())] = (*float32)(github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy))
+			this.NullableFloat[int32(r.Int31())] = (*float32)(k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v52 := r.Intn(10)
 		this.NonnullFloat = make(map[int32]float32)
 		for i := 0; i < v52; i++ {
-			this.NonnullFloat[int32(r.Int31())] = (float32)(*github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy))
+			this.NonnullFloat[int32(r.Int31())] = (float32)(*k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v53 := r.Intn(10)
 		this.NullableInt64 = make(map[int32]*int64)
 		for i := 0; i < v53; i++ {
-			this.NullableInt64[int32(r.Int31())] = (*int64)(github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy))
+			this.NullableInt64[int32(r.Int31())] = (*int64)(k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v54 := r.Intn(10)
 		this.NonnullInt64 = make(map[int32]int64)
 		for i := 0; i < v54; i++ {
-			this.NonnullInt64[int32(r.Int31())] = (int64)(*github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy))
+			this.NonnullInt64[int32(r.Int31())] = (int64)(*k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v55 := r.Intn(10)
 		this.NullableUInt64 = make(map[int32]*uint64)
 		for i := 0; i < v55; i++ {
-			this.NullableUInt64[int32(r.Int31())] = (*uint64)(github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy))
+			this.NullableUInt64[int32(r.Int31())] = (*uint64)(k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v56 := r.Intn(10)
 		this.NonnullUInt64 = make(map[int32]uint64)
 		for i := 0; i < v56; i++ {
-			this.NonnullUInt64[int32(r.Int31())] = (uint64)(*github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy))
+			this.NonnullUInt64[int32(r.Int31())] = (uint64)(*k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v57 := r.Intn(10)
 		this.NullableInt32 = make(map[int32]*int32)
 		for i := 0; i < v57; i++ {
-			this.NullableInt32[int32(r.Int31())] = (*int32)(github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy))
+			this.NullableInt32[int32(r.Int31())] = (*int32)(k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v58 := r.Intn(10)
 		this.NonnullInt32 = make(map[int32]int32)
 		for i := 0; i < v58; i++ {
-			this.NonnullInt32[int32(r.Int31())] = (int32)(*github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy))
+			this.NonnullInt32[int32(r.Int31())] = (int32)(*k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v59 := r.Intn(10)
 		this.NullableUInt32 = make(map[int32]*uint32)
 		for i := 0; i < v59; i++ {
-			this.NullableUInt32[int32(r.Int31())] = (*uint32)(github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy))
+			this.NullableUInt32[int32(r.Int31())] = (*uint32)(k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v60 := r.Intn(10)
 		this.NonnullUInt32 = make(map[int32]uint32)
 		for i := 0; i < v60; i++ {
-			this.NonnullUInt32[int32(r.Int31())] = (uint32)(*github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy))
+			this.NonnullUInt32[int32(r.Int31())] = (uint32)(*k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v61 := r.Intn(10)
 		this.NullableBool = make(map[int32]*bool)
 		for i := 0; i < v61; i++ {
-			this.NullableBool[int32(r.Int31())] = (*bool)(github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy))
+			this.NullableBool[int32(r.Int31())] = (*bool)(k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v62 := r.Intn(10)
 		this.NonnullBool = make(map[int32]bool)
 		for i := 0; i < v62; i++ {
-			this.NonnullBool[int32(r.Int31())] = (bool)(*github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy))
+			this.NonnullBool[int32(r.Int31())] = (bool)(*k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v63 := r.Intn(10)
 		this.NullableString = make(map[int32]*string)
 		for i := 0; i < v63; i++ {
-			this.NullableString[int32(r.Int31())] = (*string)(github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy))
+			this.NullableString[int32(r.Int31())] = (*string)(k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v64 := r.Intn(10)
 		this.NonnullString = make(map[int32]string)
 		for i := 0; i < v64; i++ {
-			this.NonnullString[int32(r.Int31())] = (string)(*github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy))
+			this.NonnullString[int32(r.Int31())] = (string)(*k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v65 := r.Intn(10)
 		this.NullableBytes = make(map[int32]*[]byte)
 		for i := 0; i < v65; i++ {
-			this.NullableBytes[int32(r.Int31())] = (*[]byte)(github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy))
+			this.NullableBytes[int32(r.Int31())] = (*[]byte)(k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy))
 		}
 	}
 	if r.Intn(5) != 0 {
 		v66 := r.Intn(10)
 		this.NonnullBytes = make(map[int32][]byte)
 		for i := 0; i < v66; i++ {
-			this.NonnullBytes[int32(r.Int31())] = ([]byte)(*github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy))
+			this.NonnullBytes[int32(r.Int31())] = ([]byte)(*k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy))
 		}
 	}
 	if !easy && r.Intn(10) != 0 {
@@ -3860,57 +3865,57 @@ func NewPopulatedOneofStdTypes(r randyStdtypes, easy bool) *OneofStdTypes {
 
 func NewPopulatedOneofStdTypes_Timestamp(r randyStdtypes, easy bool) *OneofStdTypes_Timestamp {
 	this := &OneofStdTypes_Timestamp{}
-	this.Timestamp = github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
+	this.Timestamp = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdTime(r, easy)
 	return this
 }
 func NewPopulatedOneofStdTypes_Duration(r randyStdtypes, easy bool) *OneofStdTypes_Duration {
 	this := &OneofStdTypes_Duration{}
-	this.Duration = github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
+	this.Duration = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
 	return this
 }
 func NewPopulatedOneofStdTypes_RepDouble(r randyStdtypes, easy bool) *OneofStdTypes_RepDouble {
 	this := &OneofStdTypes_RepDouble{}
-	this.RepDouble = github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy)
+	this.RepDouble = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdDouble(r, easy)
 	return this
 }
 func NewPopulatedOneofStdTypes_RepFloat(r randyStdtypes, easy bool) *OneofStdTypes_RepFloat {
 	this := &OneofStdTypes_RepFloat{}
-	this.RepFloat = github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy)
+	this.RepFloat = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdFloat(r, easy)
 	return this
 }
 func NewPopulatedOneofStdTypes_RepInt64(r randyStdtypes, easy bool) *OneofStdTypes_RepInt64 {
 	this := &OneofStdTypes_RepInt64{}
-	this.RepInt64 = github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy)
+	this.RepInt64 = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt64(r, easy)
 	return this
 }
 func NewPopulatedOneofStdTypes_RepUInt64(r randyStdtypes, easy bool) *OneofStdTypes_RepUInt64 {
 	this := &OneofStdTypes_RepUInt64{}
-	this.RepUInt64 = github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy)
+	this.RepUInt64 = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt64(r, easy)
 	return this
 }
 func NewPopulatedOneofStdTypes_RepInt32(r randyStdtypes, easy bool) *OneofStdTypes_RepInt32 {
 	this := &OneofStdTypes_RepInt32{}
-	this.RepInt32 = github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy)
+	this.RepInt32 = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdInt32(r, easy)
 	return this
 }
 func NewPopulatedOneofStdTypes_RepUInt32(r randyStdtypes, easy bool) *OneofStdTypes_RepUInt32 {
 	this := &OneofStdTypes_RepUInt32{}
-	this.RepUInt32 = github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy)
+	this.RepUInt32 = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdUInt32(r, easy)
 	return this
 }
 func NewPopulatedOneofStdTypes_RepBool(r randyStdtypes, easy bool) *OneofStdTypes_RepBool {
 	this := &OneofStdTypes_RepBool{}
-	this.RepBool = github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy)
+	this.RepBool = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBool(r, easy)
 	return this
 }
 func NewPopulatedOneofStdTypes_RepString(r randyStdtypes, easy bool) *OneofStdTypes_RepString {
 	this := &OneofStdTypes_RepString{}
-	this.RepString = github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy)
+	this.RepString = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdString(r, easy)
 	return this
 }
 func NewPopulatedOneofStdTypes_RepBytes(r randyStdtypes, easy bool) *OneofStdTypes_RepBytes {
 	this := &OneofStdTypes_RepBytes{}
-	this.RepBytes = github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy)
+	this.RepBytes = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.NewPopulatedStdBytes(r, easy)
 	return this
 }
 
@@ -3993,70 +3998,70 @@ func (m *StdTypes) Size() (n int) {
 	var l int
 	_ = l
 	if m.NullableTimestamp != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdTime(*m.NullableTimestamp)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdTime(*m.NullableTimestamp)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	if m.NullableDuration != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdDuration(*m.NullableDuration)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDuration(*m.NullableDuration)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp)
+	l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp)
 	n += 1 + l + sovStdtypes(uint64(l))
-	l = github_com_gogo_protobuf_types.SizeOfStdDuration(m.Duration)
+	l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDuration(m.Duration)
 	n += 1 + l + sovStdtypes(uint64(l))
 	if m.NullableDouble != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdDouble(*m.NullableDouble)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDouble(*m.NullableDouble)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdDouble(m.NonnullDouble)
+	l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDouble(m.NonnullDouble)
 	n += 1 + l + sovStdtypes(uint64(l))
 	if m.NullableFloat != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdFloat(*m.NullableFloat)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdFloat(*m.NullableFloat)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdFloat(m.NonnullFloat)
+	l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdFloat(m.NonnullFloat)
 	n += 1 + l + sovStdtypes(uint64(l))
 	if m.NullableInt64 != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdInt64(*m.NullableInt64)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt64(*m.NullableInt64)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdInt64(m.NonnullInt64)
+	l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt64(m.NonnullInt64)
 	n += 1 + l + sovStdtypes(uint64(l))
 	if m.NullableUInt64 != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdUInt64(*m.NullableUInt64)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt64(*m.NullableUInt64)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdUInt64(m.NonnullUInt64)
+	l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt64(m.NonnullUInt64)
 	n += 1 + l + sovStdtypes(uint64(l))
 	if m.NullableInt32 != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdInt32(*m.NullableInt32)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt32(*m.NullableInt32)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdInt32(m.NonnullInt32)
+	l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt32(m.NonnullInt32)
 	n += 1 + l + sovStdtypes(uint64(l))
 	if m.NullableUInt32 != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdUInt32(*m.NullableUInt32)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt32(*m.NullableUInt32)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdUInt32(m.NonnullUInt32)
+	l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt32(m.NonnullUInt32)
 	n += 2 + l + sovStdtypes(uint64(l))
 	if m.NullableBool != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdBool(*m.NullableBool)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBool(*m.NullableBool)
 		n += 2 + l + sovStdtypes(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdBool(m.NonnullBool)
+	l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBool(m.NonnullBool)
 	n += 2 + l + sovStdtypes(uint64(l))
 	if m.NullableString != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdString(*m.NullableString)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdString(*m.NullableString)
 		n += 2 + l + sovStdtypes(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdString(m.NonnullString)
+	l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdString(m.NonnullString)
 	n += 2 + l + sovStdtypes(uint64(l))
 	if m.NullableBytes != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdBytes(*m.NullableBytes)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBytes(*m.NullableBytes)
 		n += 2 + l + sovStdtypes(uint64(l))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdBytes(m.NonnullBytes)
+	l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBytes(m.NonnullBytes)
 	n += 2 + l + sovStdtypes(uint64(l))
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
@@ -4072,133 +4077,133 @@ func (m *RepStdTypes) Size() (n int) {
 	_ = l
 	if len(m.NullableTimestamps) > 0 {
 		for _, e := range m.NullableTimestamps {
-			l = github_com_gogo_protobuf_types.SizeOfStdTime(*e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdTime(*e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NullableDurations) > 0 {
 		for _, e := range m.NullableDurations {
-			l = github_com_gogo_protobuf_types.SizeOfStdDuration(*e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDuration(*e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.Timestamps) > 0 {
 		for _, e := range m.Timestamps {
-			l = github_com_gogo_protobuf_types.SizeOfStdTime(e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdTime(e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.Durations) > 0 {
 		for _, e := range m.Durations {
-			l = github_com_gogo_protobuf_types.SizeOfStdDuration(e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDuration(e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NullableDouble) > 0 {
 		for _, e := range m.NullableDouble {
-			l = github_com_gogo_protobuf_types.SizeOfStdDouble(*e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDouble(*e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NonnullDouble) > 0 {
 		for _, e := range m.NonnullDouble {
-			l = github_com_gogo_protobuf_types.SizeOfStdDouble(e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDouble(e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NullableFloat) > 0 {
 		for _, e := range m.NullableFloat {
-			l = github_com_gogo_protobuf_types.SizeOfStdFloat(*e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdFloat(*e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NonnullFloat) > 0 {
 		for _, e := range m.NonnullFloat {
-			l = github_com_gogo_protobuf_types.SizeOfStdFloat(e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdFloat(e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NullableInt64) > 0 {
 		for _, e := range m.NullableInt64 {
-			l = github_com_gogo_protobuf_types.SizeOfStdInt64(*e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt64(*e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NonnullInt64) > 0 {
 		for _, e := range m.NonnullInt64 {
-			l = github_com_gogo_protobuf_types.SizeOfStdInt64(e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt64(e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NullableUInt64) > 0 {
 		for _, e := range m.NullableUInt64 {
-			l = github_com_gogo_protobuf_types.SizeOfStdUInt64(*e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt64(*e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NonnullUInt64) > 0 {
 		for _, e := range m.NonnullUInt64 {
-			l = github_com_gogo_protobuf_types.SizeOfStdUInt64(e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt64(e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NullableInt32) > 0 {
 		for _, e := range m.NullableInt32 {
-			l = github_com_gogo_protobuf_types.SizeOfStdInt32(*e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt32(*e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NonnullInt32) > 0 {
 		for _, e := range m.NonnullInt32 {
-			l = github_com_gogo_protobuf_types.SizeOfStdInt32(e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt32(e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NullableUInt32) > 0 {
 		for _, e := range m.NullableUInt32 {
-			l = github_com_gogo_protobuf_types.SizeOfStdUInt32(*e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt32(*e)
 			n += 1 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NonnullUInt32) > 0 {
 		for _, e := range m.NonnullUInt32 {
-			l = github_com_gogo_protobuf_types.SizeOfStdUInt32(e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt32(e)
 			n += 2 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NullableBool) > 0 {
 		for _, e := range m.NullableBool {
-			l = github_com_gogo_protobuf_types.SizeOfStdBool(*e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBool(*e)
 			n += 2 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NonnullBool) > 0 {
 		for _, e := range m.NonnullBool {
-			l = github_com_gogo_protobuf_types.SizeOfStdBool(e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBool(e)
 			n += 2 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NullableString) > 0 {
 		for _, e := range m.NullableString {
-			l = github_com_gogo_protobuf_types.SizeOfStdString(*e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdString(*e)
 			n += 2 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NonnullString) > 0 {
 		for _, e := range m.NonnullString {
-			l = github_com_gogo_protobuf_types.SizeOfStdString(e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdString(e)
 			n += 2 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NullableBytes) > 0 {
 		for _, e := range m.NullableBytes {
-			l = github_com_gogo_protobuf_types.SizeOfStdBytes(*e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBytes(*e)
 			n += 2 + l + sovStdtypes(uint64(l))
 		}
 	}
 	if len(m.NonnullBytes) > 0 {
 		for _, e := range m.NonnullBytes {
-			l = github_com_gogo_protobuf_types.SizeOfStdBytes(e)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBytes(e)
 			n += 2 + l + sovStdtypes(uint64(l))
 		}
 	}
@@ -4220,7 +4225,7 @@ func (m *MapStdTypes) Size() (n int) {
 			_ = v
 			l = 0
 			if v != nil {
-				l = github_com_gogo_protobuf_types.SizeOfStdTime(*v)
+				l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdTime(*v)
 				l += 1 + sovStdtypes(uint64(l))
 			}
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + l
@@ -4231,7 +4236,7 @@ func (m *MapStdTypes) Size() (n int) {
 		for k, v := range m.Timestamp {
 			_ = k
 			_ = v
-			l = github_com_gogo_protobuf_types.SizeOfStdTime(v)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdTime(v)
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + 1 + l + sovStdtypes(uint64(l))
 			n += mapEntrySize + 1 + sovStdtypes(uint64(mapEntrySize))
 		}
@@ -4242,7 +4247,7 @@ func (m *MapStdTypes) Size() (n int) {
 			_ = v
 			l = 0
 			if v != nil {
-				l = github_com_gogo_protobuf_types.SizeOfStdDuration(*v)
+				l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDuration(*v)
 				l += 1 + sovStdtypes(uint64(l))
 			}
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + l
@@ -4253,7 +4258,7 @@ func (m *MapStdTypes) Size() (n int) {
 		for k, v := range m.Duration {
 			_ = k
 			_ = v
-			l = github_com_gogo_protobuf_types.SizeOfStdDuration(v)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDuration(v)
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + 1 + l + sovStdtypes(uint64(l))
 			n += mapEntrySize + 1 + sovStdtypes(uint64(mapEntrySize))
 		}
@@ -4264,7 +4269,7 @@ func (m *MapStdTypes) Size() (n int) {
 			_ = v
 			l = 0
 			if v != nil {
-				l = github_com_gogo_protobuf_types.SizeOfStdDouble(*v)
+				l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDouble(*v)
 				l += 1 + sovStdtypes(uint64(l))
 			}
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + l
@@ -4275,7 +4280,7 @@ func (m *MapStdTypes) Size() (n int) {
 		for k, v := range m.NonnullDouble {
 			_ = k
 			_ = v
-			l = github_com_gogo_protobuf_types.SizeOfStdDouble(v)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDouble(v)
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + 1 + l + sovStdtypes(uint64(l))
 			n += mapEntrySize + 1 + sovStdtypes(uint64(mapEntrySize))
 		}
@@ -4286,7 +4291,7 @@ func (m *MapStdTypes) Size() (n int) {
 			_ = v
 			l = 0
 			if v != nil {
-				l = github_com_gogo_protobuf_types.SizeOfStdFloat(*v)
+				l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdFloat(*v)
 				l += 1 + sovStdtypes(uint64(l))
 			}
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + l
@@ -4297,7 +4302,7 @@ func (m *MapStdTypes) Size() (n int) {
 		for k, v := range m.NonnullFloat {
 			_ = k
 			_ = v
-			l = github_com_gogo_protobuf_types.SizeOfStdFloat(v)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdFloat(v)
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + 1 + l + sovStdtypes(uint64(l))
 			n += mapEntrySize + 1 + sovStdtypes(uint64(mapEntrySize))
 		}
@@ -4308,7 +4313,7 @@ func (m *MapStdTypes) Size() (n int) {
 			_ = v
 			l = 0
 			if v != nil {
-				l = github_com_gogo_protobuf_types.SizeOfStdInt64(*v)
+				l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt64(*v)
 				l += 1 + sovStdtypes(uint64(l))
 			}
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + l
@@ -4319,7 +4324,7 @@ func (m *MapStdTypes) Size() (n int) {
 		for k, v := range m.NonnullInt64 {
 			_ = k
 			_ = v
-			l = github_com_gogo_protobuf_types.SizeOfStdInt64(v)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt64(v)
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + 1 + l + sovStdtypes(uint64(l))
 			n += mapEntrySize + 1 + sovStdtypes(uint64(mapEntrySize))
 		}
@@ -4330,7 +4335,7 @@ func (m *MapStdTypes) Size() (n int) {
 			_ = v
 			l = 0
 			if v != nil {
-				l = github_com_gogo_protobuf_types.SizeOfStdUInt64(*v)
+				l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt64(*v)
 				l += 1 + sovStdtypes(uint64(l))
 			}
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + l
@@ -4341,7 +4346,7 @@ func (m *MapStdTypes) Size() (n int) {
 		for k, v := range m.NonnullUInt64 {
 			_ = k
 			_ = v
-			l = github_com_gogo_protobuf_types.SizeOfStdUInt64(v)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt64(v)
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + 1 + l + sovStdtypes(uint64(l))
 			n += mapEntrySize + 1 + sovStdtypes(uint64(mapEntrySize))
 		}
@@ -4352,7 +4357,7 @@ func (m *MapStdTypes) Size() (n int) {
 			_ = v
 			l = 0
 			if v != nil {
-				l = github_com_gogo_protobuf_types.SizeOfStdInt32(*v)
+				l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt32(*v)
 				l += 1 + sovStdtypes(uint64(l))
 			}
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + l
@@ -4363,7 +4368,7 @@ func (m *MapStdTypes) Size() (n int) {
 		for k, v := range m.NonnullInt32 {
 			_ = k
 			_ = v
-			l = github_com_gogo_protobuf_types.SizeOfStdInt32(v)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt32(v)
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + 1 + l + sovStdtypes(uint64(l))
 			n += mapEntrySize + 1 + sovStdtypes(uint64(mapEntrySize))
 		}
@@ -4374,7 +4379,7 @@ func (m *MapStdTypes) Size() (n int) {
 			_ = v
 			l = 0
 			if v != nil {
-				l = github_com_gogo_protobuf_types.SizeOfStdUInt32(*v)
+				l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt32(*v)
 				l += 1 + sovStdtypes(uint64(l))
 			}
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + l
@@ -4385,7 +4390,7 @@ func (m *MapStdTypes) Size() (n int) {
 		for k, v := range m.NonnullUInt32 {
 			_ = k
 			_ = v
-			l = github_com_gogo_protobuf_types.SizeOfStdUInt32(v)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt32(v)
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + 1 + l + sovStdtypes(uint64(l))
 			n += mapEntrySize + 2 + sovStdtypes(uint64(mapEntrySize))
 		}
@@ -4396,7 +4401,7 @@ func (m *MapStdTypes) Size() (n int) {
 			_ = v
 			l = 0
 			if v != nil {
-				l = github_com_gogo_protobuf_types.SizeOfStdBool(*v)
+				l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBool(*v)
 				l += 1 + sovStdtypes(uint64(l))
 			}
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + l
@@ -4407,7 +4412,7 @@ func (m *MapStdTypes) Size() (n int) {
 		for k, v := range m.NonnullBool {
 			_ = k
 			_ = v
-			l = github_com_gogo_protobuf_types.SizeOfStdBool(v)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBool(v)
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + 1 + l + sovStdtypes(uint64(l))
 			n += mapEntrySize + 2 + sovStdtypes(uint64(mapEntrySize))
 		}
@@ -4418,7 +4423,7 @@ func (m *MapStdTypes) Size() (n int) {
 			_ = v
 			l = 0
 			if v != nil {
-				l = github_com_gogo_protobuf_types.SizeOfStdString(*v)
+				l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdString(*v)
 				l += 1 + sovStdtypes(uint64(l))
 			}
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + l
@@ -4429,7 +4434,7 @@ func (m *MapStdTypes) Size() (n int) {
 		for k, v := range m.NonnullString {
 			_ = k
 			_ = v
-			l = github_com_gogo_protobuf_types.SizeOfStdString(v)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdString(v)
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + 1 + l + sovStdtypes(uint64(l))
 			n += mapEntrySize + 2 + sovStdtypes(uint64(mapEntrySize))
 		}
@@ -4440,7 +4445,7 @@ func (m *MapStdTypes) Size() (n int) {
 			_ = v
 			l = 0
 			if v != nil {
-				l = github_com_gogo_protobuf_types.SizeOfStdBytes(*v)
+				l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBytes(*v)
 				l += 1 + sovStdtypes(uint64(l))
 			}
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + l
@@ -4451,7 +4456,7 @@ func (m *MapStdTypes) Size() (n int) {
 		for k, v := range m.NonnullBytes {
 			_ = k
 			_ = v
-			l = github_com_gogo_protobuf_types.SizeOfStdBytes(v)
+			l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBytes(v)
 			mapEntrySize := 1 + sovStdtypes(uint64(k)) + 1 + l + sovStdtypes(uint64(l))
 			n += mapEntrySize + 2 + sovStdtypes(uint64(mapEntrySize))
 		}
@@ -4484,7 +4489,7 @@ func (m *OneofStdTypes_Timestamp) Size() (n int) {
 	var l int
 	_ = l
 	if m.Timestamp != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdTime(*m.Timestamp)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdTime(*m.Timestamp)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	return n
@@ -4496,7 +4501,7 @@ func (m *OneofStdTypes_Duration) Size() (n int) {
 	var l int
 	_ = l
 	if m.Duration != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdDuration(*m.Duration)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDuration(*m.Duration)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	return n
@@ -4508,7 +4513,7 @@ func (m *OneofStdTypes_RepDouble) Size() (n int) {
 	var l int
 	_ = l
 	if m.RepDouble != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdDouble(*m.RepDouble)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdDouble(*m.RepDouble)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	return n
@@ -4520,7 +4525,7 @@ func (m *OneofStdTypes_RepFloat) Size() (n int) {
 	var l int
 	_ = l
 	if m.RepFloat != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdFloat(*m.RepFloat)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdFloat(*m.RepFloat)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	return n
@@ -4532,7 +4537,7 @@ func (m *OneofStdTypes_RepInt64) Size() (n int) {
 	var l int
 	_ = l
 	if m.RepInt64 != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdInt64(*m.RepInt64)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt64(*m.RepInt64)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	return n
@@ -4544,7 +4549,7 @@ func (m *OneofStdTypes_RepUInt64) Size() (n int) {
 	var l int
 	_ = l
 	if m.RepUInt64 != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdUInt64(*m.RepUInt64)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt64(*m.RepUInt64)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	return n
@@ -4556,7 +4561,7 @@ func (m *OneofStdTypes_RepInt32) Size() (n int) {
 	var l int
 	_ = l
 	if m.RepInt32 != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdInt32(*m.RepInt32)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdInt32(*m.RepInt32)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	return n
@@ -4568,7 +4573,7 @@ func (m *OneofStdTypes_RepUInt32) Size() (n int) {
 	var l int
 	_ = l
 	if m.RepUInt32 != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdUInt32(*m.RepUInt32)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdUInt32(*m.RepUInt32)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	return n
@@ -4580,7 +4585,7 @@ func (m *OneofStdTypes_RepBool) Size() (n int) {
 	var l int
 	_ = l
 	if m.RepBool != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdBool(*m.RepBool)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBool(*m.RepBool)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	return n
@@ -4592,7 +4597,7 @@ func (m *OneofStdTypes_RepString) Size() (n int) {
 	var l int
 	_ = l
 	if m.RepString != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdString(*m.RepString)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdString(*m.RepString)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	return n
@@ -4604,7 +4609,7 @@ func (m *OneofStdTypes_RepBytes) Size() (n int) {
 	var l int
 	_ = l
 	if m.RepBytes != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdBytes(*m.RepBytes)
+		l = k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_types.SizeOfStdBytes(*m.RepBytes)
 		n += 1 + l + sovStdtypes(uint64(l))
 	}
 	return n

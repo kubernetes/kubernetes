@@ -63,7 +63,7 @@ The following message:
 		option (gogoproto.goproto_getters) = false;
 		optional string Description = 1 [(gogoproto.nullable) = false];
 		optional int64 Number = 2 [(gogoproto.nullable) = false];
-		optional bytes Id = 3 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uuid", (gogoproto.nullable) = false];
+		optional bytes Id = 3 [(gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom.Uuid", (gogoproto.nullable) = false];
 	  }
 
 given to the face plugin, will generate the following code:

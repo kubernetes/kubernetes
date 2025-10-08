@@ -580,6 +580,7 @@ func (m *Maps) GetMBoolSimple() map[bool]*Simple {
 
 type MsgWithOneof struct {
 	// Types that are valid to be assigned to Union:
+	//
 	//	*MsgWithOneof_Title
 	//	*MsgWithOneof_Salary
 	//	*MsgWithOneof_Country

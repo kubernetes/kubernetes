@@ -9,7 +9,7 @@ import (
 	fmt "fmt"
 	io "io"
 	proto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
-	github_com_gogo_protobuf_sortkeys "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/sortkeys"
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/sortkeys"
 	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
@@ -976,7 +976,7 @@ func (this *Struct) GoString() string {
 	for k := range this.Fields {
 		keysForFields = append(keysForFields, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForFields)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Strings(keysForFields)
 	mapStringForFields := "map[string]*Value{"
 	for _, k := range keysForFields {
 		mapStringForFields += fmt.Sprintf("%#v: %#v,", k, this.Fields[k])
@@ -1607,7 +1607,7 @@ func (this *Struct) String() string {
 	for k := range this.Fields {
 		keysForFields = append(keysForFields, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForFields)
+	k8s_io_code_generator_cmd_go_to_protobuf_protoc_gen_gogo_internal_third_party_github_com_gogo_protobuf_sortkeys.Strings(keysForFields)
 	mapStringForFields := "map[string]*Value{"
 	for _, k := range keysForFields {
 		mapStringForFields += fmt.Sprintf("%v: %v,", k, this.Fields[k])

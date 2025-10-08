@@ -54,7 +54,7 @@ The following message:
 	  message B {
 		option (gogoproto.description) = true;
 		optional A A = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
-		repeated bytes G = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
+		repeated bytes G = 2 [(gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
 	  }
 
 given to the description plugin, will generate the following code:
@@ -78,6 +78,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+
 	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto"
 	"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	descriptor "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
