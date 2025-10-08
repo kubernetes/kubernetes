@@ -5090,6 +5090,40 @@ func TestAllocator(t *testing.T,
 				),
 			},
 		},
+		"allocation-mode-all-with-multi-host-resource-pool": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				},
+			})),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				func() wrapResourceSlice {
+					s := slice(slice1, node1, pool1, driverA,
+						device(device1, nil, nil),
+					)
+					s.Spec.Pool.ResourceSliceCount = 2
+					return s
+				}(),
+				func() wrapResourceSlice {
+					s := slice(slice2, node2, pool1, driverA,
+						device(device2, nil, nil),
+					)
+					s.Spec.Pool.ResourceSliceCount = 2
+					return s
+				}(),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
+				),
+			},
+		},
 	}
 
 	for name, tc := range testcases {
