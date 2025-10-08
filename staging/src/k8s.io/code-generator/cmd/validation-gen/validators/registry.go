@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -135,6 +136,25 @@ func (reg *registry) ExtractTags(_ Context, comments []string) ([]codetags.Tag, 
 	return tags, nil
 }
 
+// checkTags checks all tags and their chained tags recursively for tag processing issues
+func (reg *registry) checkTags(tags []codetags.Tag) []string {
+	var errors []string
+	for _, tag := range tags {
+		// Check the current tag
+		if tv, exists := reg.tagValidators[tag.Name]; !exists {
+			errors = append(errors, fmt.Sprintf("unknown tag %q", tag.Name))
+		} else if tv == nil {
+			errors = append(errors, fmt.Sprintf("nil validator for tag %q", tag.Name))
+		}
+
+		// Recursively check ValueTag if it exists
+		if tag.ValueTag != nil {
+			errors = append(errors, reg.checkTags([]codetags.Tag{*tag.ValueTag})...)
+		}
+	}
+	return errors
+}
+
 // ExtractValidations considers the given context (e.g. a type definition) and
 // evaluates registered validators.  This includes type validators (which run
 // against all types) and tag validators which run only if a specific tag is
@@ -146,6 +166,14 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 		panic("registry.init() was not called")
 	}
 	validations := Validations{}
+
+	// Check all tags first for tag processing issues, including chained tags
+	errors := reg.checkTags(tags)
+
+	// If there are tag processing issues, report them all together
+	if len(errors) > 0 {
+		return Validations{}, fmt.Errorf("tag processing errors: %s", strings.Join(errors, "; "))
+	}
 
 	// Run tag-validators first.
 	phases := reg.sortTagsIntoPhases(tags)
@@ -225,6 +253,8 @@ func (reg *registry) sortTagsIntoPhases(tags []codetags.Tag) [][]codetags.Tag {
 	phase1 := []codetags.Tag{} // "late" tags
 	for _, tn := range sortedTags {
 		tv := reg.tagValidators[tn.Name]
+		// Note: We don't filter out unknown tags here since ExtractValidations
+		// handles all tag processing logic upfront.
 		if _, ok := tv.(LateTagValidator); ok {
 			phase1 = append(phase1, tn)
 		} else {
@@ -238,7 +268,12 @@ func (reg *registry) sortTagsIntoPhases(tags []codetags.Tag) [][]codetags.Tag {
 func (reg *registry) Docs() []TagDoc {
 	var result []TagDoc
 	for _, k := range reg.tagIndex {
-		v := reg.tagValidators[k]
+		v, exists := reg.tagValidators[k]
+		if !exists {
+			// Skip unknown tags - this shouldn't happen in normal operation
+			// but provides safety against data corruption
+			continue
+		}
 		result = append(result, v.Docs())
 	}
 	return result
@@ -278,6 +313,23 @@ type Validator interface {
 
 	// Docs returns documentation for each known tag.
 	Docs() []TagDoc
+
+	// Stability returns the stability level for a given tag.
+	Stability(tag string) (StabilityLevel, error)
+}
+
+// Stability returns the stability level for a given tag.
+func (reg *registry) Stability(tag string) (StabilityLevel, error) {
+	tagName := strings.TrimPrefix(tag, "+")
+	tv, ok := reg.tagValidators[tagName]
+	if !ok {
+		return "", fmt.Errorf("tag %q doesn't have stability level", tag)
+	}
+
+	if tv.Docs().StabilityLevel == "" {
+		return "", fmt.Errorf("tag %q doesn't have stability level", tag)
+	}
+	return tv.Docs().StabilityLevel, nil
 }
 
 // InitGlobalValidator must be called exactly once by the main application to

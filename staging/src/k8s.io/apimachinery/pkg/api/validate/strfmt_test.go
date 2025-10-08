@@ -85,66 +85,6 @@ func TestShortName(t *testing.T) {
 	}
 }
 
-func TestLongName(t *testing.T) {
-	ctx := context.Background()
-	fldPath := field.NewPath("test")
-
-	testCases := []struct {
-		name     string
-		input    string
-		wantErrs field.ErrorList
-	}{{
-		name:     "valid",
-		input:    "a.b.c",
-		wantErrs: nil,
-	}, {
-		name:  "invalid: empty",
-		input: "",
-		wantErrs: field.ErrorList{
-			field.Invalid(fldPath, "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character").WithOrigin("format=k8s-long-name"),
-		},
-	}, {
-		name:  "invalid: too long",
-		input: strings.Repeat("a", 254),
-		wantErrs: field.ErrorList{
-			field.Invalid(fldPath, strings.Repeat("a", 254), "must be no more than 253 bytes").WithOrigin("format=k8s-long-name"),
-		},
-	}, {
-		name:  "invalid: starts with dash",
-		input: "-a.b.c",
-		wantErrs: field.ErrorList{
-			field.Invalid(fldPath, "-a.b.c", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character").WithOrigin("format=k8s-long-name"),
-		},
-	}, {
-		name:  "invalid: ends with dash",
-		input: "a.b.c-",
-		wantErrs: field.ErrorList{
-			field.Invalid(fldPath, "a.b.c-", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character").WithOrigin("format=k8s-long-name"),
-		},
-	}, {
-		name:  "invalid: upper-case",
-		input: "A.b.c",
-		wantErrs: field.ErrorList{
-			field.Invalid(fldPath, "A.b.c", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character").WithOrigin("format=k8s-long-name"),
-		},
-	}, {
-		name:  "invalid: other chars",
-		input: "a_b.c",
-		wantErrs: field.ErrorList{
-			field.Invalid(fldPath, "a_b.c", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character").WithOrigin("format=k8s-long-name"),
-		},
-	}}
-
-	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			value := tc.input
-			gotErrs := LongName(ctx, operation.Operation{}, fldPath, &value, nil)
-			matcher.Test(t, tc.wantErrs, gotErrs)
-		})
-	}
-}
-
 func TestLabelKey(t *testing.T) {
 	ctx := context.Background()
 	fldPath := field.NewPath("test")
@@ -412,7 +352,7 @@ func TestLabelValue(t *testing.T) {
 	}
 }
 
-func TestLongNameCaseless(t *testing.T) {
+func TestLongName(t *testing.T) {
 	ctx := context.Background()
 	fldPath := field.NewPath("test")
 
@@ -421,49 +361,90 @@ func TestLongNameCaseless(t *testing.T) {
 		input    string
 		wantErrs field.ErrorList
 	}{{
-		name:     "valid",
-		input:    "A.b.C",
+		name:     "valid single label",
+		input:    "valid-label",
 		wantErrs: nil,
 	}, {
-		name:  "invalid: empty",
-		input: "",
-		wantErrs: field.ErrorList{
-			field.Invalid(fldPath, "", "an RFC 1123 subdomain must consist of alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character").WithOrigin("format=k8s-long-name-caseless"),
-		},
+		name:     "valid subdomain",
+		input:    "this-is.a-valid.subdomain",
+		wantErrs: nil,
 	}, {
-		name:  "invalid: too long",
-		input: strings.Repeat("a", 254),
+		name:     "valid single character elements",
+		input:    "a.b.c",
+		wantErrs: nil,
+	}, {
+		name:     "valid elements with numbers",
+		input:    "123.abc-123.456-def",
+		wantErrs: nil,
+	}, {
+		name:     "all number elements",
+		input:    "1.2.3.4",
+		wantErrs: nil,
+	}, {
+		name:  "invalid: uppercase characters",
+		input: "Invalid.Subdomain",
 		wantErrs: field.ErrorList{
-			field.Invalid(fldPath, strings.Repeat("a", 254), "must be no more than 253 bytes").WithOrigin("format=k8s-long-name-caseless"),
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-long-name"),
 		},
 	}, {
 		name:  "invalid: starts with dash",
-		input: "-A.b.C",
+		input: "this-is.-an-invalid.subdomain",
 		wantErrs: field.ErrorList{
-			field.Invalid(fldPath, "-A.b.C", "an RFC 1123 subdomain must consist of alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character").WithOrigin("format=k8s-long-name-caseless"),
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-long-name"),
 		},
-	},
-		{
-			name:  "invalid: ends with dash",
-			input: "A.b.C-",
-			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, "A.b.C-", "an RFC 1123 subdomain must consist of alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character").WithOrigin("format=k8s-long-name-caseless"),
-			},
+	}, {
+		name:  "invalid: ends with dash",
+		input: "this-is.an-invalid-.subdomain",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-long-name"),
 		},
-		{
-			name:  "invalid: other chars",
-			input: "A_b.C",
-			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, "A_b.C", "an RFC 1123 subdomain must consist of alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character").WithOrigin("format=k8s-long-name-caseless"),
-			},
+	}, {
+		name:  "invalid: contains double dots",
+		input: "invalid..subdomain",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-long-name"),
 		},
-	}
+	}, {
+		name:  "invalid: contains special characters",
+		input: "inv@lid.subdoma!n",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-long-name"),
+		},
+	}, {
+		name:  "invalid: too long single label",
+		input: "a" + strings.Repeat("b", 252) + "c", // 254 characters
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-long-name"),
+		},
+	}, {
+		name: "invalid: too long multiple labels",
+		input: strings.Join([]string{
+			strings.Repeat("a", 60), // 61 with the "."
+			strings.Repeat("b", 60), // 122 with the "."
+			strings.Repeat("c", 60), // 183 with the "."
+			strings.Repeat("d", 60), // 244 with the "."
+			strings.Repeat("e", 10), // 254 characters
+		}, "."),
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-long-name"),
+		},
+	}, {
+		name:     "valid: max length single label",     // supported for compat
+		input:    "a" + strings.Repeat("b", 251) + "c", // 253 characters
+		wantErrs: nil,
+	}, {
+		name:  "invalid: empty string",
+		input: "",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-long-name"),
+		},
+	}}
 
 	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			value := tc.input
-			gotErrs := LongNameCaseless(ctx, operation.Operation{}, fldPath, &value, nil)
+			gotErrs := LongName(ctx, operation.Operation{}, fldPath, &value, nil)
 
 			matcher.Test(t, tc.wantErrs, gotErrs)
 		})

@@ -66,7 +66,7 @@ type ScaleStatus struct {
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=autoscaling,v1,Scale
-// +k8s:isSubresource=/scale
+// +k8s:isSubresource="/scale"
 
 // Scale represents a scaling request for a resource.
 type Scale struct {

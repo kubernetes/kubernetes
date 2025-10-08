@@ -12841,7 +12841,7 @@ func TestValidatePod(t *testing.T) {
 			),
 		},
 		"final PVC name for ephemeral volume must be valid": {
-			expectedError: "spec.volumes[1].name: Invalid value: \"" + longVolName + "\": PVC name \"" + longPodName + "-" + longVolName + "\": must be no more than 253 characters",
+			expectedError: "spec.volumes[1].name: Invalid value: \"" + longVolName + "\": PVC name \"" + longPodName + "-" + longVolName + "\": must be no more than 253 bytes",
 			spec: *podtest.MakePod(longPodName,
 				podtest.SetVolumes(
 					core.Volume{Name: "pvc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
@@ -22386,7 +22386,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=ip-sloppy"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=k8s-ip"),
 			},
 		},
 		"invalid legacy IP with strict validation": {
@@ -22398,7 +22398,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=ip-sloppy"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=k8s-ip"),
 			},
 		},
 		"Multiple ports, one without name": {
@@ -22446,7 +22446,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=ip-sloppy"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=k8s-ip"),
 			},
 		},
 		"Port missing number": {
@@ -22482,7 +22482,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=k8s-endpoint-ip"),
 			},
 		},
 		"Address is link-local": {
@@ -22494,7 +22494,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=k8s-endpoint-ip"),
 			},
 		},
 		"Address is link-local multicast": {
@@ -22506,7 +22506,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=k8s-endpoint-ip"),
 			},
 		},
 		"Invalid AppProtocol": {
@@ -22518,7 +22518,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].ports[0].appProtocol"), nil, "").WithOrigin("format=qualified-name"),
+				field.Invalid(field.NewPath("subsets[0].ports[0].appProtocol"), nil, "").WithOrigin("format=k8s-qualified-name"),
 			},
 		},
 	}

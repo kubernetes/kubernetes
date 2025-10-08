@@ -31,8 +31,8 @@ import (
 // +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,CertificateSigningRequest
 
 // Describes a certificate signing request
-// +k8s:supportsSubresource=/status
-// +k8s:supportsSubresource=/approval
+// +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/approval"
 type CertificateSigningRequest struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional

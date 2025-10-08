@@ -137,8 +137,8 @@ type Config struct {
 	// Validator provides a way to compose validations.
 	//
 	// For example, it is possible to define a validation such as
-	// "+myValidator=+format=IP" by using the registry to extract the
-	// validation for the embedded "+format=IP" and use those to
+	// "+myValidator=+format=k8s-something" by using the registry to extract
+	// the validation for the embedded "+format=k8s-something" and use those to
 	// create the final Validations returned by the "+myValidator" tag.
 	//
 	// This field MUST NOT be used during init, since other validators may not
@@ -203,7 +203,8 @@ type Context struct {
 	// ScopeField, this is the field path (e.g. "spec.containers[*].image").
 	// When Scope indicates a list-value, map-key, or map-value, this is the
 	// type or field path, as described above, with a suffix indicating
-	// that it refers to the keys or values. For ScopeConst, this will be nil.
+	// that it refers to the keys or values. For ScopeConst, this will be the
+	// name of the constant.
 	Path *field.Path
 
 	// Member provides details about a field within a struct when Scope is
@@ -224,7 +225,7 @@ type Context struct {
 	// field (depending on where the validation tag was sepcified).  When Scope
 	// indicates a list-value, map-key, or map-value, this is the path to the
 	// list or map type or field (depending on where the validation tag was
-	// specified). When Scope is ScopeType, this is nil.
+	// specified). When Scope is ScopeType or ScopeConst, this is nil.
 	ParentPath *field.Path
 
 	// Constants provides access to all constants of the type being
@@ -247,10 +248,48 @@ type ListSelectorTerm struct {
 	Value any
 }
 
+// StabilityLevel indicates the stability of a validation tag.
+type StabilityLevel string
+
+const (
+	// Stable indicates that a tag's semantics will remain unchanged for the
+	// foreseeable future.
+	Stable StabilityLevel = "Stable"
+	// Alpha indicates that a tag's semantics may change in the future.
+	Alpha StabilityLevel = "Alpha"
+)
+
+var stabilityOrder = map[StabilityLevel]int{
+	Alpha:  0,
+	Stable: 1,
+}
+
+// Min returns the minimum of two stability levels, or an error if either
+// stability level is unknown.
+func (s StabilityLevel) Min(other StabilityLevel) (StabilityLevel, error) {
+	sOrder, okS := stabilityOrder[s]
+	if !okS {
+		return "", fmt.Errorf("unknown stability level %q", s)
+	}
+	otherOrder, okOther := stabilityOrder[other]
+	if !okOther {
+		return "", fmt.Errorf("unknown stability level %q", other)
+	}
+
+	if sOrder < otherOrder {
+		return s, nil
+	}
+	return other, nil
+}
+
 // TagDoc describes a comment-tag and its usage.
 type TagDoc struct {
 	// Tag is the tag name, without the leading '+'.
 	Tag string
+	// StabilityLevel is the stability level of the tag.
+	// Alpha indicates that the tag's semantics may change in the future.
+	// Stable indicates that the tag's semantics will remain unchanged for the foreseeable future.
+	StabilityLevel StabilityLevel
 	// Args lists any arguments this tag might take.
 	Args []TagArgDoc
 	// Usage is how the tag is used, including arguments.
@@ -399,7 +438,9 @@ const (
 	DefaultFlags FunctionFlags = 0
 
 	// ShortCircuit indicates that further validations should be skipped if
-	// this validator fails. Most validators are not fatal.
+	// this validator fails. If there are multiple validators with this flag
+	// set, they will ALL run, and if any of them fail, any non-short-circuit
+	// validators will be skipped.  Most validators are not fatal.
 	ShortCircuit FunctionFlags = 1 << iota
 
 	// NonError indicates that a failure of this validator should not be
@@ -407,20 +448,6 @@ const (
 	// path (e.g. early return when combined with ShortCircuit).
 	NonError
 )
-
-// Conditions defines what conditions must be true for a resource to be validated.
-// If any of the conditions are not true, the resource is not validated.
-type Conditions struct {
-	// OptionEnabled specifies an option name that must be set to true for the condition to be true.
-	OptionEnabled string
-
-	// OptionDisabled specifies an option name that must be set to false for the condition to be true.
-	OptionDisabled string
-}
-
-func (c Conditions) Empty() bool {
-	return len(c.OptionEnabled) == 0 && len(c.OptionDisabled) == 0
-}
 
 // Identifier is a name that the generator will output as an identifier.
 // Identifiers are generated using the RawNamer strategy.
@@ -472,10 +499,6 @@ type FunctionGen struct {
 	// generic function calls which require explicit type arguments.
 	TypeArgs []types.Name
 
-	// Conditions holds any conditions that must true for a field to be
-	// validated by this function.
-	Conditions Conditions
-
 	// Comments holds optional comments that should be added to the generated
 	// code (without the leading "//").
 	Comments []string
@@ -484,12 +507,6 @@ type FunctionGen struct {
 // WithTypeArgs returns a derived FunctionGen with type arguments.
 func (fg FunctionGen) WithTypeArgs(typeArgs ...types.Name) FunctionGen {
 	fg.TypeArgs = typeArgs
-	return fg
-}
-
-// WithConditions returns a derived FunctionGen with conditions.
-func (fg FunctionGen) WithConditions(conditions Conditions) FunctionGen {
-	fg.Conditions = conditions
 	return fg
 }
 

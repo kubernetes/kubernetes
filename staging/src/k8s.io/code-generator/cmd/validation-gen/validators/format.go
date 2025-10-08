@@ -49,9 +49,7 @@ func (formatTagValidator) ValidScopes() sets.Set[Scope] {
 
 var (
 	// Keep this list alphabetized.
-	// TODO: uncomment the following when we've done the homework
-	// to be sure it works the current state of IP manual-ratcheting
-	// ipSloppyValidator         = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
+	ipSloppyValidator         = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
 	labelKeyValidator         = types.Name{Package: libValidationPkg, Name: "LabelKey"}
 	labelValueValidator       = types.Name{Package: libValidationPkg, Name: "LabelValue"}
 	longNameCaselessValidator = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
@@ -85,12 +83,8 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 
 	switch format {
 	// Keep this sequence alphabetized.
-	// TODO: uncomment the following when we've done the homework
-	// to be sure it works the current state of IP manual-ratcheting
-	/*
-		case "k8s-ip":
-			return Function(formatTagName, DefaultFlags, ipSloppyValidator), nil
-	*/
+	case "k8s-ip":
+		return Function(formatTagName, DefaultFlags, ipSloppyValidator), nil
 	case "k8s-label-key":
 		return Function(formatTagName, DefaultFlags, labelKeyValidator), nil
 	case "k8s-label-value":
@@ -113,9 +107,10 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 
 func (ftv formatTagValidator) Docs() TagDoc {
 	return TagDoc{
-		Tag:         ftv.TagName(),
-		Scopes:      ftv.ValidScopes().UnsortedList(),
-		Description: "Indicates that a string field has a particular format.",
+		Tag:            ftv.TagName(),
+		Scopes:         ftv.ValidScopes().UnsortedList(),
+		StabilityLevel: Stable,
+		Description:    "Indicates that a string field has a particular format.",
 		Payloads: []TagPayloadDoc{{ // Keep this list alphabetized.
 			Description: "k8s-ip",
 			Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
@@ -130,10 +125,7 @@ func (ftv formatTagValidator) Docs() TagDoc {
 			Docs:        "This field holds a Kubernetes \"long name\", aka a \"DNS subdomain\" value.",
 		}, {
 			Description: "k8s-long-name-caseless",
-			Docs:        "Deprecated: This field holds a case-insensitive Kubernetes \"long name\", aka a \"DNS subdomain\" value.",
-		}, {
-			Description: "k8s-resource-pool-name",
-			Docs:        "This field holds value with one or more Kubernetes \"long name\" parts separated by `/` and no longer than 253 characters.",
+			Docs:        "This field holds a case-insensitive Kubernetes \"long name\", aka a \"DNS subdomain\" value.",
 		}, {
 			Description: "k8s-short-name",
 			Docs:        "This field holds a Kubernetes \"short name\", aka a \"DNS label\" value.",

@@ -7521,7 +7521,7 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 			podName:       "test-pod",
 			podHostname:   strings.Repeat("a", 64),
 			expectError:   true,
-			errorContains: "must be no more than 63 characters",
+			errorContains: "must be no more than 63 bytes",
 		},
 	}
 

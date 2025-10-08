@@ -116,9 +116,10 @@ func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag c
 
 func (udtv unionDiscriminatorTagValidator) Docs() TagDoc {
 	return TagDoc{
-		Tag:         udtv.TagName(),
-		Scopes:      udtv.ValidScopes().UnsortedList(),
-		Description: "Indicates that this field is the discriminator for a union.",
+		Tag:            udtv.TagName(),
+		StabilityLevel: Alpha,
+		Scopes:         udtv.ValidScopes().UnsortedList(),
+		Description:    "Indicates that this field is the discriminator for a union.",
 		Args: []TagArgDoc{{
 			Name:        "union",
 			Description: "<string>",
@@ -154,9 +155,10 @@ func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags
 
 func (umtv unionMemberTagValidator) Docs() TagDoc {
 	return TagDoc{
-		Tag:         umtv.TagName(),
-		Scopes:      umtv.ValidScopes().UnsortedList(),
-		Description: "Indicates that this field is a member of a union.",
+		Tag:            umtv.TagName(),
+		StabilityLevel: Alpha,
+		Scopes:         umtv.ValidScopes().UnsortedList(),
+		Description:    "Indicates that this field is a member of a union.",
 		Args: []TagArgDoc{{
 			Name:        "union",
 			Description: "<string>",

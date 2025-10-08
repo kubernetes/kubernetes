@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -304,6 +304,26 @@ func TestErrorMatcher_Matches(t *testing.T) {
 		actualErr: &Error{Type: ErrorTypeRequired, Field: "field", BadValue: "value", Detail: "detail", Origin: "origin"},
 		matches:   false,
 	}, {
+		name:    "ByDeclarativeOnly: match",
+		matcher: ErrorMatcher{}.ByDeclarativeOnly(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.DeclarativeOnly = true
+			return e
+		},
+		actualErr: &Error{DeclarativeOnly: true},
+		matches:   true,
+	}, {
+		name:    "ByDeclarativeOnly: no match",
+		matcher: ErrorMatcher{}.ByDeclarativeOnly(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.DeclarativeOnly = true
+			return e
+		},
+		actualErr: &Error{DeclarativeOnly: false},
+		matches:   false,
+	}, {
 		name:      "RequireOriginWhenInvalid: match",
 		matcher:   ErrorMatcher{}.ByOrigin().RequireOriginWhenInvalid(),
 		wantedErr: baseErr,
@@ -405,6 +425,17 @@ func TestErrorMatcher_Test(t *testing.T) {
 		}),
 		want:           ErrorList{Invalid(NewPath("f").Index(0).Child("x", "a"), nil, "")},
 		got:            ErrorList{Invalid(NewPath("f").Index(1).Child("a"), "v", "d")},
+		expectedErrors: []string{"expected an error matching:", "unmatched error:"},
+	}, {
+		name:    "declarative only: match",
+		matcher: ErrorMatcher{}.ByDeclarativeOnly(),
+		want:    ErrorList{{DeclarativeOnly: true}},
+		got:     ErrorList{{DeclarativeOnly: true}},
+	}, {
+		name:           "declarative only: no match",
+		matcher:        ErrorMatcher{}.ByDeclarativeOnly(),
+		want:           ErrorList{{DeclarativeOnly: true}},
+		got:            ErrorList{{DeclarativeOnly: false}},
 		expectedErrors: []string{"expected an error matching:", "unmatched error:"},
 	}, {
 		name:    "with origin: single match",
@@ -531,6 +562,26 @@ func TestErrorMatcher_Render(t *testing.T) {
 			}),
 			err:      Invalid(NewPath("f").Index(0).Child("x", "a"), "value", "detail"),
 			expected: `{Field="f[0].x.a"}`,
+		},
+		{
+			name:    "with covered by declarative",
+			matcher: ErrorMatcher{}.ByDeclarativeOnly(),
+			err: func() *Error {
+				e := Invalid(NewPath("field"), "value", "detail")
+				e.DeclarativeOnly = true
+				return e
+			}(),
+			expected: `{DeclarativeOnly=true}`,
+		},
+		{
+			name:    "all fields with covered by declarative",
+			matcher: ErrorMatcher{}.ByType().ByField().ByValue().ByOrigin().ByDetailExact().ByDeclarativeOnly(),
+			err: func() *Error {
+				e := Invalid(NewPath("field"), "value", "detail").WithOrigin("origin")
+				e.DeclarativeOnly = true
+				return e
+			}(),
+			expected: `{Type="Invalid value", Field="field", Value="value", Origin="origin", Detail="detail", DeclarativeOnly=true}`,
 		},
 		{
 			name:     "requireOriginWhenInvalid with origin",

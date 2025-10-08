@@ -30,8 +30,8 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 option go_package = "k8s.io/api/certificates/v1beta1";
 
 // Describes a certificate signing request
-// +k8s:supportsSubresource=/status
-// +k8s:supportsSubresource=/approval
+// +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/approval"
 message CertificateSigningRequest {
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
