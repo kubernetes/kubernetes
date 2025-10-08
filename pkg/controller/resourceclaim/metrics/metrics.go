@@ -26,6 +26,12 @@ import (
 // ResourceClaimSubsystem - subsystem name used for ResourceClaim creation
 const ResourceClaimSubsystem = "resourceclaim_controller"
 
+type NumResourceClaimLabels struct {
+	Allocated   string
+	AdminAccess string
+	Source      string
+}
+
 var (
 	// ResourceClaimCreate tracks the total number of
 	// ResourceClaims creation requests
@@ -45,7 +51,7 @@ var (
 	NumResourceClaimsDesc = metrics.NewDesc(
 		metrics.BuildFQName("", ResourceClaimSubsystem, "resource_claims"),
 		"Number of ResourceClaims, categorized by allocation status and admin access",
-		[]string{"allocated", "admin_access"}, nil,
+		[]string{"allocated", "admin_access", "source"}, nil,
 		metrics.ALPHA, "")
 )
 

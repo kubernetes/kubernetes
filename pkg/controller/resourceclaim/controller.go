@@ -1036,7 +1036,7 @@ func (collector *customCollector) DescribeWithStability(ch chan<- *metrics.Desc)
 }
 
 func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	allocateMetrics := make(map[string]map[string]int)
+	rcMetrics := make(map[resourceclaimmetrics.NumResourceClaimLabels]int)
 	rcList, err := collector.rcLister.List(labels.Everything())
 	if err != nil {
 		collector.logger.Error(err, "failed to list resource claims for metrics collection")
@@ -1049,14 +1049,22 @@ func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric)
 			allocated = "true"
 		}
 		adminAccess := collector.adminAccessFunc(rc)
-		if allocateMetrics[allocated] == nil {
-			allocateMetrics[allocated] = make(map[string]int)
+		source := ""
+		if val, ok := rc.Annotations[resourceapi.ExtendedResourceClaimAnnotation]; ok && val == "true" {
+			source = "extended_resource"
+		} else if val, ok := rc.Annotations[podResourceClaimAnnotation]; ok && val != "" {
+			source = "resource_claim_template"
 		}
-		allocateMetrics[allocated][adminAccess]++
+		rcMetrics[resourceclaimmetrics.NumResourceClaimLabels{Allocated: allocated, AdminAccess: adminAccess, Source: source}]++
 	}
-	for allocated, adminAccessMap := range allocateMetrics {
-		for adminAccess, count := range adminAccessMap {
-			ch <- metrics.NewLazyConstMetric(resourceclaimmetrics.NumResourceClaimsDesc, metrics.GaugeValue, float64(count), allocated, adminAccess)
-		}
+	for label, count := range rcMetrics {
+		ch <- metrics.NewLazyConstMetric(
+			resourceclaimmetrics.NumResourceClaimsDesc,
+			metrics.GaugeValue,
+			float64(count),
+			label.Allocated,
+			label.AdminAccess,
+			label.Source,
+		)
 	}
 }
