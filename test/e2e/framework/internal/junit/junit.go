@@ -17,10 +17,8 @@ limitations under the License.
 package junit
 
 import (
-	"regexp"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/reporters"
@@ -60,47 +58,7 @@ func WriteJUnitReport(report ginkgo.Report, filename string) error {
 		return res
 	})
 
-	// Detect data races in output and mark those tests as failed.
-	// Ginkgo itself captures the warning in the output of those
-	// tests where it is printed, but does not mark the tests as failed.
-	// This is not exactly wrong (the reason might be in code that was
-	// started elsewhere), but without a test being marked as "failed",
-	// prune-junit-xml will prune the output and spyglass won't show
-	// the test as failed.
-	//
-	// Both variants of captured output get checked, just to be on the safe side.
-	for i, spec := range report.SpecReports {
-		if spec.State == types.SpecStatePassed {
-			ginkgoWriterRace := containsDataRace(spec.CapturedGinkgoWriterOutput)
-			stdoutRace := containsDataRace(spec.CapturedStdOutErr)
-			if ginkgoWriterRace || stdoutRace {
-				spec.State = types.SpecStateFailed
-				spec.Failure = types.Failure{
-					FailureNodeContext: types.FailureNodeIsLeafNode,
-					FailureNodeType:    spec.LeafNodeType,
-					Location:           types.NewCustomCodeLocation("output analysis"),
-					TimelineLocation: types.TimelineLocation{
-						Time: time.Now(),
-					},
-				}
-				// Let's move that text to the failure message.
-				if stdoutRace {
-					spec.Failure.Message = spec.CapturedStdOutErr
-					spec.CapturedStdOutErr = ""
-				} else {
-					spec.Failure.Message = spec.CapturedGinkgoWriterOutput
-					spec.CapturedGinkgoWriterOutput = ""
-				}
-				report.SpecReports[i] = spec
-			}
-		}
-	}
+	detectDataRaces(report)
 
 	return reporters.GenerateJUnitReportWithConfig(report, filename, config)
-}
-
-var dataRaceRE = regexp.MustCompile(`(?m)^WARNING: DATA RACE$`)
-
-func containsDataRace(output string) bool {
-	return dataRaceRE.MatchString(output)
 }
