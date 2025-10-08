@@ -181,9 +181,10 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 	}
 	// working with copy to avoid race condition between this and migration controller
 	toBeProcessedSVM := svm.DeepCopy()
-	gvr := getGVRFromResource(toBeProcessedSVM)
+	gvr := getGRFromResource(toBeProcessedSVM)
 
-	if IsConditionTrue(toBeProcessedSVM, svmv1beta1.MigrationSucceeded) || IsConditionTrue(toBeProcessedSVM, svmv1beta1.MigrationFailed) {
+	if meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationSucceeded)) ||
+		meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationFailed)) {
 		logger.V(4).Info("Migration has already succeeded or failed previously, skipping", "svm", name)
 		return nil
 	}

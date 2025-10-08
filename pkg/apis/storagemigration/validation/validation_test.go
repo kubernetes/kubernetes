@@ -38,9 +38,8 @@ func TestValidateStorageVersionMigration(t *testing.T) {
 					Name: "test-svm",
 				},
 				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
+					Resource: storagemigration.GroupResource{
 						Group:    "non-empty",
-						Version:  "non-empty",
 						Resource: "non-empty",
 					},
 				},
@@ -54,14 +53,13 @@ func TestValidateStorageVersionMigration(t *testing.T) {
 					Name: "test-svm",
 				},
 				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
+					Resource: storagemigration.GroupResource{
 						Group:    "",
-						Version:  "",
 						Resource: "",
 					},
 				},
 			},
-			errorString: "[spec.resource.resource: Required value: resource is required, spec.resource.version: Required value: version is required]",
+			errorString: "spec.resource.resource: Required value: resource is required",
 		},
 		{
 			name: "when resource is empty",
@@ -70,30 +68,13 @@ func TestValidateStorageVersionMigration(t *testing.T) {
 					Name: "test-svm",
 				},
 				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
+					Resource: storagemigration.GroupResource{
 						Group:    "non-empty",
-						Version:  "non-empty",
 						Resource: "",
 					},
 				},
 			},
 			errorString: "spec.resource.resource: Required value: resource is required",
-		},
-		{
-			name: "when version is empty",
-			svm: &storagemigration.StorageVersionMigration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-svm",
-				},
-				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
-						Group:    "non-empty",
-						Version:  "",
-						Resource: "non-empty",
-					},
-				},
-			},
-			errorString: "spec.resource.version: Required value: version is required",
 		},
 	}
 
