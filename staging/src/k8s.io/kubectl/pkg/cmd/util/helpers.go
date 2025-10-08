@@ -538,7 +538,7 @@ func AddApplyAnnotationVarFlags(cmd *cobra.Command, applyAnnotation *bool) {
 
 func AddChunkSizeFlag(cmd *cobra.Command, value *int64) {
 	cmd.Flags().Int64Var(value, "chunk-size", *value,
-		"Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
+		"Return large lists in chunks rather than all at once. Pass 0 to disable.")
 }
 
 func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
