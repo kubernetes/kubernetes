@@ -408,24 +408,6 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 	return nil
 }
 
-// hasDeviceClassMappedExtendedResource returns true when the given resource list has an extended resource, that has
-// a mapping to a device class.
-func hasDeviceClassMappedExtendedResource(reqs v1.ResourceList, deviceClassMapping map[v1.ResourceName]string) bool {
-	for rName, rValue := range reqs {
-		if rValue.IsZero() {
-			// We only care about the resources requested by the pod we are trying to schedule.
-			continue
-		}
-		if schedutil.IsDRAExtendedResourceName(rName) {
-			_, ok := deviceClassMapping[rName]
-			if ok {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // findExtendedResourceClaim looks for the extended resource claim, i.e., the claim with special annotation
 // set to "true", and with the pod as owner. It must be called with all ResourceClaims in the cluster.
 // The returned ResourceClaim is read-only.
@@ -461,13 +443,50 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 		return nil, nil
 	}
 
-	deviceClassMapping, err := extended.DeviceClassMapping(pl.draManager)
-	if err != nil {
-		return nil, statusError(logger, err, "retrieving extended resource to DeviceClass mapping")
+	// Try to build device class mapping from cache first
+	cache := pl.draManager.ExtendedResourceCache()
+	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
+	deviceClassMapping := make(map[v1.ResourceName]string)
+	hasExtendedResource := false
+	needsFallback := false
+
+	// First pass: try to get mappings from cache for requested resources
+	for rName, rValue := range reqs {
+		if rValue.IsZero() {
+			continue
+		}
+		if schedutil.IsDRAExtendedResourceName(rName) {
+			if deviceClass := cache.GetDeviceClass(rName); deviceClass != "" {
+				deviceClassMapping[rName] = deviceClass
+				hasExtendedResource = true
+			} else {
+				// Cache doesn't have this resource, need to fallback
+				needsFallback = true
+			}
+		}
 	}
 
-	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
-	hasExtendedResource := hasDeviceClassMappedExtendedResource(reqs, deviceClassMapping)
+	// Fallback: if cache didn't have some mappings, query all device classes
+	// This handles cases where the cache isn't populated yet (e.g., in tests)
+	if needsFallback || !hasExtendedResource {
+		if mapping, err := pl.getDeviceClassMapping(); err == nil {
+			deviceClassMapping = mapping
+			// Recheck if we have extended resources now
+			hasExtendedResource = false
+			for rName, rValue := range reqs {
+				if rValue.IsZero() {
+					continue
+				}
+				if schedutil.IsDRAExtendedResourceName(rName) {
+					if _, ok := deviceClassMapping[rName]; ok {
+						hasExtendedResource = true
+						break
+					}
+				}
+			}
+		}
+	}
+
 	if !hasExtendedResource {
 		return nil, nil
 	}
@@ -1698,6 +1717,12 @@ func statusUnschedulable(logger klog.Logger, reason string, kv ...interface{}) *
 		loggerV.Info("pod unschedulable", kv...)
 	}
 	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, reason)
+}
+
+// getDeviceClassMapping provides device class to extended resource mapping.
+// This is used as a fallback when the cache is not populated.
+func (pl *DynamicResources) getDeviceClassMapping() (map[v1.ResourceName]string, error) {
+	return extended.DeviceClassMapping(pl.draManager)
 }
 
 // statusError ensures that there is a log message associated with the
