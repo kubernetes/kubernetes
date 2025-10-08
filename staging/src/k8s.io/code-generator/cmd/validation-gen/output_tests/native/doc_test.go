@@ -163,7 +163,7 @@ func TestMyObjectValidation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			st := localSchemeBuilder.Test(t)
-			st.Value(&tc.obj).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDeclarativeOnly(), tc.errs)
+			st.Value(&tc.obj).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), tc.errs)
 		})
 	}
 }

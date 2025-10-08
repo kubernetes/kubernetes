@@ -50,7 +50,7 @@ func Test(t *testing.T) {
 	}
 
 	st.Value(invalidBothSet).ExpectMatches(
-		field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDeclarativeOnly(),
+		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 		field.ErrorList{
 			field.Invalid(field.NewPath("tasks"), nil, "").WithOrigin("zeroOrOneOf"),
 		},
