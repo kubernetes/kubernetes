@@ -25,7 +25,6 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -98,19 +97,19 @@ type StrategicMergePatchRawTestCaseData struct {
 }
 
 type MergeItem struct {
-	Name                  string                `json:"name,omitempty"`
-	Value                 string                `json:"value,omitempty"`
-	Other                 string                `json:"other,omitempty"`
-	MergingList           []MergeItem           `json:"mergingList,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
-	NonMergingList        []MergeItem           `json:"nonMergingList,omitempty"`
-	MergingIntList        []int                 `json:"mergingIntList,omitempty" patchStrategy:"merge"`
-	NonMergingIntList     []int                 `json:"nonMergingIntList,omitempty"`
-	MergeItemPtr          *MergeItem            `json:"mergeItemPtr,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
-	SimpleMap             map[string]string     `json:"simpleMap,omitempty"`
-	ReplacingItem         runtime.RawExtension  `json:"replacingItem,omitempty" patchStrategy:"replace"`
-	JsonItem              *apiextensionsv1.JSON `json:"jsonItem,omitempty"`
-	RetainKeysMap         RetainKeysMergeItem   `json:"retainKeysMap,omitempty" patchStrategy:"retainKeys"`
-	RetainKeysMergingList []MergeItem           `json:"retainKeysMergingList,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	Name                  string               `json:"name,omitempty"`
+	Value                 string               `json:"value,omitempty"`
+	Other                 string               `json:"other,omitempty"`
+	MergingList           []MergeItem          `json:"mergingList,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	NonMergingList        []MergeItem          `json:"nonMergingList,omitempty"`
+	MergingIntList        []int                `json:"mergingIntList,omitempty" patchStrategy:"merge"`
+	NonMergingIntList     []int                `json:"nonMergingIntList,omitempty"`
+	MergeItemPtr          *MergeItem           `json:"mergeItemPtr,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	SimpleMap             map[string]string    `json:"simpleMap,omitempty"`
+	ReplacingItem         runtime.RawExtension `json:"replacingItem,omitempty" patchStrategy:"replace"`
+	JSONItem              struct{ Raw []byte } `json:"jsonItem,omitempty"`
+	RetainKeysMap         RetainKeysMergeItem  `json:"retainKeysMap,omitempty" patchStrategy:"retainKeys"`
+	RetainKeysMergingList []MergeItem          `json:"retainKeysMergingList,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type RetainKeysMergeItem struct {
