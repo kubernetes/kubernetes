@@ -32,7 +32,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +44,8 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -57,11 +58,16 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
+
+func init() {
+	metrics.InitMetrics()
+}
 
 var (
 	podKind = v1.SchemeGroupVersion.WithKind("Pod")
@@ -777,6 +783,7 @@ func TestPlugin(t *testing.T) {
 		disableDRASchedulerFilterTimeout bool
 		skipOnWindows                    string
 		failPatch                        bool
+		metrics                          func(*testing.T, compbasemetrics.Gatherer)
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
@@ -1411,7 +1418,7 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"extended-resource-name-wth-node-resource": {
+		"extended-resource-name-with-node-resource": {
 			enableDRAExtendedResource:          true,
 			enableDRADeviceBindingConditions:   true,
 			enableDRAResourceClaimDeviceStatus: true,
@@ -1419,6 +1426,10 @@ func TestPlugin(t *testing.T) {
 			pod:                                podWithExtendedResourceName,
 			classes:                            []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
 			want:                               want{},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				assert.ErrorContains(t, err, "not found")
+			},
 		},
 		"extended-resource-name-with-zero-allocatable": {
 			enableDRAExtendedResource: true,
@@ -1466,6 +1477,10 @@ func TestPlugin(t *testing.T) {
 					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
 				},
 			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				assert.ErrorContains(t, err, "not found")
+			},
 		},
 		"extended-resource-name-with-resources": {
 			enableDRAExtendedResource: true,
@@ -1483,6 +1498,11 @@ func TestPlugin(t *testing.T) {
 				postbind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
 				},
+			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				assert.NoError(t, err)
+				assert.Equal(t, float64(1), metric["success"])
 			},
 		},
 		"implicit-extended-resource-name-with-resources": {
@@ -1502,6 +1522,11 @@ func TestPlugin(t *testing.T) {
 					assumedClaim: reserve(implicitExtendedResourceClaim, podWithImplicitExtendedResourceName),
 				},
 			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				assert.NoError(t, err)
+				assert.Equal(t, float64(1), metric["success"])
+			},
 		},
 		"implicit-extended-resource-name-two-containers-with-resources": {
 			enableDRAExtendedResource: true,
@@ -1519,6 +1544,11 @@ func TestPlugin(t *testing.T) {
 				postbind: result{
 					assumedClaim: reserve(implicitExtendedResourceClaimTwoContainers, podWithImplicitExtendedResourceNameTwoContainers),
 				},
+			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				assert.NoError(t, err)
+				assert.Equal(t, float64(1), metric["success"])
 			},
 		},
 		"extended-resource-name-with-resources-fail-patch": {
@@ -1540,6 +1570,11 @@ func TestPlugin(t *testing.T) {
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
 				},
 			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				assert.NoError(t, err)
+				assert.Equal(t, float64(1), metric["success"])
+			},
 		},
 		"extended-resource-name-with-resources-has-claim": {
 			enableDRAExtendedResource: true,
@@ -1557,6 +1592,10 @@ func TestPlugin(t *testing.T) {
 					status:  fwk.NewStatus(fwk.Unschedulable, `deletion of ResourceClaim completed`),
 					removed: []metav1.Object{extendedResourceClaim},
 				},
+			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				assert.ErrorContains(t, err, "not found")
 			},
 		},
 		"extended-resource-name-with-resources-delete-claim": {
@@ -1576,6 +1615,10 @@ func TestPlugin(t *testing.T) {
 					removed: []metav1.Object{extendedResourceClaimNode2},
 				},
 			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				assert.ErrorContains(t, err, "not found")
+			},
 		},
 		"extended-resource-name-bind-failure": {
 			enableDRAExtendedResource: true,
@@ -1594,6 +1637,11 @@ func TestPlugin(t *testing.T) {
 					removed: []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
 				},
 			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				assert.NoError(t, err)
+				assert.Equal(t, float64(1), metric["success"])
+			},
 		},
 		"extended-resource-name-skip-bind": {
 			enableDRAExtendedResource: true,
@@ -1605,6 +1653,11 @@ func TestPlugin(t *testing.T) {
 					inFlightClaim: extendedResourceClaimNoName,
 				},
 				unreserveBeforePreBind: &result{},
+			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				assert.NoError(t, err)
+				assert.Equal(t, float64(1), metric["success"])
 			},
 		},
 		"canceled": {
@@ -1966,7 +2019,6 @@ func TestPlugin(t *testing.T) {
 		if len(tc.skipOnWindows) > 0 && goruntime.GOOS == "windows" {
 			t.Skipf("Skipping '%s' test case on Windows, reason: %s", name, tc.skipOnWindows)
 		}
-		// We can run in parallel because logging is per-test.
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			nodes := tc.nodes
@@ -1987,6 +2039,10 @@ func TestPlugin(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, feats, tc.failPatch)
 			initialObjects := testCtx.listAll(t)
+			var registry compbasemetrics.KubeRegistry
+			if tc.metrics != nil {
+				registry = setupMetrics(features)
+			}
 
 			status := testCtx.p.PreEnqueue(testCtx.ctx, tc.pod)
 			t.Run("PreEnqueue", func(t *testing.T) {
@@ -2103,8 +2159,22 @@ func TestPlugin(t *testing.T) {
 					testCtx.verify(t, tc.want.postfilter, initialObjects, nil, status)
 				})
 			}
+			if tc.metrics != nil {
+				tc.metrics(t, registry)
+			}
 		})
 	}
+}
+
+func setupMetrics(features feature.Features) compbasemetrics.KubeRegistry {
+	// Since feature gate is not set globally, we can't use metrics.Register().
+	// We use a new registry instead of using global registry.
+	testRegistry := compbasemetrics.NewKubeRegistry()
+	if features.EnableDRAExtendedResource {
+		testRegistry.MustRegister(metrics.ResourceClaimCreatesTotal)
+		metrics.ResourceClaimCreatesTotal.Reset()
+	}
+	return testRegistry
 }
 
 type testContext struct {
