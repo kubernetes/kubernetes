@@ -610,7 +610,7 @@ function install-containerd-cos {
     if download-robust "runc ${COS_INSTALL_RUNC_VERSION}" "${temp_dir}" \
        "https://github.com/opencontainers/runc/releases/download/${COS_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}"; then
       cp "${temp_dir}/runc.${HOST_ARCH}" /home/containerd/bin/runc && chmod 755 /home/containerd/bin/runc
-      sed -i "/\[Service\]/a Environment=PATH=/home/containerd/bin:\$PATH" /etc/systemd/system/containerd.service
+      sed -i "/\[Service\]/a Environment=PATH=/home/containerd/bin:$PATH" /etc/systemd/system/containerd.service
     fi
     rm -rf "${temp_dir}"
   fi
