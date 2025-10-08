@@ -32,6 +32,6 @@
 all:	regenerate
 
 regenerate:
-	go install github.com/gogo/protobuf/protoc-min-version
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-min-version
 	protoc-min-version --version="3.0.0" --gogo_out=paths=source_relative:. test.proto
 	

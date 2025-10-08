@@ -29,8 +29,8 @@
 syntax = "proto2";
 package enumprefix;
 
-import "github.com/gogo/protobuf/test/thetest.proto";
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/thetest.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 message MyMessage {
 	optional test.TheTestEnum TheField = 1 [(gogoproto.nullable) = false];

@@ -30,7 +30,7 @@ syntax = "proto3";
 
 package one;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 option (gogoproto.goproto_stringer_all) = false;
 option (gogoproto.goproto_enum_prefix_all) = false;

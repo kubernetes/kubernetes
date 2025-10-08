@@ -33,7 +33,7 @@ syntax = "proto3";
 
 package test;
 
-option go_package = "github.com/gogo/protobuf/protoc-gen-gogo/testdata/imports";
+option go_package = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/testdata/imports";
 
 // test_a_1/m*.proto are in the same Go package and proto package.
 // test_a_*/*.proto are in different Go packages, but the same proto package.

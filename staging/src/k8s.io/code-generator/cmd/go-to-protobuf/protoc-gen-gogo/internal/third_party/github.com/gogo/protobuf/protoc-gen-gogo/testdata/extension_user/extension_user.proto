@@ -36,7 +36,7 @@ import "extension_extra/extension_extra.proto";
 
 package extension_user;
 
-option go_package = "github.com/gogo/protobuf/protoc-gen-gogo/testdata/extension_user";
+option go_package = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/testdata/extension_user";
 
 message UserMessage {
   optional string name = 1;

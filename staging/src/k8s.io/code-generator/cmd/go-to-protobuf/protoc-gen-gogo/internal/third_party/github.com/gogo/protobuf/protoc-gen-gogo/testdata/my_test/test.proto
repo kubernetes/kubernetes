@@ -34,7 +34,7 @@ syntax = "proto2";
 // This package holds interesting messages.
 package my.test;  // dotted package name
 
-option go_package = "github.com/gogo/protobuf/protoc-gen-gogo/testdata/my_test;test";
+option go_package = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/testdata/my_test;test";
 
 //import "imp.proto";
 import "multi/multi1.proto";  // unused import

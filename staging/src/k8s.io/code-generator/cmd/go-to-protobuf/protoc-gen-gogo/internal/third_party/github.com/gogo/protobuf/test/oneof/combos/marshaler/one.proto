@@ -30,7 +30,7 @@ syntax = "proto2";
 
 package one;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 option (gogoproto.goproto_stringer_all) = false;
 option (gogoproto.goproto_enum_prefix_all) = false;
@@ -98,8 +98,8 @@ message TwoOneofs {
 message CustomOneof {
   oneof custom {
     string Stringy = 34;
-    bytes CustomType = 35 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
-    uint64 CastType = 36 [(gogoproto.casttype) = "github.com/gogo/protobuf/test/casttype.MyUint64Type"];
+    bytes CustomType = 35 [(gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom.Uint128"];
+    uint64 CastType = 36 [(gogoproto.casttype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyUint64Type"];
     int64 CustomName = 37 [(gogoproto.customname) = "MyCustomName"];
   }
 }

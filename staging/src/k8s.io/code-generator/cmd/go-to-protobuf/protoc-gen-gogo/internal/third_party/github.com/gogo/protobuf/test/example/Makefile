@@ -27,4 +27,4 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 regenerate:
-	(protoc -I=. -I=$(GOPATH)/src/github.com/gogo/protobuf/protobuf -I=$(GOPATH)/src --gogo_out=. example.proto)
+	(protoc -I=. -I=$(GOPATH)/src/k8s.io/kubernetes/staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protobuf -I=$(GOPATH)/src/k8s.io/kubernetes/staging/src --gogo_out=. example.proto)

@@ -1,6 +1,6 @@
 package int64support;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 option go_package = "int64support";
 option (gogoproto.benchgen_all) = true;

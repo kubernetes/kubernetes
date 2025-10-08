@@ -1,4 +1,4 @@
 regenerate:
-	go install github.com/gogo/protobuf/protoc-gen-gogo
-	protoc --proto_path=.:$(GOPATH)/src/:$(GOPATH)/src/github.com/gogo/protobuf/protobuf/ \
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo
+	protoc --proto_path=.:$(GOPATH)/src/k8s.io/kubernetes/staging/src/:$(GOPATH)/src/k8s.io/kubernetes/staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protobuf/ \
 	--gogo_out=. events.proto 

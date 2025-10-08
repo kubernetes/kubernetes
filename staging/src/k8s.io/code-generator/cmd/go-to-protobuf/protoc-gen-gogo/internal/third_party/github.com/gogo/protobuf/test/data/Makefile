@@ -27,7 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 regenerate:
-	go install github.com/gogo/protobuf/protoc-min-version
-	go install github.com/gogo/protobuf/protoc-gen-gogo
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-min-version
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo
 	protoc-min-version --version="3.0.0" --gogo_out=. \
-	--proto_path=../../../../../:../../protobuf/:. data.proto
+	--proto_path=../../../../../../../../../../../../:../../protobuf/:. data.proto

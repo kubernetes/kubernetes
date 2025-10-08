@@ -27,10 +27,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 regenerate:
-	go install github.com/gogo/protobuf/protoc-gen-combo
-	go install github.com/gogo/protobuf/protoc-gen-gogo
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-combo
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo
 	cp header.proto theproto3.proto
 	cat maps.proto >> theproto3.proto
 	cat footer.proto >> theproto3.proto
-	protoc-gen-combo --version="3.0.0" --gogo_out=. --proto_path=../../protobuf/:../../../../../:. theproto3.proto
+	protoc-gen-combo --version="3.0.0" --gogo_out=. --proto_path=../../protobuf/:../../../../../../../../../../../..:. theproto3.proto
 	find combos -type d -not -name combos -exec cp proto3_test.go.in {}/proto3_test.go \;

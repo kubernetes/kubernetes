@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package typedeclimport;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
 
-import "github.com/gogo/protobuf/test/typedeclimport/subpkg/subpkg.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/typedeclimport/subpkg/subpkg.proto";
 
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.marshaler_all) = true;

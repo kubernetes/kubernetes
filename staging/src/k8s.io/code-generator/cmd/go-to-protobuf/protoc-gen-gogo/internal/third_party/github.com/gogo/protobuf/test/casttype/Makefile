@@ -27,6 +27,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 regenerate:
-	go install github.com/gogo/protobuf/protoc-gen-combo
-	go install github.com/gogo/protobuf/protoc-gen-gogo
-	protoc-gen-combo --gogo_out=. --version="3.0.0" --proto_path=../../protobuf/:../../../../../:. casttype.proto
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-combo
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo
+	protoc-gen-combo --gogo_out=. --version="3.0.0" --proto_path=../../protobuf/:../../../../../../../../../../../..:. casttype.proto

@@ -33,7 +33,7 @@ syntax = "proto2";
 
 package multitest;
 
-option go_package = "github.com/gogo/protobuf/protoc-gen-gogo/testdata/multi;multitest";
+option go_package = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/testdata/multi;multitest";
 
 message Multi3 {
   enum HatType {

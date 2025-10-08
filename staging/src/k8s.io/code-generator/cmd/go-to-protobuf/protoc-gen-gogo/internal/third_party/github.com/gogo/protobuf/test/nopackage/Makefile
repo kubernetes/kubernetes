@@ -27,4 +27,4 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 regenerate:
-	(protoc-min-version --version="3.0.0" --proto_path=../../../../../:../../protobuf/:. --gogofast_out=. nopackage.proto)
+	(protoc-min-version --version="3.0.0" --proto_path=../../../../../../../../../../../../:../../protobuf/:. --gogofast_out=. nopackage.proto)

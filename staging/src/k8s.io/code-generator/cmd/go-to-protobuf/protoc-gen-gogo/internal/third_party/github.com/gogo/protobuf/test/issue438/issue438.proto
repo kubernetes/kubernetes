@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package issue438;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/api.proto";
 import "google/protobuf/duration.proto";

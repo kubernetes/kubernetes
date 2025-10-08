@@ -27,5 +27,5 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 regenerate:
-	(protoc --proto_path=../../../../../:../../protobuf/:. --gogo_out=. proto.proto)
-	(protoc --proto_path=../../../../../:../../protobuf/:. --gogo_out=. subpkg/subproto.proto)
+	(protoc --proto_path=../../../../../../../../../../../../:../../protobuf/:. --gogo_out=. proto.proto)
+	(protoc --proto_path=../../../../../../../../../../../../:../../protobuf/:. --gogo_out=. subpkg/subproto.proto)

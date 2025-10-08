@@ -29,7 +29,7 @@
 syntax = "proto2";
 package test;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 option (gogoproto.testgen_all) = true;
 option (gogoproto.populate_all) = true;

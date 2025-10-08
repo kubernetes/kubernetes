@@ -27,5 +27,5 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 regenerate:
-	(cd index && protoc --proto_path=../../../../../../:../../../protobuf/:. --gogo_out=. index.proto)
-	(protoc --proto_path=../../../../../:../../protobuf/:. --gogo_out=. indeximport.proto)
+	(cd index && protoc --proto_path=../../../../../../../../../../../../../:../../../protobuf/:. --gogo_out=. index.proto)
+	(protoc --proto_path=../../../../../../../../../../../../:../../protobuf/:. --gogo_out=. indeximport.proto)

@@ -30,8 +30,8 @@ syntax = "proto2";
 
 package moredefaults;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-import "github.com/gogo/protobuf/test/example/example.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/example/example.proto";
 
 option (gogoproto.goproto_getters_all) = true;
 option (gogoproto.testgen_all) = true;

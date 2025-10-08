@@ -29,9 +29,9 @@
 syntax = "proto3";
 package importduplicate;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-import "github.com/gogo/protobuf/test/importduplicate/sortkeys/sortable.proto";
-import "github.com/gogo/protobuf/test/importduplicate/proto/proto.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/importduplicate/sortkeys/sortable.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/importduplicate/proto/proto.proto";
 
 option (gogoproto.testgen_all) = true;
 option (gogoproto.populate_all) = true;

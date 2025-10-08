@@ -135,11 +135,11 @@ To generate the code, you also need to set the include path properly.
 To use proto files from "google/protobuf" you need to add additional args to protoc.
 
     protoc -I=. -I=$GOPATH/src -I=$GOPATH/src/github.com/gogo/protobuf/protobuf --{binary}_out=\
-    Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,\
-    Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types,\
-    Mgoogle/protobuf/struct.proto=github.com/gogo/protobuf/types,\
-    Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,\
-    Mgoogle/protobuf/wrappers.proto=github.com/gogo/protobuf/types:. \
+    Mgoogle/protobuf/any.proto=k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types,\
+    Mgoogle/protobuf/duration.proto=k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types,\
+    Mgoogle/protobuf/struct.proto=k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types,\
+    Mgoogle/protobuf/timestamp.proto=k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types,\
+    Mgoogle/protobuf/wrappers.proto=k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/types:. \
     myproto.proto
 
 Note that in the protoc command, {binary} does not contain the initial prefix of "protoc-gen".

@@ -31,7 +31,7 @@ package registration
 import (
 	"testing"
 
-	gogoproto "github.com/gogo/protobuf/proto"
+	gogoproto "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto"
 	golangproto "github.com/golang/protobuf/proto"
 )
 

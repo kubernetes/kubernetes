@@ -27,5 +27,5 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 regenerate:
-	go install github.com/gogo/protobuf/protoc-gen-gogofast
-	protoc  --proto_path=../../../../../:../../protobuf/:. --gogofast_out=. fuzz.proto
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogofast
+	protoc  --proto_path=../../../../../../../../../../../../:../../protobuf/:. --gogofast_out=. fuzz.proto

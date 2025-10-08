@@ -28,10 +28,10 @@
 
 regenerate:
 	rm -rf combos
-	go install github.com/gogo/protobuf/protoc-gen-combo
-	go install github.com/gogo/protobuf/protoc-gen-gogo
-	protoc-min-version --version="3.0.0" --gogo_out=. --proto_path=../../protobuf/:../../../../../:. castvalue.proto
-	protoc-gen-combo --default=false --version="3.0.0" --gogo_out=. --proto_path=../../protobuf/:../../../../../:. castvalue.proto
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-combo
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo
+	protoc-min-version --version="3.0.0" --gogo_out=. --proto_path=../../protobuf/:../../../../../../../../../../../..:. castvalue.proto
+	protoc-gen-combo --default=false --version="3.0.0" --gogo_out=. --proto_path=../../protobuf/:../../../../../../../../../../../..:. castvalue.proto
 	cp mytypes.go ./combos/both/ || true
 	cp mytypes.go ./combos/marshaler/ || true
 	cp mytypes.go ./combos/unmarshaler/ || true

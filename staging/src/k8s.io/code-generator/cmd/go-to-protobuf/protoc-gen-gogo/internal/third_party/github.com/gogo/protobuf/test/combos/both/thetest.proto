@@ -29,7 +29,7 @@
 syntax = "proto2";
 package test;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 option (gogoproto.goproto_stringer_all) = false;
 option (gogoproto.goproto_enum_prefix_all) = false;
@@ -238,26 +238,26 @@ message NinNestedStruct {
 
 message NidOptCustom {
 	optional bytes Id = 1 [(gogoproto.customtype) = "Uuid", (gogoproto.nullable) = false];
-	optional bytes Value = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
+	optional bytes Value = 2 [(gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
 }
 
 message CustomDash {
-	optional bytes Value = 1 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom-dash-type.Bytes"];
+	optional bytes Value = 1 [(gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom-dash-type.Bytes"];
 }
 
 message NinOptCustom {
 	optional bytes Id = 1 [(gogoproto.customtype) = "Uuid"];
-	optional bytes Value = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
+	optional bytes Value = 2 [(gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom.Uint128"];
 }
 
 message NidRepCustom {
 	repeated bytes Id = 1 [(gogoproto.customtype) = "Uuid", (gogoproto.nullable) = false];
-	repeated bytes Value = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
+	repeated bytes Value = 2 [(gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
 }
 
 message NinRepCustom {
 	repeated bytes Id = 1 [(gogoproto.customtype) = "Uuid"];
-	repeated bytes Value = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
+	repeated bytes Value = 2 [(gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom.Uint128"];
 }
 
 message NinOptNativeUnion {
@@ -564,9 +564,9 @@ message CustomNameNinStruct {
 
 message CustomNameCustomType {
 	optional bytes Id = 1 [(gogoproto.customname) = "FieldA", (gogoproto.customtype) = "Uuid"];
-	optional bytes Value = 2 [(gogoproto.customname) = "FieldB", (gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
+	optional bytes Value = 2 [(gogoproto.customname) = "FieldB", (gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom.Uint128"];
 	repeated bytes Ids = 3 [(gogoproto.customname) = "FieldC", (gogoproto.customtype) = "Uuid"];
-	repeated bytes Values = 4 [(gogoproto.customname) = "FieldD", (gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
+	repeated bytes Values = 4 [(gogoproto.customname) = "FieldD", (gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom.Uint128"];
 }
 
 message CustomNameNinEmbeddedStructUnion {

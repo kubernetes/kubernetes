@@ -33,7 +33,7 @@ syntax = "proto3";
 
 package issue411;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 message Span {
   bytes trace_id = 1 [

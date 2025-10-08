@@ -10,8 +10,8 @@ message FloatingPoint {
 }
 
 message Uint128Pair {
-  bytes left = 1 [(gogoproto.nullable) = false, (gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
-  bytes right = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
+  bytes left = 1 [(gogoproto.nullable) = false, (gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom.Uint128"];
+  bytes right = 2 [(gogoproto.customtype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/custom.Uint128"];
 }
 
 message ContainsNestedMap {

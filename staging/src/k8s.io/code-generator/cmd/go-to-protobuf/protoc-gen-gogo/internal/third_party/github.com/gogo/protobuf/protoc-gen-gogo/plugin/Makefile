@@ -33,5 +33,5 @@
 # at src/google/protobuf/compiler/plugin.proto
 # Also we need to fix an import.
 regenerate:
-	go install github.com/gogo/protobuf/protoc-gen-gogo
-	protoc --gogo_out=Mgoogle/protobuf/descriptor.proto=github.com/gogo/protobuf/protoc-gen-gogo/descriptor:. -I=../../protobuf/google/protobuf/compiler/:../../protobuf/ ../../protobuf/google/protobuf/compiler/plugin.proto
+	go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo
+	protoc --gogo_out=Mgoogle/protobuf/descriptor.proto=k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/descriptor:. -I=../../protobuf/google/protobuf/compiler/:../../protobuf/ ../../protobuf/google/protobuf/compiler/plugin.proto

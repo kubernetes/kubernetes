@@ -1,7 +1,7 @@
 syntax = "proto3";
 package merge;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 message A {
   B B = 1 [(gogoproto.nullable) = false];

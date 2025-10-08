@@ -30,7 +30,7 @@ syntax = "proto2";
 
 package casttype;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 option (gogoproto.goproto_stringer_all) = false;
 option (gogoproto.goproto_enum_prefix_all) = false;
@@ -59,20 +59,20 @@ option (gogoproto.unsafe_unmarshaler_all) = false;
 message Castaway {
 	optional int64 Int32Ptr = 1         [(gogoproto.casttype) = "int32"];
 	optional int64 Int32 = 2            [(gogoproto.casttype) = "int32", (gogoproto.nullable) = false];
-	optional uint64 MyUint64Ptr = 3     [(gogoproto.casttype) = "github.com/gogo/protobuf/test/casttype.MyUint64Type"];
-	optional uint64 MyUint64 = 4        [(gogoproto.casttype) = "github.com/gogo/protobuf/test/casttype.MyUint64Type", (gogoproto.nullable) = false];
-	optional float MyFloat32Ptr = 5    [(gogoproto.casttype) = "github.com/gogo/protobuf/test/casttype.MyFloat32Type"];
-	optional float MyFloat32 = 6       [(gogoproto.casttype) = "github.com/gogo/protobuf/test/casttype.MyFloat32Type", (gogoproto.nullable) = false];
-	optional double MyFloat64Ptr = 7    [(gogoproto.casttype) = "github.com/gogo/protobuf/test/casttype.MyFloat64Type"];
-	optional double MyFloat64 = 8       [(gogoproto.casttype) = "github.com/gogo/protobuf/test/casttype.MyFloat64Type", (gogoproto.nullable) = false];
-	optional bytes MyBytes = 9          [(gogoproto.casttype) = "github.com/gogo/protobuf/test/casttype.Bytes"];
+	optional uint64 MyUint64Ptr = 3     [(gogoproto.casttype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyUint64Type"];
+	optional uint64 MyUint64 = 4        [(gogoproto.casttype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyUint64Type", (gogoproto.nullable) = false];
+	optional float MyFloat32Ptr = 5    [(gogoproto.casttype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyFloat32Type"];
+	optional float MyFloat32 = 6       [(gogoproto.casttype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyFloat32Type", (gogoproto.nullable) = false];
+	optional double MyFloat64Ptr = 7    [(gogoproto.casttype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyFloat64Type"];
+	optional double MyFloat64 = 8       [(gogoproto.casttype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyFloat64Type", (gogoproto.nullable) = false];
+	optional bytes MyBytes = 9          [(gogoproto.casttype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.Bytes"];
 	optional bytes NormalBytes = 10;
-	repeated uint64 MyUint64s = 11       [(gogoproto.casttype) = "github.com/gogo/protobuf/test/casttype.MyUint64Type"];
-	map<string,uint64> MyMap = 12        [(gogoproto.casttype) = "github.com/gogo/protobuf/test/casttype.MyMapType"];
-	map<string,uint64> MyCustomMap = 13  [(gogoproto.castkey) = "github.com/gogo/protobuf/test/casttype.MyStringType", (gogoproto.castvalue) = "github.com/gogo/protobuf/test/casttype.MyUint64Type"];
-	map<int32,Wilson> MyNullableMap = 14 [(gogoproto.castkey) = "github.com/gogo/protobuf/test/casttype.MyInt32Type"];
-	map<int32,Wilson> MyEmbeddedMap = 15 [(gogoproto.castkey) = "github.com/gogo/protobuf/test/casttype.MyInt32Type", (gogoproto.nullable) = false];
-	optional string String = 16 [(gogoproto.casttype) = "github.com/gogo/protobuf/test/casttype.MyStringType"];
+	repeated uint64 MyUint64s = 11       [(gogoproto.casttype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyUint64Type"];
+	map<string,uint64> MyMap = 12        [(gogoproto.casttype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyMapType"];
+	map<string,uint64> MyCustomMap = 13  [(gogoproto.castkey) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyStringType", (gogoproto.castvalue) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyUint64Type"];
+	map<int32,Wilson> MyNullableMap = 14 [(gogoproto.castkey) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyInt32Type"];
+	map<int32,Wilson> MyEmbeddedMap = 15 [(gogoproto.castkey) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyInt32Type", (gogoproto.nullable) = false];
+	optional string String = 16 [(gogoproto.casttype) = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/casttype.MyStringType"];
 }
 
 message Wilson {

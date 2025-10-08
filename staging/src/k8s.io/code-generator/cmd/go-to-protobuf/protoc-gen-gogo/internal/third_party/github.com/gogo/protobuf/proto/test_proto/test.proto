@@ -35,7 +35,7 @@ syntax = "proto2";
 
 package test_proto;
 
-option go_package = "github.com/gogo/protobuf/proto/test_proto";
+option go_package = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/proto/test_proto";
 
 enum FOO { FOO1 = 1; };
 

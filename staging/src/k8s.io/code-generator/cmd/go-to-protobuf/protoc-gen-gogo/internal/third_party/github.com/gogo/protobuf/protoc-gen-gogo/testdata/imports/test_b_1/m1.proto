@@ -31,5 +31,5 @@
 
 syntax = "proto3";
 package test.b.part1;
-option go_package = "github.com/gogo/protobuf/protoc-gen-gogo/testdata/imports/test_b_1;beta";
+option go_package = "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/protoc-gen-gogo/testdata/imports/test_b_1;beta";
 message M1 {}
