@@ -560,7 +560,7 @@ func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ types.UID, _ kubec
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetContainerStatus")
-	return nil, f.Err
+	return &kubecontainer.Status{}, f.Err
 }
 
 func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubetypes.SwapBehavior {
