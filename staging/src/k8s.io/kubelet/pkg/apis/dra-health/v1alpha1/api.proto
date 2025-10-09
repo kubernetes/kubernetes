@@ -56,6 +56,9 @@ message DeviceHealth {
 
   // The Unix time (in seconds) of when this health status was last determined by the plugin.
   int64 last_updated_time = 3;
+
+  // An optional message providing additional details about the device's health.
+  string message = 4;
 }
 
 // NodeWatchResourcesResponse contains a list of devices and their current health.

@@ -1910,7 +1910,8 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue"
+                "health": "healthValue",
+                "message": "messageValue"
               }
             ]
           }
@@ -2003,7 +2004,8 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue"
+                "health": "healthValue",
+                "message": "messageValue"
               }
             ]
           }
@@ -2097,7 +2099,8 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue"
+                "health": "healthValue",
+                "message": "messageValue"
               }
             ]
           }

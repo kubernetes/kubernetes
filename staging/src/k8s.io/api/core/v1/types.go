@@ -3448,6 +3448,10 @@ type ResourceHealth struct {
 	//
 	// In future we may want to introduce the PermanentlyUnhealthy Status.
 	Health ResourceHealthStatus `json:"health,omitempty" protobuf:"bytes,2,name=health"`
+	// Message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
+	// This field is populated by the kubelet when ResourceHealthStatus is enabled.
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 }
 
 // ContainerUser represents user identity information

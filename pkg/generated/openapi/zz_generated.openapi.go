@@ -31614,6 +31614,13 @@ func schema_k8sio_api_core_v1_ResourceHealth(ref common.ReferenceCallback) commo
 							Format:      "",
 						},
 					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Message provides human-readable context for Health (e.g. \"ECC error count exceeded threshold\"). This field is populated by the kubelet when ResourceHealthStatus is enabled.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"resourceID"},
 			},

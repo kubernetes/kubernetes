@@ -11487,6 +11487,11 @@ func (m *ResourceHealth) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	i -= len(m.Message)
+	copy(dAtA[i:], m.Message)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Message)))
+	i--
+	dAtA[i] = 0x1a
 	i -= len(m.Health)
 	copy(dAtA[i:], m.Health)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Health)))
@@ -18994,6 +18999,8 @@ func (m *ResourceHealth) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.Health)
 	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Message)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -23295,6 +23302,7 @@ func (this *ResourceHealth) String() string {
 	s := strings.Join([]string{`&ResourceHealth{`,
 		`ResourceID:` + fmt.Sprintf("%v", this.ResourceID) + `,`,
 		`Health:` + fmt.Sprintf("%v", this.Health) + `,`,
+		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -59253,6 +59261,38 @@ func (m *ResourceHealth) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Health = ResourceHealthStatus(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Message = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
