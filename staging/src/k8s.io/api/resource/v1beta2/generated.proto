@@ -564,6 +564,9 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:unique=map
+  // +k8s:listMapKey=name
   // +k8s:maxItems=32
   repeated DeviceRequest requests = 1;
 
