@@ -715,6 +715,8 @@ message DeviceConstraint {
   //
   // +optional
   // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:unique=set
   // +k8s:maxItems=32
   repeated string requests = 1;
 

@@ -500,6 +500,8 @@ func Validate_DeviceConstraint(ctx context.Context, op operation.Operation, fldP
 			if earlyReturn {
 				return // do not proceed
 			}
+			// lists with set semantics require unique values
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
 			return
 		}(fldPath.Child("requests"), obj.Requests, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceConstraint) []string { return oldObj.Requests }))...)
 
