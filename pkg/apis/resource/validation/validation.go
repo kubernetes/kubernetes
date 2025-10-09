@@ -353,7 +353,7 @@ func validateDeviceClaimConfiguration(config resource.DeviceClaimConfiguration, 
 	allErrs = append(allErrs, validateSet(config.Requests, resource.DeviceRequestsMaxSize,
 		func(name string, fldPath *field.Path) field.ErrorList {
 			return validateRequestNameRef(name, fldPath, requestNames)
-		}, stringKey, fldPath.Child("requests"), sizeCovered)...)
+		}, stringKey, fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	allErrs = append(allErrs, validateDeviceConfiguration(config.DeviceConfiguration, fldPath, stored)...)
 	return allErrs
 }
