@@ -89,9 +89,9 @@ readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.8.2
-readonly __default_go_runner_version=v2.4.0-go1.25.1-bookworm.0
-readonly __default_setcap_version=bookworm-v1.0.4
+readonly __default_distroless_iptables_version=v0.8.4
+readonly __default_go_runner_version=v2.4.0-go1.25.3-bookworm.0
+readonly __default_setcap_version=bookworm-v1.0.6
 
 # The default image for all binaries which are dynamically linked.
 # Includes everything that is required by kube-proxy, which uses it
