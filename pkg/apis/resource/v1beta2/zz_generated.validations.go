@@ -549,8 +549,14 @@ func Validate_DeviceRequest(ctx context.Context, op operation.Operation, fldPath
 			if earlyReturn {
 				return // do not proceed
 			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta2.DeviceSubRequest, b resourcev1beta2.DeviceSubRequest) bool {
+				return a.Name == b.Name
+			})...)
 			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceSubRequest)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta2.DeviceSubRequest, b resourcev1beta2.DeviceSubRequest) bool {
+				return a.Name == b.Name
+			}, validate.SemanticDeepEqual, Validate_DeviceSubRequest)...)
 			return
 		}(fldPath.Child("firstAvailable"), obj.FirstAvailable, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceRequest) []resourcev1beta2.DeviceSubRequest {
 			return oldObj.FirstAvailable
