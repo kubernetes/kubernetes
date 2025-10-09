@@ -314,6 +314,8 @@ func Validate_DeviceClaimConfiguration(ctx context.Context, op operation.Operati
 			if earlyReturn {
 				return // do not proceed
 			}
+			// lists with set semantics require unique values
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
 			return
 		}(fldPath.Child("requests"), obj.Requests, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceClaimConfiguration) []string { return oldObj.Requests }))...)
 
