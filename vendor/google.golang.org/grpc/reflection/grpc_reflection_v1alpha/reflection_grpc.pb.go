@@ -87,7 +87,7 @@ type ServerReflectionServer interface {
 type UnimplementedServerReflectionServer struct{}
 
 func (UnimplementedServerReflectionServer) ServerReflectionInfo(grpc.BidiStreamingServer[ServerReflectionRequest, ServerReflectionResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method ServerReflectionInfo not implemented")
+	return status.Error(codes.Unimplemented, "method ServerReflectionInfo not implemented")
 }
 func (UnimplementedServerReflectionServer) testEmbeddedByValue() {}
 

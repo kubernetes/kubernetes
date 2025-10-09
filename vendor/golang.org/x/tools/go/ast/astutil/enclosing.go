@@ -207,6 +207,9 @@ func childrenOf(n ast.Node) []ast.Node {
 		return false // no recursion
 	})
 
+	// TODO(adonovan): be more careful about missing (!Pos.Valid)
+	// tokens in trees produced from invalid input.
+
 	// Then add fake Nodes for bare tokens.
 	switch n := n.(type) {
 	case *ast.ArrayType:
@@ -226,9 +229,12 @@ func childrenOf(n ast.Node) []ast.Node {
 		children = append(children, tok(n.OpPos, len(n.Op.String())))
 
 	case *ast.BlockStmt:
-		children = append(children,
-			tok(n.Lbrace, len("{")),
-			tok(n.Rbrace, len("}")))
+		if n.Lbrace.IsValid() {
+			children = append(children, tok(n.Lbrace, len("{")))
+		}
+		if n.Rbrace.IsValid() {
+			children = append(children, tok(n.Rbrace, len("}")))
+		}
 
 	case *ast.BranchStmt:
 		children = append(children,
@@ -304,9 +310,12 @@ func childrenOf(n ast.Node) []ast.Node {
 		// TODO(adonovan): Field.{Doc,Comment,Tag}?
 
 	case *ast.FieldList:
-		children = append(children,
-			tok(n.Opening, len("(")), // or len("[")
-			tok(n.Closing, len(")"))) // or len("]")
+		if n.Opening.IsValid() {
+			children = append(children, tok(n.Opening, len("(")))
+		}
+		if n.Closing.IsValid() {
+			children = append(children, tok(n.Closing, len(")")))
+		}
 
 	case *ast.File:
 		// TODO test: Doc

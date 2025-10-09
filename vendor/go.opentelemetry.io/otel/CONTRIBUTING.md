@@ -109,10 +109,9 @@ A PR is considered **ready to merge** when:
 
   This is not enforced through automation, but needs to be validated by the
   maintainer merging.
-  * The qualified approvals need to be from [Approver]s/[Maintainer]s
-    affiliated with different companies. Two qualified approvals from
-    [Approver]s or [Maintainer]s affiliated with the same company counts as a
-    single qualified approval.
+  * At least one of the qualified approvals need to be from an
+    [Approver]/[Maintainer] affiliated with a different company than the author
+    of the PR.
   * PRs introducing changes that have already been discussed and consensus
     reached only need one qualified approval. The discussion and resolution
     needs to be linked to the PR.
@@ -643,17 +642,18 @@ should be canceled.
 
 ### Triagers
 
+- [Alex Kats](https://github.com/akats7), Capital One
 - [Cheng-Zhen Yang](https://github.com/scorpionknifes), Independent
 
 ### Approvers
 
 ### Maintainers
 
-- [Damien Mathieu](https://github.com/dmathieu), Elastic
-- [David Ashpole](https://github.com/dashpole), Google
-- [Robert Pająk](https://github.com/pellared), Splunk
-- [Sam Xie](https://github.com/XSAM), Cisco/AppDynamics
-- [Tyler Yahn](https://github.com/MrAlias), Splunk
+- [Damien Mathieu](https://github.com/dmathieu), Elastic ([GPG](https://keys.openpgp.org/search?q=5A126B972A81A6CE443E5E1B408B8E44F0873832))
+- [David Ashpole](https://github.com/dashpole), Google ([GPG](https://keys.openpgp.org/search?q=C0D1BDDCAAEAE573673085F176327DA4D864DC70))
+- [Robert Pająk](https://github.com/pellared), Splunk ([GPG](https://keys.openpgp.org/search?q=CDAD3A60476A3DE599AA5092E5F7C35A4DBE90C2))
+- [Sam Xie](https://github.com/XSAM), Splunk ([GPG](https://keys.openpgp.org/search?q=AEA033782371ABB18EE39188B8044925D6FEEBEA))
+- [Tyler Yahn](https://github.com/MrAlias), Splunk ([GPG](https://keys.openpgp.org/search?q=0x46B0F3E1A8B1BA5A))
 
 ### Emeritus
 

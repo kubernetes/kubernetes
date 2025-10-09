@@ -371,6 +371,7 @@ const (
 	SO_RCVBUFFORCE                   = 0x21
 	SO_RCVLOWAT                      = 0x1004
 	SO_RCVMARK                       = 0x4b
+	SO_RCVPRIORITY                   = 0x52
 	SO_RCVTIMEO                      = 0x1006
 	SO_RCVTIMEO_NEW                  = 0x42
 	SO_RCVTIMEO_OLD                  = 0x1006

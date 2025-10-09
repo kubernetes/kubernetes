@@ -19,7 +19,7 @@ func NewAllowKeysFilter(keys ...Key) Filter {
 		return func(kv KeyValue) bool { return false }
 	}
 
-	allowed := make(map[Key]struct{})
+	allowed := make(map[Key]struct{}, len(keys))
 	for _, k := range keys {
 		allowed[k] = struct{}{}
 	}
@@ -38,7 +38,7 @@ func NewDenyKeysFilter(keys ...Key) Filter {
 		return func(kv KeyValue) bool { return true }
 	}
 
-	forbid := make(map[Key]struct{})
+	forbid := make(map[Key]struct{}, len(keys))
 	for _, k := range keys {
 		forbid[k] = struct{}{}
 	}

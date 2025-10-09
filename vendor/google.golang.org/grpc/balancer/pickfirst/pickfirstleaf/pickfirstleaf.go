@@ -54,18 +54,9 @@ func init() {
 	balancer.Register(pickfirstBuilder{})
 }
 
-type (
-	// enableHealthListenerKeyType is a unique key type used in resolver
-	// attributes to indicate whether the health listener usage is enabled.
-	enableHealthListenerKeyType struct{}
-	// managedByPickfirstKeyType is an attribute key type to inform Outlier
-	// Detection that the generic health listener is being used.
-	// TODO: https://github.com/grpc/grpc-go/issues/7915 - Remove this when
-	// implementing the dualstack design. This is a hack. Once Dualstack is
-	// completed, outlier detection will stop sending ejection updates through
-	// the connectivity listener.
-	managedByPickfirstKeyType struct{}
-)
+// enableHealthListenerKeyType is a unique key type used in resolver
+// attributes to indicate whether the health listener usage is enabled.
+type enableHealthListenerKeyType struct{}
 
 var (
 	logger = grpclog.Component("pick-first-leaf-lb")
@@ -76,21 +67,21 @@ var (
 	disconnectionsMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
 		Name:        "grpc.lb.pick_first.disconnections",
 		Description: "EXPERIMENTAL. Number of times the selected subchannel becomes disconnected.",
-		Unit:        "disconnection",
+		Unit:        "{disconnection}",
 		Labels:      []string{"grpc.target"},
 		Default:     false,
 	})
 	connectionAttemptsSucceededMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
 		Name:        "grpc.lb.pick_first.connection_attempts_succeeded",
 		Description: "EXPERIMENTAL. Number of successful connection attempts.",
-		Unit:        "attempt",
+		Unit:        "{attempt}",
 		Labels:      []string{"grpc.target"},
 		Default:     false,
 	})
 	connectionAttemptsFailedMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
 		Name:        "grpc.lb.pick_first.connection_attempts_failed",
 		Description: "EXPERIMENTAL. Number of failed connection attempts.",
-		Unit:        "attempt",
+		Unit:        "{attempt}",
 		Labels:      []string{"grpc.target"},
 		Default:     false,
 	})
@@ -149,17 +140,6 @@ func EnableHealthListener(state resolver.State) resolver.State {
 	return state
 }
 
-// IsManagedByPickfirst returns whether an address belongs to a SubConn
-// managed by the pickfirst LB policy.
-// TODO: https://github.com/grpc/grpc-go/issues/7915 - This is a hack to disable
-// outlier_detection via the with connectivity listener when using pick_first.
-// Once Dualstack changes are complete, all SubConns will be created by
-// pick_first and outlier detection will only use the health listener for
-// ejection. This hack can then be removed.
-func IsManagedByPickfirst(addr resolver.Address) bool {
-	return addr.BalancerAttributes.Value(managedByPickfirstKeyType{}) != nil
-}
-
 type pfConfig struct {
 	serviceconfig.LoadBalancingConfig `json:"-"`
 
@@ -186,7 +166,6 @@ type scData struct {
 }
 
 func (b *pickfirstBalancer) newSCData(addr resolver.Address) (*scData, error) {
-	addr.BalancerAttributes = addr.BalancerAttributes.WithValue(managedByPickfirstKeyType{}, true)
 	sd := &scData{
 		rawConnectivityState: connectivity.Idle,
 		effectiveState:       connectivity.Idle,
@@ -304,7 +283,7 @@ func (b *pickfirstBalancer) UpdateClientConnState(state balancer.ClientConnState
 		newAddrs = state.ResolverState.Addresses
 		if cfg.ShuffleAddressList {
 			newAddrs = append([]resolver.Address{}, newAddrs...)
-			internal.RandShuffle(len(endpoints), func(i, j int) { endpoints[i], endpoints[j] = endpoints[j], endpoints[i] })
+			internal.RandShuffle(len(newAddrs), func(i, j int) { newAddrs[i], newAddrs[j] = newAddrs[j], newAddrs[i] })
 		}
 	}
 
@@ -372,6 +351,13 @@ func (b *pickfirstBalancer) ExitIdle() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.state == connectivity.Idle {
+		// Move the balancer into CONNECTING state immediately. This is done to
+		// avoid staying in IDLE if a resolver update arrives before the first
+		// SubConn reports CONNECTING.
+		b.updateBalancerState(balancer.State{
+			ConnectivityState: connectivity.Connecting,
+			Picker:            &picker{err: balancer.ErrNoSubConnAvailable},
+		})
 		b.startFirstPassLocked()
 	}
 }
@@ -625,7 +611,7 @@ func (b *pickfirstBalancer) updateSubConnState(sd *scData, newState balancer.Sub
 		if !b.addressList.seekTo(sd.addr) {
 			// This should not fail as we should have only one SubConn after
 			// entering READY. The SubConn should be present in the addressList.
-			b.logger.Errorf("Address %q not found address list in  %v", sd.addr, b.addressList.addresses)
+			b.logger.Errorf("Address %q not found address list in %v", sd.addr, b.addressList.addresses)
 			return
 		}
 		if !b.healthCheckingEnabled {
