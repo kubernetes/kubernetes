@@ -423,34 +423,6 @@ function kube::build::clean() {
   fi
 }
 
-# Set up the context directory for the kube-build image and build it.
-function kube::build::build_image() {
-  # TODO: eliminate this entirely in favor of just docker run kube-cross
-  return
-  mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
-  # Make sure the context directory owned by the right user for syncing sources to container.
-  chown -R "${USER_ID}":"${GROUP_ID}" "${LOCAL_OUTPUT_BUILD_CONTEXT}"
-
-  cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
-  chmod u+w "${LOCAL_OUTPUT_BUILD_CONTEXT}/localtime"
-
-  cp "${KUBE_ROOT}/build/build-image/Dockerfile" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-  cp "${KUBE_ROOT}/build/build-image/rsyncd.sh" "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
-  dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
-  chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
-
-  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false' "--build-arg=KUBE_CROSS_IMAGE=${KUBE_CROSS_IMAGE} --build-arg=KUBE_CROSS_VERSION=${KUBE_CROSS_VERSION}"
-
-  # Clean up old versions of everything
-  kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}" "${KUBE_BUILD_CONTAINER_NAME}"
-  kube::build::docker_delete_old_containers "${KUBE_RSYNC_CONTAINER_NAME_BASE}" "${KUBE_RSYNC_CONTAINER_NAME}"
-  kube::build::docker_delete_old_containers "${KUBE_DATA_CONTAINER_NAME_BASE}" "${KUBE_DATA_CONTAINER_NAME}"
-  kube::build::docker_delete_old_images "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG_BASE}" "${KUBE_BUILD_IMAGE_TAG}"
-
-  kube::build::ensure_data_container
-  kube::build::sync_to_container
-}
-
 # Build a docker image from a Dockerfile.
 # $1 is the name of the image to build
 # $2 is the location of the "context" directory, with the Dockerfile at the root.
@@ -756,41 +728,6 @@ function kube::build::sync_to_container() {
     --filter='- /_output/' \
     --filter='- /' \
     "${KUBE_ROOT}/" "rsync://k8s@${KUBE_RSYNC_ADDR}/k8s/"
-
-  kube::build::stop_rsyncd_container
-}
-
-# Copy all build results back out.
-function kube::build::copy_output() {
-  # TODO eliminate calls to this
-  # For now just returning early
-  return
-  kube::log::status "Syncing out of container"
-
-  kube::build::start_rsyncd_container
-
-  # The filter syntax for rsync is a little obscure. It filters on files and
-  # directories.  If you don't go in to a directory you won't find any files
-  # there.  Rules are evaluated in order.  The last two rules are a little
-  # magic. '+ */' says to go in to every directory and '- /**' says to ignore
-  # any file or directory that isn't already specifically allowed.
-  #
-  # We are looking to copy out all of the built binaries along with various
-  # generated files.
-  # PLEASE DO NOT ADD TO THIS
-  # https://github.com/kubernetes/kubernetes/issues/112862
-  kube::build::rsync \
-    --prune-empty-dirs \
-    --filter='- /_temp/' \
-    --filter='+ /vendor/' \
-    --filter='+ /_output/dockerized/bin/**' \
-    --filter='+ zz_generated.*' \
-    --filter='+ generated.proto' \
-    --filter='+ *.pb.go' \
-    --filter='+ types.go' \
-    --filter='+ */' \
-    --filter='- /**' \
-    "rsync://k8s@${KUBE_RSYNC_ADDR}/k8s/" "${KUBE_ROOT}"
 
   kube::build::stop_rsyncd_container
 }
