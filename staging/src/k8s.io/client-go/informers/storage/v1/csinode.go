@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	storagev1 "k8s.io/client-go/listers/storage/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // CSINodeInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredCSINodeInformer(client kubernetes.Interface, resyncPeriod time.D
 				}
 				return client.StorageV1().CSINodes().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apistoragev1.CSINode{},
 		resyncPeriod,

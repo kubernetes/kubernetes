@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	resourcev1 "k8s.io/client-go/listers/resource/v1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ResourceClaimTemplateInformer provides access to a shared informer and lister for
@@ -82,6 +83,7 @@ func NewFilteredResourceClaimTemplateInformer(client kubernetes.Interface, names
 				}
 				return client.ResourceV1().ResourceClaimTemplates(namespace).Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiresourcev1.ResourceClaimTemplate{},
 		resyncPeriod,

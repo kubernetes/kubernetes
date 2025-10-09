@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	flowcontrolv1beta1 "k8s.io/client-go/listers/flowcontrol/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // FlowSchemaInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredFlowSchemaInformer(client kubernetes.Interface, resyncPeriod tim
 				}
 				return client.FlowcontrolV1beta1().FlowSchemas().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiflowcontrolv1beta1.FlowSchema{},
 		resyncPeriod,

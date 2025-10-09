@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	certificatesv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // CertificateSigningRequestInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredCertificateSigningRequestInformer(client kubernetes.Interface, r
 				}
 				return client.CertificatesV1beta1().CertificateSigningRequests().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apicertificatesv1beta1.CertificateSigningRequest{},
 		resyncPeriod,

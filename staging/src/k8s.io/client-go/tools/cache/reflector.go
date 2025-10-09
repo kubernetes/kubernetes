@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/tools/pager"
+	"k8s.io/client-go/util/watchlist"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -297,6 +298,12 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 	}
 
 	r.useWatchList = clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient)
+	if r.useWatchList {
+		if !watchlist.DoesClientSupportWatchListSemantics(lw) {
+			klog.V(2).InfoS("Warning: The provided ListWatcher (%T) doesn't support WatchList semantics. %q feature will be disabled. If you are using a custom client, check the documentation of watchlist.DoesClientSupportWatchListSemantics() method", lw, clientfeatures.WatchListClient)
+			r.useWatchList = false
+		}
+	}
 
 	return r
 }

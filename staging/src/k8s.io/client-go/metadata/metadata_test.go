@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"k8s.io/client-go/util/watchlist"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -34,6 +35,13 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2/ktesting"
 )
+
+func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	target := &Client{}
+	if !watchlist.DoesClientSupportWatchListSemantics(target) {
+		t.Fatalf("Client should support WatchList semantics")
+	}
+}
 
 func TestClient(t *testing.T) {
 	gvr := schema.GroupVersionResource{Group: "group", Version: "v1", Resource: "resource"}

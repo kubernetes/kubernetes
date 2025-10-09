@@ -62,6 +62,7 @@ func (lw *listerWatcher) List(options metav1.ListOptions) (runtime.Object, error
 	}
 
 	storageOpts := storage.ListOptions{
+		ResourceVersion:      options.ResourceVersion,
 		ResourceVersionMatch: options.ResourceVersionMatch,
 		Predicate:            pred,
 		Recursive:            true,
@@ -104,4 +105,9 @@ func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, err
 	}
 
 	return lw.storage.Watch(ctx, lw.resourcePrefix, opts)
+}
+
+func (c *listerWatcher) IsWatchListSemanticsSupported() bool {
+	// the current etcd impl supports watchlist semantics
+	return true
 }

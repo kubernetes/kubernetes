@@ -30,6 +30,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	admissionregistrationv1alpha1 "k8s.io/client-go/listers/admissionregistration/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
+	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // MutatingAdmissionPolicyBindingInformer provides access to a shared informer and lister for
@@ -81,6 +82,7 @@ func NewFilteredMutatingAdmissionPolicyBindingInformer(client kubernetes.Interfa
 				}
 				return client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Watch(ctx, options)
 			},
+			WatchListSemanticsSupported: watchlist.DoesClientSupportWatchListSemantics(client),
 		},
 		&apiadmissionregistrationv1alpha1.MutatingAdmissionPolicyBinding{},
 		resyncPeriod,
