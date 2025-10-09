@@ -335,7 +335,7 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 		func(name string, fldPath *field.Path) field.ErrorList {
 			return validateRequestNameRef(name, fldPath, requestNames)
 		},
-		stringKey, fldPath.Child("requests"), sizeCovered)...)
+		stringKey, fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	if constraint.MatchAttribute != nil {
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute"))...)
 	} else if constraint.DistinctAttribute != nil {
