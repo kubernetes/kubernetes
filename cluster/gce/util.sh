@@ -1817,7 +1817,7 @@ function generate-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the kubelet client cert with the correct groups
-    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare kubelet
+    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare kubelet
     mv "kubelet-key.pem" "pki/private/kubelet.key"
     mv "kubelet.pem" "pki/issued/kubelet.crt"
     rm -f "kubelet.csr"
@@ -1882,7 +1882,7 @@ function generate-aggregator-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the aggregator client cert with the correct groups
-    echo '{"CN":"aggregator","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare proxy-client
+    echo '{"CN":"aggregator","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare proxy-client
     mv "proxy-client-key.pem" "pki/private/proxy-client.key"
     mv "proxy-client.pem" "pki/issued/proxy-client.crt"
     rm -f "proxy-client.csr"
@@ -1943,7 +1943,7 @@ function generate-konnectivity-server-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the konnectivity server cert with the correct groups
-    echo '{"CN":"konnectivity-server","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-server
+    echo '{"CN":"konnectivity-server","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-server
     rm -f "konnectivity-server.csr"
 
     # Make the agent <-> konnectivity server side certificates.
@@ -1959,7 +1959,7 @@ function generate-konnectivity-server-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","agent auth"]}}}' > "ca-config.json"
     # create the konnectivity server cert with the correct groups
-    echo '{"CN":"koonectivity-server","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
+    echo '{"CN":"koonectivity-server","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
     rm -f "konnectivity-agent.csr"
 
     echo "completed main certificate section") &>"${cert_create_debug_output}" || true
@@ -2021,7 +2021,7 @@ function generate-cloud-pvl-admission-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the cloud-pvl-admission cert with the correct groups
-    echo '{"CN":"cloud-pvl-admission","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare cloud-pvl-admission
+    echo '{"CN":"cloud-pvl-admission","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare cloud-pvl-admission
     rm -f "cloud-pvl-admission.csr"
 
     # Make the cloud-pvl-admission server side certificates.
@@ -2037,7 +2037,7 @@ function generate-cloud-pvl-admission-certs {
     # make the config for the signer
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","agent auth"]}}}' > "ca-config.json"
     # create the cloud-pvl-admission server cert with the correct groups
-    echo '{"CN":"cloud-pvl-admission","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
+    echo '{"CN":"cloud-pvl-admission","hosts":[],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
     rm -f "konnectivity-agent.csr"
 
     echo "completed main certificate section") &>"${cert_create_debug_output}" || true
