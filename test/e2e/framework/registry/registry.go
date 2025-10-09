@@ -60,15 +60,16 @@ const (
 // the Node Conformance test suite).
 //
 // This function returns:
+// - the node-local address of the registry
 // - set of node names that the registry runs on
 // - an error
-func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) ([]string, error) {
+func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) (string, []string, error) {
 	const registryReplicas = 1
 
 	podTestLabel := "test-registry-pod-" + f.UniqueName
 	pod, err := podManifest(podTestLabel)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	if podOnly {
@@ -83,7 +84,7 @@ func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) ([
 
 		deployment, err = f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 
 		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 120*time.Second, true, func(ctx context.Context) (done bool, err error) {
@@ -96,24 +97,24 @@ func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) ([
 				dep.Status.ReadyReplicas == registryReplicas, nil
 		})
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 	}
 
 	pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "kube-e2e=" + podTestLabel})
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	podNodes := make([]string, 0, len(pods.Items))
 	for _, pod := range pods.Items {
 		podNodes = append(podNodes, pod.Spec.NodeName)
 	}
 
-	return podNodes, nil
+	return "localhost:5000", podNodes, nil
 }
 
 func podManifest(podTestLabel string) (*v1.Pod, error) {
-	pod, err := test.GetMinimalValidLinuxPod(api.LevelRestricted, api.MajorMinorVersion(1, 22))
+	pod, err := test.GetMinimalValidPod(api.LevelRestricted, api.MajorMinorVersion(1, 25))
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +146,7 @@ func podManifest(podTestLabel string) (*v1.Pod, error) {
 //
 // If successful, returns cleanup() function that needs to be run in order to remove
 // the labels from the nodes.
-func SetupRegistryLabelNodes(ctx context.Context, f *framework.Framework, podOnly bool) (cleanup func(context.Context) error, err error) {
+func SetupRegistryLabelNodes(ctx context.Context, f *framework.Framework, podOnly bool) (registryAddress string, cleanup func(context.Context) error, err error) {
 	cleanups := []func(ctx context.Context) error{}
 	cleanup = func(ctx context.Context) error {
 		var errs []error
@@ -166,9 +167,9 @@ func SetupRegistryLabelNodes(ctx context.Context, f *framework.Framework, podOnl
 	}()
 
 	var registryNodes []string
-	registryNodes, err = SetupRegistry(ctx, f, podOnly)
+	registryAddress, registryNodes, err = SetupRegistry(ctx, f, podOnly)
 	if err != nil {
-		return cleanup, err
+		return registryAddress, cleanup, err
 	}
 
 	for _, nodeName := range registryNodes {
@@ -178,7 +179,7 @@ func SetupRegistryLabelNodes(ctx context.Context, f *framework.Framework, podOnl
 				FieldManager: "e2e-tests",
 			},
 		); err != nil {
-			return cleanup, err
+			return registryAddress, cleanup, err
 		}
 		cleanups = append(cleanups, func(ctx context.Context) error {
 			node, nodeErr := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
@@ -191,7 +192,7 @@ func SetupRegistryLabelNodes(ctx context.Context, f *framework.Framework, podOnl
 		})
 	}
 
-	return cleanup, err
+	return registryAddress, cleanup, err
 }
 
 // PodNodeSelector should be used in pod spec for a node selector in case there is

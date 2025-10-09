@@ -42,7 +42,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	ginkgo.Describe("container runtime conformance blackbox test", func() {
 
 		ginkgo.Context("when running a container with a new image", func() {
-			registryAddress := "localhost:5000"
+			var registryAddress string
 			auth := e2eregistry.User1DockerSecret(registryAddress).Data[v1.DockerConfigJsonKey]
 			// The following images are not added into NodePrePullImageList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
@@ -56,15 +56,16 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 			}{
 				{
 					description:  "should be able to pull from private registry with credential provider",
-					image:        registryAddress + "/pause:testing",
+					image:        "pause:testing",
 					setupRegisty: true,
 					phase:        v1.PodRunning,
 					waiting:      false,
 				},
 			} {
-
 				ginkgo.BeforeEach(func(ctx context.Context) {
-					cleanup, err := e2eregistry.SetupRegistryLabelNodes(ctx, f, true)
+					var cleanup func(context.Context) error
+					var err error
+					registryAddress, cleanup, err = e2eregistry.SetupRegistryLabelNodes(ctx, f, true)
 					framework.ExpectNoError(err)
 					ginkgo.DeferCleanup(cleanup)
 				})
@@ -81,7 +82,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 						PodClient: e2epod.NewPodClient(f),
 						Container: v1.Container{
 							Name:  name,
-							Image: testCase.image,
+							Image: registryAddress + "/" + testCase.image,
 							// PullAlways makes sure that the image will always be pulled even if it is present before the test.
 							ImagePullPolicy: v1.PullAlways,
 						},
