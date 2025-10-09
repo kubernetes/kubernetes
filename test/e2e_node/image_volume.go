@@ -28,21 +28,18 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // Run this single test locally using a running CRI-O instance by:
-// make test-e2e-node CONTAINER_RUNTIME_ENDPOINT="unix:///var/run/crio/crio.sock" TEST_ARGS='--ginkgo.focus="ImageVolume" --feature-gates=ImageVolume=true --service-feature-gates=ImageVolume=true --kubelet-flags="--cgroup-root=/ --runtime-cgroups=/system.slice/crio.service --kubelet-cgroups=/system.slice/kubelet.service --fail-swap-on=false"'
-var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
+// make test-e2e-node CONTAINER_RUNTIME_ENDPOINT="unix:///var/run/crio/crio.sock" TEST_ARGS='--ginkgo.focus="ImageVolume" --kubelet-flags="--cgroup-root=/ --runtime-cgroups=/system.slice/crio.service --kubelet-cgroups=/system.slice/kubelet.service --fail-swap-on=false"'
+var _ = SIGDescribe(framework.WithNodeConformance(), "ImageVolume", func() {
 	f := framework.NewDefaultFramework("image-volume-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -59,10 +56,6 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 		defaultSELinuxType  = "svirt_lxc_net_t"
 		defaultSELinuxLevel = "s0:c1,c5"
 	)
-
-	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.SkipUnlessFeatureGateEnabled(features.ImageVolume)
-	})
 
 	createPod := func(ctx context.Context, podName, nodeName string, volumes []v1.Volume, volumeMounts []v1.VolumeMount, selinuxOptions *v1.SELinuxOptions) {
 		pod := &v1.Pod{
@@ -275,19 +268,6 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 	})
 
 	f.Context("subPath", func() {
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			runtime, _, err := getCRIClient()
-			framework.ExpectNoError(err, "Failed to get CRI client")
-
-			version, err := runtime.Version(context.Background(), "")
-			framework.ExpectNoError(err, "Failed to get runtime version")
-
-			// TODO: enable the subpath tests if containerd main branch has support for it.
-			if version.GetRuntimeName() != "cri-o" {
-				e2eskipper.Skip("runtime is not CRI-O")
-			}
-		})
-
 		f.It("should succeed when using a valid subPath", func(ctx context.Context) {
 			var selinuxOptions *v1.SELinuxOptions
 			if selinux.GetEnabled() {
