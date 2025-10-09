@@ -95,4 +95,8 @@ type DeviceHealth struct {
 
 	// LastUpdated keeps track of the last health status update of this device.
 	LastUpdated time.Time
+
+	// Message provides additional details about the device's health status.
+	// This field is optional and may be empty.
+	Message string
 }

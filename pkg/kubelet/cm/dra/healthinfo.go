@@ -121,8 +121,13 @@ func (cache *healthInfoCache) saveToCheckpointInternal() error {
 }
 
 // getHealthInfo returns the current health info, adjusting for timeouts.
-func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName string) state.DeviceHealthStatus {
-	res := state.DeviceHealthStatusUnknown
+func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName string) state.DeviceHealth {
+	res := state.DeviceHealth{
+		PoolName:   poolName,
+		DeviceName: deviceName,
+		Health:     state.DeviceHealthStatusUnknown,
+		Message:    "",
+	}
 
 	_ = cache.withRLock(func() error {
 		now := time.Now()
@@ -130,9 +135,11 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 			key := poolName + "/" + deviceName
 			if device, ok := driver.Devices[key]; ok {
 				if now.Sub(device.LastUpdated) > healthTimeout {
-					res = state.DeviceHealthStatusUnknown
+					// Keep default Unknown status, clear message for stale device
+					res.Health = state.DeviceHealthStatusUnknown
+					res.Message = ""
 				} else {
-					res = device.Health
+					res = device
 				}
 			}
 		}
@@ -166,7 +173,8 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 
 			existingDevice, ok := currentDriver.Devices[key]
 
-			if !ok || existingDevice.Health != reportedDevice.Health {
+			// Consider both health status and message changes as updates
+			if !ok || existingDevice.Health != reportedDevice.Health || existingDevice.Message != reportedDevice.Message {
 				changedDevices = append(changedDevices, reportedDevice)
 			}
 
