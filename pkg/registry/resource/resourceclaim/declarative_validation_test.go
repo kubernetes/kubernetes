@@ -144,6 +144,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Duplicate(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), "req-0"),
 			},
 		},
+		"invalid config requests, duplicate name": {
+			input: mkValidResourceClaim(tweakDuplicateConfigRequest("req-0")),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), "req-0"),
+			},
+		},
 		"valid firstAvailable, max allowed": {
 			input: mkValidResourceClaim(tweakFirstAvailable(8)),
 		},
@@ -372,6 +378,15 @@ func tweakDuplicateConstraintRequest(name string) func(*resource.ResourceClaim) 
 			rc.Spec.Devices.Constraints = append(rc.Spec.Devices.Constraints, mkDeviceConstraint())
 		}
 		rc.Spec.Devices.Constraints[0].Requests = append(rc.Spec.Devices.Constraints[0].Requests, name)
+	}
+}
+
+func tweakDuplicateConfigRequest(name string) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Config) == 0 {
+			rc.Spec.Devices.Config = append(rc.Spec.Devices.Config, mkDeviceClaimConfiguration())
+		}
+		rc.Spec.Devices.Config[0].Requests = append(rc.Spec.Devices.Config[0].Requests, name)
 	}
 }
 
