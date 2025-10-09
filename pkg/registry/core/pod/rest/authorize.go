@@ -28,6 +28,13 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
+// Pod subresources differs on the REST verbs depending on the protocol used
+// SPDY uses POST that at the authz layer is translated to "create".
+// Websockets uses GET that is translated to "get".
+// Since the defaulting to websocket for kubectl in KEP-4006 this caused an
+// unexpected side effect and in order to keep existing policies backwards
+// compatible we always check that the "create" verb is allowed.
+// Ref: https://issues.k8s.io/133515
 func ensureAuthorizedForVerb(ctx context.Context, a authorizer.Authorizer, verb string) error {
 	requestInfo, ok := genericapirequest.RequestInfoFrom(ctx)
 	if !ok {
