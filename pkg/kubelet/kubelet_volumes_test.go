@@ -19,6 +19,8 @@ package kubelet
 import (
 	"context"
 	"fmt"
+	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,11 +29,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	utiltesting "k8s.io/client-go/util/testing"
+	csitrans "k8s.io/csi-translation-lib"
+	"k8s.io/kubernetes/pkg/kubelet/config"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/test/utils/ktesting"
+
+	"k8s.io/klog/v2"
 )
 
 func TestListVolumesForPod(t *testing.T) {
@@ -741,4 +759,292 @@ func (f *stubBlockVolume) SupportsMetrics() bool {
 
 func (f *stubBlockVolume) GetMetrics() (*volume.Metrics, error) {
 	return nil, nil
+}
+
+func TestStaticPodVolumeProcessShouldNotInterleave(t *testing.T) {
+	// this test exercises the following scenario:
+	// we have two static pods with uid 1 and 2, both pods have the same
+	// name, both pods are identical in spec, and they have a volume
+	// we will refer to these pods as pod-1, and pod-2 respectively
+	// a) pod-1 starts
+	// b) populator for the desired state of the world comes across pod-1
+	//    and starts processing its volume by calling AddPodToVolume
+	// c) complete the sync for pod-1 so it is in terminating state, and we
+	//    let it remain in this state so the test can exercise its steps
+	// d) start pod-2, since pod-1 with the same name is in terminating
+	//    state, pod-2 will not be deemed ready to start yet by pod worker
+	// e) as the populator for the desired state of the world runs
+	//    asynchronously, it comes across pod-2, but it should not start
+	//    processing volumes of pod-2 by calling AddPodToVolume just yet
+	// f) drain all workers for pod-1, and pod-1 transitions to terminated state
+	// g) wait for the populator to start processing the volumes
+	//    of pod-2 by calling AddPodToVolume
+	clientset := &fake.Clientset{}
+	podManager := kubepod.NewBasicPodManager()
+
+	// so we can force pod-1 to remain in terminating state
+	timedPodWorkers, _ := createTimeIncrementingPodWorkers()
+	podWorkers := timedPodWorkers.w
+	intreeToCSITranslator := csitrans.New()
+	csiMigratedPluginManager := csimigration.NewPluginManager(intreeToCSITranslator, utilfeature.DefaultFeatureGate)
+	seLinuxTranslator := util.NewSELinuxLabelTranslator()
+
+	// we need a fake plugin and an initialized VolumePluginMgr
+	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Fatalf("failed to remove temp dir: %v", err)
+		}
+	}()
+	// TODO (#51147) inject mock prober
+	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, clientset, nil)
+	fakeVolumeHost.WithNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "fake"}})
+	fakePlugin := &volumetest.FakeVolumePlugin{
+		PluginName: "fake",
+		Host:       nil,
+		CanSupportFn: func(spec *volume.Spec) bool {
+			return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD != nil) ||
+				(spec.Volume != nil && spec.Volume.RBD != nil)
+		},
+	}
+	volumePluginMgr := &volume.VolumePluginMgr{}
+	if err := volumePluginMgr.InitPlugins([]volume.VolumePlugin{fakePlugin}, nil /* prober */, fakeVolumeHost); err != nil {
+		t.Fatalf("volume plugin manager failed to initialize")
+	}
+
+	// this wraps the AddPodToVolume method of the DesiredStateOfWorld in
+	// use by the populator so we can record how it's being invoked
+	desired := &trackingAddPodToVolume{
+		DesiredStateOfWorld: cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator),
+	}
+	actual := cache.NewActualStateOfWorld("fake", volumePluginMgr)
+
+	dswPopulator := populator.NewDesiredStateOfWorldPopulator(
+		clientset,
+		10*time.Millisecond, // the populator will poll every 10ms
+		podManager,          // shared PodManager
+		podWorkers,          // shared PodStateProvider
+		desired,             // shared cache.DesiredStateOfWorld in use by the populator
+		actual,
+		csiMigratedPluginManager,
+		intreeToCSITranslator,
+		volumePluginMgr,
+	)
+
+	// returns a static pod with volume(s)
+	newPodFn := func(uid types.UID, name string) *v1.Pod {
+		pod := newStaticPod(string(uid), name)
+		pod.Spec.Containers = []v1.Container{
+			{
+				Name: "container1",
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "vol1",
+						MountPath: "/mnt/vol1",
+					},
+				},
+			},
+		}
+		pod.Spec.Volumes = []v1.Volume{
+			{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					RBD: &v1.RBDVolumeSource{
+						RBDImage: "fake1",
+					},
+				},
+			},
+		}
+		return pod
+	}
+
+	// waits up to timeout to observe if AddPodToVolume has been invoked
+	waitForAddPodToVolumeInvoked := func(timeout time.Duration) error {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		return wait.PollUntilContextCancel(ctx, 5*time.Millisecond, true, func(ctx context.Context) (bool, error) {
+			var done bool
+			desired.visit(func(r recorded) {
+				if len(r.added) > 0 {
+					done = true
+				}
+			})
+			return done, nil
+		})
+	}
+
+	// run the populator in its own goroutine
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	populatorDone := make(chan struct{})
+	go func() {
+		defer close(populatorDone)
+		alwaysReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+		dswPopulator.Run(ctx, alwaysReady)
+	}()
+
+	// we have two static pods having the same name
+	name := "static-pod-foo"
+	uid1, uid2 := types.UID("1"), types.UID("2")
+	pod1, pod2 := newPodFn(uid1, name), newPodFn(uid2, name)
+	fullname := kubecontainer.BuildPodFullName(pod1.Name, pod1.Namespace)
+
+	if !kubetypes.IsStaticPod(pod1) || !kubetypes.IsStaticPod(pod2) {
+		t.Fatalf("wrong test setup - must be static pods")
+	}
+
+	// a) start the first static pod, pod-1
+	// manually add pod-1 to pod manager cache
+	podManager.AddPod(pod1)
+	timedPodWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        pod1,
+		UpdateType: kubetypes.SyncPodUpdate,
+	})
+	podWorkers.podLock.Lock()
+	// we should observe the static pod running
+	if status := podWorkers.podSyncStatuses[uid1]; status == nil || status.IsTerminated() {
+		t.Fatalf("unexpected pod state: %#v", status)
+	}
+	if uidGot, ok := podWorkers.startedStaticPodsByFullname[fullname]; !ok || uidGot != uid1 {
+		t.Fatalf("expected pod-1 to be in startedStaticPodsByFullname")
+	}
+	if waiting := podWorkers.waitingToStartStaticPodsByFullname[fullname]; len(waiting) > 0 {
+		t.Fatalf("did not expect pod-1 to be in waitingToStartStaticPodsByFullname")
+	}
+	podWorkers.podLock.Unlock()
+
+	// b) we expect the volume(s) of pod-1 to be processed by the populator
+	// wait for 3 second(s) at most, to minimize flakes
+	if err := waitForAddPodToVolumeInvoked(3 * time.Second); err != nil {
+		t.Fatalf("timed out while waiting for AddPodToVolume to be invoked: %v", err)
+	}
+	desired.visit(func(r recorded) {
+		if len(r.added) != 1 || r.added[0] != uid1 || len(r.error) > 0 {
+			t.Errorf("expected volumes of pod-1 to be processed - %#v", r)
+		}
+	})
+	desired.reset()
+
+	// c) transition pod-1 to terminating, and let it stay in terminating state
+	timedPodWorkers.PauseWorkers(uid1)
+	podWorkers.completeSync(uid1)
+	podWorkers.podLock.Lock()
+	if status := podWorkers.podSyncStatuses[uid1]; status == nil || !status.IsTerminationStarted() || !status.IsTerminationRequested() {
+		t.Fatalf("expected pod-1 to be in terminating state: %#v", status)
+	}
+	// pod-1 should still be in startedStaticPodsByFullname
+	if uidGot, ok := podWorkers.startedStaticPodsByFullname[fullname]; !ok || uidGot != uid1 {
+		t.Fatalf("expected pod-1 to be in startedStaticPodsByFullname")
+	}
+	podWorkers.podLock.Unlock()
+
+	// d) start static pod pod-2
+	podManager.AddPod(pod2)
+	timedPodWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        pod2,
+		UpdateType: kubetypes.SyncPodUpdate,
+	})
+	podWorkers.podLock.Lock()
+	if status := podWorkers.podSyncStatuses[uid2]; status == nil || status.IsTerminated() {
+		t.Fatalf("unexpected pod state: %#v", status)
+	}
+	if uidGot, ok := podWorkers.startedStaticPodsByFullname[fullname]; ok && uidGot == uid2 {
+		t.Fatalf("did not expect pod-2 in startedStaticPodsByFullname yet")
+	}
+	if waiting := podWorkers.waitingToStartStaticPodsByFullname[fullname]; len(waiting) != 1 || waiting[0] != uid2 {
+		t.Fatalf("expected pod-2 in waitingToStartStaticPodsByFullname")
+	}
+	podWorkers.podLock.Unlock()
+
+	// e) wait for at most 3s to see if AddPodToVolume was invoked
+	// we don't expect AddPodToVolume to be called by the populator
+	// for pod-2 volumes just yet
+	if err := waitForAddPodToVolumeInvoked(3 * time.Second); err == nil {
+		t.Errorf("did not expect AddPodToVolume to be invoked")
+	}
+	desired.visit(func(r recorded) {
+		if len(r.added) > 0 || len(r.error) > 0 {
+			t.Fatalf("did not expect pod-2 volume(s) to be processed while pod-1 is terminating - %#v", r)
+		}
+	})
+	desired.reset()
+
+	// f) transition pod-1 from terminating to terminated
+	timedPodWorkers.ReleaseWorkers(uid1)
+	drainAllWorkers(podWorkers)
+	podWorkers.podLock.Lock()
+	if status := podWorkers.podSyncStatuses[uid1]; status == nil || !status.IsTerminated() {
+		t.Fatalf("unexpected podpod-1 to be in terminated state: %#v", status)
+	}
+	podWorkers.podLock.Unlock()
+
+	// g) now that pod-1 is in terminated state, we expect the populator to
+	// start processing volume(s) of pod-2 by calling AddPodToVolume.
+	// wait for at most 3s, to minimize flakes
+	if err := waitForAddPodToVolumeInvoked(3 * time.Second); err != nil {
+		t.Errorf("timed out while waiting for AddPodToVolume to be invoked: %v", err)
+	}
+	desired.visit(func(r recorded) {
+		if len(r.added) != 1 || r.added[0] != uid2 || len(r.error) > 0 {
+			t.Errorf("expected pod-2 volume(s) to be processed by the populator - %#v", r)
+		}
+	})
+
+	// wait for the populator to return
+	cancel()
+	select {
+	case <-populatorDone:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timed out waiting for the populator to be done")
+	}
+}
+
+type recorded struct {
+	// when AddPodToVolume is invoked, the uid of the given pod is appended
+	added []types.UID
+	// if AddErrorToPod is invoked, the error is saved here
+	error string
+}
+type trackingAddPodToVolume struct {
+	cache.DesiredStateOfWorld
+
+	// recorded values
+	lock  sync.Mutex
+	count recorded
+}
+
+func (dsw *trackingAddPodToVolume) AddPodToVolume(logger klog.Logger, podName volumetypes.UniquePodName, pod *v1.Pod,
+	volumeSpec *volume.Spec, outerVolumeSpecName string, volumeGIDValue string,
+	seLinuxContainerContexts []*v1.SELinuxOptions) (v1.UniqueVolumeName, error) {
+	dsw.lock.Lock()
+	dsw.count.added = append(dsw.count.added, pod.UID)
+	dsw.lock.Unlock()
+
+	return dsw.DesiredStateOfWorld.AddPodToVolume(logger, podName, pod, volumeSpec, outerVolumeSpecName, volumeGIDValue, seLinuxContainerContexts)
+}
+
+func (dsw *trackingAddPodToVolume) AddErrorToPod(podName volumetypes.UniquePodName, err string) {
+	dsw.lock.Lock()
+	if len(dsw.count.error) == 0 {
+		dsw.count.error = err
+	}
+	dsw.lock.Unlock()
+
+	dsw.DesiredStateOfWorld.AddErrorToPod(podName, err)
+}
+
+// the following methods are intended to be called by the test
+func (dsw *trackingAddPodToVolume) visit(f func(r recorded)) {
+	dsw.lock.Lock()
+	defer dsw.lock.Unlock()
+	f(dsw.count)
+}
+
+func (dsw *trackingAddPodToVolume) reset() {
+	dsw.lock.Lock()
+	defer dsw.lock.Unlock()
+	dsw.count = recorded{}
 }
