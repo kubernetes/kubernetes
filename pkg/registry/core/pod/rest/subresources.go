@@ -111,8 +111,12 @@ func (r *AttachREST) Destroy() {
 
 // Connect returns a handler for the pod exec proxy
 func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	if err := ensureAuthorizedForVerb(ctx, r.Authorizer, "create"); err != nil {
-		return nil, err
+	// Forces a authz check for "create", if feature gate enabled.
+	// See: https://github.com/kubernetes/kubernetes/issues/133515
+	if utilfeature.DefaultFeatureGate.Enabled(features.AuthorizePodWebsocketUpgradeCreatePermission) {
+		if err := ensureAuthorizedForVerb(ctx, r.Authorizer, "create"); err != nil {
+			return nil, err
+		}
 	}
 
 	attachOpts, ok := opts.(*api.PodAttachOptions)
@@ -173,8 +177,12 @@ func (r *ExecREST) Destroy() {
 
 // Connect returns a handler for the pod exec proxy
 func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	if err := ensureAuthorizedForVerb(ctx, r.Authorizer, "create"); err != nil {
-		return nil, err
+	// Forces a authz check for "create", if feature gate enabled.
+	// See: https://github.com/kubernetes/kubernetes/issues/133515
+	if utilfeature.DefaultFeatureGate.Enabled(features.AuthorizePodWebsocketUpgradeCreatePermission) {
+		if err := ensureAuthorizedForVerb(ctx, r.Authorizer, "create"); err != nil {
+			return nil, err
+		}
 	}
 
 	execOpts, ok := opts.(*api.PodExecOptions)
@@ -246,8 +254,12 @@ func (r *PortForwardREST) ConnectMethods() []string {
 
 // Connect returns a handler for the pod portforward proxy
 func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	if err := ensureAuthorizedForVerb(ctx, r.Authorizer, "create"); err != nil {
-		return nil, err
+	// Forces a authz check for "create", if feature gate enabled.
+	// See: https://github.com/kubernetes/kubernetes/issues/133515
+	if utilfeature.DefaultFeatureGate.Enabled(features.AuthorizePodWebsocketUpgradeCreatePermission) {
+		if err := ensureAuthorizedForVerb(ctx, r.Authorizer, "create"); err != nil {
+			return nil, err
+		}
 	}
 
 	portForwardOpts, ok := opts.(*api.PodPortForwardOptions)
