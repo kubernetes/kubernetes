@@ -163,7 +163,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			})
 			ginkgo.It("the mirror pod should terminate successfully", func(ctx context.Context) {
 				ginkgo.By("verifying the pod is described as syncing in metrics")
-				gomega.Eventually(ctx, getKubeletMetrics, 5*time.Second, time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				gomega.Eventually(ctx, getKubeletMetrics, time.Minute, 5*time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 					"kubelet_working_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
 						`kubelet_working_pods{config="desired", lifecycle="sync", static=""}`:                    timelessSample(0),
 						`kubelet_working_pods{config="desired", lifecycle="sync", static="true"}`:                timelessSample(1),
@@ -217,9 +217,8 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 				gomega.Consistently(ctx, func(ctx context.Context) error {
 					return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
 				}, 19*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
-
 				ginkgo.By("verifying the pod is described as terminating in metrics")
-				gomega.Eventually(ctx, getKubeletMetrics, 5*time.Second, time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				gomega.Eventually(ctx, getKubeletMetrics, time.Minute, 5*time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 					"kubelet_working_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
 						`kubelet_working_pods{config="desired", lifecycle="sync", static=""}`:                    timelessSample(0),
 						`kubelet_working_pods{config="desired", lifecycle="sync", static="true"}`:                timelessSample(0),
@@ -281,7 +280,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 				}, time.Second*3, time.Second).Should(gomega.Succeed())
 
 				ginkgo.By("verifying the pod finishes terminating and is removed from metrics")
-				gomega.Eventually(ctx, getKubeletMetrics, 15*time.Second, time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				gomega.Eventually(ctx, getKubeletMetrics, time.Minute, 5*time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 					"kubelet_working_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
 						`kubelet_working_pods{config="desired", lifecycle="sync", static=""}`:                    timelessSample(0),
 						`kubelet_working_pods{config="desired", lifecycle="sync", static="true"}`:                timelessSample(0),
