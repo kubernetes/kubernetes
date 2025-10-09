@@ -23,7 +23,6 @@ import (
 	fmt "fmt"
 
 	io "io"
-	"sort"
 
 	v1 "k8s.io/api/authentication/v1"
 	v11 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +30,7 @@ import (
 
 	math_bits "math/bits"
 	reflect "reflect"
+	"sort"
 	strings "strings"
 
 	k8s_io_apimachinery_pkg_types "k8s.io/apimachinery/pkg/types"

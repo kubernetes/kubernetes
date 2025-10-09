@@ -23,12 +23,12 @@ import (
 	fmt "fmt"
 
 	io "io"
-	"sort"
 
 	runtime "k8s.io/apimachinery/pkg/runtime"
 
 	math_bits "math/bits"
 	reflect "reflect"
+	"sort"
 	strings "strings"
 	time "time"
 

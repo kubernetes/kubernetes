@@ -23,12 +23,12 @@ import (
 	fmt "fmt"
 
 	io "io"
-	"sort"
 
 	v11 "k8s.io/api/authorization/v1"
 
 	math_bits "math/bits"
 	reflect "reflect"
+	"sort"
 	strings "strings"
 )
 

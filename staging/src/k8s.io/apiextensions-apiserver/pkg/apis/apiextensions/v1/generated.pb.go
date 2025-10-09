@@ -24,13 +24,13 @@ import (
 	fmt "fmt"
 
 	io "io"
-	"sort"
 
 	runtime "k8s.io/apimachinery/pkg/runtime"
 
 	math "math"
 	math_bits "math/bits"
 	reflect "reflect"
+	"sort"
 	strings "strings"
 
 	k8s_io_apimachinery_pkg_types "k8s.io/apimachinery/pkg/types"
