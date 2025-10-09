@@ -177,7 +177,7 @@ func rewriteGogoSortImport(decl ast.Decl) (string, bool) {
 	}
 	for _, s := range t.Specs {
 		if spec, ok := s.(*ast.ImportSpec); ok {
-			if spec.Path != nil && spec.Path.Value == `"github.com/gogo/protobuf/sortkeys"` {
+			if spec.Path != nil && (spec.Path.Value == `"github.com/gogo/protobuf/sortkeys"` || spec.Path.Value == `"k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/sortkeys"`) {
 				// switch gogo sort to stdlib sort
 				spec.Path.Value = `"sort"`
 				oldName := "sortkeys"
