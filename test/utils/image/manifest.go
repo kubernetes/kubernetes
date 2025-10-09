@@ -33,7 +33,6 @@ import (
 
 // RegistryList holds public and private image registries
 type RegistryList struct {
-	GcAuthenticatedRegistry  string `yaml:"gcAuthenticatedRegistry"`
 	PromoterE2eRegistry      string `yaml:"promoterE2eRegistry"`
 	BuildImageRegistry       string `yaml:"buildImageRegistry"`
 	InvalidRegistry          string `yaml:"invalidRegistry"`
@@ -389,8 +388,6 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 		registryAndUser = reg.PromoterE2eRegistry
 	case initRegistry.BuildImageRegistry:
 		registryAndUser = reg.BuildImageRegistry
-	case initRegistry.GcAuthenticatedRegistry:
-		registryAndUser = reg.GcAuthenticatedRegistry
 	case initRegistry.DockerLibraryRegistry:
 		registryAndUser = reg.DockerLibraryRegistry
 	case initRegistry.CloudProviderGcpRegistry:
