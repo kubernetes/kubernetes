@@ -101,7 +101,7 @@ ALLOWED_NOTREADY_NODES=${ALLOWED_NOTREADY_NODES:-$(($(get-num-nodes) / 100))}
 # By default, the latest image from the image family will be used unless an
 # explicit image will be set.
 GCI_VERSION=${KUBE_GCI_VERSION:-}
-IMAGE_FAMILY=${KUBE_IMAGE_FAMILY:-cos-109-lts}
+IMAGE_FAMILY=${KUBE_IMAGE_FAMILY:-cos-121-lts}
 export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 export MASTER_IMAGE_FAMILY=${KUBE_GCE_MASTER_IMAGE_FAMILY:-${IMAGE_FAMILY}}
 export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
