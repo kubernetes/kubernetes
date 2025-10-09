@@ -106,6 +106,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable"), 9, 8).WithOrigin("maxItems"),
 			},
 		},
+		"invalid firstAvailable, duplicate name": {
+			input: mkValidResourceClaim(tweakDuplicateFirstAvailableName("sub-0")),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(1), "sub-0"),
+			},
+		},
 		"invalid selectors, too many": {
 			input: mkValidResourceClaim(tweakExactlySelectors(33)),
 			expectedErrs: field.ErrorList{
@@ -271,6 +277,24 @@ func tweakDevicesRequests(items int) func(*resource.ResourceClaim) {
 func tweakDuplicateRequestName(name string) func(*resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests, mkDeviceRequest(name))
+	}
+}
+
+func tweakDuplicateFirstAvailableName(name string) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Spec.Devices.Requests[0].Exactly = nil
+		rc.Spec.Devices.Requests[0].FirstAvailable = []resource.DeviceSubRequest{
+			{
+				Name:            name,
+				DeviceClassName: "class",
+				AllocationMode:  resource.DeviceAllocationModeAll,
+			},
+			{
+				Name:            name,
+				DeviceClassName: "class",
+				AllocationMode:  resource.DeviceAllocationModeAll,
+			},
+		}
 	}
 }
 
