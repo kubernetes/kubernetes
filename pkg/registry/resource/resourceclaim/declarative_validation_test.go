@@ -138,7 +138,81 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid config requests, max allowed": {
 			input: mkValidResourceClaim(tweakConfigRequests(32)),
 		},
-		// TODO: Add more test cases
+		"valid DeviceAllocationMode - All": {
+			input: mkValidResourceClaim(tweakAllocationMode(resource.DeviceAllocationModeAll, 0)),
+		},
+		"invalid DeviceAllocationMode - Exactly": {
+			input: mkValidResourceClaim(tweakAllocationMode("InvalidMode", 1)),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "allocationMode"),
+					resource.DeviceAllocationMode("InvalidMode"),
+					[]string{"All", "ExactCount"},
+				).WithOrigin("enum"),
+			},
+		},
+		"valid DeviceAllocationMode - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailableAllocationMode(resource.DeviceAllocationModeAll, 0)),
+		},
+		"invalid DeviceAllocationMode - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailableAllocationMode("InvalidMode", 1)),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("allocationMode"),
+					resource.DeviceAllocationMode("InvalidMode"),
+					[]string{"All", "ExactCount"},
+				).WithOrigin("enum"),
+			},
+		},
+		"valid DeviceTolerationOperator/Effect - Exactly": {
+			input: mkValidResourceClaim(tweakTolerations(resource.DeviceTolerationOpEqual, resource.DeviceTaintEffectNoSchedule)),
+		},
+		// "valid DeviceTolerationOperator/Effect (empty effect) - Exactly": {
+		// 	input: mkValidResourceClaim(tweakTolerations(resource.DeviceTolerationOpExists, "")),
+		// },
+		"invalid DeviceTolerationOperator - Exactly": {
+			input: mkValidResourceClaim(tweakTolerations("InvalidOp", resource.DeviceTaintEffectNoSchedule)),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("operator"),
+					resource.DeviceTolerationOperator("InvalidOp"),
+					[]string{"Equal", "Exists"},
+				).WithOrigin("enum"),
+			},
+		},
+		"invalid DeviceTaintEffect - Exactly": {
+			input: mkValidResourceClaim(tweakTolerations(resource.DeviceTolerationOpEqual, "InvalidEffect")),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("effect"),
+					resource.DeviceTaintEffect("InvalidEffect"),
+					[]string{"NoExecute", "NoSchedule"},
+				).WithOrigin("enum"),
+			},
+		},
+		"valid DeviceTolerationOperator/Effect - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailableTolerations(resource.DeviceTolerationOpEqual, resource.DeviceTaintEffectNoSchedule)),
+		},
+		"invalid DeviceTolerationOperator - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailableTolerations("InvalidOp", resource.DeviceTaintEffectNoSchedule)),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("operator"),
+					resource.DeviceTolerationOperator("InvalidOp"),
+					[]string{"Equal", "Exists"},
+				).WithOrigin("enum"),
+			},
+		},
+		"invalid DeviceTaintEffect - FirstAvailable": {
+			input: mkValidResourceClaim(tweakFirstAvailableTolerations(resource.DeviceTolerationOpEqual, "InvalidEffect")),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("effect"),
+					resource.DeviceTaintEffect("InvalidEffect"),
+					[]string{"NoExecute", "NoSchedule"},
+				).WithOrigin("enum"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -249,6 +323,78 @@ func tweakFirstAvailable(items int) func(*resource.ResourceClaim) {
 	}
 }
 
+func tweakAllocationMode(mode resource.DeviceAllocationMode, count int64) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Requests) > 0 && rc.Spec.Devices.Requests[0].Exactly != nil {
+			rc.Spec.Devices.Requests[0].Exactly.AllocationMode = mode
+			rc.Spec.Devices.Requests[0].Exactly.Count = count
+		}
+	}
+}
+
+func tweakFirstAvailableAllocationMode(mode resource.DeviceAllocationMode, count int64) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Requests) > 0 {
+			// Clear Exactly and set FirstAvailable
+			rc.Spec.Devices.Requests[0].Exactly = nil
+			rc.Spec.Devices.Requests[0].FirstAvailable = []resource.DeviceSubRequest{
+				{
+					Name:            "sub-0",
+					DeviceClassName: "class",
+					AllocationMode:  mode,
+					Count:           count,
+				},
+			}
+		}
+	}
+}
+
+func tweakTolerations(op resource.DeviceTolerationOperator, effect resource.DeviceTaintEffect) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Requests) > 0 && rc.Spec.Devices.Requests[0].Exactly != nil {
+			val := "value"
+			if op == resource.DeviceTolerationOpExists {
+				val = ""
+			}
+			rc.Spec.Devices.Requests[0].Exactly.Tolerations = []resource.DeviceToleration{
+				{
+					Key:      "key",
+					Operator: op,
+					Value:    val,
+					Effect:   effect,
+				},
+			}
+		}
+	}
+}
+
+func tweakFirstAvailableTolerations(op resource.DeviceTolerationOperator, effect resource.DeviceTaintEffect) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Requests) > 0 {
+			// Clear Exactly and set FirstAvailable
+			rc.Spec.Devices.Requests[0].Exactly = nil
+			val := "value"
+			if op == resource.DeviceTolerationOpExists {
+				val = ""
+			}
+			rc.Spec.Devices.Requests[0].FirstAvailable = []resource.DeviceSubRequest{
+				{
+					Name:            "sub-0",
+					DeviceClassName: "class",
+					AllocationMode:  resource.DeviceAllocationModeExactCount,
+					Count:           1,
+					Tolerations: []resource.DeviceToleration{{
+						Key:      "key",
+						Operator: op,
+						Value:    val,
+						Effect:   effect,
+					}},
+				},
+			}
+		}
+	}
+}
+
 func mkDeviceClaimConfiguration() resource.DeviceClaimConfiguration {
 	return resource.DeviceClaimConfiguration{
 		Requests: []string{"req-0"},
@@ -274,7 +420,8 @@ func mkDeviceRequest(name string) resource.DeviceRequest {
 		Name: name,
 		Exactly: &resource.ExactDeviceRequest{
 			DeviceClassName: "class",
-			AllocationMode:  resource.DeviceAllocationModeAll,
+			AllocationMode:  resource.DeviceAllocationModeExactCount,
+			Count:           1,
 		},
 	}
 }
@@ -520,13 +667,7 @@ func mkValidResourceClaim(tweaks ...func(rc *resource.ResourceClaim)) resource.R
 		Spec: resource.ResourceClaimSpec{
 			Devices: resource.DeviceClaim{
 				Requests: []resource.DeviceRequest{
-					{
-						Name: "req-0",
-						Exactly: &resource.ExactDeviceRequest{
-							DeviceClassName: "class",
-							AllocationMode:  resource.DeviceAllocationModeAll,
-						},
-					},
+					mkDeviceRequest("req-0"),
 				},
 			},
 		},
@@ -539,34 +680,16 @@ func mkValidResourceClaim(tweaks ...func(rc *resource.ResourceClaim)) resource.R
 }
 
 func mkResourceClaimWithStatus(tweaks ...func(rc *resource.ResourceClaim)) resource.ResourceClaim {
-	rc := resource.ResourceClaim{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      "valid-claim",
-			Namespace: "default",
-		},
-		Spec: resource.ResourceClaimSpec{
-			Devices: resource.DeviceClaim{
-				Requests: []resource.DeviceRequest{
+	rc := mkValidResourceClaim()
+	rc.Status = resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
 					{
-						Name: "req-0",
-						Exactly: &resource.ExactDeviceRequest{
-							DeviceClassName: "class",
-							AllocationMode:  resource.DeviceAllocationModeAll,
-						},
-					},
-				},
-			},
-		},
-		Status: resource.ResourceClaimStatus{
-			Allocation: &resource.AllocationResult{
-				Devices: resource.DeviceAllocationResult{
-					Results: []resource.DeviceRequestAllocationResult{
-						{
-							Request: "req-0",
-							Driver:  "dra.example.com",
-							Pool:    "pool-0",
-							Device:  "device-0",
-						},
+						Request: "req-0",
+						Driver:  "dra.example.com",
+						Pool:    "pool-0",
+						Device:  "device-0",
 					},
 				},
 			},

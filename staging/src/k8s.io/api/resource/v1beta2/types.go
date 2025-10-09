@@ -650,6 +650,7 @@ type DeviceTaint struct {
 }
 
 // +enum
+// +k8s:enum
 type DeviceTaintEffect string
 
 const (
@@ -865,6 +866,7 @@ type ExactDeviceRequest struct {
 	// requests with unknown modes.
 	//
 	// +optional
+	// +k8s:optional
 	AllocationMode DeviceAllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,3,opt,name=allocationMode"`
 
 	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
@@ -1077,6 +1079,7 @@ const (
 )
 
 // +enum
+// +k8s:enum
 type DeviceAllocationMode string
 
 // Valid [DeviceRequest.CountMode] values.
@@ -1346,6 +1349,7 @@ type DeviceToleration struct {
 // A toleration operator is the set of operators that can be used in a toleration.
 //
 // +enum
+// +k8s:enum
 type DeviceTolerationOperator string
 
 const (
