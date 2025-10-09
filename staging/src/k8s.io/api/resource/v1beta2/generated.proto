@@ -811,6 +811,9 @@ message DeviceRequest {
   // +oneOf=deviceRequestType
   // +listType=atomic
   // +featureGate=DRAPrioritizedList
+  // +k8s:listType=atomic
+  // +k8s:unique=map
+  // +k8s:listMapKey=name
   // +k8s:maxItems=8
   repeated DeviceSubRequest firstAvailable = 3;
 }

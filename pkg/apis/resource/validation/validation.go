@@ -218,7 +218,7 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 			func(subRequest resource.DeviceSubRequest) string {
 				return subRequest.Name
 			},
-			fldPath.Child("firstAvailable"), sizeCovered)...)
+			fldPath.Child("firstAvailable"), sizeCovered, uniquenessCovered)...)
 	case hasExactly:
 		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, fldPath.Child("exactly"), stored)...)
 	}
