@@ -82,6 +82,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("spec", "devices", "requests"), 33, 32).WithOrigin("maxItems"),
 			},
 		},
+		"invalid requests, duplicate name": {
+			input: mkValidResourceClaim(tweakDuplicateRequestName("req-0")),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(1), "req-0"),
+			},
+		},
 		"invalid constraints, too many": {
 			input: mkValidResourceClaim(tweakDevicesConstraints(33)),
 			expectedErrs: field.ErrorList{
@@ -259,6 +265,12 @@ func tweakDevicesRequests(items int) func(*resource.ResourceClaim) {
 		for i := 1; i < items; i++ {
 			rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests, mkDeviceRequest(fmt.Sprintf("req-%d", i)))
 		}
+	}
+}
+
+func tweakDuplicateRequestName(name string) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests, mkDeviceRequest(name))
 	}
 }
 
