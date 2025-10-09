@@ -56,17 +56,18 @@ const (
 // the Node Conformance test suite).
 //
 // This function returns:
+// - the node-local address of the registry
 // - set of node names that the registry runs on, mostly useful only in the podOnly case
 // - an error
 //
 // TODO: once https://github.com/kubernetes/kubernetes/issues/132955 is
 // addressed, we might be able to proxy a single endpoint from the cluster to each
 // node's localhost port instead of using DaemonSets.
-func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) ([]string, error) {
+func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) (string, []string, error) {
 	podTestLabel := "test-registry-pod-" + f.UniqueName
 	pod, err := podManifest(podTestLabel)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	if podOnly {
@@ -81,31 +82,31 @@ func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) ([
 
 		daemonset, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ctx, daemonset, metav1.CreateOptions{})
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 
 		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 120*time.Second, true, func(ctx context.Context) (done bool, err error) {
 			return e2edaemonset.CheckRunningOnAllNodes(ctx, f, daemonset)
 		})
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 	}
 
 	pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "kube-e2e=" + podTestLabel})
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	podNodes := make([]string, 0, len(pods.Items))
 	for _, pod := range pods.Items {
 		podNodes = append(podNodes, pod.Spec.NodeName)
 	}
 
-	return podNodes, nil
+	return "localhost:5000", podNodes, nil
 }
 
 func podManifest(podTestLabel string) (*v1.Pod, error) {
-	pod, err := test.GetMinimalValidLinuxPod(api.LevelRestricted, api.MajorMinorVersion(1, 22))
+	pod, err := test.GetMinimalValidPod(api.LevelRestricted, api.MajorMinorVersion(1, 25))
 	if err != nil {
 		return nil, err
 	}

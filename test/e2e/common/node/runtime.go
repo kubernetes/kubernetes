@@ -19,7 +19,6 @@ package node
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"path"
 	"time"
@@ -260,15 +259,16 @@ while true; do sleep 1; done
 		})
 
 		framework.Context("when running a container with a new image", framework.WithSerial(), func() {
-			var registrySetup bool
-			registryAddress := net.JoinHostPort("localhost", "5000")
+			var registryAddress string
 			ginkgo.BeforeEach(func(ctx context.Context) {
-				_, err := e2eregistry.SetupRegistry(ctx, f, false)
+				var err error
+
+				registryAddress, _, err = e2eregistry.SetupRegistry(ctx, f, false)
 				framework.ExpectNoError(err)
 			})
 
 			ginkgo.AfterEach(func(ctx context.Context) {
-				if !registrySetup {
+				if len(registryAddress) == 0 {
 					return
 				}
 				f.DeleteNamespace(ctx, f.Namespace.Name) // we need to wait for the registry to be removed and so we need to delete the whole NS early (before the actual cleanup)
