@@ -391,8 +391,14 @@ function kube::build::clean() {
 
   if [[ -d "${LOCAL_OUTPUT_ROOT}" ]]; then
     kube::log::status "Removing _output directory"
-    # this ensures we can clean _output/local/go/cache which is not rw by default
-    chmod -R +w "${LOCAL_OUTPUT_ROOT}"
+    # This ensures we can clean _output/local/go/cache which is not rw by default.
+    #
+    # We only do this path specifically instead of the entire output root
+    # because recursive chmod is slow.
+    # We don't need to do this at all for dockerized builds
+    if [[ -d "${LOCAL_OUTPUT_ROOT}/local/go/cache" ]]; then
+      chmod -R +w "${LOCAL_OUTPUT_ROOT}/local/go/cache"
+    fi
     rm -rf "${LOCAL_OUTPUT_ROOT}"
   fi
 }
