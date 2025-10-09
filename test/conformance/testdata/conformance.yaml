@@ -2874,6 +2874,14 @@
     lifecycle of a container.
   release: v1.19
   file: test/e2e/common/node/expansion.go
+- testname: Image Volume
+  codename: '[sig-node] [Conformance] ImageVolume should succeed with pod and pull
+    policy of Always [Conformance]'
+  description: Create a Pod using an image volume and a pull policy of Always. This
+    test verifies that the image volume functionality is available by default and
+    works as intended.
+  release: v1.35
+  file: test/e2e/common/node/image_volume.go
 - testname: CRUD operations for deviceclasses
   codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 DeviceClass [Conformance]'
   description: kube-apiserver must support create/update/list/patch/delete operations
