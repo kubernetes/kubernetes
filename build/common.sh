@@ -168,11 +168,6 @@ kube::build::get_docker_wrapped_binaries() {
 #   KUBE_BUILD_IMAGE
 #   KUBE_BUILD_CONTAINER_NAME_BASE
 #   KUBE_BUILD_CONTAINER_NAME
-#   KUBE_DATA_CONTAINER_NAME_BASE
-#   KUBE_DATA_CONTAINER_NAME
-#   KUBE_RSYNC_CONTAINER_NAME_BASE
-#   KUBE_RSYNC_CONTAINER_NAME
-#   DOCKER_MOUNT_ARGS
 #   LOCAL_OUTPUT_BUILD_CONTEXT
 function kube::build::setup_vars() {
   KUBE_GIT_BRANCH=$(git symbolic-ref --short -q HEAD 2>/dev/null || true)
@@ -182,11 +177,6 @@ function kube::build::setup_vars() {
   KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
   KUBE_BUILD_CONTAINER_NAME_BASE="kube-build-${KUBE_ROOT_HASH}"
   KUBE_BUILD_CONTAINER_NAME="${KUBE_BUILD_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  KUBE_RSYNC_CONTAINER_NAME_BASE="kube-rsync-${KUBE_ROOT_HASH}"
-  KUBE_RSYNC_CONTAINER_NAME="${KUBE_RSYNC_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  KUBE_DATA_CONTAINER_NAME_BASE="kube-build-data-${KUBE_ROOT_HASH}"
-  KUBE_DATA_CONTAINER_NAME="${KUBE_DATA_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  DOCKER_MOUNT_ARGS=(--volumes-from "${KUBE_DATA_CONTAINER_NAME}")
   LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
 }
 
@@ -202,11 +192,6 @@ function kube::build::setup_vars() {
 #   KUBE_BUILD_IMAGE
 #   KUBE_BUILD_CONTAINER_NAME_BASE
 #   KUBE_BUILD_CONTAINER_NAME
-#   KUBE_DATA_CONTAINER_NAME_BASE
-#   KUBE_DATA_CONTAINER_NAME
-#   KUBE_RSYNC_CONTAINER_NAME_BASE
-#   KUBE_RSYNC_CONTAINER_NAME
-#   DOCKER_MOUNT_ARGS
 #   LOCAL_OUTPUT_BUILD_CONTEXT
 # shellcheck disable=SC2120 # optional parameters
 function kube::build::verify_prereqs() {
@@ -401,8 +386,6 @@ function kube::build::destroy_container() {
 function kube::build::clean() {
   if kube::build::has_docker ; then
     kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}"
-    kube::build::docker_delete_old_containers "${KUBE_RSYNC_CONTAINER_NAME_BASE}"
-    kube::build::docker_delete_old_containers "${KUBE_DATA_CONTAINER_NAME_BASE}"
     kube::build::docker_delete_old_images "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG_BASE}"
 
     V=2 kube::log::status "Cleaning all untagged docker images"
@@ -445,7 +428,6 @@ function kube::build::run_build_command_ex() {
     "--user=$(id -u):$(id -g)"
     "--hostname=${HOSTNAME}"
     "-e=GOPROXY=${GOPROXY}"
-    #"${DOCKER_MOUNT_ARGS[@]}"
   )
 
   local detach=false
