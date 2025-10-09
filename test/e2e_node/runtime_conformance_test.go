@@ -42,8 +42,6 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	ginkgo.Describe("container runtime conformance blackbox test", func() {
 
 		ginkgo.Context("when running a container with a new image", func() {
-			registryAddress := "localhost:5000"
-			auth := e2eregistry.User1DockerSecret(registryAddress).Data[v1.DockerConfigJsonKey]
 			// The following images are not added into NodePrePullImageList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
 			// is v1.PullAlways, so it won't be blocked by framework image pre-pull list check.
@@ -56,25 +54,25 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 			}{
 				{
 					description:  "should be able to pull from private registry with credential provider",
-					image:        registryAddress + "/pause:testing",
+					image:        "pause:testing",
 					setupRegisty: true,
 					phase:        v1.PodRunning,
 					waiting:      false,
 				},
 			} {
+				var registryAddress string
 				var podNodes []string
 				ginkgo.BeforeEach(func(ctx context.Context) {
 					var err error
 					if testCase.setupRegisty {
-						podNodes, err = e2eregistry.SetupRegistry(ctx, f, true)
+						registryAddress, podNodes, err = e2eregistry.SetupRegistry(ctx, f, true)
 						framework.ExpectNoError(err)
 					}
 				})
 				ginkgo.AfterEach(func(ctx context.Context) {
-					if !testCase.setupRegisty {
-						return
+					if testCase.setupRegisty {
+						f.DeleteNamespace(ctx, f.Namespace.Name) // we need to wait for the registry to be removed and so we need to delete the whole NS early (before the actual cleanup)
 					}
-					f.DeleteNamespace(ctx, f.Namespace.Name) // we need to wait for the registry to be removed and so we need to delete the whole NS early (before the actual cleanup)
 				})
 
 				f.It(testCase.description+"", f.WithNodeConformance(), func(ctx context.Context) {
@@ -83,7 +81,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 						PodClient: e2epod.NewPodClient(f),
 						Container: v1.Container{
 							Name:  name,
-							Image: testCase.image,
+							Image: registryAddress + "/" + testCase.image,
 							// PullAlways makes sure that the image will always be pulled even if it is present before the test.
 							ImagePullPolicy: v1.PullAlways,
 						},
@@ -93,10 +91,11 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 						container.NodeName = podNodes[0]
 					}
 
+					auth := e2eregistry.User1DockerSecret(registryAddress).Data[v1.DockerConfigJsonKey]
 					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
 					err := os.WriteFile(configFile, []byte(auth), 0644)
 					framework.ExpectNoError(err)
-					defer func() { framework.ExpectNoError(os.Remove(configFile)) }()
+					ginkgo.DeferCleanup(func() { framework.ExpectNoError(os.Remove(configFile)) })
 
 					// checkContainerStatus checks whether the container status matches expectation.
 					checkContainerStatus := func(ctx context.Context) error {
