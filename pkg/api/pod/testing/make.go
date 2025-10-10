@@ -250,6 +250,12 @@ func SetObjectMeta(objectMeta metav1.ObjectMeta) Tweak {
 	}
 }
 
+func SetWorkloadRef(workloadRef *api.WorkloadReference) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.WorkloadRef = workloadRef
+	}
+}
+
 func MakeContainer(name string, tweaks ...TweakContainer) api.Container {
 	cnr := api.Container{
 		Name: name, Image: "image", ImagePullPolicy: "IfNotPresent",
