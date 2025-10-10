@@ -632,6 +632,21 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 				field.Duplicate(field.NewPath("status", "reservedFor").Index(4), ""),
 			},
 		},
+		"invalid status.ReservedFor, too many": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusReservedFor(generateResourceClaimReferences(257)...),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "reservedFor"), 257, 256).WithOrigin("maxItems"),
+			},
+		},
+		"valid status.ReservedFor, max items": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusReservedFor(generateResourceClaimReferences(256)...),
+			),
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -775,6 +790,18 @@ func resourceClaimReference(uid string) resource.ResourceClaimConsumerReference 
 		Resource: "Pod",
 		Name:     "pod-name",
 	}
+}
+
+func generateResourceClaimReferences(count int) []resource.ResourceClaimConsumerReference {
+	refs := make([]resource.ResourceClaimConsumerReference, count)
+	for i := 0; i < count; i++ {
+		refs[i] = resource.ResourceClaimConsumerReference{
+			Resource: "pods",
+			Name:     fmt.Sprintf("pod-%d", i),
+			UID:      types.UID(uuid.New().String()),
+		}
+	}
+	return refs
 }
 
 func tweakStatusReservedFor(refs ...resource.ResourceClaimConsumerReference) func(rc *resource.ResourceClaim) {
