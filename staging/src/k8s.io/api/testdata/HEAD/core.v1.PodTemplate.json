@@ -1831,7 +1831,12 @@
           }
         ]
       },
-      "hostnameOverride": "hostnameOverrideValue"
+      "hostnameOverride": "hostnameOverrideValue",
+      "workloadRef": {
+        "name": "nameValue",
+        "podGroup": "podGroupValue",
+        "podGroupReplicaKey": "podGroupReplicaKeyValue"
+      }
     }
   }
 }
