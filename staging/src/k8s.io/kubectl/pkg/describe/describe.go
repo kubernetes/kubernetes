@@ -887,6 +887,9 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
 		describeTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, w, "")
+		if pod.Spec.Workload != nil {
+			describeWorkload(pod.Spec.Workload, w, "")
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1015,6 +1018,15 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
+	}
+}
+
+func describeWorkload(workload *corev1.WorkloadReference, w PrefixWriter, space string) {
+	w.Write(LEVEL_0, "%sWorkload:\n", space)
+	w.Write(LEVEL_1, "Name:\t%s\n", workload.Name)
+	w.Write(LEVEL_1, "PodGroup:\t%s\n", workload.PodGroup)
+	if workload.PodGroupReplicaIndex != "" {
+		w.Write(LEVEL_1, "PodGroupReplicaIndex:\t%s\n", workload.PodGroupReplicaIndex)
 	}
 }
 
@@ -2248,6 +2260,9 @@ func DescribePodTemplate(template *corev1.PodTemplateSpec, w PrefixWriter) {
 	}
 	printLabelsMultiline(w, "  Node-Selectors", template.Spec.NodeSelector)
 	printPodTolerationsMultiline(w, "  Tolerations", template.Spec.Tolerations)
+	if template.Spec.Workload != nil {
+		describeWorkload(template.Spec.Workload, w, "  ")
+	}
 }
 
 // ReplicaSetDescriber generates information about a ReplicaSet and the pods it has created.
