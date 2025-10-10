@@ -637,7 +637,7 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 		defer close(stopCh)
 		informers.Start(stopCh)
 
-		d := newDeployment(test.deploymentName, 1, nil, nil, nil, map[string]string{"foo": "bar"})
+		d := newDeployment(test.deploymentName, 1, nil, nil, nil, map[string]string{"foo": "baz"})
 
 		if _, err := controller.getNewReplicaSet(ctx, d, []*apps.ReplicaSet{}, []*apps.ReplicaSet{}, true); err != nil {
 			t.Errorf("failed to create new ReplicaSet: %v", err)

@@ -4417,6 +4417,14 @@ type PodSpec struct {
 	// +featureGate=HostnameOverride
 	// +optional
 	HostnameOverride *string `json:"hostnameOverride,omitempty" protobuf:"bytes,41,opt,name=hostnameOverride"`
+	// Workload provides a reference to the Workload object that this Pod belongs to.
+	// This field is used by the scheduler to identify the PodGroup and apply the
+	// correct group scheduling policies.
+	// This field is immutable.
+	//
+	// +featureGate=GenericWorkload
+	// +optional
+	Workload *WorkloadReference `json:"workload,omitempty" protobuf:"bytes,42,opt,name=workload"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly
@@ -4526,6 +4534,31 @@ type PodSchedulingGate struct {
 	// Name of the scheduling gate.
 	// Each scheduling gate must have a unique name field.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+}
+
+// WorkloadReference identifies the Workload object and PodGroup membership
+// that a Pod belongs to. The scheduler uses this information to apply
+// workload-aware scheduling semantics.
+type WorkloadReference struct {
+	// Name defines the name of the Workload object this pod belongs to.
+	// Workload must be in the same namespace as the pod.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// PodGroup is the name of the PodGroup within the Workload that this pod
+	// belongs to.
+	//
+	// +required
+	PodGroup string `json:"podGroup" protobuf:"bytes,2,opt,name=podGroup"`
+
+	// PodGroupReplicaIndex specifies the replica index of the PodGroup that this
+	// pod belongs to. It is only set when the Workload uses a replicated
+	// scheduling mode. This index differentiates pods belonging to different replicas
+	// of the same PodGroup.
+	//
+	// +optional
+	PodGroupReplicaIndex string `json:"podGroupReplicaIndex,omitempty" protobuf:"bytes,3,opt,name=podGroupReplicaIndex"`
 }
 
 // +enum
