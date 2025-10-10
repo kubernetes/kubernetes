@@ -323,6 +323,18 @@ var ValidateResourceClaimName = apimachineryvalidation.NameIsDNSSubdomain
 // name for a ResourceClaimTemplate is valid.
 var ValidateResourceClaimTemplateName = apimachineryvalidation.NameIsDNSSubdomain
 
+// ValidateWorkloadName can be used to check whether the given
+// name for a Workload is valid.
+var ValidateWorkloadName = apimachineryvalidation.NameIsDNSSubdomain
+
+// ValidatePodGroupName can be used to check whether the given
+// name for a PodGroup is valid.
+var ValidatePodGroupName = apimachineryvalidation.NameIsDNSLabel
+
+// ValidatePodGroupReplicaKey can be used to check whether the given
+// PodGroupReplicaKey is valid.
+var ValidatePodGroupReplicaKey = apimachineryvalidation.NameIsDNSLabel
+
 // ValidateRuntimeClassName can be used to check whether the given RuntimeClass name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
@@ -4643,6 +4655,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 		case spec.OS.Name == core.Windows:
 			allErrs = append(allErrs, validateWindows(spec, fldPath)...)
 		}
+	}
+
+	if spec.Workload != nil {
+		allErrs = append(allErrs, validateWorkloadReference(spec.Workload, fldPath.Child("workload"))...)
 	}
 
 	allErrs = append(allErrs, validateFileKeyRefVolumes(spec, fldPath)...)
@@ -9317,4 +9333,20 @@ func validateNodeSwapStatus(nodeSwapStatus *core.NodeSwapStatus, fldPath *field.
 	}
 
 	return allErrors
+}
+
+func validateWorkloadReference(workload *core.WorkloadReference, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, detail := range ValidateWorkloadName(workload.Name, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), workload.Name, detail))
+	}
+	for _, detail := range ValidatePodGroupName(workload.PodGroup, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("podGroup"), workload.PodGroup, detail))
+	}
+	if workload.PodGroupReplicaKey != "" {
+		for _, detail := range ValidatePodGroupReplicaKey(workload.PodGroupReplicaKey, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("podGroupReplicaKey"), workload.PodGroupReplicaKey, detail))
+		}
+	}
+	return allErrs
 }
