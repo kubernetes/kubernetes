@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/tools/cache"
+	fcache "k8s.io/client-go/tools/cache/testing"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/client-go/util/watchlist"
 	"k8s.io/kubectl/pkg/util/interrupt"
 )
 
@@ -136,7 +136,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 
 	mapping := info.ResourceMapping() // used to pass back meaningful errors if object disappears
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-	lw := &cache.ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
 			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
@@ -145,8 +145,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 			options.FieldSelector = fieldSelector
 			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
 		},
-		UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(o.DynamicClient),
-	}
+	})
 
 	// this function is used to refresh the cache to prevent timeout waits on resources that have disappeared
 	preconditionFunc := func(store cache.Store) (bool, error) {
