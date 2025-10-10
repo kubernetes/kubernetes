@@ -169,7 +169,17 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 		//   slowing down all tracing consumers.
 		// - Logging code may be instrumented with tracing and deadlock because it could try
 		//   acquiring the same non-reentrant mutex.
-		global.Info("Tracer created", "name", name, "version", is.Version, "schemaURL", is.SchemaURL, "attributes", is.Attributes)
+		global.Info(
+			"Tracer created",
+			"name",
+			name,
+			"version",
+			is.Version,
+			"schemaURL",
+			is.SchemaURL,
+			"attributes",
+			is.Attributes,
+		)
 	}
 	return t
 }

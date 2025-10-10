@@ -319,6 +319,7 @@ const (
 	AUDIT_INTEGRITY_POLICY_RULE                 = 0x70f
 	AUDIT_INTEGRITY_RULE                        = 0x70d
 	AUDIT_INTEGRITY_STATUS                      = 0x70a
+	AUDIT_INTEGRITY_USERSPACE                   = 0x710
 	AUDIT_IPC                                   = 0x517
 	AUDIT_IPC_SET_PERM                          = 0x51f
 	AUDIT_IPE_ACCESS                            = 0x58c
@@ -843,9 +844,9 @@ const (
 	DM_UUID_FLAG                                = 0x4000
 	DM_UUID_LEN                                 = 0x81
 	DM_VERSION                                  = 0xc138fd00
-	DM_VERSION_EXTRA                            = "-ioctl (2023-03-01)"
+	DM_VERSION_EXTRA                            = "-ioctl (2025-01-17)"
 	DM_VERSION_MAJOR                            = 0x4
-	DM_VERSION_MINOR                            = 0x30
+	DM_VERSION_MINOR                            = 0x31
 	DM_VERSION_PATCHLEVEL                       = 0x0
 	DT_BLK                                      = 0x6
 	DT_CHR                                      = 0x2
@@ -941,6 +942,8 @@ const (
 	ETHER_FLOW                                  = 0x12
 	ETHTOOL_BUSINFO_LEN                         = 0x20
 	ETHTOOL_EROMVERS_LEN                        = 0x20
+	ETHTOOL_FAMILY_NAME                         = "ethtool"
+	ETHTOOL_FAMILY_VERSION                      = 0x1
 	ETHTOOL_FEC_AUTO                            = 0x2
 	ETHTOOL_FEC_BASER                           = 0x10
 	ETHTOOL_FEC_LLRS                            = 0x20
@@ -1203,6 +1206,9 @@ const (
 	FAN_DENY                                    = 0x2
 	FAN_ENABLE_AUDIT                            = 0x40
 	FAN_EPIDFD                                  = -0x2
+	FAN_ERRNO_BITS                              = 0x8
+	FAN_ERRNO_MASK                              = 0xff
+	FAN_ERRNO_SHIFT                             = 0x18
 	FAN_EVENT_INFO_TYPE_DFID                    = 0x3
 	FAN_EVENT_INFO_TYPE_DFID_NAME               = 0x2
 	FAN_EVENT_INFO_TYPE_ERROR                   = 0x5
@@ -1210,6 +1216,7 @@ const (
 	FAN_EVENT_INFO_TYPE_NEW_DFID_NAME           = 0xc
 	FAN_EVENT_INFO_TYPE_OLD_DFID_NAME           = 0xa
 	FAN_EVENT_INFO_TYPE_PIDFD                   = 0x4
+	FAN_EVENT_INFO_TYPE_RANGE                   = 0x6
 	FAN_EVENT_METADATA_LEN                      = 0x18
 	FAN_EVENT_ON_CHILD                          = 0x8000000
 	FAN_FS_ERROR                                = 0x8000
@@ -1240,6 +1247,7 @@ const (
 	FAN_OPEN_EXEC                               = 0x1000
 	FAN_OPEN_EXEC_PERM                          = 0x40000
 	FAN_OPEN_PERM                               = 0x10000
+	FAN_PRE_ACCESS                              = 0x100000
 	FAN_Q_OVERFLOW                              = 0x4000
 	FAN_RENAME                                  = 0x10000000
 	FAN_REPORT_DFID_NAME                        = 0xc00
@@ -2787,7 +2795,7 @@ const (
 	RTAX_UNSPEC                                 = 0x0
 	RTAX_WINDOW                                 = 0x3
 	RTA_ALIGNTO                                 = 0x4
-	RTA_MAX                                     = 0x1e
+	RTA_MAX                                     = 0x1f
 	RTCF_DIRECTSRC                              = 0x4000000
 	RTCF_DOREDIRECT                             = 0x1000000
 	RTCF_LOG                                    = 0x2000000
@@ -2864,10 +2872,12 @@ const (
 	RTM_DELACTION                               = 0x31
 	RTM_DELADDR                                 = 0x15
 	RTM_DELADDRLABEL                            = 0x49
+	RTM_DELANYCAST                              = 0x3d
 	RTM_DELCHAIN                                = 0x65
 	RTM_DELLINK                                 = 0x11
 	RTM_DELLINKPROP                             = 0x6d
 	RTM_DELMDB                                  = 0x55
+	RTM_DELMULTICAST                            = 0x39
 	RTM_DELNEIGH                                = 0x1d
 	RTM_DELNETCONF                              = 0x51
 	RTM_DELNEXTHOP                              = 0x69
@@ -2917,11 +2927,13 @@ const (
 	RTM_NEWACTION                               = 0x30
 	RTM_NEWADDR                                 = 0x14
 	RTM_NEWADDRLABEL                            = 0x48
+	RTM_NEWANYCAST                              = 0x3c
 	RTM_NEWCACHEREPORT                          = 0x60
 	RTM_NEWCHAIN                                = 0x64
 	RTM_NEWLINK                                 = 0x10
 	RTM_NEWLINKPROP                             = 0x6c
 	RTM_NEWMDB                                  = 0x54
+	RTM_NEWMULTICAST                            = 0x38
 	RTM_NEWNDUSEROPT                            = 0x44
 	RTM_NEWNEIGH                                = 0x1c
 	RTM_NEWNEIGHTBL                             = 0x40
@@ -2987,11 +2999,12 @@ const (
 	RUSAGE_THREAD                               = 0x1
 	RWF_APPEND                                  = 0x10
 	RWF_ATOMIC                                  = 0x40
+	RWF_DONTCACHE                               = 0x80
 	RWF_DSYNC                                   = 0x2
 	RWF_HIPRI                                   = 0x1
 	RWF_NOAPPEND                                = 0x20
 	RWF_NOWAIT                                  = 0x8
-	RWF_SUPPORTED                               = 0x7f
+	RWF_SUPPORTED                               = 0xff
 	RWF_SYNC                                    = 0x4
 	RWF_WRITE_LIFE_NOT_SET                      = 0x0
 	SCHED_BATCH                                 = 0x3
@@ -3271,6 +3284,7 @@ const (
 	STATX_BTIME                                 = 0x800
 	STATX_CTIME                                 = 0x80
 	STATX_DIOALIGN                              = 0x2000
+	STATX_DIO_READ_ALIGN                        = 0x20000
 	STATX_GID                                   = 0x10
 	STATX_INO                                   = 0x100
 	STATX_MNT_ID                                = 0x1000
@@ -3322,7 +3336,7 @@ const (
 	TASKSTATS_GENL_NAME                         = "TASKSTATS"
 	TASKSTATS_GENL_VERSION                      = 0x1
 	TASKSTATS_TYPE_MAX                          = 0x6
-	TASKSTATS_VERSION                           = 0xe
+	TASKSTATS_VERSION                           = 0xf
 	TCIFLUSH                                    = 0x0
 	TCIOFF                                      = 0x2
 	TCIOFLUSH                                   = 0x2
@@ -3503,6 +3517,7 @@ const (
 	TP_STATUS_WRONG_FORMAT                      = 0x4
 	TRACEFS_MAGIC                               = 0x74726163
 	TS_COMM_LEN                                 = 0x20
+	UBI_IOCECNFO                                = 0xc01c6f06
 	UDF_SUPER_MAGIC                             = 0x15013346
 	UDP_CORK                                    = 0x1
 	UDP_ENCAP                                   = 0x64

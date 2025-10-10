@@ -41,7 +41,6 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
-	_ "google.golang.org/grpc/xds"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"

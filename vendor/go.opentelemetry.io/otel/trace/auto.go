@@ -20,7 +20,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.34.0"
 	"go.opentelemetry.io/otel/trace/embedded"
 	"go.opentelemetry.io/otel/trace/internal/telemetry"
 )
@@ -57,14 +57,15 @@ type autoTracer struct {
 var _ Tracer = autoTracer{}
 
 func (t autoTracer) Start(ctx context.Context, name string, opts ...SpanStartOption) (context.Context, Span) {
-	var psc SpanContext
+	var psc, sc SpanContext
 	sampled := true
 	span := new(autoSpan)
 
 	// Ask eBPF for sampling decision and span context info.
-	t.start(ctx, span, &psc, &sampled, &span.spanContext)
+	t.start(ctx, span, &psc, &sampled, &sc)
 
 	span.sampled.Store(sampled)
+	span.spanContext = sc
 
 	ctx = ContextWithSpan(ctx, span)
 
