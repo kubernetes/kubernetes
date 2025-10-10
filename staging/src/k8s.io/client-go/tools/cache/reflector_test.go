@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	fcache "k8s.io/client-go/tools/cache/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -686,7 +687,7 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 		watchRet, watchErr := item.events, item.watchErr
 		_, ctx := ktesting.NewTestContext(t)
 		ctx, cancel := context.WithCancelCause(ctx)
-		lw := &ListWatch{
+		lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if watchErr != nil {
 					return nil, watchErr
@@ -710,8 +711,7 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return item.list, item.listErr
 			},
-			UnsupportedWatchListSemantics: true,
-		}
+		})
 		r := NewReflector(lw, &v1.Pod{}, s, 0)
 		err := r.ListAndWatchWithContext(ctx)
 		if item.listErr != nil && !errors.Is(err, item.listErr) {
@@ -992,7 +992,7 @@ func TestReflectorResync(t *testing.T) {
 		},
 	}
 
-	lw := &ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			fw := watch.NewFake()
 			return fw, nil
@@ -1000,8 +1000,7 @@ func TestReflectorResync(t *testing.T) {
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "0"}}, nil
 		},
-		UnsupportedWatchListSemantics: true,
-	}
+	})
 	resyncPeriod := 1 * time.Millisecond
 	r := NewReflector(lw, &v1.Pod{}, s, resyncPeriod)
 	if err := r.ListAndWatchWithContext(ctx); err != nil {
@@ -1018,7 +1017,7 @@ func TestReflectorWatchListPageSize(t *testing.T) {
 	ctx, cancel := context.WithCancelCause(ctx)
 	s := NewStore(MetaNamespaceKeyFunc)
 
-	lw := &ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			// Stop once the reflector begins watching since we're only interested in the list.
 			cancel(errors.New("done"))
@@ -1045,8 +1044,7 @@ func TestReflectorWatchListPageSize(t *testing.T) {
 			}
 			return nil, nil
 		},
-		UnsupportedWatchListSemantics: true,
-	}
+	})
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 	// Set resource version to test pagination also for not consistent reads.
 	r.setLastSyncResourceVersion("10")
@@ -1065,7 +1063,7 @@ func TestReflectorNotPaginatingNotConsistentReads(t *testing.T) {
 	ctx, cancel := context.WithCancelCause(ctx)
 	s := NewStore(MetaNamespaceKeyFunc)
 
-	lw := &ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			// Stop once the reflector begins watching since we're only interested in the list.
 			cancel(errors.New("done"))
@@ -1085,8 +1083,7 @@ func TestReflectorNotPaginatingNotConsistentReads(t *testing.T) {
 			}
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods}, nil
 		},
-		UnsupportedWatchListSemantics: true,
-	}
+	})
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 	r.setLastSyncResourceVersion("10")
 	require.NoError(t, r.ListAndWatchWithContext(ctx))
@@ -1102,7 +1099,7 @@ func TestReflectorPaginatingNonConsistentReadsIfWatchCacheDisabled(t *testing.T)
 	var cancel func(error)
 	s := NewStore(MetaNamespaceKeyFunc)
 
-	lw := &ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			// Stop once the reflector begins watching since we're only interested in the list.
 			cancel(errors.New("done"))
@@ -1130,8 +1127,7 @@ func TestReflectorPaginatingNonConsistentReadsIfWatchCacheDisabled(t *testing.T)
 			}
 			return nil, nil
 		},
-		UnsupportedWatchListSemantics: true,
-	}
+	})
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 
 	// Initial list should initialize paginatedResult in the reflector.
@@ -1160,7 +1156,7 @@ func TestReflectorResyncWithResourceVersion(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 	listCallRVs := []string{}
 
-	lw := &ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			// Stop once the reflector begins watching since we're only interested in the list.
 			cancel(errors.New("done"))
@@ -1183,8 +1179,7 @@ func TestReflectorResyncWithResourceVersion(t *testing.T) {
 			}
 			return nil, nil
 		},
-		UnsupportedWatchListSemantics: true,
-	}
+	})
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 
 	// Initial list should use RV=0
@@ -1222,7 +1217,7 @@ func TestReflectorExpiredExactResourceVersion(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 	listCallRVs := []string{}
 
-	lw := &ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			// Stop once the reflector begins watching since we're only interested in the list.
 			cancel(errors.New("done"))
@@ -1248,8 +1243,7 @@ func TestReflectorExpiredExactResourceVersion(t *testing.T) {
 			}
 			return nil, nil
 		},
-		UnsupportedWatchListSemantics: true,
-	}
+	})
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 
 	// Initial list should use RV=0
@@ -1283,7 +1277,7 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 	listCallRVs := []string{}
 
-	lw := &ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			// Stop once the reflector begins watching since we're only interested in the list.
 			cancel(errors.New("done"))
@@ -1318,8 +1312,7 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 				return nil, err
 			}
 		},
-		UnsupportedWatchListSemantics: true,
-	}
+	})
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 	r.WatchListPageSize = 4
 
@@ -1359,7 +1352,7 @@ func TestReflectorFullListIfTooLarge(t *testing.T) {
 	listCallRVs := []string{}
 	version := 30
 
-	lw := &ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			// Stop once the reflector begins watching since we're only interested in the list.
 			cancel(errors.New("done"))
@@ -1396,8 +1389,7 @@ func TestReflectorFullListIfTooLarge(t *testing.T) {
 				return nil, fmt.Errorf("unexpected List call: %s", options.ResourceVersion)
 			}
 		},
-		UnsupportedWatchListSemantics: true,
-	}
+	})
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 
 	// Initial list should use RV=0
@@ -1590,15 +1582,14 @@ func TestReflectorResourceVersionUpdate(t *testing.T) {
 	ctx, cancel := context.WithCancelCause(ctx)
 	fw := watch.NewFake()
 
-	lw := &ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			return fw, nil
 		},
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
 		},
-		UnsupportedWatchListSemantics: true,
-	}
+	})
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 
 	makePod := func(rv string) *v1.Pod {
@@ -2007,7 +1998,7 @@ func TestReflectorReplacesStoreOnUnsafeDelete(t *testing.T) {
 	}
 
 	var once sync.Once
-	lw := &ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			fw := watch.NewFake()
 			go func() {
@@ -2027,8 +2018,7 @@ func TestReflectorReplacesStoreOnUnsafeDelete(t *testing.T) {
 			}
 			return list, nil
 		},
-		UnsupportedWatchListSemantics: true,
-	}
+	})
 
 	r := NewReflector(lw, &v1.Pod{}, store, 0)
 	doneCh, stopCh := make(chan struct{}), make(chan struct{})
