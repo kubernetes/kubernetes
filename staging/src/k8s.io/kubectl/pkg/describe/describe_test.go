@@ -612,6 +612,65 @@ func TestDescribePodRuntimeClass(t *testing.T) {
 	}
 }
 
+func TestDescribePodWorkloadReference(t *testing.T) {
+	testCases := []struct {
+		name     string
+		pod      *corev1.Pod
+		expected string
+	}{
+		{
+			name: "test1",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					WorkloadRef: &corev1.WorkloadReference{
+						Name:     "workload",
+						PodGroup: "pg",
+					},
+				},
+			},
+			expected: `WorkloadRef:
+  Name:      workload
+  PodGroup:  pg`,
+		},
+		{
+			name: "test2",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					WorkloadRef: &corev1.WorkloadReference{
+						Name:               "workload",
+						PodGroup:           "pg",
+						PodGroupReplicaKey: "pg1",
+					},
+				},
+			},
+			expected: `WorkloadRef:
+  Name:                workload
+  PodGroup:            pg
+  PodGroupReplicaKey:  pg1`,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := fake.NewClientset(tc.pod)
+			c := &describeClient{T: t, Interface: fake}
+			d := PodDescriber{c}
+			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if !strings.Contains(out, tc.expected) {
+				t.Errorf("Expected to find %q in output: %q", tc.expected, out)
+			}
+		})
+	}
+}
+
 func TestDescribePriorityClass(t *testing.T) {
 	preemptLowerPriority := corev1.PreemptLowerPriority
 	preemptNever := corev1.PreemptNever
