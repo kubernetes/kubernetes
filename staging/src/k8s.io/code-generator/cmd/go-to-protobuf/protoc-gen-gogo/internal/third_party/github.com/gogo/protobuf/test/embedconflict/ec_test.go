@@ -36,6 +36,9 @@ import (
 )
 
 func TestEmbedConflict(t *testing.T) {
+	if _, err := exec.LookPath("protoc"); err != nil {
+		t.Skip(err)
+	}
 	cmd := exec.Command("protoc", "--gogo_out=.", "-I=../../../../../../../../../../../../:../../protobuf/:.", "ec.proto")
 	data, err := cmd.CombinedOutput()
 	if err == nil && !strings.Contains(string(data), "Plugin failed with status code 1") {
@@ -48,6 +51,9 @@ func TestEmbedConflict(t *testing.T) {
 }
 
 func TestEmbedMarshaler(t *testing.T) {
+	if _, err := exec.LookPath("protoc"); err != nil {
+		t.Skip(err)
+	}
 	cmd := exec.Command("protoc", "--gogo_out=.", "-I=../../../../../../../../../../../..:../../protobuf/:.", "em.proto")
 	data, err := cmd.CombinedOutput()
 	dataStr := string(data)
@@ -61,6 +67,9 @@ func TestEmbedMarshaler(t *testing.T) {
 }
 
 func TestEmbedExtend(t *testing.T) {
+	if _, err := exec.LookPath("protoc"); err != nil {
+		t.Skip(err)
+	}
 	cmd := exec.Command("protoc", "--gogo_out=.", "-I=../../../../../../../../../../../../:../../protobuf/:.", "ee.proto")
 	data, err := cmd.CombinedOutput()
 	if err == nil && !strings.Contains(string(data), "Plugin failed with status code 1") {
@@ -73,6 +82,9 @@ func TestEmbedExtend(t *testing.T) {
 }
 
 func TestCustomName(t *testing.T) {
+	if _, err := exec.LookPath("protoc"); err != nil {
+		t.Skip(err)
+	}
 	cmd := exec.Command("protoc", "--gogo_out=.", "-I=../../../../../../../../../../../../:../../protobuf/:.", "en.proto")
 	data, err := cmd.CombinedOutput()
 	if err == nil && !strings.Contains(string(data), "Plugin failed with status code 1") {
@@ -85,6 +97,9 @@ func TestCustomName(t *testing.T) {
 }
 
 func TestRepeatedEmbed(t *testing.T) {
+	if _, err := exec.LookPath("protoc"); err != nil {
+		t.Skip(err)
+	}
 	cmd := exec.Command("protoc", "--gogo_out=.", "-I=../../../../../../../../../../../../:../../protobuf/:.", "er.proto")
 	data, err := cmd.CombinedOutput()
 	if err == nil && !strings.Contains(string(data), "Plugin failed with status code 1") {
@@ -102,6 +117,9 @@ func TestRepeatedEmbed(t *testing.T) {
 }
 
 func TestTakesTooLongToDebug(t *testing.T) {
+	if _, err := exec.LookPath("protoc"); err != nil {
+		t.Skip(err)
+	}
 	cmd := exec.Command("protoc", "--gogo_out=.", "-I=../../../../../../../../../../../../:../../protobuf/:.", "eb.proto")
 	data, err := cmd.CombinedOutput()
 	if err == nil && !strings.Contains(string(data), "Plugin failed with status code 1") {

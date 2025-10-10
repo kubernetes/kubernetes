@@ -36,6 +36,9 @@ import (
 )
 
 func TestPopulateWarning(t *testing.T) {
+	if _, err := exec.LookPath("protoc"); err != nil {
+		t.Skip(err)
+	}
 	cmd := exec.Command("protoc", "--gogo_out=.", "-I=../../../../../:../../protobuf/:.", "a/a1.proto")
 	data, err := cmd.CombinedOutput()
 	dataStr := string(data)

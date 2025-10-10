@@ -330,6 +330,9 @@ func parseFile(source string) (packageName string, imports []string, err error) 
 }
 
 func protoc(t *testing.T, args []string) {
+	if _, err := exec.LookPath("protoc-min-version"); err != nil {
+		t.Skip(err)
+	}
 	cmd := exec.Command("protoc-min-version", "--version=3.0.0")
 	cmd.Args = append(cmd.Args, args...)
 	// We set the RUN_AS_PROTOC_GEN_GO environment variable to indicate that

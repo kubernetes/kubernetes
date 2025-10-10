@@ -36,6 +36,9 @@ import (
 
 // Issue 16 : https://github.com/gogo/protobuf/issues/detail?id=16
 func TestDashFilename(t *testing.T) {
+	if _, err := exec.LookPath("protoc"); err != nil {
+		t.Skip(err)
+	}
 	name := "dash-filename"
 	cmd := exec.Command("protoc", "--gogo_out=.", "-I=../../../../../:../../protobuf/:.", name+".proto")
 	data, err := cmd.CombinedOutput()
