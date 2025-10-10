@@ -49,7 +49,7 @@ import (
 
 const (
 	// Warning message for the users still using cgroup v1
-	CgroupV1UnsupportedWarning = "cgroup v1 support is unsupported and will be removed in a future release. Please migrate to cgroup v2. More information at https://git.k8s.io/enhancements/keps/sig-node/5573-cgroup-v1-unsupported"
+	CgroupV1DeprecatedWarning = "cgroup v1 detected. cgroup v1 support is deprecated and will be removed in a future release. Please migrate to cgroup v2. More information at https://git.k8s.io/enhancements/keps/sig-node/5573-remove-cgroup-v1"
 
 	// Warning message for the users using cgroup v2 on kernel doesn't support root `cpu.stat`.
 	// `cpu.stat` was added to root cgroup in kernel 5.8.
