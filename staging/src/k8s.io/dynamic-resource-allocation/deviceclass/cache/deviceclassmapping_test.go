@@ -78,7 +78,6 @@ func TestDeviceClassMapping(t *testing.T) {
 	_, ok = cache.Get("tpu-class")
 	if ok {
 		t.Errorf("Expected device class 'tpu-class' not found")
-
 	}
 
 	// Test updating device classes
