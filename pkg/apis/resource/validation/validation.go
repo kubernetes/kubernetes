@@ -398,7 +398,7 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 	allErrs = append(allErrs, validateSet(status.ReservedFor, resource.ResourceClaimReservedForMaxSize,
 		validateResourceClaimUserReference,
 		func(consumer resource.ResourceClaimConsumerReference) types.UID { return consumer.UID },
-		fldPath.Child("reservedFor"), uniquenessCovered)...)
+		fldPath.Child("reservedFor"), sizeCovered, uniquenessCovered)...)
 
 	var allocatedDevices sets.Set[structured.SharedDeviceID]
 	if status.Allocation != nil {
