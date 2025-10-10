@@ -1269,6 +1269,10 @@ spec:
           storagePolicyID: storagePolicyIDValue
           storagePolicyName: storagePolicyNameValue
           volumePath: volumePathValue
+      workloadRef:
+        name: nameValue
+        podGroup: podGroupValue
+        podGroupReplicaKey: podGroupReplicaKeyValue
   updateStrategy:
     rollingUpdate:
       maxSurge: maxSurgeValue
