@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatalister"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/watchlist"
 )
 
 // SharedInformerOption defines the functional option type for metadataSharedInformerFactory.
@@ -179,7 +178,7 @@ func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVers
 	return &metadataInformer{
 		gvr: gvr,
 		informer: cache.NewSharedIndexInformer(
-			&cache.ListWatch{
+			cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					if tweakListOptions != nil {
 						tweakListOptions(&options)
@@ -204,8 +203,7 @@ func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVers
 					}
 					return client.Resource(gvr).Namespace(namespace).Watch(ctx, options)
 				},
-				UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
-			},
+			}, client),
 			&metav1.PartialObjectMetadata{},
 			resyncPeriod,
 			indexers,
