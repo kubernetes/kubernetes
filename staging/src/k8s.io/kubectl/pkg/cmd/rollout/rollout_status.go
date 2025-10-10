@@ -34,8 +34,8 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
+	fcache "k8s.io/client-go/tools/cache/testing"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/client-go/util/watchlist"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
@@ -185,7 +185,7 @@ func (o *RolloutStatusOptions) Run() error {
 		}
 
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-		lw := &cache.ListWatch{
+		lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
 				return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
@@ -194,8 +194,7 @@ func (o *RolloutStatusOptions) Run() error {
 				options.FieldSelector = fieldSelector
 				return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
 			},
-			UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(o.DynamicClient),
-		}
+		})
 
 		// if the rollout isn't done yet, keep watching deployment status
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
