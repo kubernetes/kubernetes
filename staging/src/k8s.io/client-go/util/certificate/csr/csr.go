@@ -38,7 +38,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/client-go/util/watchlist"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
@@ -179,14 +178,14 @@ func WaitForCertificate(ctx context.Context, client clientset.Interface, reqName
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", reqName).String()
 	logger := klog.FromContext(ctx)
 
-	var lw *cache.ListWatch
+	var lw cache.ListerWatcher
 	var obj runtime.Object
 	for {
 		// see if the v1 API is available
 		if _, err := client.CertificatesV1().CertificateSigningRequests().List(ctx, metav1.ListOptions{FieldSelector: fieldSelector}); err == nil {
 			// watch v1 objects
 			obj = &certificatesv1.CertificateSigningRequest{}
-			lw = &cache.ListWatch{
+			lw = cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					options.FieldSelector = fieldSelector
 					return client.CertificatesV1().CertificateSigningRequests().List(ctx, options)
@@ -195,8 +194,7 @@ func WaitForCertificate(ctx context.Context, client clientset.Interface, reqName
 					options.FieldSelector = fieldSelector
 					return client.CertificatesV1().CertificateSigningRequests().Watch(ctx, options)
 				},
-				UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
-			}
+			}, client)
 			break
 		} else {
 			logger.V(2).Info("Error fetching v1 certificate signing request", "err", err)
@@ -211,7 +209,7 @@ func WaitForCertificate(ctx context.Context, client clientset.Interface, reqName
 		if _, err := client.CertificatesV1beta1().CertificateSigningRequests().List(ctx, metav1.ListOptions{FieldSelector: fieldSelector}); err == nil {
 			// watch v1beta1 objects
 			obj = &certificatesv1beta1.CertificateSigningRequest{}
-			lw = &cache.ListWatch{
+			lw = cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					options.FieldSelector = fieldSelector
 					return client.CertificatesV1beta1().CertificateSigningRequests().List(ctx, options)
@@ -220,8 +218,7 @@ func WaitForCertificate(ctx context.Context, client clientset.Interface, reqName
 					options.FieldSelector = fieldSelector
 					return client.CertificatesV1beta1().CertificateSigningRequests().Watch(ctx, options)
 				},
-				UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
-			}
+			}, client)
 			break
 		} else {
 			logger.V(2).Info("Error fetching v1beta1 certificate signing request", "err", err)
