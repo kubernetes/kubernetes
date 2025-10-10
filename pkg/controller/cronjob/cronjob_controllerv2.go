@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/robfig/cron/v3"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -48,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
 	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
+	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/ptr"
 )
 
@@ -391,7 +390,7 @@ func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr 
 	// the sync loop will essentially be a no-op for the already queued key with old schedule.
 	if oldCJ.Spec.Schedule != newCJ.Spec.Schedule || !ptr.Equal(oldCJ.Spec.TimeZone, newCJ.Spec.TimeZone) {
 		// schedule changed, change the requeue time, pass nil recorder so that syncCronJob will output any warnings
-		sched, err := cron.ParseStandard(formatSchedule(newCJ, nil))
+		sched, err := parsers.ParseCronScheduleWithPanicRecovery(formatSchedule(newCJ, nil))
 		if err != nil {
 			// this is likely a user error in defining the spec value
 			// we should log the error and not reconcile this cronjob until an update to spec
@@ -511,7 +510,7 @@ func (jm *ControllerV2) syncCronJob(
 		return nil, updateStatus, nil
 	}
 
-	sched, err := cron.ParseStandard(formatSchedule(cronJob, jm.recorder))
+	sched, err := parsers.ParseCronScheduleWithPanicRecovery(formatSchedule(cronJob, jm.recorder))
 	if err != nil {
 		// this is likely a user error in defining the spec value
 		// we should log the error and not reconcile this cronjob until an update to spec

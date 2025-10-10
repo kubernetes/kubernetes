@@ -23,8 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/robfig/cron/v3"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryapivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/ptr"
 )
 
@@ -791,7 +790,8 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 
 func validateScheduleFormat(schedule string, allowTZInSchedule bool, timeZone *string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if _, err := cron.ParseStandard(schedule); err != nil {
+
+	if _, err := parsers.ParseCronScheduleWithPanicRecovery(schedule); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
 	}
 	switch {

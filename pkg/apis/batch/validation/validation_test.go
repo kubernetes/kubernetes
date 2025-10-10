@@ -18,11 +18,10 @@ package validation
 
 import (
 	"errors"
-	_ "time/tzdata"
-
 	"fmt"
 	"strings"
 	"testing"
+	_ "time/tzdata"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -3997,6 +3996,135 @@ func TestValidateFailedIndexesNotOverlapCompleted(t *testing.T) {
 			} else if tc.wantError != nil && gotErr != nil {
 				if diff := cmp.Diff(tc.wantError.Error(), gotErr.Error()); diff != "" {
 					t.Errorf("unexpected error, diff: %s", diff)
+				}
+			}
+		})
+	}
+}
+
+// TestValidateScheduleFormatPanicRecovery tests that validateScheduleFormat
+// properly recovers from panics in cron.ParseStandard and returns validation errors
+func TestValidateScheduleFormatPanicRecovery(t *testing.T) {
+	testCases := []struct {
+		name     string
+		schedule string
+		expected string
+	}{
+		{
+			name:     "TZ=0 without space should not panic",
+			schedule: "TZ=0",
+			expected: "invalid schedule format",
+		},
+		{
+			name:     "TZ= without value should not panic",
+			schedule: "TZ=",
+			expected: "invalid schedule format",
+		},
+		{
+			name:     "CRON_TZ= without space should not panic",
+			schedule: "CRON_TZ=UTC",
+			expected: "invalid schedule format",
+		},
+		{
+			name:     "malformed timezone spec should not panic",
+			schedule: "TZ=Invalid/Timezone",
+			expected: "invalid schedule format",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// This should not panic and should return a validation error
+			errs := validateScheduleFormat(tc.schedule, false, nil, field.NewPath("spec", "schedule"))
+
+			if len(errs) == 0 {
+				t.Errorf("Expected validation error for schedule %q, but got none", tc.schedule)
+				return
+			}
+
+			// Check that the error message contains expected text
+			errMsg := errs[0].Error()
+			if !strings.Contains(errMsg, tc.expected) {
+				t.Errorf("Expected error message to contain %q, but got: %s", tc.expected, errMsg)
+			}
+
+			// Verify it's an Invalid field error
+			if errs[0].Type != field.ErrorTypeInvalid {
+				t.Errorf("Expected ErrorTypeInvalid, but got: %v", errs[0].Type)
+			}
+		})
+	}
+}
+
+// TestValidateScheduleFormatNormalCases tests normal validation cases
+// to ensure panic recovery doesn't interfere with normal operation
+func TestValidateScheduleFormatNormalCases(t *testing.T) {
+	testCases := []struct {
+		name              string
+		schedule          string
+		allowTZInSchedule bool
+		timeZone          *string
+		expectError       bool
+		expectedError     string
+	}{
+		{
+			name:              "valid schedule without timezone",
+			schedule:          "0 0 * * *",
+			allowTZInSchedule: false,
+			timeZone:          nil,
+			expectError:       false,
+		},
+		{
+			name:              "valid schedule with timezone field",
+			schedule:          "0 0 * * *",
+			allowTZInSchedule: false,
+			timeZone:          &timeZoneUTC,
+			expectError:       false,
+		},
+		{
+			name:              "TZ in schedule when not allowed",
+			schedule:          "TZ=UTC 0 0 * * *",
+			allowTZInSchedule: false,
+			timeZone:          nil,
+			expectError:       true,
+			expectedError:     "cannot use TZ or CRON_TZ in schedule",
+		},
+		{
+			name:              "TZ in schedule when allowed",
+			schedule:          "TZ=UTC 0 0 * * *",
+			allowTZInSchedule: true,
+			timeZone:          nil,
+			expectError:       false,
+		},
+		{
+			name:              "TZ in schedule with timezone field",
+			schedule:          "TZ=UTC 0 0 * * *",
+			allowTZInSchedule: true,
+			timeZone:          &timeZoneUTC,
+			expectError:       true,
+			expectedError:     "cannot use both timeZone field and TZ or CRON_TZ in schedule",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateScheduleFormat(tc.schedule, tc.allowTZInSchedule, tc.timeZone, field.NewPath("spec", "schedule"))
+
+			if tc.expectError {
+				if len(errs) == 0 {
+					t.Errorf("Expected validation error for schedule %q, but got none", tc.schedule)
+					return
+				}
+
+				if tc.expectedError != "" {
+					errMsg := errs[0].Error()
+					if !strings.Contains(errMsg, tc.expectedError) {
+						t.Errorf("Expected error message to contain %q, but got: %s", tc.expectedError, errMsg)
+					}
+				}
+			} else {
+				if len(errs) > 0 {
+					t.Errorf("Expected no validation errors for schedule %q, but got: %v", tc.schedule, errs)
 				}
 			}
 		})
