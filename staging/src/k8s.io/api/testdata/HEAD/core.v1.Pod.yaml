@@ -1225,6 +1225,10 @@ spec:
       storagePolicyID: storagePolicyIDValue
       storagePolicyName: storagePolicyNameValue
       volumePath: volumePathValue
+  workloadRef:
+    name: nameValue
+    podGroup: podGroupValue
+    podGroupReplicaKey: podGroupReplicaKeyValue
 status:
   conditions:
   - lastProbeTime: "2003-01-01T01:01:01Z"
