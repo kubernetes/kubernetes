@@ -40,11 +40,15 @@ const (
 	maxUpdateRetries = 5
 	// maxBackoff is the maximum sleep time during backoff (e.g. in backoffEnsureLease)
 	maxBackoff = 7 * time.Second
+	// shutdownTimeout is the timeout for deleting the lease on shutdown.
+	shutdownTimeout = 10 * time.Second
 )
 
 // Controller manages creating and renewing the lease for this component (kube-apiserver, kubelet, etc.)
 type Controller interface {
 	Run(ctx context.Context)
+	Start(stopCh <-chan struct{}) error
+	Stop()
 }
 
 // ProcessLeaseFunc processes the given lease in-place
@@ -87,6 +91,43 @@ func NewController(clock clock.Clock, client clientset.Interface, holderIdentity
 		clock:                      clock,
 		onRepeatedHeartbeatFailure: onRepeatedHeartbeatFailure,
 		newLeasePostProcessFunc:    newLeasePostProcessFunc,
+	}
+}
+
+// Start performs setup actions, and then starts the lease controller.
+func (c *controller) Start(stopCh <-chan struct{}) error {
+	if c.leaseClient == nil {
+		klog.Info("lease controller has nil lease client, will not claim or renew leases")
+		return nil
+	}
+
+	// We delete the lease on startup to ensure that if a new apiserver starts up,
+	// it removes any stale lease from a previous instance. This is important to
+	// prevent other components from discovering and communicating with a dead peer.
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+	klog.FromContext(ctx).Info("Deleting old lease on startup", "lease", klog.KRef(c.leaseNamespace, c.leaseName))
+	if err := c.leaseClient.Delete(ctx, c.leaseName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		// The lease controller will eventually take over and update the lease.
+		klog.FromContext(ctx).Error(err, "error deleting old lease", "lease", klog.KRef(c.leaseNamespace, c.leaseName))
+	}
+
+	go c.Run(wait.ContextForChannel(stopCh))
+	return nil
+}
+
+// Stop gracefully shuts down the controller.
+func (c *controller) Stop() {
+	// if leaseClient is nil, we can't clean up the lease
+	if c.leaseClient == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+	klog.FromContext(ctx).Info("Cleaning up lease on exit", "lease", klog.KRef(c.leaseNamespace, c.leaseName))
+	if err := c.leaseClient.Delete(ctx, c.leaseName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		klog.FromContext(ctx).Error(err, "Unable to delete lease", "lease", klog.KRef(c.leaseNamespace, c.leaseName))
 	}
 }
 
