@@ -30,7 +30,6 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	eventsv1beta1 "k8s.io/client-go/listers/events/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
-	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // EventInformer provides access to a shared informer and lister for
@@ -58,7 +57,7 @@ func NewEventInformer(client kubernetes.Interface, namespace string, resyncPerio
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredEventInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -83,8 +82,7 @@ func NewFilteredEventInformer(client kubernetes.Interface, namespace string, res
 				}
 				return client.EventsV1beta1().Events(namespace).Watch(ctx, options)
 			},
-			UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
-		},
+		}, client),
 		&apieventsv1beta1.Event{},
 		resyncPeriod,
 		indexers,

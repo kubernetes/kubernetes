@@ -26,7 +26,6 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	watchlist "k8s.io/client-go/util/watchlist"
 	apiswardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	versioned "k8s.io/sample-apiserver/pkg/generated/clientset/versioned"
 	internalinterfaces "k8s.io/sample-apiserver/pkg/generated/informers/externalversions/internalinterfaces"
@@ -58,7 +57,7 @@ func NewFlunderInformer(client versioned.Interface, namespace string, resyncPeri
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredFlunderInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -83,8 +82,7 @@ func NewFilteredFlunderInformer(client versioned.Interface, namespace string, re
 				}
 				return client.WardleV1alpha1().Flunders(namespace).Watch(ctx, options)
 			},
-			UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
-		},
+		}, client),
 		&apiswardlev1alpha1.Flunder{},
 		resyncPeriod,
 		indexers,

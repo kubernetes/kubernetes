@@ -26,7 +26,6 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	watchlist "k8s.io/client-go/util/watchlist"
 	apisexamplev1 "k8s.io/code-generator/examples/MixedCase/apis/example/v1"
 	versioned "k8s.io/code-generator/examples/MixedCase/clientset/versioned"
 	internalinterfaces "k8s.io/code-generator/examples/MixedCase/informers/externalversions/internalinterfaces"
@@ -57,7 +56,7 @@ func NewClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Du
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,8 +81,7 @@ func NewFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod
 				}
 				return client.ExampleV1().ClusterTestTypes().Watch(ctx, options)
 			},
-			UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
-		},
+		}, client),
 		&apisexamplev1.ClusterTestType{},
 		resyncPeriod,
 		indexers,

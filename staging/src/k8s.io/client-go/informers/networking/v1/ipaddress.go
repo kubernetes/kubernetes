@@ -30,7 +30,6 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	networkingv1 "k8s.io/client-go/listers/networking/v1"
 	cache "k8s.io/client-go/tools/cache"
-	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // IPAddressInformer provides access to a shared informer and lister for
@@ -57,7 +56,7 @@ func NewIPAddressInformer(client kubernetes.Interface, resyncPeriod time.Duratio
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredIPAddressInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,8 +81,7 @@ func NewFilteredIPAddressInformer(client kubernetes.Interface, resyncPeriod time
 				}
 				return client.NetworkingV1().IPAddresses().Watch(ctx, options)
 			},
-			UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
-		},
+		}, client),
 		&apinetworkingv1.IPAddress{},
 		resyncPeriod,
 		indexers,

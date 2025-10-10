@@ -30,7 +30,6 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	storagev1beta1 "k8s.io/client-go/listers/storage/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
-	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // StorageClassInformer provides access to a shared informer and lister for
@@ -57,7 +56,7 @@ func NewStorageClassInformer(client kubernetes.Interface, resyncPeriod time.Dura
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredStorageClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,8 +81,7 @@ func NewFilteredStorageClassInformer(client kubernetes.Interface, resyncPeriod t
 				}
 				return client.StorageV1beta1().StorageClasses().Watch(ctx, options)
 			},
-			UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
-		},
+		}, client),
 		&apistoragev1beta1.StorageClass{},
 		resyncPeriod,
 		indexers,

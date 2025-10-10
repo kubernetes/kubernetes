@@ -30,7 +30,6 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
-	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // ResourceQuotaInformer provides access to a shared informer and lister for
@@ -58,7 +57,7 @@ func NewResourceQuotaInformer(client kubernetes.Interface, namespace string, res
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredResourceQuotaInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -83,8 +82,7 @@ func NewFilteredResourceQuotaInformer(client kubernetes.Interface, namespace str
 				}
 				return client.CoreV1().ResourceQuotas(namespace).Watch(ctx, options)
 			},
-			UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
-		},
+		}, client),
 		&apicorev1.ResourceQuota{},
 		resyncPeriod,
 		indexers,

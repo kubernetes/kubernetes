@@ -30,7 +30,6 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	admissionregistrationv1 "k8s.io/client-go/listers/admissionregistration/v1"
 	cache "k8s.io/client-go/tools/cache"
-	watchlist "k8s.io/client-go/util/watchlist"
 )
 
 // MutatingWebhookConfigurationInformer provides access to a shared informer and lister for
@@ -57,7 +56,7 @@ func NewMutatingWebhookConfigurationInformer(client kubernetes.Interface, resync
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredMutatingWebhookConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -82,8 +81,7 @@ func NewFilteredMutatingWebhookConfigurationInformer(client kubernetes.Interface
 				}
 				return client.AdmissionregistrationV1().MutatingWebhookConfigurations().Watch(ctx, options)
 			},
-			UnsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(client),
-		},
+		}, client),
 		&apiadmissionregistrationv1.MutatingWebhookConfiguration{},
 		resyncPeriod,
 		indexers,
