@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package users contains utilities for managing the users.
 package users
 
 // EntryMap is empty on non-Linux.
