@@ -839,6 +839,7 @@ type DeviceRequest struct {
 	// requests with unknown modes.
 	//
 	// +optional
+	// +k8s:optional
 	AllocationMode DeviceAllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,4,opt,name=allocationMode"`
 
 	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
@@ -1084,6 +1085,7 @@ const (
 )
 
 // +enum
+// +k8s:enum
 type DeviceAllocationMode string
 
 // Valid [DeviceRequest.CountMode] values.
