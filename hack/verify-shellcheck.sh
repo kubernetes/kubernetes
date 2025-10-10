@@ -71,7 +71,7 @@ if [[ "$#" == 0 ]]; then
       -path ./_\*      -o \
       -path ./.git\*   -o \
       -path ./vendor\* -o \
-      \( -path ./third_party\* -a -not -path ./third_party/forked\* \) \
+      \( -path \*/third_party\* -a -not -path ./third_party/forked\* \) \
     \))
 fi
 
