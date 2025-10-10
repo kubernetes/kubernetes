@@ -26,6 +26,7 @@ import (
 	"time"
 
 	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -1010,5 +1011,220 @@ func BenchmarkIPAllocatorAllocateNextIPv6Size65535(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		r.AllocateNext()
+	}
+}
+
+// TestUsedWithCIDRFiltering tests that Used() method only counts IPs within the allocator's CIDR
+func TestUsedWithCIDRFiltering(t *testing.T) {
+	// Create an allocator for 192.168.1.0/24
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create test components
+	client := fake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
+	ipStore := ipInformer.Informer().GetIndexer()
+
+	r, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.ipAddressSynced = func() bool { return true }
+	defer r.Destroy()
+
+	// Add valid IPs (within CIDR) with correct labels
+	validIPAddr1 := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "192.168.1.10",
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	validIPAddr2 := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "192.168.1.20",
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	if err := ipStore.Add(validIPAddr1); err != nil {
+		t.Fatal(err)
+	}
+	if err := ipStore.Add(validIPAddr2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add invalid IPs (outside CIDR) with correct labels - these should not be counted
+	invalidIP1 := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "192.168.2.10", // different subnet
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	invalidIP2 := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "10.0.0.1", // completely different network
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	if err := ipStore.Add(invalidIP1); err != nil {
+		t.Fatal(err)
+	}
+	if err := ipStore.Add(invalidIP2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Used() should only count valid IPs (2), not all IPs (4)
+	used := r.Used()
+	if used != 2 {
+		t.Errorf("Expected Used() to return 2 (only IPs in CIDR), got %d", used)
+	}
+}
+
+// TestFreeWithOverflowProtection tests the overflow protection in Free() method
+func TestFreeWithOverflowProtection(t *testing.T) {
+	testCases := []struct {
+		name         string
+		cidr         string
+		simulateSize uint64
+		simulateUsed int
+		expectedFree int
+	}{
+		{
+			name:         "normal case",
+			cidr:         "192.168.1.0/30", // size = 2 (4 total - 2 reserved)
+			simulateSize: 2,
+			simulateUsed: 1,
+			expectedFree: 1,
+		},
+		{
+			name:         "size exceeds MaxInt",
+			cidr:         "192.168.1.0/24",
+			simulateSize: uint64(math.MaxInt) + 1,
+			simulateUsed: 100,
+			expectedFree: math.MaxInt - 100,
+		},
+		{
+			name:         "used exceeds size (data inconsistency)",
+			cidr:         "192.168.1.0/30",
+			simulateSize: 2,
+			simulateUsed: 5, // More than size
+			expectedFree: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, cidr, err := netutils.ParseCIDRSloppy(tc.cidr)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Create test components
+			client := fake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
+			ipInformer := informerFactory.Networking().V1().IPAddresses()
+			ipStore := ipInformer.Informer().GetIndexer()
+
+			r, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.ipAddressSynced = func() bool { return true }
+			defer r.Destroy()
+
+			// Override the size for testing overflow scenarios
+			r.size = tc.simulateSize
+
+			// Mock the Used() method by adding IP addresses to simulate usage
+			for i := 0; i < tc.simulateUsed; i++ {
+				// Add valid IPs within the CIDR with correct labels
+				ip := &networkingv1.IPAddress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fmt.Sprintf("192.168.1.%d", i+1),
+						Labels: map[string]string{
+							networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+							networkingv1.LabelManagedBy:       ControllerName,
+						},
+					},
+				}
+				if err := ipStore.Add(ip); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			free := r.Free()
+			if free != tc.expectedFree {
+				t.Errorf("Expected Free() to return %d, got %d", tc.expectedFree, free)
+			}
+		})
+	}
+}
+
+// TestUsedWithInvalidIPs tests that Used() handles invalid IP addresses gracefully
+func TestUsedWithInvalidIPs(t *testing.T) {
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create test components
+	client := fake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
+	ipStore := ipInformer.Informer().GetIndexer()
+
+	r, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.ipAddressSynced = func() bool { return true }
+	defer r.Destroy()
+
+	// Add valid IP with correct labels
+	validIP := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "192.168.1.10",
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	if err := ipStore.Add(validIP); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add invalid IP address (malformed) with correct labels
+	invalidIP := &networkingv1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "invalid-ip-address",
+			Labels: map[string]string{
+				networkingv1.LabelIPAddressFamily: string(r.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
+			},
+		},
+	}
+	if err := ipStore.Add(invalidIP); err != nil {
+		t.Fatal(err)
+	}
+
+	// Used() should only count the valid IP
+	used := r.Used()
+	if used != 1 {
+		t.Errorf("Expected Used() to return 1 (only valid IPs), got %d", used)
 	}
 }
