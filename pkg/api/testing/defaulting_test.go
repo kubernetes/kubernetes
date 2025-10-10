@@ -216,6 +216,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "scheduling.k8s.io", Version: "v1alpha1", Kind: "PriorityClassList"}:                               {},
 		{Group: "scheduling.k8s.io", Version: "v1beta1", Kind: "PriorityClassList"}:                                {},
 		{Group: "scheduling.k8s.io", Version: "v1", Kind: "PriorityClassList"}:                                     {},
+		{Group: "scheduling.k8s.io", Version: "v1alpha1", Kind: "Workload"}:                                        {},
+		{Group: "scheduling.k8s.io", Version: "v1alpha1", Kind: "WorkloadList"}:                                    {},
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1", Kind: "PriorityLevelConfiguration"}:           {},
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1", Kind: "PriorityLevelConfigurationList"}:       {},
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1", Kind: "PriorityLevelConfiguration"}:            {},

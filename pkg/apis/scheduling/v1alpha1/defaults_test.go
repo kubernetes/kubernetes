@@ -58,3 +58,17 @@ func TestSetDefaultPreempting(t *testing.T) {
 		t.Errorf("Expected PriorityClass.Preempting value: %+v\ngot: %+v\n", apiv1.PreemptLowerPriority, output.PreemptionPolicy)
 	}
 }
+
+func TestSetDefaultPodGroupReplicas(t *testing.T) {
+	workload := &v1alpha1.Workload{
+		Spec: v1alpha1.WorkloadSpec{
+			PodGroups: []v1alpha1.PodGroup{{}},
+		},
+	}
+
+	output := roundTrip(t, runtime.Object(workload)).(*v1alpha1.Workload)
+	replicas := output.Spec.PodGroups[0].Replicas
+	if replicas == nil || *replicas != 1 {
+		t.Errorf("Expected PodGroup replicas: 1, got: %v\n", replicas)
+	}
+}
