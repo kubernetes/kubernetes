@@ -184,7 +184,7 @@ func (o *RolloutStatusOptions) Run() error {
 		}
 
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-		lw := &cache.ListWatch{
+		lw := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
 				return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
@@ -193,7 +193,7 @@ func (o *RolloutStatusOptions) Run() error {
 				options.FieldSelector = fieldSelector
 				return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
 			},
-		}
+		}, o.DynamicClient)
 
 		// if the rollout isn't done yet, keep watching deployment status
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
