@@ -731,6 +731,7 @@ func dropDisabledFields(
 	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
+	dropDisabledWorkloadRef(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -1767,4 +1768,20 @@ func containerRestartRulesInUse(oldPodSpec *api.PodSpec) bool {
 		}
 	}
 	return false
+}
+
+// dropDisabledWorkloadRef removes pod workload reference from its spec
+// unless it is already used by the old pod spec.
+func dropDisabledWorkloadRef(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) && !workloadRefInUse(oldPodSpec) {
+		podSpec.WorkloadRef = nil
+	}
+}
+
+func workloadRefInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	return podSpec.WorkloadRef != nil
 }
