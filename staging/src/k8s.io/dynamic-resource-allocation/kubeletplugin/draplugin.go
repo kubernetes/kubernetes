@@ -41,6 +41,7 @@ import (
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -194,6 +195,10 @@ type Device struct {
 	// DeviceName identifies the device inside that pool.
 	// Must not be empty.
 	DeviceName string
+
+	// ShareID identifes the device share.
+	// May be empty.
+	ShareID *types.UID
 
 	// CDIDeviceIDs lists all CDI devices associated with this DRA device.
 	// Each ID must be of the form "<vendor ID>/<class>=<unique name>".
@@ -865,10 +870,15 @@ func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req
 	for uid, claimResult := range result {
 		var devices []*drapbv1.Device
 		for _, result := range claimResult.Devices {
+			var shareIDStr *string
+			if result.ShareID != nil {
+				shareIDStr = ptr.To(string(*result.ShareID))
+			}
 			device := &drapbv1.Device{
 				RequestNames: stripSubrequestNames(result.Requests),
 				PoolName:     result.PoolName,
 				DeviceName:   result.DeviceName,
+				ShareId:      shareIDStr,
 				CdiDeviceIds: result.CDIDeviceIDs,
 			}
 			devices = append(devices, device)
