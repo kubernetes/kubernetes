@@ -273,6 +273,11 @@ type PodSpecApplyConfiguration struct {
 	// This field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters.
 	// Requires the HostnameOverride feature gate to be enabled.
 	HostnameOverride *string `json:"hostnameOverride,omitempty"`
+	// Workload provides a reference to the Workload object that this Pod belongs to.
+	// This field is used by the scheduler to identify the PodGroup and apply the
+	// correct group scheduling policies.
+	// This field is immutable.
+	Workload *WorkloadReferenceApplyConfiguration `json:"workload,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -667,5 +672,13 @@ func (b *PodSpecApplyConfiguration) WithResources(value *ResourceRequirementsApp
 // If called multiple times, the HostnameOverride field is set to the value of the last call.
 func (b *PodSpecApplyConfiguration) WithHostnameOverride(value string) *PodSpecApplyConfiguration {
 	b.HostnameOverride = &value
+	return b
+}
+
+// WithWorkload sets the Workload field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Workload field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithWorkload(value *WorkloadReferenceApplyConfiguration) *PodSpecApplyConfiguration {
+	b.Workload = value
 	return b
 }

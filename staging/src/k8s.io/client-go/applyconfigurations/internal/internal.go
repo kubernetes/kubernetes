@@ -7633,6 +7633,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: workload
+      type:
+        namedType: io.k8s.api.core.v1.WorkloadReference
 - name: io.k8s.api.core.v1.PodStatus
   map:
     fields:
@@ -9005,6 +9008,20 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: boolean
     - name: runAsUserName
+      type:
+        scalar: string
+- name: io.k8s.api.core.v1.WorkloadReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: podGroup
+      type:
+        scalar: string
+      default: ""
+    - name: podGroupReplicaIndex
       type:
         scalar: string
 - name: io.k8s.api.discovery.v1.Endpoint
@@ -14934,6 +14951,60 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: io.k8s.api.scheduling.v1alpha1.DefaultSchedulingPolicy
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
+- name: io.k8s.api.scheduling.v1alpha1.GangSchedulingPolicy
+  map:
+    fields:
+    - name: minCount
+      type:
+        scalar: numeric
+      default: 0
+- name: io.k8s.api.scheduling.v1alpha1.PodGroup
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: policy
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha1.PodGroupPolicy
+      default: {}
+    - name: replicas
+      type:
+        scalar: numeric
+      default: 1
+- name: io.k8s.api.scheduling.v1alpha1.PodGroupPolicy
+  map:
+    fields:
+    - name: default
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha1.DefaultSchedulingPolicy
+    - name: gang
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha1.GangSchedulingPolicy
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    unions:
+    - discriminator: kind
+      fields:
+      - fieldName: default
+        discriminatorValue: Default
+      - fieldName: gang
+        discriminatorValue: Gang
 - name: io.k8s.api.scheduling.v1alpha1.PriorityClass
   map:
     fields:
@@ -14960,6 +15031,37 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: io.k8s.api.scheduling.v1alpha1.Workload
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha1.WorkloadSpec
+      default: {}
+- name: io.k8s.api.scheduling.v1alpha1.WorkloadSpec
+  map:
+    fields:
+    - name: controllerRef
+      type:
+        namedType: io.k8s.api.core.v1.ObjectReference
+    - name: podGroups
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.scheduling.v1alpha1.PodGroup
+          elementRelationship: associative
+          keys:
+          - name
 - name: io.k8s.api.scheduling.v1beta1.PriorityClass
   map:
     fields:

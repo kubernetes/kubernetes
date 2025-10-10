@@ -734,6 +734,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.VsphereVirtualDiskVolumeSource{}.OpenAPIModelName():                                                      schema_k8sio_api_core_v1_VsphereVirtualDiskVolumeSource(ref),
 		corev1.WeightedPodAffinityTerm{}.OpenAPIModelName():                                                             schema_k8sio_api_core_v1_WeightedPodAffinityTerm(ref),
 		corev1.WindowsSecurityContextOptions{}.OpenAPIModelName():                                                       schema_k8sio_api_core_v1_WindowsSecurityContextOptions(ref),
+		corev1.WorkloadReference{}.OpenAPIModelName():                                                                   schema_k8sio_api_core_v1_WorkloadReference(ref),
 		discoveryv1.Endpoint{}.OpenAPIModelName():                                                                       schema_k8sio_api_discovery_v1_Endpoint(ref),
 		discoveryv1.EndpointConditions{}.OpenAPIModelName():                                                             schema_k8sio_api_discovery_v1_EndpointConditions(ref),
 		discoveryv1.EndpointHints{}.OpenAPIModelName():                                                                  schema_k8sio_api_discovery_v1_EndpointHints(ref),
@@ -1154,8 +1155,15 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.ResourceSliceSpec{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref),
 		schedulingv1.PriorityClass{}.OpenAPIModelName():                                                                 schema_k8sio_api_scheduling_v1_PriorityClass(ref),
 		schedulingv1.PriorityClassList{}.OpenAPIModelName():                                                             schema_k8sio_api_scheduling_v1_PriorityClassList(ref),
+		schedulingv1alpha1.DefaultSchedulingPolicy{}.OpenAPIModelName():                                                 schema_k8sio_api_scheduling_v1alpha1_DefaultSchedulingPolicy(ref),
+		schedulingv1alpha1.GangSchedulingPolicy{}.OpenAPIModelName():                                                    schema_k8sio_api_scheduling_v1alpha1_GangSchedulingPolicy(ref),
+		schedulingv1alpha1.PodGroup{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha1_PodGroup(ref),
+		schedulingv1alpha1.PodGroupPolicy{}.OpenAPIModelName():                                                          schema_k8sio_api_scheduling_v1alpha1_PodGroupPolicy(ref),
 		schedulingv1alpha1.PriorityClass{}.OpenAPIModelName():                                                           schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref),
 		schedulingv1alpha1.PriorityClassList{}.OpenAPIModelName():                                                       schema_k8sio_api_scheduling_v1alpha1_PriorityClassList(ref),
+		schedulingv1alpha1.Workload{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha1_Workload(ref),
+		schedulingv1alpha1.WorkloadList{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha1_WorkloadList(ref),
+		schedulingv1alpha1.WorkloadSpec{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha1_WorkloadSpec(ref),
 		schedulingv1beta1.PriorityClass{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref),
 		schedulingv1beta1.PriorityClassList{}.OpenAPIModelName():                                                        schema_k8sio_api_scheduling_v1beta1_PriorityClassList(ref),
 		storagev1.CSIDriver{}.OpenAPIModelName():                                                                        schema_k8sio_api_storage_v1_CSIDriver(ref),
@@ -30150,12 +30158,18 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Format:      "",
 						},
 					},
+					"workload": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Workload provides a reference to the Workload object that this Pod belongs to. This field is used by the scheduler to identify the PodGroup and apply the correct group scheduling policies. This field is immutable.",
+							Ref:         ref(corev1.WorkloadReference{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"containers"},
 			},
 		},
 		Dependencies: []string{
-			corev1.Affinity{}.OpenAPIModelName(), corev1.Container{}.OpenAPIModelName(), corev1.EphemeralContainer{}.OpenAPIModelName(), corev1.HostAlias{}.OpenAPIModelName(), corev1.LocalObjectReference{}.OpenAPIModelName(), corev1.PodDNSConfig{}.OpenAPIModelName(), corev1.PodOS{}.OpenAPIModelName(), corev1.PodReadinessGate{}.OpenAPIModelName(), corev1.PodResourceClaim{}.OpenAPIModelName(), corev1.PodSchedulingGate{}.OpenAPIModelName(), corev1.PodSecurityContext{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.Toleration{}.OpenAPIModelName(), corev1.TopologySpreadConstraint{}.OpenAPIModelName(), corev1.Volume{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			corev1.Affinity{}.OpenAPIModelName(), corev1.Container{}.OpenAPIModelName(), corev1.EphemeralContainer{}.OpenAPIModelName(), corev1.HostAlias{}.OpenAPIModelName(), corev1.LocalObjectReference{}.OpenAPIModelName(), corev1.PodDNSConfig{}.OpenAPIModelName(), corev1.PodOS{}.OpenAPIModelName(), corev1.PodReadinessGate{}.OpenAPIModelName(), corev1.PodResourceClaim{}.OpenAPIModelName(), corev1.PodSchedulingGate{}.OpenAPIModelName(), corev1.PodSecurityContext{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.Toleration{}.OpenAPIModelName(), corev1.TopologySpreadConstraint{}.OpenAPIModelName(), corev1.Volume{}.OpenAPIModelName(), corev1.WorkloadReference{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -34656,6 +34670,43 @@ func schema_k8sio_api_core_v1_WindowsSecurityContextOptions(ref common.Reference
 						},
 					},
 				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_core_v1_WorkloadReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadReference identifies the Workload object and PodGroup membership that a Pod belongs to. The scheduler uses this information to apply workload-aware scheduling semantics.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name defines the name of the Workload object this pod belongs to. Workload must be in the same namespace as the pod.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"podGroup": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodGroup is the name of the PodGroup within the Workload that this pod belongs to.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"podGroupReplicaIndex": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodGroupReplicaIndex specifies the replica index of the PodGroup that this pod belongs to. It is only set when the Workload uses a replicated scheduling mode. This index differentiates pods belonging to different replicas of the same PodGroup.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "podGroup"},
 			},
 		},
 	}
@@ -54951,6 +55002,128 @@ func schema_k8sio_api_scheduling_v1_PriorityClassList(ref common.ReferenceCallba
 	}
 }
 
+func schema_k8sio_api_scheduling_v1alpha1_DefaultSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DefaultSchedulingPolicy indicates that standard Kubernetes scheduling behavior should be used.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha1_GangSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GangSchedulingPolicy defines the parameters for gang scheduling.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MinCount is the minimum number of pods that must be schedulable at the same time for the scheduler to admit the entire group.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"minCount"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha1_PodGroup(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroup represents a set of pods with a common scheduling policy.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is a unique identifier for the PodGroup within the Workload. This field is immutable.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Replicas specifies the number of identical instances of this PodGroup. For example, a PodGroup with Replicas=2 will result in two identical sets of pods being scheduled based on the policy. Defaults to 1.",
+							Default:     1,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"policy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Policy defines the scheduling policy for this PodGroup.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1alpha1.PodGroupPolicy{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"name", "policy"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha1.PodGroupPolicy{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha1_PodGroupPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupPolicy defines the scheduling configuration for a PodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind indicates which scheduling policy is in use.\n\n\nPossible enum values:\n - `\"Default\"` uses the standard Kubernetes scheduler.\n - `\"Gang\"` uses gang scheduling (all-or-nothing).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Default", "Gang"},
+						},
+					},
+					"default": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Default specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior.",
+							Ref:         ref(schedulingv1alpha1.DefaultSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"gang": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Gang specifies that the pods in this group should be scheduled using all-or-nothing semantics.",
+							Ref:         ref(schedulingv1alpha1.GangSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"kind"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"discriminator": "kind",
+							"fields-to-discriminateBy": map[string]interface{}{
+								"default": "Default",
+								"gang":    "Gang",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha1.DefaultSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha1.GangSchedulingPolicy{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -55066,6 +55239,144 @@ func schema_k8sio_api_scheduling_v1alpha1_PriorityClassList(ref common.Reference
 		},
 		Dependencies: []string{
 			schedulingv1alpha1.PriorityClass{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha1_Workload(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Workload allows for expressing scheduling constraints that should be used when managing lifecycle of workloads from scheduling perspective, including scheduling, preemption, eviction and other phases.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines the desired behavior of a Workload.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1alpha1.WorkloadSpec{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha1.WorkloadSpec{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha1_WorkloadList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadList contains a list of Workload resources.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of Workloads.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(schedulingv1alpha1.Workload{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha1.Workload{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha1_WorkloadSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadSpec defines the desired state of a Workload.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"controllerRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ControllerRef is an optional reference to the controlling object, such as a Deployment or Job. This field is intended for use by tools like CLIs to provide a link back to the original workload definition. When set, it cannot be changed.",
+							Ref:         ref(corev1.ObjectReference{}.OpenAPIModelName()),
+						},
+					},
+					"podGroups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "PodGroups is the list of pod groups that make up the Workload. Number of pod groups cannot be changed.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(schedulingv1alpha1.PodGroup{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			corev1.ObjectReference{}.OpenAPIModelName(), schedulingv1alpha1.PodGroup{}.OpenAPIModelName()},
 	}
 }
 

@@ -1261,6 +1261,10 @@ spec:
           storagePolicyID: storagePolicyIDValue
           storagePolicyName: storagePolicyNameValue
           volumePath: volumePathValue
+      workload:
+        name: nameValue
+        podGroup: podGroupValue
+        podGroupReplicaIndex: podGroupReplicaIndexValue
 status:
   availableReplicas: 5
   conditions:

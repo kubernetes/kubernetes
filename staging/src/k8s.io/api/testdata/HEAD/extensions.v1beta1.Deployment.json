@@ -1844,7 +1844,12 @@
             }
           ]
         },
-        "hostnameOverride": "hostnameOverrideValue"
+        "hostnameOverride": "hostnameOverrideValue",
+        "workload": {
+          "name": "nameValue",
+          "podGroup": "podGroupValue",
+          "podGroupReplicaIndex": "podGroupReplicaIndexValue"
+        }
       }
     },
     "strategy": {
