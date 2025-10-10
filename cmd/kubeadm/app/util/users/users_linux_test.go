@@ -579,7 +579,7 @@ func writeTempFile(t *testing.T, contents string) (string, func()) {
 		t.Fatalf("could not write file: %v", err)
 	}
 	close := func() {
-		os.Remove(file.Name())
+		_ = os.Remove(file.Name())
 	}
 	return file.Name(), close
 }
