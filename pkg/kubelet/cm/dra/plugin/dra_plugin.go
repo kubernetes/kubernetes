@@ -61,7 +61,6 @@ type DRAPlugin struct {
 	mutex         sync.Mutex
 	backgroundCtx context.Context
 
-	healthClient       drahealthv1alpha1.DRAResourceHealthClient
 	healthStreamCtx    context.Context
 	healthStreamCancel context.CancelFunc
 }
@@ -158,15 +157,11 @@ func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
 
 // NodeWatchResources establishes a stream to receive health updates from the DRA plugin.
 func (p *DRAPlugin) NodeWatchResources(ctx context.Context) (drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, error) {
-	p.mutex.Lock()
-	if p.healthClient == nil {
-		p.healthClient = drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
-	}
-	p.mutex.Unlock()
+	healthClient := drahealthv1alpha1.NewDRAResourceHealthClient(p.conn)
 
 	logger := klog.FromContext(ctx).WithValues("pluginName", p.driverName)
 	logger.V(4).Info("Starting WatchResources stream")
-	stream, err := p.healthClient.NodeWatchResources(ctx, &drahealthv1alpha1.NodeWatchResourcesRequest{})
+	stream, err := healthClient.NodeWatchResources(ctx, &drahealthv1alpha1.NodeWatchResourcesRequest{})
 	if err != nil {
 		logger.Error(err, "NodeWatchResources RPC call failed")
 		return nil, err
