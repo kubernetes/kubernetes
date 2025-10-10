@@ -5,9 +5,9 @@ metadata:
 spec:
   # The entire hardware installation is broken.
   # Evict all pods and don't schedule new ones.
-  selector:
-    driver: dra.example.com
+  deviceSelector:
+    driver: test-driver.cdi.k8s.io
   taint:
-    key: dra.example.com/health
+    key: dra.example.com/unhealthy
     value: "Down"
     effect: NoExecute
