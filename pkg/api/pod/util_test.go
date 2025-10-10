@@ -6216,3 +6216,98 @@ func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
 		})
 	}
 }
+
+func TestDisabledWorkload(t *testing.T) {
+	podWithWorkload := &api.Pod{
+		Spec: api.PodSpec{
+			WorkloadRef: &api.WorkloadReference{
+				Name:     "w",
+				PodGroup: "pg",
+			},
+		},
+	}
+	podWithoutWorkload := &api.Pod{
+		Spec: api.PodSpec{},
+	}
+
+	tests := []struct {
+		name    string
+		enabled bool
+		oldPod  *api.Pod
+		newPod  *api.Pod
+		wantPod *api.Pod
+	}{
+		{
+			name:    "old with workload / new with workload / disabled",
+			oldPod:  podWithWorkload,
+			newPod:  podWithWorkload,
+			wantPod: podWithWorkload,
+		},
+		{
+			name:    "old without workload / new with workload / disabled",
+			oldPod:  podWithoutWorkload,
+			newPod:  podWithWorkload,
+			wantPod: podWithoutWorkload,
+		},
+		{
+			name:    "old with workload / new without workload / disabled",
+			oldPod:  podWithWorkload,
+			newPod:  podWithoutWorkload,
+			wantPod: podWithoutWorkload,
+		},
+		{
+			name:    "old without workload / new without workload / disabled",
+			oldPod:  podWithoutWorkload,
+			newPod:  podWithoutWorkload,
+			wantPod: podWithoutWorkload,
+		},
+		{
+			name:    "old with workload / new with workload / enabled",
+			enabled: true,
+			oldPod:  podWithWorkload,
+			newPod:  podWithWorkload,
+			wantPod: podWithWorkload,
+		},
+		{
+			name:    "old without workload / new with workload / enabled",
+			enabled: true,
+			oldPod:  podWithoutWorkload,
+			newPod:  podWithWorkload,
+			wantPod: podWithWorkload,
+		},
+		{
+			name:    "old with workload / new without workload / enabled",
+			enabled: true,
+			oldPod:  podWithWorkload,
+			newPod:  podWithoutWorkload,
+			wantPod: podWithoutWorkload,
+		},
+		{
+			name:    "old without workload / new without workload / enabled",
+			enabled: true,
+			oldPod:  podWithoutWorkload,
+			newPod:  podWithoutWorkload,
+			wantPod: podWithoutWorkload,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, tc.enabled)
+
+			oldPod := tc.oldPod.DeepCopy()
+			newPod := tc.newPod.DeepCopy()
+			wantPod := tc.wantPod
+			DropDisabledPodFields(newPod, oldPod)
+
+			// Old pod should be never changed
+			if diff := cmp.Diff(oldPod, tc.oldPod); diff != "" {
+				t.Errorf("Old pod changed (-want,+got): %s", diff)
+			}
+
+			if diff := cmp.Diff(wantPod, newPod); diff != "" {
+				t.Errorf("New pod changed (-want,+got): %s", diff)
+			}
+		})
+	}
+}
