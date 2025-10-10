@@ -281,10 +281,18 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 		}
 	}
 
-	// Dropped fields for partitionable devices can be detected without looking at the devices themselves.
+	// Dropped fields for partitionable devices can be found either directly on the ResourceSlice spec
+	// or within devices.
 	if ptr.Deref(err.DesiredSlice.Spec.PerDeviceNodeSelection, false) && !ptr.Deref(err.ActualSlice.Spec.PerDeviceNodeSelection, false) ||
 		len(err.DesiredSlice.Spec.SharedCounters) > len(err.ActualSlice.Spec.SharedCounters) {
 		disabled = append(disabled, "DRAPartitionableDevices")
+	} else {
+		for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
+			if len(err.DesiredSlice.Spec.Devices[i].ConsumesCounters) != len(err.ActualSlice.Spec.Devices[i].ConsumesCounters) {
+				disabled = append(disabled, "DRAPartitionableDevices")
+				break
+			}
+		}
 	}
 
 	// The number of binding conditions for both slices should be the same. If they differ,
@@ -569,7 +577,6 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		// It will be retried.
 		return true
 	}
-
 	c.queue.Forget(poolName)
 	return true
 }
@@ -596,6 +603,12 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	c.mutex.RLock()
 	resources = c.resources
 	c.mutex.RUnlock()
+	if err := validateDriverResources(resources); err != nil {
+		c.errorHandler(ctx, err, "pool validation failed")
+		// We only report the error through the error handler to prevent
+		// the controller from retrying.
+		return nil
+	}
 
 	pool, ok := resources.Pools[poolName]
 	if !ok {
