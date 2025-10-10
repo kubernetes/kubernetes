@@ -77,7 +77,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 	}
 
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-	lw := &cache.ListWatch{
+	lw := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
 			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(ctx, options)
@@ -86,7 +86,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 			options.FieldSelector = fieldSelector
 			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(ctx, options)
 		},
-	}
+	}, o.DynamicClient)
 
 	// this function is used to refresh the cache to prevent timeout waits on resources that have disappeared
 	preconditionFunc := func(store cache.Store) (bool, error) {
