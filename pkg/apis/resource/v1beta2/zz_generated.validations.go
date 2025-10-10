@@ -567,7 +567,21 @@ func Validate_DeviceRequestAllocationResult(ctx context.Context, op operation.Op
 
 	// field resourcev1beta2.DeviceRequestAllocationResult.Device has no validation
 	// field resourcev1beta2.DeviceRequestAllocationResult.AdminAccess has no validation
-	// field resourcev1beta2.DeviceRequestAllocationResult.Tolerations has no validation
+
+	// field resourcev1beta2.DeviceRequestAllocationResult.Tolerations
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.DeviceToleration) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration)...)
+			return
+		}(fldPath.Child("tolerations"), obj.Tolerations, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceRequestAllocationResult) []resourcev1beta2.DeviceToleration {
+			return oldObj.Tolerations
+		}))...)
+
 	// field resourcev1beta2.DeviceRequestAllocationResult.BindingConditions has no validation
 	// field resourcev1beta2.DeviceRequestAllocationResult.BindingFailureConditions has no validation
 
@@ -623,8 +637,51 @@ func Validate_DeviceSubRequest(ctx context.Context, op operation.Operation, fldP
 
 	// field resourcev1beta2.DeviceSubRequest.AllocationMode has no validation
 	// field resourcev1beta2.DeviceSubRequest.Count has no validation
-	// field resourcev1beta2.DeviceSubRequest.Tolerations has no validation
+
+	// field resourcev1beta2.DeviceSubRequest.Tolerations
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.DeviceToleration) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration)...)
+			return
+		}(fldPath.Child("tolerations"), obj.Tolerations, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceSubRequest) []resourcev1beta2.DeviceToleration {
+			return oldObj.Tolerations
+		}))...)
+
 	// field resourcev1beta2.DeviceSubRequest.Capacity has no validation
+	return errs
+}
+
+// Validate_DeviceToleration validates an instance of DeviceToleration according
+// to declarative validation rules in the API schema.
+func Validate_DeviceToleration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceToleration) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceToleration.Key
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.LabelKey(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("key"), &obj.Key, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceToleration) *string { return &oldObj.Key }))...)
+
+	// field resourcev1beta2.DeviceToleration.Operator has no validation
+	// field resourcev1beta2.DeviceToleration.Value has no validation
+	// field resourcev1beta2.DeviceToleration.Effect has no validation
+	// field resourcev1beta2.DeviceToleration.TolerationSeconds has no validation
 	return errs
 }
 
@@ -657,7 +714,21 @@ func Validate_ExactDeviceRequest(ctx context.Context, op operation.Operation, fl
 	// field resourcev1beta2.ExactDeviceRequest.AllocationMode has no validation
 	// field resourcev1beta2.ExactDeviceRequest.Count has no validation
 	// field resourcev1beta2.ExactDeviceRequest.AdminAccess has no validation
-	// field resourcev1beta2.ExactDeviceRequest.Tolerations has no validation
+
+	// field resourcev1beta2.ExactDeviceRequest.Tolerations
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.DeviceToleration) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration)...)
+			return
+		}(fldPath.Child("tolerations"), obj.Tolerations, safe.Field(oldObj, func(oldObj *resourcev1beta2.ExactDeviceRequest) []resourcev1beta2.DeviceToleration {
+			return oldObj.Tolerations
+		}))...)
+
 	// field resourcev1beta2.ExactDeviceRequest.Capacity has no validation
 	return errs
 }
