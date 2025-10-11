@@ -198,7 +198,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 	ginkgo.When("running non-guaranteed pods tests", ginkgo.Label("non-guaranteed", "reserved-cpus"), func() {
 		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: cpuset.CPUSet{},
 			}))
 
@@ -222,7 +222,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			reservedCPUs = cpuset.New(0)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
 
@@ -249,7 +249,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount+1) // note the extra for the non-gu pod
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
 
@@ -300,7 +300,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
 
@@ -332,7 +332,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
 
@@ -363,7 +363,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
 
@@ -395,7 +395,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
 
@@ -435,7 +435,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
 
@@ -476,7 +476,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
 
@@ -516,7 +516,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
 
@@ -568,7 +568,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enableCPUManagerOptions: false,
 			}))
@@ -601,7 +601,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enableCPUManagerOptions: false,
 			}))
@@ -633,7 +633,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enableCPUManagerOptions: false,
 			}))
@@ -666,7 +666,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enableCPUManagerOptions: false,
 			}))
@@ -707,7 +707,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enableCPUManagerOptions: false,
 			}))
@@ -749,7 +749,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enableCPUManagerOptions: false,
 			}))
@@ -790,7 +790,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enableCPUManagerOptions: false,
 			}))
@@ -839,7 +839,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 
 		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      cpuset.CPUSet{},
 				enableCPUManagerOptions: true,
 				options: map[string]string{
@@ -868,7 +868,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 
 		ginkgo.It("should let the container access all the online CPUs minus the reserved CPUs set when enabled", func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enableCPUManagerOptions: true,
 				options: map[string]string{
@@ -898,7 +898,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount+1) // note the extra for the non-gu pod)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enableCPUManagerOptions: true,
 				options: map[string]string{
@@ -956,7 +956,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			reservedCPUs = cpuset.New(0)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs,
 				enableCPUManagerOptions: true,
 				options: map[string]string{
@@ -1038,7 +1038,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			reservedCPUs := cpuset.New(0)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs,
 				enableCPUManagerOptions: true,
 				options: map[string]string{
@@ -1116,7 +1116,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			reservedCPUs := cpuset.New(0)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs,
 				enableCPUManagerOptions: true,
 				options: map[string]string{
@@ -1131,7 +1131,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
 
@@ -1183,7 +1183,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount+1) // note the extra for the non-gu pod)
 
 				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-					policyName:              string(cpumanager.PolicyStatic),
+					policyName:              kubeletconfig.StaticCPUManagerPolicy,
 					reservedSystemCPUs:      reservedCPUs,
 					enableCPUManagerOptions: true,
 					options: map[string]string{
@@ -1230,7 +1230,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), smtLevel)
 
 				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-					policyName:              string(cpumanager.PolicyStatic),
+					policyName:              kubeletconfig.StaticCPUManagerPolicy,
 					reservedSystemCPUs:      reservedCPUs,
 					enableCPUManagerOptions: true,
 					options: map[string]string{
@@ -1283,7 +1283,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), smtLevel)
 
 				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-					policyName:              string(cpumanager.PolicyStatic),
+					policyName:              kubeletconfig.StaticCPUManagerPolicy,
 					reservedSystemCPUs:      reservedCPUs,
 					enableCPUManagerOptions: true,
 					options: map[string]string{
@@ -1318,7 +1318,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), smtLevel)
 
 				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-					policyName:              string(cpumanager.PolicyStatic),
+					policyName:              kubeletconfig.StaticCPUManagerPolicy,
 					reservedSystemCPUs:      reservedCPUs,
 					enableCPUManagerOptions: true,
 					options: map[string]string{
@@ -1408,7 +1408,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-					policyName:              string(cpumanager.PolicyStatic),
+					policyName:              kubeletconfig.StaticCPUManagerPolicy,
 					reservedSystemCPUs:      reservedCPUs,
 					enableCPUManagerOptions: true,
 					options: map[string]string{
@@ -1498,7 +1498,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), smtLevel)
 
 				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-					policyName:              string(cpumanager.PolicyStatic),
+					policyName:              kubeletconfig.StaticCPUManagerPolicy,
 					reservedSystemCPUs:      reservedCPUs,
 					enableCPUManagerOptions: true,
 					options: map[string]string{
@@ -1540,7 +1540,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuReq)
 
 				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-					policyName:              string(cpumanager.PolicyStatic),
+					policyName:              kubeletconfig.StaticCPUManagerPolicy,
 					reservedSystemCPUs:      reservedCPUs,
 					enableCPUManagerOptions: true,
 					options: map[string]string{
@@ -1597,7 +1597,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			//          this means on more-than-2-way SMT systems this test will prove nothing
 			reservedCPUs = cpuset.New(0)
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
+				policyName:                       kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:               reservedCPUs,
 				disableCPUQuotaWithExclusiveCPUs: true,
 			}))
@@ -1763,7 +1763,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			//          this means on more-than-2-way SMT systems this test will prove nothing
 			reservedCPUs = cpuset.New(0)
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
+				policyName:                       kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:               reservedCPUs,
 				disableCPUQuotaWithExclusiveCPUs: false,
 			}))
@@ -1870,7 +1870,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
+				policyName:         kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
 
@@ -1983,7 +1983,7 @@ var _ = SIGDescribe("CPU Manager Incompatibility Pod Level Resources", ginkgo.Or
 	ginkgo.When("running guaranteed pod level resources tests", ginkgo.Label("guaranteed pod level resources", "reserved-cpus"), func() {
 		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      cpuset.CPUSet{},
 				enablePodLevelResources: true,
 			}))
@@ -2018,7 +2018,7 @@ var _ = SIGDescribe("CPU Manager Incompatibility Pod Level Resources", ginkgo.Or
 			reservedCPUs = cpuset.New(0)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enablePodLevelResources: true,
 			}))
