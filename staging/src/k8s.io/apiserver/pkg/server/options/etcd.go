@@ -61,8 +61,6 @@ type EtcdOptions struct {
 
 	// Set EnableWatchCache to false to disable all watch caches
 	EnableWatchCache bool
-	// Set DefaultWatchCacheSize to zero to disable watch caches for those resources that have no explicit cache size set
-	DefaultWatchCacheSize int
 	// WatchCacheSizes represents override to a given resource
 	WatchCacheSizes []string
 
@@ -82,7 +80,6 @@ func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 		DeleteCollectionWorkers: 1,
 		EnableGarbageCollection: true,
 		EnableWatchCache:        true,
-		DefaultWatchCacheSize:   100,
 	}
 	options.StorageConfig.CountMetricPollPeriod = time.Minute
 	return options
@@ -149,11 +146,12 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableWatchCache, "watch-cache", s.EnableWatchCache,
 		"Enable watch caching in the apiserver")
 
-	fs.IntVar(&s.DefaultWatchCacheSize, "default-watch-cache-size", s.DefaultWatchCacheSize,
+	defaultWatchCacheSize := 0
+	fs.IntVar(&defaultWatchCacheSize, "default-watch-cache-size", defaultWatchCacheSize,
 		"Default watch cache size. If zero, watch cache will be disabled for resources that do not have a default watch size set.")
 
 	fs.MarkDeprecated("default-watch-cache-size",
-		"watch caches are sized automatically and this flag will be removed in a future version")
+		"Watch caches are sized automatically. This flag is no-op and it will be removed in a future version.")
 
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"Watch cache size settings for some resources (pods, nodes, etc.), comma separated. "+
