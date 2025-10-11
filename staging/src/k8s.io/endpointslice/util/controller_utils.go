@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 )
 
 // semanticIgnoreResourceVersion does semantic deep equality checks for objects
@@ -49,8 +50,9 @@ var semanticIgnoreResourceVersion = conversion.EqualitiesOrDie(
 
 // GetPodServiceMemberships returns a set of Service keys for Services that have
 // a selector matching the given pod.
-func GetPodServiceMemberships(serviceLister v1listers.ServiceLister, pod *v1.Pod) (sets.String, error) {
-	set := sets.String{}
+func GetPodServiceMemberships(serviceLister v1listers.ServiceLister, pod *v1.Pod) (sets.Set[string], error) {
+	// Initialize the set using the new generic type.
+	set := sets.Set[string]{}
 	services, err := serviceLister.Services(pod.Namespace).List(labels.Everything())
 	if err != nil {
 		return set, err
@@ -58,14 +60,15 @@ func GetPodServiceMemberships(serviceLister v1listers.ServiceLister, pod *v1.Pod
 
 	for _, service := range services {
 		if service.Spec.Selector == nil {
-			// if the service has a nil selector this means selectors match nothing, not everything.
+			// If the service has a nil selector this means selectors match nothing, not everything.
 			continue
 		}
 
 		if labels.ValidatedSetSelector(service.Spec.Selector).Matches(labels.Set(pod.Labels)) {
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(service)
 			if err != nil {
-				return nil, err
+				// Return an empty set instead of nil on error to match the return type.
+				return sets.Set[string]{}, err
 			}
 			set.Insert(key)
 		}
@@ -160,32 +163,32 @@ func podEndpointsChanged(oldPod, newPod *v1.Pod) (bool, bool) {
 
 // GetServicesToUpdateOnPodChange returns a set of Service keys for Services
 // that have potentially been affected by a change to this pod.
-func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, old, cur interface{}) sets.String {
+func GetServicesToUpdateOnPodChange(logger klog.Logger, serviceLister v1listers.ServiceLister, old, cur interface{}) sets.Set[string] {
 	newPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	if newPod.ResourceVersion == oldPod.ResourceVersion {
 		// Periodic resync will send update events for all known pods.
 		// Two different versions of the same pod will always have different RVs
-		return sets.String{}
+		return nil
 	}
 
 	podChanged, labelsChanged := podEndpointsChanged(oldPod, newPod)
 
 	// If both the pod and labels are unchanged, no update is needed
 	if !podChanged && !labelsChanged {
-		return sets.String{}
+		return nil
 	}
 
 	services, err := GetPodServiceMemberships(serviceLister, newPod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
-		return sets.String{}
+		utilruntime.HandleErrorWithLogger(logger, err, "Unable to get pod's service memberships", "pod", klog.KObj(newPod))
+		return sets.Set[string]{}
 	}
 
 	if labelsChanged {
 		oldServices, err := GetPodServiceMemberships(serviceLister, oldPod)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", oldPod.Namespace, oldPod.Name, err))
+			utilruntime.HandleErrorWithLogger(logger, err, "Unable to get pod's service memberships", "pod", klog.KObj(oldPod))
 		}
 		services = determineNeededServiceUpdates(oldServices, services, podChanged)
 	}
@@ -195,7 +198,7 @@ func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, old, 
 
 // GetPodFromDeleteAction returns a pointer to a pod if one can be derived from
 // obj (could be a *v1.Pod, or a DeletionFinalStateUnknown marker item).
-func GetPodFromDeleteAction(obj interface{}) *v1.Pod {
+func GetPodFromDeleteAction(logger klog.Logger, obj interface{}) *v1.Pod {
 	if pod, ok := obj.(*v1.Pod); ok {
 		// Enqueue all the services that the pod used to be a member of.
 		// This is the same thing we do when we add a pod.
@@ -204,12 +207,12 @@ func GetPodFromDeleteAction(obj interface{}) *v1.Pod {
 	// If we reached here it means the pod was deleted but its final state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Couldn't get object from tombstone", "obj", obj)
 		return nil
 	}
 	pod, ok := tombstone.Obj.(*v1.Pod)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod: %#v", obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Tombstone contained object that is not a Pod", "type", fmt.Sprintf("%T", obj))
 		return nil
 	}
 	return pod
@@ -220,7 +223,7 @@ func hostNameAndDomainAreEqual(pod1, pod2 *v1.Pod) bool {
 		pod1.Spec.Subdomain == pod2.Spec.Subdomain
 }
 
-func determineNeededServiceUpdates(oldServices, services sets.String, podChanged bool) sets.String {
+func determineNeededServiceUpdates(oldServices, services sets.Set[string], podChanged bool) sets.Set[string] {
 	if podChanged {
 		// if the labels and pod changed, all services need to be updated
 		services = services.Union(oldServices)
