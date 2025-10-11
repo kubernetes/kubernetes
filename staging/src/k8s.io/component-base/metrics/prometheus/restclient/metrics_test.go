@@ -18,6 +18,7 @@ package restclient
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -58,6 +59,19 @@ func TestClientGOMetrics(t *testing.T) {
 			            # HELP rest_client_request_retries_total [ALPHA] Number of request retries, partitioned by status code, verb, and host.
 			            # TYPE rest_client_request_retries_total counter
 			            rest_client_request_retries_total{code="500",host="www.bar.com",verb="GET"} 1
+				`,
+		},
+		{
+			description: "Number of rate limiter hits, partitioned by verb and host.",
+			name:        "rest_client_rate_limiter_hit_count_total",
+			metric:      rateLimiterHitCount,
+			update: func() {
+				metrics.RateLimiterHitCount.Increment(context.TODO(), "GET", url.URL{Host: "www.bar.com"})
+			},
+			want: `
+						# HELP rest_client_rate_limiter_hit_count_total [ALPHA] Client side rate limiter hit count. Broken down by verb and host.
+						# TYPE rest_client_rate_limiter_hit_count_total counter
+						rest_client_rate_limiter_hit_count_total{host="www.bar.com",verb="GET"} 1
 				`,
 		},
 	}
