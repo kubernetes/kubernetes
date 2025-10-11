@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
@@ -78,7 +79,7 @@ func returnPolicyByName(ctx context.Context, testCase testMemoryManager) Policy 
 			err: fmt.Errorf("fake reg error"),
 		}
 	case PolicyTypeStatic:
-		policy, _ := NewPolicyStatic(ctx, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager())
+		policy, _ := NewPolicyStatic(ctx, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager(klog.FromContext(ctx)))
 		return policy
 	case policyTypeNone:
 		return NewPolicyNone(ctx)
@@ -1914,7 +1915,7 @@ func getPolicyNameForOs() policyType {
 }
 
 func TestNewManager(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 	expectedReserved := systemReservedMemory{
 		0: map[v1.ResourceName]uint64{
@@ -1940,7 +1941,7 @@ func TestNewManager(t *testing.T) {
 					Limits:   v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI)},
 				},
 			},
-			affinity:         topologymanager.NewFakeManager(),
+			affinity:         topologymanager.NewFakeManager(logger),
 			expectedError:    nil,
 			expectedReserved: expectedReserved,
 		},
@@ -1963,7 +1964,7 @@ func TestNewManager(t *testing.T) {
 					},
 				},
 			},
-			affinity:         topologymanager.NewFakeManager(),
+			affinity:         topologymanager.NewFakeManager(logger),
 			expectedError:    fmt.Errorf("the total amount \"3Gi\" of type %q is not equal to the value \"2Gi\" determined by Node Allocatable feature", v1.ResourceMemory),
 			expectedReserved: expectedReserved,
 		},
@@ -1973,7 +1974,7 @@ func TestNewManager(t *testing.T) {
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{},
 			systemReservedMemory:       []kubeletconfig.MemoryReservation{},
-			affinity:                   topologymanager.NewFakeManager(),
+			affinity:                   topologymanager.NewFakeManager(logger),
 			expectedError:              fmt.Errorf("[memorymanager] you should specify the system reserved memory"),
 			expectedReserved:           expectedReserved,
 		},
@@ -1983,7 +1984,7 @@ func TestNewManager(t *testing.T) {
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{},
 			systemReservedMemory:       []kubeletconfig.MemoryReservation{},
-			affinity:                   topologymanager.NewFakeManager(),
+			affinity:                   topologymanager.NewFakeManager(logger),
 			expectedError:              fmt.Errorf("unknown policy: \"fake\""),
 			expectedReserved:           expectedReserved,
 		},
@@ -1993,7 +1994,7 @@ func TestNewManager(t *testing.T) {
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{},
 			systemReservedMemory:       []kubeletconfig.MemoryReservation{},
-			affinity:                   topologymanager.NewFakeManager(),
+			affinity:                   topologymanager.NewFakeManager(logger),
 			expectedError:              nil,
 			expectedReserved:           expectedReserved,
 		},
