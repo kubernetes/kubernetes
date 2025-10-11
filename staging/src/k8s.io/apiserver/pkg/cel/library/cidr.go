@@ -82,24 +82,24 @@ import (
 //
 // Examples:
 //
-// cidr('192.168.0.0/24').containsIP(ip('192.168.0.1')) // returns true
-// cidr('192.168.0.0/24').containsIP(ip('192.168.1.1')) // returns false
-// cidr('192.168.0.0/24').containsIP('192.168.0.1') // returns true
-// cidr('192.168.0.0/24').containsIP('192.168.1.1') // returns false
-// cidr('192.168.0.0/16').containsCIDR(cidr('192.168.10.0/24')) // returns true
-// cidr('192.168.1.0/24').containsCIDR(cidr('192.168.2.0/24')) // returns false
-// cidr('192.168.0.0/16').containsCIDR('192.168.10.0/24') // returns true
-// cidr('192.168.1.0/24').containsCIDR('192.168.2.0/24') // returns false
-// cidr('192.168.0.1/24').ip() // returns ipAddr('192.168.0.1')
-// cidr('192.168.0.1/24').ip().family() // returns '4'
-// cidr('::1/128').ip() // returns ipAddr('::1')
-// cidr('::1/128').ip().family() // returns '6'
-// cidr('192.168.0.0/24').masked() // returns cidr('192.168.0.0/24')
-// cidr('192.168.0.1/24').masked() // returns cidr('192.168.0.0/24')
-// cidr('192.168.0.0/24') == cidr('192.168.0.0/24').masked() // returns true, CIDR was already in canonical format
-// cidr('192.168.0.1/24') == cidr('192.168.0.1/24').masked() // returns false, CIDR was not in canonical format
-// cidr('192.168.0.0/16').prefixLength() // returns 16
-// cidr('::1/128').prefixLength() // returns 128
+//	cidr('192.168.0.0/24').containsIP(ip('192.168.0.1')) // returns true
+//	cidr('192.168.0.0/24').containsIP(ip('192.168.1.1')) // returns false
+//	cidr('192.168.0.0/24').containsIP('192.168.0.1') // returns true
+//	cidr('192.168.0.0/24').containsIP('192.168.1.1') // returns false
+//	cidr('192.168.0.0/16').containsCIDR(cidr('192.168.10.0/24')) // returns true
+//	cidr('192.168.1.0/24').containsCIDR(cidr('192.168.2.0/24')) // returns false
+//	cidr('192.168.0.0/16').containsCIDR('192.168.10.0/24') // returns true
+//	cidr('192.168.1.0/24').containsCIDR('192.168.2.0/24') // returns false
+//	cidr('192.168.0.1/24').ip() // returns ipAddr('192.168.0.1')
+//	cidr('192.168.0.1/24').ip().family() // returns '4'
+//	cidr('::1/128').ip() // returns ipAddr('::1')
+//	cidr('::1/128').ip().family() // returns '6'
+//	cidr('192.168.0.0/24').masked() // returns cidr('192.168.0.0/24')
+//	cidr('192.168.0.1/24').masked() // returns cidr('192.168.0.0/24')
+//	cidr('192.168.0.0/24') == cidr('192.168.0.0/24').masked() // returns true, CIDR was already in canonical format
+//	cidr('192.168.0.1/24') == cidr('192.168.0.1/24').masked() // returns false, CIDR was not in canonical format
+//	cidr('192.168.0.0/16').prefixLength() // returns 16
+//	cidr('::1/128').prefixLength() // returns 128
 func CIDR() cel.EnvOption {
 	return cel.Lib(cidrsLib)
 }
