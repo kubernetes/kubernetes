@@ -19,16 +19,15 @@ package clusterrole
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // strategy implements behavior for ClusterRoles
@@ -79,24 +78,14 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	}
 	allErrs := validation.ValidateClusterRole(clusterRole, opts)
 
-	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
-
-		// Determine if takeover is enabled
-		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-
-		// Run declarative validation with panic recovery
-		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, clusterRole, rest.WithTakeover(takeover))
-
-		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover, "ClusterRole")
-
-		// Only apply declarative errors if takeover is enabled
-		if takeover {
-			allErrs = append(allErrs.RemoveCoveredByDeclarative(), declarativeErrs...)
-		}
-	}
-	return allErrs
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		clusterRole,
+		nil,
+		allErrs,
+		operation.Create,
+	)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -116,25 +105,14 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	}
 	errs := validation.ValidateClusterRoleUpdate(newObj, oldObj, opts)
 
-	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
-
-		// Determine if takeover is enabled
-		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-
-		// Run declarative validation with panic recovery
-		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, newObj, rest.WithTakeover(takeover))
-
-		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover, "ClusterRoleUpdate")
-
-		// Only apply declarative errors if takeover is enabled
-		if takeover {
-			errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
-		}
-	}
-
-	return errs
+	return rest.ValidateDeclarativelyWithMigrationChecks(
+		ctx,
+		legacyscheme.Scheme,
+		newObj,
+		oldObj,
+		errs,
+		operation.Update,
+	)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
