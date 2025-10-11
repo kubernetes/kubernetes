@@ -696,6 +696,13 @@ func (m *DeploymentSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.PodReplacementPolicy != nil {
+		i -= len(*m.PodReplacementPolicy)
+		copy(dAtA[i:], *m.PodReplacementPolicy)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.PodReplacementPolicy)))
+		i--
+		dAtA[i] = 0x52
+	}
 	if m.ProgressDeadlineSeconds != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.ProgressDeadlineSeconds))
 		i--
@@ -2591,6 +2598,10 @@ func (m *DeploymentSpec) Size() (n int) {
 	if m.ProgressDeadlineSeconds != nil {
 		n += 1 + sovGenerated(uint64(*m.ProgressDeadlineSeconds))
 	}
+	if m.PodReplacementPolicy != nil {
+		l = len(*m.PodReplacementPolicy)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -3368,6 +3379,7 @@ func (this *DeploymentSpec) String() string {
 		`Paused:` + fmt.Sprintf("%v", this.Paused) + `,`,
 		`RollbackTo:` + strings.Replace(this.RollbackTo.String(), "RollbackConfig", "RollbackConfig", 1) + `,`,
 		`ProgressDeadlineSeconds:` + valueToStringGenerated(this.ProgressDeadlineSeconds) + `,`,
+		`PodReplacementPolicy:` + valueToStringGenerated(this.PodReplacementPolicy) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -5948,6 +5960,39 @@ func (m *DeploymentSpec) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.ProgressDeadlineSeconds = &v
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodReplacementPolicy", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := DeploymentPodReplacementPolicy(dAtA[iNdEx:postIndex])
+			m.PodReplacementPolicy = &s
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

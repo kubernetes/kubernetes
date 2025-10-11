@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
@@ -58,6 +59,28 @@ type DeploymentSpecApplyConfiguration struct {
 	// reason will be surfaced in the deployment status. Note that progress will
 	// not be estimated during the time a deployment is paused. Defaults to 600s.
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty"`
+	// podReplacementPolicy specifies when to create replacement Pods.
+	// Possible values are:
+	// - TerminationStarted policy creates replacement Pods when the old Pods start
+	// terminating (have a non-null .metadata.deletionTimestamp). The total number
+	// of Deployment Pods can be greater than specified by the Deployment's
+	// .spec.replicas and the DeploymentStrategy.
+	// - TerminationComplete policy creates replacement Pods only when the old Pods
+	// are fully terminated (reach Succeeded or Failed phase). The old Pods are
+	// subsequently removed. The total number of the Deployment Pods is
+	// limited by the Deployment's .spec.replicas and the DeploymentStrategy.
+	// This policy will also delay declaring the deployment as complete until all
+	// of its terminating replicas have been fully terminated.
+	//
+	// The default behavior when the policy is not specified depends on the DeploymentStrategy:
+	// - Recreate strategy uses TerminationComplete behavior when recreating the deployment,
+	// but uses TerminationStarted when scaling the deployment.
+	// - RollingUpdate strategy uses TerminationStarted behavior for both rolling out and
+	// scaling the deployments.
+	//
+	// This is an alpha field. Enable DeploymentPodReplacementPolicy and
+	// DeploymentReplicaSetTerminatingReplicas to be able to use this field.
+	PodReplacementPolicy *appsv1beta1.DeploymentPodReplacementPolicy `json:"podReplacementPolicy,omitempty"`
 }
 
 // DeploymentSpecApplyConfiguration constructs a declarative configuration of the DeploymentSpec type for use with
@@ -135,5 +158,13 @@ func (b *DeploymentSpecApplyConfiguration) WithRollbackTo(value *RollbackConfigA
 // If called multiple times, the ProgressDeadlineSeconds field is set to the value of the last call.
 func (b *DeploymentSpecApplyConfiguration) WithProgressDeadlineSeconds(value int32) *DeploymentSpecApplyConfiguration {
 	b.ProgressDeadlineSeconds = &value
+	return b
+}
+
+// WithPodReplacementPolicy sets the PodReplacementPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PodReplacementPolicy field is set to the value of the last call.
+func (b *DeploymentSpecApplyConfiguration) WithPodReplacementPolicy(value appsv1beta1.DeploymentPodReplacementPolicy) *DeploymentSpecApplyConfiguration {
+	b.PodReplacementPolicy = &value
 	return b
 }
