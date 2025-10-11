@@ -22,25 +22,29 @@ package app
 import (
 	"context"
 	"fmt"
+
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/custom_metrics"
 	"k8s.io/metrics/pkg/client/external_metrics"
+
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller/run"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
 
-func newHorizontalPodAutoscalerControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.HorizontalPodAutoscalerController,
-		aliases:     []string{"horizontalpodautoscaling"},
-		constructor: newHorizontalPodAutoscalerController,
+func newHorizontalPodAutoscalerControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.HorizontalPodAutoscalerController,
+		Aliases:     []string{"horizontalpodautoscaling"},
+		Constructor: newHorizontalPodAutoscalerController,
 	}
 }
 
-func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	clientConfig, err := controllerContext.NewClientConfig("horizontal-pod-autoscaler")
 	if err != nil {
 		return nil, err
@@ -92,7 +96,7 @@ func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
 	)
-	return newControllerLoop(concurrentRun(
+	return run.NewControllerLoop(run.Concurrent(
 		func(ctx context.Context) {
 			custom_metrics.PeriodicallyInvalidate(
 				apiVersionsGetter,
