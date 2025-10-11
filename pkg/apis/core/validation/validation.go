@@ -8389,7 +8389,7 @@ var (
 func ValidateLoadBalancerStatus(status, oldStatus *core.LoadBalancerStatus, fldPath *field.Path, spec *core.ServiceSpec) field.ErrorList {
 	allErrs := field.ErrorList{}
 	ingrPath := fldPath.Child("ingress")
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AllowServiceLBStatusOnNonLB) && spec.Type != core.ServiceTypeLoadBalancer && len(status.Ingress) != 0 {
+	if spec.Type != core.ServiceTypeLoadBalancer && len(status.Ingress) != 0 {
 		allErrs = append(allErrs, field.Forbidden(ingrPath, "may only be used when `spec.type` is 'LoadBalancer'"))
 	} else {
 		var existingIngressIPs []string
