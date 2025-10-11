@@ -21,7 +21,10 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 )
@@ -39,6 +42,9 @@ const (
 	ContainersNotInitialized = "ContainersNotInitialized"
 	// ReadinessGatesNotReady says that one or more pod readiness gates are not ready.
 	ReadinessGatesNotReady = "ReadinessGatesNotReady"
+	// AllContainersNotRunning says that all containers are not running.
+	AllContainerNotRunning = "AllContainerNotRunning"
+	ContainerExited        = "ContainerExited"
 )
 
 // GenerateContainersReadyCondition returns the status of "ContainersReady" condition.
@@ -233,6 +239,20 @@ func GeneratePodInitializedCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, co
 	}
 	unreadyMessage := strings.Join(unreadyMessages, ", ")
 	if unreadyMessage != "" {
+		// During pod in-place restart, init container status can change from completed to waiting.
+		// However, it is assumed that once a pod is initialized, it cannot be uninitialized. If
+		// the pod is already initialized, the condition is kept.
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+			for _, cond := range oldPodStatus.Conditions {
+				if cond.Type == v1.PodInitialized && cond.Status == v1.ConditionTrue {
+					return v1.PodCondition{
+						Type:               v1.PodInitialized,
+						ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodInitialized),
+						Status:             v1.ConditionTrue,
+					}
+				}
+			}
+		}
 		return v1.PodCondition{
 			Type:               v1.PodInitialized,
 			ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodInitialized),
@@ -299,4 +319,110 @@ func generatePodReadyConditionForTerminalPhase(pod *v1.Pod, oldPodStatus *v1.Pod
 	}
 
 	return condition
+}
+
+func GeneratePodRestartCondition(pod *v1.Pod, podStatus *kubecontainer.PodStatus, podPhase v1.PodPhase) v1.PodCondition {
+	if podPhase == v1.PodSucceeded {
+		return v1.PodCondition{
+			Type:   v1.PodRestartInPlace,
+			Status: v1.ConditionFalse,
+			Reason: PodCompleted,
+		}
+	}
+	if podPhase == v1.PodFailed {
+		return v1.PodCondition{
+			Type:   v1.PodRestartInPlace,
+			Status: v1.ConditionFalse,
+			Reason: PodFailed,
+		}
+	}
+
+	// If all init and regular containers have been removed, remove the condition.
+	allRemoved := true
+	for _, initC := range pod.Spec.InitContainers {
+		if podStatus.FindContainerStatusByName(initC.Name) != nil {
+			allRemoved = false
+			break
+		}
+	}
+	for _, c := range pod.Spec.Containers {
+		if podStatus.FindContainerStatusByName(c.Name) != nil {
+			allRemoved = false
+			break
+		}
+	}
+	if allRemoved {
+		klog.V(3).InfoS("all containers removed, removing PodRestartInPlace condition", "podName", pod.Name)
+		return v1.PodCondition{
+			Type:   v1.PodRestartInPlace,
+			Status: v1.ConditionFalse,
+			Reason: AllContainerNotRunning,
+		}
+	}
+
+	if kubecontainer.ShouldPodBeRestarted(pod, podStatus) {
+		return v1.PodCondition{
+			Type:    v1.PodRestartInPlace,
+			Status:  v1.ConditionTrue,
+			Reason:  ContainerExited,
+			Message: "container exited with restart policy rule",
+		}
+	}
+	cond := v1.PodCondition{
+		Type:   v1.PodRestartInPlace,
+		Status: v1.ConditionFalse,
+	}
+	// Preserve the existing condition.
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodRestartInPlace {
+			cond = condition
+		}
+	}
+	return cond
+	// for _, initContainer := range pod.Spec.InitContainers {
+	// 	status := podStatus.FindContainerStatusByName(initContainer.Name)
+	// 	if status == nil || status.State != kubecontainer.ContainerStateExited {
+	// 		continue
+	// 	}
+	// 	exitCode := int32(status.ExitCode)
+	// 	rule, ok := podutil.FindMatchingContainerRestartRule(initContainer, exitCode)
+	// 	if ok && rule.Action == v1.ContainerRestartRuleActionRestartPod {
+	// 		klog.V(3).InfoS("initContainer exited with RestartPod action", "podName", pod.Name, "containerName", initContainer.Name, "exitCode", exitCode)
+	// 		return v1.PodCondition{
+	// 			Type:    v1.PodRestartInPlace,
+	// 			Status:  v1.ConditionTrue,
+	// 			Reason:  ContainerExited,
+	// 			Message: fmt.Sprintf("initContainer %s exited with code %d", initContainer.Name, exitCode),
+	// 		}
+	// 	}
+	// }
+	// for _, container := range pod.Spec.Containers {
+	// 	status := podStatus.FindContainerStatusByName(container.Name)
+	// 	if status == nil || status.State != kubecontainer.ContainerStateExited {
+	// 		continue
+	// 	}
+	// 	exitCode := int32(status.ExitCode)
+	// 	rule, ok := podutil.FindMatchingContainerRestartRule(container, exitCode)
+	// 	if ok && rule.Action == v1.ContainerRestartRuleActionRestartPod {
+	// 		klog.V(3).InfoS("container exited with RestartPod action", "podName", pod.Name, "containerName", container.Name)
+	// 		return v1.PodCondition{
+	// 			Type:    v1.PodRestartInPlace,
+	// 			Status:  v1.ConditionTrue,
+	// 			Reason:  ContainerExited,
+	// 			Message: fmt.Sprintf("containers %s exited with code %d", container.Name, exitCode),
+	// 		}
+	// 	}
+	// }
+
+	// cond := v1.PodCondition{
+	// 	Type:   v1.PodRestartInPlace,
+	// 	Status: v1.ConditionFalse,
+	// }
+	// // Preserve the existing condition.
+	// for _, condition := range pod.Status.Conditions {
+	// 	if condition.Type == v1.PodRestartInPlace {
+	// 		cond = condition
+	// 	}
+	// }
+	// return cond
 }

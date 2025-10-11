@@ -428,6 +428,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
 		AllowUserNamespacesWithVolumeDevices:                false,
+		AllowContainerRestartPolicyRulesOnSidecars:          utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -474,6 +475,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
 
 		opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
+		opts.AllowContainerRestartPolicyRulesOnSidecars = opts.AllowContainerRestartPolicyRulesOnSidecars || containerRestartRulesInUseOnSidecar(oldPodSpec)
 
 		// If old spec has userns and volume devices (doesn't work), we still allow
 		// modifications to it.
@@ -1764,6 +1766,22 @@ func containerRestartRulesInUse(oldPodSpec *api.PodSpec) bool {
 	for _, c := range oldPodSpec.Containers {
 		if c.RestartPolicy != nil {
 			return true
+		}
+	}
+	return false
+}
+
+func containerRestartRulesInUseOnSidecar(oldPodSpec *api.PodSpec) bool {
+	if oldPodSpec == nil {
+		return false
+	}
+	for _, c := range oldPodSpec.InitContainers {
+		if c.RestartPolicy != nil && *c.RestartPolicy == api.ContainerRestartPolicyAlways {
+			for _, rule := range c.RestartPolicyRules {
+				if rule.Action == api.ContainerRestartRuleActionRestartPod {
+					return true
+				}
+			}
 		}
 	}
 	return false

@@ -3286,6 +3286,9 @@ func validateInitContainerRestartPolicy(restartPolicy *core.ContainerRestartPoli
 	if opts.AllowContainerRestartPolicyRules {
 		switch *restartPolicy {
 		case core.ContainerRestartPolicyAlways:
+			if opts.AllowContainerRestartPolicyRulesOnSidecars {
+				return allErrors
+			}
 			// Sidecar containers should not have restart policy rules
 			if len(restartRules) > 0 {
 				allErrors = append(allErrors, field.Forbidden(fldPath.Child("restartPolicyRules"), "restartPolicyRules are not allowed for init containers with restart policy Always"))
@@ -3624,13 +3627,18 @@ var supportedContainerRestartPolicies = sets.New(
 	core.ContainerRestartPolicyOnFailure,
 )
 
+var supportedContainerRestartRuleActions = sets.New(
+	core.ContainerRestartRuleActionRestart,
+	core.ContainerRestartRuleActionRestartPod,
+)
+
 var supportedContainerRestartPolicyOperators = sets.New(
 	core.ContainerRestartRuleOnExitCodesOpIn,
 	core.ContainerRestartRuleOnExitCodesOpNotIn,
 )
 
 // validateContainerRestartPolicy checks the container-level restartPolicy and restartPolicyRules are valid for
-// regular containers and non-sidecar init containers.
+// regular containers and init containers.
 func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules []core.ContainerRestartRule, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	restartPolicyFld := fldPath.Child("restartPolicy")
@@ -3649,10 +3657,8 @@ func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules [
 	}
 	for i, rule := range rules {
 		policyRulesFld := fldPath.Child("restartPolicyRules").Index(i)
-
-		if rule.Action != core.ContainerRestartRuleActionRestart {
-			validActions := []core.ContainerRestartRuleAction{core.ContainerRestartRuleActionRestart}
-			allErrs = append(allErrs, field.NotSupported(policyRulesFld.Child("action"), rule.Action, validActions))
+		if !supportedContainerRestartRuleActions.Has(rule.Action) {
+			allErrs = append(allErrs, field.NotSupported(policyRulesFld.Child("action"), rule.Action, sets.List(supportedContainerRestartRuleActions)))
 		}
 
 		if rule.ExitCodes != nil {
@@ -4413,6 +4419,8 @@ type PodValidationOptions struct {
 	AllowContainerRestartPolicyRules bool
 	// Allow user namespaces with volume devices, even though they will not function properly (should only be tolerated in updates of objects which already have this invalid configuration).
 	AllowUserNamespacesWithVolumeDevices bool
+	// AllowContainerRestartPolicyRulesOnSidecars bool
+	AllowContainerRestartPolicyRulesOnSidecars bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -5754,13 +5762,18 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 }
 
 // ValidateContainerStateTransition test to if any illegal container state transitions are being attempted
-func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerStatus, fldPath *field.Path, podSpec core.PodSpec) field.ErrorList {
+func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerStatus, fldPath *field.Path, pod core.Pod) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
 		v1PodSpec := &v1.PodSpec{}
-		err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&podSpec, v1PodSpec, nil)
+		err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&pod.Spec, v1PodSpec, nil)
 		if err != nil {
 			allErrs = append(allErrs, field.InternalError(fldPath, fmt.Errorf("invalid %q: %v", fldPath, err.Error())))
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+			if podutil.PodCouldRestartInPlace(v1PodSpec) {
+				return allErrs
+			}
 		}
 		for i, oldStatus := range oldStatuses {
 			// Skip any container that is not terminated
@@ -5785,7 +5798,7 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 		}
 		return allErrs
 	}
-	restartPolicy := podSpec.RestartPolicy
+	restartPolicy := pod.Spec.RestartPolicy
 	// If we should always restart, containers are allowed to leave the terminated state
 	if restartPolicy == core.RestartPolicyAlways {
 		return allErrs
@@ -5809,8 +5822,43 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 }
 
 // ValidateInitContainerStateTransition test to if any illegal init container state transitions are being attempted
-func ValidateInitContainerStateTransition(newStatuses, oldStatuses []core.ContainerStatus, fldpath *field.Path, podSpec *core.PodSpec) field.ErrorList {
+func ValidateInitContainerStateTransition(newStatuses, oldStatuses []core.ContainerStatus, fldpath *field.Path, pod core.Pod) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+		v1PodSpec := &v1.PodSpec{}
+		err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&pod.Spec, v1PodSpec, nil)
+		if err != nil {
+			allErrs = append(allErrs, field.InternalError(fldpath, fmt.Errorf("invalid %q: %v", fldpath, err.Error())))
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRestartPodInPlace) {
+			if podutil.PodCouldRestartInPlace(v1PodSpec) {
+				return allErrs
+			}
+		}
+		for i, oldStatus := range oldStatuses {
+			// Skip any container that is not terminated
+			if oldStatus.State.Terminated == nil {
+				continue
+			}
+			for _, newStatus := range newStatuses {
+				if newStatus.Name == oldStatus.Name && newStatus.State.Terminated == nil {
+					allowed := false
+					for _, c := range v1PodSpec.InitContainers {
+						if c.Name == oldStatus.Name {
+							allowed = podutil.ContainerShouldRestart(c, *v1PodSpec, oldStatus.State.Terminated.ExitCode)
+							break
+						}
+					}
+					if !allowed {
+						allErrs = append(allErrs, field.Forbidden(fldpath.Index(i).Child("state"), "may not be transitioned to non-terminated state"))
+					}
+					break
+				}
+			}
+		}
+		return allErrs
+	}
+	podSpec := pod.Spec
 	// If we should always restart, containers are allowed to leave the terminated state
 	if podSpec.RestartPolicy == core.RestartPolicyAlways {
 		return allErrs
@@ -5907,8 +5955,8 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	//
 	// If pod should not restart, make sure the status update does not transition
 	// any terminated containers to a non-terminated state.
-	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.ContainerStatuses, oldPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), oldPod.Spec)...)
-	allErrs = append(allErrs, ValidateInitContainerStateTransition(newPod.Status.InitContainerStatuses, oldPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), &oldPod.Spec)...)
+	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.ContainerStatuses, oldPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), *oldPod)...)
+	allErrs = append(allErrs, ValidateInitContainerStateTransition(newPod.Status.InitContainerStatuses, oldPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), *oldPod)...)
 	allErrs = append(allErrs, ValidateEphemeralContainerStateTransition(newPod.Status.EphemeralContainerStatuses, oldPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"))...)
 	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
 	allErrs = append(allErrs, validatePodExtendedResourceClaimStatus(newPod.Status.ExtendedResourceClaimStatus, &newPod.Spec, fldPath.Child("extendedResourceClaimStatus"))...)

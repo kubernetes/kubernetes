@@ -2145,6 +2145,16 @@ func failedState(cName string) v1.ContainerStatus {
 		},
 	}
 }
+func failedStateWithExitCode(cName string, exitCode int32) v1.ContainerStatus {
+	return v1.ContainerStatus{
+		Name: cName,
+		State: v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{
+				ExitCode: exitCode,
+			},
+		},
+	}
+}
 func waitingWithLastTerminationUnknown(cName string, restartCount int32) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name: cName,
@@ -2168,6 +2178,26 @@ func ready(status v1.ContainerStatus) v1.ContainerStatus {
 func withID(status v1.ContainerStatus, id string) v1.ContainerStatus {
 	status.ContainerID = id
 	return status
+}
+func withRestartCount(status v1.ContainerStatus, restartCount int32) v1.ContainerStatus {
+	status.RestartCount = restartCount
+	return status
+}
+
+func kubecontainerStatusFailedWithExitCode(cName string, exitCode int) *kubecontainer.Status {
+	return &kubecontainer.Status{
+		Name:     cName,
+		ID:       kubecontainer.ContainerID{ID: cName},
+		State:    kubecontainer.ContainerStateExited,
+		ExitCode: exitCode,
+	}
+}
+func kubecontainerStatusRunning(cName string) *kubecontainer.Status {
+	return &kubecontainer.Status{
+		Name:  cName,
+		ID:    kubecontainer.ContainerID{ID: cName},
+		State: kubecontainer.ContainerStateRunning,
+	}
 }
 
 func TestPodPhaseWithRestartAlways(t *testing.T) {
@@ -2305,7 +2335,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, test.podIsTerminal, false)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, test.podIsTerminal, false, nil)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2409,7 +2439,7 @@ func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(test.pod, statusInfo, false, false)
+		status := getPhase(test.pod, statusInfo, false, false, nil)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2652,7 +2682,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(test.pod, statusInfo, test.podIsTerminal, test.podHasInitialized)
+		status := getPhase(test.pod, statusInfo, test.podIsTerminal, test.podHasInitialized, nil)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2765,7 +2795,7 @@ func TestPodPhaseWithRestartAlwaysAndPodHasRun(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(test.pod, statusInfo, false, test.podHasInitialized)
+		status := getPhase(test.pod, statusInfo, false, test.podHasInitialized, nil)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2865,7 +2895,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false, false)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false, false, nil)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2969,7 +2999,7 @@ func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(test.pod, statusInfo, false, false)
+		status := getPhase(test.pod, statusInfo, false, false, nil)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -3181,7 +3211,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
-		status := getPhase(test.pod, statusInfo, false, test.podHasInitialized)
+		status := getPhase(test.pod, statusInfo, false, test.podHasInitialized, nil)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -3294,7 +3324,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false, false)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false, false, nil)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -3424,7 +3454,7 @@ func TestPodPhaseWithContainerRestartPolicy(t *testing.T) {
 					ContainerStatuses: tc.statuses,
 				},
 			}
-			phase := getPhase(pod, tc.statuses, tc.podIsTerminal, true)
+			phase := getPhase(pod, tc.statuses, tc.podIsTerminal, true, nil)
 			assert.Equal(t, tc.expectedPhase, phase)
 		})
 	}
@@ -3497,15 +3527,207 @@ func TestPodPhaseWithContainerRestartPolicyInitContainers(t *testing.T) {
 					ContainerStatuses: tc.statuses,
 				},
 			}
-			phase := getPhase(pod, tc.statuses, tc.podIsTerminal, true)
+			phase := getPhase(pod, tc.statuses, tc.podIsTerminal, true, nil)
 			assert.Equal(t, tc.expectedPhase, phase)
 		})
 	}
 }
 
-// No special init-specific logic for this, see RestartAlways case
-// func TestPodPhaseWithRestartOnFailureInitContainers(t *testing.T) {
-// }
+func TestPodPhaseWithRestartPod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletRestartPodInPlace, true)
+	var (
+		containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyNever  = v1.ContainerRestartPolicyNever
+	)
+
+	containerWithRule := v1.Container{
+		Name:          "container",
+		RestartPolicy: &containerRestartPolicyNever,
+		RestartPolicyRules: []v1.ContainerRestartRule{{
+			Action: v1.ContainerRestartRuleActionRestartPod,
+			ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+				Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+				Values:   []int32{42},
+			},
+		}},
+	}
+	sidecarContainerWithRule := v1.Container{
+		Name:          "container",
+		RestartPolicy: &containerRestartPolicyAlways,
+		RestartPolicyRules: []v1.ContainerRestartRule{{
+			Action: v1.ContainerRestartRuleActionRestartPod,
+			ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+				Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+				Values:   []int32{42},
+			},
+		}},
+	}
+
+	tests := []struct {
+		name          string
+		spec          *v1.PodSpec
+		statuses      []v1.ContainerStatus
+		podStatus     *kubecontainer.PodStatus
+		expectedPhase v1.PodPhase
+	}{
+		// Cleanup phase test cases, podStatus contains the exited containers; pod should be running.
+		{
+			name: "regular container triggers restartPod",
+			spec: &v1.PodSpec{
+				Containers:    []v1.Container{containerWithRule},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				failedStateWithExitCode("container", 42),
+			},
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{kubecontainerStatusFailedWithExitCode("container", 42)},
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "init container triggers restartPod",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{containerWithRule},
+				RestartPolicy:  v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				failedStateWithExitCode("container", 42),
+			},
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{kubecontainerStatusFailedWithExitCode("container", 42)},
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "sidecar container triggers restartPod",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{sidecarContainerWithRule},
+				Containers:     []v1.Container{{Name: "regular"}},
+				RestartPolicy:  v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				failedStateWithExitCode("container", 42),
+				failedStateWithExitCode("regular", 137),
+			},
+			podStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					kubecontainerStatusFailedWithExitCode("container", 42),
+					kubecontainerStatusFailedWithExitCode("regular", 137),
+				},
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "sidecar container triggers restartPod; kills another init container",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{sidecarContainerWithRule, {Name: "init"}},
+				Containers:     []v1.Container{{Name: "regular"}},
+				RestartPolicy:  v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				failedStateWithExitCode("container", 42),
+				failedStateWithExitCode("init", 137),
+				waitingState("regular"),
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		// Startup phase, podStatus is empty, containerStatuses have last failure.
+		{
+			name: "regular container triggered restartPod",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{{Name: "init"}},
+				Containers:     []v1.Container{containerWithRule},
+				RestartPolicy:  v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				succeededState("init"),
+				failedStateWithExitCode("container", 42),
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "init container triggered restartPod",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{containerWithRule},
+				Containers:     []v1.Container{{Name: "regular"}},
+				RestartPolicy:  v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				failedStateWithExitCode("container", 42),
+				waitingState("regular"),
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "init container triggered restartPod; init container succeeds",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{containerWithRule},
+				Containers:     []v1.Container{{Name: "regular"}},
+				RestartPolicy:  v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				succeededState("container"),
+				waitingState("regular"),
+			},
+			expectedPhase: v1.PodPending,
+		},
+		{
+			name: "sidecar container triggered restartPod kills regular container",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{sidecarContainerWithRule},
+				Containers:     []v1.Container{{Name: "regular"}},
+				RestartPolicy:  v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				failedStateWithExitCode("container", 42),
+				failedStateWithExitCode("regular", 137),
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "sidecar container triggered restartPod kills regular container; sidecar running",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{sidecarContainerWithRule},
+				Containers:     []v1.Container{{Name: "regular"}},
+				RestartPolicy:  v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				runningState("container"),
+				failedStateWithExitCode("regular", 137),
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "sidecar container triggered restartPod; kills init container",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{sidecarContainerWithRule, {Name: "init"}},
+				Containers:     []v1.Container{{Name: "regular"}},
+				RestartPolicy:  v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				runningState("container"),
+				waitingState("init"),
+				waitingState("regular"),
+			},
+			expectedPhase: v1.PodPending,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: *tc.spec,
+				Status: v1.PodStatus{
+					ContainerStatuses: tc.statuses,
+				},
+			}
+			phase := getPhase(pod, tc.statuses, false, true, tc.podStatus)
+			assert.Equal(t, tc.expectedPhase, phase)
+		})
+	}
+}
 
 func TestConvertToAPIContainerStatuses(t *testing.T) {
 	desiredState := v1.PodSpec{
@@ -3577,7 +3799,186 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				waitingWithLastTerminationUnknown("containerB", 1),
 			},
 		},
+		{
+			name: "no current status, keeping previous restartCount",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						withRestartCount(failedState("containerA"), 5),
+						withRestartCount(failedState("containerB"), 5),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{},
+			previousStatus: []v1.ContainerStatus{
+				withRestartCount(failedState("containerA"), 5),
+				withRestartCount(failedState("containerB"), 5),
+			},
+			containers: desiredState.Containers,
+			// no init containers
+			// is not an init container
+			expected: []v1.ContainerStatus{
+				withRestartCount(failedState("containerA"), 5),
+				withRestartCount(failedState("containerB"), 5),
+			},
+		},
+		{
+			name: "currently running with lower reset restartCount; should keeping previous restartCount",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						withRestartCount(failedState("containerA"), 5),
+						withRestartCount(failedState("containerA"), 5),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:         "containerA",
+					ID:           kubecontainer.ContainerID{ID: "containerA"},
+					State:        kubecontainer.ContainerStateRunning,
+					RestartCount: 0,
+				}, {
+					Name:         "containerB",
+					ID:           kubecontainer.ContainerID{ID: "containerB"},
+					State:        kubecontainer.ContainerStateRunning,
+					RestartCount: 0,
+				}},
+			},
+			previousStatus: []v1.ContainerStatus{
+				withRestartCount(failedState("containerA"), 5),
+				withRestartCount(failedState("containerB"), 5),
+			},
+			containers: desiredState.Containers,
+			// no init containers
+			// is not an init container
+			expected: []v1.ContainerStatus{{
+				Name: "containerA",
+				State: v1.ContainerState{
+					Running: &v1.ContainerStateRunning{},
+				},
+				ContainerID:  "://containerA",
+				Resources:    &v1.ResourceRequirements{Limits: nil, Requests: nil, Claims: nil},
+				RestartCount: 6,
+			}, {
+				Name: "containerB",
+				State: v1.ContainerState{
+					Running: &v1.ContainerStateRunning{},
+				},
+				ContainerID:  "://containerB",
+				Resources:    &v1.ResourceRequirements{Limits: nil, Requests: nil, Claims: nil},
+				RestartCount: 6,
+			}},
+		},
+		{
+			name: "restartPod in place, container becomes unknown, should be considered waiting",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+					Conditions: []v1.PodCondition{{
+						Type:   v1.PodRestartInPlace,
+						Status: v1.ConditionTrue,
+					}},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:  "containerA",
+					ID:    kubecontainer.ContainerID{ID: "containerA"},
+					State: kubecontainer.ContainerStateUnknown,
+				}, {
+					Name:  "containerB",
+					ID:    kubecontainer.ContainerID{ID: "containerB"},
+					State: kubecontainer.ContainerStateUnknown,
+				}},
+			},
+			previousStatus: []v1.ContainerStatus{
+				runningState("containerA"),
+				runningState("containerB"),
+			},
+			containers: desiredState.Containers,
+			expected: []v1.ContainerStatus{{
+				Name: "containerA",
+				State: v1.ContainerState{
+					Waiting: &v1.ContainerStateWaiting{
+						Reason:  kubecontainer.ContainerReasonStatusUnknown,
+						Message: "container removed during pod restart",
+					},
+				},
+				ContainerID:  "://containerA",
+				Resources:    &v1.ResourceRequirements{Limits: nil, Requests: nil, Claims: nil},
+				RestartCount: 1,
+			}, {
+				Name: "containerB",
+				State: v1.ContainerState{
+					Waiting: &v1.ContainerStateWaiting{
+						Reason:  kubecontainer.ContainerReasonStatusUnknown,
+						Message: "container removed during pod restart",
+					},
+				},
+				ContainerID:  "://containerB",
+				Resources:    &v1.ResourceRequirements{Limits: nil, Requests: nil, Claims: nil},
+				RestartCount: 1,
+			}},
+		},
+		{
+			name: "restartPod in place, container killed and removed, should be considered waiting",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						failedState("containerA"),
+						failedState("containerB"),
+					},
+					Conditions: []v1.PodCondition{{
+						Type:   v1.PodRestartInPlace,
+						Status: v1.ConditionTrue,
+					}},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:  "containerA",
+					ID:    kubecontainer.ContainerID{ID: "containerA"},
+					State: kubecontainer.ContainerStateUnknown,
+				}, {
+					Name:  "containerB",
+					ID:    kubecontainer.ContainerID{ID: "containerB"},
+					State: kubecontainer.ContainerStateUnknown,
+				}},
+			},
+			previousStatus: []v1.ContainerStatus{
+				failedState("containerA"),
+				failedState("containerB"),
+			},
+			containers: desiredState.Containers,
+			expected: []v1.ContainerStatus{{
+				Name: "containerA",
+				State: v1.ContainerState{
+					Waiting: &v1.ContainerStateWaiting{},
+				},
+				ContainerID:  "://containerA",
+				Resources:    &v1.ResourceRequirements{Limits: nil, Requests: nil, Claims: nil},
+				RestartCount: 0,
+			}, {
+				Name: "containerB",
+				State: v1.ContainerState{
+					Waiting: &v1.ContainerStateWaiting{},
+				},
+				ContainerID:  "://containerB",
+				Resources:    &v1.ResourceRequirements{Limits: nil, Requests: nil, Claims: nil},
+				RestartCount: 0,
+			}},
+		},
 	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletRestartPodInPlace, true)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
