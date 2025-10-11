@@ -515,6 +515,22 @@ func withSerial() interface{} {
 	return newLabel("Serial")
 }
 
+// WithLinuxOnly specifies that a certain test or group of tests must only run
+// on Linux nodes. The return value must be passed as additional argument to
+// [framework.It], [framework.Describe], [framework.Context].
+func WithLinuxOnly() interface{} {
+	return withLinuxOnly()
+}
+
+// WithLinuxOnly is a shorthand for the corresponding package function.
+func (f *Framework) WithLinuxOnly() interface{} {
+	return withLinuxOnly()
+}
+
+func withLinuxOnly() interface{} {
+	return newLabel("LinuxOnly")
+}
+
 // WithSlow specifies that a certain test, or each test within a group of
 // tests, is slow (is expected to take longer than 5 minutes to run in CI).
 // The return value must be passed as additional argument to [framework.It],

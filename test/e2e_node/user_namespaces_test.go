@@ -37,7 +37,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("UserNamespaces", "[LinuxOnly]", feature.UserNamespacesSupport, framework.WithSerial(), func() {
+var _ = SIGDescribe("UserNamespaces", feature.UserNamespacesSupport, framework.WithSerial(), framework.WithLinuxOnly(), func() {
 	f := framework.NewDefaultFramework("user-namespace-off-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	f.Context("when UserNamespacesSupport=false in the kubelet", func() {

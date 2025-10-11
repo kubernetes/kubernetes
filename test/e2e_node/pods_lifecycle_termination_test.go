@@ -35,7 +35,7 @@ import (
 // Pod sigkill test will cover pods with graceful termination period set but failed
 // to terminate and forcefully killed by kubelet. This test examine pod's container's
 // exit code is 137 and the exit reason is `Error`
-var _ = SIGDescribe("Pod SIGKILL [LinuxOnly]", framework.WithNodeConformance(), func() {
+var _ = SIGDescribe("Pod SIGKILL", framework.WithNodeConformance(), framework.WithLinuxOnly(), func() {
 	f := framework.NewDefaultFramework("sigkill-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
