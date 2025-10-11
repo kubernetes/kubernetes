@@ -359,21 +359,21 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		checkTrafficDistribution(ctx, clientPods)
 	})
 
-	framework.It("should route traffic to an endpoint in the same zone when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+	framework.It("should route traffic to an endpoint in the same zone when using PreferSameZone", func(ctx context.Context) {
 		clientPods, serverPods := allocateClientsAndServers(ctx)
 		svc := createService(ctx, v1.ServiceTrafficDistributionPreferSameZone)
 		createPods(ctx, svc, clientPods, serverPods)
 		checkTrafficDistribution(ctx, clientPods)
 	})
 
-	framework.It("should route traffic correctly between pods on multiple nodes when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+	framework.It("should route traffic correctly between pods on multiple nodes when using PreferSameZone", func(ctx context.Context) {
 		clientPods, serverPods := allocateMultiNodeClientsAndServers(ctx)
 		svc := createService(ctx, v1.ServiceTrafficDistributionPreferSameZone)
 		createPods(ctx, svc, clientPods, serverPods)
 		checkTrafficDistribution(ctx, clientPods)
 	})
 
-	framework.It("should route traffic to an endpoint on the same node or fall back to same zone when using PreferSameNode", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+	framework.It("should route traffic to an endpoint on the same node or fall back to same zone when using PreferSameNode", func(ctx context.Context) {
 		ginkgo.By("finding a set of nodes for the test")
 		zone1Nodes, zone2Nodes, zone3Nodes := getNodesForMultiNode(ctx)
 
@@ -425,7 +425,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		checkTrafficDistribution(ctx, clientPods)
 	})
 
-	framework.It("should route traffic to an endpoint on the same node when using PreferSameNode and fall back when the endpoint becomes unavailable", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+	framework.It("should route traffic to an endpoint on the same node when using PreferSameNode and fall back when the endpoint becomes unavailable", func(ctx context.Context) {
 		ginkgo.By("finding a set of nodes for the test")
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		framework.ExpectNoError(err)

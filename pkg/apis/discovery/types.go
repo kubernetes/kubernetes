@@ -138,10 +138,7 @@ type EndpointHints struct {
 	ForZones []ForZone
 
 	// forNodes indicates the node(s) this endpoint should be consumed by when
-	// using topology aware routing.
-	// This is an Alpha feature and is only used when the PreferSameTrafficDistribution
-	// feature gate is enabled. May contain a maximum of 8 entries.
-	// +featureGate=PreferSameTrafficDistribution
+	// using topology aware routing. May contain a maximum of 8 entries.
 	ForNodes []ForNode
 }
 
