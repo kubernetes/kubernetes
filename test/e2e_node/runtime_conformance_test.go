@@ -65,15 +65,21 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 				ginkgo.BeforeEach(func(ctx context.Context) {
 					var cleanup func(context.Context) error
 					var err error
-					registryAddress, cleanup, err = e2eregistry.SetupRegistryLabelNodes(ctx, f, true)
+					if testCase.setupRegisty {
+						registryAddress, cleanup, err = e2eregistry.SetupRegistryLabelNodes(ctx, f, true)
+						framework.ExpectNoError(err)
+						ginkgo.DeferCleanup(cleanup)
+					}
+
+					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
+					err = os.WriteFile(configFile, []byte(auth), 0644)
 					framework.ExpectNoError(err)
-					ginkgo.DeferCleanup(cleanup)
+					ginkgo.DeferCleanup(func() { framework.ExpectNoError(os.Remove(configFile)) })
 				})
 				ginkgo.AfterEach(func(ctx context.Context) {
-					if !testCase.setupRegisty {
-						return
+					if testCase.setupRegisty {
+						f.DeleteNamespace(ctx, f.Namespace.Name) // we need to wait for the registry to be removed and so we need to delete the whole NS early (before the actual cleanup)
 					}
-					f.DeleteNamespace(ctx, f.Namespace.Name) // we need to wait for the registry to be removed and so we need to delete the whole NS early (before the actual cleanup)
 				})
 
 				f.It(testCase.description+"", f.WithNodeConformance(), func(ctx context.Context) {
@@ -91,11 +97,6 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					if testCase.setupRegisty {
 						container.NodeSelector = e2eregistry.PodNodeSelector(f)
 					}
-
-					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
-					err := os.WriteFile(configFile, []byte(auth), 0644)
-					framework.ExpectNoError(err)
-					defer func() { framework.ExpectNoError(os.Remove(configFile)) }()
 
 					// checkContainerStatus checks whether the container status matches expectation.
 					checkContainerStatus := func(ctx context.Context) error {
@@ -152,10 +153,11 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 						if err == nil {
 							break
 						}
+						configFileContent, configFileErr := os.ReadFile(filepath.Join(services.KubeletRootDirectory, "config.json"))
 						if i < flakeRetry {
-							framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
+							framework.Logf("No.%d attempt failed: %v, retrying...%v, %s", i, err, configFileErr, configFileContent)
 						} else {
-							framework.Failf("All %d attempts failed: %v", flakeRetry, err)
+							framework.Failf("All %d attempts failed: %v %v %s", flakeRetry, err, configFileErr, configFileContent)
 						}
 					}
 				})
