@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
@@ -73,6 +74,7 @@ type containerOptions struct {
 }
 
 func TestPodGuaranteedCPUs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	options := [][]*containerOptions{
 		{
 			{request: "0", limit: "0"},
@@ -200,7 +202,7 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			requestedCPU := p.podGuaranteedCPUs(tc.pod)
+			requestedCPU := p.podGuaranteedCPUs(logger, tc.pod)
 
 			if requestedCPU != tc.expectedCPU {
 				t.Errorf("Expected in result to be %v , got %v", tc.expectedCPU, requestedCPU)
@@ -210,12 +212,13 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 }
 
 func TestGetTopologyHints(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
 
-		topology, _ := topology.Discover(&machineInfo)
+		topology, _ := topology.Discover(logger, &machineInfo)
 
 		var activePods []*v1.Pod
 		for p := range tc.assignments {
@@ -243,7 +246,7 @@ func TestGetTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		hints := m.GetTopologyHints(&tc.pod, &tc.container)[string(v1.ResourceCPU)]
+		hints := m.GetTopologyHints(logger, &tc.pod, &tc.container)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue
 		}
@@ -260,12 +263,13 @@ func TestGetTopologyHints(t *testing.T) {
 }
 
 func TestGetPodTopologyHints(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
 
-		topology, _ := topology.Discover(&machineInfo)
+		topology, _ := topology.Discover(logger, &machineInfo)
 
 		var activePods []*v1.Pod
 		for p := range tc.assignments {
@@ -293,7 +297,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		podHints := m.GetPodTopologyHints(&tc.pod)[string(v1.ResourceCPU)]
+		podHints := m.GetPodTopologyHints(logger, &tc.pod)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(podHints) == 0 {
 			continue
 		}
@@ -475,7 +479,8 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				sourcesReady:      &sourcesReadyStub{},
 			}
 
-			podHints := m.GetPodTopologyHints(&testCase.pod)[string(v1.ResourceCPU)]
+			logger, _ := ktesting.NewTestContext(t)
+			podHints := m.GetPodTopologyHints(logger, &testCase.pod)[string(v1.ResourceCPU)]
 			sort.SliceStable(podHints, func(i, j int) bool {
 				return podHints[i].LessThan(podHints[j])
 			})
