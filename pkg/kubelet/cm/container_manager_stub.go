@@ -127,7 +127,10 @@ func (cm *containerManagerStub) UpdatePluginResources(*schedulerframework.NodeIn
 }
 
 func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), cm.memoryManager, topologymanager.NewFakeManager()}
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), cm.memoryManager, topologymanager.NewFakeManager(logger)}
 }
 
 func (cm *containerManagerStub) GetPodCgroupRoot() string {
@@ -147,7 +150,10 @@ func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
 }
 
 func (cm *containerManagerStub) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
-	return topologymanager.NewFakeManager()
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
+	return topologymanager.NewFakeManager(logger)
 }
 
 func (cm *containerManagerStub) UpdateAllocatedDevices() {

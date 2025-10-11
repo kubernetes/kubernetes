@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -178,10 +179,13 @@ func (cm *FakeContainerManager) UpdatePluginResources(*schedulerframework.NodeIn
 }
 
 func (cm *FakeContainerManager) InternalContainerLifecycle() InternalContainerLifecycle {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "InternalContainerLifecycle")
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), cm.memoryManager, topologymanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), cm.memoryManager, topologymanager.NewFakeManager(logger)}
 }
 
 func (cm *FakeContainerManager) GetPodCgroupRoot() string {
@@ -213,10 +217,13 @@ func (cm *FakeContainerManager) ShouldResetExtendedResourceCapacity() bool {
 }
 
 func (cm *FakeContainerManager) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocateResourcesPodAdmitHandler")
-	return topologymanager.NewFakeManager()
+	return topologymanager.NewFakeManager(logger)
 }
 
 func (cm *FakeContainerManager) UpdateAllocatedDevices() {
