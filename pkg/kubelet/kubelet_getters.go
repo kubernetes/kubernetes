@@ -299,10 +299,8 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // in which case return a manufactured nodeInfo representing a node with no pods,
 // zero capacity, and the default labels.
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
-	if kl.kubeClient != nil {
-		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
-			return n, nil
-		}
+	if n, err := kl.GetNode(); err == nil {
+		return n, nil
 	}
 	return kl.initialNode(context.TODO())
 }
