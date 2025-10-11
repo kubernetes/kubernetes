@@ -21,6 +21,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // List returns a list of all the items.
@@ -71,13 +73,22 @@ func testFifoObjectKeyFunc(obj interface{}) (string, error) {
 	return obj.(testFifoObject).name, nil
 }
 
+func testFifoObjectUIDFunc(obj interface{}) (types.UID, error) {
+	return obj.(testFifoObject).uid, nil
+}
+
 type testFifoObject struct {
 	name string
+	uid  types.UID
 	val  interface{}
 }
 
 func mkFifoObj(name string, val interface{}) testFifoObject {
 	return testFifoObject{name: name, val: val}
+}
+
+func mkFifoUID(name, uid string, val interface{}) testFifoObject {
+	return testFifoObject{name: name, uid: types.UID(uid), val: val}
 }
 
 func TestFIFO_basic(t *testing.T) {
