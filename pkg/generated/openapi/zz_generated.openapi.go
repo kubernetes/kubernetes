@@ -22368,7 +22368,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources resize policy for the container.",
+							Description: "Resources resize policy for the container. You cannot set this field on ephemeral containers.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -23741,7 +23741,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Ports are not allowed for ephemeral containers.",
+							Description: "You cannot set this field on ephemeral containers.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -23798,7 +23798,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 					},
 					"resources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod.",
+							Description: "You cannot set this field on ephemeral containers. Ephemeral containers use spare resources already allocated to the pod.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(corev1.ResourceRequirements{}.OpenAPIModelName()),
 						},
@@ -23810,7 +23810,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources resize policy for the container.",
+							Description: "Resources resize policy for the container. You cannot set this field on ephemeral containers.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -23898,25 +23898,25 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 					},
 					"livenessProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Probes are not allowed for ephemeral containers.",
+							Description: "You cannot set this field on ephemeral containers.",
 							Ref:         ref(corev1.Probe{}.OpenAPIModelName()),
 						},
 					},
 					"readinessProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Probes are not allowed for ephemeral containers.",
+							Description: "You cannot set this field on ephemeral containers.",
 							Ref:         ref(corev1.Probe{}.OpenAPIModelName()),
 						},
 					},
 					"startupProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Probes are not allowed for ephemeral containers.",
+							Description: "You cannot set this field on ephemeral containers.",
 							Ref:         ref(corev1.Probe{}.OpenAPIModelName()),
 						},
 					},
 					"lifecycle": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Lifecycle is not allowed for ephemeral containers.",
+							Description: "You cannot set this field on ephemeral containers.",
 							Ref:         ref(corev1.Lifecycle{}.OpenAPIModelName()),
 						},
 					},
@@ -24068,7 +24068,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Ports are not allowed for ephemeral containers.",
+							Description: "You cannot set this field on ephemeral containers.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -24125,7 +24125,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 					},
 					"resources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod.",
+							Description: "You cannot set this field on ephemeral containers. Ephemeral containers use spare resources already allocated to the pod.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(corev1.ResourceRequirements{}.OpenAPIModelName()),
 						},
@@ -24137,7 +24137,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources resize policy for the container.",
+							Description: "Resources resize policy for the container. You cannot set this field on ephemeral containers.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -24225,25 +24225,25 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 					},
 					"livenessProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Probes are not allowed for ephemeral containers.",
+							Description: "You cannot set this field on ephemeral containers.",
 							Ref:         ref(corev1.Probe{}.OpenAPIModelName()),
 						},
 					},
 					"readinessProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Probes are not allowed for ephemeral containers.",
+							Description: "You cannot set this field on ephemeral containers.",
 							Ref:         ref(corev1.Probe{}.OpenAPIModelName()),
 						},
 					},
 					"startupProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Probes are not allowed for ephemeral containers.",
+							Description: "You cannot set this field on ephemeral containers.",
 							Ref:         ref(corev1.Probe{}.OpenAPIModelName()),
 						},
 					},
 					"lifecycle": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Lifecycle is not allowed for ephemeral containers.",
+							Description: "You cannot set this field on ephemeral containers.",
 							Ref:         ref(corev1.Lifecycle{}.OpenAPIModelName()),
 						},
 					},

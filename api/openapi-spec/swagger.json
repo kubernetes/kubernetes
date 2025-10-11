@@ -6514,7 +6514,7 @@
           "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
         },
         "resizePolicy": {
-          "description": "Resources resize policy for the container.",
+          "description": "Resources resize policy for the container. You cannot set this field on ephemeral containers.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.core.v1.ContainerResizePolicy"
           },
@@ -7270,18 +7270,18 @@
         },
         "lifecycle": {
           "$ref": "#/definitions/io.k8s.api.core.v1.Lifecycle",
-          "description": "Lifecycle is not allowed for ephemeral containers."
+          "description": "You cannot set this field on ephemeral containers."
         },
         "livenessProbe": {
           "$ref": "#/definitions/io.k8s.api.core.v1.Probe",
-          "description": "Probes are not allowed for ephemeral containers."
+          "description": "You cannot set this field on ephemeral containers."
         },
         "name": {
           "description": "Name of the ephemeral container specified as a DNS_LABEL. This name must be unique among all containers, init containers and ephemeral containers.",
           "type": "string"
         },
         "ports": {
-          "description": "Ports are not allowed for ephemeral containers.",
+          "description": "You cannot set this field on ephemeral containers.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.core.v1.ContainerPort"
           },
@@ -7296,10 +7296,10 @@
         },
         "readinessProbe": {
           "$ref": "#/definitions/io.k8s.api.core.v1.Probe",
-          "description": "Probes are not allowed for ephemeral containers."
+          "description": "You cannot set this field on ephemeral containers."
         },
         "resizePolicy": {
-          "description": "Resources resize policy for the container.",
+          "description": "Resources resize policy for the container. You cannot set this field on ephemeral containers.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.core.v1.ContainerResizePolicy"
           },
@@ -7308,7 +7308,7 @@
         },
         "resources": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ResourceRequirements",
-          "description": "Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod."
+          "description": "You cannot set this field on ephemeral containers. Ephemeral containers use spare resources already allocated to the pod."
         },
         "restartPolicy": {
           "description": "Restart policy for the container to manage the restart behavior of each container within a pod. You cannot set this field on ephemeral containers.",
@@ -7328,7 +7328,7 @@
         },
         "startupProbe": {
           "$ref": "#/definitions/io.k8s.api.core.v1.Probe",
-          "description": "Probes are not allowed for ephemeral containers."
+          "description": "You cannot set this field on ephemeral containers."
         },
         "stdin": {
           "description": "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",

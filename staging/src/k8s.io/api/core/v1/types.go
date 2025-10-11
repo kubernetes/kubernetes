@@ -2958,6 +2958,7 @@ type Container struct {
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// Resources resize policy for the container.
+	// You cannot set this field on ephemeral containers.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	// +listType=atomic
@@ -5026,7 +5027,7 @@ type EphemeralContainerCommon struct {
 	// Cannot be updated.
 	// +optional
 	WorkingDir string `json:"workingDir,omitempty" protobuf:"bytes,5,opt,name=workingDir"`
-	// Ports are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	// +optional
 	// +patchMergeKey=containerPort
 	// +patchStrategy=merge
@@ -5051,11 +5052,12 @@ type EphemeralContainerCommon struct {
 	// +listType=map
 	// +listMapKey=name
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
-	// Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
-	// already allocated to the pod.
+	// You cannot set this field on ephemeral containers.
+	// Ephemeral containers use spare resources already allocated to the pod.
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// Resources resize policy for the container.
+	// You cannot set this field on ephemeral containers.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	// +listType=atomic
@@ -5087,16 +5089,16 @@ type EphemeralContainerCommon struct {
 	// +listMapKey=devicePath
 	// +optional
 	VolumeDevices []VolumeDevice `json:"volumeDevices,omitempty" patchStrategy:"merge" patchMergeKey:"devicePath" protobuf:"bytes,21,rep,name=volumeDevices"`
-	// Probes are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	// +optional
 	LivenessProbe *Probe `json:"livenessProbe,omitempty" protobuf:"bytes,10,opt,name=livenessProbe"`
-	// Probes are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	// +optional
 	ReadinessProbe *Probe `json:"readinessProbe,omitempty" protobuf:"bytes,11,opt,name=readinessProbe"`
-	// Probes are not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	// +optional
 	StartupProbe *Probe `json:"startupProbe,omitempty" protobuf:"bytes,22,opt,name=startupProbe"`
-	// Lifecycle is not allowed for ephemeral containers.
+	// You cannot set this field on ephemeral containers.
 	// +optional
 	Lifecycle *Lifecycle `json:"lifecycle,omitempty" protobuf:"bytes,12,opt,name=lifecycle"`
 	// Optional: Path at which the file to which the container's termination message
