@@ -130,7 +130,7 @@ func TestPodCalculateAffinity(t *testing.T) {
 			},
 		}
 
-		podScope.calculateAffinity(&v1.Pod{})
+		podScope.calculateAffinity(t.Context(), &v1.Pod{})
 		actual := podScope.policy.(*mockPolicy).ph
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("Test Case: %s", tc.name)
@@ -260,7 +260,7 @@ func TestPodAccumulateProvidersHints(t *testing.T) {
 				hintProviders: tc.hp,
 			},
 		}
-		actual := pScope.accumulateProvidersHints(&v1.Pod{})
+		actual := pScope.accumulateProvidersHints(t.Context(), &v1.Pod{})
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Test Case %s: Expected NUMANodeAffinity in result to be %v, got %v", tc.name, tc.expected, actual)
 		}
