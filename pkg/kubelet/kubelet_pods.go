@@ -1872,7 +1872,33 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	if !found {
 		oldPodStatus = pod.Status
 	}
-	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
+	// A pod that is terminal, has no backing runtime containers, and has no container statuses in its
+	// last known state was likely rejected at admission time. In that case, we should not
+	// generate container statuses, as that would be misleading.
+	isEmptyRuntimeStatus := len(podStatus.ContainerStatuses) == 0 && len(podStatus.SandboxStatuses) == 0
+	wasRejectedAtAdmission := (pod.Status.Phase == v1.PodFailed) &&
+		len(pod.Status.ContainerStatuses) == 0 &&
+		len(pod.Status.InitContainerStatuses) == 0
+
+	var s *v1.PodStatus // Use a pointer for the status object
+	if podIsTerminal && isEmptyRuntimeStatus && wasRejectedAtAdmission {
+		// Pod was rejected at admission, so we will not generate container statuses.
+		// We will copy the status from the pod object which is the source of truth,
+		// as the status manager may not have a cached entry after a restart.
+		s = pod.Status.DeepCopy()
+		// QOS Class is not persisted to the API server, so we must re-calculate it.
+		s.QOSClass = v1qos.GetPodQOS(pod)
+		// Ensure slices are non-nil to avoid hitting the nil-check paths
+		// in the condition generators.
+		if s.ContainerStatuses == nil {
+			s.ContainerStatuses = []v1.ContainerStatus{}
+		}
+		if s.InitContainerStatuses == nil {
+			s.InitContainerStatuses = []v1.ContainerStatus{}
+		}
+	} else {
+		s = kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
+	}
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(pod, allStatus, podIsTerminal, kubecontainer.HasAnyActiveRegularContainerStarted(&pod.Spec, podStatus))
