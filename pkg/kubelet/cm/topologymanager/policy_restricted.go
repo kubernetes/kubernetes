@@ -39,6 +39,21 @@ func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) bool {
 }
 
 func (p *restrictedPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
+	// Removes preferred=false from the provided Hints
+	for _, hints := range providersHints {
+		for resourceIndex, resource := range hints {
+			var newList []TopologyHint
+			for _, topValue := range resource {
+				if topValue.Preferred {
+					newList = append(newList, topValue)
+				}
+
+			}
+
+			hints[resourceIndex] = newList
+		}
+	}
+
 	filteredHints := filterProvidersHints(providersHints)
 	merger := NewHintMerger(p.numaInfo, filteredHints, p.Name(), p.opts)
 	bestHint := merger.Merge()
