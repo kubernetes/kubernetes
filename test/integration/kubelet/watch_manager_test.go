@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/tools/cache"
 	"sync"
 	"testing"
 	"time"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/watchlist"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -67,12 +67,15 @@ func TestWatchBasedManager(t *testing.T) {
 	// We want all watches to be up and running to stress test it.
 	// So don't treat any secret as immutable here.
 	isImmutable := func(_ runtime.Object) bool { return false }
+	listWatcherWithWatchListSemanticsWrapper := func(lw cache.ListerWatcher) cache.ListerWatcher {
+		return cache.ToListWatcherWithWatchListSemantics(lw, client)
+	}
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	stopCh := make(chan struct{})
 	t.Cleanup(func() { close(stopCh) })
 
-	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, watchlist.DoesClientNotSupportWatchListSemantics(client), schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
+	store := manager.NewObjectCache(listObj, watchObj, listWatcherWithWatchListSemanticsWrapper, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
 
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")
