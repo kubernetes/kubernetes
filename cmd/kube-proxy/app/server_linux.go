@@ -191,6 +191,9 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		ipts := utiliptables.NewBestEffort()
 
 		logger.Info("Using ipvs Proxier")
+		message := "The ipvs proxier is now deprecated and may be removed in a future release. Please use 'nftables' instead."
+		klog.Warning(message)
+		s.Recorder.Eventf(s.NodeRef, nil, v1.EventTypeWarning, "IPVSDeprecation", "ProxyModeCheck", message)
 		if dualStack {
 			proxier, err = ipvs.NewDualStackProxier(
 				ctx,
