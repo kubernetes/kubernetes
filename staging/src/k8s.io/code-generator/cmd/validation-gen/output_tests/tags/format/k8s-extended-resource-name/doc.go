@@ -18,25 +18,25 @@ limitations under the License.
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
-package k8suuid
+package k8sextendedresourcename
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
 var localSchemeBuilder = testscheme.New()
 
-// MyType is a struct that contains a field with the uuid format.
+// MyType is a struct that contains a field with the extended-resource-name format.
 // +k8s:validation:Required
 type MyType struct {
 	TypeMeta int
 	// +k8s:optional
-	// +k8s:format=k8s-uuid
-	UUIDField string `json:"uuidField"`
+	// +k8s:format=k8s-extended-resource-name
+	NameField string `json:"nameField"`
 	// +k8s:optional
-	// +k8s:format=k8s-uuid
-	UUIDPtrField *string `json:"uuidPtrField"`
+	// +k8s:format=k8s-extended-resource-name
+	NamePtrField *string `json:"namePtrField"`
 	// Note: no validation here
-	UUIDTypedefField UUIDStringType `json:"uuidTypedefField"`
+	NameTypedefField NameStringType `json:"nameTypedefField"`
 }
 
-// +k8s:format=k8s-uuid
-type UUIDStringType string
+// +k8s:format=k8s-extended-resource-name
+type NameStringType string
