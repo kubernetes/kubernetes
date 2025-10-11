@@ -17,6 +17,7 @@ limitations under the License.
 package statusz
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/util/version"
+	v1alpha1 "k8s.io/component-base/zpages/statusz/v1alpha1"
 )
 
 const wantTmpl = `
@@ -36,7 +38,7 @@ Up: %s
 Go version: %s
 Binary version: %v
 Emulation version: %v
-Paths:  /livez /readyz
+Paths: /livez /readyz
 `
 
 const wantTmplWithoutEmulation = `
@@ -48,22 +50,10 @@ Up: %s
 Go version: %s
 Binary version: %v
 
-Paths:  /livez /readyz
+Paths: /livez /readyz
 `
 
-const wantTmplWithKubeApiserverComp = `
-%s statusz
-Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.
-
-Started: %v
-Up: %s
-Go version: %s
-Binary version: %v
-
-Paths:  /livez /readyz
-`
-
-func TestStatusz(t *testing.T) {
+func TestHandleStatusz(t *testing.T) {
 	delimiters = []string{":"}
 	fakeStartTime := time.Now()
 	fakeUptime := uptime(fakeStartTime)
@@ -75,21 +65,17 @@ func TestStatusz(t *testing.T) {
 	fakeListedPaths := []string{"/livez/poststarthook/peer-discovery-cache-sync", "/livez/post", "/readyz/informer-sync", "/readyz/log", "/readyz/ping"}
 	tests := []struct {
 		name           string
+		acceptHeader   string
 		componentName  string
-		reqHeader      string
 		registry       fakeRegistry
 		wantStatusCode int
 		wantBody       string
+		wantJSONBody   *v1alpha1.Statusz
 	}{
 		{
-			name:           "invalid header",
-			reqHeader:      "some header",
-			wantStatusCode: http.StatusNotAcceptable,
-		},
-		{
-			name:          "valid request",
+			name:          "valid request for text/plain",
+			acceptHeader:  "text/plain",
 			componentName: "test-server",
-			reqHeader:     "text/plain; charset=utf-8",
 			registry: fakeRegistry{
 				startTime:    fakeStartTime,
 				goVer:        fakeGoVersion,
@@ -109,9 +95,60 @@ func TestStatusz(t *testing.T) {
 			),
 		},
 		{
-			name:          "missing emulation version",
+			name:          "valid request for v1alpha1",
+			acceptHeader:  "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
 			componentName: "test-server",
-			reqHeader:     "text/plain; charset=utf-8",
+			registry: fakeRegistry{
+				startTime:    fakeStartTime,
+				goVer:        fakeGoVersion,
+				binaryVer:    fakeBinaryVersion,
+				emulationVer: fakeEmulationVersion,
+				listedPaths:  fakeListedPaths,
+				deprecated:   map[string]bool{},
+			},
+			wantStatusCode: http.StatusOK,
+			wantJSONBody: &v1alpha1.Statusz{
+				APIVersion:       "v1alpha1",
+				ComponentName:    "test-server",
+				StartTime:        fakeStartTime.Format(time.UnixDate),
+				UpTime:           fakeUptime,
+				GoVersion:        fakeGoVersion,
+				BinaryVersion:    fakeBvStr,
+				EmulationVersion: fakeEvStr,
+				Paths:            []string{"/livez", "/readyz"},
+			},
+		}, {
+			name:          "no accept header",
+			acceptHeader:  "",
+			componentName: "test-server",
+			registry: fakeRegistry{
+				startTime:    fakeStartTime,
+				goVer:        fakeGoVersion,
+				binaryVer:    fakeBinaryVersion,
+				emulationVer: fakeEmulationVersion,
+				listedPaths:  fakeListedPaths,
+			},
+			wantStatusCode: http.StatusOK,
+			wantBody: fmt.Sprintf(
+				wantTmpl,
+				"test-server",
+				fakeStartTime.Format(time.UnixDate),
+				fakeUptime,
+				fakeGoVersion,
+				fakeBinaryVersion,
+				fakeEmulationVersion,
+			),
+		},
+		{
+			name:           "invalid accept header",
+			acceptHeader:   "application/xml",
+			componentName:  "test-server",
+			wantStatusCode: http.StatusNotAcceptable,
+		},
+		{
+			name:          "missing emulation version",
+			acceptHeader:  "text/plain",
+			componentName: "test-server",
 			registry: fakeRegistry{
 				startTime:    fakeStartTime,
 				goVer:        fakeGoVersion,
@@ -130,32 +167,71 @@ func TestStatusz(t *testing.T) {
 			),
 		},
 		{
-			name:          "valid request for kube-apiserver",
-			componentName: "kube-apiserver",
-			reqHeader:     "text/plain; charset=utf-8",
+			name:           "application/json without params",
+			acceptHeader:   "application/json",
+			componentName:  "test-server",
+			wantStatusCode: http.StatusNotAcceptable,
+		},
+		{
+			name:           "application/json with missing as",
+			acceptHeader:   "application/json;v=v1alpha1;g=config.k8s.io",
+			componentName:  "test-server",
+			wantStatusCode: http.StatusNotAcceptable,
+		},
+		{
+			name:          "wildcard accept header",
+			acceptHeader:  "*/*",
+			componentName: "test-server",
 			registry: fakeRegistry{
 				startTime:    fakeStartTime,
 				goVer:        fakeGoVersion,
 				binaryVer:    fakeBinaryVersion,
-				emulationVer: nil,
+				emulationVer: fakeEmulationVersion,
 				listedPaths:  fakeListedPaths,
 			},
 			wantStatusCode: http.StatusOK,
 			wantBody: fmt.Sprintf(
-				wantTmplWithKubeApiserverComp,
-				"kube-apiserver",
+				wantTmpl,
+				"test-server",
 				fakeStartTime.Format(time.UnixDate),
 				fakeUptime,
 				fakeGoVersion,
 				fakeBinaryVersion,
+				fakeEmulationVersion,
 			),
+		},
+		{
+			name:          "deprecated version request",
+			acceptHeader:  "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			componentName: "test-server",
+			registry: fakeRegistry{
+				startTime:    fakeStartTime,
+				goVer:        fakeGoVersion,
+				binaryVer:    fakeBinaryVersion,
+				emulationVer: fakeEmulationVersion,
+				listedPaths:  fakeListedPaths,
+				deprecated: map[string]bool{
+					"v1alpha1": true,
+				},
+			},
+			wantStatusCode: http.StatusOK,
+			wantJSONBody: &v1alpha1.Statusz{
+				APIVersion:         "v1alpha1",
+				ComponentName:      "test-server",
+				StartTime:          fakeStartTime.Format(time.UnixDate),
+				UpTime:             fakeUptime,
+				GoVersion:          fakeGoVersion,
+				BinaryVersion:      fakeBvStr,
+				EmulationVersion:   fakeEvStr,
+				DeprecationMessage: "This version of the statusz endpoint is deprecated. Please use a newer version.",
+				Paths:              []string{"/livez", "/readyz"},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mux := http.NewServeMux()
-
 			Install(mux, tt.componentName, tt.registry)
 
 			path := "/statusz"
@@ -163,10 +239,8 @@ func TestStatusz(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error while creating request: %v", err)
 			}
-
-			req.Header.Set("Accept", "text/plain; charset=utf-8")
-			if tt.reqHeader != "" {
-				req.Header.Set("Accept", tt.reqHeader)
+			if tt.acceptHeader != "" {
+				req.Header.Set("Accept", tt.acceptHeader)
 			}
 
 			w := httptest.NewRecorder()
@@ -177,13 +251,18 @@ func TestStatusz(t *testing.T) {
 			}
 
 			if tt.wantStatusCode == http.StatusOK {
-				c := w.Header().Get("Content-Type")
-				if c != "text/plain; charset=utf-8" {
-					t.Fatalf("want header: %v, got: %v", "text/plain", c)
-				}
-
-				if diff := cmp.Diff(tt.wantBody, string(w.Body.String())); diff != "" {
-					t.Errorf("Unexpected diff on response (-want,+got):\n%s", diff)
+				if tt.wantJSONBody != nil {
+					var got v1alpha1.Statusz
+					if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+						t.Fatalf("unexpected error while unmarshalling response: %v", err)
+					}
+					if diff := cmp.Diff(*tt.wantJSONBody, got); diff != "" {
+						t.Errorf("Unexpected diff on response (-want,+got):\n%s", diff)
+					}
+				} else {
+					if diff := cmp.Diff(tt.wantBody, string(w.Body.String())); diff != "" {
+						t.Errorf("Unexpected diff on response (-want,+got):\n%s", diff)
+					}
 				}
 			}
 		})
@@ -205,6 +284,11 @@ type fakeRegistry struct {
 	binaryVer    *version.Version
 	emulationVer *version.Version
 	listedPaths  []string
+	deprecated   map[string]bool
+}
+
+func (f fakeRegistry) deprecatedVersions() map[string]bool {
+	return f.deprecated
 }
 
 func (f fakeRegistry) processStartTime() time.Time {
