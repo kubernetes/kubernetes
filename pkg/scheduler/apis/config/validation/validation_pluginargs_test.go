@@ -656,9 +656,7 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			for k, v := range tc.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
-			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, tc.features)
 			err := ValidateVolumeBindingArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateVolumeBindingArgs returned err (-want,+got):\n%s", diff)

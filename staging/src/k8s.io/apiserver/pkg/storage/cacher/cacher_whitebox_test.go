@@ -780,8 +780,10 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 
 func TestGetListNonRecursiveCacheWithConsistentListFromCache(t *testing.T) {
 	// Set feature gates once at the beginning since we only care about ConsistentListFromCache=true and ListFromCacheSnapshot=false
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ConsistentListFromCache: true,
+		features.ListFromCacheSnapshot:   false,
+	})
 	forceRequestWatchProgressSupport(t)
 
 	tests := []struct {
@@ -2411,8 +2413,10 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 }
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.WatchList:               true,
+		features.ConsistentListFromCache: true,
+	})
 	forceRequestWatchProgressSupport(t)
 
 	scenarios := []struct {

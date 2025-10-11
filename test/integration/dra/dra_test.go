@@ -337,9 +337,7 @@ func TestDRA(t *testing.T) {
 			sort.Strings(entries)
 			t.Logf("Config: %s", strings.Join(entries, ","))
 
-			for key, value := range tc.features {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, key, value)
-			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.features)
 
 			etcdOptions := framework.SharedEtcd()
 			apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
