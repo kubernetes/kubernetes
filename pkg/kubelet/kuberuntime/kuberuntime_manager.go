@@ -1763,7 +1763,15 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		}
 
 		if idx == 0 && utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-			if resp.Timestamp == 0 {
+			if resp.Timestamp != 0 && len(resp.ContainersStatuses) != 0 {
+				// Get the statuses of all containers visible to the pod and
+				// timestamp from sandboxStatus.
+				timestamp = time.Unix(0, resp.Timestamp)
+				for _, cs := range resp.ContainersStatuses {
+					cStatus := m.convertToKubeContainerStatus(ctx, uid, cs)
+					containerStatuses = append(containerStatuses, cStatus)
+				}
+			} else {
 				// If the Evented PLEG is enabled in the kubelet, but not in the runtime
 				// then the pod status we get will not have the timestamp set.
 				// e.g. CI job 'pull-kubernetes-e2e-gce-alpha-features' will runs with
@@ -1776,14 +1784,6 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 						logger.Error(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
 					}
 					return nil, err
-				}
-			} else {
-				// Get the statuses of all containers visible to the pod and
-				// timestamp from sandboxStatus.
-				timestamp = time.Unix(0, resp.Timestamp)
-				for _, cs := range resp.ContainersStatuses {
-					cStatus := m.convertToKubeContainerStatus(ctx, uid, cs)
-					containerStatuses = append(containerStatuses, cStatus)
 				}
 			}
 		}
