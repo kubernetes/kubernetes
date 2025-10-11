@@ -161,9 +161,9 @@ func ValidateRowPrintHandlerFunc(printFunc reflect.Value) error {
 		return fmt.Errorf("invalid print handler." +
 			"Must accept 2 parameters and return 2 value")
 	}
-	if funcType.In(1) != reflect.TypeOf((*GenerateOptions)(nil)).Elem() ||
-		funcType.Out(0) != reflect.TypeOf((*[]metav1.TableRow)(nil)).Elem() ||
-		funcType.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {
+	if funcType.In(1) != reflect.TypeFor[GenerateOptions]() ||
+		funcType.Out(0) != reflect.TypeFor[[]metav1.TableRow]() ||
+		funcType.Out(1) != reflect.TypeFor[error]() {
 		return fmt.Errorf("invalid print handler. The expected signature is: "+
 			"func handler(obj %v, options GenerateOptions) ([]metav1.TableRow, error)", funcType.In(0))
 	}
