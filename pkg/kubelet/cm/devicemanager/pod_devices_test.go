@@ -27,6 +27,7 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetContainerDevices(t *testing.T) {
@@ -157,6 +158,7 @@ func expectResourceDeviceInstances(t *testing.T, resp ResourceDeviceInstances, e
 }
 
 func TestDeviceRunContainerOptions(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	const (
 		podUID        = "pod"
 		containerName = "container"
@@ -239,7 +241,7 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 					response,
 				)
 			}
-			opts := podDevices.deviceRunContainerOptions(podUID, containerName)
+			opts := podDevices.deviceRunContainerOptions(logger, podUID, containerName)
 
 			// The exact ordering of the options depends on the order of the resources in the map.
 			// We therefore use `ElementsMatch` instead of `Equal` on the member slices.
