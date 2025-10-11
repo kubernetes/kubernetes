@@ -256,10 +256,10 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		// TODO: Add more test cases
 		"valid DeviceAllocationMode - All": {
-			input: mkValidResourceClaim(tweakAllocationMode(resource.DeviceAllocationModeAll, 0)),
+			input: mkValidResourceClaim(tweakExactlyAllocationMode(resource.DeviceAllocationModeAll, 0)),
 		},
 		"invalid DeviceAllocationMode - Exactly": {
-			input: mkValidResourceClaim(tweakAllocationMode("InvalidMode", 1)),
+			input: mkValidResourceClaim(tweakExactlyAllocationMode("InvalidMode", 1)),
 			expectedErrs: field.ErrorList{
 				field.NotSupported(
 					field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "allocationMode"),
@@ -427,7 +427,7 @@ func tweakFirstAvailable(items int) func(*resource.ResourceClaim) {
 	}
 }
 
-func tweakAllocationMode(mode resource.DeviceAllocationMode, count int64) func(*resource.ResourceClaim) {
+func tweakExactlyAllocationMode(mode resource.DeviceAllocationMode, count int64) func(*resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		if len(rc.Spec.Devices.Requests) > 0 && rc.Spec.Devices.Requests[0].Exactly != nil {
 			rc.Spec.Devices.Requests[0].Exactly.AllocationMode = mode
