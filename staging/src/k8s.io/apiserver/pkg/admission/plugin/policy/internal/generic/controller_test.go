@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	fcache "k8s.io/client-go/tools/cache/testing"
 
 	"k8s.io/apiserver/pkg/admission/plugin/policy/internal/generic"
 
@@ -113,15 +114,14 @@ func setupTest(ctx context.Context, customReconciler func(string, string, runtim
 
 	// Set up fake informers that return instances of mock Policy definitoins
 	// and mock policy bindings
-	informer = &testInformer{SharedIndexInformer: cache.NewSharedIndexInformer(&cache.ListWatch{
+	informer = &testInformer{SharedIndexInformer: cache.NewSharedIndexInformer(fcache.ToListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return tracker.List(fakeGVR, fakeGVK, "")
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			return tracker.Watch(fakeGVR, "")
 		},
-		UnsupportedWatchListSemantics: true,
-	}, &unstructured.Unstructured{}, 30*time.Second, nil)}
+	}), &unstructured.Unstructured{}, 30*time.Second, nil)}
 
 	reconciler := func(namespace, name string, newObj *unstructured.Unstructured) error {
 		var err error
