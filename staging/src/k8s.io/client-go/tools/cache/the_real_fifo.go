@@ -61,7 +61,8 @@ type RealFIFO struct {
 }
 
 var (
-	_ = Queue(&RealFIFO{}) // RealFIFO is a Queue
+	_ = Queue(&RealFIFO{})             // RealFIFO is a Queue
+	_ = TransformingStore(&RealFIFO{}) // RealFIFO implements TransformingStore to allow memory optimizations
 )
 
 // Close the queue.
