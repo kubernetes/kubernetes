@@ -19,6 +19,7 @@ package manager
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/tools/cache"
 	"strings"
 	"testing"
 	"time"
@@ -31,8 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/util/watchlist"
-
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -67,15 +66,17 @@ func isSecretImmutable(object runtime.Object) bool {
 
 func newSecretCache(ctx context.Context, fakeClient clientset.Interface, fakeClock clock.Clock, maxIdleTime time.Duration) *objectCache {
 	return &objectCache{
-		listObject:                    listSecret(ctx, fakeClient),
-		watchObject:                   watchSecret(ctx, fakeClient),
-		newObject:                     func() runtime.Object { return &v1.Secret{} },
-		isImmutable:                   isSecretImmutable,
-		unsupportedWatchListSemantics: watchlist.DoesClientNotSupportWatchListSemantics(fakeClient),
-		groupResource:                 corev1.Resource("secret"),
-		clock:                         fakeClock,
-		maxIdleTime:                   maxIdleTime,
-		items:                         make(map[objectKey]*objectCacheItem),
+		listObject:  listSecret(ctx, fakeClient),
+		watchObject: watchSecret(ctx, fakeClient),
+		newObject:   func() runtime.Object { return &v1.Secret{} },
+		isImmutable: isSecretImmutable,
+		listWatcherWithWatchListSemanticsWrapper: func(lw cache.ListerWatcher) cache.ListerWatcher {
+			return cache.ToListWatcherWithWatchListSemantics(lw, fakeClient)
+		},
+		groupResource: corev1.Resource("secret"),
+		clock:         fakeClock,
+		maxIdleTime:   maxIdleTime,
+		items:         make(map[objectKey]*objectCacheItem),
 	}
 }
 
