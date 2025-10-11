@@ -22,10 +22,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	unsafe "unsafe"
-
-	v1 "k8s.io/api/core/v1"
 	storagemigrationv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	storagemigration "k8s.io/kubernetes/pkg/apis/storagemigration"
@@ -38,23 +36,13 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*storagemigrationv1alpha1.GroupVersionResource)(nil), (*storagemigration.GroupVersionResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_GroupVersionResource_To_storagemigration_GroupVersionResource(a.(*storagemigrationv1alpha1.GroupVersionResource), b.(*storagemigration.GroupVersionResource), scope)
+	if err := s.AddGeneratedConversionFunc((*storagemigrationv1alpha1.GroupVersionResource)(nil), (*v1.GroupVersionResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_GroupVersionResource_To_v1_GroupVersionResource(a.(*storagemigrationv1alpha1.GroupVersionResource), b.(*v1.GroupVersionResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*storagemigration.GroupVersionResource)(nil), (*storagemigrationv1alpha1.GroupVersionResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_storagemigration_GroupVersionResource_To_v1alpha1_GroupVersionResource(a.(*storagemigration.GroupVersionResource), b.(*storagemigrationv1alpha1.GroupVersionResource), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*storagemigrationv1alpha1.MigrationCondition)(nil), (*storagemigration.MigrationCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_MigrationCondition_To_storagemigration_MigrationCondition(a.(*storagemigrationv1alpha1.MigrationCondition), b.(*storagemigration.MigrationCondition), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*storagemigration.MigrationCondition)(nil), (*storagemigrationv1alpha1.MigrationCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_storagemigration_MigrationCondition_To_v1alpha1_MigrationCondition(a.(*storagemigration.MigrationCondition), b.(*storagemigrationv1alpha1.MigrationCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.GroupVersionResource)(nil), (*storagemigrationv1alpha1.GroupVersionResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_GroupVersionResource_To_v1alpha1_GroupVersionResource(a.(*v1.GroupVersionResource), b.(*storagemigrationv1alpha1.GroupVersionResource), scope)
 	}); err != nil {
 		return err
 	}
@@ -78,11 +66,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*storagemigrationv1alpha1.StorageVersionMigrationSpec)(nil), (*storagemigration.StorageVersionMigrationSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_StorageVersionMigrationSpec_To_storagemigration_StorageVersionMigrationSpec(a.(*storagemigrationv1alpha1.StorageVersionMigrationSpec), b.(*storagemigration.StorageVersionMigrationSpec), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*storagemigration.StorageVersionMigrationSpec)(nil), (*storagemigrationv1alpha1.StorageVersionMigrationSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_storagemigration_StorageVersionMigrationSpec_To_v1alpha1_StorageVersionMigrationSpec(a.(*storagemigration.StorageVersionMigrationSpec), b.(*storagemigrationv1alpha1.StorageVersionMigrationSpec), scope)
 	}); err != nil {
@@ -98,59 +81,56 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*storagemigration.GroupResource)(nil), (*storagemigrationv1alpha1.GroupVersionResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storagemigration_GroupResource_To_v1alpha1_GroupVersionResource(a.(*storagemigration.GroupResource), b.(*storagemigrationv1alpha1.GroupVersionResource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.Condition)(nil), (*storagemigrationv1alpha1.MigrationCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Condition_To_v1alpha1_MigrationCondition(a.(*v1.Condition), b.(*storagemigrationv1alpha1.MigrationCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*storagemigrationv1alpha1.GroupVersionResource)(nil), (*storagemigration.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_GroupVersionResource_To_storagemigration_GroupResource(a.(*storagemigrationv1alpha1.GroupVersionResource), b.(*storagemigration.GroupResource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*storagemigrationv1alpha1.MigrationCondition)(nil), (*v1.Condition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_MigrationCondition_To_v1_Condition(a.(*storagemigrationv1alpha1.MigrationCondition), b.(*v1.Condition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*storagemigrationv1alpha1.StorageVersionMigrationSpec)(nil), (*storagemigration.StorageVersionMigrationSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_StorageVersionMigrationSpec_To_storagemigration_StorageVersionMigrationSpec(a.(*storagemigrationv1alpha1.StorageVersionMigrationSpec), b.(*storagemigration.StorageVersionMigrationSpec), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
-func autoConvert_v1alpha1_GroupVersionResource_To_storagemigration_GroupVersionResource(in *storagemigrationv1alpha1.GroupVersionResource, out *storagemigration.GroupVersionResource, s conversion.Scope) error {
+func autoConvert_v1alpha1_GroupVersionResource_To_v1_GroupVersionResource(in *storagemigrationv1alpha1.GroupVersionResource, out *v1.GroupVersionResource, s conversion.Scope) error {
 	out.Group = in.Group
 	out.Version = in.Version
 	out.Resource = in.Resource
 	return nil
 }
 
-// Convert_v1alpha1_GroupVersionResource_To_storagemigration_GroupVersionResource is an autogenerated conversion function.
-func Convert_v1alpha1_GroupVersionResource_To_storagemigration_GroupVersionResource(in *storagemigrationv1alpha1.GroupVersionResource, out *storagemigration.GroupVersionResource, s conversion.Scope) error {
-	return autoConvert_v1alpha1_GroupVersionResource_To_storagemigration_GroupVersionResource(in, out, s)
+// Convert_v1alpha1_GroupVersionResource_To_v1_GroupVersionResource is an autogenerated conversion function.
+func Convert_v1alpha1_GroupVersionResource_To_v1_GroupVersionResource(in *storagemigrationv1alpha1.GroupVersionResource, out *v1.GroupVersionResource, s conversion.Scope) error {
+	return autoConvert_v1alpha1_GroupVersionResource_To_v1_GroupVersionResource(in, out, s)
 }
 
-func autoConvert_storagemigration_GroupVersionResource_To_v1alpha1_GroupVersionResource(in *storagemigration.GroupVersionResource, out *storagemigrationv1alpha1.GroupVersionResource, s conversion.Scope) error {
+func autoConvert_v1_GroupVersionResource_To_v1alpha1_GroupVersionResource(in *v1.GroupVersionResource, out *storagemigrationv1alpha1.GroupVersionResource, s conversion.Scope) error {
 	out.Group = in.Group
 	out.Version = in.Version
 	out.Resource = in.Resource
 	return nil
 }
 
-// Convert_storagemigration_GroupVersionResource_To_v1alpha1_GroupVersionResource is an autogenerated conversion function.
-func Convert_storagemigration_GroupVersionResource_To_v1alpha1_GroupVersionResource(in *storagemigration.GroupVersionResource, out *storagemigrationv1alpha1.GroupVersionResource, s conversion.Scope) error {
-	return autoConvert_storagemigration_GroupVersionResource_To_v1alpha1_GroupVersionResource(in, out, s)
-}
-
-func autoConvert_v1alpha1_MigrationCondition_To_storagemigration_MigrationCondition(in *storagemigrationv1alpha1.MigrationCondition, out *storagemigration.MigrationCondition, s conversion.Scope) error {
-	out.Type = storagemigration.MigrationConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
-	out.LastUpdateTime = in.LastUpdateTime
-	out.Reason = in.Reason
-	out.Message = in.Message
-	return nil
-}
-
-// Convert_v1alpha1_MigrationCondition_To_storagemigration_MigrationCondition is an autogenerated conversion function.
-func Convert_v1alpha1_MigrationCondition_To_storagemigration_MigrationCondition(in *storagemigrationv1alpha1.MigrationCondition, out *storagemigration.MigrationCondition, s conversion.Scope) error {
-	return autoConvert_v1alpha1_MigrationCondition_To_storagemigration_MigrationCondition(in, out, s)
-}
-
-func autoConvert_storagemigration_MigrationCondition_To_v1alpha1_MigrationCondition(in *storagemigration.MigrationCondition, out *storagemigrationv1alpha1.MigrationCondition, s conversion.Scope) error {
-	out.Type = storagemigrationv1alpha1.MigrationConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
-	out.LastUpdateTime = in.LastUpdateTime
-	out.Reason = in.Reason
-	out.Message = in.Message
-	return nil
-}
-
-// Convert_storagemigration_MigrationCondition_To_v1alpha1_MigrationCondition is an autogenerated conversion function.
-func Convert_storagemigration_MigrationCondition_To_v1alpha1_MigrationCondition(in *storagemigration.MigrationCondition, out *storagemigrationv1alpha1.MigrationCondition, s conversion.Scope) error {
-	return autoConvert_storagemigration_MigrationCondition_To_v1alpha1_MigrationCondition(in, out, s)
+// Convert_v1_GroupVersionResource_To_v1alpha1_GroupVersionResource is an autogenerated conversion function.
+func Convert_v1_GroupVersionResource_To_v1alpha1_GroupVersionResource(in *v1.GroupVersionResource, out *storagemigrationv1alpha1.GroupVersionResource, s conversion.Scope) error {
+	return autoConvert_v1_GroupVersionResource_To_v1alpha1_GroupVersionResource(in, out, s)
 }
 
 func autoConvert_v1alpha1_StorageVersionMigration_To_storagemigration_StorageVersionMigration(in *storagemigrationv1alpha1.StorageVersionMigration, out *storagemigration.StorageVersionMigration, s conversion.Scope) error {
@@ -187,7 +167,17 @@ func Convert_storagemigration_StorageVersionMigration_To_v1alpha1_StorageVersion
 
 func autoConvert_v1alpha1_StorageVersionMigrationList_To_storagemigration_StorageVersionMigrationList(in *storagemigrationv1alpha1.StorageVersionMigrationList, out *storagemigration.StorageVersionMigrationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]storagemigration.StorageVersionMigration)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]storagemigration.StorageVersionMigration, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_StorageVersionMigration_To_storagemigration_StorageVersionMigration(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -198,7 +188,17 @@ func Convert_v1alpha1_StorageVersionMigrationList_To_storagemigration_StorageVer
 
 func autoConvert_storagemigration_StorageVersionMigrationList_To_v1alpha1_StorageVersionMigrationList(in *storagemigration.StorageVersionMigrationList, out *storagemigrationv1alpha1.StorageVersionMigrationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]storagemigrationv1alpha1.StorageVersionMigration)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]storagemigrationv1alpha1.StorageVersionMigration, len(*in))
+		for i := range *in {
+			if err := Convert_storagemigration_StorageVersionMigration_To_v1alpha1_StorageVersionMigration(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -208,23 +208,17 @@ func Convert_storagemigration_StorageVersionMigrationList_To_v1alpha1_StorageVer
 }
 
 func autoConvert_v1alpha1_StorageVersionMigrationSpec_To_storagemigration_StorageVersionMigrationSpec(in *storagemigrationv1alpha1.StorageVersionMigrationSpec, out *storagemigration.StorageVersionMigrationSpec, s conversion.Scope) error {
-	if err := Convert_v1alpha1_GroupVersionResource_To_storagemigration_GroupVersionResource(&in.Resource, &out.Resource, s); err != nil {
+	if err := Convert_v1alpha1_GroupVersionResource_To_storagemigration_GroupResource(&in.Resource, &out.Resource, s); err != nil {
 		return err
 	}
-	out.ContinueToken = in.ContinueToken
+	// WARNING: in.ContinueToken requires manual conversion: does not exist in peer-type
 	return nil
 }
 
-// Convert_v1alpha1_StorageVersionMigrationSpec_To_storagemigration_StorageVersionMigrationSpec is an autogenerated conversion function.
-func Convert_v1alpha1_StorageVersionMigrationSpec_To_storagemigration_StorageVersionMigrationSpec(in *storagemigrationv1alpha1.StorageVersionMigrationSpec, out *storagemigration.StorageVersionMigrationSpec, s conversion.Scope) error {
-	return autoConvert_v1alpha1_StorageVersionMigrationSpec_To_storagemigration_StorageVersionMigrationSpec(in, out, s)
-}
-
 func autoConvert_storagemigration_StorageVersionMigrationSpec_To_v1alpha1_StorageVersionMigrationSpec(in *storagemigration.StorageVersionMigrationSpec, out *storagemigrationv1alpha1.StorageVersionMigrationSpec, s conversion.Scope) error {
-	if err := Convert_storagemigration_GroupVersionResource_To_v1alpha1_GroupVersionResource(&in.Resource, &out.Resource, s); err != nil {
+	if err := Convert_storagemigration_GroupResource_To_v1alpha1_GroupVersionResource(&in.Resource, &out.Resource, s); err != nil {
 		return err
 	}
-	out.ContinueToken = in.ContinueToken
 	return nil
 }
 
@@ -234,7 +228,17 @@ func Convert_storagemigration_StorageVersionMigrationSpec_To_v1alpha1_StorageVer
 }
 
 func autoConvert_v1alpha1_StorageVersionMigrationStatus_To_storagemigration_StorageVersionMigrationStatus(in *storagemigrationv1alpha1.StorageVersionMigrationStatus, out *storagemigration.StorageVersionMigrationStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]storagemigration.MigrationCondition)(unsafe.Pointer(&in.Conditions))
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]v1.Condition, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_MigrationCondition_To_v1_Condition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	out.ResourceVersion = in.ResourceVersion
 	return nil
 }
@@ -245,7 +249,17 @@ func Convert_v1alpha1_StorageVersionMigrationStatus_To_storagemigration_StorageV
 }
 
 func autoConvert_storagemigration_StorageVersionMigrationStatus_To_v1alpha1_StorageVersionMigrationStatus(in *storagemigration.StorageVersionMigrationStatus, out *storagemigrationv1alpha1.StorageVersionMigrationStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]storagemigrationv1alpha1.MigrationCondition)(unsafe.Pointer(&in.Conditions))
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]storagemigrationv1alpha1.MigrationCondition, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Condition_To_v1alpha1_MigrationCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	out.ResourceVersion = in.ResourceVersion
 	return nil
 }

@@ -18,15 +18,12 @@ package validation
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/storagemigration"
 
-	corev1 "k8s.io/api/core/v1"
+	metaconditions "k8s.io/apimachinery/pkg/api/meta"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -38,7 +35,6 @@ func ValidateStorageVersionMigration(svm *storagemigration.StorageVersionMigrati
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&svm.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
 
 	allErrs = checkAndAppendError(allErrs, field.NewPath("spec", "resource", "resource"), svm.Spec.Resource.Resource, "resource is required")
-	allErrs = checkAndAppendError(allErrs, field.NewPath("spec", "resource", "version"), svm.Spec.Resource.Version, "version is required")
 
 	return allErrs
 }
@@ -50,9 +46,6 @@ func ValidateStorageVersionMigrationUpdate(newSVMBundle, oldSVMBundle *storagemi
 	// prevent changes to the group, version and resource
 	if newSVMBundle.Spec.Resource.Group != oldSVMBundle.Spec.Resource.Group {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("group"), newSVMBundle.Spec.Resource.Group, "field is immutable"))
-	}
-	if newSVMBundle.Spec.Resource.Version != oldSVMBundle.Spec.Resource.Version {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("version"), newSVMBundle.Spec.Resource.Version, "field is immutable"))
 	}
 	if newSVMBundle.Spec.Resource.Resource != oldSVMBundle.Spec.Resource.Resource {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("resource"), newSVMBundle.Spec.Resource.Resource, "field is immutable"))
@@ -74,7 +67,7 @@ func ValidateStorageVersionMigrationStatusUpdate(newSVMBundle, oldSVMBundle *sto
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(rvInt, fldPath.Child("resourceVersion"))...)
 
 	// TODO: after switching to metav1.Conditions in beta replace this validation with metav1.ValidateConditions
-	allErrs = append(allErrs, validateConditions(newSVMBundle.Status.Conditions, fldPath.Child("conditions"))...)
+	allErrs = append(allErrs, metav1validation.ValidateConditions(newSVMBundle.Status.Conditions, fldPath.Child("conditions"))...)
 
 	// resource version should not change once it has been set
 	if len(oldSVMBundle.Status.ResourceVersion) != 0 && oldSVMBundle.Status.ResourceVersion != newSVMBundle.Status.ResourceVersion {
@@ -108,101 +101,27 @@ func ValidateStorageVersionMigrationStatusUpdate(newSVMBundle, oldSVMBundle *sto
 }
 
 func isSuccessful(svm *storagemigration.StorageVersionMigration) bool {
-	successCondition := getCondition(svm, storagemigration.MigrationSucceeded)
-	if successCondition != nil && successCondition.Status == corev1.ConditionTrue {
+	successCondition := metaconditions.FindStatusCondition(svm.Status.Conditions, string(storagemigration.MigrationSucceeded))
+	if successCondition != nil && successCondition.Status == metav1.ConditionTrue {
 		return true
 	}
 	return false
 }
 
 func isFailed(svm *storagemigration.StorageVersionMigration) bool {
-	failedCondition := getCondition(svm, storagemigration.MigrationFailed)
-	if failedCondition != nil && failedCondition.Status == corev1.ConditionTrue {
+	failedCondition := metaconditions.FindStatusCondition(svm.Status.Conditions, string(storagemigration.MigrationFailed))
+	if failedCondition != nil && failedCondition.Status == metav1.ConditionTrue {
 		return true
 	}
 	return false
 }
 
 func isRunning(svm *storagemigration.StorageVersionMigration) bool {
-	runningCondition := getCondition(svm, storagemigration.MigrationRunning)
-	if runningCondition != nil && runningCondition.Status == corev1.ConditionTrue {
+	runningCondition := metaconditions.FindStatusCondition(svm.Status.Conditions, string(storagemigration.MigrationRunning))
+	if runningCondition != nil && runningCondition.Status == metav1.ConditionTrue {
 		return true
 	}
 	return false
-}
-
-func getCondition(svm *storagemigration.StorageVersionMigration, conditionType storagemigration.MigrationConditionType) *storagemigration.MigrationCondition {
-	for _, c := range svm.Status.Conditions {
-		if c.Type == conditionType {
-			return &c
-		}
-	}
-
-	return nil
-}
-
-func validateConditions(conditions []storagemigration.MigrationCondition, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-
-	conditionTypeToFirstIndex := map[string]int{}
-	for i, condition := range conditions {
-		if _, ok := conditionTypeToFirstIndex[string(condition.Type)]; ok {
-			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i).Child("type"), condition.Type))
-		} else {
-			conditionTypeToFirstIndex[string(condition.Type)] = i
-		}
-
-		allErrs = append(allErrs, validateCondition(condition, fldPath.Index(i))...)
-	}
-
-	return allErrs
-}
-
-func validateCondition(condition storagemigration.MigrationCondition, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	var validConditionStatuses = sets.NewString(string(metav1.ConditionTrue), string(metav1.ConditionFalse), string(metav1.ConditionUnknown))
-
-	// type is set and is a valid format
-	allErrs = append(allErrs, metav1validation.ValidateLabelName(string(condition.Type), fldPath.Child("type"))...)
-
-	// status is set and is an accepted value
-	if !validConditionStatuses.Has(string(condition.Status)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, validConditionStatuses.List()))
-	}
-
-	if condition.LastUpdateTime.IsZero() {
-		allErrs = append(allErrs, field.Required(fldPath.Child("lastTransitionTime"), ""))
-	}
-
-	if len(condition.Reason) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), ""))
-	} else {
-		for _, currErr := range isValidConditionReason(condition.Reason) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, currErr))
-		}
-
-		const maxReasonLen int = 1 * 1024 // 1024
-		if len(condition.Reason) > maxReasonLen {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), "" /*unused*/, maxReasonLen))
-		}
-	}
-
-	const maxMessageLen int = 32 * 1024 // 32768
-	if len(condition.Message) > maxMessageLen {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxMessageLen))
-	}
-
-	return allErrs
-}
-func isValidConditionReason(value string) []string {
-	const conditionReasonFmt string = "[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?"
-	const conditionReasonErrMsg string = "a condition reason must start with alphabetic character, optionally followed by a string of alphanumeric characters or '_,:', and must end with an alphanumeric character or '_'"
-	var conditionReasonRegexp = regexp.MustCompile("^" + conditionReasonFmt + "$")
-
-	if !conditionReasonRegexp.MatchString(value) {
-		return []string{validation.RegexError(conditionReasonErrMsg, conditionReasonFmt, "my_name", "MY_NAME", "MyName", "ReasonA,ReasonB", "ReasonA:ReasonB")}
-	}
-	return nil
 }
 
 func checkAndAppendError(allErrs field.ErrorList, fieldPath *field.Path, value string, message string) field.ErrorList {

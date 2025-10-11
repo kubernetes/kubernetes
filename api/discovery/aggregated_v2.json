@@ -1312,35 +1312,6 @@
             }
           ],
           "version": "v1beta1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "volumeattributesclasses",
-              "responseKind": {
-                "group": "",
-                "kind": "VolumeAttributesClass",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "shortNames": [
-                "vac"
-              ],
-              "singularResource": "volumeattributesclass",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1alpha1"
         }
       ]
     },
@@ -2282,6 +2253,47 @@
         "name": "storagemigration.k8s.io"
       },
       "versions": [
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "storageversionmigrations",
+              "responseKind": {
+                "group": "",
+                "kind": "StorageVersionMigration",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "storageversionmigration",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "StorageVersionMigration",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
+        },
         {
           "freshness": "Current",
           "resources": [

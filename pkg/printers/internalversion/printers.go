@@ -3272,7 +3272,7 @@ func printStorageVersionMigration(obj *svmv1alpha1.StorageVersionMigration, opti
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	migrationGVR := obj.Spec.Resource.Resource + "." + obj.Spec.Resource.Version + "." + obj.Spec.Resource.Group
+	migrationGVR := obj.Spec.Resource.Resource + "." + obj.Spec.Resource.Group
 	row.Cells = append(row.Cells, obj.Name, migrationGVR)
 	//ToDo: add migration condition 'status' and 'type' (migration successful | failed)
 

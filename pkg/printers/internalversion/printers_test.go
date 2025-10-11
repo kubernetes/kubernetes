@@ -7723,16 +7723,15 @@ func TestPrintStorageVersionMigration(t *testing.T) {
 			Name: "print-test",
 		},
 		Spec: storagemigration.StorageVersionMigrationSpec{
-			Resource: storagemigration.GroupVersionResource{
+			Resource: storagemigration.GroupResource{
 				Group:    "test-group",
-				Version:  "test-version",
 				Resource: "test-resource",
 			},
 		},
 	}
 
 	// Columns: Name, GVRTOMIGRATE
-	expected := []metav1.TableRow{{Cells: []interface{}{"print-test", "test-resource.test-version.test-group"}}}
+	expected := []metav1.TableRow{{Cells: []interface{}{"print-test", "test-resource.test-group"}}}
 
 	rows, err := printStorageVersionMigration(&storageVersionMigration, printers.GenerateOptions{})
 	if err != nil {
@@ -7756,9 +7755,8 @@ func TestPrintStorageVersionMigrationList(t *testing.T) {
 					Name: "print-test",
 				},
 				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
+					Resource: storagemigration.GroupResource{
 						Group:    "test-group",
-						Version:  "test-version",
 						Resource: "test-resource",
 					},
 				},
@@ -7772,9 +7770,8 @@ func TestPrintStorageVersionMigrationList(t *testing.T) {
 					Name: "print-test2",
 				},
 				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
+					Resource: storagemigration.GroupResource{
 						Group:    "test-group2",
-						Version:  "test-version2",
 						Resource: "test-resource2",
 					},
 				},
@@ -7784,8 +7781,8 @@ func TestPrintStorageVersionMigrationList(t *testing.T) {
 
 	// Columns: Name, GVRTOMIGRATE
 	expected := []metav1.TableRow{
-		{Cells: []interface{}{"print-test", "test-resource.test-version.test-group"}},
-		{Cells: []interface{}{"print-test2", "test-resource2.test-version2.test-group2"}},
+		{Cells: []interface{}{"print-test", "test-resource.test-group"}},
+		{Cells: []interface{}{"print-test2", "test-resource2.test-group2"}},
 	}
 
 	rows, err := printStorageVersionMigrationList(&storageVersionMigrationList, printers.GenerateOptions{})
