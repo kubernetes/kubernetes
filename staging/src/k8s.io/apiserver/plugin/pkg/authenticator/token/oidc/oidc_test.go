@@ -1912,7 +1912,7 @@ func TestToken(t *testing.T) {
 				"username": "jane",
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: `oidc: verify token: oidc: id token signed with unsupported algorithm, expected ["RS256"] got "PS256"`,
+			wantErr: `oidc: verify token: oidc: malformed jwt: unexpected signature algorithm "PS256"; expected ["RS256"]`,
 		},
 		{
 			name: "ps256",
