@@ -21,6 +21,7 @@ limitations under the License.
 package contract
 
 import (
+	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -34,6 +35,7 @@ var _ fwk.SharedLister = &shareListerContract{}
 var _ fwk.ResourceSliceLister = &resourceSliceListerContract{}
 var _ fwk.DeviceClassLister = &deviceClassListerContract{}
 var _ fwk.ResourceClaimTracker = &resourceClaimTrackerContract{}
+var _ fwk.ExtendedResourceCache = &extendedResourceCacheContract{}
 var _ fwk.SharedDRAManager = &sharedDRAManagerContract{}
 
 type nodeInfoListerContract struct{}
@@ -135,4 +137,14 @@ func (s *sharedDRAManagerContract) ResourceSlices() fwk.ResourceSliceLister {
 
 func (s *sharedDRAManagerContract) DeviceClasses() fwk.DeviceClassLister {
 	return nil
+}
+
+func (s *sharedDRAManagerContract) ExtendedResourceCache() fwk.ExtendedResourceCache {
+	return nil
+}
+
+type extendedResourceCacheContract struct{}
+
+func (e *extendedResourceCacheContract) GetDeviceClass(_ v1.ResourceName) string {
+	return ""
 }
