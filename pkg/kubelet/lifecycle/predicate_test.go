@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	goruntime "runtime"
 	"testing"
 
@@ -189,11 +190,12 @@ func newPodWithPort(hostPorts ...int) *v1.Pod {
 
 func TestGeneralPredicates(t *testing.T) {
 	resourceTests := []struct {
-		pod      *v1.Pod
-		nodeInfo *schedulerframework.NodeInfo
-		node     *v1.Node
-		name     string
-		reasons  []PredicateFailureReason
+		pod                 *v1.Pod
+		nodeInfo            *schedulerframework.NodeInfo
+		node                *v1.Node
+		name                string
+		skipIgnorableChecks bool
+		reasons             []PredicateFailureReason
 	}{
 		{
 			pod: &v1.Pod{},
@@ -338,11 +340,89 @@ func TestGeneralPredicates(t *testing.T) {
 			},
 			name: "static pods ignore taints",
 		},
+		{
+			pod:      &v1.Pod{},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "bar", Effect: v1.TaintEffectNoExecute},
+					},
+				},
+				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name:                "NoExecute taint/toleration not match but container is already running",
+			skipIgnorableChecks: true,
+			reasons:             nil,
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name:                "node affinity not match",
+			skipIgnorableChecks: false,
+			reasons:             []PredicateFailureReason{&PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod}},
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeInfo: schedulerframework.NewNodeInfo(),
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			name:                "node affinity not match but container is already running",
+			skipIgnorableChecks: true,
+			reasons:             nil,
+		},
 	}
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
 			test.nodeInfo.SetNode(test.node)
-			reasons := generalFilter(test.pod, test.nodeInfo)
+			reasons := generalFilter(test.pod, test.nodeInfo, test.skipIgnorableChecks)
 			if diff := cmp.Diff(test.reasons, reasons); diff != "" {
 				t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
 			}
