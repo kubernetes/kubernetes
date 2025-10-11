@@ -149,18 +149,17 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+					utilruntime.HandleErrorWithContext(ctx, nil, "Could not get object from tombstone", "obj", obj)
 					return
 				}
 				node, ok = tombstone.Obj.(*v1.Node)
 				if !ok {
-					utilruntime.HandleError(fmt.Errorf("unexpected object types: %v", obj))
+					utilruntime.HandleErrorWithContext(ctx, nil, "Tombstone contained object that is not a node", "type", fmt.Sprintf("%T", obj))
 					return
 				}
 			}
 			if err := ra.ReleaseCIDR(logger, node); err != nil {
-				utilruntime.HandleError(fmt.Errorf("error while processing CIDR Release: %w", err))
-
+				utilruntime.HandleErrorWithContext(ctx, err, "Error while processing CIDR Release")
 			}
 		},
 	})
@@ -169,7 +168,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 }
 
 func (r *rangeAllocator) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start event processing pipeline.
 	r.broadcaster.StartStructuredLogging(3)
@@ -231,7 +230,7 @@ func (r *rangeAllocator) processNextNodeWorkItem(ctx context.Context) bool {
 			// Forget here else we'd go into a loop of attempting to
 			// process a work item that is invalid.
 			r.queue.Forget(obj)
-			utilruntime.HandleError(fmt.Errorf("expected string in workNodeQueue but got %#v", obj))
+			utilruntime.HandleErrorWithContext(ctx, nil, "Expected string but got unexpected type in work node queue", "type", fmt.Sprintf("%T", obj))
 			return nil
 		}
 		// Run the syncHandler, passing it the namespace/name string of the
@@ -249,7 +248,7 @@ func (r *rangeAllocator) processNextNodeWorkItem(ctx context.Context) bool {
 	}(klog.FromContext(ctx), obj)
 
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(ctx, err, "Error processing node work item")
 		return true
 	}
 
