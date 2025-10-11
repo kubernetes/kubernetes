@@ -1,0 +1,12 @@
+syntax = "proto2";
+
+package issue270.a;
+
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo/internal/third_party/github.com/gogo/protobuf/test/issue270/a/a2.proto";
+
+option (gogoproto.populate_all) = true;
+
+message A1 {
+    optional A2 a2 = 1;
+}

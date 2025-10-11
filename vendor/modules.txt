@@ -182,31 +182,8 @@ github.com/godbus/dbus/v5
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/gogoproto
-github.com/gogo/protobuf/plugin/compare
-github.com/gogo/protobuf/plugin/defaultcheck
-github.com/gogo/protobuf/plugin/description
-github.com/gogo/protobuf/plugin/embedcheck
-github.com/gogo/protobuf/plugin/enumstringer
-github.com/gogo/protobuf/plugin/equal
-github.com/gogo/protobuf/plugin/face
-github.com/gogo/protobuf/plugin/gostring
-github.com/gogo/protobuf/plugin/marshalto
-github.com/gogo/protobuf/plugin/oneofcheck
-github.com/gogo/protobuf/plugin/populate
-github.com/gogo/protobuf/plugin/size
-github.com/gogo/protobuf/plugin/stringer
-github.com/gogo/protobuf/plugin/testgen
-github.com/gogo/protobuf/plugin/union
-github.com/gogo/protobuf/plugin/unmarshal
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
-github.com/gogo/protobuf/protoc-gen-gogo/generator
-github.com/gogo/protobuf/protoc-gen-gogo/generator/internal/remap
-github.com/gogo/protobuf/protoc-gen-gogo/grpc
-github.com/gogo/protobuf/protoc-gen-gogo/plugin
-github.com/gogo/protobuf/sortkeys
-github.com/gogo/protobuf/vanity
-github.com/gogo/protobuf/vanity/command
 # github.com/golang-jwt/jwt/v5 v5.2.2
 ## explicit; go 1.18
 github.com/golang-jwt/jwt/v5
