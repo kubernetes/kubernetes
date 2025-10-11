@@ -56,7 +56,7 @@ func NewVolumeAttributesClassInformer(client kubernetes.Interface, resyncPeriod 
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredVolumeAttributesClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredVolumeAttributesClassInformer(client kubernetes.Interface, resyn
 				}
 				return client.StorageV1beta1().VolumeAttributesClasses().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apistoragev1beta1.VolumeAttributesClass{},
 		resyncPeriod,
 		indexers,

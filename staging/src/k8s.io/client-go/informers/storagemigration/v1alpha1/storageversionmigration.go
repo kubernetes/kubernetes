@@ -56,7 +56,7 @@ func NewStorageVersionMigrationInformer(client kubernetes.Interface, resyncPerio
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredStorageVersionMigrationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -81,7 +81,7 @@ func NewFilteredStorageVersionMigrationInformer(client kubernetes.Interface, res
 				}
 				return client.StoragemigrationV1alpha1().StorageVersionMigrations().Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apistoragemigrationv1alpha1.StorageVersionMigration{},
 		resyncPeriod,
 		indexers,

@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	fcache "k8s.io/client-go/tools/cache/testing"
 	"k8s.io/component-base/featuregate"
 
 	"k8s.io/apiserver/pkg/admission"
@@ -159,27 +160,27 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	// Make an informer for our policies and bindings
 
 	policyInformer := cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		fcache.ToListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return policiesAndBindingsTracker.List(fakePolicyGVR, fakePolicyGVK, "")
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return policiesAndBindingsTracker.Watch(fakePolicyGVR, "")
 			},
-		},
+		}),
 		Pexample,
 		30*time.Second,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	bindingInformer := cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		fcache.ToListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return policiesAndBindingsTracker.List(fakeBindingGVR, fakeBindingGVK, "")
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return policiesAndBindingsTracker.Watch(fakeBindingGVR, "")
 			},
-		},
+		}),
 		Bexample,
 		30*time.Second,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},

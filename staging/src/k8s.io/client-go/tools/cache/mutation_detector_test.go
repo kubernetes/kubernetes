@@ -25,18 +25,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	fcache "k8s.io/client-go/tools/cache/testing"
 )
 
 func TestMutationDetector(t *testing.T) {
 	fakeWatch := watch.NewFake()
-	lw := &ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			return fakeWatch, nil
 		},
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return &v1.PodList{}, nil
 		},
-	}
+	})
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "anything",

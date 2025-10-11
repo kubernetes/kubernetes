@@ -39,6 +39,7 @@ import (
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	fcache "k8s.io/client-go/tools/cache/testing"
 )
 
 // TestEventProcessorExit is expected to timeout if the event processor fails
@@ -387,7 +388,7 @@ func TestNewInformerWatcher(t *testing.T) {
 func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 	listCalls := 0
 	watchCalls := 0
-	lw := &cache.ListWatch{
+	lw := fcache.ToListWatcherWithUnSupportedWatchListSemantics(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			retval := &corev1.SecretList{}
 			if listCalls == 0 {
@@ -413,7 +414,7 @@ func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 			watchCalls++
 			return w, nil
 		},
-	}
+	})
 	//nolint:logcheck // Intentionally uses the older API.
 	_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
 	defer w.Stop()
