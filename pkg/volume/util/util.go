@@ -634,12 +634,14 @@ func IsMultiAttachAllowed(volumeSpec *volume.Spec) bool {
 
 // IsAttachableVolume checks if the given volumeSpec is an attachable volume or not
 func IsAttachableVolume(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) bool {
-	attachableVolumePlugin, _ := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
-	if attachableVolumePlugin != nil {
-		volumeAttacher, err := attachableVolumePlugin.NewAttacher()
-		if err == nil && volumeAttacher != nil {
-			return true
-		}
+	attachableVolumePlugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	if err != nil || attachableVolumePlugin == nil {
+		return false
+	}
+	
+	volumeAttacher, err := attachableVolumePlugin.NewAttacher()
+	if err == nil && volumeAttacher != nil {
+		return true
 	}
 
 	return false
@@ -647,12 +649,14 @@ func IsAttachableVolume(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumeP
 
 // IsDeviceMountableVolume checks if the given volumeSpec is an device mountable volume or not
 func IsDeviceMountableVolume(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) bool {
-	deviceMountableVolumePlugin, _ := volumePluginMgr.FindDeviceMountablePluginBySpec(volumeSpec)
-	if deviceMountableVolumePlugin != nil {
-		volumeDeviceMounter, err := deviceMountableVolumePlugin.NewDeviceMounter()
-		if err == nil && volumeDeviceMounter != nil {
-			return true
-		}
+	deviceMountableVolumePlugin, err := volumePluginMgr.FindDeviceMountablePluginBySpec(volumeSpec)
+	if err != nil || deviceMountableVolumePlugin == nil {
+		return false
+	}
+	
+	volumeDeviceMounter, err := deviceMountableVolumePlugin.NewDeviceMounter()
+	if err == nil && volumeDeviceMounter != nil {
+		return true
 	}
 
 	return false
