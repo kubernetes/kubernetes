@@ -17,30 +17,45 @@ limitations under the License.
 package core
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	quota "k8s.io/apiserver/pkg/quota/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/dynamic-resource-allocation/deviceclass/cache"
+	"k8s.io/klog/v2/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
-func testResourceClaim(name string, namespace string, spec api.ResourceClaimSpec) *api.ResourceClaim {
-	return &api.ResourceClaim{
+func testResourceClaim(name string, namespace string, isExtended bool, spec api.ResourceClaimSpec) *api.ResourceClaim {
+	claim := &api.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec:       spec,
 	}
+	if isExtended {
+		claim.Annotations = map[string]string{resourceapi.ExtendedResourceClaimAnnotation: "true"}
+	}
+	return claim
 }
 
 func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	classGpu := "gpu"
 	classTpu := "tpu"
-	validClaim := testResourceClaim("foo", "ns", api.ResourceClaimSpec{
+	validClaim := testResourceClaim("foo", "ns", false, api.ResourceClaimSpec{
 		Devices: api.DeviceClaim{
 			Requests: []api.DeviceRequest{
 				{
@@ -54,7 +69,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			},
 		},
 	})
-	validClaimWithPrioritizedList := testResourceClaim("foo", "ns", api.ResourceClaimSpec{
+	validClaimWithPrioritizedList := testResourceClaim("foo", "ns", false, api.ResourceClaimSpec{
 		Devices: api.DeviceClaim{
 			Requests: []api.DeviceRequest{
 				{
@@ -71,18 +86,126 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			},
 		},
 	})
+	explicitExtendedResourceClaim := testResourceClaim("foo", "ns", true, api.ResourceClaimSpec{
+		Devices: api.DeviceClaim{
+			Requests: []api.DeviceRequest{
+				{
+					Name: "container-0-request-0",
+					Exactly: &api.ExactDeviceRequest{
+						DeviceClassName: classGpu,
+						AllocationMode:  api.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				},
+			},
+		},
+	})
+	implicitExtendedResourceClaim := testResourceClaim("foo", "ns", true, api.ResourceClaimSpec{
+		Devices: api.DeviceClaim{
+			Requests: []api.DeviceRequest{
+				{
+					Name: "container-0-request-0-i",
+					Exactly: &api.ExactDeviceRequest{
+						DeviceClassName: classGpu,
+						AllocationMode:  api.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				},
+			},
+		},
+	})
+	hybridExtendedResourceClaim := testResourceClaim("foo", "ns", true, api.ResourceClaimSpec{
+		Devices: api.DeviceClaim{
+			Requests: []api.DeviceRequest{
+				{
+					Name: "container-0-request-0-i",
+					Exactly: &api.ExactDeviceRequest{
+						DeviceClassName: classGpu,
+						AllocationMode:  api.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				},
+				{
+					Name: "container-0-request-1",
+					Exactly: &api.ExactDeviceRequest{
+						DeviceClassName: classGpu,
+						AllocationMode:  api.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				},
+			},
+		},
+	})
 
-	evaluator := NewResourceClaimEvaluator(nil)
+	deviceClass1 := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: classGpu,
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: ptr.To("example.com/gpu"),
+		},
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	tCtx, tCancel := context.WithCancel(ctx)
+	client := fake.NewClientset(deviceClass1)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	deviceclassmapping := cache.NewDeviceClassMapping(informerFactory)
+	evaluatorWithDeviceMapping := NewResourceClaimEvaluator(nil, deviceclassmapping)
+
+	informerFactory.Start(tCtx.Done())
+	t.Cleanup(func() {
+		// Need to cancel before waiting for the shutdown.
+		tCancel()
+		// Now we can wait for all goroutines to stop.
+		informerFactory.Shutdown()
+	})
+	informerFactory.WaitForCacheSync(tCtx.Done())
+
+	// wait for informer sync
+	time.Sleep(1 * time.Second)
+
+	evaluator := NewResourceClaimEvaluator(nil, nil)
 	testCases := map[string]struct {
-		claim  *api.ResourceClaim
-		usage  corev1.ResourceList
-		errMsg string
+		evaluator quota.Evaluator
+		claim     *api.ResourceClaim
+		usage     corev1.ResourceList
+		errMsg    string
 	}{
-		"simple": {
-			claim: validClaim,
+		"implicit-extended-resource-claim": {
+			evaluator: evaluatorWithDeviceMapping,
+			claim:     implicitExtendedResourceClaim,
 			usage: corev1.ResourceList{
 				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
 				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+				"requests.example.com/gpu":                resource.MustParse("1"),
+			},
+		},
+		"explicit-extended-resource-claim": {
+			evaluator: evaluatorWithDeviceMapping,
+			claim:     explicitExtendedResourceClaim,
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("1"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("1"),
+			},
+		},
+		"hybrid-extended-resource-claim": {
+			evaluator: evaluatorWithDeviceMapping,
+			claim:     hybridExtendedResourceClaim,
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("2"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("1"),
+				"requests.example.com/gpu":                        resource.MustParse("1"),
+			},
+		},
+		"simple": {
+			claim: validClaim,
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("1"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("1"),
 			},
 		},
 		"many-requests": {
@@ -94,8 +217,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("5"),
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("5"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("5"),
 			},
 		},
 		"count": {
@@ -105,8 +229,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("5"),
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("5"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("5"),
 			},
 		},
 		"all": {
@@ -116,8 +241,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": *resource.NewQuantity(api.AllocationResultsMaxSize, resource.DecimalSI),
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         *resource.NewQuantity(api.AllocationResultsMaxSize, resource.DecimalSI),
+				"requests.deviceclass.resource.kubernetes.io/gpu": *resource.NewQuantity(api.AllocationResultsMaxSize, resource.DecimalSI),
 			},
 		},
 		"unknown-count-mode": {
@@ -127,8 +253,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("0"),
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("0"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("0"),
 			},
 		},
 		"admin": {
@@ -139,15 +266,17 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("1"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("1"),
 			},
 		},
 		"prioritized-list": {
 			claim: validClaimWithPrioritizedList,
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("1"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("1"),
 			},
 		},
 		"prioritized-list-multiple-subrequests": {
@@ -163,8 +292,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("2"),
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("2"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("2"),
 			},
 		},
 		"prioritized-list-multiple-subrequests-allocation-mode-all": {
@@ -178,8 +308,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("32"),
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("33"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("33"),
 			},
 		},
 		"prioritized-list-multiple-subrequests-different-device-classes": {
@@ -193,15 +324,21 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
-				"tpu.deviceclass.resource.k8s.io/devices": resource.MustParse("32"),
+				"count/resourceclaims.resource.k8s.io":            resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("1"),
+				"requests.deviceclass.resource.kubernetes.io/gpu": resource.MustParse("1"),
+				"tpu.deviceclass.resource.k8s.io/devices":         resource.MustParse("32"),
+				"requests.deviceclass.resource.kubernetes.io/tpu": resource.MustParse("32"),
 			},
 		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			actual, err := evaluator.Usage(testCase.claim)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
+			if testCase.evaluator == nil {
+				testCase.evaluator = evaluator
+			}
+			actual, err := testCase.evaluator.Usage(testCase.claim)
 			if err != nil {
 				if testCase.errMsg == "" {
 					t.Fatalf("Unexpected error: %v", err)
@@ -222,7 +359,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 }
 
 func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
-	evaluator := NewResourceClaimEvaluator(nil)
+	evaluator := NewResourceClaimEvaluator(nil, nil)
 	testCases := map[string]struct {
 		items []corev1.ResourceName
 		want  []corev1.ResourceName
@@ -231,11 +368,15 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 			items: []corev1.ResourceName{
 				"count/resourceclaims.resource.k8s.io",
 				"gpu.deviceclass.resource.k8s.io/devices",
+				"requests.example.com/gpu",
+				"requests.deviceclass.resource.kubernetes.io/gpu",
 			},
 
 			want: []corev1.ResourceName{
 				"count/resourceclaims.resource.k8s.io",
 				"gpu.deviceclass.resource.k8s.io/devices",
+				"requests.example.com/gpu",
+				"requests.deviceclass.resource.kubernetes.io/gpu",
 			},
 		},
 		"unsupported-resources": {
@@ -251,6 +392,7 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
 			actual := evaluator.MatchingResources(testCase.items)
 
 			if diff := cmp.Diff(testCase.want, actual); diff != "" {
@@ -261,7 +403,7 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 }
 
 func TestResourceClaimEvaluatorHandles(t *testing.T) {
-	evaluator := NewResourceClaimEvaluator(nil)
+	evaluator := NewResourceClaimEvaluator(nil, nil)
 	testCases := []struct {
 		name  string
 		attrs admission.Attributes

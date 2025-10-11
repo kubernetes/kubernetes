@@ -856,9 +856,16 @@ func createDeviceRequests(pod *v1.Pod, extendedResources map[v1.ResourceName]int
 			// i is the index of the container if the list of initContainers + containers.
 			// ridx is the index of the extended resource request in the sorted all requests in the container.
 			// crq is the quantity of the extended resource request.
+			extendedResourceEncoding := ""
+			if strings.HasPrefix(string(r), resourceapi.ResourceDeviceClassPrefix) && strings.HasSuffix(string(r), className) && (len(r) == len(resourceapi.ResourceDeviceClassPrefix)+len(className)) {
+				// add "-i" to implicit extended resource device request
+				// such that quota resource claim evaluator can distinguish whether a device request
+				// is by explicit extended resource or implicit extended resource.
+				extendedResourceEncoding = "-i"
+			}
 			deviceRequests = append(deviceRequests,
 				resourceapi.DeviceRequest{
-					Name: fmt.Sprintf("container-%d-request-%d", i, ridx), // need to be container name index - extended resource name index
+					Name: fmt.Sprintf("container-%d-request-%d%s", i, ridx, extendedResourceEncoding), // need to be container name index - extended resource name index
 					Exactly: &resourceapi.ExactDeviceRequest{
 						DeviceClassName: className, // map external resource name -> device class name
 						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
@@ -1401,7 +1408,7 @@ func createRequestMappings(claim *resourceapi.ResourceClaim, pod *v1.Pod) []v1.C
 			for _, devReqName := range deviceReqNames {
 				// During filter phase, device request name is set to be
 				// container name index "-" extended resource name index
-				if fmt.Sprintf("container-%d-request-%d", i, ridx) == devReqName {
+				if strings.HasPrefix(devReqName, fmt.Sprintf("container-%d-request-%d", i, ridx)) {
 					cer = append(cer,
 						v1.ContainerExtendedResourceRequest{
 							ContainerName: c.Name,

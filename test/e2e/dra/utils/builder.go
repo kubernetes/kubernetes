@@ -353,6 +353,8 @@ func (b *Builder) Create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 			})
 		case *v1.Pod:
 			createdObj, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *v1.ResourceQuota:
+			createdObj, err = b.f.ClientSet.CoreV1().ResourceQuotas(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *v1.ConfigMap:
 			createdObj, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceClaim:
