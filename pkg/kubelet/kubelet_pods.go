@@ -59,6 +59,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -2073,10 +2074,22 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 	// set status for Pods created on versions of kube older than 1.6
 	apiPodStatus.QOSClass = v1qos.GetPodQOS(pod)
 
+	var imageVolumeNames sets.Set[string]
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) && utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) {
+		imageVolumeNames = sets.New[string]()
+		for _, podVolume := range pod.Spec.Volumes {
+			if podVolume.Image == nil {
+				continue
+			}
+			imageVolumeNames.Insert(podVolume.Name)
+		}
+	}
+
 	apiPodStatus.ContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,
 		oldPodStatus.ContainerStatuses,
 		pod.Spec.Containers,
+		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
 		false,
 	)
@@ -2084,6 +2097,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		pod, podStatus,
 		oldPodStatus.InitContainerStatuses,
 		pod.Spec.InitContainers,
+		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
 		true,
 	)
@@ -2098,6 +2112,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		pod, podStatus,
 		oldPodStatus.EphemeralContainerStatuses,
 		ecSpecs,
+		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
 		false,
 	)
@@ -2107,7 +2122,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 
 // convertToAPIContainerStatuses converts the given internal container
 // statuses into API container statuses.
-func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, hasInitContainers, isInitContainer bool) []v1.ContainerStatus {
+func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, imageVolumeNames sets.Set[string], hasInitContainers, isInitContainer bool) []v1.ContainerStatus {
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
 	logger := klog.TODO()
@@ -2126,6 +2141,39 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		if oldStatus != nil {
 			status.VolumeMounts = oldStatus.VolumeMounts // immutable
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) && utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) && imageVolumeNames.Len() > 0 {
+			for i := range status.VolumeMounts {
+				volumeName := status.VolumeMounts[i].Name
+				if !imageVolumeNames.Has(volumeName) {
+					continue
+				}
+
+				var imageSpec kubecontainer.ImageSpec
+				for _, curVolumeMount := range cs.Mounts {
+					if curVolumeMount.Image == nil || curVolumeMount.Name != volumeName {
+						continue
+					}
+					imageSpec = kuberuntime.ToKubeContainerImageSpec(&runtimeapi.Image{
+						Id:   curVolumeMount.Image.Image,
+						Spec: curVolumeMount.Image,
+					})
+					break
+				}
+
+				if imageSpec.Image == "" {
+					klog.ErrorS(fmt.Errorf("image was not found"), "", "pod", pod.Name, "container", cs.Name, "volume name", volumeName)
+					continue
+				}
+
+				imageRef, err := kl.containerRuntime.GetImageRef(context.Background(), imageSpec)
+				if err != nil {
+					klog.ErrorS(err, "error getting image volume digest", "image name", imageVolumeNames[volumeName])
+				}
+
+				status.VolumeMounts[i].ImageRef = &imageRef
+			}
+		}
+
 		switch {
 		case cs.State == kubecontainer.ContainerStateRunning:
 			status.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(cs.StartedAt)}
