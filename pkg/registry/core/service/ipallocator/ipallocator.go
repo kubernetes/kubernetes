@@ -424,12 +424,44 @@ func (a *Allocator) Used() int {
 	if err != nil {
 		return 0
 	}
-	return len(ips)
+
+	// Count only IPs that belong to this allocator's CIDR
+	count := 0
+	for _, ipAddress := range ips {
+		// Parse the IP address string to netip.Addr type
+		ip, err := netip.ParseAddr(ipAddress.Name)
+		if err != nil {
+			continue
+		}
+		// Only count valid IPs that fall within this allocator's CIDR range
+		if a.prefix.Contains(ip) {
+			count++
+		}
+	}
+	return count
 }
 
 // for testing, it assumes this is the allocator is unique for the ipFamily
 func (a *Allocator) Free() int {
-	return int(a.size) - a.Used()
+	used := a.Used()
+
+	// Prevent integer overflow: if a.size exceeds int max value, use MaxInt
+	if a.size > math.MaxInt {
+		// In this case, used is definitely less than MaxInt, so no negative values
+		return math.MaxInt - used
+	}
+
+	size := int(a.size)
+
+	// Prevent negative return values due to data inconsistency
+	if used > size {
+		// This usually indicates data inconsistency, log a warning and return 0
+		klog.Warningf("IP allocator inconsistency detected: used (%d) > size (%d) for CIDR %s",
+			used, size, a.cidr.String())
+		return 0
+	}
+
+	return size - used
 }
 
 // Destroy
