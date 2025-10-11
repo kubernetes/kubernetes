@@ -2453,12 +2453,24 @@ func TestEarlyNominate(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			podInformer := informerFactory.Core().V1().Pods()
 
-			cs.CoreV1().Pods(tt.pod.Namespace).Create(ctx, tt.pod, metav1.CreateOptions{})
-			podInformer.Informer().GetStore().Add(tt.pod)
+			_, err :=cs.CoreV1().Pods(tt.pod.Namespace).Create(ctx, tt.pod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create test pod %s: %v", tt.pod.Name, err)
+			}
+			err = podInformer.Informer().GetStore().Add(tt.pod)
+			if err != nil {
+				t.Fatalf("Failed to add test pod %s to informer: %v", tt.pod.Name, err)
+			}
 
 			for _, pod := range tt.existingPods {
-				cs.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
-				podInformer.Informer().GetStore().Add(pod)
+				_, err = cs.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create test pod %s: %v", pod.Name, err)
+				}
+				err = podInformer.Informer().GetStore().Add(pod)
+				if err != nil {
+					t.Fatalf("Failed to add test pod %s to informer: %v", pod.Name, err)
+				}
 			}
 
 			registeredPlugins := []tf.RegisterPluginFunc{
