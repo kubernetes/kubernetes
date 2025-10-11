@@ -25,7 +25,10 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -49,15 +52,20 @@ const (
 	migrationFailedStatusReason  = "StorageVersionMigrationFailed"
 )
 
+type graphBuilder interface {
+	GetMonitor(ctx context.Context, gvr schema.GroupVersionResource) (*garbagecollector.Monitor, error)
+}
+
 type SVMController struct {
 	controllerName         string
 	kubeClient             kubernetes.Interface
-	dynamicClient          *dynamic.DynamicClient
+	dynamicClient          dynamic.Interface
 	svmListers             svmlisters.StorageVersionMigrationLister
 	svmSynced              cache.InformerSynced
 	queue                  workqueue.TypedRateLimitingInterface[string]
+	rateLimiter            workqueue.TypedRateLimiter[string]
 	restMapper             meta.RESTMapper
-	dependencyGraphBuilder *garbagecollector.GraphBuilder
+	dependencyGraphBuilder graphBuilder
 }
 
 func NewSVMController(
@@ -70,6 +78,7 @@ func NewSVMController(
 	dependencyGraphBuilder *garbagecollector.GraphBuilder,
 ) *SVMController {
 	logger := klog.FromContext(ctx)
+	rateLimiter := workqueue.DefaultTypedControllerRateLimiter[string]()
 
 	svmController := &SVMController{
 		kubeClient:             kubeClient,
@@ -80,9 +89,10 @@ func NewSVMController(
 		restMapper:             mapper,
 		dependencyGraphBuilder: dependencyGraphBuilder,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
+			rateLimiter,
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: controllerName},
 		),
+		rateLimiter: rateLimiter,
 	}
 
 	_, _ = svmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -162,6 +172,10 @@ func (svmc *SVMController) processNext(ctx context.Context) bool {
 	}
 
 	klog.FromContext(ctx).V(2).Info("Error syncing SVM resource, retrying", "svm", key, "err", err)
+	if suggestDelay, ok := apierrors.SuggestsClientDelay(err); ok {
+		svmc.queue.AddAfter(key, max(time.Second*time.Duration(suggestDelay), svmc.rateLimiter.When(key)))
+		return true
+	}
 	svmc.queue.AddRateLimited(key)
 
 	return true
@@ -223,29 +237,18 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 			return fmt.Errorf("resource does not exist in GC, requeuing to attempt again: %w", errMonitor)
 		}
 
-		// we can't migrate a resource that doesn't exist in the GC
-		_, errStatus := svmc.kubeClient.StoragemigrationV1alpha1().
-			StorageVersionMigrations().
-			UpdateStatus(
-				ctx,
-				setStatusConditions(toBeProcessedSVM, svmv1alpha1.MigrationFailed, migrationFailedStatusReason, "resource not found"),
-				metav1.UpdateOptions{},
-			)
-
-		return errStatus
+		return svmc.failMigration(ctx, toBeProcessedSVM, fmt.Errorf("resource does not exist in GC: %w", errMonitor))
 	}
 
-	gcListResourceVersion, err := convertResourceVersionToInt(resourceMonitor.Controller.LastSyncResourceVersion())
+	gcListResourceVersion := resourceMonitor.Controller.LastSyncResourceVersion()
+	listResourceVersion := toBeProcessedSVM.Status.ResourceVersion
+
+	rvCmp, err := resourceversion.CompareResourceVersion(gcListResourceVersion, listResourceVersion)
 	if err != nil {
-		return err
+		return svmc.failMigration(ctx, toBeProcessedSVM, fmt.Errorf("error comparing resource versions between GC and SVM resource: %w", err))
 	}
-	listResourceVersion, err := convertResourceVersionToInt(toBeProcessedSVM.Status.ResourceVersion)
-	if err != nil {
-		return err
-	}
-
-	if gcListResourceVersion < listResourceVersion {
-		return fmt.Errorf("GC cache is not up to date, requeuing to attempt again. gcListResourceVersion: %d, listResourceVersion: %d", gcListResourceVersion, listResourceVersion)
+	if rvCmp == -1 {
+		return fmt.Errorf("GC cache is not up to date, requeuing to attempt again. gcListResourceVersion: %s, listResourceVersion: %s", gcListResourceVersion, listResourceVersion)
 	}
 
 	toBeProcessedSVM, err = svmc.kubeClient.StoragemigrationV1alpha1().
@@ -264,12 +267,19 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return err
 	}
 
-	// ToDo: implement a mechanism to resume migration from the last migrated resource in case of a failure
-	// process storage migration
 	for _, obj := range resourceMonitor.Store.List() {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
 			return err
+		}
+		rvCmp, err := resourceversion.CompareResourceVersion(accessor.GetResourceVersion(), listResourceVersion)
+		if err != nil {
+			logger.V(4).Error(err, "Unable to compare the resource version of the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "accessorRV", accessor.GetResourceVersion(), "listResourceVersion", listResourceVersion, "error", err.Error())
+			return svmc.failMigration(ctx, toBeProcessedSVM, err)
+		}
+		if rvCmp == 1 {
+			logger.V(6).Info("Resource ignored due to resource version being greater than the SVM checkpoint", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "accessorRV", accessor.GetResourceVersion(), "listResourceVersion", listResourceVersion)
+			continue
 		}
 
 		typeMeta := typeMetaUIDRV{}
@@ -284,7 +294,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		typeMeta.ResourceVersion = accessor.GetResourceVersion()
 		data, err := json.Marshal(typeMeta)
 		if err != nil {
-			return err
+			return svmc.failMigration(ctx, toBeProcessedSVM, err)
 		}
 
 		_, errPatch := svmc.dynamicClient.Resource(gvr).
@@ -307,19 +317,16 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 			continue
 		}
 
+		// in case of retriable errors like server throttling, we can return an error since that will cause the migration to be reattempted.
+		if isRetriableError(errPatch) {
+			logger.V(6).Info("Resource patch failed due to an error that can be retried", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "err", errPatch)
+			return errPatch
+		}
+
 		if errPatch != nil {
 			logger.V(4).Error(errPatch, "Failed to migrate the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "reason", apierrors.ReasonForError(errPatch))
-
-			_, errStatus := svmc.kubeClient.StoragemigrationV1alpha1().
-				StorageVersionMigrations().
-				UpdateStatus(
-					ctx,
-					setStatusConditions(toBeProcessedSVM, svmv1alpha1.MigrationFailed, migrationFailedStatusReason, "migration encountered unhandled error"),
-					metav1.UpdateOptions{},
-				)
-
+			errStatus := svmc.failMigration(ctx, toBeProcessedSVM, errPatch)
 			return errStatus
-			// Todo: add retry for scenarios where API server returns rate limiting error
 		}
 		logger.V(4).Info("Successfully migrated the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String())
 	}
@@ -337,6 +344,30 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 
 	logger.V(4).Info("Finished syncing svm resource", "key", key, "gvr", gvr.String(), "elapsed", time.Since(startTime))
 	return nil
+}
+
+func isRetriableError(k8sError error) bool {
+	return utilnet.IsConnectionReset(k8sError) ||
+		utilnet.IsHTTP2ConnectionLost(k8sError) ||
+		utilnet.IsProbableEOF(k8sError) ||
+		apierrors.IsServerTimeout(k8sError) ||
+		apierrors.IsTooManyRequests(k8sError) ||
+		apierrors.IsServiceUnavailable(k8sError) ||
+		apierrors.IsInternalError(k8sError) ||
+		apierrors.IsTimeout(k8sError)
+}
+
+func (svmc *SVMController) failMigration(ctx context.Context, toBeProcessedSVM *svmv1alpha1.StorageVersionMigration, err error) error {
+	errMsg := fmt.Sprintf("migration encountered unhandled error: %s", err)
+
+	_, errStatus := svmc.kubeClient.StoragemigrationV1alpha1().
+		StorageVersionMigrations().
+		UpdateStatus(
+			ctx,
+			setStatusConditions(toBeProcessedSVM, svmv1alpha1.MigrationFailed, migrationFailedStatusReason, errMsg),
+			metav1.UpdateOptions{},
+		)
+	return errStatus
 }
 
 type typeMetaUIDRV struct {
