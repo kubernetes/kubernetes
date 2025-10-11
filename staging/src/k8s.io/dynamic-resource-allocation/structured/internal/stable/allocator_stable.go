@@ -267,6 +267,11 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		return nil, err
 	}
 	if !done {
+		for _, pool := range pools {
+			if pool.IsInvalid {
+				return nil, fmt.Errorf("pool %s is invalid: %v", pool.PoolID.Pool, pool.InvalidReason)
+			}
+		}
 		return nil, nil
 	}
 
@@ -790,11 +795,11 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 
 	// We need to find suitable devices.
 	for _, pool := range alloc.pools {
-		// If the pool is not valid, then fail now. It's okay when pools of one driver
-		// are invalid if we allocate from some other pool, but it's not safe to
-		// allocated from an invalid pool.
-		if pool.IsInvalid {
-			return false, fmt.Errorf("pool %s is invalid: %s", pool.Pool, pool.InvalidReason)
+		// We don't allocate devices from invalid or incomplete pools, but
+		// don't error out here since there might be available devices in other
+		// pools.
+		if pool.IsIncomplete || pool.IsInvalid {
+			continue
 		}
 		for _, slice := range pool.Slices {
 			for deviceIndex := range slice.Spec.Devices {
