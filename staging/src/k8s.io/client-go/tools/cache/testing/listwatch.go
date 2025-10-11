@@ -1,18 +1,33 @@
 package framework
 
 import (
-	"k8s.io/client-go/tools/cache"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
+type Lister interface {
+	List(options metav1.ListOptions) (runtime.Object, error)
+}
+
+type Watcher interface {
+	Watch(options metav1.ListOptions) (watch.Interface, error)
+}
+
+type ListerWatcher interface {
+	Lister
+	Watcher
+}
+
 type listWatcherWithUnSupportedWatchListSemanticsWrapper struct {
-	cache.ListerWatcher
+	ListerWatcher
 }
 
 func (lw listWatcherWithUnSupportedWatchListSemanticsWrapper) IsWatchListSemanticsUnSupported() bool {
 	return true
 }
 
-func ToListWatcherWithUnSupportedWatchListSemantics(lw cache.ListerWatcher) cache.ListerWatcher {
+func ToListWatcherWithUnSupportedWatchListSemantics(lw ListerWatcher) ListerWatcher {
 	return listWatcherWithUnSupportedWatchListSemanticsWrapper{
 		lw,
 	}
