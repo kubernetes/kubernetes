@@ -511,16 +511,23 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 }
 
 func (vm *volumeManager) WaitForAllPodsUnmount(ctx context.Context, pods []*v1.Pod) error {
+	if len(pods) == 0 {
+		return nil
+	}
+
 	var (
-		errors []error
-		wg     sync.WaitGroup
+		errors     []error
+		wg         sync.WaitGroup
+		errorMutex sync.Mutex
 	)
 	wg.Add(len(pods))
 	for _, pod := range pods {
 		go func(pod *v1.Pod) {
 			defer wg.Done()
 			if err := vm.WaitForUnmount(ctx, pod); err != nil {
+				errorMutex.Lock()
 				errors = append(errors, err)
+				errorMutex.Unlock()
 			}
 		}(pod)
 	}
