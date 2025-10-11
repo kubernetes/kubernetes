@@ -164,6 +164,26 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("atomicUniqueMapItems"), obj.AtomicUniqueMapItems, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.AtomicUniqueMapItems }))...)
 
+	// field Struct.PtrKeyItems
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []PtrKeyItem) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a PtrKeyItem, b PtrKeyItem) bool {
+				return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
+			})...)
+			func() { // cohort {"key": "target-ptr"}
+				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *PtrKeyItem) bool { return item.Key != nil && *item.Key == "target-ptr" }, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrKeyItem) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item PtrKeyItems[key=target-ptr]")
+				})...)
+			}()
+			return
+		}(fldPath.Child("ptrKeyItems"), obj.PtrKeyItems, safe.Field(oldObj, func(oldObj *Struct) []PtrKeyItem { return oldObj.PtrKeyItems }))...)
+
 	return errs
 }
 

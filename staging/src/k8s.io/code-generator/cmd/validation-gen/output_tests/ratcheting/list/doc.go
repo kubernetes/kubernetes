@@ -56,10 +56,20 @@ type StructSlice struct {
 	// +k8s:listMapKey=key
 	// +k8s:eachVal=+k8s:validateFalse="field MapSliceNonComparableField[*]"
 	MapSliceNonComparableField []NonComparableStructWithKey `json:"mapSliceNonComparableField"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=key
+	// +k8s:eachVal=+k8s:validateFalse="field MapSlicePtrKeyField[*]"
+	MapSlicePtrKeyField []PtrKeyStruct `json:"mapSlicePtrKeyField"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=key1
+	// +k8s:listMapKey=key2
+	// +k8s:eachVal=+k8s:validateFalse="field MapSliceMixedKeyField[*]"
+	MapSliceMixedKeyField []MixedKeyStruct `json:"mapSliceMixedKeyField"`
 }
 
 type StringType string
-
 type IntSliceType []int
 
 type ComparableStruct struct {
@@ -80,4 +90,17 @@ type ComparableStructWithKey struct {
 type NonComparableStructWithKey struct {
 	Key         string `json:"key"`
 	IntPtrField *int   `json:"intPtrField"`
+}
+
+// +k8s:validateFalse="type PtrKeyStruct"
+type PtrKeyStruct struct {
+	Key  *string `json:"key"`
+	Data string  `json:"data"`
+}
+
+// +k8s:validateFalse="type MixedKeyStruct"
+type MixedKeyStruct struct {
+	Key1 *string `json:"key1"`
+	Key2 string  `json:"key2"`
+	Data string  `json:"data"`
 }
