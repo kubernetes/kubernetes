@@ -18,8 +18,8 @@ package reconciler
 
 import (
 	"context"
-	"crypto/md5"
 	"fmt"
+	"hash/fnv"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -1523,13 +1523,14 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 
 	modes := []v1.PersistentVolumeMode{v1.PersistentVolumeBlock, v1.PersistentVolumeFilesystem}
 
+	hasher := fnv.New128a()
 	for modeIndex := range modes {
 		for tcIndex := range tests {
 			mode := modes[modeIndex]
 			tc := tests[tcIndex]
 			testName := fmt.Sprintf("%s [%s]", tc.name, mode)
 			uniqueTestString := fmt.Sprintf("global-mount-%s", testName)
-			uniquePodDir := fmt.Sprintf("%s-%x", kubeletPodsDir, md5.Sum([]byte(uniqueTestString)))
+			uniquePodDir := fmt.Sprintf("%s-%x", kubeletPodsDir, hasher.Sum([]byte(uniqueTestString)))
 			t.Run(testName+"[", func(t *testing.T) {
 				t.Parallel()
 				pv := &v1.PersistentVolume{
@@ -1736,13 +1737,14 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 	}
 	modes := []v1.PersistentVolumeMode{v1.PersistentVolumeBlock, v1.PersistentVolumeFilesystem}
 
+	hasher := fnv.New128a()
 	for modeIndex := range modes {
 		for tcIndex := range tests {
 			mode := modes[modeIndex]
 			tc := tests[tcIndex]
 			testName := fmt.Sprintf("%s [%s]", tc.name, mode)
 			uniqueTestString := fmt.Sprintf("local-mount-%s", testName)
-			uniquePodDir := fmt.Sprintf("%s-%x", kubeletPodsDir, md5.Sum([]byte(uniqueTestString)))
+			uniquePodDir := fmt.Sprintf("%s-%x", kubeletPodsDir, hasher.Sum([]byte(uniqueTestString)))
 			t.Run(testName, func(t *testing.T) {
 				t.Parallel()
 				pv := &v1.PersistentVolume{
