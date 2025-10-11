@@ -174,7 +174,7 @@ func (c *RequestHeaderAuthRequestController) AllowedClientNames() []string {
 
 // Run starts RequestHeaderAuthRequestController controller and blocks until stopCh is closed.
 func (c *RequestHeaderAuthRequestController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	klog.Infof("Starting %s", c.name)
