@@ -38,7 +38,14 @@ import (
 
 const (
 	controllerName = "peer-discovery-cache-sync"
-	maxRetries     = 5
+	// maxRetries is set to 20 to handle the race condition during API server startup
+	// where identity leases are created before endpoint leases. During initialization,
+	// peer discovery sync may attempt to fetch discovery from a peer before that peer
+	// has created its endpoint lease, resulting in "missing port in address" errors.
+	// With the default rate limiting (exponential backoff starting at 5ms), 20 retries
+	// provides approximately 60-90 seconds of retry window, which is sufficient for
+	// both identity and endpoint leases to be established during normal startup.
+	maxRetries = 20
 )
 
 func (h *peerProxyHandler) RunPeerDiscoveryCacheSync(ctx context.Context, workers int) {
@@ -89,63 +96,85 @@ func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
 		return err
 	}
 
-	newCache := map[string]map[schema.GroupVersionResource]bool{}
+	newCache := map[string]PeerDiscoveryCacheEntry{}
 	for _, l := range leases {
 		_, ok := h.isValidPeerIdentityLease(l)
 		if !ok {
 			continue
 		}
 
-		discoveryInfo, err := h.fetchNewDiscoveryFor(ctx, l.Name, *l.Spec.HolderIdentity)
+		discoveryEntry, err := h.fetchNewDiscoveryFor(ctx, l.Name)
 		if err != nil {
 			fetchDiscoveryErr = err
 		}
-
-		if discoveryInfo != nil {
-			newCache[l.Name] = discoveryInfo
+		// Only add if there is at least one GVR or group
+		if len(discoveryEntry.GVRs) > 0 || len(discoveryEntry.GroupDiscovery) > 0 {
+			newCache[l.Name] = discoveryEntry
 		}
 	}
 
 	// Overwrite cache with new contents.
 	h.peerDiscoveryInfoCache.Store(newCache)
+
+	if len(newCache) != 0 {
+		// After updating peer discovery cache, invalidate discovery manager cache.
+		for _, cb := range h.cacheInvalidationCallbacks {
+			cb()
+		}
+	}
 	return fetchDiscoveryErr
 }
 
-func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID string, holderIdentity string) (map[schema.GroupVersionResource]bool, error) {
+func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID string) (PeerDiscoveryCacheEntry, error) {
 	hostport, err := h.hostportInfo(serverID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get host port info from identity lease for server %s: %w", serverID, err)
+		return PeerDiscoveryCacheEntry{}, fmt.Errorf("failed to get host port info from identity lease for server %s: %w", serverID, err)
 	}
 
 	klog.V(4).Infof("Proxying an agg-discovery call from %s to %s", h.serverID, serverID)
-	servedResources := make(map[schema.GroupVersionResource]bool)
+	gvrMap := make(map[schema.GroupVersionResource]bool)
 	var discoveryErr error
 	var discoveryResponse *apidiscoveryv2.APIGroupDiscoveryList
 	discoveryPaths := []string{"/api", "/apis"}
+	groupMap := make(map[string]apidiscoveryv2.APIGroupDiscovery)
 	for _, path := range discoveryPaths {
 		discoveryResponse, discoveryErr = h.aggregateDiscovery(ctx, path, hostport)
-		if err != nil {
-			klog.ErrorS(err, "error querying discovery endpoint for serverID", "path", path, "serverID", serverID)
+		if discoveryErr != nil {
+			klog.ErrorS(discoveryErr, "error querying discovery endpoint for serverID", "path", path, "serverID", serverID)
 			continue
 		}
 
 		for _, groupDiscovery := range discoveryResponse.Items {
-			groupName := groupDiscovery.Name
-			if groupName == "" {
-				groupName = "core"
-			}
-
 			for _, version := range groupDiscovery.Versions {
 				for _, resource := range version.Resources {
-					gvr := schema.GroupVersionResource{Group: groupName, Version: version.Version, Resource: resource.Resource}
-					servedResources[gvr] = true
+					gvr := schema.GroupVersionResource{
+						Group:    groupDiscovery.Name,
+						Version:  version.Version,
+						Resource: resource.Resource,
+					}
+					gvrMap[gvr] = true
 				}
 			}
+			// Skip core/v1 group from peer-aggregated discovery since its not served from /apis.
+			// We still want to re-route core/v1 requests to the peer, but we don't want it
+			// to appear in the merged discovery document.
+			if groupDiscovery.Name == "" {
+				continue
+			}
+			groupMap[groupDiscovery.Name] = groupDiscovery
 		}
 	}
 
+	groupList := make([]apidiscoveryv2.APIGroupDiscovery, 0, len(groupMap))
+	for _, group := range groupMap {
+		groupList = append(groupList, group)
+	}
+
 	klog.V(4).Infof("Agg discovery done successfully by %s for %s", h.serverID, serverID)
-	return servedResources, discoveryErr
+	return PeerDiscoveryCacheEntry{
+		GVRs:           gvrMap,
+		GroupDiscovery: groupList,
+	}, discoveryErr
 }
 
 func (h *peerProxyHandler) aggregateDiscovery(ctx context.Context, path string, hostport string) (*apidiscoveryv2.APIGroupDiscoveryList, error) {
@@ -163,7 +192,8 @@ func (h *peerProxyHandler) aggregateDiscovery(ctx context.Context, path string, 
 	ctx = apirequest.WithUser(ctx, apiServerUser)
 	req = req.WithContext(ctx)
 
-	req.Header.Add("Accept", discovery.AcceptV2)
+	// Fallback to V2 and V1 in that order if V2Unmerged is not recognized.
+	req.Header.Add("Accept", discovery.AcceptV2Unmerged+","+discovery.AcceptV2+","+discovery.AcceptV1)
 
 	writer := responsewriterutil.NewInMemoryResponseWriter()
 	h.proxyRequestToDestinationAPIServer(req, writer, hostport)

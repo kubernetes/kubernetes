@@ -77,7 +77,7 @@ func TestPeerProxy(t *testing.T) {
 		peerproxiedHeader    string
 		reconcilerConfig     reconciler
 		localCache           map[schema.GroupVersionResource]bool
-		peerCache            map[string]map[schema.GroupVersionResource]bool
+		peerCache            map[string]PeerDiscoveryCacheEntry
 		wantStatus           int
 		wantMetricsData      string
 	}{
@@ -102,7 +102,7 @@ func TestPeerProxy(t *testing.T) {
 			desc:        "Serve locally if serviceable",
 			requestPath: "/api/foo/bar",
 			localCache: map[schema.GroupVersionResource]bool{
-				{Group: "core", Version: "foo", Resource: "bar"}: true,
+				{Group: "", Version: "foo", Resource: "bar"}: true,
 			},
 			wantStatus: http.StatusOK,
 		},
@@ -116,9 +116,11 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 if no endpoint fetched from lease",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]map[schema.GroupVersionResource]bool{
+			peerCache: map[string]PeerDiscoveryCacheEntry{
 				remoteServerID1: {
-					{Group: "core", Version: "foo", Resource: "bar"}: true,
+					GVRs: map[schema.GroupVersionResource]bool{
+						{Group: "", Version: "foo", Resource: "bar"}: true,
+					},
 				},
 			},
 			wantStatus: http.StatusServiceUnavailable,
@@ -127,9 +129,11 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 unreachable peer bind address",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]map[schema.GroupVersionResource]bool{
+			peerCache: map[string]PeerDiscoveryCacheEntry{
 				remoteServerID1: {
-					{Group: "core", Version: "foo", Resource: "bar"}: true,
+					GVRs: map[schema.GroupVersionResource]bool{
+						{Group: "", Version: "foo", Resource: "bar"}: true,
+					},
 				},
 			},
 			reconcilerConfig: reconciler{
@@ -152,12 +156,16 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 if one apiserver's endpoint lease wasnt found but another valid (unreachable) apiserver was found",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]map[schema.GroupVersionResource]bool{
+			peerCache: map[string]PeerDiscoveryCacheEntry{
 				remoteServerID1: {
-					{Group: "core", Version: "foo", Resource: "bar"}: true,
+					GVRs: map[schema.GroupVersionResource]bool{
+						{Group: "", Version: "foo", Resource: "bar"}: true,
+					},
 				},
 				remoteServerID2: {
-					{Group: "core", Version: "foo", Resource: "bar"}: true,
+					GVRs: map[schema.GroupVersionResource]bool{
+						{Group: "", Version: "foo", Resource: "bar"}: true,
+					},
 				},
 			},
 			reconcilerConfig: reconciler{
@@ -235,7 +243,6 @@ func newFakePeerEndpointReconciler(t *testing.T) reconcilers.PeerEndpointLeaseRe
 	t.Cleanup(func() { server.Terminate(t) })
 	scheme := runtime.NewScheme()
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	//utilruntime.Must(core.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(scheme.SetVersionPriority(corev1.SchemeGroupVersion))
 	codecs := serializer.NewCodecFactory(scheme)
@@ -252,7 +259,7 @@ func newFakePeerEndpointReconciler(t *testing.T) reconcilers.PeerEndpointLeaseRe
 
 func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handler,
 	reconciler reconcilers.PeerEndpointLeaseReconciler,
-	localCache map[schema.GroupVersionResource]bool, peerCache map[string]map[schema.GroupVersionResource]bool) http.Handler {
+	localCache map[schema.GroupVersionResource]bool, peerCache map[string]PeerDiscoveryCacheEntry) http.Handler {
 	// Add peerproxy handler
 	s := serializer.NewCodecFactory(runtime.NewScheme()).WithoutConversion()
 	peerProxyHandler, err := newFakePeerProxyHandler(informerFinishedSync, reconciler, localServerID, s, localCache, peerCache)
@@ -273,7 +280,7 @@ func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handl
 
 func newFakePeerProxyHandler(informerFinishedSync bool,
 	reconciler reconcilers.PeerEndpointLeaseReconciler, id string, s runtime.NegotiatedSerializer,
-	localCache map[schema.GroupVersionResource]bool, peerCache map[string]map[schema.GroupVersionResource]bool) (*peerProxyHandler, error) {
+	localCache map[schema.GroupVersionResource]bool, peerCache map[string]PeerDiscoveryCacheEntry) (*peerProxyHandler, error) {
 	clientset := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 	leaseInformer := informerFactory.Coordination().V1().Leases()
