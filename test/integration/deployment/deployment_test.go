@@ -929,6 +929,8 @@ func TestSpecReplicasChange(t *testing.T) {
 }
 
 func TestDeploymentAvailableCondition(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, true)
+
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -968,7 +970,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	}
 
 	// Verify all replicas fields of DeploymentStatus have desired counts
-	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 0, 0, 10, nil); err != nil {
+	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 0, 0, 10, ptr.To[int32](0)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -988,7 +990,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	}
 
 	// Verify all replicas fields of DeploymentStatus have desired counts
-	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 10, 0, 10, nil); err != nil {
+	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 10, 0, 10, ptr.To[int32](0)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1011,7 +1013,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	}
 
 	// Verify all replicas fields of DeploymentStatus have desired counts
-	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 10, 10, 0, nil); err != nil {
+	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 10, 10, 0, ptr.To[int32](0)); err != nil {
 		t.Fatal(err)
 	}
 }
