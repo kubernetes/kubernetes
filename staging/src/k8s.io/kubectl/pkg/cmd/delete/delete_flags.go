@@ -49,6 +49,7 @@ type DeleteFlags struct {
 	Output            *string
 	Raw               *string
 	Interactive       *bool
+	Concurrency       *int
 }
 
 func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericiooptions.IOStreams) (*DeleteOptions, error) {
@@ -110,6 +111,9 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	if f.Interactive != nil {
 		options.Interactive = *f.Interactive
 	}
+	if f.Concurrency != nil {
+		options.Concurrency = *f.Concurrency
+	}
 
 	return options, nil
 }
@@ -163,6 +167,9 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	if f.Interactive != nil {
 		cmd.Flags().BoolVarP(f.Interactive, "interactive", "i", *f.Interactive, "If true, delete resource only when user confirms.")
 	}
+	if f.Concurrency != nil {
+		cmd.Flags().IntVar(f.Concurrency, "concurrency", *f.Concurrency, "Number of workers to use for concurrent deletion.")
+	}
 }
 
 // NewDeleteCommandFlags provides default flags and values for use with the "delete" command
@@ -183,6 +190,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	wait := true
 	raw := ""
 	interactive := false
+	concurrency := 1
 
 	filenames := []string{}
 	recursive := false
@@ -207,6 +215,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 		Output:         &output,
 		Raw:            &raw,
 		Interactive:    &interactive,
+		Concurrency:    &concurrency,
 	}
 }
 
@@ -218,6 +227,7 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 	force := false
 	timeout := time.Duration(0)
 	wait := false
+	concurrency := 1
 
 	filenames := []string{}
 	kustomize := ""
@@ -230,9 +240,10 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 		GracePeriod:       &gracePeriod,
 
 		// add non-defaults
-		Force:   &force,
-		Timeout: &timeout,
-		Wait:    &wait,
+		Force:       &force,
+		Timeout:     &timeout,
+		Wait:        &wait,
+		Concurrency: &concurrency,
 	}
 }
 
