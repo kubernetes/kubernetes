@@ -319,10 +319,10 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client,
 		grpc.WithDefaultServiceConfig(`{
   "load_balancing_config": [{
     "outlier_detection": {
-      "interval": "2s",
+      "interval": "10s",
       "base_ejection_time": "30s",
       "max_ejection_time": "300s",
-      "max_ejection_percent": 10,
+      "max_ejection_percent": 30,
       "failure_percentage_ejection": {
         "threshold": 85,
         "enforcement_percentage": 100,
