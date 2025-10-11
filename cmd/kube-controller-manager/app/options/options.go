@@ -100,7 +100,7 @@ type KubeControllerManagerOptions struct {
 	TTLAfterFinishedController                *TTLAfterFinishedControllerOptions
 	ValidatingAdmissionPolicyStatusController *ValidatingAdmissionPolicyStatusControllerOptions
 
-	SecureServing  *apiserveroptions.SecureServingOptionsWithLoopback
+	SecureServing  *apiserveroptions.SecureServingOptions
 	Authentication *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization  *apiserveroptions.DelegatingAuthorizationOptions
 	Metrics        *metrics.Options
@@ -217,7 +217,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		ValidatingAdmissionPolicyStatusController: &ValidatingAdmissionPolicyStatusControllerOptions{
 			&componentConfig.ValidatingAdmissionPolicyStatusController,
 		},
-		SecureServing:            apiserveroptions.NewSecureServingOptions().WithLoopback(),
+		SecureServing:            apiserveroptions.NewSecureServingOptions(),
 		Authentication:           apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:            apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Metrics:                  metrics.NewOptions(),
@@ -410,7 +410,7 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 	if err := s.ValidatingAdmissionPolicyStatusController.ApplyTo(&c.ComponentConfig.ValidatingAdmissionPolicyStatusController); err != nil {
 		return err
 	}
-	if err := s.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
+	if err := s.SecureServing.ApplyTo(&c.SecureServing); err != nil {
 		return err
 	}
 	if s.SecureServing.BindPort != 0 || s.SecureServing.Listener != nil {
