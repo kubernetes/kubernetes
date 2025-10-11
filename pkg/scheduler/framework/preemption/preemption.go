@@ -219,6 +219,14 @@ func (ev *Evaluator) IsPodRunningPreemption(podUID types.UID) bool {
 	return ev.preempting.Has(podUID)
 }
 
+// AddPreemptingPodForTest adds a pod UID to the preempting set for testing purposes only.
+// This method should only be used in tests to simulate ongoing preemption scenarios.
+func (ev *Evaluator) AddPreemptingPodForTest(podUID types.UID) {
+	ev.mu.Lock()
+	defer ev.mu.Unlock()
+	ev.preempting.Insert(podUID)
+}
+
 // Preempt returns a PostFilterResult carrying suggested nominatedNodeName, along with a Status.
 // The semantics of returned <PostFilterResult, Status> varies on different scenarios:
 //
@@ -839,16 +847,16 @@ func (ev *Evaluator) EarlyNominate(ctx context.Context, state fwk.CycleState, po
 			status := ev.Handler.RunFilterPlugins(ctx, state, pod, nodeInfo)
 			if status.IsSuccess() {
 				logger.V(2).Info("Early nominated the pod on the node with preempting pods", "pod", klog.KObj(pod), "node", nodeName)
-				return framework.NewPostFilterResultWithNominatedNode(nodeName), nil
+				return framework.NewPostFilterResultWithNominatedNode(nodeName), fwk.NewStatus(fwk.Success)
 			}
 		}
-		return nil, nil
+		return nil, fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("Cannot early nominate the pod on the node with preempting pods %q", nodeName))
 	}
 
 	for nodeName, pods := range preemptingPods {
 		result, status := checkNode(nodeName, pods)
 		if status.IsSuccess() {
-			return result, nil
+			return result, status
 		}
 	}
 	return nil, fwk.NewStatus(fwk.Unschedulable, "No available node with preempting pods for early nomination")
