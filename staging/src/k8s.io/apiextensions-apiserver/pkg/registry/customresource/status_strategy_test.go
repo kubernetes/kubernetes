@@ -244,3 +244,154 @@ func TestStatusStrategyValidateUpdate(t *testing.T) {
 		}
 	}
 }
+func TestStatusStrategy_PrepareForUpdate_WithNilStructuralSchema(t *testing.T) {
+	// This test covers the panic scenario from issue #133651
+	// where CRDs created in v1beta1 (before 1.22) lack openAPIV3Schema fields
+	// and cause a panic when accessing status subresource
+	
+	tests := []struct {
+		name             string
+		structuralSchema *structuralschema.Structural
+		expectPanic      bool
+		description      string
+	}{
+		{
+			name:             "nil structural schema should not panic",
+			structuralSchema: nil,
+			expectPanic:      false,
+			description:      "Legacy CRDs from v1beta1 may have nil structural schema",
+		},
+		{
+			name: "valid structural schema should work normally",
+			structuralSchema: &structuralschema.Structural{
+				Generic: structuralschema.Generic{
+					Type: "object",
+				},
+			},
+			expectPanic: false,
+			description: "Normal CRDs with proper schema should continue working",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a minimal status strategy with the test structural schema
+			// We don't need to set up the full customResourceStrategy for this test
+			crStrategy := customResourceStrategy{
+				structuralSchema: tt.structuralSchema,
+			}
+			strategy := NewStatusStrategy(crStrategy)
+			// Create test objects - a simple custom resource with status
+			oldObj := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "example.com/v1",
+					"kind":       "TestResource",
+					"metadata": map[string]interface{}{
+						"name":      "test-resource",
+						"namespace": "default",
+					},
+					"spec": map[string]interface{}{
+						"field": "old-value",
+					},
+					"status": map[string]interface{}{
+						"phase": "Pending",
+					},
+				},
+			}
+
+			newObj := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "example.com/v1",
+					"kind":       "TestResource",
+					"metadata": map[string]interface{}{
+						"name":      "test-resource",
+						"namespace": "default",
+					},
+					"spec": map[string]interface{}{
+						"field": "new-value", // spec change should be ignored in status update
+					},
+					"status": map[string]interface{}{
+						"phase": "Running", // status change should be preserved
+					},
+				},
+			}
+
+			// Test that PrepareForUpdate doesn't panic with nil structural schema
+			defer func() {
+				if r := recover(); r != nil {
+					if tt.expectPanic {
+						t.Logf("Expected panic occurred: %v", r)
+					} else {
+						t.Errorf("Unexpected panic with %s: %v", tt.description, r)
+					}
+				} else if tt.expectPanic {
+					t.Errorf("Expected panic did not occur with %s", tt.description)
+				}
+			}()
+
+			// This is the operation that was causing the panic
+			strategy.PrepareForUpdate(context.TODO(), newObj, oldObj)
+
+			// Verify that status updates work correctly even with nil schema
+			if !tt.expectPanic {
+				// The status field should be preserved from newObj
+				newStatus, found, err := unstructured.NestedMap(newObj.Object, "status")
+				if err != nil {
+					t.Errorf("Error getting status from newObj: %v", err)
+				}
+				if !found {
+					t.Error("Status field not found in newObj after PrepareForUpdate")
+				}
+				if phase, ok := newStatus["phase"].(string); !ok || phase != "Running" {
+					t.Errorf("Expected status.phase to be 'Running', got %v", newStatus["phase"])
+				}
+
+				// The spec should be reset to old value (status updates shouldn't change spec)
+				newSpec, found, err := unstructured.NestedMap(newObj.Object, "spec")
+				if err != nil {
+					t.Errorf("Error getting spec from newObj: %v", err)
+				}
+				if found {
+					if field, ok := newSpec["field"].(string); ok && field != "old-value" {
+						t.Errorf("Expected spec.field to be reset to 'old-value', got %v", field)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestStatusStrategy_Validate_WithNilStructuralSchema(t *testing.T) {
+	// Additional test to ensure validation also works with nil structural schema
+	crStrategy := customResourceStrategy{
+		structuralSchema: nil,
+	}
+	strategy := NewStatusStrategy(crStrategy)
+
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "example.com/v1",
+			"kind":       "TestResource",
+			"metadata": map[string]interface{}{
+				"name":      "test-resource",
+				"namespace": "default",
+			},
+			"status": map[string]interface{}{
+				"phase": "Running",
+			},
+		},
+	}
+
+	// This should not panic even with nil structural schema
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Validate panicked with nil structural schema: %v", r)
+		}
+	}()
+
+	errs := strategy.Validate(context.TODO(), obj)
+	// Validation might return errors, but it should not panic
+	if len(errs) > 0 {
+		t.Logf("Validation returned errors (expected for nil schema): %v", errs)
+	}
+}
