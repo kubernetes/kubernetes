@@ -725,6 +725,9 @@ type DeviceClaim struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:listType=atomic
+	// +k8s:unique=map
+	// +k8s:listMapKey=name
 	// +k8s:maxItems=32
 	Requests []DeviceRequest `json:"requests" protobuf:"bytes,1,name=requests"`
 
@@ -814,6 +817,9 @@ type DeviceRequest struct {
 	// +oneOf=deviceRequestType
 	// +listType=atomic
 	// +featureGate=DRAPrioritizedList
+	// +k8s:listType=atomic
+	// +k8s:unique=map
+	// +k8s:listMapKey=name
 	// +k8s:maxItems=8
 	FirstAvailable []DeviceSubRequest `json:"firstAvailable,omitempty" protobuf:"bytes,3,name=firstAvailable"`
 }
@@ -1195,6 +1201,8 @@ type DeviceConstraint struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:listType=atomic
+	// +k8s:unique=set
 	// +k8s:maxItems=32
 	Requests []string `json:"requests,omitempty" protobuf:"bytes,1,opt,name=requests"`
 
@@ -1253,6 +1261,8 @@ type DeviceClaimConfiguration struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:listType=atomic
+	// +k8s:unique=set
 	// +k8s:maxItems=32
 	Requests []string `json:"requests,omitempty" protobuf:"bytes,1,opt,name=requests"`
 

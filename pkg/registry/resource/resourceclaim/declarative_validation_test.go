@@ -82,6 +82,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("spec", "devices", "requests"), 33, 32).WithOrigin("maxItems"),
 			},
 		},
+		"invalid requests, duplicate name": {
+			input: mkValidResourceClaim(tweakDuplicateRequestName("req-0")),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(1), "req-0"),
+			},
+		},
 		"invalid constraints, too many": {
 			input: mkValidResourceClaim(tweakDevicesConstraints(33)),
 			expectedErrs: field.ErrorList{
@@ -98,6 +104,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: mkValidResourceClaim(tweakFirstAvailable(9)),
 			expectedErrs: field.ErrorList{
 				field.TooMany(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable"), 9, 8).WithOrigin("maxItems"),
+			},
+		},
+		"invalid firstAvailable, duplicate name": {
+			input: mkValidResourceClaim(tweakDuplicateFirstAvailableName("sub-0")),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(1), "sub-0"),
 			},
 		},
 		"invalid selectors, too many": {
@@ -124,6 +136,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				field.TooMany(field.NewPath("spec", "devices", "requests"), 33, 32).WithOrigin("maxItems"),
 				field.TooMany(field.NewPath("spec", "devices", "config").Index(0).Child("requests"), 33, 32).WithOrigin("maxItems"),
+			},
+		},
+		"invalid constraint requests, duplicate name": {
+			input: mkValidResourceClaim(tweakDuplicateConstraintRequest("req-0")),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), "req-0"),
+			},
+		},
+		"invalid config requests, duplicate name": {
+			input: mkValidResourceClaim(tweakDuplicateConfigRequest("req-0")),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), "req-0"),
 			},
 		},
 		"valid firstAvailable, max allowed": {
@@ -262,6 +286,30 @@ func tweakDevicesRequests(items int) func(*resource.ResourceClaim) {
 	}
 }
 
+func tweakDuplicateRequestName(name string) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests, mkDeviceRequest(name))
+	}
+}
+
+func tweakDuplicateFirstAvailableName(name string) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Spec.Devices.Requests[0].Exactly = nil
+		rc.Spec.Devices.Requests[0].FirstAvailable = []resource.DeviceSubRequest{
+			{
+				Name:            name,
+				DeviceClassName: "class",
+				AllocationMode:  resource.DeviceAllocationModeAll,
+			},
+			{
+				Name:            name,
+				DeviceClassName: "class",
+				AllocationMode:  resource.DeviceAllocationModeAll,
+			},
+		}
+	}
+}
+
 func tweakExactlySelectors(items int) func(*resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		for i := 0; i < items; i++ {
@@ -321,6 +369,24 @@ func tweakConfigRequests(count int) func(*resource.ResourceClaim) {
 		for i := 0; i < count; i++ {
 			rc.Spec.Devices.Config[0].Requests = append(rc.Spec.Devices.Config[0].Requests, fmt.Sprintf("req-%d", i))
 		}
+	}
+}
+
+func tweakDuplicateConstraintRequest(name string) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Constraints) == 0 {
+			rc.Spec.Devices.Constraints = append(rc.Spec.Devices.Constraints, mkDeviceConstraint())
+		}
+		rc.Spec.Devices.Constraints[0].Requests = append(rc.Spec.Devices.Constraints[0].Requests, name)
+	}
+}
+
+func tweakDuplicateConfigRequest(name string) func(*resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Spec.Devices.Config) == 0 {
+			rc.Spec.Devices.Config = append(rc.Spec.Devices.Config, mkDeviceClaimConfiguration())
+		}
+		rc.Spec.Devices.Config[0].Requests = append(rc.Spec.Devices.Config[0].Requests, name)
 	}
 }
 

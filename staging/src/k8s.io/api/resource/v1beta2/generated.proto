@@ -562,6 +562,9 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:unique=map
+  // +k8s:listMapKey=name
   // +k8s:maxItems=32
   repeated DeviceRequest requests = 1;
 
@@ -594,6 +597,8 @@ message DeviceClaimConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:unique=set
   // +k8s:maxItems=32
   repeated string requests = 1;
 
@@ -702,6 +707,8 @@ message DeviceConstraint {
   //
   // +optional
   // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:unique=set
   // +k8s:maxItems=32
   repeated string requests = 1;
 
@@ -806,6 +813,9 @@ message DeviceRequest {
   // +oneOf=deviceRequestType
   // +listType=atomic
   // +featureGate=DRAPrioritizedList
+  // +k8s:listType=atomic
+  // +k8s:unique=map
+  // +k8s:listMapKey=name
   // +k8s:maxItems=8
   repeated DeviceSubRequest firstAvailable = 3;
 }

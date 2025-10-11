@@ -129,7 +129,7 @@ func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path,
 		func(request resource.DeviceRequest) string {
 			return request.Name
 		},
-		fldPath.Child("requests"), sizeCovered)...)
+		fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	allErrs = append(allErrs, validateSlice(deviceClaim.Constraints, resource.DeviceConstraintsMaxSize,
 		func(constraint resource.DeviceConstraint, fldPath *field.Path) field.ErrorList {
 			return validateDeviceConstraint(constraint, fldPath, requestNames)
@@ -218,7 +218,7 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 			func(subRequest resource.DeviceSubRequest) string {
 				return subRequest.Name
 			},
-			fldPath.Child("firstAvailable"), sizeCovered)...)
+			fldPath.Child("firstAvailable"), sizeCovered, uniquenessCovered)...)
 	case hasExactly:
 		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, fldPath.Child("exactly"), stored)...)
 	}
@@ -335,7 +335,7 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 		func(name string, fldPath *field.Path) field.ErrorList {
 			return validateRequestNameRef(name, fldPath, requestNames)
 		},
-		stringKey, fldPath.Child("requests"), sizeCovered)...)
+		stringKey, fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	if constraint.MatchAttribute != nil {
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute"))...)
 	} else if constraint.DistinctAttribute != nil {
@@ -353,7 +353,7 @@ func validateDeviceClaimConfiguration(config resource.DeviceClaimConfiguration, 
 	allErrs = append(allErrs, validateSet(config.Requests, resource.DeviceRequestsMaxSize,
 		func(name string, fldPath *field.Path) field.ErrorList {
 			return validateRequestNameRef(name, fldPath, requestNames)
-		}, stringKey, fldPath.Child("requests"), sizeCovered)...)
+		}, stringKey, fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	allErrs = append(allErrs, validateDeviceConfiguration(config.DeviceConfiguration, fldPath, stored)...)
 	return allErrs
 }
