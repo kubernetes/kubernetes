@@ -244,3 +244,142 @@ func TestStatusStrategyValidateUpdate(t *testing.T) {
 		}
 	}
 }
+
+const listTypeResourceSchemaForLegacyV1beta1 = `
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: foos.test
+spec:
+  group: test
+  names:
+    kind: Foo
+    listKind: FooList
+    plural: foos
+    singular: foo
+  scope: Cluster
+  versions:
+  - name: v1
+    served: true
+    storage: true
+  - name: v2
+    served: true
+    storage: true
+    subresources:
+      status: {}
+  - name: v3
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              data:
+                type: string
+  - name: v4
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              data:
+                type: string
+    subresources:
+      status: {}
+`
+
+// TestStatusStrategyValidateUpdateForLegacyV1beta1 legacy test the crd with subresource and without .Schema.OpenAPIV3Schema,
+func TestStatusStrategyValidateUpdateForLegacyV1beta1(t *testing.T) {
+	crdV1 := &apiextensionsv1.CustomResourceDefinition{}
+	err := yaml.Unmarshal([]byte(listTypeResourceSchemaForLegacyV1beta1), &crdV1)
+	if err != nil {
+		t.Fatalf("unexpected decoding error: %v", err)
+	}
+	t.Logf("crd details: %v", crdV1)
+	crd := &apiextensions.CustomResourceDefinition{}
+	if err = apiextensionsv1.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crdV1, crd, nil); err != nil {
+		t.Fatalf("unexpected convert error: %v", err)
+	}
+	t.Logf("crd details: %v", crd)
+
+	ctx := context.TODO()
+
+	tcs := []struct {
+		name                string
+		old                 *unstructured.Unstructured
+		obj                 *unstructured.Unstructured
+		version             int
+		hasStructuralSchema bool
+		isValid             bool
+	}{
+		{
+			name:                "the CRD does not have a schema at all",
+			old:                 &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v1", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			obj:                 &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v1", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{"phase": "ready"}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			version:             0,
+			hasStructuralSchema: false,
+			isValid:             true,
+		},
+		{
+			name:                "the CRD does not have a schema at all but declares the status property",
+			old:                 &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v2", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			obj:                 &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v2", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{"phase": "ready"}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			version:             1,
+			hasStructuralSchema: false,
+			isValid:             true,
+		},
+		{
+			name:                "the CRD has a schema",
+			old:                 &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v3", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			obj:                 &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v3", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{"phase": "ready"}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			version:             2,
+			hasStructuralSchema: true,
+			isValid:             true,
+		},
+		{
+			name:                "the CRD has a schema and has declares the status property",
+			old:                 &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v4", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			obj:                 &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v4", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{"phase": "ready"}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			version:             3,
+			hasStructuralSchema: true,
+			isValid:             true,
+		},
+		{
+			name:                "the CRD has a schema but it not being structural",
+			old:                 &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v4", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			obj:                 &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "test/v4", "kind": "Foo", "numArray": []interface{}{1, 2}, "status": map[string]interface{}{"phase": "ready"}, "metadata": map[string]interface{}{"resourceVersion": "1"}}},
+			version:             3,
+			hasStructuralSchema: false,
+			isValid:             true,
+		},
+	}
+
+	for _, tc := range tcs {
+		strategy := statusStrategy{}
+		kind := schema.GroupVersionKind{
+			Version: crd.Spec.Versions[tc.version].Name,
+			Kind:    crd.Spec.Names.Kind,
+			Group:   crd.Spec.Group,
+		}
+		strategy.customResourceStrategy.validator.kind = kind
+		if tc.hasStructuralSchema {
+			ss, _ := structuralschema.NewStructural(crd.Spec.Versions[tc.version].Schema.OpenAPIV3Schema)
+			strategy.structuralSchema = ss
+		}
+		t.Logf("case: %v", tc.name)
+		errs := strategy.ValidateUpdate(ctx, tc.obj, tc.old)
+		if tc.isValid && len(errs) > 0 {
+			t.Errorf("%v: unexpected error: %v", tc.name, errs)
+		}
+		if !tc.isValid && len(errs) == 0 {
+			t.Errorf("%v: unexpected non-error", tc.name)
+		}
+	}
+}
