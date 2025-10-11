@@ -22,16 +22,20 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/resource"
+	"k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources/extended"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -119,6 +123,11 @@ type preScoreState struct {
 	// podRequests have the same order as the resources defined in NodeResourcesBalancedAllocationArgs.Resources,
 	// same for other place we store a list like that.
 	podRequests []int64
+
+	// allocatedState holds the DRA allocated state for DRA extended resources scoring.
+	allocatedState *structured.AllocatedState
+	// resourceSlices holds the list of resource slices for DRA extended resource scoring.
+	resourceSlices []*resourceapi.ResourceSlice
 }
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
@@ -131,6 +140,14 @@ func (s *preScoreState) Clone() fwk.StateData {
 func (f *Fit) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	state := &preScoreState{
 		podRequests: f.calculatePodResourceRequestList(pod, f.resources),
+	}
+	if f.enableDRAExtendedResource {
+		allocatedState, resourceSlices, status := getDRAPreScoredParams(f.draManager)
+		if status != nil {
+			return status
+		}
+		state.allocatedState = allocatedState
+		state.resourceSlices = resourceSlices
 	}
 	cycleState.Write(preScoreStateKey, state)
 	return nil
@@ -174,6 +191,16 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy)
 	}
 
+	scorer := scorePlugin(args)
+	if fts.EnableDRAExtendedResource {
+		scorer.enableDRAExtendedResource = true
+		scorer.draManager = h.SharedDRAManager()
+		scorer.draFeatures = dynamicresources.AllocatorFeatures(fts)
+		// Create a CEL cache for device class selector compilation
+		// This cache improves performance by avoiding recompilation of the same CEL expressions
+		scorer.celCache = cel.NewCache(10, cel.Features{EnableConsumableCapacity: fts.EnableDRAConsumableCapacity})
+	}
+
 	return &Fit{
 		ignoredResources:                sets.New(args.IgnoredResources...),
 		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
@@ -183,7 +210,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		handle:                          h,
 		enablePodLevelResources:         fts.EnablePodLevelResources,
 		enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
-		resourceAllocationScorer:        *scorePlugin(args),
+		resourceAllocationScorer:        *scorer,
 	}, nil
 }
 
@@ -666,7 +693,15 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 		s = &preScoreState{
 			podRequests: f.calculatePodResourceRequestList(pod, f.resources),
 		}
+		if f.enableDRAExtendedResource {
+			allocatedState, resourceSlices, status := getDRAPreScoredParams(f.draManager)
+			if status != nil {
+				return 0, status
+			}
+			s.allocatedState = allocatedState
+			s.resourceSlices = resourceSlices
+		}
 	}
 
-	return f.score(ctx, pod, nodeInfo, s.podRequests)
+	return f.score(ctx, pod, nodeInfo, s.podRequests, s.allocatedState, s.resourceSlices)
 }

@@ -22,7 +22,9 @@ import (
 	"math"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/dynamic-resource-allocation/structured"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -53,6 +55,11 @@ type balancedAllocationPreScoreState struct {
 	// podRequests have the same order of the resources defined in NodeResourcesFitArgs.Resources,
 	// same for other place we store a list like that.
 	podRequests []int64
+
+	// allocatedState holds the DRA allocated state for DRA extended resources scoring.
+	allocatedState *structured.AllocatedState
+	// resourceSlices holds the list of resource slices for DRA extended resource scoring.
+	resourceSlices []*resourceapi.ResourceSlice
 }
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
@@ -72,6 +79,14 @@ func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState fwk.Cycle
 	}
 	state := &balancedAllocationPreScoreState{
 		podRequests: podRequests,
+	}
+	if ba.enableDRAExtendedResource {
+		allocatedState, resourceSlices, status := getDRAPreScoredParams(ba.draManager)
+		if status != nil {
+			return status
+		}
+		state.allocatedState = allocatedState
+		state.resourceSlices = resourceSlices
 	}
 	cycleState.Write(balancedAllocationPreScoreStateKey, state)
 	return nil
@@ -103,6 +118,14 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, p
 		if ba.isBestEffortPod(s.podRequests) {
 			return 0, nil
 		}
+		if ba.enableDRAExtendedResource {
+			allocatedState, resourceSlices, status := getDRAPreScoredParams(ba.draManager)
+			if status != nil {
+				return 0, status
+			}
+			s.allocatedState = allocatedState
+			s.resourceSlices = resourceSlices
+		}
 	}
 
 	// ba.score favors nodes with balanced resource usage rate.
@@ -110,7 +133,7 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, p
 	// Detail: score = (1 - std) * MaxNodeScore, where std is calculated by the root square of Σ((fraction(i)-mean)^2)/len(resources)
 	// The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-	return ba.score(ctx, pod, nodeInfo, s.podRequests)
+	return ba.score(ctx, pod, nodeInfo, s.podRequests, s.allocatedState, s.resourceSlices)
 }
 
 // ScoreExtensions of the Score plugin.
@@ -135,6 +158,7 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 			Name:                            BalancedAllocationName,
 			enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
 			enablePodLevelResources:         fts.EnablePodLevelResources,
+			enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
 			scorer:                          balancedResourceScorer,
 			useRequested:                    true,
 			resources:                       args.Resources,
