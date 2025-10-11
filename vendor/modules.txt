@@ -163,6 +163,10 @@ github.com/go-logr/stdr
 # github.com/go-logr/zapr v1.3.0
 ## explicit; go 1.18
 github.com/go-logr/zapr
+# github.com/go-ole/go-ole v1.3.0
+## explicit; go 1.12
+github.com/go-ole/go-ole
+github.com/go-ole/go-ole/oleutil
 # github.com/go-openapi/jsonpointer v0.21.0
 ## explicit; go 1.20
 github.com/go-openapi/jsonpointer
@@ -373,6 +377,18 @@ github.com/lithammer/dedent
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
+# github.com/microsoft/wmi v0.34.0
+## explicit; go 1.24.3
+github.com/microsoft/wmi/go/wmi
+github.com/microsoft/wmi/pkg/base/credential
+github.com/microsoft/wmi/pkg/base/host
+github.com/microsoft/wmi/pkg/base/instance
+github.com/microsoft/wmi/pkg/base/query
+github.com/microsoft/wmi/pkg/base/session
+github.com/microsoft/wmi/pkg/errors
+github.com/microsoft/wmi/pkg/wmiinstance
+github.com/microsoft/wmi/server2019/root/cimv2
+github.com/microsoft/wmi/server2019/root/microsoft/windows/storage
 # github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible
 ## explicit
 github.com/mistifyio/go-zfs
