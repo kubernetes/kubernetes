@@ -59,7 +59,9 @@ func (f *FakeVolumeManager) Run(ctx context.Context, sourcesReady config.Sources
 // WaitForAttachAndMount is not implemented
 func (f *FakeVolumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod) error {
 	if f.volumeAttachLimitExceeded {
-		return &VolumeAttachLimitExceededError{}
+		return &RejectingPodError{
+			Reason: VolumeAttachmentLimitExceededReason,
+		}
 	}
 	return nil
 }
