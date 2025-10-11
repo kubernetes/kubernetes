@@ -194,12 +194,12 @@ func TestGetHealthInfo(t *testing.T) {
 	require.NoError(t, err)
 
 	// Initial state
-	assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, testDevice))
+	assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
 
 	// Add a device
 	_, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{testDeviceHealth})
 	require.NoError(t, err)
-	assert.Equal(t, state.DeviceHealthStatusHealthy, cache.getHealthInfo(testDriver, testPool, testDevice))
+	assert.Equal(t, state.DeviceHealthStatusHealthy, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
 
 	// Test timeout (simulated with old LastUpdated)
 	err = cache.withLock(func() error {
@@ -212,7 +212,7 @@ func TestGetHealthInfo(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
-	assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, testDevice))
+	assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
 }
 
 // TestGetHealthInfoRobust tests retrieving health status logic solely & against many cases.
@@ -347,7 +347,7 @@ func TestGetHealthInfoRobust(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cache := &healthInfoCache{HealthInfo: tt.initialState}
-			health := cache.getHealthInfo(tt.driverName, tt.poolName, tt.deviceName)
+			health := cache.getHealthInfo(tt.driverName, tt.poolName, tt.deviceName).Health
 			assert.Equal(t, tt.expectedHealth, health)
 		})
 	}
@@ -365,7 +365,7 @@ func TestUpdateHealthInfo(t *testing.T) {
 	changedDevices, err := cache.updateHealthInfo(testDriver, []state.DeviceHealth{testDeviceHealth})
 	require.NoError(t, err)
 	assertDeviceHealthElementsMatchIgnoreTime(t, expectedChanged1, changedDevices)
-	assert.Equal(t, state.DeviceHealthStatusHealthy, cache.getHealthInfo(testDriver, testPool, testDevice))
+	assert.Equal(t, state.DeviceHealthStatusHealthy, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
 
 	// 2 -- Update with no change
 	changedDevices, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{testDeviceHealth})
@@ -379,7 +379,7 @@ func TestUpdateHealthInfo(t *testing.T) {
 	changedDevices, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{newHealth})
 	require.NoError(t, err)
 	assertDeviceHealthElementsMatchIgnoreTime(t, expectedChanged3, changedDevices)
-	assert.Equal(t, state.DeviceHealthStatusUnhealthy, cache.getHealthInfo(testDriver, testPool, testDevice))
+	assert.Equal(t, state.DeviceHealthStatusUnhealthy, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
 
 	// 4 -- Add second device, omit first
 	secondDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "device2", Health: state.DeviceHealthStatusHealthy}
@@ -401,14 +401,14 @@ func TestUpdateHealthInfo(t *testing.T) {
 	changedDevices, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{secondDevice})
 	require.NoError(t, err)
 	assertDeviceHealthElementsMatchIgnoreTime(t, expectedChanged4, changedDevices)
-	assert.Equal(t, state.DeviceHealthStatusHealthy, cache.getHealthInfo(testDriver, testPool, "device2"))
-	assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, testDevice))
+	assert.Equal(t, state.DeviceHealthStatusHealthy, cache.getHealthInfo(testDriver, testPool, "device2").Health)
+	assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
 
 	// 5 -- Test persistence
 	cache2, err := newHealthInfoCache(tmpFile)
 	require.NoError(t, err)
-	assert.Equal(t, state.DeviceHealthStatusHealthy, cache2.getHealthInfo(testDriver, testPool, "device2"))
-	assert.Equal(t, state.DeviceHealthStatusUnknown, cache2.getHealthInfo(testDriver, testPool, testDevice))
+	assert.Equal(t, state.DeviceHealthStatusHealthy, cache2.getHealthInfo(testDriver, testPool, "device2").Health)
+	assert.Equal(t, state.DeviceHealthStatusUnknown, cache2.getHealthInfo(testDriver, testPool, testDevice).Health)
 
 	// 6 -- Test how updateHealthInfo handles device timeouts
 	timeoutDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "timeoutDevice", Health: "Unhealthy"}
@@ -445,9 +445,9 @@ func TestClearDriver(t *testing.T) {
 
 	_, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{testDeviceHealth})
 	require.NoError(t, err)
-	assert.Equal(t, state.DeviceHealthStatusHealthy, cache.getHealthInfo(testDriver, testPool, testDevice))
+	assert.Equal(t, state.DeviceHealthStatusHealthy, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
 
 	err = cache.clearDriver(testDriver)
 	require.NoError(t, err)
-	assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, testDevice))
+	assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
 }

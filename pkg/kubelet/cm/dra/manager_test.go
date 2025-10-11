@@ -1341,7 +1341,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		}
 
 		// Check cache state
-		cachedHealth := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName)
+		cachedHealth := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health
 		assert.Equal(t, state.DeviceHealthStatus("Unhealthy"), cachedHealth, "Cache update check failed")
 
 		t.Log("HealthChangeForAllocatedDevice: Closing responses channel to signal EOF")
@@ -1399,7 +1399,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		}
 
 		// Check health cache for the "other-device"
-		cachedHealthOther := manager.healthInfoCache.getHealthInfo(driverName, poolName, "other-device")
+		cachedHealthOther := manager.healthInfoCache.getHealthInfo(driverName, poolName, "other-device").Health
 		assert.Equal(t, state.DeviceHealthStatus("Unhealthy"), cachedHealthOther, "Cache update for other-device failed")
 
 		close(responses)
