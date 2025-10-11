@@ -61,7 +61,7 @@ type Options struct {
 	// The default values.
 	ComponentConfig *kubeschedulerconfig.KubeSchedulerConfiguration
 
-	SecureServing  *apiserveroptions.SecureServingOptionsWithLoopback
+	SecureServing  *apiserveroptions.SecureServingOptions
 	Authentication *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization  *apiserveroptions.DelegatingAuthorizationOptions
 	Metrics        *metrics.Options
@@ -98,7 +98,7 @@ func NewOptions() *Options {
 
 func NewOptionsWithComponentGlobalsRegistry(componentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry) *Options {
 	o := &Options{
-		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
+		SecureServing:  apiserveroptions.NewSecureServingOptions(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Deprecated: &DeprecatedOptions{
@@ -250,7 +250,7 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 	}
 	c.KubeConfig = kubeConfig
 
-	if err := o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
+	if err := o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
 		return err
 	}
 	if o.SecureServing != nil && (o.SecureServing.BindPort != 0 || o.SecureServing.Listener != nil) {
