@@ -345,7 +345,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 					if err != nil {
 						return nil, cleanupAction, err
 					}
-					if err := subpather.SafeMakeDir(subPath, volumePath, perm); err != nil {
+					if err := subpather.SafeMakeDir(subPath, volumePath, perm); err != nil && !goerrors.Is(err, os.ErrExist) {
 						// Don't pass detailed error back to the user because it could give information about host filesystem
 						klog.ErrorS(err, "Failed to create subPath directory for volumeMount of the container", "containerName", container.Name, "volumeMountName", mount.Name)
 						return nil, cleanupAction, fmt.Errorf("failed to create subPath directory for volumeMount %q of container %q", mount.Name, container.Name)
