@@ -2453,7 +2453,7 @@ func TestEarlyNominate(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			podInformer := informerFactory.Core().V1().Pods()
 
-			_, err :=cs.CoreV1().Pods(tt.pod.Namespace).Create(ctx, tt.pod, metav1.CreateOptions{})
+			_, err := cs.CoreV1().Pods(tt.pod.Namespace).Create(ctx, tt.pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create test pod %s: %v", tt.pod.Name, err)
 			}
