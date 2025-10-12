@@ -105,7 +105,7 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 
 // Run starts the workers to clean up Jobs.
 func (tc *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer tc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
@@ -146,17 +146,17 @@ func (tc *Controller) enqueue(logger klog.Logger, job *batch.Job) {
 	logger.V(4).Info("Add job to cleanup", "job", klog.KObj(job))
 	key, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", job, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for job object", "job", klog.KObj(job))
 		return
 	}
 
 	tc.queue.Add(key)
 }
 
-func (tc *Controller) enqueueAfter(job *batch.Job, after time.Duration) {
+func (tc *Controller) enqueueAfter(logger klog.Logger, job *batch.Job, after time.Duration) {
 	key, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", job, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for job object", "job", klog.KObj(job))
 		return
 	}
 
@@ -176,18 +176,19 @@ func (tc *Controller) processNextWorkItem(ctx context.Context) bool {
 	defer tc.queue.Done(key)
 
 	err := tc.processJob(ctx, key)
-	tc.handleErr(err, key)
+	logger := klog.FromContext(ctx)
+	tc.handleErr(logger, err, key)
 
 	return true
 }
 
-func (tc *Controller) handleErr(err error, key string) {
+func (tc *Controller) handleErr(logger klog.Logger, err error, key string) {
 	if err == nil {
 		tc.queue.Forget(key)
 		return
 	}
 
-	utilruntime.HandleError(fmt.Errorf("error cleaning up Job %v, will retry: %v", key, err))
+	utilruntime.HandleErrorWithLogger(logger, err, "Error cleaning up Job, will retry", "key", key)
 	tc.queue.AddRateLimited(key)
 }
 
@@ -273,7 +274,7 @@ func (tc *Controller) processTTL(logger klog.Logger, job *batch.Job) (expiredAt 
 		return e, nil
 	}
 
-	tc.enqueueAfter(job, *t)
+	tc.enqueueAfter(logger, job, *t)
 	return nil, nil
 }
 
