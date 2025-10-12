@@ -101,8 +101,11 @@ func NewController(
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ephemeral_volume"})
 
+	logger := klog.FromContext(ctx)
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: ec.enqueuePod,
+		AddFunc: func(obj interface{}) {
+			ec.enqueuePod(logger, obj)
+		},
 		// The pod spec is immutable. Therefore the controller can ignore pod updates
 		// because there cannot be any changes that have to be copied into the generated
 		// PVC.
@@ -110,7 +113,9 @@ func NewController(
 		// Therefore pod deletions also can be ignored.
 	})
 	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		DeleteFunc: ec.onPVCDelete,
+		DeleteFunc: func(obj interface{}) {
+			ec.onPVCDelete(logger, obj)
+		},
 	})
 	if err := common.AddPodPVCIndexerIfNotPresent(ec.podIndexer); err != nil {
 		return nil, fmt.Errorf("could not initialize ephemeral volume controller: %w", err)
@@ -119,7 +124,7 @@ func NewController(
 	return ec, nil
 }
 
-func (ec *ephemeralController) enqueuePod(obj interface{}) {
+func (ec *ephemeralController) enqueuePod(logger klog.Logger, obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		return
@@ -135,7 +140,7 @@ func (ec *ephemeralController) enqueuePod(obj interface{}) {
 			// It has at least one ephemeral inline volume, work on it.
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(pod)
 			if err != nil {
-				runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pod, err))
+				runtime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "pod", klog.KObj(pod))
 				return
 			}
 			ec.queue.Add(key)
@@ -144,7 +149,7 @@ func (ec *ephemeralController) enqueuePod(obj interface{}) {
 	}
 }
 
-func (ec *ephemeralController) onPVCDelete(obj interface{}) {
+func (ec *ephemeralController) onPVCDelete(logger klog.Logger, obj interface{}) {
 	pvc, ok := obj.(*v1.PersistentVolumeClaim)
 	if !ok {
 		return
@@ -158,16 +163,16 @@ func (ec *ephemeralController) onPVCDelete(obj interface{}) {
 	// the PVC.
 	objs, err := ec.podIndexer.ByIndex(common.PodPVCIndex, fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name))
 	if err != nil {
-		runtime.HandleError(fmt.Errorf("listing pods from cache: %v", err))
+		runtime.HandleErrorWithLogger(logger, err, "Listing pods from cache")
 		return
 	}
 	for _, obj := range objs {
-		ec.enqueuePod(obj)
+		ec.enqueuePod(logger, obj)
 	}
 }
 
 func (ec *ephemeralController) Run(ctx context.Context, workers int) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 	defer ec.queue.ShutDown()
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ephemeral volume controller")
@@ -202,7 +207,7 @@ func (ec *ephemeralController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	runtime.HandleError(fmt.Errorf("%v failed with: %v", key, err))
+	runtime.HandleErrorWithContext(ctx, err, "Work item failed", "item", key)
 	ec.queue.AddRateLimited(key)
 
 	return true
