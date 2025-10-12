@@ -51,20 +51,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
-- name: AllowServiceLBStatusOnNonLB
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: GA
-    version: "1.0"
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: "1.29"
-  - default: false
-    lockToDefault: true
-    preRelease: Deprecated
-    version: "1.32"
 - name: AllowUnsafeMalformedObjectDeletion
   versionedSpecs:
   - default: false

@@ -26914,15 +26914,13 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 		name             string
 		ipModeEnabled    bool
 		legacyIPs        bool
-		nonLBAllowed     bool
 		tweakOldLBStatus func(s *core.LoadBalancerStatus)
 		tweakLBStatus    func(s *core.LoadBalancerStatus)
 		tweakSvcSpec     func(s *core.ServiceSpec)
 		numErrs          int
 	}{
 		{
-			name:         "type is not LB",
-			nonLBAllowed: false,
+			name: "type is not LB",
 			tweakSvcSpec: func(s *core.ServiceSpec) {
 				s.Type = core.ServiceTypeClusterIP
 			},
@@ -26932,18 +26930,6 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 				}}
 			},
 			numErrs: 1,
-		}, {
-			name:         "type is not LB. back-compat",
-			nonLBAllowed: true,
-			tweakSvcSpec: func(s *core.ServiceSpec) {
-				s.Type = core.ServiceTypeClusterIP
-			},
-			tweakLBStatus: func(s *core.LoadBalancerStatus) {
-				s.Ingress = []core.LoadBalancerIngress{{
-					IP: "1.2.3.4",
-				}}
-			},
-			numErrs: 0,
 		}, {
 			name:          "valid vip ipMode",
 			ipModeEnabled: true,
@@ -27081,10 +27067,7 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 				// when testing !ipModeEnabled.)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.LoadBalancerIPMode:          tc.ipModeEnabled,
-				features.AllowServiceLBStatusOnNonLB: tc.nonLBAllowed,
-			})
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			oldStatus := core.LoadBalancerStatus{}
 			if tc.tweakOldLBStatus != nil {
 				tc.tweakOldLBStatus(&oldStatus)
