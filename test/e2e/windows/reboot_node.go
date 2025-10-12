@@ -53,6 +53,7 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run as a reboot process on the host/node", func(ctx context.Context) {
+		e2eskipper.Skipf("skipping test until graceful shutdown feature enabled")
 
 		ginkgo.By("selecting a Windows node")
 		nodes, err := findWindowsNodes(ctx, f)
