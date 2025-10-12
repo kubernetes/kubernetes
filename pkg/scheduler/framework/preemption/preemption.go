@@ -806,7 +806,7 @@ func (ev *Evaluator) EarlyNominate(ctx context.Context, state fwk.CycleState, po
 		return nil, fwk.AsStatus(err)
 	}
 	for _, p := range allPods {
-		if ev.preempting.Has(p.UID) {
+		if ev.IsPodRunningPreemption(p.UID) {
 			preemptingPods[p.Spec.NodeName] = append(preemptingPods[p.Spec.NodeName], p)
 		}
 		if p.DeletionTimestamp != nil && p.Status.Reason == v1.PodReasonPreemptionByScheduler {
