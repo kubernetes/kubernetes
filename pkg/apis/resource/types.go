@@ -251,10 +251,6 @@ const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a 
 const BindingConditionsMaxSize = 4
 const BindingFailureConditionsMaxSize = 4
 
-// Defines the max number of shared counters that can be specified
-// in a ResourceSlice. The number is summed up across all sets.
-const ResourceSliceMaxSharedCounters = 32
-
 // Defines the maximum number of counter sets (through the
 // SharedCounters field) that can be defined in a ResourceSlice.
 const ResourceSliceMaxCounterSets = 8
@@ -553,14 +549,6 @@ type CapacityRequestPolicyRange struct {
 
 // Limit for the sum of the number of entries in both attributes and capacity.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
-
-// Limit for the total number of counters in each device.
-const ResourceSliceMaxCountersPerDevice = 32
-
-// Limit for the total number of counters defined in devices in
-// a ResourceSlice. We want to allow up to 64 devices to specify
-// up to 16 counters, so the limit for the ResourceSlice will be 1024.
-const ResourceSliceMaxDeviceCountersPerSlice = 1024 // 64 * 16
 
 // QualifiedName is the name of a device attribute or capacity.
 //
