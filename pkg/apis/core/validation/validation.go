@@ -8407,7 +8407,7 @@ func ValidateLoadBalancerStatus(status, oldStatus *core.LoadBalancerStatus, fldP
 				allErrs = append(allErrs, IsValidIPForLegacyField(idxPath.Child("ip"), ingress.IP, existingIngressIPs)...)
 			}
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) && ingress.IPMode == nil {
+			if ingress.IPMode == nil {
 				if len(ingress.IP) > 0 {
 					allErrs = append(allErrs, field.Required(idxPath.Child("ipMode"), "must be specified when `ip` is set"))
 				}

@@ -24,11 +24,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -216,9 +214,6 @@ func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 }
 
 func IsVIPMode(ing v1.LoadBalancerIngress) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
-		return true // backwards compat
-	}
 	if ing.IPMode == nil {
 		return true
 	}
