@@ -102,20 +102,20 @@ func NewResourceVersionController(
 func (rv *ResourceVersionController) addSVM(logger klog.Logger, obj interface{}) {
 	svm := obj.(*svmv1beta1.StorageVersionMigration)
 	logger.V(4).Info("Adding", "svm", klog.KObj(svm))
-	rv.enqueue(svm)
+	rv.enqueue(logger, svm)
 }
 
 func (rv *ResourceVersionController) updateSVM(logger klog.Logger, oldObj, newObj interface{}) {
 	oldSVM := oldObj.(*svmv1beta1.StorageVersionMigration)
 	newSVM := newObj.(*svmv1beta1.StorageVersionMigration)
 	logger.V(4).Info("Updating", "svm", klog.KObj(oldSVM))
-	rv.enqueue(newSVM)
+	rv.enqueue(logger, newSVM)
 }
 
-func (rv *ResourceVersionController) enqueue(svm *svmv1beta1.StorageVersionMigration) {
+func (rv *ResourceVersionController) enqueue(logger klog.Logger, svm *svmv1beta1.StorageVersionMigration) {
 	key, err := controller.KeyFunc(svm)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %w", svm, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "svm", klog.KObj(svm))
 		return
 	}
 
@@ -123,7 +123,7 @@ func (rv *ResourceVersionController) enqueue(svm *svmv1beta1.StorageVersionMigra
 }
 
 func (rv *ResourceVersionController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", ResourceVersionControllerName)

@@ -18,12 +18,13 @@ package ipamperf
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sort"
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -148,9 +149,10 @@ func (o *Observer) monitor() {
 
 	sharedInformer := informers.NewSharedInformerFactory(o.clientSet, 1*time.Second)
 	nodeInformer := sharedInformer.Core().V1().Nodes().Informer()
+	logger := klog.FromContext(context.TODO())
 
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) (err error) {
+		AddFunc: controllerutil.CreateAddNodeHandler(logger, func(node *v1.Node) (err error) {
 			name := node.GetName()
 			if node.Spec.PodCIDR != "" {
 				// ignore nodes that have PodCIDR (might be hold over from previous runs that did not get cleaned up)
@@ -162,7 +164,7 @@ func (o *Observer) monitor() {
 			o.numAdded = o.numAdded + 1
 			return
 		}),
-		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) (err error) {
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(logger, func(oldNode, newNode *v1.Node) (err error) {
 			name := newNode.GetName()
 			nTime, found := o.timing[name]
 			if !found {

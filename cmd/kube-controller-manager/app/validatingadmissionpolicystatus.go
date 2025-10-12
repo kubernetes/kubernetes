@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus"
 	"k8s.io/kubernetes/pkg/generated/openapi"
@@ -57,7 +58,9 @@ func newValidatingAdmissionPolicyStatusController(ctx context.Context, controlle
 		return nil, err
 	}
 
+	logger := klog.FromContext(ctx)
 	c, err := validatingadmissionpolicystatus.NewController(
+		logger,
 		controllerContext.InformerFactory.Admissionregistration().V1().ValidatingAdmissionPolicies(),
 		client.AdmissionregistrationV1().ValidatingAdmissionPolicies(),
 		typeChecker,

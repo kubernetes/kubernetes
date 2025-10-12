@@ -93,7 +93,7 @@ func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, le
 
 // Run starts one worker.
 func (c *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting storage version garbage collector")
@@ -106,8 +106,8 @@ func (c *Controller) Run(ctx context.Context) {
 		wg.Wait()
 	}()
 
-	if !cache.WaitForCacheSync(ctx.Done(), c.leasesSynced, c.storageVersionSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.leasesSynced, c.storageVersionSynced) {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Timed out waiting for caches to sync")
 		return
 	}
 
@@ -143,7 +143,7 @@ func (c *Controller) processNextLease(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("lease %v failed with: %v", key, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Error processing work item: Lease", "item", key)
 	c.leaseQueue.AddRateLimited(key)
 	return true
 }
@@ -166,7 +166,7 @@ func (c *Controller) processNextStorageVersion(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("storage version %v failed with: %v", key, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Error processing work item: Storage version", "item", key)
 	c.storageVersionQueue.AddRateLimited(key)
 	return true
 }
@@ -267,12 +267,12 @@ func (c *Controller) onDeleteLease(logger klog.Logger, obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Couldn't get object from tombstone", "obj", obj)
 			return
 		}
 		castObj, ok = tombstone.Obj.(*coordinationv1.Lease)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Lease %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Tombstone contained object that is not a Lease", "type", fmt.Sprintf("%T", obj))
 			return
 		}
 	}

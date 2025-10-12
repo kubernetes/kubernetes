@@ -226,10 +226,10 @@ func NewAttachDetachController(
 
 	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			adc.enqueuePVC(obj)
+			adc.enqueuePVC(logger, obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
-			adc.enqueuePVC(new)
+			adc.enqueuePVC(logger, new)
 		},
 	})
 
@@ -324,7 +324,7 @@ type attachDetachController struct {
 }
 
 func (adc *attachDetachController) Run(ctx context.Context) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	adc.broadcaster.StartStructuredLogging(3)
@@ -593,10 +593,10 @@ func (adc *attachDetachController) nodeDelete(logger klog.Logger, obj interface{
 	adc.processVolumesInUse(logger, nodeName, node.Status.VolumesInUse)
 }
 
-func (adc *attachDetachController) enqueuePVC(obj interface{}) {
+func (adc *attachDetachController) enqueuePVC(logger klog.Logger, obj interface{}) {
 	key, err := kcache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		runtime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		runtime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "obj", obj)
 		return
 	}
 	adc.pvcQueue.Add(key)
@@ -619,7 +619,7 @@ func (adc *attachDetachController) processNextItem(logger klog.Logger) bool {
 		// Rather than wait for a full resync, re-add the key to the
 		// queue to be processed.
 		adc.pvcQueue.AddRateLimited(keyObj)
-		runtime.HandleError(fmt.Errorf("failed to sync pvc %q, will retry again: %w", keyObj, err))
+		runtime.HandleErrorWithLogger(logger, err, "Error processing work item: PVC sync", "item", keyObj)
 		return true
 	}
 

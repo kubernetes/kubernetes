@@ -160,7 +160,7 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 
 // Run runs the controller goroutines.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting PVC protection controller")
@@ -190,7 +190,8 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 // Main worker batch-pulls PVC items off informer's work queue and populates namespace queue and namespace-PVCs map
 func (c *Controller) runMainWorker(ctx context.Context) {
-	for c.processNextWorkItem() {
+	logger := klog.FromContext(ctx)
+	for c.processNextWorkItem(logger) {
 	}
 }
 
@@ -200,7 +201,7 @@ func (c *Controller) runProcessNamespaceWorker(ctx context.Context) {
 	}
 }
 
-func (c *Controller) processNextWorkItem() bool {
+func (c *Controller) processNextWorkItem(logger klog.Logger) bool {
 	pvcKey, quit := c.queue.Get()
 	if quit {
 		return false
@@ -208,7 +209,7 @@ func (c *Controller) processNextWorkItem() bool {
 
 	pvcNamespace, pvcName, err := cache.SplitMetaNamespaceKey(pvcKey)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error parsing PVC key %q: %w", pvcKey, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Error parsing PVC key", "pvcKey", pvcKey)
 		return true
 	}
 
@@ -230,7 +231,7 @@ func (c *Controller) processPVCsByNamespace(ctx context.Context) bool {
 			c.queue.Forget(pvcKey)
 		} else {
 			c.queue.AddRateLimited(pvcKey)
-			utilruntime.HandleError(fmt.Errorf("PVC %v/%v failed with: %w", pvcName, namespace, err))
+			utilruntime.HandleErrorWithContext(ctx, err, "PVC processing failed", "pvc", klog.KRef(namespace, pvcName))
 		}
 		c.queue.Done(pvcKey)
 	}
@@ -429,12 +430,12 @@ func podIsShutDown(pod *v1.Pod) bool {
 func (c *Controller) pvcAddedUpdated(logger klog.Logger, obj interface{}) {
 	pvc, ok := obj.(*v1.PersistentVolumeClaim)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("PVC informer returned non-PVC object: %#v", obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "PVC informer returned non-PVC object", "type", fmt.Sprintf("%T", obj))
 		return
 	}
 	key, err := cache.MetaNamespaceKeyFunc(pvc)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for Persistent Volume Claim %#v: %v", pvc, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for Persistent Volume Claim", "pvc", klog.KObj(pvc))
 		return
 	}
 	logger.V(4).Info("Got event on PVC", "pvc", klog.KObj(pvc))
@@ -446,7 +447,7 @@ func (c *Controller) pvcAddedUpdated(logger klog.Logger, obj interface{}) {
 
 // podAddedDeletedUpdated reacts to Pod events
 func (c *Controller) podAddedDeletedUpdated(logger klog.Logger, old, new interface{}, deleted bool) {
-	if pod := c.parsePod(new); pod != nil {
+	if pod := c.parsePod(logger, new); pod != nil {
 		c.enqueuePVCs(logger, pod, deleted)
 
 		// An update notification might mask the deletion of a pod X and the
@@ -454,13 +455,13 @@ func (c *Controller) podAddedDeletedUpdated(logger klog.Logger, old, new interfa
 		// that's the case X needs to be processed as well to handle the case
 		// where it is blocking deletion of a PVC not referenced by Y, otherwise
 		// such PVC will never be deleted.
-		if oldPod := c.parsePod(old); oldPod != nil && oldPod.UID != pod.UID {
+		if oldPod := c.parsePod(logger, old); oldPod != nil && oldPod.UID != pod.UID {
 			c.enqueuePVCs(logger, oldPod, true)
 		}
 	}
 }
 
-func (*Controller) parsePod(obj interface{}) *v1.Pod {
+func (*Controller) parsePod(logger klog.Logger, obj interface{}) *v1.Pod {
 	if obj == nil {
 		return nil
 	}
@@ -468,12 +469,12 @@ func (*Controller) parsePod(obj interface{}) *v1.Pod {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Couldn't get object from tombstone", "obj", obj)
 			return nil
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Tombstone contained object that is not a Pod", "type", fmt.Sprintf("%T", obj))
 			return nil
 		}
 	}

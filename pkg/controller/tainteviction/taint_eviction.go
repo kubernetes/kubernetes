@@ -255,11 +255,11 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 	}
 
 	_, err = nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
+		AddFunc: controllerutil.CreateAddNodeHandler(logger, func(node *v1.Node) error {
 			tm.NodeUpdated(nil, node)
 			return nil
 		}),
-		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(logger, func(oldNode, newNode *v1.Node) error {
 			tm.NodeUpdated(oldNode, newNode)
 			return nil
 		}),
@@ -277,8 +277,7 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 
 // Run starts the controller which will run in loop until `stopCh` is closed.
 func (tc *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
-
+	defer utilruntime.HandleCrashWithContext(ctx)
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", tc.name)
 
@@ -500,7 +499,7 @@ func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateIt
 			tc.cancelWorkWithEvent(logger, podNamespacedName)
 			return
 		}
-		utilruntime.HandleError(fmt.Errorf("could not get pod %s/%s: %v", podUpdate.podName, podUpdate.podNamespace, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Could not get pod", "pod", klog.KRef(podUpdate.podNamespace, podUpdate.podName))
 		return
 	}
 
@@ -542,7 +541,7 @@ func (tc *Controller) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdat
 			delete(tc.taintedNodes, nodeUpdate.nodeName)
 			return
 		}
-		utilruntime.HandleError(fmt.Errorf("cannot get node %s: %v", nodeUpdate.nodeName, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Cannot get node", "node", klog.KRef("", nodeUpdate.nodeName))
 		return
 	}
 

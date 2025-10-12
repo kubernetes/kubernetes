@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	listers "k8s.io/client-go/listers/core/v1"
@@ -235,12 +235,13 @@ func TestDesiredTTL(t *testing.T) {
 			desiredTTLSeconds: testCase.desiredTTL,
 			boundaryStep:      testCase.boundaryStep,
 		}
+		logger, _ := ktesting.NewTestContext(t)
+
 		if testCase.addNode {
-			logger, _ := ktesting.NewTestContext(t)
 			ttlController.addNode(logger, &v1.Node{})
 		}
 		if testCase.deleteNode {
-			ttlController.deleteNode(&v1.Node{})
+			ttlController.deleteNode(logger, &v1.Node{})
 		}
 		assert.Equal(t, testCase.expectedTTL, ttlController.getDesiredTTLSeconds(),
 			"%d: unexpected ttl: %d", i, ttlController.getDesiredTTLSeconds())
