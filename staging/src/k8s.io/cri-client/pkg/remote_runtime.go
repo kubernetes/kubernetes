@@ -872,18 +872,27 @@ func (r *remoteRuntimeService) GetContainerEvents(ctx context.Context, container
 	}
 
 	for {
-		resp, err := containerEventsStreamingClient.Recv()
-		if err == io.EOF {
-			r.logErr(err, "container events stream is closed")
-			return err
-		}
-		if err != nil {
-			r.logErr(err, "failed to receive streaming container event")
-			return err
-		}
-		if resp != nil {
-			containerEventsCh <- resp
-			r.log(4, "container event received", "resp", resp)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			resp, err := containerEventsStreamingClient.Recv()
+			if errors.Is(err, io.EOF) {
+				r.logErr(err, "container events stream is closed")
+				return err
+			}
+			if err != nil {
+				r.logErr(err, "failed to receive streaming container event")
+				return err
+			}
+			if resp != nil {
+				select {
+				case containerEventsCh <- resp:
+					r.log(4, "container event received", "resp", resp)
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
 		}
 	}
 }
