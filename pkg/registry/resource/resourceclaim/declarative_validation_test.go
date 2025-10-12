@@ -647,6 +647,12 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 				tweakStatusReservedFor(generateResourceClaimReferences(256)...),
 			),
 		},
+		"valid status.allocation.devices.results, max items": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationDevicesResults(32),
+			),
+		},
 		"valid status.allocation unchanged": {
 			old:    mkResourceClaimWithStatus(),
 			update: mkResourceClaimWithStatus(),
@@ -692,6 +698,15 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 			update: mkResourceClaimWithStatus(),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("status", "allocation"), nil, "field is immutable").WithOrigin("update"),
+			},
+		},
+		"invalid status.allocation.devices.results, too many": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationDevicesResults(33),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "allocation", "devices", "results"), 33, 32).WithOrigin("maxItems"),
 			},
 		},
 	}
@@ -854,6 +869,20 @@ func generateResourceClaimReferences(count int) []resource.ResourceClaimConsumer
 func tweakStatusReservedFor(refs ...resource.ResourceClaimConsumerReference) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		rc.Status.ReservedFor = refs
+	}
+}
+
+func tweakStatusAllocationDevicesResults(count int) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Status.Allocation.Devices.Results = []resource.DeviceRequestAllocationResult{}
+		for i := 0; i < count; i++ {
+			rc.Status.Allocation.Devices.Results = append(rc.Status.Allocation.Devices.Results, resource.DeviceRequestAllocationResult{
+				Request: "req-0",
+				Driver:  "dra.example.com",
+				Pool:    fmt.Sprintf("pool-%d", i),
+				Device:  fmt.Sprintf("device-%d", i),
+			})
+		}
 	}
 }
 
