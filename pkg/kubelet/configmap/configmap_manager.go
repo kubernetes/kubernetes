@@ -152,7 +152,7 @@ func NewWatchingConfigMapManager(kubeClient clientset.Interface, resyncInterval 
 		}
 		return false
 	}
-	listWatcherWithWatchListSemanticsWrapper := func(lw cache.ListerWatcher) cache.ListerWatcher {
+	listWatcherWithWatchListSemanticsWrapper := func(lw *cache.ListWatch) cache.ListerWatcher {
 		return cache.ToListWatcherWithWatchListSemantics(lw, kubeClient)
 	}
 

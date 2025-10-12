@@ -44,7 +44,7 @@ type watchObjectFunc func(string, metav1.ListOptions) (watch.Interface, error)
 type newObjectFunc func() runtime.Object
 type isImmutableFunc func(runtime.Object) bool
 
-type listWatcherWithWatchListSemanticsWrapperFunc func(lw cache.ListerWatcher) cache.ListerWatcher
+type listWatcherWithWatchListSemanticsWrapperFunc func(lw *cache.ListWatch) cache.ListerWatcher
 
 // objectCacheItem is a single item stored in objectCache.
 type objectCacheItem struct {
