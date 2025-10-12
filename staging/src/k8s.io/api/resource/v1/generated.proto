@@ -499,6 +499,7 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=64
   repeated DeviceAllocationConfiguration config = 2;
 }
 

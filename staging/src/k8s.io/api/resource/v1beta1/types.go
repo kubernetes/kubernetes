@@ -1498,6 +1498,7 @@ type DeviceAllocationResult struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:maxItems=64
 	Config []DeviceAllocationConfiguration `json:"config,omitempty" protobuf:"bytes,2,opt,name=config"`
 }
 
