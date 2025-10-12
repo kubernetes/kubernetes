@@ -133,7 +133,7 @@ type listerWatcherWrapper struct {
 }
 
 type listWatcherWithWatchListSemanticsWrapper struct {
-	ListerWatcher
+	*ListWatch
 
 	// unsupportedWatchListSemantics indicates whether a client explicitly does NOT support
 	// WatchList semantics.
@@ -147,12 +147,12 @@ type listWatcherWithWatchListSemanticsWrapper struct {
 	unsupportedWatchListSemantics bool
 }
 
-func (lw listWatcherWithWatchListSemanticsWrapper) IsWatchListSemanticsUnSupported() bool {
+func (lw *listWatcherWithWatchListSemanticsWrapper) IsWatchListSemanticsUnSupported() bool {
 	return lw.unsupportedWatchListSemantics
 }
 
-func ToListWatcherWithWatchListSemantics(lw ListerWatcher, client any) ListerWatcher {
-	return listWatcherWithWatchListSemanticsWrapper{
+func ToListWatcherWithWatchListSemantics(lw *ListWatch, client any) ListerWatcher {
+	return &listWatcherWithWatchListSemanticsWrapper{
 		lw,
 		watchlist.DoesClientNotSupportWatchListSemantics(client),
 	}
