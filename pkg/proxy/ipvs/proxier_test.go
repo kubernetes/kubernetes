@@ -39,11 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
@@ -5762,57 +5758,27 @@ func TestDismissLocalhostRuleExist(t *testing.T) {
 func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 	testCases := []struct {
 		name             string
-		ipModeEnabled    bool
 		svcIP            string
 		svcLBIP          string
 		ipMode           *v1.LoadBalancerIPMode
 		expectedServices int
 	}{
-		/* LoadBalancerIPMode disabled */
 		{
-			name:             "LoadBalancerIPMode disabled, ipMode Proxy",
-			ipModeEnabled:    false,
-			svcIP:            "10.20.30.41",
-			svcLBIP:          "1.2.3.4",
-			ipMode:           ptr.To(v1.LoadBalancerIPModeProxy),
-			expectedServices: 2,
-		},
-		{
-			name:             "LoadBalancerIPMode disabled, ipMode VIP",
-			ipModeEnabled:    false,
-			svcIP:            "10.20.30.42",
-			svcLBIP:          "1.2.3.5",
-			ipMode:           ptr.To(v1.LoadBalancerIPModeVIP),
-			expectedServices: 2,
-		},
-		{
-			name:             "LoadBalancerIPMode disabled, ipMode nil",
-			ipModeEnabled:    false,
-			svcIP:            "10.20.30.43",
-			svcLBIP:          "1.2.3.6",
-			ipMode:           nil,
-			expectedServices: 2,
-		},
-		/* LoadBalancerIPMode enabled */
-		{
-			name:             "LoadBalancerIPMode enabled, ipMode Proxy",
-			ipModeEnabled:    true,
+			name:             "ipMode Proxy",
 			svcIP:            "10.20.30.41",
 			svcLBIP:          "1.2.3.4",
 			ipMode:           ptr.To(v1.LoadBalancerIPModeProxy),
 			expectedServices: 1,
 		},
 		{
-			name:             "LoadBalancerIPMode enabled, ipMode VIP",
-			ipModeEnabled:    true,
+			name:             "ipMode VIP",
 			svcIP:            "10.20.30.42",
 			svcLBIP:          "1.2.3.5",
 			ipMode:           ptr.To(v1.LoadBalancerIPModeVIP),
 			expectedServices: 2,
 		},
 		{
-			name:             "LoadBalancerIPMode enabled, ipMode nil",
-			ipModeEnabled:    true,
+			name:             "ipMode nil",
 			svcIP:            "10.20.30.43",
 			svcLBIP:          "1.2.3.6",
 			ipMode:           nil,
@@ -5829,10 +5795,6 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if !testCase.ipModeEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, testCase.ipModeEnabled)
 			_, fp := buildFakeProxier(t)
 			makeServiceMap(fp,
 				makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
