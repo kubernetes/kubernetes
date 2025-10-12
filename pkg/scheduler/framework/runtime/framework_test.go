@@ -3894,7 +3894,6 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 						},
 					},
 				},
-				// Additional test cases from original TestRecordingMetrics
 				{
 					name:                            "PreScore - Success",
 					action:                          func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, state, pod, nil) },
