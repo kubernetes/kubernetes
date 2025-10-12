@@ -70,7 +70,7 @@ func newSecretCache(ctx context.Context, fakeClient clientset.Interface, fakeClo
 		watchObject: watchSecret(ctx, fakeClient),
 		newObject:   func() runtime.Object { return &v1.Secret{} },
 		isImmutable: isSecretImmutable,
-		listWatcherWithWatchListSemanticsWrapper: func(lw cache.ListerWatcher) cache.ListerWatcher {
+		listWatcherWithWatchListSemanticsWrapper: func(lw *cache.ListWatch) cache.ListerWatcher {
 			return cache.ToListWatcherWithWatchListSemantics(lw, fakeClient)
 		},
 		groupResource: corev1.Resource("secret"),
