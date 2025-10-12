@@ -236,10 +236,11 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, kubeProxy)
 
 	s.NodeRef = &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      s.NodeName,
-		UID:       types.UID(s.NodeName),
-		Namespace: "",
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       s.NodeName,
+		UID:        types.UID(s.NodeName),
+		Namespace:  "",
 	}
 
 	if len(config.HealthzBindAddress) > 0 {

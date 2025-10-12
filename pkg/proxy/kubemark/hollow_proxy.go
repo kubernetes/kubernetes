@@ -76,10 +76,11 @@ func NewHollowProxy(
 			Broadcaster: broadcaster,
 			Recorder:    recorder,
 			NodeRef: &v1.ObjectReference{
-				Kind:      "Node",
-				Name:      nodeName,
-				UID:       types.UID(nodeName),
-				Namespace: "",
+				APIVersion: "v1",
+				Kind:       "Node",
+				Name:       nodeName,
+				UID:        types.UID(nodeName),
+				Namespace:  "",
 			},
 		},
 	}
