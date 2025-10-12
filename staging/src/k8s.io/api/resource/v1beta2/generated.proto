@@ -486,6 +486,7 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceRequestAllocationResult results = 1;
 
   // This field is a combination of all the claim and class configuration parameters.

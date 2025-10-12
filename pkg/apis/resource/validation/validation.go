@@ -476,7 +476,7 @@ func validateDeviceAllocationResult(allocation resource.DeviceAllocationResult, 
 	allErrs = append(allErrs, validateSlice(allocation.Results, resource.AllocationResultsMaxSize,
 		func(result resource.DeviceRequestAllocationResult, fldPath *field.Path) field.ErrorList {
 			return validateDeviceRequestAllocationResult(result, fldPath, requestNames)
-		}, fldPath.Child("results"))...)
+		}, fldPath.Child("results"), sizeCovered)...)
 	allErrs = append(allErrs, validateSlice(allocation.Config, 2*resource.DeviceConfigMaxSize, /* class + claim */
 		func(config resource.DeviceAllocationConfiguration, fldPath *field.Path) field.ErrorList {
 			return validateDeviceAllocationConfiguration(config, fldPath, requestNames, stored)
