@@ -180,6 +180,7 @@ type IngressPortStatus struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
 	// +kubebuilder:validation:MaxLength=316
+	//nolint:kubeapilinter
 	Error *string `json:"error,omitempty" protobuf:"bytes,3,opt,name=error"`
 }
 
