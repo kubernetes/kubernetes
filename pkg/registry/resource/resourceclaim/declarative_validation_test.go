@@ -281,6 +281,29 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				),
 			},
 		},
+		// spec.devices.requests[%d].firstAvailable[%d].deviceClassName
+		"valid firstAvailable class name": {
+			input:        mkValidResourceClaim(tweakFirstAvailableDeviceClassName("class")),
+			expectedErrs: field.ErrorList{},
+		},
+		"invalid firstAvailable class name - invalid characters": {
+			input: mkValidResourceClaim(tweakFirstAvailableDeviceClassName("Class&")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), "Class&", "").WithOrigin("format=k8s-long-name"),
+			},
+		},
+		"invalid firstAvailable class name - long name": {
+			input: mkValidResourceClaim(tweakFirstAvailableDeviceClassName(strings.Repeat("a", 254))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), "Class&", "").WithOrigin("format=k8s-long-name"),
+			},
+		},
+		"invalid firstAvailable class name - empty": {
+			input: mkValidResourceClaim(tweakFirstAvailableDeviceClassName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), ""),
+			},
+		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
@@ -586,6 +609,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old: mkValidResourceClaim(tweakFirstAvailable(1), tweakFirstAvailableTolerations([]resource.DeviceToleration{
 				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists},
 			})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
+			},
+		},
+		"spec immutable: short-circuits deviceClassName error": {
+			update: mkValidResourceClaim(tweakFirstAvailableDeviceClassName("Class")),
+			old:    mkValidResourceClaim(),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
 			},
@@ -1029,6 +1059,19 @@ func tweakStatusAllocationDevicesConfig(count int) func(rc *resource.ResourceCla
 func tweakSpecAddConstraint(c resource.DeviceConstraint) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		rc.Spec.Devices.Constraints = append(rc.Spec.Devices.Constraints, c)
+	}
+}
+
+func tweakFirstAvailableDeviceClassName(name string) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		rc.Spec.Devices.Requests[0].Exactly = nil
+		rc.Spec.Devices.Requests[0].FirstAvailable = []resource.DeviceSubRequest{
+			{
+				Name:            "sub-0",
+				DeviceClassName: name,
+				AllocationMode:  resource.DeviceAllocationModeAll,
+			},
+		}
 	}
 }
 

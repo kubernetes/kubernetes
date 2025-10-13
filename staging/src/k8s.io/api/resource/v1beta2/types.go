@@ -967,6 +967,8 @@ type DeviceSubRequest struct {
 	// to reference.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-long-name
 	DeviceClassName string `json:"deviceClassName" protobuf:"bytes,2,name=deviceClassName"`
 
 	// Selectors define criteria which must be satisfied by a specific
