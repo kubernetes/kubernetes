@@ -254,7 +254,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("key"), "a/b/c", "").WithOrigin("format=k8s-label-key"),
 			},
 		},
-		// TODO: Add more test cases
 		"valid DeviceAllocationMode - All": {
 			input: mkValidResourceClaim(tweakExactlyAllocationMode(resource.DeviceAllocationModeAll, 0)),
 		},
@@ -281,6 +280,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				).WithOrigin("enum"),
 			},
 		},
+		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
