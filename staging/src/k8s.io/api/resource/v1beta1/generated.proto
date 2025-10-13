@@ -41,7 +41,7 @@ message AllocatedDeviceStatus {
   // needed on a node.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver.
+  // vendor of the driver. It should use only lower case characters.
   //
   // +required
   optional string driver = 1;
@@ -65,6 +65,8 @@ message AllocatedDeviceStatus {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
+  // +k8s:optional
+  // +k8s:format=k8s-uuid
   optional string shareID = 7;
 
   // Conditions contains the latest observation of the device's state.
@@ -568,6 +570,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceRequest requests = 1;
 
   // These constraints must be satisfied by the set of devices that get
@@ -575,6 +578,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceConstraint constraints = 2;
 
   // This field holds configuration for multiple potential drivers which
@@ -583,6 +587,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceClaimConfiguration config = 3;
 }
 
@@ -597,6 +602,7 @@ message DeviceClaimConfiguration {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated string requests = 1;
 
   optional DeviceConfiguration deviceConfiguration = 2;
@@ -647,6 +653,8 @@ message DeviceClassSpec {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:maxItems=32
   repeated DeviceSelector selectors = 1;
 
   // Config defines configuration parameters that apply to each device that is claimed via this class.
@@ -657,6 +665,8 @@ message DeviceClassSpec {
   //
   // +optional
   // +listType=atomic
+  // +k8s:optional
+  // +k8s:maxItems=32
   repeated DeviceClassConfiguration config = 2;
 
   // ExtendedResourceName is the extended resource name for the devices of this class.
@@ -682,6 +692,7 @@ message DeviceConfiguration {
   //
   // +optional
   // +oneOf=ConfigurationType
+  // +k8s:optional
   optional OpaqueDeviceConfiguration opaque = 1;
 }
 
@@ -699,6 +710,7 @@ message DeviceConstraint {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated string requests = 1;
 
   // MatchAttribute requires that all devices in question have this
@@ -797,6 +809,7 @@ message DeviceRequest {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceSelector selectors = 3;
 
   // AllocationMode and its related fields define how devices are allocated
@@ -871,6 +884,7 @@ message DeviceRequest {
   // +oneOf=deviceRequestType
   // +listType=atomic
   // +featureGate=DRAPrioritizedList
+  // +k8s:maxItems=8
   repeated DeviceSubRequest firstAvailable = 7;
 
   // If specified, the request's tolerations.
@@ -935,7 +949,7 @@ message DeviceRequestAllocationResult {
   // needed on a node.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver.
+  // vendor of the driver. It should use only lower case characters.
   //
   // +required
   optional string driver = 2;
@@ -947,6 +961,8 @@ message DeviceRequestAllocationResult {
   // DNS sub-domains separated by slashes.
   //
   // +required
+  // +k8s:required
+  // +k8s:format=k8s-resource-pool-name
   optional string pool = 3;
 
   // Device references one device instance via its name in the driver's
@@ -978,6 +994,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
+  // +k8s:maxItems=16
   repeated DeviceToleration tolerations = 6;
 
   // BindingConditions contains a copy of the BindingConditions
@@ -1009,6 +1026,8 @@ message DeviceRequestAllocationResult {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
+  // +k8s:optional
+  // +k8s:format=k8s-uuid
   optional string shareID = 9;
 
   // ConsumedCapacity tracks the amount of capacity consumed per device as part of the claim request.
@@ -1075,6 +1094,7 @@ message DeviceSubRequest {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceSelector selectors = 3;
 
   // AllocationMode and its related fields define how devices are allocated
@@ -1187,6 +1207,8 @@ message DeviceToleration {
   // Must be a label name.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:format=k8s-label-key
   optional string key = 1;
 
   // Operator represents a key's relationship to the value.
@@ -1265,9 +1287,11 @@ message OpaqueDeviceConfiguration {
   // to decide whether it needs to validate them.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver.
+  // vendor of the driver. It should use only lower case characters.
   //
   // +required
+  // +k8s:required
+  // +k8s:format=k8s-long-name-caseless
   optional string driver = 1;
 
   // Parameters can contain arbitrary data. It is the responsibility of
@@ -1296,6 +1320,7 @@ message ResourceClaim {
 
   // Spec describes what is being requested and how to configure it.
   // The spec is immutable.
+  // +k8s:immutable
   optional ResourceClaimSpec spec = 2;
 
   // Status describes whether the claim is ready to use and what has been allocated.
@@ -1350,6 +1375,7 @@ message ResourceClaimStatus {
   // Allocation is set once the claim has been allocated successfully.
   //
   // +optional
+  // +k8s:optional
   optional AllocationResult allocation = 1;
 
   // ReservedFor indicates which entities are currently allowed to use
@@ -1377,6 +1403,9 @@ message ResourceClaimStatus {
   // +listMapKey=uid
   // +patchStrategy=merge
   // +patchMergeKey=uid
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=uid
   repeated ResourceClaimConsumerReference reservedFor = 2;
 
   // Devices contains the status of each device allocated for this
@@ -1384,6 +1413,7 @@ message ResourceClaimStatus {
   // information. Entries are owned by their respective drivers.
   //
   // +optional
+  // +k8s:optional
   // +listType=map
   // +listMapKey=driver
   // +listMapKey=device
@@ -1523,7 +1553,8 @@ message ResourceSliceSpec {
   // objects with a certain driver name.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver. This field is immutable.
+  // vendor of the driver. It should use only lower case characters.
+  // This field is immutable.
   //
   // +required
   optional string driver = 1;

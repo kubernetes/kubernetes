@@ -141,7 +141,7 @@ func (nc *Controller) Run(ctx context.Context) {
 	klog.FromContext(ctx).Info("Starting ipam controller")
 	defer klog.FromContext(ctx).Info("Shutting down ipam controller")
 
-	if !cache.WaitForNamedCacheSync("node", ctx.Done(), nc.nodeInformerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, nc.nodeInformerSynced) {
 		return
 	}
 

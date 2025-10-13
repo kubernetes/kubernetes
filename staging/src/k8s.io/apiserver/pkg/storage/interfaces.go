@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -389,4 +390,33 @@ type Stats struct {
 	// EstimatedAverageObjectSizeBytes informs about size of objects stored in the storage, based on size of serialized values.
 	// Value is an estimate, meaning it doesn't need to provide accurate nor consistent.
 	EstimatedAverageObjectSizeBytes int64
+}
+
+func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
+	if key == ".." ||
+		strings.HasPrefix(key, "../") ||
+		strings.HasSuffix(key, "/..") ||
+		strings.Contains(key, "/../") {
+		return "", fmt.Errorf("invalid key: %q", key)
+	}
+	if key == "." ||
+		strings.HasPrefix(key, "./") ||
+		strings.HasSuffix(key, "/.") ||
+		strings.Contains(key, "/./") {
+		return "", fmt.Errorf("invalid key: %q", key)
+	}
+	if key == "" || key == "/" {
+		return "", fmt.Errorf("empty key: %q", key)
+	}
+	// For recursive requests, we need to make sure the key ended with "/" so that we only
+	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
+	// with prefix "/a" will return all three, while with prefix "/a/" will return only
+	// "/a/b" which is the correct answer.
+	if recursive && !strings.HasSuffix(key, "/") {
+		key += "/"
+	}
+	if !strings.HasPrefix(key, resourcePrefix) {
+		return "", fmt.Errorf("invalid key: %q lacks resource prefix: %q", key, resourcePrefix)
+	}
+	return key, nil
 }

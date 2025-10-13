@@ -813,7 +813,7 @@ func (dc *DisruptionController) getExpectedPodCount(ctx context.Context, pdb *po
 	// handled the same way for integer and percentage minAvailable
 
 	if pdb.Spec.MaxUnavailable != nil {
-		expectedCount, unmanagedPods, err = dc.getExpectedScale(ctx, pdb, pods)
+		expectedCount, unmanagedPods, err = dc.getExpectedScale(ctx, pods)
 		if err != nil {
 			return
 		}
@@ -831,7 +831,7 @@ func (dc *DisruptionController) getExpectedPodCount(ctx context.Context, pdb *po
 			desiredHealthy = pdb.Spec.MinAvailable.IntVal
 			expectedCount = int32(len(pods))
 		} else if pdb.Spec.MinAvailable.Type == intstr.String {
-			expectedCount, unmanagedPods, err = dc.getExpectedScale(ctx, pdb, pods)
+			expectedCount, unmanagedPods, err = dc.getExpectedScale(ctx, pods)
 			if err != nil {
 				return
 			}
@@ -847,7 +847,7 @@ func (dc *DisruptionController) getExpectedPodCount(ctx context.Context, pdb *po
 	return
 }
 
-func (dc *DisruptionController) getExpectedScale(ctx context.Context, pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount int32, unmanagedPods []string, err error) {
+func (dc *DisruptionController) getExpectedScale(ctx context.Context, pods []*v1.Pod) (expectedCount int32, unmanagedPods []string, err error) {
 	// When the user specifies a fraction of pods that must be available, we
 	// use as the fraction's denominator
 	// SUM_{all c in C} scale(c)

@@ -18,6 +18,8 @@ package validate
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
@@ -97,6 +99,9 @@ func LabelKey[T ~string](_ context.Context, op operation.Operation, fldPath *fie
 //   - must be less than 254 characters long
 //   - each element must start and end with alphanumeric characters
 //   - each element must contain only alphanumeric characters or dashes
+//
+// Deprecated: Case-insensitive names are not recommended as they can lead to ambiguity
+// (e.g., 'Foo', 'FOO', and 'foo' would be allowed names for foo). Use LongName for strict, lowercase validation.
 func LongNameCaseless[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
 		return nil
@@ -151,4 +156,27 @@ func UUID[T ~string](_ context.Context, op operation.Operation, fldPath *field.P
 		}
 	}
 	return nil
+}
+
+// ResourcePoolName verifies that the specified value is one or more valid "long name"
+// parts separated by a '/' and no longer than 253 characters.
+func ResourcePoolName[T ~string](ctx context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	val := (string)(*value)
+	var allErrs field.ErrorList
+	if len(val) > 253 {
+		allErrs = append(allErrs, field.TooLong(fldPath, val, 253))
+	}
+	parts := strings.Split(val, "/")
+	for i, part := range parts {
+		if len(part) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, val, fmt.Sprintf("segment %d: must not be empty", i)))
+			continue
+		}
+		// Note that we are overwriting the origin from the underlying LongName validation.
+		allErrs = append(allErrs, LongName(ctx, op, fldPath, &part, nil).PrefixDetail(fmt.Sprintf("segment %d: ", i))...)
+	}
+	return allErrs.WithOrigin("format=k8s-resource-pool-name")
 }

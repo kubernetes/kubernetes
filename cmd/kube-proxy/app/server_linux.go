@@ -90,17 +90,21 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 
 	if isIPTablesBased(s.Config.Mode) {
 		// Check for the iptables and ip6tables binaries.
-		ipts, errDS := utiliptables.NewDualStack()
+		errv4 := utiliptables.New(utiliptables.ProtocolIPv4).Present()
+		errv6 := utiliptables.New(utiliptables.ProtocolIPv6).Present()
 
-		ipv4Supported = ipts[v1.IPv4Protocol] != nil
-		ipv6Supported = ipts[v1.IPv6Protocol] != nil
+		ipv4Supported = errv4 == nil
+		ipv6Supported = errv6 == nil
 
 		if !ipv4Supported && !ipv6Supported {
-			err = fmt.Errorf("iptables is not available on this host : %w", errDS)
+			// errv4 and errv6 are almost certainly the same underlying error
+			// ("iptables isn't installed" or "kernel modules not available")
+			// so it doesn't make sense to try to combine them.
+			err = fmt.Errorf("iptables is not available on this host : %w", errv4)
 		} else if !ipv4Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol, "error", errDS)
+			logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol, "error", errv4)
 		} else if !ipv6Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol, "error", errDS)
+			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol, "error", errv6)
 		}
 	} else {
 		// The nft CLI always supports both families.
@@ -130,7 +134,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 
 	if config.Mode == proxyconfigapi.ProxyModeIPTables {
 		logger.Info("Using iptables Proxier")
-		ipts, _ := utiliptables.NewDualStack()
+		ipts := utiliptables.NewBestEffort()
 
 		if dualStack {
 			// TODO this has side effects that should only happen when Run() is invoked.
@@ -184,7 +188,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		if err := ipvs.CanUseIPVSProxier(ctx, ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
 		}
-		ipts, _ := utiliptables.NewDualStack()
+		ipts := utiliptables.NewBestEffort()
 
 		logger.Info("Using ipvs Proxier")
 		if dualStack {
@@ -300,13 +304,9 @@ func (s *ProxyServer) setupConntrack(ctx context.Context, ct Conntracker) error 
 			if err != errReadOnlySysFS {
 				return err
 			}
-			// errReadOnlySysFS is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
-			// the only remediation we know is to restart the docker daemon.
-			// Here we'll send an node event with specific reason and message, the
-			// administrator should decide whether and how to handle this issue,
-			// whether to drain the node and restart docker.  Occurs in other container runtimes
-			// as well.
-			// TODO(random-liu): Remove this when the docker bug is fixed.
+			// errReadOnlySysFS means we ran into a known container runtim bug
+			// (https://issues.k8s.io/134108). For historical reasons we ignore
+			// this problem and just alert the admin that it occurred.
 			const message = "CRI error: /sys is read-only: " +
 				"cannot modify conntrack limits, problems may arise later (If running Docker, see docker issue #24000)"
 			s.Recorder.Eventf(s.NodeRef, nil, v1.EventTypeWarning, err.Error(), "StartKubeProxy", message)

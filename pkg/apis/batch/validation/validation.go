@@ -23,9 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/robfig/cron/v3"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryapivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/ptr"
 )
 
@@ -150,7 +150,7 @@ func validateGeneratedSelector(obj *batch.Job, validateBatchLabels bool) field.E
 // ValidateJob validates a Job and returns an ErrorList with any errors.
 func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 	// Jobs and rcs have the same name validation
-	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apimachineryapivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateGeneratedSelector(job, opts.RequirePrefixedLabels)...)
 	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"), opts.PodValidationOptions)...)
 	if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion && job.Spec.Completions != nil && *job.Spec.Completions > 0 {
@@ -714,7 +714,7 @@ func ValidateJobStatusUpdate(job, oldJob *batch.Job, opts JobStatusValidationOpt
 // ValidateCronJobCreate validates a CronJob on creation and returns an ErrorList with any errors.
 func ValidateCronJobCreate(cronJob *batch.CronJob, opts apivalidation.PodValidationOptions) field.ErrorList {
 	// CronJobs and rcs have the same name validation
-	allErrs := apivalidation.ValidateObjectMeta(&cronJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&cronJob.ObjectMeta, true, apimachineryapivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateCronJobSpec(&cronJob.Spec, nil, field.NewPath("spec"), opts)...)
 	if len(cronJob.ObjectMeta.Name) > apimachineryvalidation.DNS1035LabelMaxLength-11 {
 		// The cronjob controller appends a 11-character suffix to the cronjob (`-$TIMESTAMP`) when
@@ -790,7 +790,8 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 
 func validateScheduleFormat(schedule string, allowTZInSchedule bool, timeZone *string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if _, err := cron.ParseStandard(schedule); err != nil {
+
+	if _, err := parsers.ParseCronScheduleWithPanicRecovery(schedule); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
 	}
 	switch {

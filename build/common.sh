@@ -97,17 +97,39 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.7.8
-readonly __default_go_runner_version=v2.4.0-go1.24.6-bookworm.0
+readonly __default_distroless_iptables_version=v0.8.2
+readonly __default_go_runner_version=v2.4.0-go1.25.1-bookworm.0
 readonly __default_setcap_version=bookworm-v1.0.4
 
-# These are the base images for the Docker-wrapped binaries.
+# The default image for all binaries which are dynamically linked.
+# Includes everything that is required by kube-proxy, which uses it
+# by default. Other commands only use this when dynamically linking
+# them gets requested.
+readonly __default_dynamic_base_image="$KUBE_BASE_IMAGE_REGISTRY/distroless-iptables:$__default_distroless_iptables_version"
+
+# KUBE_GORUNNER_IMAGE is the default image for commands which are built statically.
+# It can be overridden to change the image for all such commands.
+# When the per-command env variable is set, that env variable is
+# used without considering KUBE_GORUNNER_IMAGE.
 readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
-readonly KUBE_APISERVER_BASE_IMAGE="${KUBE_APISERVER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
-readonly KUBE_CONTROLLER_MANAGER_BASE_IMAGE="${KUBE_CONTROLLER_MANAGER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
-readonly KUBE_SCHEDULER_BASE_IMAGE="${KUBE_SCHEDULER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
-readonly KUBE_PROXY_BASE_IMAGE="${KUBE_PROXY_BASE_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/distroless-iptables:$__default_distroless_iptables_version}"
-readonly KUBECTL_BASE_IMAGE="${KUBECTL_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
+
+# __default_base_image takes the canonical build target for a Kubernetes command (e.g. k8s.io/kubernetes/cmd/kube-scheduler)
+# and prints the right default base image for it, depending on whether that command gets built dynamically or statically.
+__default_base_image() {
+  if kube::golang::is_statically_linked "$1"; then
+    echo "$KUBE_GORUNNER_IMAGE"
+  else
+    echo "$__default_dynamic_base_image"
+  fi
+}
+
+# These are the base images for the Docker-wrapped binaries.
+# These can be overridden on a case-by-case basis.
+readonly KUBE_APISERVER_BASE_IMAGE="${KUBE_APISERVER_BASE_IMAGE:-$(__default_base_image k8s.io/kubernetes/cmd/kube-apiserver)}"
+readonly KUBE_CONTROLLER_MANAGER_BASE_IMAGE="${KUBE_CONTROLLER_MANAGER_BASE_IMAGE:-$(__default_base_image k8s.io/kubernetes/cmd/kube-controller-manager)}"
+readonly KUBE_SCHEDULER_BASE_IMAGE="${KUBE_SCHEDULER_BASE_IMAGE:-$(__default_base_image k8s.io/kubernetes/cmd/kube-scheduler)}"
+readonly KUBE_PROXY_BASE_IMAGE="${KUBE_PROXY_BASE_IMAGE:-$__default_dynamic_base_image}"
+readonly KUBECTL_BASE_IMAGE="${KUBECTL_BASE_IMAGE:-$(__default_base_image k8s.io/kubernetes/cmd/kubectl)}"
 
 # This is the image used in a multi-stage build to apply capabilities to Docker-wrapped binaries.
 readonly KUBE_BUILD_SETCAP_IMAGE="${KUBE_BUILD_SETCAP_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/setcap:$__default_setcap_version}"
@@ -135,6 +157,38 @@ kube::build::get_docker_wrapped_binaries() {
 
 # ---------------------------------------------------------------------------
 # Basic setup functions
+
+# Set up dynamic constants for build environment.
+# This function sets up variables that are needed by both verification and cleaning.
+#
+# Vars set:
+#   KUBE_ROOT_HASH
+#   KUBE_BUILD_IMAGE_TAG_BASE
+#   KUBE_BUILD_IMAGE_TAG
+#   KUBE_BUILD_IMAGE
+#   KUBE_BUILD_CONTAINER_NAME_BASE
+#   KUBE_BUILD_CONTAINER_NAME
+#   KUBE_DATA_CONTAINER_NAME_BASE
+#   KUBE_DATA_CONTAINER_NAME
+#   KUBE_RSYNC_CONTAINER_NAME_BASE
+#   KUBE_RSYNC_CONTAINER_NAME
+#   DOCKER_MOUNT_ARGS
+#   LOCAL_OUTPUT_BUILD_CONTEXT
+function kube::build::setup_vars() {
+  KUBE_GIT_BRANCH=$(git symbolic-ref --short -q HEAD 2>/dev/null || true)
+  KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${KUBE_ROOT}:${KUBE_GIT_BRANCH}")
+  KUBE_BUILD_IMAGE_TAG_BASE="build-${KUBE_ROOT_HASH}"
+  KUBE_BUILD_IMAGE_TAG="${KUBE_BUILD_IMAGE_TAG_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
+  KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
+  KUBE_BUILD_CONTAINER_NAME_BASE="kube-build-${KUBE_ROOT_HASH}"
+  KUBE_BUILD_CONTAINER_NAME="${KUBE_BUILD_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
+  KUBE_RSYNC_CONTAINER_NAME_BASE="kube-rsync-${KUBE_ROOT_HASH}"
+  KUBE_RSYNC_CONTAINER_NAME="${KUBE_RSYNC_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
+  KUBE_DATA_CONTAINER_NAME_BASE="kube-build-data-${KUBE_ROOT_HASH}"
+  KUBE_DATA_CONTAINER_NAME="${KUBE_DATA_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
+  DOCKER_MOUNT_ARGS=(--volumes-from "${KUBE_DATA_CONTAINER_NAME}")
+  LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
+}
 
 # Verify that the right utilities and such are installed for building Kube. Set
 # up some dynamic constants.
@@ -173,19 +227,7 @@ function kube::build::verify_prereqs() {
     fi
   fi
 
-  KUBE_GIT_BRANCH=$(git symbolic-ref --short -q HEAD 2>/dev/null || true)
-  KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${KUBE_ROOT}:${KUBE_GIT_BRANCH}")
-  KUBE_BUILD_IMAGE_TAG_BASE="build-${KUBE_ROOT_HASH}"
-  KUBE_BUILD_IMAGE_TAG="${KUBE_BUILD_IMAGE_TAG_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
-  KUBE_BUILD_CONTAINER_NAME_BASE="kube-build-${KUBE_ROOT_HASH}"
-  KUBE_BUILD_CONTAINER_NAME="${KUBE_BUILD_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  KUBE_RSYNC_CONTAINER_NAME_BASE="kube-rsync-${KUBE_ROOT_HASH}"
-  KUBE_RSYNC_CONTAINER_NAME="${KUBE_RSYNC_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  KUBE_DATA_CONTAINER_NAME_BASE="kube-build-data-${KUBE_ROOT_HASH}"
-  KUBE_DATA_CONTAINER_NAME="${KUBE_DATA_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  DOCKER_MOUNT_ARGS=(--volumes-from "${KUBE_DATA_CONTAINER_NAME}")
-  LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
+  kube::build::setup_vars
 
   kube::version::get_version_vars
   kube::version::save_version_vars "${KUBE_ROOT}/.dockerized-kube-version-defs"
@@ -369,8 +411,14 @@ function kube::build::clean() {
 
   if [[ -d "${LOCAL_OUTPUT_ROOT}" ]]; then
     kube::log::status "Removing _output directory"
-    # this ensures we can clean _output/local/go/cache which is not rw by default
-    chmod -R +w "${LOCAL_OUTPUT_ROOT}"
+    # This ensures we can clean _output/local/go/cache which is not rw by default.
+    #
+    # We only do this path specifically instead of the entire output root
+    # because recursive chmod is slow.
+    # We don't need to do this at all for dockerized builds
+    if [[ -d "${LOCAL_OUTPUT_ROOT}/local/go/cache" ]]; then
+      chmod -R +w "${LOCAL_OUTPUT_ROOT}/local/go/cache"
+    fi
     rm -rf "${LOCAL_OUTPUT_ROOT}"
   fi
 }

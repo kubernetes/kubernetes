@@ -113,12 +113,17 @@ func Validate_CertificateSigningRequestStatus(ctx context.Context, op operation.
 	// field certificatesv1.CertificateSigningRequestStatus.Conditions
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []certificatesv1.CertificateSigningRequestCondition) (errs field.ErrorList) {
+			// Uniqueness validation is implemented via custom, handwritten validation
 			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil
 			}
 			// call field-attached validations
+			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
 			errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1_CertificateSigningRequestStatus_conditions_, func(list []certificatesv1.CertificateSigningRequestCondition) bool {

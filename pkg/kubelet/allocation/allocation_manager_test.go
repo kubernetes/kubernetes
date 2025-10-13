@@ -812,8 +812,10 @@ func TestHandlePodResourcesResizeForGuanteedQOSPods(t *testing.T) {
 		for _, originalPod := range tt.podsToTest {
 			isSidecarContainer := len(originalPod.Spec.InitContainers) > 0
 			t.Run(fmt.Sprintf("%s/sidecar=%t", tt.name, isSidecarContainer), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, tt.ipprExclusiveCPUsFeatureGate)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveMemory, tt.ipprExclusiveMemoryFeatureGate)
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.InPlacePodVerticalScalingExclusiveCPUs:   tt.ipprExclusiveCPUsFeatureGate,
+					features.InPlacePodVerticalScalingExclusiveMemory: tt.ipprExclusiveMemoryFeatureGate,
+				})
 				var originalCtr *v1.Container
 
 				if isSidecarContainer {
@@ -914,8 +916,10 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 	metrics.Register()
 	metrics.PodInfeasibleResizes.Reset()
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.InPlacePodVerticalScaling: true,
+		features.NodeSwap:                  true,
+	})
 	noSwapContainerName, swapContainerName := "test-container-noswap", "test-container-limitedswap"
 
 	cpu500m := resource.MustParse("500m")

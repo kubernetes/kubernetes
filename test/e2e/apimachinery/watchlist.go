@@ -227,7 +227,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		framework.ExpectNoError(err)
 		dynamicClient := dynamic.New(restClient)
 
-		opts, hasPreparedOptions, err := watchlist.PrepareWatchListOptionsFromListOptions(metav1.ListOptions{})
+		opts, hasPreparedOptions, err := watchlist.PrepareWatchListOptionsFromListOptions(metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 		gomega.Expect(hasPreparedOptions).To(gomega.BeTrueBecause("it should be possible to prepare watchlist opts from an empty ListOptions"))
 

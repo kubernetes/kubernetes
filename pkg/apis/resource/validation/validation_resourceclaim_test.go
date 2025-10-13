@@ -259,17 +259,17 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"invalid-request": {
 			wantFailures: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "devices", "requests"), resource.DeviceRequestsMaxSize+1, resource.DeviceRequestsMaxSize),
+				field.TooMany(field.NewPath("spec", "devices", "requests"), resource.DeviceRequestsMaxSize+1, resource.DeviceRequestsMaxSize).MarkCoveredByDeclarative(),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), resource.FullyQualifiedName("missing-domain"), "must include a domain"),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(1).Child("matchAttribute"), "name required"),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(2).Child("matchAttribute"), ""),
-				field.TooMany(field.NewPath("spec", "devices", "constraints"), resource.DeviceConstraintsMaxSize+1, resource.DeviceConstraintsMaxSize),
+				field.TooMany(field.NewPath("spec", "devices", "constraints"), resource.DeviceConstraintsMaxSize+1, resource.DeviceConstraintsMaxSize).MarkCoveredByDeclarative(),
 				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
 				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
-				field.TooMany(field.NewPath("spec", "devices", "config"), resource.DeviceConfigMaxSize+1, resource.DeviceConfigMaxSize),
+				field.TooMany(field.NewPath("spec", "devices", "config"), resource.DeviceConfigMaxSize+1, resource.DeviceConfigMaxSize).MarkCoveredByDeclarative(),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
@@ -414,7 +414,7 @@ func TestValidateClaim(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(2).Child("exactly", "count"), int64(-1), "must be greater than zero"),
 				field.NotSupported(field.NewPath("spec", "devices", "requests").Index(3).Child("exactly", "allocationMode"), resource.DeviceAllocationMode("other"), []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}),
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(4).Child("exactly", "count"), int64(2), "must not be specified when allocationMode is 'All'"),
-				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(5).Child("name"), "foo"),
+				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(5), "foo"),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
@@ -622,6 +622,16 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
+		"first-available-with-zero-exactly-fails-old-validation": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0), nil, "exactly one of `exactly` or `firstAvailable` is required, but multiple fields are set"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				claim.Spec.Devices.Requests[0].Exactly = &resource.ExactDeviceRequest{}
+				return claim
+			}(),
+		},
 		"prioritized-list-invalid-nested-request": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
@@ -638,7 +648,7 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"prioritized-list-nested-requests-same-name": {
 			wantFailures: field.ErrorList{
-				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(1).Child("name"), "foo"),
+				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(1), "foo"),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
@@ -648,7 +658,7 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"prioritized-list-too-many-subrequests": {
 			wantFailures: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable"), 9, 8),
+				field.TooMany(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable"), 9, 8).MarkCoveredByDeclarative(),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
@@ -778,7 +788,7 @@ func TestValidateClaim(t *testing.T) {
 
 					field.NotSupported(fldPath.Index(4).Child("operator"), resource.DeviceTolerationOperator("some-other-op"), []resource.DeviceTolerationOperator{resource.DeviceTolerationOpEqual, resource.DeviceTolerationOpExists}),
 
-					field.Invalid(fldPath.Index(5).Child("key"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
+					field.Invalid(fldPath.Index(5).Child("key"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')").MarkCoveredByDeclarative(),
 					field.Invalid(fldPath.Index(5).Child("value"), badName, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')"),
 					field.NotSupported(fldPath.Index(5).Child("effect"), resource.DeviceTaintEffect("some-other-effect"), []resource.DeviceTaintEffect{resource.DeviceTaintEffectNoExecute, resource.DeviceTaintEffectNoSchedule}),
 				)
@@ -855,7 +865,7 @@ func TestValidateClaimUpdate(t *testing.T) {
 				spec := validClaim.Spec.DeepCopy()
 				spec.Devices.Requests[0].Exactly.DeviceClassName += "2"
 				return *spec
-			}(), "field is immutable")},
+			}(), "field is immutable")}.MarkCoveredByDeclarative(),
 			oldClaim: validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Spec.Devices.Requests[0].Exactly.DeviceClassName += "2"
@@ -1064,7 +1074,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-reserved-for-duplicate": {
-			wantFailures: field.ErrorList{field.Duplicate(field.NewPath("status", "reservedFor").Index(1).Child("uid"), types.UID("1"))},
+			wantFailures: field.ErrorList{field.Duplicate(field.NewPath("status", "reservedFor").Index(1), types.UID("1")).MarkCoveredByDeclarative()},
 			oldClaim:     validAllocatedClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				for i := 0; i < 2; i++ {
@@ -1191,8 +1201,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				field.Required(field.NewPath("status", "allocation", "devices", "config").Index(1).Child("source"), ""),
 				field.NotSupported(field.NewPath("status", "allocation", "devices", "config").Index(2).Child("source"), resource.AllocationConfigSource("no-such-source"), []resource.AllocationConfigSource{resource.AllocationConfigSourceClaim, resource.AllocationConfigSourceClass}),
 				field.Required(field.NewPath("status", "allocation", "devices", "config").Index(3).Child("opaque"), ""),
-				field.Required(field.NewPath("status", "allocation", "devices", "config").Index(4).Child("opaque", "driver"), ""),
-				field.Invalid(field.NewPath("status", "allocation", "devices", "config").Index(4).Child("opaque", "driver"), "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.Required(field.NewPath("status", "allocation", "devices", "config").Index(4).Child("opaque", "driver"), "").MarkCoveredByDeclarative(),
 				field.Required(field.NewPath("status", "allocation", "devices", "config").Index(4).Child("opaque", "parameters"), ""),
 				field.TooLong(field.NewPath("status", "allocation", "devices", "config").Index(6).Child("opaque", "parameters"), "" /* unused */, resource.OpaqueParametersMaxLength),
 			},
@@ -1331,7 +1340,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		"invalid-device-status-duplicate": {
 			wantFailures: field.ErrorList{
 				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "2001:db8::1/64"),
-				field.Duplicate(field.NewPath("status", "devices").Index(1).Child("deviceID"), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)),
+				field.Duplicate(field.NewPath("status", "devices").Index(1), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1359,7 +1368,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-device-status-duplicate-with-share-id": {
 			wantFailures: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "devices").Index(1).Child("deviceID"),
+				field.Duplicate(field.NewPath("status", "devices").Index(1),
 					structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), ptr.To(goodShareID))),
 			},
 			oldClaim: func() *resource.ResourceClaim {
@@ -1494,7 +1503,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		"invalid-device-status-duplicate-disabled-feature-gate": {
 			wantFailures: field.ErrorList{
 				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "2001:db8::1/64"),
-				field.Duplicate(field.NewPath("status", "devices").Index(1).Child("deviceID"), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)),
+				field.Duplicate(field.NewPath("status", "devices").Index(1), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil)),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1522,7 +1531,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-device-status-duplicate-with-share-id-disabled-feature-gate": {
 			wantFailures: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "devices").Index(1).Child("deviceID"),
+				field.Duplicate(field.NewPath("status", "devices").Index(1),
 					structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), ptr.To(goodShareID))),
 			},
 			oldClaim: func() *resource.ResourceClaim {
@@ -2158,10 +2167,10 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-add-allocated-status-invalid-share-id": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("status", "devices").Index(0).Child("shareID"), badLengthShareIDStr, "error validating uid: invalid UUID length: 1"),
-				field.Invalid(field.NewPath("status", "devices").Index(1).Child("shareID"), badFormatShareIDStr, "uid must be in RFC 4122 normalized form, `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` with lowercase hexadecimal characters"),
-				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), badLengthShareIDStr, "error validating uid: invalid UUID length: 1"),
-				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(1).Child("shareID"), badFormatShareIDStr, "uid must be in RFC 4122 normalized form, `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` with lowercase hexadecimal characters"),
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("shareID"), badLengthShareIDStr, "error validating uid: invalid UUID length: 1").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("status", "devices").Index(1).Child("shareID"), badFormatShareIDStr, "uid must be in RFC 4122 normalized form, `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` with lowercase hexadecimal characters").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), badLengthShareIDStr, "error validating uid: invalid UUID length: 1").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(1).Child("shareID"), badFormatShareIDStr, "uid must be in RFC 4122 normalized form, `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` with lowercase hexadecimal characters").MarkCoveredByDeclarative(),
 			},
 			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -2240,10 +2249,12 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, scenario.adminAccess)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, scenario.deviceStatusFeatureGate)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, scenario.prioritizedListFeatureGate)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAAdminAccess:               scenario.adminAccess,
+				features.DRAResourceClaimDeviceStatus: scenario.deviceStatusFeatureGate,
+				features.DRAPrioritizedList:           scenario.prioritizedListFeatureGate,
+				features.DRAConsumableCapacity:        scenario.consumableCapacityFeatureGate,
+			})
 
 			scenario.oldClaim.ResourceVersion = "1"
 			errs := ValidateResourceClaimStatusUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim)

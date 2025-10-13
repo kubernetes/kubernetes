@@ -19,6 +19,7 @@ package parsers
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // Based on Docker test case removed in:
@@ -56,5 +57,134 @@ func TestParseImageName(t *testing.T) {
 			t.Errorf("Expected repo: %q, tag: %q and digest: %q, got %q, %q and %q", testCase.Repo, testCase.Tag, testCase.Digest,
 				repo, tag, digest)
 		}
+	}
+}
+
+func TestParseCronSchedule(t *testing.T) {
+	testCases := []struct {
+		name          string
+		schedule      string
+		expectError   bool
+		expectedError string
+		expectPanic   bool
+	}{
+		{
+			name:        "valid schedule without timezone",
+			schedule:    "0 0 * * *",
+			expectError: false,
+		},
+		{
+			name:        "valid schedule with timezone",
+			schedule:    "TZ=UTC 0 0 * * *",
+			expectError: false,
+		},
+		{
+			name:        "valid schedule with CRON_TZ",
+			schedule:    "CRON_TZ=America/New_York 0 0 * * *",
+			expectError: false,
+		},
+		{
+			name:          "TZ=0 without space should panic and be recovered",
+			schedule:      "TZ=0",
+			expectError:   true,
+			expectedError: "invalid schedule format",
+			expectPanic:   true,
+		},
+		{
+			name:          "TZ= without value should panic and be recovered",
+			schedule:      "TZ=",
+			expectError:   true,
+			expectedError: "invalid schedule format",
+			expectPanic:   true,
+		},
+		{
+			name:          "CRON_TZ= without space should panic and be recovered",
+			schedule:      "CRON_TZ=UTC",
+			expectError:   true,
+			expectedError: "invalid schedule format",
+			expectPanic:   true,
+		},
+		{
+			name:          "malformed timezone spec should panic and be recovered",
+			schedule:      "TZ=Invalid/Timezone",
+			expectError:   true,
+			expectedError: "invalid schedule format",
+			expectPanic:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// This should not panic even with malformed schedules
+			sched, err := ParseCronScheduleWithPanicRecovery(tc.schedule)
+
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("Expected error for schedule %q, but got none", tc.schedule)
+					return
+				}
+
+				if tc.expectedError != "" {
+					errMsg := err.Error()
+					if !strings.Contains(errMsg, tc.expectedError) {
+						t.Errorf("Expected error message to contain %q, but got: %s", tc.expectedError, errMsg)
+					}
+				}
+
+				if sched != nil {
+					t.Errorf("Expected nil schedule when error occurs, but got: %v", sched)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error for schedule %q, but got: %v", tc.schedule, err)
+					return
+				}
+
+				if sched == nil {
+					t.Errorf("Expected valid schedule for %q, but got nil", tc.schedule)
+					return
+				}
+
+				// Verify that the schedule is actually valid by calling Next
+				// This ensures we got a real cron.Schedule, not just a non-nil value
+				next := sched.Next(time.Now())
+				if next.IsZero() {
+					t.Errorf("Expected valid next execution time for schedule %q, but got zero time", tc.schedule)
+				}
+			}
+		})
+	}
+}
+
+func TestParseCronSchedulePanicRecovery(t *testing.T) {
+	// Test that panics are properly recovered and converted to errors
+	panicSchedules := []string{
+		"TZ=0",
+		"TZ=",
+		"CRON_TZ=UTC",
+		"TZ=Invalid/Timezone",
+	}
+
+	for _, schedule := range panicSchedules {
+		t.Run("panic_recovery_"+schedule, func(t *testing.T) {
+			// This should not panic
+			sched, err := ParseCronScheduleWithPanicRecovery(schedule)
+
+			// Should get an error
+			if err == nil {
+				t.Errorf("Expected error for panic-causing schedule %q, but got none", schedule)
+			}
+
+			// Should get nil schedule
+			if sched != nil {
+				t.Errorf("Expected nil schedule for panic-causing schedule %q, but got: %v", schedule, sched)
+			}
+
+			// Error message should contain "invalid schedule format"
+			errMsg := err.Error()
+			if !strings.Contains(errMsg, "invalid schedule format") {
+				t.Errorf("Expected error message to contain 'invalid schedule format', but got: %s", errMsg)
+			}
+		})
 	}
 }

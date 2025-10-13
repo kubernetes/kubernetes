@@ -399,7 +399,9 @@ const (
 	DefaultFlags FunctionFlags = 0
 
 	// ShortCircuit indicates that further validations should be skipped if
-	// this validator fails. Most validators are not fatal.
+	// this validator fails. If there are multiple validators with this flag
+	// set, they will ALL run, and if any of them fail, any non-short-circuit
+	// validators will be skipped.  Most validators are not fatal.
 	ShortCircuit FunctionFlags = 1 << iota
 
 	// NonError indicates that a failure of this validator should not be
@@ -444,6 +446,10 @@ func Function(tagName string, flags FunctionFlags, function types.Name, extraArg
 type FunctionGen struct {
 	// TagName is the tag which triggered this function.
 	TagName string
+
+	// Cohort indicates a set of related functions which are processed
+	// together.
+	Cohort string
 
 	// Flags holds the options for this validator function.
 	Flags FunctionFlags

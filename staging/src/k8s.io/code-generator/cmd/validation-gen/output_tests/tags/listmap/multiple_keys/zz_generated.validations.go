@@ -49,6 +49,17 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_ListType validates an instance of ListType according
+// to declarative validation rules in the API schema.
+func Validate_ListType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ListType) (errs field.ErrorList) {
+	// lists with map semantics require unique keys
+	errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
+		return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
+	})...)
+
+	return errs
+}
+
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
@@ -62,9 +73,20 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
 				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-			}, validate.DirectEqual, validate.ImmutableByCompare)...)
+			}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
+				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
+			})...)
 			return
 		}(fldPath.Child("listField"), obj.ListField, safe.Field(oldObj, func(oldObj *Struct) []OtherStruct { return oldObj.ListField }))...)
 
@@ -76,9 +98,20 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherTypedefStruct, b OtherTypedefStruct) bool {
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherTypedefStruct, b OtherTypedefStruct) bool {
 				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-			}, validate.DirectEqual, validate.ImmutableByCompare)...)
+			}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a OtherTypedefStruct, b OtherTypedefStruct) bool {
+				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
+			})...)
 			return
 		}(fldPath.Child("listTypedefField"), obj.ListTypedefField, safe.Field(oldObj, func(oldObj *Struct) []OtherTypedefStruct { return oldObj.ListTypedefField }))...)
 
@@ -90,9 +123,18 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return nil
 			}
 			// call field-attached validations
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
 				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-			}, validate.DirectEqual, validate.ImmutableByCompare)...)
+			}, validate.DirectEqual, validate.Immutable); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ListType(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("typedefField"), obj.TypedefField, safe.Field(oldObj, func(oldObj *Struct) ListType { return oldObj.TypedefField }))...)
 
@@ -109,6 +151,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			}, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListComparableField[*]")
 			})...)
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a OtherStruct, b OtherStruct) bool {
+				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
+			})...)
 			return
 		}(fldPath.Child("listComparableField"), obj.ListComparableField, safe.Field(oldObj, func(oldObj *Struct) []OtherStruct { return oldObj.ListComparableField }))...)
 
@@ -124,6 +170,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
 			}, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListNonComparableField[*]")
+			})...)
+			// lists with map semantics require unique keys
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a NonComparableStruct, b NonComparableStruct) bool {
+				return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
 			})...)
 			return
 		}(fldPath.Child("listNonComparableField"), obj.ListNonComparableField, safe.Field(oldObj, func(oldObj *Struct) []NonComparableStruct { return oldObj.ListNonComparableField }))...)

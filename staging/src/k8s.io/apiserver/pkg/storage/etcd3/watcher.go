@@ -104,7 +104,7 @@ type watchChan struct {
 // pred must be non-nil. Only if opts.Predicate matches the change, it will be returned.
 func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage.ListOptions) (watch.Interface, error) {
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
-		key += "/"
+		return nil, fmt.Errorf(`recursive key needs to end with "/"`)
 	}
 	if opts.ProgressNotify && w.newFunc == nil {
 		return nil, apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))

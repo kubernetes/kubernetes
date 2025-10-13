@@ -26,6 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
@@ -492,8 +494,9 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err, "failed to list rsList")
 	// Create a ReplicaSet
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
-	_, err = c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
+	createdRS, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
+	gomega.Expect(createdRS).To(apimachineryutils.HaveValidResourceVersion())
 
 	// Verify that the required pods have come up.
 	err = e2epod.VerifyPodsRunning(ctx, c, ns, podName, labels.SelectorFromSet(map[string]string{"name": podName}), false, replicas)
@@ -527,8 +530,9 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 		},
 	})
 	framework.ExpectNoError(err, "failed to Marshal ReplicaSet JSON patch")
-	_, err = f.ClientSet.AppsV1().ReplicaSets(ns).Patch(ctx, rsName, types.StrategicMergePatchType, []byte(rsPatch), metav1.PatchOptions{})
+	patchedRS, err := f.ClientSet.AppsV1().ReplicaSets(ns).Patch(ctx, rsName, types.StrategicMergePatchType, []byte(rsPatch), metav1.PatchOptions{})
 	framework.ExpectNoError(err, "failed to patch ReplicaSet")
+	gomega.Expect(resourceversion.CompareResourceVersion(createdRS.ResourceVersion, patchedRS.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 	ctxUntil, cancel := context.WithTimeout(ctx, f.Timeouts.PodStart)
 	defer cancel()

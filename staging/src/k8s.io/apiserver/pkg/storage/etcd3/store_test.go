@@ -185,6 +185,11 @@ func TestGetListRecursivePrefix(t *testing.T) {
 	storagetesting.RunTestGetListRecursivePrefix(ctx, t, store)
 }
 
+func TestKeySchema(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestKeySchema(ctx, t, store)
+}
+
 type storeWithPrefixTransformer struct {
 	*store
 }
@@ -655,18 +660,32 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 	return ctx, store, client
 }
 
-func TestValidateKey(t *testing.T) {
+func TestPrepareKey(t *testing.T) {
 	validKeys := []string{
-		"/foo/bar/baz/a.b.c/",
-		"/foo",
-		"foo/bar/baz",
-		"/foo/bar..baz/",
-		"/foo/bar..",
-		"foo",
-		"foo/bar",
-		"/foo/bar/",
+		"/pods/foo/bar/baz/a.b.c/",
+		"/pods/foo",
+		"/pods/foo/bar/baz",
+		"/pods/foo/bar..baz/",
+		"/pods/foo/bar..",
+		"/pods/foo",
+		"/pods/foo/bar",
+		"/pods/foo/bar/",
+		"/pods/",
 	}
 	invalidKeys := []string{
+		"/pods",
+		"/pods/foo/bar/../a.b.c/",
+		"/pods/..",
+		"/pods/../",
+		"/pods/foo/bar/..",
+		"/pods/../foo/bar",
+		"/pods/../foo",
+		"/pods/foo/bar/../",
+		"/pods/.",
+		"/pods/./",
+		"/pods/foo/.",
+		"/pods/./bar",
+		"/pods/foo/./bar/",
 		"/foo/bar/../a.b.c/",
 		"..",
 		"/..",
@@ -689,21 +708,46 @@ func TestValidateKey(t *testing.T) {
 	)
 	_, store, _ := testSetup(t, withPrefix(pathPrefix))
 
-	for _, key := range validKeys {
-		k, err := store.prepareKey(key)
-		if err != nil {
-			t.Errorf("key %q should be valid; unexpected error: %v", key, err)
-		} else if !strings.HasPrefix(k, expectPrefix) {
-			t.Errorf("key %q should have prefix %q", k, expectPrefix)
+	t.Run("Non-recursive", func(t *testing.T) {
+		for _, key := range validKeys {
+			preparedKey, err := store.prepareKey(key, false)
+			if err != nil {
+				t.Errorf("preparing key %q should be valid; unexpected error: %v", key, err)
+				continue
+			}
+			if !strings.HasPrefix(preparedKey, expectPrefix) {
+				t.Errorf("prepared key %q should have prefix %q", preparedKey, expectPrefix)
+			}
+			if !strings.HasSuffix(preparedKey, key) {
+				t.Errorf("Prepared non-recursive key %q should have suffix %q", preparedKey, key)
+			}
 		}
-	}
+	})
 
-	for _, key := range invalidKeys {
-		_, err := store.prepareKey(key)
-		if err == nil {
-			t.Errorf("key %q should be invalid", key)
+	t.Run("Recursive", func(t *testing.T) {
+		for _, key := range validKeys {
+			preparedKey, err := store.prepareKey(key, true)
+			if err != nil {
+				t.Errorf("preparing key %q should be valid; unexpected error: %v", key, err)
+				continue
+			}
+			if !strings.HasPrefix(preparedKey, expectPrefix) {
+				t.Errorf("prepared key %q should have prefix %q", preparedKey, expectPrefix)
+			}
+			if !strings.HasSuffix(preparedKey, "/") {
+				t.Errorf("Prepared non-recursive key %q should have suffix '/'", preparedKey)
+			}
 		}
-	}
+	})
+
+	t.Run("Invalid", func(t *testing.T) {
+		for _, key := range invalidKeys {
+			_, err := store.prepareKey(key, false)
+			if err == nil {
+				t.Errorf("key %q should be invalid", key)
+			}
+		}
+	})
 }
 
 func TestInvalidKeys(t *testing.T) {

@@ -1233,12 +1233,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
-- name: ProbeHostPodSecurityStandards
-  versionedSpecs:
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
 - name: ProcMountType
   versionedSpecs:
   - default: false
@@ -1391,7 +1385,7 @@
     version: "1.29"
 - name: SchedulerAsyncAPICalls
   versionedSpecs:
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
