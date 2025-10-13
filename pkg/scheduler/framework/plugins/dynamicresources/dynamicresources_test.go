@@ -45,9 +45,9 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -1430,7 +1430,7 @@ func TestPlugin(t *testing.T) {
 			want:                               want{},
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				assert.ErrorContains(t, err, "not found")
+				require.ErrorContains(t, err, "not found")
 			},
 		},
 		"extended-resource-name-with-zero-allocatable": {
@@ -1481,7 +1481,7 @@ func TestPlugin(t *testing.T) {
 			},
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				assert.ErrorContains(t, err, "not found")
+				require.ErrorContains(t, err, "not found")
 			},
 		},
 		"extended-resource-name-with-resources": {
@@ -1503,8 +1503,8 @@ func TestPlugin(t *testing.T) {
 			},
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				assert.NoError(t, err)
-				assert.Equal(t, float64(1), metric["success"])
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
 			},
 		},
 		"implicit-extended-resource-name-with-resources": {
@@ -1526,8 +1526,8 @@ func TestPlugin(t *testing.T) {
 			},
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				assert.NoError(t, err)
-				assert.Equal(t, float64(1), metric["success"])
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
 			},
 		},
 		"implicit-extended-resource-name-two-containers-with-resources": {
@@ -1549,8 +1549,8 @@ func TestPlugin(t *testing.T) {
 			},
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				assert.NoError(t, err)
-				assert.Equal(t, float64(1), metric["success"])
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
 			},
 		},
 		"extended-resource-name-with-resources-fail-patch": {
@@ -1574,8 +1574,8 @@ func TestPlugin(t *testing.T) {
 			},
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				assert.NoError(t, err)
-				assert.Equal(t, float64(1), metric["success"])
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
 			},
 		},
 		"extended-resource-name-with-resources-has-claim": {
@@ -1597,7 +1597,7 @@ func TestPlugin(t *testing.T) {
 			},
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				assert.ErrorContains(t, err, "not found")
+				require.ErrorContains(t, err, "not found")
 			},
 		},
 		"extended-resource-name-with-resources-delete-claim": {
@@ -1619,7 +1619,7 @@ func TestPlugin(t *testing.T) {
 			},
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				assert.ErrorContains(t, err, "not found")
+				require.ErrorContains(t, err, "not found")
 			},
 		},
 		"extended-resource-name-bind-failure": {
@@ -1641,8 +1641,8 @@ func TestPlugin(t *testing.T) {
 			},
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				assert.NoError(t, err)
-				assert.Equal(t, float64(1), metric["success"])
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
 			},
 		},
 		"extended-resource-name-skip-bind": {
@@ -1658,8 +1658,8 @@ func TestPlugin(t *testing.T) {
 			},
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				assert.NoError(t, err)
-				assert.Equal(t, float64(1), metric["success"])
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["success"]))
 			},
 		},
 		"extended-resource-name-claim-creation-failure": {
@@ -1689,8 +1689,8 @@ func TestPlugin(t *testing.T) {
 			},
 			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
 				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
-				assert.NoError(t, err)
-				assert.Equal(t, float64(1), metric["failure"])
+				require.NoError(t, err)
+				require.Equal(t, 1, int(metric["failure"]))
 			},
 		},
 		"canceled": {
