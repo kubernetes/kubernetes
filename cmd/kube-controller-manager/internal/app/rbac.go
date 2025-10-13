@@ -19,19 +19,22 @@ package app
 import (
 	"context"
 
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
+
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller/run"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
 
-func newClusterRoleAggregrationControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.ClusterRoleAggregationController,
-		aliases:     []string{"clusterrole-aggregation"},
-		constructor: newClusterRoleAggregationController,
+func newClusterRoleAggregrationControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.ClusterRoleAggregationController,
+		Aliases:     []string{"clusterrole-aggregation"},
+		Constructor: newClusterRoleAggregationController,
 	}
 }
 
-func newClusterRoleAggregationController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newClusterRoleAggregationController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	client, err := controllerContext.NewClient("clusterrole-aggregation-controller")
 	if err != nil {
 		return nil, err
@@ -41,7 +44,7 @@ func newClusterRoleAggregationController(ctx context.Context, controllerContext 
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),
 		client.RbacV1(),
 	)
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		crac.Run(ctx, 5)
 	}, controllerName), nil
 }

@@ -22,20 +22,23 @@ package app
 import (
 	"context"
 
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	endpointslicecontroller "k8s.io/kubernetes/pkg/controller/endpointslice"
 	endpointslicemirroringcontroller "k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
+
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/internal/controller/run"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 )
 
-func newEndpointSliceControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.EndpointSliceController,
-		aliases:     []string{"endpointslice"},
-		constructor: newEndpointSliceController,
+func newEndpointSliceControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.EndpointSliceController,
+		Aliases:     []string{"endpointslice"},
+		Constructor: newEndpointSliceController,
 	}
 }
 
-func newEndpointSliceController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newEndpointSliceController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	client, err := controllerContext.NewClient("endpointslice-controller")
 	if err != nil {
 		return nil, err
@@ -51,20 +54,20 @@ func newEndpointSliceController(ctx context.Context, controllerContext Controlle
 		client,
 		controllerContext.ComponentConfig.EndpointSliceController.EndpointUpdatesBatchPeriod.Duration,
 	)
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		esc.Run(ctx, int(controllerContext.ComponentConfig.EndpointSliceController.ConcurrentServiceEndpointSyncs))
 	}, controllerName), nil
 }
 
-func newEndpointSliceMirroringControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.EndpointSliceMirroringController,
-		aliases:     []string{"endpointslicemirroring"},
-		constructor: newEndpointSliceMirroringController,
+func newEndpointSliceMirroringControllerDescriptor() *controller.Descriptor {
+	return &controller.Descriptor{
+		Name:        names.EndpointSliceMirroringController,
+		Aliases:     []string{"endpointslicemirroring"},
+		Constructor: newEndpointSliceMirroringController,
 	}
 }
 
-func newEndpointSliceMirroringController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+func newEndpointSliceMirroringController(ctx context.Context, controllerContext controller.Context, controllerName string) (controller.Controller, error) {
 	client, err := controllerContext.NewClient("endpointslicemirroring-controller")
 	if err != nil {
 		return nil, err
@@ -79,7 +82,7 @@ func newEndpointSliceMirroringController(ctx context.Context, controllerContext 
 		client,
 		controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringEndpointUpdatesBatchPeriod.Duration,
 	)
-	return newControllerLoop(func(ctx context.Context) {
+	return run.NewControllerLoop(func(ctx context.Context) {
 		esmc.Run(ctx, int(controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringConcurrentServiceEndpointSyncs))
 	}, controllerName), nil
 }
