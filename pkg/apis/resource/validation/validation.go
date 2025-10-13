@@ -55,6 +55,11 @@ var ResourceNormalizationRules = []field.NormalizationRule{
 		Regexp:      regexp.MustCompile(`spec.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
 		Replacement: "spec.devices.requests[$1].exactly.$2",
 	},
+	{
+		// This v1beta1 'basic' to flattened rule is to support ResourceSlice
+		Regexp:      regexp.MustCompile(`spec.devices\[(\d+)\]\.basic\.`),
+		Replacement: "spec.devices[$1].",
+	},
 }
 
 var (
@@ -1363,7 +1368,7 @@ func validateDeviceTaint(taint resource.DeviceTaint, fldPath *field.Path) field.
 	case taint.Effect == "":
 		allErrs = append(allErrs, field.Required(fldPath.Child("effect"), "")) // Required in a taint.
 	case !validDeviceTaintEffects.Has(taint.Effect):
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("effect"), taint.Effect, sets.List(validDeviceTaintEffects)))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("effect"), taint.Effect, sets.List(validDeviceTaintEffects)).MarkCoveredByDeclarative())
 	}
 
 	return allErrs
@@ -1385,13 +1390,13 @@ func validateDeviceToleration(toleration resource.DeviceToleration, fldPath *fie
 	case "":
 		allErrs = append(allErrs, field.Required(fldPath.Child("operator"), ""))
 	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("operator"), toleration.Operator, validDeviceTolerationOperators))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("operator"), toleration.Operator, validDeviceTolerationOperators).MarkCoveredByDeclarative())
 	}
 	switch {
 	case toleration.Effect == "":
 		// Optional in a toleration.
 	case !validDeviceTaintEffects.Has(toleration.Effect):
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("effect"), toleration.Effect, sets.List(validDeviceTaintEffects)))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("effect"), toleration.Effect, sets.List(validDeviceTaintEffects)).MarkCoveredByDeclarative())
 	}
 
 	return allErrs

@@ -89,6 +89,22 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
+	// type ResourceSlice
+	scheme.AddValidationFunc((*resourcev1beta2.ResourceSlice)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ResourceSlice(ctx, op, nil /* fldPath */, obj.(*resourcev1beta2.ResourceSlice), safe.Cast[*resourcev1beta2.ResourceSlice](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ResourceSliceList
+	scheme.AddValidationFunc((*resourcev1beta2.ResourceSliceList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ResourceSliceList(ctx, op, nil /* fldPath */, obj.(*resourcev1beta2.ResourceSliceList), safe.Cast[*resourcev1beta2.ResourceSliceList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
 }
 
@@ -153,6 +169,36 @@ func Validate_AllocationResult(ctx context.Context, op operation.Operation, fldP
 
 	// field resourcev1beta2.AllocationResult.NodeSelector has no validation
 	// field resourcev1beta2.AllocationResult.AllocationTimestamp has no validation
+	return errs
+}
+
+// Validate_Device validates an instance of Device according
+// to declarative validation rules in the API schema.
+func Validate_Device(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.Device) (errs field.ErrorList) {
+	// field resourcev1beta2.Device.Name has no validation
+	// field resourcev1beta2.Device.Attributes has no validation
+	// field resourcev1beta2.Device.Capacity has no validation
+	// field resourcev1beta2.Device.ConsumesCounters has no validation
+	// field resourcev1beta2.Device.NodeName has no validation
+	// field resourcev1beta2.Device.NodeSelector has no validation
+	// field resourcev1beta2.Device.AllNodes has no validation
+
+	// field resourcev1beta2.Device.Taints
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.DeviceTaint) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceTaint)...)
+			return
+		}(fldPath.Child("taints"), obj.Taints, safe.Field(oldObj, func(oldObj *resourcev1beta2.Device) []resourcev1beta2.DeviceTaint { return oldObj.Taints }))...)
+
+	// field resourcev1beta2.Device.BindsToNode has no validation
+	// field resourcev1beta2.Device.BindingConditions has no validation
+	// field resourcev1beta2.Device.BindingFailureConditions has no validation
+	// field resourcev1beta2.Device.AllowMultipleAllocations has no validation
 	return errs
 }
 
@@ -835,6 +881,38 @@ func Validate_DeviceSubRequest(ctx context.Context, op operation.Operation, fldP
 	return errs
 }
 
+// Validate_DeviceTaint validates an instance of DeviceTaint according
+// to declarative validation rules in the API schema.
+func Validate_DeviceTaint(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceTaint) (errs field.ErrorList) {
+	// field resourcev1beta2.DeviceTaint.Key has no validation
+	// field resourcev1beta2.DeviceTaint.Value has no validation
+
+	// field resourcev1beta2.DeviceTaint.Effect
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceTaintEffect) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceTaintEffect(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("effect"), &obj.Effect, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceTaint) *resourcev1beta2.DeviceTaintEffect { return &oldObj.Effect }))...)
+
+	// field resourcev1beta2.DeviceTaint.TimeAdded has no validation
+	return errs
+}
+
+var symbolsForDeviceTaintEffect = sets.New(resourcev1beta2.DeviceTaintEffectNoExecute, resourcev1beta2.DeviceTaintEffectNoSchedule)
+
+// Validate_DeviceTaintEffect validates an instance of DeviceTaintEffect according
+// to declarative validation rules in the API schema.
+func Validate_DeviceTaintEffect(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceTaintEffect) (errs field.ErrorList) {
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDeviceTaintEffect, nil)...)
+
+	return errs
+}
+
 // Validate_DeviceToleration validates an instance of DeviceToleration according
 // to declarative validation rules in the API schema.
 func Validate_DeviceToleration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceToleration) (errs field.ErrorList) {
@@ -857,10 +935,47 @@ func Validate_DeviceToleration(ctx context.Context, op operation.Operation, fldP
 			return
 		}(fldPath.Child("key"), &obj.Key, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceToleration) *string { return &oldObj.Key }))...)
 
-	// field resourcev1beta2.DeviceToleration.Operator has no validation
+	// field resourcev1beta2.DeviceToleration.Operator
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceTolerationOperator) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceTolerationOperator(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("operator"), &obj.Operator, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceToleration) *resourcev1beta2.DeviceTolerationOperator {
+			return &oldObj.Operator
+		}))...)
+
 	// field resourcev1beta2.DeviceToleration.Value has no validation
-	// field resourcev1beta2.DeviceToleration.Effect has no validation
+
+	// field resourcev1beta2.DeviceToleration.Effect
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceTaintEffect) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DeviceTaintEffect(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("effect"), &obj.Effect, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceToleration) *resourcev1beta2.DeviceTaintEffect {
+			return &oldObj.Effect
+		}))...)
+
 	// field resourcev1beta2.DeviceToleration.TolerationSeconds has no validation
+	return errs
+}
+
+var symbolsForDeviceTolerationOperator = sets.New(resourcev1beta2.DeviceTolerationOpEqual, resourcev1beta2.DeviceTolerationOpExists)
+
+// Validate_DeviceTolerationOperator validates an instance of DeviceTolerationOperator according
+// to declarative validation rules in the API schema.
+func Validate_DeviceTolerationOperator(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceTolerationOperator) (errs field.ErrorList) {
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDeviceTolerationOperator, nil)...)
+
 	return errs
 }
 
@@ -1196,5 +1311,73 @@ func Validate_ResourceClaimTemplateSpec(ctx context.Context, op operation.Operat
 			return &oldObj.Spec
 		}))...)
 
+	return errs
+}
+
+// Validate_ResourceSlice validates an instance of ResourceSlice according
+// to declarative validation rules in the API schema.
+func Validate_ResourceSlice(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceSlice) (errs field.ErrorList) {
+	// field resourcev1beta2.ResourceSlice.TypeMeta has no validation
+	// field resourcev1beta2.ResourceSlice.ObjectMeta has no validation
+
+	// field resourcev1beta2.ResourceSlice.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceSliceSpec) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ResourceSliceSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceSlice) *resourcev1beta2.ResourceSliceSpec { return &oldObj.Spec }))...)
+
+	return errs
+}
+
+// Validate_ResourceSliceList validates an instance of ResourceSliceList according
+// to declarative validation rules in the API schema.
+func Validate_ResourceSliceList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceSliceList) (errs field.ErrorList) {
+	// field resourcev1beta2.ResourceSliceList.TypeMeta has no validation
+	// field resourcev1beta2.ResourceSliceList.ListMeta has no validation
+
+	// field resourcev1beta2.ResourceSliceList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.ResourceSlice) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ResourceSlice)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceSliceList) []resourcev1beta2.ResourceSlice { return oldObj.Items }))...)
+
+	return errs
+}
+
+// Validate_ResourceSliceSpec validates an instance of ResourceSliceSpec according
+// to declarative validation rules in the API schema.
+func Validate_ResourceSliceSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.ResourceSliceSpec) (errs field.ErrorList) {
+	// field resourcev1beta2.ResourceSliceSpec.Driver has no validation
+	// field resourcev1beta2.ResourceSliceSpec.Pool has no validation
+	// field resourcev1beta2.ResourceSliceSpec.NodeName has no validation
+	// field resourcev1beta2.ResourceSliceSpec.NodeSelector has no validation
+	// field resourcev1beta2.ResourceSliceSpec.AllNodes has no validation
+
+	// field resourcev1beta2.ResourceSliceSpec.Devices
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta2.Device) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Device)...)
+			return
+		}(fldPath.Child("devices"), obj.Devices, safe.Field(oldObj, func(oldObj *resourcev1beta2.ResourceSliceSpec) []resourcev1beta2.Device { return oldObj.Devices }))...)
+
+	// field resourcev1beta2.ResourceSliceSpec.PerDeviceNodeSelection has no validation
+	// field resourcev1beta2.ResourceSliceSpec.SharedCounters has no validation
 	return errs
 }
