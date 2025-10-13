@@ -4286,7 +4286,14 @@ var _ = common.SIGDescribe("Services", func() {
 		checkServiceReachabilityFromExecPod(ctx, f.ClientSet, ns, service.Name, service.Spec.ClusterIP, port)
 	})
 
-	ginkgo.It("should support named targetPorts that resolve to different ports on different endpoints", func(ctx context.Context) {
+	/*
+		Release: v1.35
+		Testname: Service, should support named targetPorts that resolve to different ports on different endpoints.
+		Description: Given a Service with a named targetPort and two backing pods, the Service can be rolled out with an update to the pods that changes the named port, and it MUST reach both endpoints at all points during the rollout.
+		Update the Service by recreating a new pod with the same port name and the different port number, it MUST be able to forward traffic to both pods.
+		Update the Service by recreating a new pod with the same port name and number, it MUST be able to forward traffic to both pods.
+	*/
+	framework.ConformanceIt("should support named targetPorts that resolve to different ports on different endpoints", func(ctx context.Context) {
 		serviceName := "mutable-named-port"
 		ns := f.Namespace.Name
 
