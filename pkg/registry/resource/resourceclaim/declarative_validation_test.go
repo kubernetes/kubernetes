@@ -709,6 +709,21 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 				field.TooMany(field.NewPath("status", "allocation", "devices", "results"), 33, 32).WithOrigin("maxItems"),
 			},
 		},
+		"valid status.allocation.devices.config, max items": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationDevicesConfig(64),
+			),
+		},
+		"invalid status.allocation.devices.config, too many": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationDevicesConfig(65),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "allocation", "devices", "config"), 33, 32).WithOrigin("maxItems"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -881,6 +896,29 @@ func tweakStatusAllocationDevicesResults(count int) func(rc *resource.ResourceCl
 				Driver:  "dra.example.com",
 				Pool:    fmt.Sprintf("pool-%d", i),
 				Device:  fmt.Sprintf("device-%d", i),
+			})
+		}
+	}
+}
+
+func tweakStatusAllocationDevicesConfig(count int) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil {
+			return
+		}
+		rc.Status.Allocation.Devices.Config = []resource.DeviceAllocationConfiguration{}
+		for i := 0; i < count; i++ {
+			rc.Status.Allocation.Devices.Config = append(rc.Status.Allocation.Devices.Config, resource.DeviceAllocationConfiguration{
+				Source:   resource.AllocationConfigSourceClaim,
+				Requests: []string{"req-0"},
+				DeviceConfiguration: resource.DeviceConfiguration{
+					Opaque: &resource.OpaqueDeviceConfiguration{
+						Driver: "dra.example.com",
+						Parameters: runtime.RawExtension{
+							Raw: []byte(fmt.Sprintf(`{"item": %d}`, i)),
+						},
+					},
+				},
 			})
 		}
 	}
