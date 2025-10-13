@@ -122,7 +122,7 @@ func (ftv formatTagValidator) Docs() TagDoc {
 		Description:    "Indicates that a string field has a particular format.",
 		Payloads: []TagPayloadDoc{{ // Keep this list alphabetized.
 			Description: "k8s-extended-resource-name",
-			Docs:        "This field holds a Kubernetes extended resource name, which is a domain-prefixed name that does not use the 'kubernetes.io' or 'requests.' prefixes.",
+			Docs:        "This field holds a Kubernetes extended resource name. This is a domain-prefixed name that must not have a `kubernetes.io` or `requests.` prefix. When `requests.` is prepended, the result must be a valid label key, as used by quota.",
 		}, {
 			Description: "k8s-ip",
 			Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
