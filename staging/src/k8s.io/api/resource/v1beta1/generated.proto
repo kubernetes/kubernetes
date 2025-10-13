@@ -494,6 +494,7 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceRequestAllocationResult results = 1;
 
   // This field is a combination of all the claim and class configuration parameters.
@@ -506,6 +507,7 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=64
   repeated DeviceAllocationConfiguration config = 2;
 }
 
@@ -1376,6 +1378,7 @@ message ResourceClaimStatus {
   //
   // +optional
   // +k8s:optional
+  // +k8s:update=NoModify
   optional AllocationResult allocation = 1;
 
   // ReservedFor indicates which entities are currently allowed to use
@@ -1406,6 +1409,7 @@ message ResourceClaimStatus {
   // +k8s:optional
   // +k8s:listType=map
   // +k8s:listMapKey=uid
+  // +k8s:maxItems=256
   repeated ResourceClaimConsumerReference reservedFor = 2;
 
   // Devices contains the status of each device allocated for this
