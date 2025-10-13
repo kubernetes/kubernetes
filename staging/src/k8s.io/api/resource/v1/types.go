@@ -1365,6 +1365,7 @@ type ResourceClaimStatus struct {
 	//
 	// +optional
 	// +k8s:optional
+	// +k8s:update=NoModify
 	Allocation *AllocationResult `json:"allocation,omitempty" protobuf:"bytes,1,opt,name=allocation"`
 
 	// ReservedFor indicates which entities are currently allowed to use
@@ -1395,6 +1396,7 @@ type ResourceClaimStatus struct {
 	// +k8s:optional
 	// +k8s:listType=map
 	// +k8s:listMapKey=uid
+	// +k8s:maxItems=256
 	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,2,opt,name=reservedFor" patchStrategy:"merge" patchMergeKey:"uid"`
 
 	// DeallocationRequested is tombstoned since Kubernetes 1.32 where
@@ -1476,6 +1478,7 @@ type DeviceAllocationResult struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:maxItems=32
 	Results []DeviceRequestAllocationResult `json:"results,omitempty" protobuf:"bytes,1,opt,name=results"`
 
 	// This field is a combination of all the claim and class configuration parameters.
@@ -1488,6 +1491,7 @@ type DeviceAllocationResult struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:maxItems=64
 	Config []DeviceAllocationConfiguration `json:"config,omitempty" protobuf:"bytes,2,opt,name=config"`
 }
 

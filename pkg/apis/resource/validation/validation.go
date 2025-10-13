@@ -398,7 +398,7 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 	allErrs = append(allErrs, validateSet(status.ReservedFor, resource.ResourceClaimReservedForMaxSize,
 		validateResourceClaimUserReference,
 		func(consumer resource.ResourceClaimConsumerReference) types.UID { return consumer.UID },
-		fldPath.Child("reservedFor"), uniquenessCovered)...)
+		fldPath.Child("reservedFor"), sizeCovered, uniquenessCovered)...)
 
 	var allocatedDevices sets.Set[structured.SharedDeviceID]
 	if status.Allocation != nil {
@@ -437,7 +437,7 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 	// in this particular case, must not be validated again because
 	// validation for new results is tighter than it was before.
 	if oldStatus.Allocation != nil && status.Allocation != nil {
-		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status.Allocation, oldStatus.Allocation, fldPath.Child("allocation"))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status.Allocation, oldStatus.Allocation, fldPath.Child("allocation")).WithOrigin("update").MarkCoveredByDeclarative()...)
 	} else if status.Allocation != nil {
 		allErrs = append(allErrs, validateAllocationResult(status.Allocation, fldPath.Child("allocation"), requestNames, false)...)
 	}
@@ -476,11 +476,11 @@ func validateDeviceAllocationResult(allocation resource.DeviceAllocationResult, 
 	allErrs = append(allErrs, validateSlice(allocation.Results, resource.AllocationResultsMaxSize,
 		func(result resource.DeviceRequestAllocationResult, fldPath *field.Path) field.ErrorList {
 			return validateDeviceRequestAllocationResult(result, fldPath, requestNames)
-		}, fldPath.Child("results"))...)
+		}, fldPath.Child("results"), sizeCovered)...)
 	allErrs = append(allErrs, validateSlice(allocation.Config, 2*resource.DeviceConfigMaxSize, /* class + claim */
 		func(config resource.DeviceAllocationConfiguration, fldPath *field.Path) field.ErrorList {
 			return validateDeviceAllocationConfiguration(config, fldPath, requestNames, stored)
-		}, fldPath.Child("config"))...)
+		}, fldPath.Child("config"), sizeCovered)...)
 
 	return allErrs
 }
