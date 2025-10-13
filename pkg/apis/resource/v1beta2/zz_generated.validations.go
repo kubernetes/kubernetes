@@ -653,7 +653,26 @@ func Validate_DeviceRequestAllocationResult(ctx context.Context, op operation.Op
 // to declarative validation rules in the API schema.
 func Validate_DeviceSubRequest(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.DeviceSubRequest) (errs field.ErrorList) {
 	// field resourcev1beta2.DeviceSubRequest.Name has no validation
-	// field resourcev1beta2.DeviceSubRequest.DeviceClassName has no validation
+
+	// field resourcev1beta2.DeviceSubRequest.DeviceClassName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("deviceClassName"), &obj.DeviceClassName, safe.Field(oldObj, func(oldObj *resourcev1beta2.DeviceSubRequest) *string { return &oldObj.DeviceClassName }))...)
 
 	// field resourcev1beta2.DeviceSubRequest.Selectors
 	errs = append(errs,
