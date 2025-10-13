@@ -186,27 +186,27 @@ func ResourcePoolName[T ~string](ctx context.Context, op operation.Operation, fl
 
 // ExtendedResourceName verifies that the specified value is a valid extended resource name.
 // An extended resource name is a domain-prefixed name that does not use the "kubernetes.io"
-// or "requests." prefixes. It must be a valid label key when prefixed with "requests.".
+// or "requests." prefixes. Must be a valid label key when appended to "requests.", as in quota.
 //
 //   - must have slash domain and name.
 //   - must not have the "kubernetes.io" domain
 //   - must not have the "requests." prefix
 //   - name must be 63 characters or less
-//   - must be a valid label key when prefixed with "requests."
+//   - must be a valid label key when appended to "requests.", as in quota
 //     -- must contain only alphanumeric characters, dashes, underscores, or dots
 //     -- must end with an alphanumeric character
 func ExtendedResourceName[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
 		return nil
 	}
-	val := (string)(*value)
+	val := string(*value)
 	allErrs := field.ErrorList{}
 	if !strings.Contains(val, "/") {
 		allErrs = append(allErrs, field.Invalid(fldPath, val, "a name must be a domain-prefixed path, such as 'example.com/my-prop'"))
 	} else if strings.Contains(val, resourceDefaultNamespacePrefix) {
 		allErrs = append(allErrs, field.Invalid(fldPath, val, fmt.Sprintf("must not have %q domain", resourceDefaultNamespacePrefix)))
 	}
-
+	// Ensure extended resource is not type of quota.
 	if strings.HasPrefix(val, defaultResourceRequestsPrefix) {
 		allErrs = append(allErrs, field.Invalid(fldPath, val, fmt.Sprintf("must not have %q prefix", defaultResourceRequestsPrefix)))
 	}
