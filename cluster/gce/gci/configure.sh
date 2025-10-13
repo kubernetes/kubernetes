@@ -528,7 +528,6 @@ function install-containerd-ubuntu {
     socat \
     curl \
     gnupg2 \
-    nfs-common \
     software-properties-common \
     lsb-release
 
