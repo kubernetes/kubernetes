@@ -654,6 +654,7 @@ type DeviceTaint struct {
 }
 
 // +enum
+// +k8s:enum
 type DeviceTaintEffect string
 
 const (
@@ -1372,6 +1373,7 @@ type DeviceToleration struct {
 // A toleration operator is the set of operators that can be used in a toleration.
 //
 // +enum
+// +k8s:enum
 type DeviceTolerationOperator string
 
 const (
