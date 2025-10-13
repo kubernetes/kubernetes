@@ -71,14 +71,6 @@ func SetFeatureGatesDuringTest(tb TB, gate featuregate.FeatureGate, features Fea
 	var originalUnset []featuregate.Feature
 	overrides := FeatureOverrides{}
 
-	// Automatically disable dependents when disabling a dependency.
-	dependencies := gate.Dependencies()
-	for f := range dependencies {
-		if gate.Enabled(f) && hasDisabledDependency(f, dependencies, features) {
-			overrides[f] = false
-		}
-	}
-
 	// Specially handle AllAlpha and AllBeta
 	allAlphaValue, allAlpha := features["AllAlpha"]
 	allBetaValue, allBeta := features["AllBeta"]
@@ -101,6 +93,20 @@ func SetFeatureGatesDuringTest(tb TB, gate featuregate.FeatureGate, features Fea
 	// Explicit features take precedence, so merge them in now.
 	for f, v := range features {
 		overrides[f] = v
+	}
+
+	// Automatically disable dependents when disabling a dependency.
+	dependencies := gate.Dependencies()
+	for f := range dependencies {
+		if _, overridden := overrides[f]; overridden || !gate.Enabled(f) {
+			continue // Don't automatically disable features that have been explicitly set.
+		}
+		// If the feature gate was default-enabled and has an explicitly
+		// disabled dependency, then automatically disable it.
+		if disabled, disabledDep := hasDisabledDependency(f, dependencies, features); disabled {
+			tb.Logf("Disabling feature %s since it depends on disabled feature %s", f, disabledDep)
+			overrides[f] = false
+		}
 	}
 
 	for f := range overrides {
@@ -145,16 +151,16 @@ func SetFeatureGatesDuringTest(tb TB, gate featuregate.FeatureGate, features Fea
 }
 
 // hasDisabledDependency recursively walks the dependencies for feature f, and checks whether any are explicitly disabled in the features map.
-func hasDisabledDependency(f featuregate.Feature, dependencies map[featuregate.Feature][]featuregate.Feature, features map[featuregate.Feature]bool) bool {
+func hasDisabledDependency(f featuregate.Feature, dependencies map[featuregate.Feature][]featuregate.Feature, features map[featuregate.Feature]bool) (bool, featuregate.Feature) {
 	if enabled, set := features[f]; set {
-		return !enabled
+		return !enabled, f
 	}
 	for _, dep := range dependencies[f] {
-		if hasDisabledDependency(dep, dependencies, features) {
-			return true
+		if disabled, disabledDep := hasDisabledDependency(dep, dependencies, features); disabled {
+			return disabled, disabledDep
 		}
 	}
-	return false
+	return false, ""
 }
 
 func suggestChangeEmulationVersion(tb TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) string {
@@ -256,6 +262,7 @@ func sameTestOrSubtest(tb TB, testName string) bool {
 
 type TB interface {
 	Cleanup(func())
+	Logf(format string, args ...any)
 	Error(args ...any)
 	Errorf(format string, args ...any)
 	Fatal(args ...any)
