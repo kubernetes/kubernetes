@@ -60,6 +60,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 
 	opaqueDriverPath := field.NewPath("spec", "devices", "config").Index(0).Child("opaque", "driver")
 
+	// TODO: As we accumulate more and more test cases, consider breaking this
+	// up into smaller tests for maintainability.
 	testCases := map[string]struct {
 		input        resource.ResourceClaim
 		expectedErrs field.ErrorList
@@ -83,7 +85,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			},
 		},
 		"invalid requests, duplicate name": {
-			input: mkValidResourceClaim(tweakDuplicateRequestName("req-0")),
+			input: mkValidResourceClaim(tweakAddDeviceRequest(mkDeviceRequest("req-0"))),
 			expectedErrs: field.ErrorList{
 				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(1), "req-0"),
 			},
@@ -286,12 +288,6 @@ func tweakDevicesRequests(items int) func(*resource.ResourceClaim) {
 	}
 }
 
-func tweakDuplicateRequestName(name string) func(*resource.ResourceClaim) {
-	return func(rc *resource.ResourceClaim) {
-		rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests, mkDeviceRequest(name))
-	}
-}
-
 func tweakDuplicateFirstAvailableName(name string) func(*resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		rc.Spec.Devices.Requests[0].Exactly = nil
@@ -453,6 +449,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	mockNSClient := fakeClient.CoreV1().Namespaces()
 	Strategy := NewStrategy(mockNSClient)
 	validClaim := mkValidResourceClaim()
+	// TODO: As we accumulate more and more test cases, consider breaking this
+	// up into smaller tests for maintainability.
 	testCases := map[string]struct {
 		update       resource.ResourceClaim
 		old          resource.ResourceClaim
@@ -470,7 +468,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			},
 		},
 		"spec immutable: add request": {
-			update: mkValidResourceClaim(tweakSpecAddRequest(mkDeviceRequest("req-1"))),
+			update: mkValidResourceClaim(tweakAddDeviceRequest(mkDeviceRequest("req-1"))),
 			old:    validClaim,
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
@@ -905,7 +903,7 @@ func tweakStatusAllocatedDeviceStatusShareID(shareID string) func(rc *resource.R
 	}
 }
 
-func tweakSpecAddRequest(req resource.DeviceRequest) func(rc *resource.ResourceClaim) {
+func tweakAddDeviceRequest(req resource.DeviceRequest) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		rc.Spec.Devices.Requests = append(rc.Spec.Devices.Requests, req)
 	}
