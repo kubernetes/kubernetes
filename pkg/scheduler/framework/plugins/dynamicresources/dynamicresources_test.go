@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -783,6 +784,7 @@ func TestPlugin(t *testing.T) {
 		disableDRASchedulerFilterTimeout bool
 		skipOnWindows                    string
 		failPatch                        bool
+		reactors                         []cgotesting.Reactor
 		metrics                          func(*testing.T, compbasemetrics.Gatherer)
 	}{
 		"empty": {
@@ -1660,6 +1662,37 @@ func TestPlugin(t *testing.T) {
 				assert.Equal(t, float64(1), metric["success"])
 			},
 		},
+		"extended-resource-name-claim-creation-failure": {
+			enableDRAExtendedResource: true,
+			pod:                       podWithExtendedResourceName,
+			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs:                      []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaim: extendedResourceClaimNoName,
+				},
+				prebind: result{
+					status: fwk.NewStatus(fwk.Unschedulable, `claim creation errors`),
+				},
+				unreserveAfterBindFailure: &result{
+					removed: []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
+				},
+			},
+			reactors: []cgotesting.Reactor{
+				&cgotesting.SimpleReactor{
+					Verb:     "create",
+					Resource: "resourceclaims",
+					Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+						return true, nil, apierrors.NewBadRequest("claim creation errors")
+					},
+				},
+			},
+			metrics: func(t *testing.T, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				assert.NoError(t, err)
+				assert.Equal(t, float64(1), metric["failure"])
+			},
+		},
 		"canceled": {
 			cancelFilter: true,
 			args: &config.DynamicResourcesArgs{
@@ -2037,11 +2070,11 @@ func TestPlugin(t *testing.T) {
 			}
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
-			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, feats, tc.failPatch)
+			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, feats, tc.failPatch, tc.reactors)
 			initialObjects := testCtx.listAll(t)
 			var registry compbasemetrics.KubeRegistry
 			if tc.metrics != nil {
-				registry = setupMetrics(features)
+				registry = setupMetrics(feats)
 			}
 
 			status := testCtx.p.PreEnqueue(testCtx.ctx, tc.pod)
@@ -2371,7 +2404,7 @@ func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Obje
 	return updated
 }
 
-func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features, failPatch bool) (result *testContext) {
+func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) (result *testContext) {
 	t.Helper()
 
 	tc := &testContext{}
@@ -2381,6 +2414,8 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	tc.client = fake.NewSimpleClientset(objs...)
 	reactor := createReactor(tc.client.Tracker(), failPatch)
 	tc.client.PrependReactor("*", "*", reactor)
+	// Prepends reactors to the client.
+	tc.client.ReactionChain = append(apiReactors, tc.client.ReactionChain...)
 
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
@@ -2636,7 +2671,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, nil, tc.claims, nil, nil, features, false)
+			testCtx := setup(t, nil, nil, tc.claims, nil, nil, features, false, nil)
 			oldObj := tc.oldObj
 			newObj := tc.newObj
 			if claim, ok := tc.newObj.(*resourceapi.ResourceClaim); ok {
@@ -2760,7 +2795,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, nil, tc.claims, nil, tc.objs, features, false)
+			testCtx := setup(t, nil, nil, tc.claims, nil, tc.objs, features, false, nil)
 			gotHint, err := testCtx.p.isSchedulableAfterPodChange(logger, tc.pod, nil, tc.obj)
 			if tc.wantErr {
 				if err == nil {
