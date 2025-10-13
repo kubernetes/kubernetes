@@ -114,7 +114,7 @@ var (
 	claimPrioritizedList = st.MakeResourceClaim().
 				Name(claimName).
 				Namespace(namespace).
-				RequestWithPrioritizedList(className).
+				RequestWithPrioritizedList(st.SubRequest("subreq-1", className, 1)).
 				Obj()
 
 	numNodes = 2

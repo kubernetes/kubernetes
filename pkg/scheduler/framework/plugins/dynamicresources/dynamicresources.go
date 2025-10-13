@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -209,6 +211,7 @@ var _ fwk.PreEnqueuePlugin = &DynamicResources{}
 var _ fwk.PreFilterPlugin = &DynamicResources{}
 var _ fwk.FilterPlugin = &DynamicResources{}
 var _ fwk.PostFilterPlugin = &DynamicResources{}
+var _ fwk.ScorePlugin = &DynamicResources{}
 var _ fwk.ReservePlugin = &DynamicResources{}
 var _ fwk.EnqueueExtensions = &DynamicResources{}
 var _ fwk.PreBindPlugin = &DynamicResources{}
@@ -1081,6 +1084,103 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 		return nil, fwk.NewStatus(fwk.Unschedulable, "deletion of ResourceClaim completed")
 	}
 	return nil, fwk.NewStatus(fwk.Unschedulable, "still not schedulable")
+}
+
+func (pl *DynamicResources) Score(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
+	if !pl.enabled {
+		return 0, nil
+	}
+	logger := klog.FromContext(ctx)
+
+	state, err := getStateData(cs)
+	if err != nil {
+		return 0, statusError(logger, err)
+	}
+
+	// If there are no claims, no need to do anything.
+	if state.claims.empty() {
+		return 0, nil
+	}
+
+	// Do we need to hold the mutex here? We don't write anything, but are
+	// we guaranteeed to see data written by another thread without syncronization?
+	allocations, found := state.nodeAllocations[nodeInfo.Node().Name]
+	if !found {
+		return 0, nil
+	}
+
+	score, err := computeScore(state.claims.all(), allocations)
+	if err != nil {
+		return 0, statusError(logger, err)
+	}
+	return score, nil
+}
+
+func computeScore(iterator iter.Seq2[int, *resourceapi.ResourceClaim], allocations nodeAllocation) (int64, error) {
+	var score int64
+	for i, claim := range iterator {
+		// Collect the names for all allocated subrequests.
+		allocatedSubRequests := sets.New[string]()
+		if i >= len(allocations.allocationResults) {
+			return 0, fmt.Errorf("number of allocations %d is smaller than number of claims", len(allocations.allocationResults))
+		}
+		allocation := allocations.allocationResults[i]
+		for _, res := range allocation.Devices.Results {
+			request := res.Request
+			if len(strings.Split(request, "/")) == 2 {
+				allocatedSubRequests.Insert(request)
+			}
+		}
+
+		for _, req := range claim.Spec.Devices.Requests {
+			if req.Exactly != nil {
+				continue
+			}
+			for i, subReq := range req.FirstAvailable {
+				fullName := fmt.Sprintf("%s/%s", req.Name, subReq.Name)
+				if allocatedSubRequests.Has(fullName) {
+					score += int64(8 - i)
+				}
+			}
+		}
+	}
+	return score, nil
+}
+
+func (pl *DynamicResources) ScoreExtensions() fwk.ScoreExtensions {
+	return pl
+}
+
+func (pl *DynamicResources) NormalizeScore(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, scores fwk.NodeScoreList) *fwk.Status {
+	if !pl.enabled {
+		return nil
+	}
+	normalizeScore(scores)
+	return nil
+}
+
+func normalizeScore(scores fwk.NodeScoreList) {
+	maxScore := int64(0)
+	minScore := int64(math.MaxInt64)
+	for _, s := range scores {
+		if s.Score > maxScore {
+			maxScore = s.Score
+		}
+		if s.Score < minScore {
+			minScore = s.Score
+		}
+	}
+
+	// This means all scores are the same, so no need to normalize. Also,
+	// return early so we don't end up dividing by zero.
+	if maxScore == minScore {
+		return
+	}
+
+	for i := range scores {
+		score := int64(float64(scores[i].Score-minScore) / float64(maxScore-minScore) * 100)
+		scores[i].Score = score
+	}
 }
 
 // Reserve reserves claims for the pod.
