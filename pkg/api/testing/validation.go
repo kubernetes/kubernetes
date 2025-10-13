@@ -241,8 +241,10 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
 	// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
 	t.Run("with declarative validation", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, true)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, true)
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.DeclarativeValidation:         true,
+			features.DeclarativeValidationTakeover: true,
+		})
 		declarativeTakeoverErrs = runValidations()
 
 		if len(expectedErrs) > 0 {
@@ -253,8 +255,10 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	})
 
 	t.Run("hand written validation", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, false)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, false)
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			features.DeclarativeValidationTakeover: false,
+			features.DeclarativeValidation:         false,
+		})
 		imperativeErrs = runValidations()
 
 		if len(expectedErrs) > 0 {

@@ -674,9 +674,11 @@ func TestInstallAuthNotRequiredHandlers(t *testing.T) {
 func TestAuthFilters(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	// Enable features.ContainerCheckpoint during test
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentFlagz, true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerCheckpoint:    true,
+		zpagesfeatures.ComponentStatusz: true,
+		zpagesfeatures.ComponentFlagz:   true,
+	})
 
 	fw := newServerTest(tCtx)
 	defer fw.testHTTPServer.Close()

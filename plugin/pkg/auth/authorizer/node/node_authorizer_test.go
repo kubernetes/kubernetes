@@ -79,8 +79,10 @@ func TestNodeAuthorizer(t *testing.T) {
 	selectorAuthzDisabled := func(t testing.TB) featuregate.FeatureGate {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, f, version.MustParse("1.33"))
-		featuregatetesting.SetFeatureGateDuringTest(t, f, genericfeatures.AuthorizeWithSelectors, false)
-		featuregatetesting.SetFeatureGateDuringTest(t, f, features.AuthorizeNodeWithSelectors, false)
+		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
+			genericfeatures.AuthorizeWithSelectors: false,
+			features.AuthorizeNodeWithSelectors:    false,
+		})
 		return f
 	}
 
@@ -102,9 +104,11 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	podCertificateProjectionEnabled := func(t testing.TB) featuregate.FeatureGate {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
-		featuregatetesting.SetFeatureGateDuringTest(t, f, genericfeatures.AuthorizeWithSelectors, true)
-		featuregatetesting.SetFeatureGateDuringTest(t, f, features.AuthorizeNodeWithSelectors, true)
-		featuregatetesting.SetFeatureGateDuringTest(t, f, features.PodCertificateRequest, true)
+		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
+			genericfeatures.AuthorizeWithSelectors: true,
+			features.AuthorizeNodeWithSelectors:    true,
+			features.PodCertificateRequest:         true,
+		})
 		return f
 	}
 
