@@ -33,7 +33,7 @@ func Enum[T ~string](_ context.Context, op operation.Operation, fldPath *field.P
 		return nil
 	}
 	if !validValues.Has(*value) || isExcluded(op, exclusions, *value) {
-		return field.ErrorList{field.NotSupported[T](fldPath, *value, supportedValues(op, validValues, exclusions)).WithOrigin("enum")}
+		return field.ErrorList{field.NotSupported[T](fldPath, *value, supportedValues(op, validValues, exclusions))}
 	}
 	return nil
 }
