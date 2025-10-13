@@ -333,6 +333,7 @@ func autoConvert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(in *storagev1bet
 	out.RequiresRepublish = (*bool)(unsafe.Pointer(in.RequiresRepublish))
 	out.SELinuxMount = (*bool)(unsafe.Pointer(in.SELinuxMount))
 	out.NodeAllocatableUpdatePeriodSeconds = (*int64)(unsafe.Pointer(in.NodeAllocatableUpdatePeriodSeconds))
+	out.ServiceAccountTokenInSecrets = (*bool)(unsafe.Pointer(in.ServiceAccountTokenInSecrets))
 	return nil
 }
 
@@ -351,6 +352,7 @@ func autoConvert_storage_CSIDriverSpec_To_v1beta1_CSIDriverSpec(in *storage.CSID
 	out.RequiresRepublish = (*bool)(unsafe.Pointer(in.RequiresRepublish))
 	out.SELinuxMount = (*bool)(unsafe.Pointer(in.SELinuxMount))
 	out.NodeAllocatableUpdatePeriodSeconds = (*int64)(unsafe.Pointer(in.NodeAllocatableUpdatePeriodSeconds))
+	out.ServiceAccountTokenInSecrets = (*bool)(unsafe.Pointer(in.ServiceAccountTokenInSecrets))
 	return nil
 }
 

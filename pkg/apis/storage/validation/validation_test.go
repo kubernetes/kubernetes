@@ -1523,6 +1523,7 @@ func TestCSIDriverValidation(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	// assume this feature is on for this test, detailed enabled/disabled tests in TestMutableCSINodeAllocatableCountEnabledDisabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIServiceAccountTokenSecrets, true)
 
 	driverName := "test-driver"
 	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
@@ -1536,10 +1537,13 @@ func TestCSIDriverValidation(t *testing.T) {
 	notStorageCapacity := false
 	seLinuxMount := true
 	notSELinuxMount := false
+	serviceAccountTokenInSecrets := true
+	notServiceAccountTokenInSecrets := false
 	supportedFSGroupPolicy := storage.FileFSGroupPolicy
 	invalidFSGroupPolicy := storage.FSGroupPolicy("invalid-mode")
 	validNodeAllocatableUpdatePeriodSeconds := int64(10)
 	invalidNodeAllocatableUpdatePeriodSeconds := int64(9)
+	tokenRequests := []storage.TokenRequest{{Audience: "test-audience"}}
 	successCases := []storage.CSIDriver{{
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
@@ -1709,6 +1713,41 @@ func TestCSIDriverValidation(t *testing.T) {
 			SELinuxMount:                       &seLinuxMount,
 			NodeAllocatableUpdatePeriodSeconds: &validNodeAllocatableUpdatePeriodSeconds,
 		},
+	}, {
+		// With ServiceAccountTokenInSecrets set to true with TokenRequests
+		ObjectMeta: metav1.ObjectMeta{Name: driverName},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired:               &attachNotRequired,
+			PodInfoOnMount:               &notPodInfoOnMount,
+			RequiresRepublish:            &notRequiresRepublish,
+			StorageCapacity:              &storageCapacity,
+			SELinuxMount:                 &seLinuxMount,
+			ServiceAccountTokenInSecrets: &serviceAccountTokenInSecrets,
+			TokenRequests:                tokenRequests,
+		},
+	}, {
+		// With ServiceAccountTokenInSecrets set to false with TokenRequests
+		ObjectMeta: metav1.ObjectMeta{Name: driverName},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired:               &attachNotRequired,
+			PodInfoOnMount:               &notPodInfoOnMount,
+			RequiresRepublish:            &notRequiresRepublish,
+			StorageCapacity:              &storageCapacity,
+			SELinuxMount:                 &seLinuxMount,
+			ServiceAccountTokenInSecrets: &notServiceAccountTokenInSecrets,
+			TokenRequests:                tokenRequests,
+		},
+	}, {
+		// With ServiceAccountTokenInSecrets set to nil (not set)
+		ObjectMeta: metav1.ObjectMeta{Name: driverName},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired:               &attachNotRequired,
+			PodInfoOnMount:               &notPodInfoOnMount,
+			RequiresRepublish:            &notRequiresRepublish,
+			StorageCapacity:              &storageCapacity,
+			SELinuxMount:                 &seLinuxMount,
+			ServiceAccountTokenInSecrets: nil,
+		},
 	}}
 
 	for _, csiDriver := range successCases {
@@ -1799,6 +1838,16 @@ func TestCSIDriverValidation(t *testing.T) {
 			SELinuxMount:                       &seLinuxMount,
 			NodeAllocatableUpdatePeriodSeconds: &invalidNodeAllocatableUpdatePeriodSeconds,
 		},
+	}, {
+		// ServiceAccountTokenInSecrets set without TokenRequests (invalid)
+		ObjectMeta: metav1.ObjectMeta{Name: driverName},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired:               &attachNotRequired,
+			PodInfoOnMount:               &notPodInfoOnMount,
+			StorageCapacity:              &storageCapacity,
+			SELinuxMount:                 &seLinuxMount,
+			ServiceAccountTokenInSecrets: &serviceAccountTokenInSecrets,
+		},
 	}}
 
 	for _, csiDriver := range errorCases {
@@ -1813,6 +1862,7 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	// assume this feature is on for this test, detailed enabled/disabled tests in TestMutableCSINodeAllocatableCountEnabledDisabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIServiceAccountTokenSecrets, true)
 
 	driverName := "test-driver"
 	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
@@ -1828,8 +1878,11 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	notStorageCapacity := false
 	seLinuxMount := true
 	notSELinuxMount := false
+	serviceAccountTokenInSecrets := true
+	notServiceAccountTokenInSecrets := false
 	validNodeAllocatableUpdatePeriodSeconds := int64(10)
 	invalidNodeAllocatableUpdatePeriodSeconds := int64(9)
+	tokenRequests := []storage.TokenRequest{{Audience: "test-audience"}}
 
 	old := storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{Name: driverName, ResourceVersion: "1"},
@@ -1887,6 +1940,26 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 		name: "Update NodeAllocatableUpdatePeriodSeconds from nil to valid value",
 		modify: func(new *storage.CSIDriver) {
 			new.Spec.NodeAllocatableUpdatePeriodSeconds = &validNodeAllocatableUpdatePeriodSeconds
+		},
+	}, {
+		name: "change ServiceAccountTokenInSecrets from nil to true with TokenRequests",
+		modify: func(new *storage.CSIDriver) {
+			new.Spec.ServiceAccountTokenInSecrets = &serviceAccountTokenInSecrets
+			new.Spec.TokenRequests = tokenRequests
+		},
+	}, {
+		name: "change ServiceAccountTokenInSecrets from nil to false with TokenRequests",
+		modify: func(new *storage.CSIDriver) {
+			new.Spec.ServiceAccountTokenInSecrets = &notServiceAccountTokenInSecrets
+			new.Spec.TokenRequests = tokenRequests
+		},
+	}, {
+		name: "change ServiceAccountTokenInSecrets from true to false",
+		modify: func(new *storage.CSIDriver) {
+			new.Spec.ServiceAccountTokenInSecrets = &serviceAccountTokenInSecrets
+			new.Spec.TokenRequests = tokenRequests
+			old := new.DeepCopy()
+			old.Spec.ServiceAccountTokenInSecrets = &notServiceAccountTokenInSecrets
 		},
 	}}
 
@@ -1979,6 +2052,11 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 		name: "Update NodeAllocatableUpdatePeriodSeconds to invalid value",
 		modify: func(new *storage.CSIDriver) {
 			new.Spec.NodeAllocatableUpdatePeriodSeconds = &invalidNodeAllocatableUpdatePeriodSeconds
+		},
+	}, {
+		name: "ServiceAccountTokenInSecrets set without TokenRequests",
+		modify: func(new *storage.CSIDriver) {
+			new.Spec.ServiceAccountTokenInSecrets = &serviceAccountTokenInSecrets
 		},
 	}}
 

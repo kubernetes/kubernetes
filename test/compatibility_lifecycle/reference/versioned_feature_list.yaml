@@ -369,6 +369,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: CSIServiceAccountTokenSecrets
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.35"
 - name: CSIVolumeHealth
   versionedSpecs:
   - default: false
