@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"sort"
 	"strings"
 	"sync"
@@ -84,6 +85,8 @@ var (
 	claimName                   = podName + "-" + resourceName
 	className                   = "my-resource-class"
 	extendedClassName           = "my-extended-resource-class"
+	device1                     = "device-1"
+	device2                     = "device-2"
 	podWithClaimName            = st.MakePod().Name(podName).Namespace(namespace).
 					Container("my-container").
 					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
@@ -113,10 +116,10 @@ var (
 	claimPrioritizedList = st.MakeResourceClaim().
 				Name(claimName).
 				Namespace(namespace).
-				RequestWithPrioritizedList(className).
+				RequestWithPrioritizedList(st.SubRequest("subreq-1", className, 1)).
 				Obj()
 
-	numNodes = 2
+	numNodes = 8
 )
 
 func TestDRA(t *testing.T) {
@@ -217,6 +220,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("ControllerManagerMetrics", testControllerManagerMetrics)
 				tCtx.Run("DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, true) })
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
+				tCtx.Run("PrioritizedListScoring", func(tCtx ktesting.TContext) { testPrioritizedListScoring(tCtx) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })
 				// note testExtendedResource depends on testPublishResourceSlices to provide the devices
 				tCtx.Run("ExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true) })
@@ -516,7 +520,7 @@ func testFilterTimeout(tCtx ktesting.TContext) {
 	claim = createClaim(tCtx, namespace, "", class, claim)
 
 	tCtx.Run("disabled", func(tCtx ktesting.TContext) {
-		pod := createPod(tCtx, namespace, "", claim, podWithClaimName)
+		pod := createPod(tCtx, namespace, "", podWithClaimName, claim)
 		startSchedulerWithConfig(tCtx, `
 profiles:
 - schedulerName: default-scheduler
@@ -529,7 +533,7 @@ profiles:
 	})
 
 	tCtx.Run("enabled", func(tCtx ktesting.TContext) {
-		pod := createPod(tCtx, namespace, "", claim, podWithClaimName)
+		pod := createPod(tCtx, namespace, "", podWithClaimName, claim)
 		startSchedulerWithConfig(tCtx, `
 profiles:
 - schedulerName: default-scheduler
@@ -587,13 +591,13 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 	// We could create ResourceSlices for some node with the right driver.
 	// But failing during Filter is sufficient to determine that it did
 	// not fail during PreFilter because of FirstAvailable.
-	pod := createPod(tCtx, namespace, "", claim, podWithClaimName)
+	pod := createPod(tCtx, namespace, "", podWithClaimName, claim)
 	schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
 		gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 			"Type":    gomega.Equal(v1.PodScheduled),
 			"Status":  gomega.Equal(v1.ConditionFalse),
 			"Reason":  gomega.Equal("Unschedulable"),
-			"Message": gomega.Equal("0/2 nodes are available: 2 cannot allocate all claims. still not schedulable, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling."),
+			"Message": gomega.Equal("0/8 nodes are available: 8 cannot allocate all claims. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
 		}),
 	))
 	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
@@ -601,6 +605,169 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 		tCtx.ExpectNoError(err, "get pod")
 		return pod
 	}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
+}
+
+type nodeInfo struct {
+	name       string
+	driverName string
+	class      *resourceapi.DeviceClass
+	pool       string
+}
+
+func testPrioritizedListScoring(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	namespace := createTestNamespace(tCtx, nil)
+	nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err, "list nodes")
+
+	// We don't want to use more than 8 nodes since we limit the number
+	// of subrequests to max 8.
+	var nodesForTest []v1.Node
+	if len(nodes.Items) > 8 {
+		nodesForTest = nodes.Items[:8]
+	} else {
+		nodesForTest = nodes.Items
+	}
+
+	// Create a separate device class and driver for each node. This makes
+	// it easy to create subrequests that can only be satisfied by specific
+	// nodes.
+	var nodeInfos []nodeInfo
+	for _, node := range nodesForTest {
+		driverName := fmt.Sprintf("%s-%s", namespace, node.Name)
+		class, driverName := createTestClass(tCtx, driverName)
+		slice := st.MakeResourceSlice(node.Name, driverName).Devices(device1, device2)
+		createSlice(tCtx, slice.Obj())
+		nodeInfos = append(nodeInfos, nodeInfo{
+			name:       node.Name,
+			driverName: driverName,
+			class:      class,
+			pool:       slice.Spec.Pool.Name,
+		})
+	}
+
+	// Randomize the list of nodes so the selected node isn't always the first one.
+	rand.Shuffle(len(nodeInfos), func(i, j int) {
+		nodeInfos[i], nodeInfos[j] = nodeInfos[j], nodeInfos[i]
+	})
+
+	startScheduler(tCtx)
+
+	tCtx.Run("single-claim", func(tCtx ktesting.TContext) {
+		var firstAvailable []resourceapi.DeviceSubRequest
+		for i := range nodeInfos {
+			firstAvailable = append(firstAvailable, resourceapi.DeviceSubRequest{
+				Name:            fmt.Sprintf("subreq-%d", i),
+				DeviceClassName: nodeInfos[i].class.Name,
+			})
+		}
+		claimPrioritizedList := st.MakeResourceClaim().
+			Name(claimName + "-pl-single-claim").
+			Namespace(namespace).
+			RequestWithPrioritizedList(firstAvailable...).
+			Obj()
+		claim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claimPrioritizedList, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create claim "+claimName)
+
+		_ = createPod(tCtx, namespace, "-pl-single-claim", podWithClaimName, claim)
+		expectedSelectedRequest := fmt.Sprintf("%s/%s", claim.Spec.Devices.Requests[0].Name, claim.Spec.Devices.Requests[0].FirstAvailable[0].Name)
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+			c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
+			tCtx.ExpectNoError(err)
+			return c
+		}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[0]))
+	})
+
+	tCtx.Run("multi-claim", func(tCtx ktesting.TContext) {
+		// Set up two claims where the node in nodeInfos[2] will be the best
+		// option:
+		// nodeInfos[1]: rank 1 in claim1 and rank 3 in claim2, so it will get a score of 14
+		// nodeInfos[2]: rank 2 in claim1 and rank 1 in claim2, so it will get a score of 15
+		// nodeInfos[3]: rank 3 in claim1 and rank 2 in claim2, so it will get a score of 13
+		claimPrioritizedList1 := st.MakeResourceClaim().
+			Name(claimName + "-pl-multiclaim-1").
+			Namespace(namespace).
+			RequestWithPrioritizedList([]resourceapi.DeviceSubRequest{
+				{
+					Name:            "subreq-0",
+					DeviceClassName: nodeInfos[1].class.Name,
+				},
+				{
+					Name:            "subreq-1",
+					DeviceClassName: nodeInfos[2].class.Name,
+				},
+				{
+					Name:            "subreq-2",
+					DeviceClassName: nodeInfos[3].class.Name,
+				},
+			}...).
+			Obj()
+		claim1, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claimPrioritizedList1, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create claim "+claimName)
+
+		claimPrioritizedList2 := st.MakeResourceClaim().
+			Name(claimName + "-pl-multiclaim-2").
+			Namespace(namespace).
+			RequestWithPrioritizedList([]resourceapi.DeviceSubRequest{
+				{
+					Name:            "subreq-0",
+					DeviceClassName: nodeInfos[2].class.Name,
+				},
+				{
+					Name:            "subreq-1",
+					DeviceClassName: nodeInfos[3].class.Name,
+				},
+				{
+					Name:            "subreq-2",
+					DeviceClassName: nodeInfos[1].class.Name,
+				},
+			}...).
+			Obj()
+		claim2, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claimPrioritizedList2, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create claim "+claimName)
+
+		pod := st.MakePod().Name(podName).Namespace(namespace).
+			Container("my-container").
+			Obj()
+		_ = createPod(tCtx, namespace, "-pl-multiclaim", pod, claim1, claim2)
+
+		// The second subrequest in claim1 is for nodeInfos[2], so it should be chosen.
+		expectedSelectedRequest := fmt.Sprintf("%s/%s", claim1.Spec.Devices.Requests[0].Name, claim1.Spec.Devices.Requests[0].FirstAvailable[1].Name)
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+			c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimPrioritizedList1.Name, metav1.GetOptions{})
+			tCtx.ExpectNoError(err)
+			return c
+		}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[2]))
+
+		// The first subrequest in claim2 is for nodeInfos[2], so it should be chosen.
+		expectedSelectedRequest = fmt.Sprintf("%s/%s", claim2.Spec.Devices.Requests[0].Name, claim2.Spec.Devices.Requests[0].FirstAvailable[0].Name)
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+			c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimPrioritizedList2.Name, metav1.GetOptions{})
+			tCtx.ExpectNoError(err)
+			return c
+		}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(expectedAllocatedClaim(expectedSelectedRequest, nodeInfos[2]))
+	})
+}
+
+func expectedAllocatedClaim(request string, nodeInfo nodeInfo) gtypes.GomegaMatcher {
+	return gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+		"Devices": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+			"Results": gomega.HaveExactElements(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Request": gomega.Equal(request),
+				"Driver":  gomega.Equal(nodeInfo.driverName),
+				"Pool":    gomega.Equal(nodeInfo.pool),
+			})),
+		}),
+		"NodeSelector": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+			"NodeSelectorTerms": gomega.HaveExactElements(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"MatchFields": gomega.HaveExactElements(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Key":      gomega.Equal("metadata.name"),
+					"Operator": gomega.Equal(v1.NodeSelectorOpIn),
+					"Values":   gomega.HaveExactElements(gomega.Equal(nodeInfo.name)),
+				})),
+			})),
+		})),
+	})))
 }
 
 func testExtendedResource(tCtx ktesting.TContext, enabled bool) {
@@ -623,7 +790,7 @@ func testExtendedResource(tCtx ktesting.TContext, enabled bool) {
 				"Type":    gomega.Equal(v1.PodScheduled),
 				"Status":  gomega.Equal(v1.ConditionFalse),
 				"Reason":  gomega.Equal("Unschedulable"),
-				"Message": gomega.Equal("0/2 nodes are available: 2 Insufficient my-example.com/my-extended-resource. no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling."),
+				"Message": gomega.Equal("0/8 nodes are available: 8 Insufficient my-example.com/my-extended-resource. no new claims to deallocate, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
 			}),
 		))
 		if enabled {
@@ -1469,7 +1636,7 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 	// Schedule first pod and wait for the scheduler to reach the binding phase, which marks the claim as allocated.
 	start := time.Now()
 	claim1 := createClaim(tCtx, namespace, "-a", class, claim)
-	pod := createPod(tCtx, namespace, "-a", claim1, podWithClaimName)
+	pod := createPod(tCtx, namespace, "-a", podWithClaimName, claim1)
 	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
 		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim1.Name, metav1.GetOptions{})
 		tCtx.ExpectNoError(err)
@@ -1496,7 +1663,7 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 
 	// Second pod should get the device with binding conditions.
 	claim2 := createClaim(tCtx, namespace, "-b", class, claim)
-	pod = createPod(tCtx, namespace, "-b", claim2, podWithClaimName)
+	pod = createPod(tCtx, namespace, "-b", podWithClaimName, claim2)
 	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
 		c, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claim2.Name, metav1.GetOptions{})
 		tCtx.ExpectNoError(err)

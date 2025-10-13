@@ -366,7 +366,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.VolumeZone},
 									{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
 									{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
-									{Name: names.DynamicResources},
+									{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
 									{Name: names.DefaultPreemption},
 									{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 									{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
