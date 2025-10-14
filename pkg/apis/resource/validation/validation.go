@@ -357,7 +357,7 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 		},
 		stringKey, fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	if constraint.MatchAttribute != nil {
-		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute"))...)
+		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute")).MarkCoveredByDeclarative()...)
 	} else if constraint.DistinctAttribute != nil {
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute"))...)
 	} else if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
@@ -1098,27 +1098,44 @@ func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) fie
 		allErrs = append(allErrs, validateCIdentifier(parts[0], fldPath)...)
 	case 2:
 		if len(parts[0]) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath, "the domain must not be empty"))
+			allErrs = append(allErrs, field.Invalid(fldPath, "", "the domain must not be empty"))
 		} else {
 			allErrs = append(allErrs, validateDriverName(parts[0], fldPath)...)
 		}
 		if len(parts[1]) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath, "the name must not be empty"))
+			allErrs = append(allErrs, field.Invalid(fldPath, "", "the name must not be empty"))
 		} else {
 			allErrs = append(allErrs, validateCIdentifier(parts[1], fldPath)...)
 		}
+		// TODO: This validation is incomplete. It should reject qualified names
+		// that contain more than one slash. Currently, names like "a/b/c" are not
+		// handled and are implicitly accepted.
+		//
+		// This needs to be fixed in two places:
+		// 1. Here in this function.
+		// 2. In the corresponding declarative validation utility `resourcesQualifiedName`
+		//    in `staging/src/k8s.io/apimachinery/pkg/api/validate/strfmt.go`.
+		//
+		// The fix should be introduced carefully, possibly using ratcheting to avoid
+		// breaking existing, non-compliant objects.
 	}
+
 	return allErrs
 }
 
 func validateFullyQualifiedName(name resource.FullyQualifiedName, fldPath *field.Path) field.ErrorList {
-	allErrs := validateQualifiedName(resource.QualifiedName(name), fldPath)
+	var allErrs field.ErrorList
+	if name == "" {
+		allErrs = append(allErrs, field.Required(fldPath, "name required"))
+		return allErrs
+	}
+	allErrs = append(allErrs, validateQualifiedName(resource.QualifiedName(name), fldPath)...)
 	// validateQualifiedName checks that the name isn't empty and both parts are valid.
 	// What we need to enforce here is that there really is a domain.
 	if name != "" && !strings.Contains(string(name), "/") {
 		allErrs = append(allErrs, field.Invalid(fldPath, name, "must include a domain"))
 	}
-	return allErrs
+	return allErrs.WithOrigin("format=k8s-resource-fully-qualified-name")
 }
 
 func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
