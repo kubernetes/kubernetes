@@ -1054,6 +1054,9 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	// resetField write all version information
 	for _, v := range crd.Spec.Versions {
 		clusterScoped := crd.Spec.Scope == apiextensionsv1.ClusterScoped
+		if requestScopes[v.Name] == nil {
+			continue
+		}
 		statusScope := *requestScopes[v.Name]
 		statusScope.Subresource = "status"
 		statusScope.Namer = handlers.ContextBasedNaming{
@@ -1069,6 +1072,9 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		if subresources != nil && subresources.Status != nil {
 			var statusResetFields = make(map[fieldpath.APIVersion]*fieldpath.Set)
 			for _, value := range crd.Spec.Versions {
+				if storages[value.Name].Status == nil {
+					continue
+				}
 				resetField := storages[value.Name].Status.GetResetFields()
 				for apiVersion, set := range resetField {
 					statusResetFields[apiVersion] = set
