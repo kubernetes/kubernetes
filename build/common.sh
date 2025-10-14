@@ -88,14 +88,6 @@ readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
 readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
 
-# This is the port on the workstation host to expose RSYNC on.  Set this if you
-# are doing something fancy with ssh tunneling.
-readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
-
-# This is the port that rsync is running on *inside* the container. This may be
-# mapped to KUBE_RSYNC_PORT via docker networking.
-readonly KUBE_CONTAINER_RSYNC_PORT=8730
-
 # These are the default versions (image tags) for their respective base images.
 readonly __default_distroless_iptables_version=v0.8.2
 readonly __default_go_runner_version=v2.4.0-go1.25.1-bookworm.0
@@ -168,11 +160,6 @@ kube::build::get_docker_wrapped_binaries() {
 #   KUBE_BUILD_IMAGE
 #   KUBE_BUILD_CONTAINER_NAME_BASE
 #   KUBE_BUILD_CONTAINER_NAME
-#   KUBE_DATA_CONTAINER_NAME_BASE
-#   KUBE_DATA_CONTAINER_NAME
-#   KUBE_RSYNC_CONTAINER_NAME_BASE
-#   KUBE_RSYNC_CONTAINER_NAME
-#   DOCKER_MOUNT_ARGS
 #   LOCAL_OUTPUT_BUILD_CONTEXT
 function kube::build::setup_vars() {
   KUBE_GIT_BRANCH=$(git symbolic-ref --short -q HEAD 2>/dev/null || true)
@@ -182,11 +169,6 @@ function kube::build::setup_vars() {
   KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
   KUBE_BUILD_CONTAINER_NAME_BASE="kube-build-${KUBE_ROOT_HASH}"
   KUBE_BUILD_CONTAINER_NAME="${KUBE_BUILD_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  KUBE_RSYNC_CONTAINER_NAME_BASE="kube-rsync-${KUBE_ROOT_HASH}"
-  KUBE_RSYNC_CONTAINER_NAME="${KUBE_RSYNC_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  KUBE_DATA_CONTAINER_NAME_BASE="kube-build-data-${KUBE_ROOT_HASH}"
-  KUBE_DATA_CONTAINER_NAME="${KUBE_DATA_CONTAINER_NAME_BASE}-${KUBE_BUILD_IMAGE_VERSION}"
-  DOCKER_MOUNT_ARGS=(--volumes-from "${KUBE_DATA_CONTAINER_NAME}")
   LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
 }
 
@@ -202,11 +184,6 @@ function kube::build::setup_vars() {
 #   KUBE_BUILD_IMAGE
 #   KUBE_BUILD_CONTAINER_NAME_BASE
 #   KUBE_BUILD_CONTAINER_NAME
-#   KUBE_DATA_CONTAINER_NAME_BASE
-#   KUBE_DATA_CONTAINER_NAME
-#   KUBE_RSYNC_CONTAINER_NAME_BASE
-#   KUBE_RSYNC_CONTAINER_NAME
-#   DOCKER_MOUNT_ARGS
 #   LOCAL_OUTPUT_BUILD_CONTEXT
 # shellcheck disable=SC2120 # optional parameters
 function kube::build::verify_prereqs() {
@@ -401,8 +378,6 @@ function kube::build::destroy_container() {
 function kube::build::clean() {
   if kube::build::has_docker ; then
     kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}"
-    kube::build::docker_delete_old_containers "${KUBE_RSYNC_CONTAINER_NAME_BASE}"
-    kube::build::docker_delete_old_containers "${KUBE_DATA_CONTAINER_NAME_BASE}"
     kube::build::docker_delete_old_images "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG_BASE}"
 
     V=2 kube::log::status "Cleaning all untagged docker images"
@@ -420,114 +395,6 @@ function kube::build::clean() {
       chmod -R +w "${LOCAL_OUTPUT_ROOT}/local/go/cache"
     fi
     rm -rf "${LOCAL_OUTPUT_ROOT}"
-  fi
-}
-
-# Set up the context directory for the kube-build image and build it.
-function kube::build::build_image() {
-  mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
-  # Make sure the context directory owned by the right user for syncing sources to container.
-  chown -R "${USER_ID}":"${GROUP_ID}" "${LOCAL_OUTPUT_BUILD_CONTEXT}"
-
-  cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
-  chmod u+w "${LOCAL_OUTPUT_BUILD_CONTEXT}/localtime"
-
-  cp "${KUBE_ROOT}/build/build-image/Dockerfile" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-  cp "${KUBE_ROOT}/build/build-image/rsyncd.sh" "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
-  dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
-  chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
-
-  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false' "--build-arg=KUBE_CROSS_IMAGE=${KUBE_CROSS_IMAGE} --build-arg=KUBE_CROSS_VERSION=${KUBE_CROSS_VERSION}"
-
-  # Clean up old versions of everything
-  kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}" "${KUBE_BUILD_CONTAINER_NAME}"
-  kube::build::docker_delete_old_containers "${KUBE_RSYNC_CONTAINER_NAME_BASE}" "${KUBE_RSYNC_CONTAINER_NAME}"
-  kube::build::docker_delete_old_containers "${KUBE_DATA_CONTAINER_NAME_BASE}" "${KUBE_DATA_CONTAINER_NAME}"
-  kube::build::docker_delete_old_images "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG_BASE}" "${KUBE_BUILD_IMAGE_TAG}"
-
-  kube::build::ensure_data_container
-  kube::build::sync_to_container
-}
-
-# Build a docker image from a Dockerfile.
-# $1 is the name of the image to build
-# $2 is the location of the "context" directory, with the Dockerfile at the root.
-# $3 is the value to set the --pull flag for docker build; true by default
-# $4 is the set of --build-args for docker.
-function kube::build::docker_build() {
-  kube::util::ensure-docker-buildx
-
-  local -r image=$1
-  local -r context_dir=$2
-  local -r pull="${3:-true}"
-  local build_args
-  IFS=" " read -r -a build_args <<< "$4"
-  readonly build_args
-  local -ra build_cmd=("${DOCKER[@]}" buildx build --load -t "${image}" "--pull=${pull}" "${build_args[@]}" "${context_dir}")
-
-  kube::log::status "Building Docker image ${image}"
-  local docker_output
-  docker_output=$(DOCKER_CLI_EXPERIMENTAL=enabled "${build_cmd[@]}" 2>&1) || {
-    cat <<EOF >&2
-+++ Docker build command failed for ${image}
-
-${docker_output}
-
-To retry manually, run:
-
-DOCKER_CLI_EXPERIMENTAL=enabled ${build_cmd[*]}
-
-EOF
-    return 1
-  }
-}
-
-function kube::build::ensure_data_container() {
-  # If the data container exists AND exited successfully, we can use it.
-  # Otherwise nuke it and start over.
-  local ret=0
-  local code=0
-
-  code=$(docker inspect \
-      -f '{{.State.ExitCode}}' \
-      "${KUBE_DATA_CONTAINER_NAME}" 2>/dev/null) || ret=$?
-  if [[ "${ret}" == 0 && "${code}" != 0 ]]; then
-    kube::build::destroy_container "${KUBE_DATA_CONTAINER_NAME}"
-    ret=1
-  fi
-  if [[ "${ret}" != 0 ]]; then
-    kube::log::status "Creating data container ${KUBE_DATA_CONTAINER_NAME}"
-    # We have to ensure the directory exists, or else the docker run will
-    # create it as root.
-    mkdir -p "${LOCAL_OUTPUT_GOPATH}"
-    # We want this to run as root to be able to chown, so non-root users can
-    # later use the result as a data container.  This run both creates the data
-    # container and chowns the GOPATH.
-    #
-    # The data container creates volumes for all of the directories that store
-    # intermediates for the Go build. This enables incremental builds across
-    # Docker sessions. The *_cgo paths are re-compiled versions of the go std
-    # libraries for true static building.
-    local -ra docker_cmd=(
-      "${DOCKER[@]}" run
-      --volume "${REMOTE_ROOT}"   # white-out the whole output dir
-      --volume /usr/local/go/pkg/linux_386_cgo
-      --volume /usr/local/go/pkg/linux_amd64_cgo
-      --volume /usr/local/go/pkg/linux_arm_cgo
-      --volume /usr/local/go/pkg/linux_arm64_cgo
-      --volume /usr/local/go/pkg/linux_ppc64le_cgo
-      --volume /usr/local/go/pkg/darwin_amd64_cgo
-      --volume /usr/local/go/pkg/darwin_386_cgo
-      --volume /usr/local/go/pkg/windows_amd64_cgo
-      --volume /usr/local/go/pkg/windows_386_cgo
-      --name "${KUBE_DATA_CONTAINER_NAME}"
-      --hostname "${HOSTNAME}"
-      "${KUBE_BUILD_IMAGE}"
-      chown -R "${USER_ID}":"${GROUP_ID}"
-        "${REMOTE_ROOT}"
-        /usr/local/go/pkg/
-    )
-    "${docker_cmd[@]}"
   fi
 }
 
@@ -553,7 +420,6 @@ function kube::build::run_build_command_ex() {
     "--user=$(id -u):$(id -g)"
     "--hostname=${HOSTNAME}"
     "-e=GOPROXY=${GOPROXY}"
-    "${DOCKER_MOUNT_ARGS[@]}"
   )
 
   local detach=false
@@ -595,7 +461,21 @@ function kube::build::run_build_command_ex() {
     --env "GOFLAGS=${GOFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
     --env "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-}"
+    # mount source code / output dir
+    --volume "${KUBE_ROOT}:/go/src/k8s.io/kubernetes"
+    # env migrated from build-image, we could consider setting this in kube-cross
+    --env 'KUBE_OUTPUT_SUBPATH=_output/dockerized'
+    --workdir /go/src/k8s.io/kubernetes
+    --env 'GIT_AUTHOR_EMAIL=nobody@k8s.io'
+    --env 'GIT_AUTHOR_NAME=kube-build-image'
   )
+
+  # if host has localtime, mount it so we log in local time
+  if [ -f /etc/localtime ]; then
+    docker_run_opts+=(
+      --mount 'type=bind,source=/etc/localtime,target=/etc/localtime'
+    )
+  fi
 
   # use GOLDFLAGS only if it is set explicitly.
   if [[ -v GOLDFLAGS ]]; then
@@ -620,7 +500,7 @@ function kube::build::run_build_command_ex() {
   fi
 
   local -ra docker_cmd=(
-    "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}")
+    "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_CROSS_IMAGE}:${KUBE_CROSS_VERSION}")
 
   # Clean up container from any previous run
   kube::build::destroy_container "${container_name}"
@@ -628,144 +508,4 @@ function kube::build::run_build_command_ex() {
   if [[ "${detach}" == false ]]; then
     kube::build::destroy_container "${container_name}"
   fi
-}
-
-function kube::build::rsync_probe {
-  # Wait until rsync is up and running.
-  local tries=20
-  while (( tries > 0 )) ; do
-    if rsync "rsync://k8s@${1}:${2}/" \
-         --password-file="${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password" \
-         &> /dev/null ; then
-      return 0
-    fi
-    tries=$(( tries - 1))
-    sleep 0.1
-  done
-
-  return 1
-}
-
-# Start up the rsync container in the background. This should be explicitly
-# stopped with kube::build::stop_rsyncd_container.
-#
-# This will set the global var KUBE_RSYNC_ADDR to the effective port that the
-# rsync daemon can be reached out.
-function kube::build::start_rsyncd_container() {
-  IPTOOL=ifconfig
-  if kube::build::has_ip ; then
-    IPTOOL="ip address"
-  fi
-  kube::build::stop_rsyncd_container
-  V=3 kube::log::status "Starting rsyncd container"
-  kube::build::run_build_command_ex \
-    "${KUBE_RSYNC_CONTAINER_NAME}" -p 127.0.0.1:"${KUBE_RSYNC_PORT}":"${KUBE_CONTAINER_RSYNC_PORT}" -d \
-    -e ALLOW_HOST="$(${IPTOOL} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' ' ')" \
-    -- /rsyncd.sh >/dev/null
-
-  local mapped_port
-  if ! mapped_port=$("${DOCKER[@]}" port "${KUBE_RSYNC_CONTAINER_NAME}" "${KUBE_CONTAINER_RSYNC_PORT}" 2> /dev/null | cut -d: -f 2) ; then
-    kube::log::error "Could not get effective rsync port"
-    return 1
-  fi
-
-  local container_ip
-  container_ip=$("${DOCKER[@]}" inspect --format '{{ .NetworkSettings.IPAddress }}' "${KUBE_RSYNC_CONTAINER_NAME}")
-
-  # Sometimes we can reach rsync through localhost and a NAT'd port.  Other
-  # times (when we are running in another docker container on the Jenkins
-  # machines) we have to talk directly to the container IP.  There is no one
-  # strategy that works in all cases so we test to figure out which situation we
-  # are in.
-  if kube::build::rsync_probe 127.0.0.1 "${mapped_port}"; then
-    KUBE_RSYNC_ADDR="127.0.0.1:${mapped_port}"
-    return 0
-  elif kube::build::rsync_probe "${container_ip}" "${KUBE_CONTAINER_RSYNC_PORT}"; then
-    KUBE_RSYNC_ADDR="${container_ip}:${KUBE_CONTAINER_RSYNC_PORT}"
-    return 0
-  fi
-
-  kube::log::error "Could not connect to rsync container."
-  return 1
-}
-
-function kube::build::stop_rsyncd_container() {
-  V=3 kube::log::status "Stopping any currently running rsyncd container"
-  unset KUBE_RSYNC_ADDR
-  kube::build::destroy_container "${KUBE_RSYNC_CONTAINER_NAME}"
-}
-
-function kube::build::rsync {
-  local -a rsync_opts=(
-    --archive
-    "--password-file=${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
-  )
-  if (( KUBE_VERBOSE >= 6 )); then
-    rsync_opts+=("-iv")
-  fi
-  if (( KUBE_RSYNC_COMPRESS > 0 )); then
-     rsync_opts+=("--compress-level=${KUBE_RSYNC_COMPRESS}")
-  fi
-  V=3 kube::log::status "Running rsync"
-  rsync "${rsync_opts[@]}" "$@"
-}
-
-# This will launch rsyncd in a container and then sync the source tree to the
-# container over the local network.
-function kube::build::sync_to_container() {
-  kube::log::status "Syncing sources to container"
-
-  kube::build::start_rsyncd_container
-
-  # rsync filters are a bit confusing.  Here we are syncing everything except
-  # output only directories and things that are not necessary like the git
-  # directory and generated files. The '- /' filter prevents rsync
-  # from trying to set the uid/gid/perms on the root of the sync tree.
-  # As an exception, we need to sync generated files in staging/, because
-  # they will not be re-generated by 'make'. Note that the 'H' filtered files
-  # are hidden from rsync so they will be deleted in the target container if
-  # they exist. This will allow them to be re-created in the container if
-  # necessary.
-  # PLEASE DO NOT ADD TO THIS
-  # https://github.com/kubernetes/kubernetes/issues/112862
-  kube::build::rsync \
-    --delete \
-    --filter='- /_tmp/' \
-    --filter='- /_output/' \
-    --filter='- /' \
-    "${KUBE_ROOT}/" "rsync://k8s@${KUBE_RSYNC_ADDR}/k8s/"
-
-  kube::build::stop_rsyncd_container
-}
-
-# Copy all build results back out.
-function kube::build::copy_output() {
-  kube::log::status "Syncing out of container"
-
-  kube::build::start_rsyncd_container
-
-  # The filter syntax for rsync is a little obscure. It filters on files and
-  # directories.  If you don't go in to a directory you won't find any files
-  # there.  Rules are evaluated in order.  The last two rules are a little
-  # magic. '+ */' says to go in to every directory and '- /**' says to ignore
-  # any file or directory that isn't already specifically allowed.
-  #
-  # We are looking to copy out all of the built binaries along with various
-  # generated files.
-  # PLEASE DO NOT ADD TO THIS
-  # https://github.com/kubernetes/kubernetes/issues/112862
-  kube::build::rsync \
-    --prune-empty-dirs \
-    --filter='- /_temp/' \
-    --filter='+ /vendor/' \
-    --filter='+ /_output/dockerized/bin/**' \
-    --filter='+ zz_generated.*' \
-    --filter='+ generated.proto' \
-    --filter='+ *.pb.go' \
-    --filter='+ types.go' \
-    --filter='+ */' \
-    --filter='- /**' \
-    "rsync://k8s@${KUBE_RSYNC_ADDR}/k8s/" "${KUBE_ROOT}"
-
-  kube::build::stop_rsyncd_container
 }
