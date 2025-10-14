@@ -84,13 +84,10 @@ type tearDown func()
 
 func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	teardown := func() {
-		cancel()
-	}
 
 	listener, err := net.Listen("unix", addr)
 	if err != nil {
-		teardown()
+		cancel()
 		return nil, err
 	}
 
@@ -110,19 +107,30 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 			drapbv1beta1.RegisterDRAPluginServer(s, drapbv1beta1.V1ServerWrapper{DRAPluginServer: fakeGRPCServer})
 			drahealthv1alpha1.RegisterDRAResourceHealthServer(s, fakeGRPCServer)
 		} else {
+			cancel()
 			return nil, err
 		}
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	go func() {
-		go func() {
-			if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-				panic(err)
-			}
-		}()
+		defer wg.Done()
+		if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			panic(err)
+		}
+	}()
+
+	go func() {
 		<-ctx.Done()
 		s.GracefulStop()
 	}()
+
+	teardown := func() {
+		cancel()
+		wg.Wait() // wait for Serve() to finish
+	}
 
 	return teardown, nil
 }
