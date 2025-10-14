@@ -1240,6 +1240,8 @@ type DeviceConstraint struct {
 	//
 	// +optional
 	// +oneOf=ConstraintType
+	// +k8s:optional
+	// +k8s:format=k8s-resource-fully-qualified-name
 	MatchAttribute *FullyQualifiedName `json:"matchAttribute,omitempty" protobuf:"bytes,2,opt,name=matchAttribute"`
 
 	// Potential future extension, not part of the current design:
