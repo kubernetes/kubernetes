@@ -86,7 +86,7 @@ issues:
 
     - linters:
         - testifylint
-      text: "encoded-compare|error-nil|formatter"
+      text: "encoded-compare|error-nil|formatter|negative-positive|contains"
 
     - linters:
         - gocritic
