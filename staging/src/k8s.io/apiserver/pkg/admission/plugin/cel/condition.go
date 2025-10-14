@@ -62,7 +62,7 @@ func NewCondition(compilationResults []CompilationResult) ConditionEvaluator {
 	}
 }
 
-func convertObjectToUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
+func ConvertObjectToUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
 	if obj == nil || reflect.ValueOf(obj).IsNil() {
 		return &unstructured.Unstructured{Object: nil}, nil
 	}
@@ -77,7 +77,7 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 	if r == nil || reflect.ValueOf(r).IsNil() {
 		return nil, nil
 	}
-	v, err := convertObjectToUnstructured(r)
+	v, err := ConvertObjectToUnstructured(r)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 // ForInput evaluates the compiled CEL expressions converting them into CELEvaluations
 // errors per evaluation are returned on the Evaluation object
 // runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func (c *condition) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
+func (c *condition) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *unstructured.Unstructured, inputs OptionalVariableBindings, namespace *v1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
 	evaluations := make([]EvaluationResult, len(c.compilationResults))
 	var err error

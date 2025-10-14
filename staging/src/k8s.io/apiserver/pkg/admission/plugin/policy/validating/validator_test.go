@@ -27,10 +27,10 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
 
-	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -49,7 +49,7 @@ type fakeCelFilter struct {
 	throwError  bool
 }
 
-func (f *fakeCelFilter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, optionalVars cel.OptionalVariableBindings, namespace *corev1.Namespace, costBudget int64) ([]cel.EvaluationResult, int64, error) {
+func (f *fakeCelFilter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *unstructured.Unstructured, optionalVars cel.OptionalVariableBindings, namespace *corev1.Namespace, costBudget int64) ([]cel.EvaluationResult, int64, error) {
 	if costBudget <= 0 { // this filter will cost 1, so cost = 0 means fail.
 		return nil, -1, &apiservercel.Error{
 			Type:   apiservercel.ErrorTypeInvalid,
@@ -991,7 +991,12 @@ func TestValidate(t *testing.T) {
 			if tc.costBudget != 0 {
 				budget = tc.costBudget
 			}
-			validateResult := v.Validate(ctx, fakeVersionedAttr.GetResource(), fakeVersionedAttr, nil, nil, budget, nil)
+
+			request, err := cel.ConvertObjectToUnstructured(cel.CreateAdmissionRequest(fakeVersionedAttr.Attributes, metav1.GroupVersionResource(fakeVersionedAttr.GetResource()), metav1.GroupVersionKind(fakeVersionedAttr.VersionedKind)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			validateResult := v.Validate(ctx, request, fakeVersionedAttr, nil, nil, budget, nil)
 
 			require.Equal(t, len(validateResult.Decisions), len(tc.policyDecision))
 
@@ -1035,6 +1040,11 @@ func TestContextCanceled(t *testing.T) {
 
 	fakeAttr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "default", "foo", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil)
 	fakeVersionedAttr, _ := admission.NewVersionedAttributes(fakeAttr, schema.GroupVersionKind{}, nil)
+
+	request, err := cel.ConvertObjectToUnstructured(cel.CreateAdmissionRequest(fakeVersionedAttr.Attributes, metav1.GroupVersionResource{}, metav1.GroupVersionKind{}))
+	if err != nil {
+		t.Fatal(err)
+	}
 	fc := cel.NewConditionCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 	f := fc.CompileCondition([]cel.ExpressionAccessor{&ValidationCondition{Expression: "[1,2,3,4,5,6,7,8,9,10].map(x, [1,2,3,4,5,6,7,8,9,10].map(y, x*y)) == []"}}, cel.OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, environment.StoredExpressions)
 	v := validator{
@@ -1049,7 +1059,7 @@ func TestContextCanceled(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.TODO())
 	cancel()
-	validationResult := v.Validate(ctx, fakeVersionedAttr.GetResource(), fakeVersionedAttr, nil, nil, celconfig.RuntimeCELCostBudget, nil)
+	validationResult := v.Validate(ctx, request, fakeVersionedAttr, nil, nil, celconfig.RuntimeCELCostBudget, nil)
 	if len(validationResult.Decisions) != 1 || !strings.Contains(validationResult.Decisions[0].Message, "operation interrupted") {
 		t.Errorf("Expected 'operation interrupted' but got %v", validationResult.Decisions)
 	}

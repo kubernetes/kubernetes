@@ -29,7 +29,7 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
 
-	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
@@ -42,7 +42,7 @@ type fakeCelFilter struct {
 	throwError  bool
 }
 
-func (f *fakeCelFilter) ForInput(context.Context, *admission.VersionedAttributes, *admissionv1.AdmissionRequest, cel.OptionalVariableBindings, *api.Namespace, int64) ([]cel.EvaluationResult, int64, error) {
+func (f *fakeCelFilter) ForInput(context.Context, *admission.VersionedAttributes, *unstructured.Unstructured, cel.OptionalVariableBindings, *api.Namespace, int64) ([]cel.EvaluationResult, int64, error) {
 	if f.throwError {
 		return nil, 0, errors.New("test error")
 	}

@@ -31,6 +31,7 @@ import (
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/admission"
 	admissionauthorizer "k8s.io/apiserver/pkg/admission/plugin/authorizer"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	celmetrics "k8s.io/apiserver/pkg/admission/plugin/policy/validating/metrics"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
@@ -125,6 +126,14 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 
 		definition := hook.Policy
 		matches, matchResource, matchKind, err := c.matcher.DefinitionMatches(a, o, NewValidatingAdmissionPolicyAccessor(definition))
+		versionedAttr, err = admission.NewVersionedAttributes(a, matchKind, o)
+		if err != nil {
+			wrappedErr := fmt.Errorf("failed to convert object version: %w", err)
+			addConfigError(wrappedErr, definition, nil)
+			continue
+		}
+		admissionRequest := cel.CreateAdmissionRequest(versionedAttr.Attributes, metav1.GroupVersionResource(matchResource), metav1.GroupVersionKind(versionedAttr.VersionedKind))
+		unstructuredRequest, err := cel.ConvertObjectToUnstructured(admissionRequest)
 		if err != nil {
 			// Configuration error.
 			addConfigError(err, definition, nil)
@@ -213,7 +222,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 				validationResults = append(validationResults,
 					hook.Evaluator.Validate(
 						ctx,
-						matchResource,
+						unstructuredRequest,
 						versionedAttr,
 						p,
 						namespace,

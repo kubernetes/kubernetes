@@ -21,9 +21,10 @@ import (
 	gojson "encoding/json"
 	"errors"
 	"fmt"
-	celgo "github.com/google/cel-go/cel"
 	"reflect"
 	"strconv"
+
+	celgo "github.com/google/cel-go/cel"
 
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/traits"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/cel/mutation"
 	"k8s.io/apiserver/pkg/cel/mutation/dynamic"
@@ -118,7 +120,11 @@ func (e *jsonPatcher) Patch(ctx context.Context, r Request, runtimeCELCostBudget
 func (e *jsonPatcher) evaluatePatchExpression(ctx context.Context, patchEvaluator plugincel.MutatingEvaluator, remainingBudget int64, r Request, admissionRequest *admissionv1.AdmissionRequest) (jsonpatch.Patch, int64, error) {
 	var err error
 	var eval plugincel.EvaluationResult
-	eval, remainingBudget, err = patchEvaluator.ForInput(ctx, r.VersionedAttributes, admissionRequest, r.OptionalVariables, r.Namespace, remainingBudget)
+	request, err := cel.ConvertObjectToUnstructured(admissionRequest)
+	if err != nil {
+		return nil, -1, fmt.Errorf("failed to convert AdmissionRequest to unstructured: %w", err)
+	}
+	eval, remainingBudget, err = patchEvaluator.ForInput(ctx, r.VersionedAttributes, request, r.OptionalVariables, r.Namespace, remainingBudget)
 	if err != nil {
 		return nil, -1, err
 	}
