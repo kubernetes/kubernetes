@@ -659,3 +659,94 @@ func TestExtendedResourceName(t *testing.T) {
 		})
 	}
 }
+
+func TestResourceFullyQualifiedName(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "valid name with prefix",
+		input:    "prefix.com/name",
+		wantErrs: nil,
+	}, {
+		name:     "valid name with complex prefix",
+		input:    "my-subdomain.example.com/name",
+		wantErrs: nil,
+	}, {
+		name:  "invalid name with dots",
+		input: "prefix.com/name.with.dots",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "name.with.dots", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid name with dashes",
+		input: "prefix.com/name-with-dashes",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "name-with-dashes", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: no prefix",
+		input: "name",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "name", "a fully qualified name must be a prefix and a name separated by a slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: empty",
+		input: "",
+		wantErrs: field.ErrorList{
+			field.Required(fldPath, "name can't be empty"),
+		},
+	}, {
+		name:  "invalid: prefix too long",
+		input: strings.Repeat("a", 254) + "/name",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, strings.Repeat("a", 254), "prefix: must be no more than 253 bytes").WithOrigin("format=k8s-resource-fully-qualified-name"),
+			field.TooLong(fldPath, strings.Repeat("a", 254), 63).WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: name too long",
+		input: "prefix.com/" + strings.Repeat("a", 64),
+		wantErrs: field.ErrorList{
+			field.TooLong(fldPath, strings.Repeat("a", 64), 32).WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: prefix is not a valid DNS subdomain",
+		input: "Prefix.com/name",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "Prefix.com", "prefix: a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:     "invalid: name is not a valid RFC 1123 label",
+		input:    "prefix.com/Name",
+		wantErrs: nil, // no errors, C-identifiers can have uppercase letters
+	}, {
+		name:     "invalid: more than one slash",
+		input:    "prefix.com/name/extra",
+		wantErrs: nil, // This is not validated, yet.
+	}, {
+		name:  "invalid: empty name",
+		input: "prefix.com/",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "", "name must not be empty").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: empty prefix",
+		input: "/name",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "", "prefix must not be empty").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := ResourceFullyQualifiedName(ctx, operation.Operation{}, fldPath, &value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
