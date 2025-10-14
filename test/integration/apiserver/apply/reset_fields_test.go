@@ -324,13 +324,19 @@ func TestApplyResetFields(t *testing.T) {
 	}
 }
 
-// TestUpdateStatusWithOldVersion tests that apply with resetFields works as expected.
+// TestUpdateStatusWithOldVersion tests that apply with resetFields works correctly when updating
+// a custom resource's status subresource using an older API version while maintaining field ownership.
 func TestUpdateStatusWithOldVersion(t *testing.T) {
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer server.TearDownFn()
+
+	client, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	apiExtensionClient, err := apiextensionsclientset.NewForConfig(server.ClientConfig)
 	if err != nil {
@@ -341,7 +347,7 @@ func TestUpdateStatusWithOldVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuBetaDefinition := nearlyRemovedBetaMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	noxuBetaDefinition := nearlyRemovedBetaMultipleVersionNoxuCRDWithStatus(apiextensionsv1beta1.NamespaceScoped)
 
 	noxuDefinition, err := fixtures.CreateCRDUsingRemovedAPI(server.EtcdClient, server.EtcdStoragePrefix, noxuBetaDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
@@ -352,16 +358,23 @@ func TestUpdateStatusWithOldVersion(t *testing.T) {
 	name := "mytest"
 
 	rest := apiExtensionClient.Discovery().RESTClient()
-	// create cr resource by v1beta1 version restful api
+	// create namespace ns test
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resetFieldsNamespace}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the resource using the v1 CRD API.
 	yamlBody := []byte(fmt.Sprintf(`
 apiVersion: %s
 kind: %s
 metadata:
  name: %s
+ namespace: %s
 spec:
- replicas: 1`, apiVersion, kind, name))
+ a: value-for-a
+ b: value-for-b`, apiVersion, kind, name, resetFieldsNamespace))
 	result, err := rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[1].Name, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[1].Name, "/namespaces", resetFieldsNamespace, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
@@ -369,28 +382,32 @@ spec:
 	if err != nil {
 		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 	}
-	verifyReplicas(t, result, 1)
-
+	t.Logf("result: %s", string(result))
 	oldManagedFields, err := getManagedFields(result)
 	if err != nil {
 		t.Fatalf("failed to get managed fields: %v", err)
 	}
-	// update sub status by v1beta2 version restful api
+	// When updating the status subresource via the v1beta1 CRD API,
+	// we assign a value to the spec field for testing purposes.
+	// However, in this case, the operation should NOT trigger any field manager updates
+	// related to server-side apply tracking.
 	updateStatusBytes := []byte(`{
-	"status": {
-		"xx": "a"
-	}
+  "spec": { "a": "value-for-a-update" },
+  "status": {
+    "a": "status-for-a"
+  }
 }`)
 	result, err = rest.Patch(types.MergePatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
-		SubResource("status").
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, "/namespaces", resetFieldsNamespace, noxuDefinition.Spec.Names.Plural).
 		Name(name).
+		SubResource("status").
 		Param("fieldManager", "subresource_test").
 		Body(updateStatusBytes).
 		DoRaw(context.TODO())
 	if err != nil {
 		t.Fatalf("Error updating subresource: %v ", err)
 	}
+	t.Logf("result: %s", string(result))
 	newManagedFields, err := getManagedFields(result)
 	// newManagedFields should include oldManagedFields
 	var applyManagerFound, subresourceManagerFound bool
