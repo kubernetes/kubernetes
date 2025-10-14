@@ -30,6 +30,13 @@ const (
 	// referring to a PCIe (Peripheral Component Interconnect Express) Root Complex.
 	// This attribute can be used to identify devices that share the same PCIe Root Complex.
 	StandardDeviceAttributePCIeRoot resourceapi.QualifiedName = StandardDeviceAttributePrefix + "pcieRoot"
+
+	// StandardDeviceAttributePCIBusID is a standard device attribute name
+	// which describes the PCI Bus address of the PCI device.
+	// The value is a string value in the extended BDF notation (Domain:Bus:Device.Function),
+	// referring to a PCI (Peripheral Component Interconnect) device.
+	// This attribute can be used to identify PCI devices.
+	StandardDeviceAttributePCIBusID resourceapi.QualifiedName = StandardDeviceAttributePrefix + "pciBusID"
 )
 
 // DeviceAttribute represents a device attribute name and its value

@@ -34,13 +34,8 @@ import (
 //
 // ref: https://wiki.xenproject.org/wiki/Bus:Device.Function_(BDF)_Notation
 func GetPCIeRootAttributeByPCIBusID(pciBusID string) (DeviceAttribute, error) {
-	if pciBusID == "" {
-		return DeviceAttribute{}, fmt.Errorf("PCI Bus ID cannot be empty")
-	}
-
-	bdfRegexp := regexp.MustCompile(`^([0-9a-f]{4}):([0-9a-f]{2}):([0-9a-f]{2})\.([0-9a-f]{1})$`)
-	if !bdfRegexp.MatchString(pciBusID) {
-		return DeviceAttribute{}, fmt.Errorf("invalid PCI Bus ID format: %s", pciBusID)
+	if err := verifyPCIBDFFormat(pciBusID); err != nil {
+		return DeviceAttribute{}, err
 	}
 
 	pcieRoot, err := resolvePCIeRoot(pciBusID)
@@ -99,4 +94,40 @@ func resolvePCIeRoot(pciBusID string) (string, error) {
 	pcieRootPart := strings.Split(strings.TrimPrefix(target, sysfs.devices("")+"/"), "/")[0]
 
 	return pcieRootPart, nil
+}
+
+// GetPCIBusIDAttribute returns a DeviceAttribute with the PCI Bus Address("<domain>:<bus>:<device>.<function>")
+// of a PCI device as a string value.
+//
+// It returns an error if the PCI Bus ID is empty or is not in
+// extended BDF (Domain:Bus:Device.Function) format, e.g., "0123:45:1e.7"
+//
+// ref: https://wiki.xenproject.org/wiki/Bus:Device.Function_(BDF)_Notation
+func GetPCIBusIDAttribute(pciBusID string) (DeviceAttribute, error) {
+	if err := verifyPCIBDFFormat(pciBusID); err != nil {
+		return DeviceAttribute{}, err
+	}
+
+	attr := DeviceAttribute{
+		Name:  StandardDeviceAttributePCIBusID,
+		Value: resourceapi.DeviceAttribute{StringValue: &pciBusID},
+	}
+
+	return attr, nil
+}
+
+// verifyPCIBDFFormat verifies that the PCI Bus ID is in extended BDF (Domain:Bus:Device.Function) format.
+//
+// ref: https://wiki.xenproject.org/wiki/Bus:Device.Function_(BDF)_Notation
+func verifyPCIBDFFormat(pciBusID string) error {
+	if pciBusID == "" {
+		return fmt.Errorf("PCI Bus ID cannot be empty")
+	}
+
+	bdfRegexp := regexp.MustCompile(`^([0-9a-f]{4}):([0-9a-f]{2}):([0-9a-f]{2})\.([0-9a-f]{1})$`)
+	if !bdfRegexp.MatchString(pciBusID) {
+		return fmt.Errorf("invalid PCI Bus ID format: %s", pciBusID)
+	}
+
+	return nil
 }
