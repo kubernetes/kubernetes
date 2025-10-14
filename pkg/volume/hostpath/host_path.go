@@ -196,7 +196,11 @@ func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) 
 }
 
 func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error) {
-	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.HostPath == nil {
+	if spec.PersistentVolume == nil {
+		return nil, fmt.Errorf("spec.PersistentVolume is nil")
+	}
+
+	if spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
 	path := spec.PersistentVolume.Spec.HostPath.Path
