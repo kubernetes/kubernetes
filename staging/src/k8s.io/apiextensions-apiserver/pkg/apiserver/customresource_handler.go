@@ -1054,7 +1054,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	// resetField write all version information
 	for _, v := range crd.Spec.Versions {
 		clusterScoped := crd.Spec.Scope == apiextensionsv1.ClusterScoped
-		if requestScopes[v.Name] == nil {
+		// Do not construct storage if version is neither served nor stored
+		if !v.Storage && !v.Served {
 			continue
 		}
 		statusScope := *requestScopes[v.Name]
