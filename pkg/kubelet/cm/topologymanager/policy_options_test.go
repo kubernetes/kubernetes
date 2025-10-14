@@ -25,6 +25,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var fancyBetaOption = "fancy-new-option"
@@ -143,12 +144,14 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 	betaOptions.Insert(fancyBetaOption)
 	alphaOptions.Insert(fancyAlphaOption)
 
+	logger, _ := ktesting.NewTestContext(t)
+
 	for _, tcase := range testCases {
 		t.Run(tcase.description, func(t *testing.T) {
 			if tcase.featureGate != "" {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tcase.featureGate, tcase.featureGateEnable)
 			}
-			opts, err := NewPolicyOptions(tcase.policyOptions)
+			opts, err := NewPolicyOptions(logger, tcase.policyOptions)
 			if tcase.expectedErr != nil {
 				if !strings.Contains(err.Error(), tcase.expectedErr.Error()) {
 					t.Errorf("Unexpected error message. Have: %s, wants %s", err.Error(), tcase.expectedErr.Error())
