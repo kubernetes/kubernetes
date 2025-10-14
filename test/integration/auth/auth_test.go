@@ -41,10 +41,9 @@ import (
 	"testing"
 	"time"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/google/go-cmp/cmp"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -65,6 +64,7 @@ import (
 	"k8s.io/client-go/rest"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	resttransport "k8s.io/client-go/transport"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -1566,4 +1566,49 @@ func newTestWebhookTokenAuthServer() *httptest.Server {
 	server := httptest.NewUnstartedServer(http.HandlerFunc(serveHTTP))
 	server.Start()
 	return server
+}
+
+func TestSloppySANCertificates(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// append to opts.Authentication.ClientCert.ClientCA
+			fmt.Println(opts.Authentication.ClientCert.ClientCA)
+			caData, err := os.ReadFile(opts.Authentication.ClientCert.ClientCA)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sloppyCAData, err := os.ReadFile("testdata/sloppy-san-root.pem")
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = os.WriteFile(opts.Authentication.ClientCert.ClientCA, []byte(string(caData)+"\n"+string(sloppyCAData)), os.FileMode(0644))
+			if err != nil {
+				t.Fatal(err)
+			}
+		},
+	})
+	defer tearDownFn()
+
+	var err error
+	kubeConfig = rest.AnonymousClientConfig(kubeConfig)
+	kubeConfig.CertData, err = os.ReadFile("testdata/sloppy-san-client.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	kubeConfig.KeyData, err = os.ReadFile("testdata/sloppy-san-client-key.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := clientset.NewForConfig(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := c.AuthenticationV1().SelfSubjectReviews().Create(tCtx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status.UserInfo.Username != "sloppy-san-client" {
+		t.Fatalf("expected sloppy-san-client, got %#v", r.Status.UserInfo)
+	}
 }
