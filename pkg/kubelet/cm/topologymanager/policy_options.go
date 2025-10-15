@@ -32,12 +32,11 @@ const (
 )
 
 var (
-	alphaOptions = sets.New[string]()
-	betaOptions  = sets.New[string](
-		MaxAllowableNUMANodes,
-	)
+	alphaOptions  = sets.New[string]()
+	betaOptions   = sets.New[string]()
 	stableOptions = sets.New[string](
 		PreferClosestNUMANodes,
+		MaxAllowableNUMANodes,
 	)
 )
 
