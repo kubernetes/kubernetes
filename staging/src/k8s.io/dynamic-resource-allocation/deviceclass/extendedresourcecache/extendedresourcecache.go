@@ -148,6 +148,13 @@ func (c *ExtendedResourceCache) OnDelete(obj interface{}) {
 	}
 }
 
+// OnBookmark handles bookmark events.
+func (c *ExtendedResourceCache) OnBookmark(rv string) {
+	for _, handler := range c.handlers {
+		handler.OnBookmark(rv)
+	}
+}
+
 // updateResourceName2class updates the cache with the device class mapping.
 // It first removes any existing mappings for this device class to handle
 // ExtendedResourceName changes, then adds the new mappings.

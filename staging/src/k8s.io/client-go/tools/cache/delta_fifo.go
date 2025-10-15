@@ -52,6 +52,13 @@ type DeltaFIFOOptions struct {
 	// When false, `Sync` events will be sent instead.
 	EmitDeltaTypeReplaced bool
 
+	// EmitDeltaTypeBookmark indicates that the queue consumer understands the
+	// Bookmark DeltaType. When true, Bookmark events will be sent for the
+	// Replace() and Bookmark() call in order for the consumer to track the
+	// resource version. The object emitted by the type is the resource version
+	// of type string.
+	EmitDeltaTypeBookmark bool
+
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
@@ -137,6 +144,12 @@ type DeltaFIFO struct {
 	// DeltaType when Replace() is called (to preserve backwards compat).
 	emitDeltaTypeReplaced bool
 
+	// emitDeltaTypeBookmark indicates that the queue consumer understands the
+	// Bookmark DeltaType. When true, Bookmark events will be sent for the
+	// Replace() and Bookmark() call in order for the consumer to track the
+	// resource version.
+	emitDeltaTypeBookmark bool
+
 	// Called with every object if non-nil.
 	transformer TransformFunc
 
@@ -180,6 +193,9 @@ const (
 	Replaced DeltaType = "Replaced"
 	// Sync is for synthetic events during a periodic resync.
 	Sync DeltaType = "Sync"
+	// Bookmark is emitted on Bookmark calls and Replace calls to pass resource
+	// version information to the consumer.
+	Bookmark DeltaType = "Bookmark"
 )
 
 // Delta is a member of Deltas (a list of Delta objects) which
@@ -259,6 +275,7 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 		knownObjects: opts.KnownObjects,
 
 		emitDeltaTypeReplaced: opts.EmitDeltaTypeReplaced,
+		emitDeltaTypeBookmark: opts.EmitDeltaTypeBookmark,
 		transformer:           opts.Transformer,
 		logger:                klog.Background(),
 	}
@@ -425,7 +442,13 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 // ignore emitDeltaTypeReplaced.
 // Caller must lock first.
 func (f *DeltaFIFO) queueActionInternalLocked(actionType, internalActionType DeltaType, obj interface{}) error {
-	id, err := f.KeyOf(obj)
+	var id string
+	var err error
+	if internalActionType == Bookmark {
+		id = ""
+	} else {
+		id, err = f.KeyOf(obj)
+	}
 	if err != nil {
 		return KeyError{obj, err}
 	}
@@ -442,7 +465,7 @@ func (f *DeltaFIFO) queueActionInternalLocked(actionType, internalActionType Del
 	// Default informers do not pass existing objects to Replace.
 	if f.transformer != nil {
 		_, isTombstone := obj.(DeletedFinalStateUnknown)
-		if !isTombstone && internalActionType != Sync {
+		if !isTombstone && internalActionType != Sync && internalActionType != Bookmark {
 			var err error
 			obj, err = f.transformer(obj)
 			if err != nil {
@@ -542,6 +565,15 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	}
 }
 
+func (f *DeltaFIFO) Bookmark(resourceVersion string) error {
+	if !f.emitDeltaTypeBookmark {
+		return nil
+	}
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.queueActionLocked(Bookmark, resourceVersion)
+}
+
 // Replace atomically does two things: (1) it adds the given objects
 // using the Sync or Replace DeltaType and then (2) it does some deletions.
 // In particular: for every pre-existing key K that is not the key of
@@ -551,7 +583,7 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 // `f.items` and `f.knownObjects` (if not nil). The last known object for key K is
 // the one present in the last delta in `f.items`. If there is no delta for K
 // in `f.items`, it is the object in `f.knownObjects`
-func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
+func (f *DeltaFIFO) Replace(list []interface{}, listResourceVersion string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	keys := make(sets.Set[string], len(list))
@@ -627,6 +659,12 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 	if !f.populated {
 		f.populated = true
 		f.initialPopulationCount = keys.Len() + queuedDeletions
+	}
+
+	if f.emitDeltaTypeBookmark {
+		if err := f.queueActionLocked(Bookmark, listResourceVersion); err != nil {
+			return err
+		}
 	}
 
 	return nil

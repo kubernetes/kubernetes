@@ -73,6 +73,9 @@ func (l *testListener) OnUpdate(old, new interface{}) {
 func (l *testListener) OnDelete(obj interface{}) {
 }
 
+func (l *testListener) OnBookmark(rv string) {
+}
+
 func (l *testListener) handle(obj interface{}) {
 	key, _ := MetaNamespaceKeyFunc(obj)
 	fmt.Printf("%s: handle: %v\n", l.name, key)

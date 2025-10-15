@@ -173,6 +173,9 @@ func (m *mockEventHandler) OnDelete(obj interface{}) {
 	})
 }
 
+func (m *mockEventHandler) OnBookmark(rv string) {
+}
+
 func (m *mockEventHandler) verifyAndFlush(tCtx ktesting.TContext, expectedEvents []event) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
