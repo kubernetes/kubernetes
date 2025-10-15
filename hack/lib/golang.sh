@@ -1006,7 +1006,7 @@ kube::golang::build_binaries() {
     return "${fails}"
   else
     for platform in "${platforms[@]}"; do
-      kube::log::status "Building go targets for ${platform}"
+      kube::log::status "Building go targets for ${platform} in ${KUBE_OUTPUT_BIN}"
       (
         kube::golang::set_platform_envs "${platform}"
         kube::golang::build_binaries_for_platform "${platform}"
