@@ -771,6 +771,7 @@ kube::golang::delete_coverage_dummy_test() {
 kube::golang::build_some_binaries() {
   if [[ -n "${KUBE_BUILD_WITH_COVERAGE:-}" ]]; then
     local -a uncovered=()
+    go env
     for package in "$@"; do
       if kube::golang::is_instrumented_package "${package}"; then
         V=2 kube::log::info "Building ${package} with coverage..."
