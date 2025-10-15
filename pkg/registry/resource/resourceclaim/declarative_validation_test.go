@@ -548,6 +548,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 }
 
 func TestValidateStatusUpdateForDeclarative(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testValidateStatusUpdateForDeclarative(t, apiVersion)
+		})
+	}
+}
+
+func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 	fakeClient := fake.NewClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()
 	Strategy := NewStrategy(mockNSClient)
@@ -555,7 +563,7 @@ func TestValidateStatusUpdateForDeclarative(t *testing.T) {
 
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:    "resource.k8s.io",
-		APIVersion:  "v1",
+		APIVersion:  apiVersion,
 		Resource:    "resourceclaims",
 		Subresource: "status",
 	})
