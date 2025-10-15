@@ -1011,6 +1011,7 @@ kube::golang::build_binaries() {
         kube::golang::set_platform_envs "${platform}"
         kube::golang::build_binaries_for_platform "${platform}"
       )
+      find "${KUBE_OUTPUT_BIN}/"
     done
   fi
 }
