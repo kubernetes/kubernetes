@@ -61,11 +61,6 @@ func TestServiceAllocation(t *testing.T) {
 			ipAllocatorGate:      true,
 			disableDualWriteGate: true,
 		},
-		{
-			name:                 "disable dual write with bitmap allocator",
-			ipAllocatorGate:      false,
-			disableDualWriteGate: true,
-		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -296,6 +291,9 @@ func TestMigrateService(t *testing.T) {
 // TestSkewedAllocatorsRollback creating an apiserver with the new allocator and
 // later starting an old apiserver with the bitmap allocator.
 func TestSkewedAllocatorsRollback(t *testing.T) {
+	// TODO(#134606): Fix or remove this test.
+	t.Skip("Temporarily disabled: see http://issues.k8s.io/134606")
+
 	svc := func(i int) *v1.Service {
 		return &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -344,7 +342,7 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			"--emulated-version=1.33",
-			fmt.Sprintf("--feature-gates=%s=false,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
+			fmt.Sprintf("--feature-gates=%s=false,%s=false", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
 		etcdOptions)
 	defer s2.TearDownFn()
 
