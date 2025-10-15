@@ -124,6 +124,16 @@ func Validate_AllocatedDeviceStatus(ctx context.Context, op operation.Operation,
 	return errs
 }
 
+var symbolsForAllocationConfigSource = sets.New(resourcev1beta1.AllocationConfigSourceClaim, resourcev1beta1.AllocationConfigSourceClass)
+
+// Validate_AllocationConfigSource validates an instance of AllocationConfigSource according
+// to declarative validation rules in the API schema.
+func Validate_AllocationConfigSource(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.AllocationConfigSource) (errs field.ErrorList) {
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForAllocationConfigSource, nil)...)
+
+	return errs
+}
+
 // Validate_AllocationResult validates an instance of AllocationResult according
 // to declarative validation rules in the API schema.
 func Validate_AllocationResult(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.AllocationResult) (errs field.ErrorList) {
@@ -149,7 +159,29 @@ func Validate_AllocationResult(ctx context.Context, op operation.Operation, fldP
 // Validate_DeviceAllocationConfiguration validates an instance of DeviceAllocationConfiguration according
 // to declarative validation rules in the API schema.
 func Validate_DeviceAllocationConfiguration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceAllocationConfiguration) (errs field.ErrorList) {
-	// field resourcev1beta1.DeviceAllocationConfiguration.Source has no validation
+	// field resourcev1beta1.DeviceAllocationConfiguration.Source
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.AllocationConfigSource) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_AllocationConfigSource(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("source"), &obj.Source, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceAllocationConfiguration) *resourcev1beta1.AllocationConfigSource {
+			return &oldObj.Source
+		}))...)
+
 	// field resourcev1beta1.DeviceAllocationConfiguration.Requests has no validation
 
 	// field resourcev1beta1.DeviceAllocationConfiguration.DeviceConfiguration

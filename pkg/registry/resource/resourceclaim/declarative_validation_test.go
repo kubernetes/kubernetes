@@ -652,6 +652,7 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 		Subresource: "status",
 	})
 	poolPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("pool")
+	configSourcePath := field.NewPath("status", "allocation", "devices", "config").Index(0).Child("source")
 	testCases := map[string]struct {
 		old          resource.ResourceClaim
 		update       resource.ResourceClaim
@@ -878,6 +879,29 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 			),
 			expectedErrs: field.ErrorList{
 				field.TooMany(field.NewPath("status", "allocation", "devices", "config"), 33, 32).WithOrigin("maxItems"),
+			},
+		},
+		// .Status.Allocation.Devices.Config[%d].Source
+		"valid status.allocation.devices.config source FromClass": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationConfigSource(resource.AllocationConfigSourceClass)),
+		},
+		"valid status.allocation.devices.config source FromClaim": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationConfigSource(resource.AllocationConfigSourceClaim)),
+		},
+		"invalid status.allocation.devices.config source empty": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationConfigSource("")),
+			expectedErrs: field.ErrorList{
+				field.Required(configSourcePath, "").MarkCoveredByDeclarative(),
+			},
+		},
+		"invalid status.allocation.devices.config source invalid": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationConfigSource("invalid")),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(configSourcePath, resource.AllocationConfigSource("invalid"), []string{string(resource.AllocationConfigSourceClaim), string(resource.AllocationConfigSourceClass)}).MarkCoveredByDeclarative(),
 			},
 		},
 	}
@@ -1141,4 +1165,27 @@ func addStatusAllocationResult(obj resource.ResourceClaim) resource.ResourceClai
 			})
 	}
 	return obj
+}
+
+func tweakStatusAllocationConfigSource(source resource.AllocationConfigSource) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil {
+			rc.Status.Allocation = &resource.AllocationResult{}
+		}
+		if len(rc.Status.Allocation.Devices.Config) == 0 {
+			rc.Status.Allocation.Devices.Config = append(rc.Status.Allocation.Devices.Config, resource.DeviceAllocationConfiguration{
+				Source:   resource.AllocationConfigSourceClaim,
+				Requests: []string{"req-0"},
+				DeviceConfiguration: resource.DeviceConfiguration{
+					Opaque: &resource.OpaqueDeviceConfiguration{
+						Driver: "dra.example.com",
+						Parameters: runtime.RawExtension{
+							Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+						},
+					},
+				},
+			})
+		}
+		rc.Status.Allocation.Devices.Config[0].Source = source
+	}
 }

@@ -525,10 +525,10 @@ func validateAllocationConfigSource(source resource.AllocationConfigSource, fldP
 	var allErrs field.ErrorList
 	switch source {
 	case "":
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+		allErrs = append(allErrs, field.Required(fldPath, "").MarkCoveredByDeclarative())
 	case resource.AllocationConfigSourceClaim, resource.AllocationConfigSourceClass:
 	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath, source, []resource.AllocationConfigSource{resource.AllocationConfigSourceClaim, resource.AllocationConfigSourceClass}))
+		allErrs = append(allErrs, field.NotSupported(fldPath, source, []resource.AllocationConfigSource{resource.AllocationConfigSourceClaim, resource.AllocationConfigSourceClass}).MarkCoveredByDeclarative())
 	}
 	return allErrs
 }
