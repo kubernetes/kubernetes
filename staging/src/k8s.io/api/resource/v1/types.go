@@ -1628,6 +1628,7 @@ type DeviceAllocationConfiguration struct {
 	// or from a claim.
 	//
 	// +required
+	// +k8s:required
 	Source AllocationConfigSource `json:"source" protobuf:"bytes,1,name=source"`
 
 	// Requests lists the names of requests where the configuration applies.
@@ -1644,12 +1645,14 @@ type DeviceAllocationConfiguration struct {
 	DeviceConfiguration `json:",inline" protobuf:"bytes,3,name=deviceConfiguration"`
 }
 
+// +enum
+// +k8s:enum
 type AllocationConfigSource string
 
 // Valid [DeviceAllocationConfiguration.Source] values.
 const (
-	AllocationConfigSourceClass = "FromClass"
-	AllocationConfigSourceClaim = "FromClaim"
+	AllocationConfigSourceClass AllocationConfigSource = "FromClass"
+	AllocationConfigSourceClaim AllocationConfigSource = "FromClaim"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
