@@ -1602,8 +1602,8 @@ type AllocationConfigSource string
 
 // Valid [DeviceAllocationConfiguration.Source] values.
 const (
-	AllocationConfigSourceClass = "FromClass"
-	AllocationConfigSourceClaim = "FromClaim"
+	AllocationConfigSourceClass AllocationConfigSource = "FromClass"
+	AllocationConfigSourceClaim AllocationConfigSource = "FromClaim"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

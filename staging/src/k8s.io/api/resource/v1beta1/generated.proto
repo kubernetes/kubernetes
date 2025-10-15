@@ -472,6 +472,7 @@ message DeviceAllocationConfiguration {
   // or from a claim.
   //
   // +required
+  // +k8s:required
   optional string source = 1;
 
   // Requests lists the names of requests where the configuration applies.
