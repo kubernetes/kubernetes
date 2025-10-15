@@ -2121,6 +2121,23 @@
         }
       ],
       "resourceClaimName": "resourceClaimNameValue"
+    },
+    "allocatedResources": {
+      "allocatedResourcesKey": "0"
+    },
+    "resources": {
+      "limits": {
+        "limitsKey": "0"
+      },
+      "requests": {
+        "requestsKey": "0"
+      },
+      "claims": [
+        {
+          "name": "nameValue",
+          "request": "requestValue"
+        }
+      ]
     }
   }
 }

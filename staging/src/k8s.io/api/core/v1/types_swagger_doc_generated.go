@@ -1951,6 +1951,8 @@ var map_PodStatus = map[string]string{
 	"resize":                      "Status of resources resize desired for pod's containers. It is empty if no resources resize is pending. Any changes to container resources will automatically set this to \"Proposed\" Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress. PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources. PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.",
 	"resourceClaimStatuses":       "Status of resource claims.",
 	"extendedResourceClaimStatus": "Status of extended resource claim backed by DRA.",
+	"allocatedResources":          "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
+	"resources":                   "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {
