@@ -26,6 +26,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	fwk "k8s.io/kube-scheduler/framework"
+
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -51,6 +54,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	cliflag "k8s.io/component-base/cli/flag"
+	ndflib "k8s.io/component-helpers/nodedeclaredfeatures"
 	pvutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
@@ -68,6 +72,8 @@ import (
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	ndfplugin "k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodedeclaredfeatures"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -724,6 +730,42 @@ func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 		t, InitTestAPIServer(t, nsPrefix, nil),
 		0,
 		scheduler.WithProfiles(cfg.Profiles...))
+	SyncSchedulerInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+	return testCtx
+}
+
+func InitTestSchedulerWithNodeDeclaredFeaturesHelper(t *testing.T, nsPrefix string, helper *ndflib.Helper, kubeVersion string) *TestContext {
+	const customPluginName = "NodeDeclaredFeaturesWithMockLibrary"
+	registry := frameworkruntime.Registry{
+		customPluginName: func(ctx context.Context, o runtime.Object, h fwk.Handle) (fwk.Plugin, error) {
+			return ndfplugin.NewWithHelper(helper, kubeVersion)
+		},
+	}
+
+	// swap out the default NodeDeclaredFeatures plugin with the custom one with mock library
+	cfg := configtesting.V1ToInternalWithDefaults(t, kubeschedulerconfigv1.KubeSchedulerConfiguration{
+		Profiles: []kubeschedulerconfigv1.KubeSchedulerProfile{{
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			Plugins: &kubeschedulerconfigv1.Plugins{
+				PreFilter: kubeschedulerconfigv1.PluginSet{
+					Enabled:  []kubeschedulerconfigv1.Plugin{{Name: customPluginName}},
+					Disabled: []kubeschedulerconfigv1.Plugin{{Name: names.NodeDeclaredFeatures}},
+				},
+				Filter: kubeschedulerconfigv1.PluginSet{
+					Enabled:  []kubeschedulerconfigv1.Plugin{{Name: customPluginName}},
+					Disabled: []kubeschedulerconfigv1.Plugin{{Name: names.NodeDeclaredFeatures}},
+				},
+			},
+		}},
+	})
+
+	testCtx := InitTestSchedulerWithOptions(
+		t, InitTestAPIServer(t, nsPrefix, nil),
+		0,
+		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithFrameworkOutOfTreeRegistry(registry),
+	)
 	SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
 	return testCtx
