@@ -1999,6 +1999,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 //
 // Entries are alphabetized.
 var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]featuregate.Feature{
+	DisableAllocatorDualWrite:                {MultiCIDRServiceAllocator},
 	InPlacePodVerticalScalingAllocatedStatus: {InPlacePodVerticalScaling},
 	InPlacePodVerticalScalingExclusiveCPUs:   {InPlacePodVerticalScaling},
 	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling, MemoryManager},
