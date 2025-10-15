@@ -117,6 +117,8 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 				"Resize":                      gstruct.Ignore(),
 				"ResourceClaimStatuses":       gstruct.Ignore(),
 				"ExtendedResourceClaimStatus": gstruct.Ignore(),
+				"Resources":                   gstruct.Ignore(),
+				"AllocatedResources":          gstruct.Ignore(),
 			}))
 		})
 	})
