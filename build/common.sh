@@ -61,6 +61,8 @@ KUBE_CROSS_IMAGE="${KUBE_CROSS_IMAGE:-"${KUBE_BASE_IMAGE_REGISTRY}/kube-cross"}"
 readonly KUBE_CROSS_IMAGE
 KUBE_CROSS_VERSION="${KUBE_CROSS_VERSION:-"${KUBE_BUILD_IMAGE_CROSS_TAG}"}"
 readonly KUBE_CROSS_VERSION
+KUBE_CROSS_CONTAINER_ROOT="/go/src/k8s.io/kubernetes"
+readonly KUBE_CROSS_CONTAINER_ROOT
 
 # Here we map the output directories across both the local and remote _output
 # directories:
@@ -462,10 +464,10 @@ function kube::build::run_build_command_ex() {
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
     --env "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-}"
     # mount source code / output dir
-    --volume "${KUBE_ROOT}:/go/src/k8s.io/kubernetes"
+    --volume "${KUBE_ROOT}:${KUBE_CROSS_CONTAINER_ROOT}"
     # env migrated from build-image, we could consider setting this in kube-cross
     --env 'KUBE_OUTPUT_SUBPATH=_output/dockerized'
-    --workdir /go/src/k8s.io/kubernetes
+    --workdir "${KUBE_CROSS_CONTAINER_ROOT}"
     --env 'GIT_AUTHOR_EMAIL=nobody@k8s.io'
     --env 'GIT_AUTHOR_NAME=kube-build-image'
   )
@@ -489,10 +491,10 @@ function kube::build::run_build_command_ex() {
     docker_run_opts+=(--cgroup-parent "${DOCKER_CGROUP_PARENT}")
   fi
 
+  # copy KUBE_GIT_VERSION_FILE to .dockerized-kube-version-defs and set environment variable.
   if [[ -n "${KUBE_GIT_VERSION_FILE:-}" ]]; then
-    kube::version::get_version_vars
-    kube::version::save_version_vars "${KUBE_ROOT}/.dockerized-kube-version-defs"
-    docker_run_opts+=(--env 'KUBE_GIT_VERSION_FILE=/go/src/k8s.io/kubernetes/.dockerized-kube-version-defs')
+    cp "${KUBE_GIT_VERSION_FILE}" "${KUBE_ROOT}/.dockerized-kube-version-defs"
+    docker_run_opts+=(--env "KUBE_GIT_VERSION_FILE=${KUBE_CROSS_CONTAINER_ROOT}/.dockerized-kube-version-defs")
   fi
 
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'
