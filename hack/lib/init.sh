@@ -41,7 +41,8 @@ KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 # If it is specified, we'll use it in KUBE_OUTPUT.
 _KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
 export KUBE_OUTPUT="${KUBE_ROOT}/${_KUBE_OUTPUT_SUBPATH}"
-export KUBE_OUTPUT_BIN="${KUBE_OUTPUT}/bin"
+readonly _KUBE_OUTPUT_BIN_SUBPATH="bin"
+export KUBE_OUTPUT_BIN="${KUBE_OUTPUT}/${_KUBE_OUTPUT_BIN_SUBPATH}"
 export THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
 
 # This controls rsync compression. Set to a value > 0 to enable rsync

@@ -661,7 +661,7 @@ kube::golang::place_bins() {
       platform_src=""
       rm -f "${THIS_PLATFORM_BIN}"
       mkdir -p "$(dirname "${THIS_PLATFORM_BIN}")"
-      ln -s "${KUBE_OUTPUT_BIN}/${platform}" "${THIS_PLATFORM_BIN}"
+      ln -s "../${_KUBE_OUTPUT_SUBPATH}/${_KUBE_OUTPUT_BIN_SUBPATH}/${platform}" "${THIS_PLATFORM_BIN}"
     fi
 
     V=3 kube::log::status "Placing binaries for ${platform} in ${KUBE_OUTPUT_BIN}/${platform}"
