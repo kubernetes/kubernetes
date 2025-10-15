@@ -489,6 +489,12 @@ function kube::build::run_build_command_ex() {
     docker_run_opts+=(--cgroup-parent "${DOCKER_CGROUP_PARENT}")
   fi
 
+  if [[ -n "${KUBE_GIT_VERSION_FILE:-}" ]]; then
+    kube::version::get_version_vars
+    kube::version::save_version_vars "${KUBE_ROOT}/.dockerized-kube-version-defs"
+    docker_run_opts+=(--env 'KUBE_GIT_VERSION_FILE=/go/src/k8s.io/kubernetes/.dockerized-kube-version-defs')
+  fi
+
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'
   # to work.  However, if we run this way and don't have stdin, then it ends up
   # running in a daemon-ish mode.  So if we don't have a stdin, we explicitly
