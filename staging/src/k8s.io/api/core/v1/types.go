@@ -5409,12 +5409,8 @@ type PodStatus struct {
 	AllocatedResources ResourceList `json:"allocatedResources,omitempty" protobuf:"bytes,19,rep,name=allocatedResources,casttype=ResourceList,castkey=ResourceName"`
 
 	// Resources represents the compute resource requests and limits that have been
-	// applied at the pod level. If pod-level resources are not explicitly specified,
-	// then these will be the aggregate resources computed from containers. If limits are
-	// not defined for all containers (and pod-level limits are also not set), those
-	// containers remain unrestricted, and no aggregate pod-level limits will be applied.
-	// Pod-level limit aggregation is only performed, and is meaningful only, when all
-	// containers have defined limits.
+	// applied at the pod level if pod-level requests or limits are set in
+	// PodSpec.Resources
 	// +featureGate=InPlacePodLevelResourcesVerticalScaling
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,20,opt,name=resources"`
