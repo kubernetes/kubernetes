@@ -662,6 +662,9 @@ kube::golang::place_bins() {
       rm -f "${THIS_PLATFORM_BIN}"
       mkdir -p "$(dirname "${THIS_PLATFORM_BIN}")"
       ln -s "${KUBE_OUTPUT_BIN}/${platform}" "${THIS_PLATFORM_BIN}"
+      kube::log::info "Creating ${THIS_PLATFORM_BIN}, ${platform} == ${host_platform}"
+    else
+      kube::log::info "Not creating ${THIS_PLATFORM_BIN}, ${platform} != ${host_platform}"
     fi
 
     V=3 kube::log::status "Placing binaries for ${platform} in ${KUBE_OUTPUT_BIN}/${platform}"
@@ -825,9 +828,10 @@ kube::golang::build_binaries_for_platform() {
     fi
    done
 
-  V=2 kube::log::info "Env for ${platform}: GOPATH=${GOPATH-} GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
-  V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags} and -tags=${gotags:-}"
-
+  kube::log::info "Env for ${platform}: GOPATH=${GOPATH-} GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
+  kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags} and -tags=${gotags:-}"
+  go env
+ 
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then
     build_args=(
@@ -1006,11 +1010,16 @@ kube::golang::build_binaries() {
     return "${fails}"
   else
     for platform in "${platforms[@]}"; do
-      kube::log::status "Building go targets for ${platform}"
+      kube::log::status "Building go targets for ${platform} in ${KUBE_OUTPUT_BIN}"
       (
         kube::golang::set_platform_envs "${platform}"
         kube::golang::build_binaries_for_platform "${platform}"
       )
+      set -x
+      ls -l _output
+      find "${KUBE_OUTPUT_BIN}/" || true
+      find _output/local/bin || true
+      set +x
     done
   fi
 }
