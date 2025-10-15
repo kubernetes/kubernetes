@@ -825,8 +825,8 @@ kube::golang::build_binaries_for_platform() {
     fi
    done
 
-  V=2 kube::log::info "Env for ${platform}: GOPATH=${GOPATH-} GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
-  V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags} and -tags=${gotags:-}"
+  kube::log::info "Env for ${platform}: GOPATH=${GOPATH-} GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
+  kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags} and -tags=${gotags:-}"
 
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then
