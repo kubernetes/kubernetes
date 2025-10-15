@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -141,8 +142,8 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 		},
 	}
 
-	betaOptions.Insert(fancyBetaOption)
-	alphaOptions.Insert(fancyAlphaOption)
+	setTopologyManagerOptionsDuringTest(t, betaOptions, fancyBetaOption)
+	setTopologyManagerOptionsDuringTest(t, alphaOptions, fancyAlphaOption)
 
 	logger, _ := ktesting.NewTestContext(t)
 
@@ -164,6 +165,14 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func setTopologyManagerOptionsDuringTest(t *testing.T, optionGroup sets.Set[string], opts ...string) {
+	t.Helper()
+	t.Cleanup(func() {
+		optionGroup.Delete(opts...)
+	})
+	optionGroup.Insert(opts...)
 }
 
 func TestPolicyDefaultsAvailable(t *testing.T) {
@@ -243,8 +252,8 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 			expectedAvailable: false,
 		},
 	}
-	betaOptions.Insert(fancyBetaOption)
-	alphaOptions.Insert(fancyAlphaOption)
+	setTopologyManagerOptionsDuringTest(t, betaOptions, fancyBetaOption)
+	setTopologyManagerOptionsDuringTest(t, alphaOptions, fancyAlphaOption)
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, testCase.featureGate, testCase.featureGateEnable)
