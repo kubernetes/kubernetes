@@ -154,7 +154,9 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			}
 			opts, err := NewPolicyOptions(logger, tcase.policyOptions)
 			if tcase.expectedErr != nil {
-				if !strings.Contains(err.Error(), tcase.expectedErr.Error()) {
+				if err == nil {
+					t.Errorf("expected error %v, got no error", tcase.expectedErr)
+				} else if !strings.Contains(err.Error(), tcase.expectedErr.Error()) {
 					t.Errorf("Unexpected error message. Have: %s, wants %s", err.Error(), tcase.expectedErr.Error())
 				}
 				return
