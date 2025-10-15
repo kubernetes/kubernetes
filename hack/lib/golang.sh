@@ -659,9 +659,15 @@ kube::golang::place_bins() {
     local platform_src="/${platform//\//_}"
     if [[ "${platform}" == "${host_platform}" ]]; then
       platform_src=""
-      rm -f "${THIS_PLATFORM_BIN}"
-      mkdir -p "$(dirname "${THIS_PLATFORM_BIN}")"
-      ln -s "../${_KUBE_OUTPUT_SUBPATH}/${_KUBE_OUTPUT_BIN_SUBPATH}/${platform}" "${THIS_PLATFORM_BIN}"
+      # For compatibility with the old rsync behavior, only setup the symlink
+      # when we're doing a "local" build, not a "dockerized" build
+      # if KUBE_OUTPUT_SUBPATH is set then we're not writing to the default local path
+      if [[ -z "${KUBE_OUTPUT_SUBPATH+x}" ]]; then
+        V=4 kube::log::status "Creating ${THIS_PLATFORM_BIN} symlink for non-dockerized build"
+        rm -f "${THIS_PLATFORM_BIN}"
+        mkdir -p "$(dirname "${THIS_PLATFORM_BIN}")"
+        ln -s "../${_KUBE_OUTPUT_SUBPATH}/${_KUBE_OUTPUT_BIN_SUBPATH}/${platform}" "${THIS_PLATFORM_BIN}"
+      fi
     fi
 
     V=3 kube::log::status "Placing binaries for ${platform} in ${KUBE_OUTPUT_BIN}/${platform}"
