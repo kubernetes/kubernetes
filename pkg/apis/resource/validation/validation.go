@@ -48,6 +48,15 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// ResourceNormalizationRules handles the structural differences between v1beta1
+// (flattened fields) and v1/v1beta2 (fields under 'exactly') for validation error paths.
+var ResourceNormalizationRules = []field.NormalizationRule{
+	{
+		Regexp:      regexp.MustCompile(`spec.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
+		Replacement: "spec.devices.requests[$1].exactly.$2",
+	},
+}
+
 var (
 	// validateResourceDriverName reuses the validation of a CSI driver because
 	// the allowed values are exactly the same.
