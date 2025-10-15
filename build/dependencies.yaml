@@ -134,8 +134,9 @@ dependencies:
     version: 1.24
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: hack/lib/golang.sh
-      match: minimum_go_version=go([0-9]+\.[0-9]+)
+    # TODO: uncomment when we fix the jobs
+    # - path: hack/lib/golang.sh
+    #   match: minimum_go_version=go([0-9]+\.[0-9]+)
     - path: staging/src/k8s.io/kms/internal/plugins/_mock/Dockerfile
       match: golang:([0-9]+\.[0-9]+).0-bullseye
 
