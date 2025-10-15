@@ -66,7 +66,7 @@ func TestScaleDeclarativeValidation(t *testing.T) {
 			obj, _ := legacyscheme.Scheme.ConvertToVersion(&tc.input, schema.GroupVersion{Group: apiGroup, Version: apiVersion})
 			tester.Test(t, tc.expectedErrs, legacyscheme.Scheme.Validate(ctx, nil, obj, "scale"))
 
-			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil, "scale")
+			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil, apitesting.WithSubResources("scale"))
 		})
 	}
 }

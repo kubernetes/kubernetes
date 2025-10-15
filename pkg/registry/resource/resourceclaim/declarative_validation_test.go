@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	pointer "k8s.io/utils/ptr"
 )
 
@@ -284,7 +285,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs, apitesting.WithNormalizationRules(resourceClaimNormalizationRules...))
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
 }
@@ -595,7 +596,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		t.Run(k, func(t *testing.T) {
 			tc.old.ResourceVersion = "1"
 			tc.update.ResourceVersion = "2"
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs, apitesting.WithNormalizationRules(resourceClaimNormalizationRules...))
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
 }
