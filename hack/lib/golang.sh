@@ -662,6 +662,7 @@ kube::golang::place_bins() {
       rm -f "${THIS_PLATFORM_BIN}"
       mkdir -p "$(dirname "${THIS_PLATFORM_BIN}")"
       ln -s "${KUBE_OUTPUT_BIN}/${platform}" "${THIS_PLATFORM_BIN}"
+      kube::log::info "Creating ${THIS_PLATFORM_BIN}, ${platform} == ${host_platform}"
     else
       kube::log::info "Not creating ${THIS_PLATFORM_BIN}, ${platform} != ${host_platform}"
     fi
