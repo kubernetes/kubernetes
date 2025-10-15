@@ -107,18 +107,6 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 			expectedAvailable: false,
 		},
 		{
-			option:            StrictCPUReservationOption,
-			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
-			featureGateEnable: false,
-			expectedAvailable: false,
-		},
-		{
-			option:            StrictCPUReservationOption,
-			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
-			featureGateEnable: true,
-			expectedAvailable: true,
-		},
-		{
 			option:            PreferAlignByUnCoreCacheOption,
 			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
 			featureGateEnable: false,
@@ -146,6 +134,7 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 func TestPolicyOptionsAlwaysAvailableOnceGA(t *testing.T) {
 	options := []string{
 		FullPCPUsOnlyOption,
+		StrictCPUReservationOption,
 	}
 	for _, option := range options {
 		t.Run(option, func(t *testing.T) {
