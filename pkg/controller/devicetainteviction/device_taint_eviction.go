@@ -218,9 +218,11 @@ type allocatedClaim struct {
 
 func (tc *Controller) deletePodHandler(c clientset.Interface, emitEventFunc func(tainteviction.NamespacedObject)) func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
 	return func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
-		klog.FromContext(ctx).Info("Deleting pod", "pod", args.Object)
 		var err error
 		for i := 0; i < retries; i++ {
+			if i > 0 {
+				time.Sleep(10 * time.Millisecond)
+			}
 			err = addConditionAndDeletePod(ctx, c, args.Object, &emitEventFunc)
 			if apierrors.IsNotFound(err) {
 				// Not a problem, the work is done.
@@ -229,11 +231,13 @@ func (tc *Controller) deletePodHandler(c clientset.Interface, emitEventFunc func
 				return nil
 			}
 			if err == nil {
+				podDeletionLatency := time.Since(fireAt)
+				// TODO: include more information why it was evicted.
+				klog.FromContext(ctx).Info("Evicted pod by deleting it", "pod", args.Object, "latency", podDeletionLatency)
 				tc.metrics.PodDeletionsTotal.Inc()
-				tc.metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt).Seconds()))
+				tc.metrics.PodDeletionsLatency.Observe(float64(podDeletionLatency.Seconds()))
 				return nil
 			}
-			time.Sleep(10 * time.Millisecond)
 		}
 		return err
 	}
