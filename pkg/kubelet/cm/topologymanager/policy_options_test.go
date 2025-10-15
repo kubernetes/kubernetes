@@ -60,23 +60,13 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			},
 		},
 		{
-			description:       "return TopologyManagerOptions with MaxAllowableNUMANodes set to 12",
-			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
-			featureGateEnable: true,
+			description: "return TopologyManagerOptions with MaxAllowableNUMANodes set to 12",
 			expectedOptions: PolicyOptions{
 				MaxAllowableNUMANodes: 12,
 			},
 			policyOptions: map[string]string{
 				MaxAllowableNUMANodes: "12",
 			},
-		},
-		{
-			description: "fail to set option when TopologyManagerPolicyBetaOptions feature gate is not set",
-			featureGate: pkgfeatures.TopologyManagerPolicyBetaOptions,
-			policyOptions: map[string]string{
-				MaxAllowableNUMANodes: "8",
-			},
-			expectedErr: fmt.Errorf("topology manager policy beta-level options not enabled,"),
 		},
 		{
 			description: "return empty TopologyManagerOptions",
@@ -93,9 +83,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			expectedErr: fmt.Errorf("bad value for option"),
 		},
 		{
-			description:       "fail to parse options with error MaxAllowableNUMANodes",
-			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
-			featureGateEnable: true,
+			description: "fail to parse options with error MaxAllowableNUMANodes",
 			policyOptions: map[string]string{
 				MaxAllowableNUMANodes: "can't parse to int",
 			},
@@ -219,6 +207,18 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 		},
 		{
 			option:            PreferClosestNUMANodes,
+			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
+			featureGateEnable: false,
+			expectedAvailable: true,
+		},
+		{
+			option:            PreferClosestNUMANodes,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: false,
+			expectedAvailable: true,
+		},
+		{
+			option:            MaxAllowableNUMANodes,
 			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
 			featureGateEnable: false,
 			expectedAvailable: true,
