@@ -270,7 +270,10 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 
 		// Abort if the container will not be restarted.
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-			return c.State.Terminated != nil || podutil.IsContainerRestartable(w.pod.Spec, w.container)
+			if c.State.Terminated == nil {
+				return true
+			}
+			return podutil.ContainerShouldRestart(w.container, w.pod.Spec, c.State.Terminated.ExitCode)
 		}
 		return c.State.Terminated == nil ||
 			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever ||

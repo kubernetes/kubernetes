@@ -24,7 +24,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -172,6 +175,123 @@ func TestDoProbe(t *testing.T) {
 
 			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 			resultsManager(m, probeType).Remove(testContainerID)
+		}
+	}
+}
+
+func TestDoProbeWithContainerRestartRules(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	TestDoProbe(t)
+
+	var (
+		restartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		restartPolicyNever     = v1.ContainerRestartPolicyNever
+		restartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+	)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	for _, probeType := range [...]probeType{liveness, readiness, startup} {
+		testcases := []struct {
+			name           string
+			container      v1.Container
+			podStatus      v1.PodStatus
+			expectContinue bool
+		}{
+			{
+				name: "container failed with container restartPolicy=OnFailure",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyOnFailure,
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer(),
+				expectContinue: true,
+			},
+			{
+				name: "container succeeded with containerRestartPolicy=OnFailure",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyOnFailure,
+				},
+				podStatus:      getTestRunningStatusWithSucceededContainer(),
+				expectContinue: false,
+			},
+			{
+				name: "container failed with containerRestartPolicy=Always",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyAlways,
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer(),
+				expectContinue: true,
+			},
+			{
+				name: "container succeeded with containerRestartPolicy=Always",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyAlways,
+				},
+				podStatus:      getTestRunningStatusWithSucceededContainer(),
+				expectContinue: true,
+			},
+			{
+				name: "container failed with containerRestartPolicy=Never",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyNever,
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer(),
+				expectContinue: false,
+			},
+			{
+				name: "container succeeded with containerRestartPolicy=Never",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyNever,
+				},
+				podStatus:      getTestRunningStatusWithSucceededContainer(),
+				expectContinue: false,
+			},
+			{
+				name: "container terminated with matching restartPolicyRules",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyNever,
+					RestartPolicyRules: []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{1},
+						},
+					}},
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer(),
+				expectContinue: true,
+			},
+			{
+				name: "container terminated with non-matching restartPolicyRules",
+				container: v1.Container{
+					RestartPolicy: &restartPolicyNever,
+					RestartPolicyRules: []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{99},
+						},
+					}},
+				},
+				podStatus:      getTestRunningStatusWithFailedContainer(),
+				expectContinue: false,
+			},
+		}
+
+		for _, tc := range testcases {
+			pod := getTestPod()
+			setTestProbe(pod, probeType, v1.Probe{})
+			c := pod.Spec.Containers[0]
+			c.RestartPolicy = tc.container.RestartPolicy
+			c.RestartPolicyRules = tc.container.RestartPolicyRules
+			pod.Spec.Containers[0] = c
+			w := newWorker(m, probeType, pod, pod.Spec.Containers[0])
+
+			m.statusManager.SetPodStatus(logger, w.pod, tc.podStatus)
+
+			if c := w.doProbe(ctx); c != tc.expectContinue {
+				t.Errorf("[%s-%s] Expected continue to be %v but got %v", probeType, tc.name, tc.expectContinue, c)
+			}
 		}
 	}
 }
