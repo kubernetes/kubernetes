@@ -662,6 +662,8 @@ kube::golang::place_bins() {
       rm -f "${THIS_PLATFORM_BIN}"
       mkdir -p "$(dirname "${THIS_PLATFORM_BIN}")"
       ln -s "${KUBE_OUTPUT_BIN}/${platform}" "${THIS_PLATFORM_BIN}"
+    else
+      kube::log::info "Not creating ${THIS_PLATFORM_BIN}, ${platform} != ${host_platform}"
     fi
 
     V=3 kube::log::status "Placing binaries for ${platform} in ${KUBE_OUTPUT_BIN}/${platform}"
@@ -1014,8 +1016,8 @@ kube::golang::build_binaries() {
       )
       set -x
       ls -l _output
-      find "${KUBE_OUTPUT_BIN}/"
-      find _output/local/bin
+      find "${KUBE_OUTPUT_BIN}/" || true
+      find _output/local/bin || true
       set +x
     done
   fi
