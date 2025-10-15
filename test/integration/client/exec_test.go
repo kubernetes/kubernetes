@@ -555,10 +555,11 @@ var oldNewComparer = cmp.Comparer(func(a, b oldNew) bool {
 })
 
 type informerSpy struct {
-	mu      sync.Mutex
-	adds    []interface{}
-	updates []oldNew
-	deletes []interface{}
+	mu        sync.Mutex
+	adds      []interface{}
+	updates   []oldNew
+	deletes   []interface{}
+	bookmarks []string
 }
 
 func (is *informerSpy) OnAdd(obj interface{}, isInInitialList bool) {
@@ -577,6 +578,12 @@ func (is *informerSpy) OnDelete(obj interface{}) {
 	is.mu.Lock()
 	defer is.mu.Unlock()
 	is.deletes = append(is.deletes, obj)
+}
+
+func (is *informerSpy) OnBookmark(resourceVersion string) {
+	is.mu.Lock()
+	defer is.mu.Unlock()
+	is.bookmarks = append(is.bookmarks, resourceVersion)
 }
 
 func (is *informerSpy) clear() {

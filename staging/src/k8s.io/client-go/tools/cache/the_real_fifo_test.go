@@ -34,6 +34,7 @@ func (f *RealFIFO) getItems() []Delta {
 }
 
 const closedFIFOName = "FIFO WAS CLOSED"
+const isBookmark = "BOOKMARK OBJ"
 
 func popN(queue Queue, count int) []interface{} {
 	result := []interface{}{}
@@ -51,6 +52,9 @@ func testRealFIFOPop(f *RealFIFO) testFifoObject {
 	val := Pop(f)
 	if val == nil {
 		return testFifoObject{name: closedFIFOName}
+	}
+	if val.(Deltas).Newest().Type == Bookmark {
+		return testFifoObject{name: isBookmark}
 	}
 	return val.(Deltas).Newest().Object.(testFifoObject)
 }
@@ -123,6 +127,7 @@ func TestRealFIFO_replaceWithDeleteDeltaIn(t *testing.T) {
 	expectedDeltas := []Delta{
 		{Type: Deleted, Object: oldObj},
 		{Type: Replaced, Object: newObj},
+		{Type: "Bookmark", Object: ""},
 	}
 	if !reflect.DeepEqual(expectedDeltas, actualDeltas) {
 		t.Errorf("expected %#v, got %#v", expectedDeltas, actualDeltas)
@@ -146,6 +151,7 @@ func TestRealFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 			expectedDeltas: Deltas{
 				{Added, obj},
 				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
+				{Type: "Bookmark", Object: "0"},
 			},
 		},
 		//{
@@ -173,6 +179,7 @@ func TestRealFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 			expectedDeltas: Deltas{
 				{Added, obj},
 				{Deleted, obj},
+				{Type: "Bookmark", Object: "0"},
 			},
 		},
 		{
@@ -186,8 +193,11 @@ func TestRealFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 			expectedDeltas: Deltas{
 				{Added, obj},
 				{Replaced, obj},
+				{Type: "Bookmark", Object: "0"},
 				{Replaced, obj},
+				{Type: "Bookmark", Object: "0"},
 				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
+				{Type: "Bookmark", Object: "0"},
 			},
 		},
 		{
@@ -200,6 +210,8 @@ func TestRealFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 			expectedDeltas: Deltas{
 				{Added, obj},
 				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: obj}},
+				{Type: "Bookmark", Object: "0"},
+				{Type: "Bookmark", Object: "1"},
 			},
 		},
 		{
@@ -215,6 +227,7 @@ func TestRealFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 				{Deleted, obj},
 				{Added, objV2},
 				{Deleted, DeletedFinalStateUnknown{Key: "foo", Obj: objV2}},
+				{Type: "Bookmark", Object: "0"},
 			},
 		},
 	}
@@ -377,8 +390,10 @@ func TestRealFIFO_transformer(t *testing.T) {
 		{Type: Updated, Object: mustTransform(mk("foo", 12))},
 		{Type: Deleted, Object: mustTransform(mk("foo", 15))},
 		{Type: Deleted, Object: DeletedFinalStateUnknown{Key: "bar", Obj: mustTransform(mk("bar", 11))}},
+		{Type: Bookmark, Object: ""},
 		{Type: Added, Object: mustTransform(mk("bar", 16))},
 		{Type: Deleted, Object: DeletedFinalStateUnknown{Key: "bar", Obj: mustTransform(mk("bar", 16))}},
+		{Type: Bookmark, Object: ""},
 	}
 	actual1 := f.getItems()
 	if len(expected1) != len(actual1) {
@@ -495,6 +510,10 @@ func TestRealFIFO_addReplace(t *testing.T) {
 	}
 	curr = <-got
 	if e, a := 15, curr.val; e != a {
+		t.Errorf("Didn't get updated value (%v), got %v", e, a)
+	}
+	curr = <-got
+	if e, a := isBookmark, curr.name; e != a {
 		t.Errorf("Didn't get updated value (%v), got %v", e, a)
 	}
 
@@ -678,6 +697,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 		{{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 7)}}},
 		{{Replaced, mkFifoObj("bar", 100)}},
 		{{Replaced, mkFifoObj("foo", 5)}},
+		{{Type: "Bookmark", Object: "0"}},
 		// Since "bar" didn't have a delete event and wasn't in the Replace list
 		// it should get a tombstone key with the right Obj.
 		{{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 100)}}},
@@ -972,5 +992,42 @@ func TestRealFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 		case <-time.After(500 * time.Millisecond):
 			t.Fatalf("timed out waiting for Pop to return after Close")
 		}
+	}
+}
+
+func TestRealFIFO_Bookmark(t *testing.T) {
+	f := NewRealFIFO(
+		testFifoObjectKeyFunc,
+		emptyKnownObjects(),
+		nil,
+	)
+
+	defer f.Close()
+	if err := f.Bookmark("123"); err != nil {
+		t.Fatalf("Bookmark failed: %v", err)
+	}
+
+	// Check queue length
+	if e, a := 1, len(f.items); e != a {
+		t.Fatalf("Expected queue length %d, got %d", e, a)
+	}
+
+	// Pop the item
+	item := Pop(f)
+	deltas, ok := item.(Deltas)
+	if !ok {
+		t.Fatalf("Expected Deltas, got %T", item)
+	}
+
+	if e, a := 1, len(deltas); e != a {
+		t.Fatalf("Expected 1 delta, got %d", a)
+	}
+
+	delta := deltas.Newest()
+	if e, a := Bookmark, delta.Type; e != a {
+		t.Errorf("Expected delta type %s, got %s", e, a)
+	}
+	if e, a := "123", delta.Object; e != a {
+		t.Errorf("Expected delta object %s, got %s", e, a)
 	}
 }

@@ -101,6 +101,10 @@ func (f *RealFIFO) keyOf(obj interface{}) (string, error) {
 		obj = d.Newest().Object
 	}
 	if d, ok := obj.(Delta); ok {
+		if d.Type == Bookmark {
+			// bookmark deltas don't have a key
+			return "", nil
+		}
 		obj = d.Object
 	}
 	if d, ok := obj.(DeletedFinalStateUnknown); ok {
@@ -128,9 +132,11 @@ func (f *RealFIFO) hasSynced_locked() bool {
 func (f *RealFIFO) addToItems_locked(deltaActionType DeltaType, skipTransform bool, obj interface{}) error {
 	// we must be able to read the keys in order to determine whether the knownObjcts and the items
 	// in this FIFO overlap
-	_, err := f.keyOf(obj)
-	if err != nil {
-		return KeyError{obj, err}
+	if deltaActionType != Bookmark {
+		_, err := f.keyOf(obj)
+		if err != nil {
+			return KeyError{obj, err}
+		}
 	}
 
 	// Every object comes through this code path once, so this is a good
@@ -145,7 +151,7 @@ func (f *RealFIFO) addToItems_locked(deltaActionType DeltaType, skipTransform bo
 	// Default informers do not pass existing objects to Replace.
 	if f.transformer != nil {
 		_, isTombstone := obj.(DeletedFinalStateUnknown)
-		if !isTombstone && !skipTransform {
+		if !isTombstone && !skipTransform && deltaActionType != Bookmark {
 			var err error
 			obj, err = f.transformer(obj)
 			if err != nil {
@@ -254,6 +260,12 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	return Deltas{item}, err
 }
 
+func (f *RealFIFO) Bookmark(resourceVersion string) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.addToItems_locked(Bookmark, false, resourceVersion)
+}
+
 // Replace
 // 1. finds those items in f.items that are not in newItems and creates synthetic deletes for them
 // 2. finds items in knownObjects that are not in newItems and creates synthetic deletes for them
@@ -277,6 +289,9 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	queuedKeys := []string{}
 	lastQueuedItemForKey := map[string]Delta{}
 	for _, queuedItem := range queuedItems {
+		if queuedItem.Type == Bookmark {
+			continue
+		}
 		queuedKey, err := f.keyOf(queuedItem.Object)
 		if err != nil {
 			return KeyError{queuedItem.Object, err}
@@ -356,6 +371,11 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	if !f.populated {
 		f.populated = true
 		f.initialPopulationCount = len(f.items)
+	}
+
+	retErr := f.addToItems_locked(Bookmark, false, resourceVersion)
+	if retErr != nil {
+		return fmt.Errorf("couldn't enqueue bookmark: %w", retErr)
 	}
 
 	return nil

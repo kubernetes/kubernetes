@@ -492,6 +492,10 @@ type deleteNotification struct {
 	oldObj interface{}
 }
 
+type bookmarkNotification struct {
+	resourceVersion string
+}
+
 func (s *sharedIndexInformer) SetWatchErrorHandler(handler WatchErrorHandler) error {
 	return s.SetWatchErrorHandlerWithContext(func(_ context.Context, r *Reflector, err error) {
 		handler(r, err)
@@ -550,6 +554,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 			fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 				KnownObjects:          s.indexer,
 				EmitDeltaTypeReplaced: true,
+				EmitDeltaTypeBookmark: true,
 				Transformer:           s.transform,
 			})
 		}
@@ -770,6 +775,13 @@ func (s *sharedIndexInformer) OnDelete(old interface{}) {
 	// Invocation of this function is locked under s.blockDeltas, so it is
 	// safe to distribute the notification
 	s.processor.distribute(deleteNotification{oldObj: old}, false)
+}
+
+// Conforms to ResourceEventHandler
+func (s *sharedIndexInformer) OnBookmark(resourceVersion string) {
+	// Invocation of this function is locked under s.blockDeltas, so it is
+	// safe to distribute the notification
+	s.processor.distribute(bookmarkNotification{resourceVersion: resourceVersion}, false)
 }
 
 // IsStopped reports whether the informer has already been stopped
@@ -1083,6 +1095,8 @@ func (p *processorListener) run() {
 				}
 			case deleteNotification:
 				p.handler.OnDelete(notification.oldObj)
+			case bookmarkNotification:
+				p.handler.OnBookmark(notification.resourceVersion)
 			default:
 				utilruntime.HandleErrorWithLogger(p.logger, nil, "unrecognized notification", "notificationType", fmt.Sprintf("%T", next))
 			}
