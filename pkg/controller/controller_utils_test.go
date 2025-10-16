@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -1357,5 +1358,166 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		assert.Equal(t, test.requestCount, test.nodeHandler.RequestCount,
 			"%s: unexpected request count: expected %+v, got %+v",
 			test.name, test.requestCount, test.nodeHandler.RequestCount)
+	}
+}
+
+func TestFilterPodsByOwner(t *testing.T) {
+	newPod := func(name, ns string, owner *metav1.OwnerReference) *v1.Pod {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: ns,
+			},
+		}
+		if owner != nil {
+			pod.OwnerReferences = append(pod.OwnerReferences, *owner)
+		}
+		return pod
+	}
+
+	ownerKind := "OwnerKind"
+	ownerName := "ownerName"
+	cases := map[string]struct {
+		owner        *metav1.ObjectMeta
+		ownedOnly    bool
+		allPods      []*v1.Pod
+		wantPodsKeys sets.Set[string]
+	}{
+		"multiple Pods, some are owned by the owner": {
+			owner: &metav1.ObjectMeta{
+				Namespace: "ns1",
+				Name:      ownerName,
+				UID:       "abc",
+			},
+			allPods: []*v1.Pod{
+				newPod("a", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+				newPod("b", "ns1", &metav1.OwnerReference{
+					UID:        "def",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+				newPod("c", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+			},
+			wantPodsKeys: sets.New("ns1/a", "ns1/c"),
+		},
+		"orphan Pods in multiple namespaces": {
+			owner: &metav1.ObjectMeta{
+				Namespace: "ns1",
+				Name:      ownerName,
+				UID:       "abc",
+			},
+			allPods: []*v1.Pod{
+				newPod("a", "ns1", nil),
+				newPod("b", "ns2", nil),
+			},
+			wantPodsKeys: sets.New("ns1/a"),
+		},
+		"owned Pods and orphan Pods in the owner's namespace": {
+			owner: &metav1.ObjectMeta{
+				Namespace: "ns1",
+				Name:      ownerName,
+				UID:       "abc",
+			},
+			allPods: []*v1.Pod{
+				newPod("a", "ns1", nil),
+				newPod("b", "ns2", nil),
+				newPod("c", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+			},
+			wantPodsKeys: sets.New("ns1/a", "ns1/c"),
+		},
+		"exclude orphan pods, pods in mismatched ns,uid,kind,name,controller": {
+			owner: &metav1.ObjectMeta{
+				Namespace: "ns1",
+				Name:      ownerName,
+				UID:       "abc",
+			},
+			allPods: []*v1.Pod{
+				newPod("a", "ns1", nil),
+				newPod("other-ns-orphan", "ns2", nil),
+				newPod("other-ns-owned", "ns2", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+				newPod("c", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+				newPod("other-uid", "ns1", &metav1.OwnerReference{
+					UID:        "other-uid",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+				newPod("other-kind", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       "OtherKind",
+					Name:       ownerName,
+					Controller: ptr.To(true),
+				}),
+				newPod("other-name", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       "otherName",
+					Controller: ptr.To(true),
+				}),
+				newPod("non-controller", "ns1", &metav1.OwnerReference{
+					UID:        "abc",
+					Kind:       ownerKind,
+					Name:       ownerName,
+					Controller: ptr.To(false),
+				}),
+			},
+			ownedOnly:    true,
+			wantPodsKeys: sets.New("ns1/c"),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset()
+			sharedInformers := informers.NewSharedInformerFactory(fakeClient, 0)
+			podInformer := sharedInformers.Core().V1().Pods()
+
+			err := AddPodControllerIndexer(podInformer.Informer())
+			if err != nil {
+				t.Fatalf("failed to register indexer: %v", err)
+			}
+			podIndexer := podInformer.Informer().GetIndexer()
+			for _, pod := range tc.allPods {
+				if err := podIndexer.Add(pod); err != nil {
+					t.Fatalf("failed adding Pod to indexer: %v", err)
+				}
+			}
+			gotPods, err := FilterPodsByOwner(podIndexer, tc.owner, ownerKind, !tc.ownedOnly)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gotPodKeys := sets.New[string]()
+			for _, pod := range gotPods {
+				gotPodKeys.Insert(pod.Namespace + "/" + pod.Name)
+			}
+			if diff := cmp.Diff(tc.wantPodsKeys, gotPodKeys); diff != "" {
+				t.Errorf("unexpected pods returned, diff=%s", diff)
+			}
+		})
 	}
 }
