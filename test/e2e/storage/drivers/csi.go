@@ -40,6 +40,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -292,6 +293,15 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		DriverContainerName:      "csi-resizer",
 		DriverContainerArguments: []string{"--feature-gates=VolumeAttributesClass=true"},
 	})
+
+	// VGS E2E FeatureGate patches
+	// TODO: These can be removed after the VolumeGroupSnapshot feature is default enabled
+	if os.Getenv("CSI_PROW_ENABLE_GROUP_SNAPSHOT") == "true" {
+		patches = append(patches, utils.PatchCSIOptions{
+			DriverContainerName:      "csi-snapshotter",
+			DriverContainerArguments: []string{"--feature-gates=CSIVolumeGroupSnapshot=true"},
+		})
+	}
 
 	err = utils.CreateFromManifests(ctx, config.Framework, driverNamespace, func(item interface{}) error {
 		for _, o := range patches {

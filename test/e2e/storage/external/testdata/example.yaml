@@ -2,6 +2,9 @@ StorageClass:
   FromExistingClassName: example
 VolumeAttributesClass:
   FromExistingClassName: example-vac
+GroupSnapshotClass:
+  FromExistingClassName: example-gsc
+
 DriverInfo:
   Name: example
   RequiredAccessModes:
