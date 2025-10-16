@@ -172,7 +172,6 @@ function kube::build::verify_prereqs() {
   local -r require_docker=${1:-true}
   kube::log::status "Verifying Prerequisites...."
   kube::build::ensure_tar || return 1
-  kube::build::ensure_rsync || return 1
   if ${require_docker}; then
     kube::build::ensure_docker_in_path || return 1
     if kube::build::is_osx; then
@@ -218,13 +217,6 @@ function kube::build::is_osx() {
 
 function kube::build::is_gnu_sed() {
   [[ $(sed --version 2>&1) == *GNU* ]]
-}
-
-function kube::build::ensure_rsync() {
-  if [[ -z "$(which rsync)" ]]; then
-    kube::log::error "Can't find 'rsync' in PATH, please fix and retry."
-    return 1
-  fi
 }
 
 function kube::build::ensure_docker_in_path() {
