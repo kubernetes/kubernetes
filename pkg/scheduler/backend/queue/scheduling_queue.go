@@ -407,9 +407,13 @@ func (p *PriorityQueue) Run(logger klog.Logger) {
 	go p.backoffQ.waitUntilAlignedWithOrderingWindow(func() {
 		p.flushBackoffQCompleted(logger)
 	}, p.stop)
-	go wait.Until(func() {
-		p.flushUnschedulablePodsLeftover(logger)
-	}, 30*time.Second, p.stop)
+	go wait.UntilWithContext(
+		wait.ContextForChannel(p.stop),
+		func(ctx context.Context) {
+			p.flushUnschedulablePodsLeftover(logger)
+		},
+		30*time.Second,
+	)
 }
 
 // queueingStrategy indicates how the scheduling queue should enqueue the Pod from unschedulable pod pool.
