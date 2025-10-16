@@ -277,29 +277,6 @@ function kube::build::docker_image_exists() {
   [[ $("${DOCKER[@]}" images -q "${1}:${2}") ]]
 }
 
-# Delete all images that match a tag prefix except for the "current" version
-#
-# $1: The image repo/name
-# $2: The tag base. We consider any image that matches $2*
-# $3: The current image not to delete if provided
-function kube::build::docker_delete_old_images() {
-  # In Docker 1.12, we can replace this with
-  #    docker images "$1" --format "{{.Tag}}"
-  for tag in $("${DOCKER[@]}" images "${1}" | tail -n +2 | awk '{print $2}') ; do
-    if [[ "${tag}" != "${2}"* ]] ; then
-      V=3 kube::log::status "Keeping image ${1}:${tag}"
-      continue
-    fi
-
-    if [[ -z "${3:-}" || "${tag}" != "${3}" ]] ; then
-      V=2 kube::log::status "Deleting image ${1}:${tag}"
-      "${DOCKER[@]}" rmi "${1}:${tag}" >/dev/null
-    else
-      V=3 kube::log::status "Keeping image ${1}:${tag}"
-    fi
-  done
-}
-
 # Stop and delete all containers that match a pattern
 #
 # $1: The base container prefix
@@ -360,7 +337,6 @@ function kube::build::destroy_container() {
 function kube::build::clean() {
   if kube::build::has_docker ; then
     kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}"
-    kube::build::docker_delete_old_images "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG_BASE}"
 
     V=2 kube::log::status "Cleaning all untagged docker images"
     "${DOCKER[@]}" rmi "$("${DOCKER[@]}" images -q --filter 'dangling=true')" 2> /dev/null || true
