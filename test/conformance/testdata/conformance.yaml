@@ -256,9 +256,10 @@
   file: test/e2e/apimachinery/aggregated_discovery.go
 - testname: aggregator-supports-the-sample-apiserver
   codename: '[sig-api-machinery] Aggregator Should be able to support the 1.17 Sample
-    API Server using the current Aggregator [Conformance]'
+    API Server using the current Aggregator [LinuxOnly] [Conformance]'
   description: Ensure that the sample-apiserver code from 1.17 and compiled against
-    1.17 will work on the current Aggregator/API-Server.
+    1.17 will work on the current Aggregator/API-Server. This test is marked LinuxOnly
+    because etcd does not provide or support images for Windows.
   release: v1.17, v1.21, v1.27
   file: test/e2e/apimachinery/aggregator.go
 - testname: Custom Resource Definition Conversion Webhook, convert mixed version list
